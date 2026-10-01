@@ -210,4 +210,6 @@ def prepare_m01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         snapshot=snapshot,
         verify=lambda old, new: verify_m01(old, new, expected_hashes=expected),
         archive_oracle_parameters={"expected_hashes": expected},
+        archive_preview_parameters={"version": ctx.version, "parent_path": parent_object["path"],
+            "segment_name": segment_name, "media": {name: str(path) for name, path in media.items()}},
     )

@@ -171,4 +171,5 @@ def prepare_c08(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
             artifact, version=ctx.version, object_id=copied_id, expected_points=points),
         snapshot=snapshot, verify=lambda old, new: verify_c08(old, new, expected_points=points),
         archive_oracle_parameters={"expected_points": points},
+        archive_preview_parameters={"version": ctx.version, "object_id": copied_id, "expected_points": points},
     )

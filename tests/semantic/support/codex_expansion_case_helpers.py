@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import os
 import re
 import shutil
+import subprocess
+import sys
+import time
+import wave
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from wwise_waapi.host_paths import localize_waapi_host_path
 
@@ -16,6 +22,192 @@ from tests.semantic.support.codex_filesystem_security import path_is_link_or_rep
 
 class CaseBoundaryError(RuntimeError):
     """The public interface or owned fixture cannot prove a case prerequisite."""
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_GATEWAY_RUNNER = _REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "run.py"
+_GATEWAY_CWD = _GATEWAY_RUNNER.parent.parent
+_GATEWAY_OUTPUT_LIMIT_BYTES = 1_048_576
+_GATEWAY_RECEIPT_PAYLOAD_LIMIT_BYTES = 32_768
+_GATEWAY_DIAGNOSTIC_EXCERPT_BYTES = 8_192
+_GATEWAY_RECEIPT_LIMIT = 128
+_GATEWAY_CALL_TIMEOUT_SECONDS = 60
+
+
+def _bounded_diagnostic_bytes(value: bytes, limit: int = _GATEWAY_DIAGNOSTIC_EXCERPT_BYTES) -> str:
+    if len(value) <= limit:
+        return value.decode("utf-8", errors="replace")
+    half = limit // 2
+    return (
+        value[:half].decode("utf-8", errors="replace")
+        + f"\n... <{len(value) - limit} bytes omitted> ...\n"
+        + value[-half:].decode("utf-8", errors="replace")
+    )
+
+
+def make_public_gateway(
+    *,
+    host: str,
+    port: int,
+    version: str,
+    config_path: Path,
+    state_dir: Path,
+    environment: Mapping[str, str],
+    receipts: list[dict[str, Any]],
+    live_commands: frozenset[str],
+) -> Callable[[Sequence[str]], Mapping[str, Any]]:
+    """Create a bounded Gateway callable isolated in the packaged CLI process.
+
+    Setup drafts intentionally span several CLI invocations, so each call gets
+    the same owned config and state directory. Keeping the subprocess boundary
+    also prevents WAAPI client's txaio loop from colliding with the independent
+    read-only oracle actor in the pytest process.
+    """
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        raise CaseBoundaryError("fixture Gateway endpoint must be loopback")
+    if type(port) is not int or not 1 <= port <= 65535:
+        raise CaseBoundaryError("fixture Gateway endpoint port is invalid")
+    if version not in {"2022.1", "2025.1"}:
+        raise CaseBoundaryError("fixture Gateway has no reviewed version lane")
+    if (not config_path.is_absolute() or not state_dir.is_absolute()
+            or config_path.is_symlink() or not config_path.is_file()):
+        raise CaseBoundaryError("fixture Gateway needs the exact owned config and state paths")
+    if _GATEWAY_RUNNER.is_symlink() or not _GATEWAY_RUNNER.is_file():
+        raise CaseBoundaryError("packaged public Gateway runner is unavailable")
+    if len(receipts) != 0:
+        raise CaseBoundaryError("fixture Gateway receipts must start empty for this case")
+
+    def invoke(command: Sequence[str]) -> Mapping[str, Any]:
+        argv = tuple(command)
+        if (not argv or len(argv) > 128
+                or any(not isinstance(item, str) or not item or "\0" in item for item in argv)
+                or sum(len(item.encode("utf-8")) for item in argv) > 65_536):
+            raise CaseBoundaryError("fixture Gateway command is empty or exceeds its fixed bounds")
+        if len(receipts) >= _GATEWAY_RECEIPT_LIMIT:
+            raise CaseBoundaryError("fixture Gateway exceeded its case-owned call ceiling")
+
+        process_argv = [
+            sys.executable,
+            str(_GATEWAY_RUNNER),
+            "gateway.py",
+            "--host", host,
+            "--port", str(port),
+            "--version", version,
+            "--timeout", "30",
+            "--state-dir", str(state_dir),
+            *argv,
+        ]
+        child_environment = {
+            **os.environ,
+            **environment,
+            "WAAPI_SKILL_CONFIG_PATH": str(config_path),
+            "WAAPI_SKILL_STATE_DIR": str(state_dir),
+            "PYTHONDONTWRITEBYTECODE": "1",
+            "PYTHONIOENCODING": "utf-8:strict",
+        }
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(
+                process_argv,
+                cwd=_GATEWAY_CWD,
+                env=child_environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=_GATEWAY_CALL_TIMEOUT_SECONDS,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            stdout = exc.stdout if isinstance(exc.stdout, bytes) else b""
+            stderr = exc.stderr if isinstance(exc.stderr, bytes) else b""
+            receipts.append({
+                "argv": list(argv),
+                "command": process_argv,
+                "timeout_seconds": _GATEWAY_CALL_TIMEOUT_SECONDS,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "stdout_excerpt": _bounded_diagnostic_bytes(stdout),
+                "stderr_excerpt": _bounded_diagnostic_bytes(stderr),
+                "error": "subprocess_timeout",
+            })
+            raise CaseBoundaryError(
+                f"public fixture Gateway exceeded {_GATEWAY_CALL_TIMEOUT_SECONDS} seconds"
+            ) from exc
+        except OSError as exc:
+            receipts.append({
+                "argv": list(argv),
+                "command": process_argv,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            raise CaseBoundaryError("public fixture Gateway process could not start") from exc
+
+        stdout = completed.stdout if isinstance(completed.stdout, bytes) else b""
+        stderr = completed.stderr if isinstance(completed.stderr, bytes) else b""
+        receipt: dict[str, Any] = {
+            "argv": list(argv),
+            "command": process_argv,
+            "returncode": completed.returncode,
+            "elapsed_seconds": round(time.monotonic() - started, 3),
+            "stdout_bytes": len(stdout),
+            "stderr_bytes": len(stderr),
+        }
+        if len(stdout) + len(stderr) > _GATEWAY_OUTPUT_LIMIT_BYTES:
+            receipt.update({
+                "error": "gateway_output_ceiling_exceeded",
+                "stdout_excerpt": _bounded_diagnostic_bytes(stdout),
+                "stderr_excerpt": _bounded_diagnostic_bytes(stderr),
+            })
+            receipts.append(receipt)
+            raise CaseBoundaryError("public fixture Gateway exceeded its output ceiling")
+
+        try:
+            payload = json.loads(stdout.decode("utf-8", errors="strict"))
+        except (UnicodeError, ValueError, TypeError) as exc:
+            receipt.update({
+                "error": "invalid_json_receipt",
+                "stdout_excerpt": _bounded_diagnostic_bytes(stdout),
+                "stderr_excerpt": _bounded_diagnostic_bytes(stderr),
+            })
+            receipts.append(receipt)
+            raise CaseBoundaryError("public fixture Gateway returned no complete UTF-8 JSON receipt") from exc
+
+        try:
+            encoded_payload = json.dumps(
+                payload, ensure_ascii=False, allow_nan=False, separators=(",", ":"),
+            ).encode("utf-8")
+        except (TypeError, ValueError) as exc:
+            receipt.update({
+                "error": "non_json_gateway_payload",
+                "stdout_excerpt": _bounded_diagnostic_bytes(stdout),
+                "stderr_excerpt": _bounded_diagnostic_bytes(stderr),
+            })
+            receipts.append(receipt)
+            raise CaseBoundaryError("public fixture Gateway returned a non-JSON payload") from exc
+        receipt["payload_bytes"] = len(encoded_payload)
+        if len(encoded_payload) <= _GATEWAY_RECEIPT_PAYLOAD_LIMIT_BYTES:
+            receipt["payload"] = payload
+        else:
+            receipt["payload_sha256"] = hashlib.sha256(encoded_payload).hexdigest()
+            receipt["payload_excerpt"] = _bounded_diagnostic_bytes(encoded_payload)
+        if stderr:
+            receipt["stderr_excerpt"] = _bounded_diagnostic_bytes(stderr)
+        receipts.append(receipt)
+
+        if not isinstance(payload, dict):
+            raise CaseBoundaryError("public fixture Gateway returned a non-object receipt")
+        if completed.returncode != 0 or payload.get("ok") is not True:
+            status = payload.get("status")
+            error = payload.get("error")
+            raise CaseBoundaryError(
+                f"public fixture Gateway failed (exit={completed.returncode}, status={status}, error={error})"
+            )
+        if argv[0] in live_commands:
+            endpoint = payload.get("endpoint")
+            if (not isinstance(endpoint, Mapping) or endpoint.get("host") != host
+                    or endpoint.get("port") != port or payload.get("detected_version") != version):
+                raise CaseBoundaryError("public fixture Gateway reached another endpoint or Wwise version")
+        return payload
+
+    return invoke
 
 
 def rows(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -109,7 +301,7 @@ def file_evidence(ctx: ExpansionCaseContext, waapi_path: str) -> dict[str, Any]:
 
 
 def wav_assets(ctx: ExpansionCaseContext, count: int) -> tuple[Path, ...]:
-    """Reuse distinct existing sandbox WAVs; absence is an explicit fixture block."""
+    """Reuse existing media, generating only a proven distinct-content shortfall."""
     if not 1 <= count <= 4:
         raise CaseBoundaryError("asset selection exceeds the fixed fixture bound")
     found: list[Path] = []
@@ -123,7 +315,29 @@ def wav_assets(ctx: ExpansionCaseContext, count: int) -> tuple[Path, ...]:
         digests.add(digest)
         if len(found) == count:
             return tuple(found)
-    raise CaseBoundaryError(f"fixture needs {count} distinct existing WAV assets")
+    # The committed 2025 fixture has many names but only one distinct waveform.
+    # Media-mapping oracles need different content; create the smallest missing
+    # set only in this already-owned project copy, never in the source fixture.
+    generated_root = ctx.project_path.parent / "ExpansionGeneratedMedia"
+    if generated_root.exists() or generated_root.is_symlink():
+        raise CaseBoundaryError("generated fixture media destination already exists")
+    generated_root.mkdir()
+    for index in range(count - len(found)):
+        path = generated_root / f"distinct_{index + 1}.wav"
+        with wave.open(str(path), "wb") as audio:
+            audio.setnchannels(1)
+            audio.setsampwidth(2)
+            audio.setframerate(8000)
+            audio.writeframes(b"".join(
+                (((frame * (index + 1)) % 64 - 32) * 128).to_bytes(2, "little", signed=True)
+                for frame in range(800)
+            ))
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest in digests:
+            raise CaseBoundaryError("generated media did not provide distinct content")
+        digests.add(digest)
+        found.append(_owned_file(path, ctx.project_path.parent))
+    return tuple(found)
 
 
 def copy_asset(ctx: ExpansionCaseContext, source: Path, directory: str, name: str) -> Path:

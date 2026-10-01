@@ -129,4 +129,5 @@ def prepare_m05(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         required_assertions=M05_ASSERTIONS, approve_preview=lambda artifact: approve_m05_preview(artifact, version=ctx.version),
         snapshot=snapshot, verify=lambda old, new: verify_m05(old, new, target_id=TARGET),
         archive_oracle_parameters={"target_id": TARGET},
+        archive_preview_parameters={"version": ctx.version},
     )

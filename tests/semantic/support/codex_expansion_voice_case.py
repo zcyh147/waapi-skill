@@ -250,4 +250,6 @@ def prepare_c01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         snapshot=snapshot,
         verify=lambda old, new: verify_c01(old, new, replacement_sha256=replacement_sha),
         archive_oracle_parameters={"replacement_sha256": replacement_sha},
+        archive_preview_parameters={"version": ctx.version, "sound_id": sound["id"],
+                                    "sound_path": sound["path"], "replacement": str(replacement)},
     )

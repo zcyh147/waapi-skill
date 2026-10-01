@@ -63,3 +63,4 @@ class PreparedExpansionCase:
     read_curve_roles: frozenset[str] = frozenset()
     read_platforms: frozenset[str] = frozenset()
     archive_oracle_parameters: Mapping[str, Any] = field(default_factory=dict)
+    archive_preview_parameters: Mapping[str, Any] = field(default_factory=dict)

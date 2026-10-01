@@ -223,5 +223,8 @@ def prepare_c06(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
             target_id=target_id, expected_notes=before["rtpcs"][target_id].get("notes", "")),
         snapshot=snapshot, verify=lambda old, new: verify_c06(old, new, target_id=target_id),
         archive_oracle_parameters={"target_id": target_id},
+        archive_preview_parameters={"version": ctx.version, "owner_id": owner["id"],
+                                    "control_id": control_ids[0], "target_id": target_id,
+                                    "expected_notes": before["rtpcs"][target_id].get("notes", "")},
         read_fields=frozenset({"PropertyName", "ControlInput", "Curve"}),
     )

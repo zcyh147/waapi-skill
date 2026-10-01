@@ -186,4 +186,6 @@ def prepare_c03(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         approve_preview=lambda artifact: approve_c03_preview(artifact, version=ctx.version, mappings=mappings, target_ids=target_ids),
         snapshot=snapshot, verify=lambda old, new: verify_c03(old, new, expected=expected),
         archive_oracle_parameters={"expected": expected},
+        archive_preview_parameters={"version": ctx.version, "target_ids": target_ids,
+                                    "mappings": {path: str(media) for path, media in mappings.items()}},
     )

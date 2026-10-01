@@ -1,0 +1,150 @@
+{
+  "parent": 108,
+  "issues": [
+    {
+      "draft_id": 1,
+      "number": 109,
+      "database_id": 5604124441,
+      "title": "Close public-entrypoint coverage gaps for object creation",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/109",
+      "blocked_by": []
+    },
+    {
+      "draft_id": 2,
+      "number": 110,
+      "database_id": 5604124818,
+      "title": "Close public-entrypoint coverage gaps for edits and imports",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/110",
+      "blocked_by": []
+    },
+    {
+      "draft_id": 3,
+      "number": 111,
+      "database_id": 5604125089,
+      "title": "Deliver music import as the first complete path in the new acceptance profile",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/111",
+      "blocked_by": []
+    },
+    {
+      "draft_id": 4,
+      "number": 112,
+      "database_id": 5604125371,
+      "title": "Verify multilingual updates and the confirmation workflow",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/112",
+      "blocked_by": [
+        111
+      ]
+    },
+    {
+      "draft_id": 5,
+      "number": 113,
+      "database_id": 5604125834,
+      "title": "Verify existing RTPC updates and preservation",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/113",
+      "blocked_by": [
+        111
+      ]
+    },
+    {
+      "draft_id": 6,
+      "number": 114,
+      "database_id": 5604126150,
+      "title": "Run the GPT-6 model-selection pilot",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/114",
+      "blocked_by": [
+        111,
+        112,
+        113
+      ]
+    },
+    {
+      "draft_id": 7,
+      "number": 115,
+      "database_id": 5604126484,
+      "title": "Verify exact matching of same-named media",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/115",
+      "blocked_by": [
+        111
+      ]
+    },
+    {
+      "draft_id": 8,
+      "number": 116,
+      "database_id": 5604126769,
+      "title": "Verify attenuation-curve configuration",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/116",
+      "blocked_by": [
+        111
+      ]
+    },
+    {
+      "draft_id": 9,
+      "number": 117,
+      "database_id": 5604127093,
+      "title": "Verify effect appending across version-specific structures",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/117",
+      "blocked_by": [
+        111
+      ]
+    },
+    {
+      "draft_id": 10,
+      "number": 118,
+      "database_id": 5604127432,
+      "title": "Verify reference maintenance for an existing Stinger",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/118",
+      "blocked_by": [
+        111
+      ]
+    },
+    {
+      "draft_id": 11,
+      "number": 119,
+      "database_id": 5604127674,
+      "title": "Investigate Playlist authoring and independent verification",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/119",
+      "blocked_by": []
+    },
+    {
+      "draft_id": 12,
+      "number": 120,
+      "database_id": 5604127974,
+      "title": "Investigate Transition configuration and independent verification",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/120",
+      "blocked_by": []
+    },
+    {
+      "draft_id": 13,
+      "number": 121,
+      "database_id": 5604128247,
+      "title": "Investigate Music Switch paths across multiple condition groups",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/121",
+      "blocked_by": []
+    },
+    {
+      "draft_id": 14,
+      "number": 122,
+      "database_id": 5604128633,
+      "title": "Freeze the campaign and complete macOS acceptance",
+      "url": "https://github.com/zcyh147/waapi-skill/issues/122",
+      "blocked_by": [
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121
+      ]
+    }
+  ],
+  "relations_verified": true,
+  "published_date": "2026-09-28",
+  "language": "en"
+}

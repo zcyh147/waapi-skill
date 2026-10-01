@@ -5,7 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -49,6 +51,7 @@ from tests.semantic.support.codex_harness import (
     prepare_workspace_skill_install,
     recoverable_preprocess_attempt_indexes,
     semantic_task_developer_instructions,
+    parse_jsonl_events,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -164,6 +167,320 @@ class V3TaskRun:
 
 
 TurnObserver = Callable[[int, CodexRunResult, GatewayBrokerEvidence], None]
+
+
+def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> tuple[tuple[str, ...], ...]:
+    """Build notice obligations from the already approved immutable request.
+
+    This recognizes the expansion's closed operation families, not arbitrary
+    prose or native API requests. Unknown/missing effect data fails closed.
+    """
+    request = artifact.get("request", {})
+    arguments = request.get("arguments", {})
+    operation = request.get("operation")
+    if not isinstance(arguments, Mapping):
+        return ()
+    identities: dict[str, tuple[str, ...]] = {}
+
+    def index_rows(value: Any) -> None:
+        if isinstance(value, Mapping):
+            if isinstance(value.get("id"), str):
+                names = tuple(value[key] for key in ("name", "path") if isinstance(value.get(key), str) and value[key])
+                if names:
+                    identities[value["id"].casefold()] = names
+            for child in value.values():
+                index_rows(child)
+        elif isinstance(value, list):
+            for child in value:
+                index_rows(child)
+
+    index_rows(before)
+    groups: list[tuple[str, ...]] = []
+
+    def target(selector: Any) -> None:
+        value = selector.get("value") if isinstance(selector, Mapping) else selector
+        if isinstance(value, str):
+            names = identities.get(value.casefold())
+            groups.append(names or (value,))
+
+    def properties(rows: Any) -> None:
+        for row in rows if isinstance(rows, list) else []:
+            if isinstance(row, Mapping) and row.get("name") == "Volume" and type(row.get("value")) in {int, float}:
+                groups.extend((("volume", "音量", "增益"), (format(row["value"], "g"),)))
+
+    if operation == "audio.import":
+        groups.append(("import", "replace", "reimport", "create", "导入", "替换", "重导", "创建", "建立", "新增"))
+        defaults = arguments.get("defaults", {})
+        for item in arguments.get("imports", []):
+            row = {**defaults, **item}
+            path = row.get("object_path")
+            if not isinstance(path, str):
+                return ()
+            name = re.sub(r"<[^>]+>", "", path).rsplit("\\", 1)[-1]
+            groups.append((name, path))
+            language = row.get("import_language")
+            if language and language != "SFX":
+                groups.append((language, "日语", "日文") if language == "Japanese" else (language,))
+            properties(row.get("properties"))
+    elif operation == "object.setRTPC":
+        target(arguments.get("object"))
+        target(arguments.get("control_input"))
+        groups.extend((("rtpc", "曲线", "curve"), ("volume", "音量", "增益"),
+                       ("update", "replace", "set", "change", "更新", "替换", "修改", "设置", "改成")))
+    elif operation == "object.createPlugin":
+        target(arguments.get("target"))
+        plugin = arguments.get("plugin", {})
+        groups.extend(((str(plugin.get("name", "")),),
+                       ("effect", "plugin", "效果", "插件"),
+                       ("add", "create", "insert", "添加", "创建", "新增", "插入")))
+    elif operation == "object.setReference":
+        target(arguments.get("object"))
+        target(arguments.get("target"))
+        groups.extend((("trigger", "触发器"),
+                       ("retarget", "change", "set", "replace", "指向", "改为", "修改", "替换", "设置")))
+    elif operation == "waapi.call" and arguments.get("api") == "ak.wwise.core.object.setAttenuationCurve":
+        target(arguments.get("args", {}).get("object"))
+        groups.extend((("volume", "音量", "干声", "dry"), ("curve", "曲线"),
+                       ("update", "set", "change", "replace", "更新", "修改", "替换", "设置", "改成")))
+    else:
+        return ()
+    return tuple(groups) if groups and all(all(term for term in group) for group in groups) else ()
+
+
+def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
+                             version: str, execute_expected: bool,
+                             preview_artifact: Mapping[str, Any],
+                             before_snapshot: Mapping[str, Any]) -> bool:
+    """Require a reviewable expected effect after Preview and before Execute.
+
+    A reference to an earlier visible expected result is sufficient only if
+    that result itself meets the sealed request's concrete effect obligations.
+    Generic progress, a bare Preview mention, and tool output are not notices.
+    """
+    groups = _expansion_effect_groups(preview_artifact, before_snapshot)
+    if not groups:
+        return False
+    commands = {}
+    for record in command_records:
+        argv = normalized_gateway_command_argv(record.argv, expected_wwise_version=version)
+        if len(argv) >= 4:
+            commands[record.command] = argv[3]
+    preview_seen = False
+    notice_seen = False
+    earlier_effect = False
+    for event in parse_jsonl_events(result.stdout):
+        item = event.get("item")
+        if not isinstance(item, Mapping):
+            continue
+        command = commands.get(item.get("command"))
+        if item.get("type") == "command_execution" and command == "execute":
+            return notice_seen if execute_expected else False
+        if event.get("type") != "item.completed":
+            continue
+        if item.get("type") == "command_execution" and command == "preview-from-draft":
+            preview_seen = True
+        elif item.get("type") == "agent_message":
+            text = str(item.get("text", "")).casefold()
+            def mentions(term: str) -> bool:
+                if re.fullmatch(r"-?\d+(?:\.\d+)?", term):
+                    return any(float(value) == float(term) for value in
+                               re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\d.])", text))
+                return term.casefold() in text
+            effect = all(any(mentions(term) for term in group) for group in groups)
+            reference = earlier_effect and any(term in text for term in (
+                "expected result above", "expected changes above", "changes described above",
+                "result just described", "plan above", "上述预期", "上面的预期", "刚才说明的", "上述变更", "按以上方案"))
+            if preview_seen and (effect or reference):
+                notice_seen = True
+            earlier_effect = earlier_effect or effect
+    return notice_seen and not execute_expected
+
+
+def run_expansion_codex_task(
+    *, unit: Any, prepared: Any, task_root: Path, options: Any,
+    runner_environment: Mapping[str, str], scoped_paths: Mapping[str, str],
+) -> Mapping[str, Any]:
+    """Use the existing fresh task/Broker with the opt-in outcome policy.
+
+    Unlike frozen recipe profiles, accepted Gateway calls are reconciled to
+    authenticated records rather than an exact hidden command count. Independent
+    case oracles and the same isolation/no-bypass facts remain hard gates.
+    """
+    from tests.semantic.support.codex_expansion_broker_policy import ExpansionBrokerPolicy
+    from wwise_waapi.transactions import TransactionStore
+    from tests.semantic.support.codex_expansion_policy import CumulativeAgentBudget, canonical_digest
+
+    root = Path(task_root)
+    if root.exists():
+        raise V3TaskRunnerError("expansion requires a fresh task evidence directory")
+    root.mkdir(parents=True)
+    workspace = root / "agent-workspace"
+    skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
+    policy = ExpansionBrokerPolicy(prepared=prepared, version=unit.version,
+                                    skill_source=options.skill_source, scoped_paths=scoped_paths)
+    budget = CumulativeAgentBudget()
+    prompts = (prepared.prompt,)
+    if prepared.policy == "ask_before_changes":
+        prompts += ("这一步预览没问题，按当前预览执行并核验结果。",)
+    plan = {
+        "contract": "waapi-skill.integration-expansion-task-plan/v1",
+        "unit_id": unit.unit_id, "version": unit.version, "policy": prepared.policy,
+        "operation": prepared.operation, "request_schema_uri": prepared.request_schema_uri,
+        "accepted_verification_states": sorted(prepared.accepted_verification_states),
+        "prompts": list(prompts), "before": prepared.before,
+        "required_assertions": sorted(prepared.required_assertions),
+        "read_scope_sha256": policy.reads.scope.digest,
+        "read_scope": {key: sorted(value) if isinstance(value, frozenset) else value
+                       for key, value in asdict(policy.reads.scope).items()},
+        "oracle_parameters": dict(prepared.archive_oracle_parameters),
+        "preview_parameters": dict(prepared.archive_preview_parameters),
+        "inputs_sha256": options.campaign_inputs_sha256,
+        "platform_name": os.name,
+        "skill_source": str(options.skill_source.resolve()),
+        "trusted_python": str(Path(sys.executable).resolve()),
+        "windows_powershell_core_host": (asdict(options.windows_powershell_core_host)
+                                         if options.windows_powershell_core_host else None),
+        "scoped_paths": dict(scoped_paths),
+        "agent_budget": {"hard_seconds": 600, "slow_seconds": 420},
+        "model": options.model, "reasoning_effort": options.reasoning_effort,
+        "service_tier": options.service_tier,
+    }
+    _write_json(root / "expansion-plan.json", {**plan, "sha256": canonical_digest(plan)})
+    allowed_subcommands = (
+        "status", "operations", "operation-schema", "request-schema", "query-schema", "query-object", "metadata",
+        "draft-start", "draft-bind-object", "draft-discover-fields", "draft-discover-types",
+        "draft-inspect", "draft-check", "draft-business-configure", "draft-declare-import-batch",
+        "draft-declare-rtpc", "draft-declare-new", "draft-declare-existing", "draft-declare-field-change", "draft-declare-core-plan",
+        "draft-revise-declaration", "draft-remove-declaration", "draft-add-media",
+        "preview-from-draft", "transaction-show", "confirm", "execute", "verify",
+    )
+    config = CodexHarnessConfig(
+        workspace=workspace, skill_source=options.skill_source, codex_binary=options.codex_binary,
+        auth_json=options.auth_json, model=options.model, reasoning_effort=options.reasoning_effort,
+        service_tier=options.service_tier, timeout_seconds=600,
+        windows_powershell_core_host=options.windows_powershell_core_host,
+        expected_gateway_subcommands=allowed_subcommands, expected_wwise_version=unit.version,
+        sandbox_mode="workspace-write", allow_output_write=False, network_access=True,
+        developer_instructions=semantic_task_developer_instructions(
+            options.skill_source / "scripts" / "run.py", task_skill_source=skill_install,
+            expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=options.skill_source, invocation_skill_source=skill_install,
+        expected_steps=(), expected_wwise_version=unit.version,
+        project_modification_policy=prepared.policy, runner_environment=runner_environment,
+        working_root=root / "broker", transport="tcp", runner_timeout_seconds=120,
+        expansion_outcome_policy=policy,
+    )
+    cumulative_argvs: list[tuple[str, ...]] = []
+    cumulative_command_records: list[CodexCommandRecord] = []
+    turn_rows: list[dict[str, Any]] = []
+    allowed_references = {"SKILL.md", "references/waapi-operate.md", "references/waapi-query.md",
+                          "references/waapi-setup.md", "references/waapi-coverage.md"}
+    thread_id = ""
+    failure: Exception | None = None
+    try:
+        with broker:
+            with CodexCliTask(config, extra_env=broker.model_environment_overrides(),
+                              agent_case_budget=budget) as task:
+                for index, prompt in enumerate(prompts, start=1):
+                    policy.begin_turn(index, prompt)
+                    output_dir = root / "turns" / f"turn-{index:02d}"
+                    elapsed_before = budget.elapsed_seconds
+                    try:
+                        result = (task.run_initial(prompt, output_dir=output_dir) if index == 1 else
+                                  task.run_followup(prompt, output_dir=output_dir))
+                    except CodexInfrastructureError as exc:
+                        thread_id = task.thread_id
+                        reconciliation = broker.reconcile(cumulative_argvs, require_complete=False)
+                        grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
+                            reconciliation, {"completed_turn": False}, (str(exc),))
+                        _archive_turn(output_dir, prompt=prompt, result=exc.result, grade=grade)
+                        raise
+                    thread_id = task.thread_id
+                    cumulative_argvs.extend(_gateway_candidate_argvs(
+                        result, skill_source=options.skill_source, alternate_skill_sources=(skill_install,),
+                        expected_wwise_version=unit.version))
+                    reconciliation = broker.reconcile(cumulative_argvs, require_complete=False)
+                    facts = result.command_facts
+                    references = tuple(facts.skill_read_files)
+                    records = facts.command_records
+                    effective_count = len(records) - len(recoverable_preprocess_attempt_indexes(records))
+                    command_rows = _gateway_candidate_records(result, skill_source=options.skill_source,
+                                                              alternate_skill_sources=(skill_install,),
+                                                              expected_wwise_version=unit.version)
+                    cumulative_command_records.extend(command_rows)
+                    reconciliation = _bind_gateway_prefix_reconciliation(
+                        reconciliation, command_records=cumulative_command_records,
+                        broker_evidence=broker.evidence(),
+                        windows_powershell_core_host=task.windows_powershell_core_host,
+                    )
+                    gates = {
+                        "memory_isolated": result.isolation_audit.passed and not result.prompt_audit.has_memory,
+                        "completed_turn": result.exit_status == 0 and not result.timed_out and result.session_audit.passed,
+                        "one_target_skill": result.prompt_audit.passed,
+                        "no_collaboration": result.collab_call_count == 0,
+                        "only_packaged_references": (len(references) <= 12 and set(references).issubset(allowed_references)
+                                                      and (index != 1 or bool(references) and references[0] == "SKILL.md")),
+                        "only_authenticated_gateway_and_skill_reads": (
+                            effective_count == len(command_rows) + len(facts.allowed_read_commands)
+                            and not facts.non_gateway_unexpected_commands),
+                        "no_discovery_or_direct_waapi": not facts.discovery_commands and not facts.direct_waapi_client_commands,
+                        "no_write_like_commands": not facts.write_like_commands,
+                        "source_and_workspace_unchanged": (result.file_change_count == 0 and result.skill_tree_unchanged
+                            and not result.created_source_files and not result.modified_source_files and not result.deleted_source_files),
+                        "broker_provenance": reconciliation.passed,
+                        "policy_checkpoint": (policy.transaction.state == "previewed"
+                            if prepared.policy == "ask_before_changes" and index == 1 else policy.complete),
+                        "visible_preview_notice": (index != 1 or expansion_preview_notice(
+                            result, command_rows, version=unit.version,
+                            execute_expected=prepared.policy == "allow_changes",
+                            preview_artifact=(TransactionStore(broker.state_directory).load_preview(
+                                policy.transaction_id).artifact if policy.transaction_id else {}),
+                            before_snapshot=prepared.before)),
+                        "final_response_present": bool(result.final_response.strip()),
+                        "cumulative_agent_budget": budget.elapsed_seconds <= budget.hard_seconds,
+                    }
+                    grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
+                                        reconciliation, gates, tuple(key for key, passed in gates.items() if not passed))
+                    _archive_turn(output_dir, prompt=prompt, result=result, grade=grade)
+                    turn_rows.append({"index": index, "gates": gates,
+                                      "agent_seconds": budget.elapsed_seconds - elapsed_before})
+                    if not grade.passed:
+                        raise V3TaskRunnerError("expansion turn failed: " + ", ".join(grade.errors), thread_id=thread_id)
+                broker.seal_expansion_outcome()
+                final_reconciliation = broker.reconcile(cumulative_argvs)
+                if not final_reconciliation.passed:
+                    raise V3TaskRunnerError("expansion final Broker reconciliation failed", thread_id=thread_id)
+    except Exception as exc:
+        failure = exc
+        raise
+    finally:
+        if failure is not None and len(budget.turn_measurements) > len(turn_rows):
+            turn_rows.append({"index": len(turn_rows) + 1, "gates": {}, "incomplete": True,
+                              "agent_seconds": budget.turn_measurements[-1]["elapsed_seconds"]})
+        _write_json(root / "expansion-broker.json", broker.evidence().as_dict(include_output=True))
+        _write_json(root / "expansion-oracle.json", policy.oracle_evidence)
+        _write_json(root / "expansion-agent-budget.json", {
+            "hard_seconds": budget.hard_seconds, "slow_seconds": budget.slow_seconds,
+            "elapsed_seconds": budget.elapsed_seconds, "slow": budget.slow, "turns": turn_rows,
+            "measurement_scope": "CodexCliTask._record_turn including prompt audit and fresh/resume CLI",
+            "turn_measurements": budget.turn_measurements,
+        })
+        outcome = {
+            "contract": "waapi-skill.integration-expansion-task-result/v1",
+            "unit_id": unit.unit_id, "version": unit.version, "thread_id": thread_id,
+            "passed": failure is None and policy.complete and broker.evidence().passed,
+            "error": None if failure is None else f"{type(failure).__name__}: {failure}",
+            "terminal_state": policy.transaction.state,
+            "assertions": dict(policy.assertions), "required_assertions": sorted(prepared.required_assertions),
+            "gateway_verification_state": policy.transaction.gateway_verification_state,
+            "agent_seconds": budget.elapsed_seconds, "slow": budget.slow,
+            "plan_sha256": canonical_digest(plan), "turns": turn_rows,
+        }
+        _write_json(root / "expansion-task-result.json", outcome)
+    return outcome
 
 
 def run_v3_codex_task(

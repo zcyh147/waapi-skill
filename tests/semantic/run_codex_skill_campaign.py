@@ -343,6 +343,7 @@ INTEGRATION_WORKFLOWS_V2_PROFILE_ID = (
     matrix.INTEGRATION_WORKFLOWS_V2_PROFILE_ID
 )
 INTEGRATION_PROFILE_ID = matrix.INTEGRATION_PROFILE_ID
+EXPANSION_PROFILE_ID = matrix.EXPANSION_PROFILE_ID
 SEMANTIC_BOOTSTRAP_PROFILE_IDS = matrix.SEMANTIC_BOOTSTRAP_PROFILE_IDS
 _INTEGRATION_V1_WORKFLOW_IDS = frozenset(
     {
@@ -535,6 +536,7 @@ class CampaignOptions:
     wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     protocol_manifest_revision: str | None = None
+    campaign_inputs_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1100,8 +1102,10 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         units = load_heavy_v3_campaign_units(options)
     except (SystemExit, ValueError) as exc:
         raise CampaignConfigError(str(exc)) from exc
-    required_units = {str(unit.unit_id): (HEAVY_V3_PHASE,) for unit in units}
+    required_units = {str(unit.unit_id): (_heavy_unit_phase(unit),) for unit in units}
     require_skill_local_campaign_interpreter(options.skill_source)
+    if options.profile == EXPANSION_PROFILE_ID and options.verify_only:
+        return verify_expansion_campaign(options, units=units, required_units=required_units)
     windows_path_budget = None
     if not options.verify_only:
         try:
@@ -1125,6 +1129,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         options,
         windows_powershell_core_host=sealed_windows_host,
         protocol_manifest_revision=_sealed_protocol_manifest_revision(effective),
+        campaign_inputs_sha256=hashlib.sha256(canonical_json_bytes(effective)).hexdigest(),
     )
 
     root = prepare_campaign_root(options)
@@ -1155,6 +1160,8 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             write_campaign_marker(root, campaign_id=str(config["campaign_id"]))
 
         manifests = load_verified_attempts(root)
+        if options.profile == EXPANSION_PROFILE_ID and manifests:
+            replay_expansion_attempts(root, options=validation_options, units=units, manifests=manifests)
         if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
             _validate_modification_policy_identity_history(
                 root,
@@ -1162,10 +1169,12 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             )
         consolidated = consolidate_units(required_units, manifests)
         write_consolidated(root, consolidated)
+        if options.profile == EXPANSION_PROFILE_ID:
+            write_expansion_accounting(root, units=units, consolidated=consolidated)
         terminal = heavy_v3_consolidated_exit(
             consolidated,
             freeze_retryable=options.profile
-            in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID},
+            in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID, EXPANSION_PROFILE_ID},
         )
         if terminal is not None:
             return terminal
@@ -1221,7 +1230,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                 )
             else:
                 argv_child = build_heavy_v3_child_argv(
-                    options,
+                    validation_options,
                     units=scheduled_units,
                     matrix_root=matrix_root,
                     windows_powershell_core_host=sealed_windows_host,
@@ -1354,15 +1363,144 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                 )
             consolidated = consolidate_units(required_units, manifests)
             write_consolidated(root, consolidated)
-            print_status(consolidated)
+            if options.profile == EXPANSION_PROFILE_ID:
+                write_expansion_accounting(root, units=units, consolidated=consolidated)
+            if options.profile != EXPANSION_PROFILE_ID:
+                print_status(consolidated)
             if interrupts.requested:
                 return EXIT_INTERRUPTED
             terminal = heavy_v3_consolidated_exit(
                 consolidated,
                 freeze_retryable=options.profile
-                in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID},
+                in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID, EXPANSION_PROFILE_ID},
             )
             return terminal if terminal is not None else EXIT_PENDING
+
+
+def _expansion_accounting(units: Sequence[Any], consolidated: Mapping[str, Any]) -> dict[str, Any]:
+    rows = [heavy_v3_unit_row(unit, sequence=index) for index, unit in enumerate(units, 1)]
+    records = [{**row, "status": (
+        "BOUNDARY_PROVEN" if row.get("evidence_kind") == "capability_boundary"
+        and consolidated["units"][row["scenario_id"]]["status"] == "PASS"
+        else consolidated["units"][row["scenario_id"]]["status"]
+    )} for row in rows]
+    return matrix.expansion_accounting(rows, records)
+
+
+def write_expansion_accounting(root: Path, *, units: Sequence[Any], consolidated: Mapping[str, Any]) -> None:
+    accounting = _expansion_accounting(units, consolidated)
+    atomic_write_json_with_digest(root / "expansion-accounting.json", accounting)
+    print(f"[expansion] Agent PASS {len(accounting['agent_units']['passed'])}/{len(accounting['agent_units']['selected'])}; "
+          f"capability boundaries proven {len(accounting['capability_boundaries']['proven'])}/"
+          f"{len(accounting['capability_boundaries']['selected'])} (no Agent PASS credit)", flush=True)
+
+
+def _validate_expansion_outcome(outcome: Mapping[str, Any], *, expected_unit: Any,
+                                scenario_root: Path, options: CampaignOptions) -> None:
+    from tests.semantic.support.codex_expansion_archive import (
+        ExpansionArchiveError, verify_expansion_task_archive, verify_expansion_boundary_archive,
+    )
+    if not options.campaign_inputs_sha256:
+        raise CampaignEvidenceError("expansion evidence lacks its frozen campaign input digest")
+    status = outcome["status"]
+    task_root = outcome.get("task_root")
+    expected = dict(expected_unit_id=expected_unit.unit_id, expected_version=expected_unit.version,
+                    expected_inputs_sha256=options.campaign_inputs_sha256)
+    try:
+        if expected_unit.evidence_kind == "capability_boundary" and status == "BOUNDARY_PROVEN":
+            evidence = verify_expansion_boundary_archive(scenario_root, **expected)
+        elif task_root is not None:
+            evidence = verify_expansion_task_archive(Path(task_root), **expected)
+        else:
+            if status != "BLOCKED" or outcome.get("thread_id") is not None:
+                raise CampaignEvidenceError("expansion without a task must remain a pre-Agent block")
+            # No missing setup artifact receives PASS or retry credit.
+            return
+    except ExpansionArchiveError as exc:
+        raise CampaignEvidenceError(f"expansion archive is untrusted: {exc}") from exc
+    task_passed = outcome["checks"].get("task", {}).get("passed") is True
+    expected_original = "BOUNDARY_PROVEN" if status == "BOUNDARY_PROVEN" else "PASS" if task_passed else "FAIL"
+    if (evidence.get("archive_valid") is not True or evidence.get("original_status") != expected_original
+            or evidence.get("business_pass") is not (expected_original == "PASS")
+            or (status == "PASS" and not task_passed)):
+        raise CampaignEvidenceError("expansion archive verdict differs from its original outcome")
+    lifecycle = outcome.get("lifecycle")
+    if not isinstance(lifecycle, Mapping):
+        raise CampaignEvidenceError("expansion outcome lacks lifecycle evidence")
+    if status == "PASS":
+        _validate_heavy_v3_pass_lifecycle(lifecycle, checks=outcome["checks"],
+            expected_row=heavy_v3_unit_row(expected_unit, sequence=1),
+            scenario_root=scenario_root, task_root=Path(task_root))
+    elif (load_strict_regular_json(scenario_root / "evidence" / "lifecycle.json") != lifecycle
+            or lifecycle.get("scenario_id") != expected_unit.unit_id
+            or lifecycle.get("version") != expected_unit.version
+            or not isinstance(lifecycle.get("source_hash_before"), Mapping)
+            or lifecycle.get("source_hash_before") != lifecycle.get("source_hash_after")
+            or type(lifecycle.get("source_mtime_before_ns")) is not int
+            or lifecycle.get("source_mtime_before_ns") != lifecycle.get("source_mtime_after_ns")):
+        raise CampaignEvidenceError("expansion non-PASS lifecycle or source preservation is unproved")
+
+
+def replay_expansion_attempts(root: Path, *, options: CampaignOptions, units: Sequence[Any],
+                              manifests: Sequence[Mapping[str, Any]]) -> None:
+    from tests.semantic.support.codex_campaign import load_verified_json
+    by_id = {unit.unit_id: unit for unit in units}
+    seen_threads: set[str] = set()
+    for attempt, manifest in zip(list_campaign_attempts(root), manifests, strict=True):
+        group = attempt / "runs" / HEAVY_V3_GROUP_ID
+        if not (group / "child-request.json").exists():
+            if any(row.get("status") == "PASS" for row in manifest["unit_observations"]):
+                raise CampaignEvidenceError("expansion PASS attempt has no child execution")
+            continue
+        request = load_verified_json(group / "child-request.json")
+        execution = load_verified_json(group / "child-result.json")
+        ids = request.get("scenario_ids")
+        if not isinstance(ids, list) or len(set(ids)) != len(ids) or not ids or set(ids) - set(by_id):
+            raise CampaignEvidenceError("expansion attempt selection differs from its frozen campaign")
+        validation = validate_heavy_v3_child_run(group / "matrix", expected_units=[by_id[item] for item in ids],
+            options=options, returncode=execution["returncode"])
+        if list(validation.observations) != manifest["unit_observations"]:
+            raise CampaignEvidenceError("expansion replay differs from the original sealed verdicts")
+        for scenario in _heavy_v3_scenario_directories(group / "matrix").values():
+            if not (scenario / "outcome.json").exists():
+                continue  # runner-less BLOCKED record already checked above
+            outcome = load_strict_regular_json(scenario / "outcome.json")
+            thread = outcome.get("thread_id")
+            if thread is not None:
+                if not isinstance(thread, str) or not thread or thread in seen_threads:
+                    raise CampaignEvidenceError("expansion archive reused a task thread identity")
+                seen_threads.add(thread)
+
+
+def verify_expansion_campaign(options: CampaignOptions, *, units: Sequence[Any],
+                               required_units: Mapping[str, Sequence[str]]) -> int:
+    """Recheck the original sealed evidence without launching or writing anything."""
+    root = _require_real_directory(options.campaign_root, label="expansion verify-only root")
+    config = load_immutable_campaign_config(root)
+    sealed = config.get("effective")
+    if not isinstance(sealed, Mapping) or not isinstance(sealed.get("codex"), Mapping):
+        raise CampaignEvidenceError("expansion immutable config is malformed")
+    digest = hashlib.sha256(canonical_json_bytes(sealed)).hexdigest()
+    if config.get("effective_sha256") != digest:
+        raise CampaignEvidenceError("expansion effective config digest is invalid")
+    version = sealed["codex"].get("version")
+    if not isinstance(version, str) or not version:
+        raise CampaignEvidenceError("sealed Codex version is unavailable")
+    host = _sealed_windows_powershell_core_host(sealed)
+    if host is not None and sha256_file(Path(host.executable)) != host.sha256:
+        raise CampaignEvidenceError("sealed PowerShell executable drifted")
+    options = replace(options, windows_powershell_core_host=host, campaign_inputs_sha256=digest)
+    current = build_heavy_v3_effective_config(options, units=units, required_units=required_units,
+                                             sealed_codex_version=version)
+    if current != sealed:
+        raise CampaignEvidenceError("expansion candidate or invocation differs from immutable inputs")
+    verify_campaign_marker(root, campaign_id=config.get("campaign_id"))
+    manifests = load_verified_attempts(root)
+    replay_expansion_attempts(root, options=options, units=units, manifests=manifests)
+    consolidated = consolidate_units(required_units, manifests)
+    print(json.dumps(_expansion_accounting(units, consolidated), ensure_ascii=False, sort_keys=True))
+    terminal = heavy_v3_consolidated_exit(consolidated, freeze_retryable=True)
+    return terminal if terminal is not None else EXIT_PENDING
 
 
 def load_heavy_v3_campaign_units(options: CampaignOptions) -> tuple[Any, ...]:
@@ -1428,6 +1566,10 @@ def build_heavy_v3_child_argv(
         "--wwise-readiness-timeout",
         str(options.wwise_readiness_timeout_seconds),
     ]
+    if options.profile == EXPANSION_PROFILE_ID:
+        if not options.campaign_inputs_sha256:
+            raise CampaignEvidenceError("expansion child requires the frozen effective input digest")
+        argv.extend(("--sealed-campaign-inputs-sha256", options.campaign_inputs_sha256))
     if windows_powershell_core_host is not None:
         argv.extend(
             (
@@ -1478,7 +1620,7 @@ def heavy_v3_child_request(
             "memory": "disabled",
             **(
                 {"approval_policy": "never"}
-                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile == EXPANSION_PROFILE_ID
                 else {}
             ),
             "sequential": True,
@@ -1987,7 +2129,7 @@ def build_heavy_v3_suite_fingerprint(
         "path": str(options.suite_path),
         "sha256": sha256_file(options.suite_path),
     }
-    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS:
+    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile == EXPANSION_PROFILE_ID:
         dependency_root = options.suite_path.parent
         result.update(
             {
@@ -2084,6 +2226,7 @@ def build_heavy_v3_effective_config(
     *,
     units: Sequence[Any],
     required_units: Mapping[str, Sequence[str]],
+    sealed_codex_version: str | None = None,
 ) -> dict[str, Any]:
     """Fingerprint every immutable input of the V3 matrix campaign."""
 
@@ -2094,7 +2237,7 @@ def build_heavy_v3_effective_config(
     interpreter = Path(sys.executable).resolve(strict=True)
     matrix_runner = Path(matrix.__file__).resolve(strict=True)
     campaign_runner = Path(__file__).resolve(strict=True)
-    codex_version = _codex_version_fingerprint(
+    codex_version = sealed_codex_version if sealed_codex_version is not None else _codex_version_fingerprint(
         options.codex_binary,
         windows_powershell_core_host=options.windows_powershell_core_host,
     )
@@ -2193,7 +2336,7 @@ def build_heavy_v3_effective_config(
             "fresh_process_thread_and_task_per_scenario": True,
             **(
                 {"approval_policy": "never"}
-                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile == EXPANSION_PROFILE_ID
                 else {}
             ),
         },
@@ -2428,6 +2571,10 @@ def _heavy_v3_tree_mtime_sha256(root: Path) -> str:
     return hashlib.sha256(canonical_json_bytes(rows)).hexdigest()
 
 
+def _heavy_unit_phase(unit: Any) -> str:
+    return "capability-boundary" if getattr(unit, "evidence_kind", None) == "capability_boundary" else HEAVY_V3_PHASE
+
+
 def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
     scenario_id = getattr(unit, "unit_id", None)
     version = getattr(unit, "version", None)
@@ -2456,6 +2603,11 @@ def heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         "api": api,
         "runner": runner_lane,
     }
+    evidence_kind = getattr(unit, "evidence_kind", None)
+    if evidence_kind is not None:
+        if evidence_kind not in {"agent_acceptance", "capability_boundary"}:
+            raise CampaignEvidenceError("invalid expansion evidence kind")
+        row["evidence_kind"] = evidence_kind
     base_scenario_id = getattr(unit, "base_scenario_id", None)
     if base_scenario_id is not None:
         if not isinstance(base_scenario_id, str) or not base_scenario_id:
@@ -2693,20 +2845,21 @@ def validate_heavy_v3_child_run(
                 f"untrusted heavy retry-classification evidence: {exc}",
             )
             continue
-        campaign_status = "BLOCKED" if status == "INDETERMINATE" else status
+        campaign_status = "BLOCKED" if status == "INDETERMINATE" else "PASS" if status == "BOUNDARY_PROVEN" else status
         if retry_category is not None:
             campaign_status = "RETRYABLE"
             retry_categories.append(retry_category)
         reason = str(matrix_case.get("reason") or "")
         if not reason:
             reason = (
-                "runner and independent business oracle passed"
+                "independent capability boundary proven; no Agent PASS credit"
+                if status == "BOUNDARY_PROVEN" else "runner and independent business oracle passed"
                 if campaign_status == "PASS"
                 else f"matrix classified scenario as {campaign_status}"
             )
         verdict = PhaseVerdict(
             session_id=scenario_id,
-            phase=HEAVY_V3_PHASE,
+            phase=_heavy_unit_phase(units[index - 1]),
             status=campaign_status,
             reason=reason,
             retry_category=retry_category,
@@ -2870,6 +3023,8 @@ def _validate_heavy_v3_summary(
         "run_errors",
         "case_records",
     }
+    if expected_profile == EXPANSION_PROFILE_ID:
+        required_keys.add("expansion_accounting")
     if (
         not isinstance(value, Mapping)
         or set(value) != required_keys
@@ -2914,6 +3069,7 @@ def _validate_heavy_v3_summary(
             required_record_keys.update(
                 key
                 for key in (
+                    "evidence_kind",
                     "base_scenario_id",
                     "component_profile_id",
                     "family",
@@ -2936,13 +3092,13 @@ def _validate_heavy_v3_summary(
                 "heavy matrix summary unit metadata drifted"
             )
         status = record.get("status")
-        if status not in matrix.HEAVY_V3_STATUSES:
+        boundary = record.get("evidence_kind") == "capability_boundary" and expected_profile == EXPANSION_PROFILE_ID
+        if status not in matrix.HEAVY_V3_STATUSES and not (boundary and status == "BOUNDARY_PROVEN"):
             raise CampaignEvidenceError("heavy matrix summary has an invalid status")
+        if boundary and status == "PASS":
+            raise CampaignEvidenceError("capability boundary cannot count as Agent PASS")
         statuses.append(str(status))
-    expected_status_counts = {
-        status: statuses.count(status)
-        for status in ("PASS", "FAIL", "BLOCKED", "INDETERMINATE")
-    }
+    expected_status_counts = matrix._heavy_v3_status_counts(case_records)
     if value.get("status_counts") != expected_status_counts:
         raise CampaignEvidenceError("heavy matrix summary status counts disagree")
     status_lists = {
@@ -2967,12 +3123,14 @@ def _validate_heavy_v3_summary(
     all_pass = (
         len(attempted) == len(expected_ids)
         and bool(attempted)
-        and statuses == ["PASS"] * len(attempted)
+        and all(matrix._heavy_record_completed(record) for record in case_records)
         and not run_errors
         and stop_reason is None
         and value.get("preflight") == "passed"
         and value.get("completed_at") is not None
     )
+    if expected_profile == EXPANSION_PROFILE_ID and value.get("expansion_accounting") != matrix.expansion_accounting(expected_rows or (), case_records):
+        raise CampaignEvidenceError("expansion Agent/boundary accounting disagrees")
     if value.get("all_selected_passed") is not all_pass:
         raise CampaignEvidenceError("heavy matrix all-pass flag disagrees")
     if value.get("preflight") not in {"pending", "passed", "blocked"}:
@@ -3182,7 +3340,7 @@ def _validate_heavy_v3_matrix_case(
     if dict(summary_row) != expected_summary:
         raise CampaignEvidenceError("heavy matrix-case differs from summary record")
     status = value.get("status")
-    if status not in matrix.HEAVY_V3_STATUSES or not isinstance(value.get("reason"), str):
+    if (status not in matrix.HEAVY_V3_STATUSES and not (options.profile == EXPANSION_PROFILE_ID and expected_row.get("evidence_kind") == "capability_boundary" and status == "BOUNDARY_PROVEN")) or not isinstance(value.get("reason"), str):
         raise CampaignEvidenceError("heavy matrix-case status/reason is malformed")
     outcome_path = scenario_root / "outcome.json"
     runner_outcome = value.get("runner_outcome")
@@ -3218,6 +3376,10 @@ def _validate_heavy_v3_matrix_case(
         "checks",
         "lifecycle",
     }
+    if options.profile == EXPANSION_PROFILE_ID:
+        expected_outcome_keys.add("inputs_sha256")
+        if outcome.get("inputs_sha256") != options.campaign_inputs_sha256:
+            raise CampaignEvidenceError("expansion outcome inputs differ from the frozen campaign")
     if not isinstance(outcome, Mapping) or set(outcome) != expected_outcome_keys:
         raise CampaignEvidenceError("heavy runner outcome has an invalid shape")
     for key in ("scenario_id", "version", "status", "reason", "scenario_root"):
@@ -3234,6 +3396,9 @@ def _validate_heavy_v3_matrix_case(
     task_root = outcome.get("task_root")
     if task_root is not None and not _path_is_within(Path(task_root), scenario_root):
         raise CampaignEvidenceError("heavy runner task root escapes the scenario root")
+    if options.profile == EXPANSION_PROFILE_ID:
+        _validate_expansion_outcome(outcome, expected_unit=expected_unit, scenario_root=scenario_root, options=options)
+        return
     if status == "PASS":
         _validate_heavy_v3_pass_outcome(
             outcome,
@@ -14828,6 +14993,8 @@ def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024)
 
 def _heavy_v3_outcome_contract(runner: str, *, profile: str | None = None) -> str:
     if runner == "project":
+        if profile == EXPANSION_PROFILE_ID:
+            return "waapi-skill.integration-expansion-project-outcome/v1"
         return HEAVY_V3_PROJECT_OUTCOME_CONTRACT
     if runner == "cli":
         return HEAVY_V3_CLI_OUTCOME_CONTRACT
@@ -15564,7 +15731,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument(
         "--reasoning-effort",
         choices=("minimal", "low", "medium", "high", "xhigh", "ultra"),
-        default="medium",
+        default=None,
     )
     parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float)
@@ -15580,6 +15747,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--lock-timeout", type=float, default=10.0)
     parser.add_argument("--max-pre-action-retries", type=int)
     args = parser.parse_args(argv)
+    is_expansion = args.profile == EXPANSION_PROFILE_ID
+    if args.reasoning_effort is None:
+        args.reasoning_effort = "high" if is_expansion and args.model in {None, "gpt-6-luna"} else "medium"
     is_executable_v3 = args.profile in EXECUTABLE_V3_PROFILE_IDS
     is_policy_v3 = args.profile == MODIFICATION_POLICY_V3_PROFILE_ID
     is_compound_v1 = args.profile == COMPOUND_HEAVY_V1_PROFILE_ID
@@ -15603,6 +15773,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             else matrix.DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
+    if is_expansion and args.timeout is None:
+        timeout_seconds = 600.0
     is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
@@ -15617,7 +15789,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         0
         if args.max_pre_action_retries is None
         and (
-            is_typed_input
+            is_expansion
+            or is_typed_input
             or is_deep_business_acceptance
             or business_agent_profile is not None
         )
@@ -15628,7 +15801,8 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
     if (
-        is_typed_input
+        is_expansion
+        or is_typed_input
         or is_deep_business_acceptance
         or business_agent_profile is not None
     ) and max_pre_action_retries != 0:
@@ -15692,10 +15866,10 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             "--version 2022.1 and 2025.1"
         )
     model = args.model or (
-        "gpt-5.6-terra" if is_terra_v3 else "gpt-5.6-sol"
+        "gpt-6-luna" if is_expansion else "gpt-5.6-terra" if is_terra_v3 else "gpt-5.6-sol"
     )
     service_tier = args.service_tier or (
-        "default" if is_terra_v3 else "priority"
+        "default" if is_terra_v3 or is_expansion else "priority"
     )
     if is_terra_v3 and (
         model != "gpt-5.6-terra"
@@ -15735,15 +15909,29 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         if is_terra_v3
         else (matrix.DEFAULT_V3_SUITE if is_executable_v3 else matrix.DEFAULT_SUITE)
     )
+    if is_expansion:
+        suite = args.suite or str(matrix.DEFAULT_EXPANSION_SUITE)
+        try:
+            matrix.validate_expansion_cli(suite=Path(suite), case_ids=case_ids, versions=args.version,
+                model=model, reasoning_effort=args.reasoning_effort, service_tier=service_tier,
+                timeout_seconds=timeout_seconds)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
     try:
         suite_path = Path(suite).expanduser().resolve(strict=True)
         skill_source = Path(args.skill_source).expanduser().resolve(strict=True)
-        codex_binary = matrix.resolve_codex_binary(args.codex_binary)
-        windows_powershell_core_host = (
-            discover_windows_powershell_core(platform_name="nt")
-            if os.name == "nt"
-            else None
-        )
+        if is_expansion and args.verify_only:
+            # Do not discover/probe executables during a read-only archive audit.
+            sealed = load_immutable_campaign_config(Path(args.campaign_root).expanduser().resolve(strict=True))["effective"]
+            codex_binary = Path(args.codex_binary or sealed["codex"]["path"]).expanduser().resolve(strict=True)
+            windows_powershell_core_host = _sealed_windows_powershell_core_host(sealed)
+        else:
+            codex_binary = matrix.resolve_codex_binary(args.codex_binary)
+            windows_powershell_core_host = (
+                discover_windows_powershell_core(platform_name="nt")
+                if os.name == "nt"
+                else None
+            )
         auth_json = Path(args.auth_json).expanduser().resolve(strict=True)
         live_config = Path(args.live_config).expanduser().resolve(
             strict=not args.offline_only

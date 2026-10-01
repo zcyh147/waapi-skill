@@ -365,3 +365,47 @@ anonymous identity, creation, ordering, or metadata guards to make a probe pass.
 No live outcome is claimed by this note. Metadata absence, unsupported public
 placement, native rejection, missing business oracle, and failure of audible
 behavior remain distinct possible results of the planned probes.
+# Executed public-read probe update — 2026-09-28
+
+Candidate `3781167d9c42058fa2bad06bdd6a6a37b118725a` was tested in a separate
+immutable worktree, sequentially on macOS Wwise 2025.1.7 and 2022.1.19.
+The retained [probe results](music-capability-probe-results-2026-09-28.json)
+contain the original record hashes, exact selected nodes, Gateway results,
+source guards, and lifecycle outcomes.
+
+- 2025.1: all 11 selected read probes passed (32 unrelated nodes deselected).
+- 2022.1: 7 passed and 4 failed. Playlist Root required clarification;
+  `Segment` selected `PlaylistItemType` rather than a Segment reference;
+  `@Arguments` and `@Entries` were rejected as unknown properties.
+- The 2022 loop count, three Transition fields, and three RTPC fields passed.
+  Reading the RTPC Curve reference does not prove access to its points.
+- Both source mutation-bearing hashes, project mtimes, and source tree
+  metadata stayed unchanged. No transaction was executed in the selected
+  probes. Final scoped process lists were empty. The successful sandbox was
+  removed; the failed 2022 sandbox remains quarantined.
+
+An earlier invocation accidentally included the launcher's default destructive
+selection, producing 23 failures and 20 passes. Its original evidence is
+retained; it is not this targeted acceptance result. Explicit name selection
+was then collection-checked before the two targeted invocations above.
+
+Follow-up existing-object probes are retained in
+[music-maintenance-probe-results-2026-09-28.json](music-maintenance-probe-results-2026-09-28.json).
+At `6601ab1`, the 2022 Playlist loop scalar edit succeeded, while 2025 rejected
+it as `FIELD_DISABLED` because of `IsLoopingInfinite`. Both versions rejected
+Transition binding because their live display path was `Root\Transition`.
+Repair `4231c52` (#124) admits that reviewed exact-GUID-owned display identity;
+the scoped Transition property change then passed on both versions. This does
+not provide full Transition-rule/fade authoring or support every alternative
+editing lane. A subsequent 2025 Playlist dependency-read attempt resolved two
+meanings to the same result field and failed before any loop mutation. It has
+not been converted to passing evidence.
+
+The explicit exploratory entrypoints now live under `tests/maintenance/` as
+`probe_music_expansion_capabilities.py` and `probe_music_expansion_maintenance.py`.
+They intentionally expose missing capabilities and are not automatically
+collected regression tests. Historical node paths in sealed records are kept.
+
+These are read-capability observations and narrow property edits, not Agent
+acceptance, complete music configuration coverage, or proof of playback. They support the distinctions
+in the investigation below; no existing FAIL was regraded into PASS.

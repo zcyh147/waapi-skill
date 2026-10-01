@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 from tests.semantic.support.codex_expansion_cases import ExpansionCaseContext
+from tests.semantic.support import codex_expansion_case_helpers as expansion_helpers
 from tests.semantic.support.codex_expansion_case_helpers import (
-    BusinessDraft, CaseBoundaryError, file_evidence, read_object, rows, wav_assets,
+    BusinessDraft, CaseBoundaryError, file_evidence, make_public_gateway,
+    read_object, rows, wav_assets,
 )
 
 
@@ -101,7 +104,7 @@ def test_setup_does_not_execute_when_authorization_is_missing(tmp_path: Path) ->
     assert "execute" not in calls
 
 
-def test_assets_are_distinct_owned_media_and_missing_assets_block(tmp_path: Path) -> None:
+def test_assets_reuse_distinct_owned_media_and_generate_only_the_shortfall(tmp_path: Path) -> None:
     originals = tmp_path / "Originals"
     originals.mkdir()
     first = originals / "first.wav"
@@ -113,8 +116,100 @@ def test_assets_are_distinct_owned_media_and_missing_assets_block(tmp_path: Path
     selected = wav_assets(ctx, 2)
     assert len({path.read_bytes() for path in selected}) == 2
     assert file_evidence(ctx, str(first))["path"] == str(first)
-    with pytest.raises(CaseBoundaryError, match="3 distinct"):
-        wav_assets(ctx, 3)
+    selected = wav_assets(ctx, 3)
+    assert len({path.read_bytes() for path in selected}) == 3
+    generated = [path for path in selected if path.parent != originals]
+    assert len(generated) == 1
+    import wave
+    with wave.open(str(generated[0]), "rb") as audio:
+        assert audio.getnchannels() == 1 and audio.getsampwidth() == 2
+        assert audio.getnframes() == 800
+    assert first.read_bytes() == b"RIFF-a" and second.read_bytes() == b"RIFF-b"
     outside = tmp_path.parent / "outside.wav"
     with pytest.raises(CaseBoundaryError, match="escapes"):
         file_evidence(ctx, str(outside))
+
+
+def test_public_gateway_uses_the_packaged_runner_and_owned_live_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = tmp_path / "config.json"
+    config.write_text("{}", encoding="utf-8")
+    state = tmp_path / "state"
+    receipts = []
+    expected = {"ok": True, "endpoint": {"host": "127.0.0.1", "port": 8090},
+                "detected_version": "2025.1", "objects": []}
+
+    def run(command, **kwargs):
+        assert command[1] == str(expansion_helpers._GATEWAY_RUNNER)
+        assert command[2] == "gateway.py"
+        assert command[command.index("--host") + 1] == "127.0.0.1"
+        assert command[command.index("--port") + 1] == "8090"
+        assert command[command.index("--version") + 1] == "2025.1"
+        assert command[command.index("--state-dir") + 1] == str(state)
+        assert kwargs["cwd"] == expansion_helpers._GATEWAY_CWD
+        assert kwargs["env"]["WAAPI_SKILL_CONFIG_PATH"] == str(config)
+        assert kwargs["env"]["WAAPI_SKILL_STATE_DIR"] == str(state)
+        assert kwargs["timeout"] == 60
+        return expansion_helpers.subprocess.CompletedProcess(
+            command, 0, json.dumps(expected).encode("utf-8"), b"",
+        )
+
+    monkeypatch.setattr(expansion_helpers.subprocess, "run", run)
+    gateway = make_public_gateway(
+        host="127.0.0.1", port=8090, version="2025.1", config_path=config,
+        state_dir=state, environment={}, receipts=receipts,
+        live_commands=frozenset({"query-object"}),
+    )
+    assert gateway(["query-object", "--max-results", "2"]) == expected
+    assert receipts[0]["payload"] == expected
+    assert receipts[0]["returncode"] == 0
+
+
+def test_public_gateway_preserves_structured_failure_and_bounds_process_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = tmp_path / "config.json"
+    config.write_text("{}", encoding="utf-8")
+    receipts = []
+    failure = {"ok": False, "status": "failed", "error": {"code": "HOST_TIMEOUT"}}
+    monkeypatch.setattr(
+        expansion_helpers.subprocess, "run",
+        lambda command, **kwargs: expansion_helpers.subprocess.CompletedProcess(
+            command, 2, json.dumps(failure).encode(), b"bounded stderr",
+        ),
+    )
+    gateway = make_public_gateway(
+        host="127.0.0.1", port=8090, version="2022.1", config_path=config,
+        state_dir=tmp_path / "state", environment={}, receipts=receipts,
+        live_commands=frozenset({"query-object"}),
+    )
+    with pytest.raises(CaseBoundaryError, match="HOST_TIMEOUT"):
+        gateway(["query-object", "--exact-id", GUID])
+    assert receipts[0]["payload"] == failure
+    assert receipts[0]["stderr_excerpt"] == "bounded stderr"
+
+
+def test_public_gateway_timeout_is_retained_as_a_bounded_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = tmp_path / "config.json"
+    config.write_text("{}", encoding="utf-8")
+    receipts = []
+
+    def run(command, **kwargs):
+        raise expansion_helpers.subprocess.TimeoutExpired(
+            command, kwargs["timeout"], output=b"partial output", stderr=b"still running",
+        )
+
+    monkeypatch.setattr(expansion_helpers.subprocess, "run", run)
+    gateway = make_public_gateway(
+        host="127.0.0.1", port=8090, version="2025.1", config_path=config,
+        state_dir=tmp_path / "state", environment={}, receipts=receipts,
+        live_commands=frozenset(),
+    )
+    with pytest.raises(CaseBoundaryError, match="60 seconds"):
+        gateway(["draft-start", "object.create"])
+    assert receipts[0]["error"] == "subprocess_timeout"
+    assert receipts[0]["stdout_excerpt"] == "partial output"
+    assert receipts[0]["stderr_excerpt"] == "still running"

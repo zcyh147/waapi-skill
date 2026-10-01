@@ -7706,6 +7706,7 @@ def reconcile_gateway_commands(
     skill_source: Path,
     invocation_skill_source: Path | None = None,
     shim_directory: Path | None = None,
+    require_complete: bool = True,
 ) -> GatewayBrokerReconciliation:
     """Cross-check harness-observed argv against accepted broker records."""
 
@@ -7738,10 +7739,12 @@ def reconcile_gateway_commands(
             errors.append(f"command {index}: broker record did not succeed")
     if evidence.rejected_records:
         errors.append("broker recorded one or more rejected shim requests")
-    if not evidence.complete:
+    if require_complete and not evidence.complete:
         errors.append("broker did not consume every expected step")
-    if not evidence.passed:
+    if require_complete and not evidence.passed:
         errors.append("broker evidence did not pass its terminal success contract")
+    if not require_complete and evidence.terminal_state not in {_BROKER_RUNNING, _BROKER_COMPLETE}:
+        errors.append("broker is not at a safe outcome-policy checkpoint")
 
     return GatewayBrokerReconciliation(
         passed=not errors,
@@ -9143,6 +9146,8 @@ class CodexGatewayBroker:
         optional_initial_query_object_arguments: Sequence[str] | None = None,
         optional_initial_query_schema: bool = False,
         optional_query_schema_step_names: Sequence[str] = (),
+        expansion_read_scope: Any | None = None,
+        expansion_outcome_policy: Any | None = None,
     ) -> None:
         self.skill_source = _absolute_lexical(skill_source)
         self.runner_path = self.skill_source / "scripts" / "run.py"
@@ -9154,6 +9159,27 @@ class CodexGatewayBroker:
         )
         self.platform_name = _broker_platform_name()
         self.expected_steps = tuple(expected_steps)
+        self._expansion_outcome_policy = expansion_outcome_policy
+        if expansion_outcome_policy is not None:
+            from tests.semantic.support.codex_expansion_broker_policy import ExpansionBrokerPolicy
+            if not isinstance(expansion_outcome_policy, ExpansionBrokerPolicy):
+                raise TypeError("expansion_outcome_policy must be a closed ExpansionBrokerPolicy")
+            if self.expected_steps or expansion_read_scope is not None:
+                raise ValueError("outcome mode cannot mix frozen steps or a second read policy")
+        self._expansion_reads = None
+        self._expansion_read_step_names: set[str] = set()
+        if expansion_outcome_policy is not None:
+            self._expansion_reads = expansion_outcome_policy.reads
+        if expansion_read_scope is not None:
+            from tests.semantic.support.codex_expansion_policy import (
+                BoundedExpansionReads,
+                ExpansionReadScope,
+            )
+            if not isinstance(expansion_read_scope, ExpansionReadScope):
+                raise TypeError("expansion_read_scope must be a closed ExpansionReadScope")
+            if any(step.name.startswith("expansion.read.") for step in self.expected_steps):
+                raise ValueError("expansion.read names are reserved for trusted dynamic receipts")
+            self._expansion_reads = BoundedExpansionReads(expansion_read_scope)
         self.commutative_read_only_step_groups = (
             validate_commutative_read_only_step_groups(
                 self.expected_steps,
@@ -9279,7 +9305,7 @@ class CodexGatewayBroker:
             raise ValueError("transport must be auto, unix, or tcp")
         if self.runner_timeout_seconds <= 0:
             raise ValueError("runner_timeout_seconds must be positive")
-        if not self.expected_steps:
+        if not self.expected_steps and self._expansion_outcome_policy is None:
             raise ValueError("expected_steps must contain at least one step")
         if self.expected_wwise_version and self.expected_wwise_version not in _SUPPORTED_WWISE_VERSIONS:
             raise ValueError(
@@ -9923,14 +9949,25 @@ class CodexGatewayBroker:
             ),
         )
 
-    def reconcile(self, command_argvs: Sequence[Sequence[str]]) -> GatewayBrokerReconciliation:
+    def reconcile(self, command_argvs: Sequence[Sequence[str]], *, require_complete: bool = True) -> GatewayBrokerReconciliation:
         return reconcile_gateway_commands(
             command_argvs,
             self.evidence(),
             skill_source=self.skill_source,
             invocation_skill_source=self.invocation_skill_source,
             shim_directory=self.shim_directory,
+            require_complete=require_complete,
         )
+
+    def seal_expansion_outcome(self) -> None:
+        """Finish only after a completed Agent turn and independent outcome proof."""
+        with self._lock:
+            if (self._expansion_outcome_policy is None
+                    or not self._expansion_outcome_policy.complete
+                    or self._terminal_state != _BROKER_RUNNING
+                    or any(not record.succeeded for record in self._records)):
+                raise GatewayBrokerError("expansion outcome is incomplete or has a failed command")
+            self._terminal_state = _BROKER_COMPLETE
 
     def reconcile_prefix(
         self,
@@ -10420,6 +10457,26 @@ class CodexGatewayBroker:
                 payload_error=str(exc),
             )
 
+        if self._expansion_outcome_policy is not None:
+            with self._lock:
+                if self._terminal_state != _BROKER_RUNNING:
+                    return self._reject_locked(resolved, f"broker is terminal {self._terminal_state}", authenticated=True)
+                try:
+                    step = self._expansion_outcome_policy.prepare(
+                        resolved.gateway_arguments, state_directory=self.state_directory,
+                    )
+                    self._execution_steps.append(step)
+                    self._selected_expected_steps.append(step)
+                    self.expected_steps = (*self.expected_steps, step)
+                    if step.subcommand in {"status", "operations", "query-schema", "operation-schema",
+                                           "request-schema", "query-object", "metadata"}:
+                        self._expansion_read_step_names.add(step.name)
+                    semantic_hash, execution_arguments = self._validate_step(step, resolved.gateway_arguments)
+                except Exception as exc:  # policy/parser/store errors fail before dispatch
+                    return self._reject_locked(resolved, f"expansion policy rejected command: {exc}", authenticated=True)
+            return self._execute(step, resolved, semantic_hash,
+                                 execution_arguments=execution_arguments, submitted_draft_actions=None)
+
         with self._lock:
             if self._terminal_state != _BROKER_RUNNING:
                 return self._reject_locked(
@@ -10428,6 +10485,29 @@ class CodexGatewayBroker:
                     authenticated=True,
                 )
             try:
+                # New-profile opt-in: bounded read freedom does not change any
+                # mutation step or legacy default. Every inserted read remains
+                # authenticated, executed by this Broker and receipt-validated.
+                if (self._expansion_reads is not None and resolved.gateway_arguments
+                        and resolved.gateway_arguments[0] in {
+                            "operations", "query-schema", "operation-schema",
+                            "request-schema", "query-object", "metadata",
+                        }):
+                    try:
+                        read_argv = self._expansion_reads.admit(resolved.gateway_arguments)
+                    except ValueError as exc:
+                        return self._reject_locked(resolved, str(exc), authenticated=True)
+                    next_step = self._execution_steps[self._next_step]
+                    if read_argv == (next_step.subcommand, *next_step.arguments):
+                        self._expansion_read_step_names.add(next_step.name)
+                    else:
+                        inserted = ExpectedGatewayStep(
+                            name=f"expansion.read.{self._expansion_reads.calls:04d}",
+                            subcommand=read_argv[0], arguments=read_argv[1:],
+                        )
+                        self._execution_steps.insert(self._next_step, inserted)
+                        self._selected_expected_steps.insert(self._next_step, inserted)
+                        self._expansion_read_step_names.add(inserted.name)
                 optional_workflow_discovery_names = {
                     *self._optional_expected_operations_discovery_step_names,
                     *self._optional_expected_workflow_read_step_names,
@@ -13840,6 +13920,13 @@ class CodexGatewayBroker:
         submitted_draft_actions: tuple[Mapping[str, Any], ...] | None,
     ) -> dict[str, Any]:
         started_at_unix_ns = time.time_ns()
+        expansion_read = (
+            self._expansion_reads is not None
+            and step.name in self._expansion_read_step_names
+        )
+        expansion_preparation = (self._expansion_outcome_policy is not None
+            and self._expansion_outcome_policy.repairable_preparation(step.subcommand))
+        allowed_exit_codes = (0, 2) if expansion_read or expansion_preparation else step.allowed_exit_codes
         started = started_at_unix_ns / 1_000_000_000
         started_monotonic = time.monotonic()
         command = [
@@ -13946,10 +14033,10 @@ class CodexGatewayBroker:
         observer_payload: Mapping[str, Any] | None = None
         payload_start = 0
         payload_end = 0
-        if exit_code not in step.allowed_exit_codes:
+        if exit_code not in allowed_exit_codes:
             failures.append(
                 f"packaged gateway runner exit {exit_code!r} is not allowed; "
-                f"expected one of {step.allowed_exit_codes!r}"
+                f"expected one of {allowed_exit_codes!r}"
             )
         try:
             allowed_payload_contracts = _gateway_payload_contracts(step)
@@ -13986,7 +14073,12 @@ class CodexGatewayBroker:
                 )
             ):
                 validate_transaction_show_confirmation_payload(payload)
-            if step.terminal_execute:
+            if (expansion_read or expansion_preparation) and exit_code == 2:
+                if (payload.get("ok") is not False
+                        or not isinstance(payload.get("error_code"), str)
+                        or payload.get("command") != step.subcommand):
+                    raise GatewayInvocationError("failed expansion preparation/read lacks a bounded structured receipt")
+            elif step.terminal_execute:
                 _validate_terminal_execute_payload(payload, exit_code=exit_code)
             elif step.allowed_exit_codes == (0, 2):
                 _validate_branching_execute_payload(payload, exit_code=exit_code)
@@ -14001,7 +14093,9 @@ class CodexGatewayBroker:
                     raise GatewayInvocationError(
                         f"gateway payload command must be exactly {step.subcommand!r}"
                     )
-                if step.subcommand in _DRAFT_SUBCOMMANDS:
+                if step.subcommand in _DRAFT_SUBCOMMANDS and not (
+                    expansion_preparation and payload.get("status") == "needs_clarification"
+                ):
                     self._validate_operation_draft_payload(step, payload)
             else:
                 if payload.get("ok") is not False:
@@ -14075,6 +14169,18 @@ class CodexGatewayBroker:
                 )
 
         payload_hash = ""
+        if (not failures and payload is not None and self._expansion_reads is not None
+                and self._expansion_outcome_policy is None
+                and step.name in self._expansion_read_step_names):
+            try:
+                self._expansion_reads.observe(payload)
+            except (TypeError, ValueError) as exc:
+                failures.append(f"expansion read receipt rejected: {exc}")
+        if not failures and payload is not None and self._expansion_outcome_policy is not None:
+            try:
+                self._expansion_outcome_policy.observe(step, payload, state_directory=self.state_directory)
+            except Exception as exc:
+                failures.append(f"expansion outcome receipt rejected: {exc}")
         if payload is not None:
             try:
                 payload_hash = _sha256_bytes(_canonical_json_bytes(payload))
@@ -14137,7 +14243,7 @@ class CodexGatewayBroker:
             payload_sha256=payload_hash,
             payload_error=payload_error,
             runner_command_sha256=_argv_sha256(command),
-            allowed_exit_codes=step.allowed_exit_codes,
+            allowed_exit_codes=allowed_exit_codes,
             started_at_unix_ns=started_at_unix_ns,
             finished_at_unix_ns=finished_at_unix_ns,
             subscription_ack=validated_ack,
@@ -14153,7 +14259,8 @@ class CodexGatewayBroker:
                 self._next_step += 1
                 if terminal_indeterminate:
                     self._terminal_state = _BROKER_INDETERMINATE
-                elif self._next_step == len(self._execution_steps):
+                elif (self._next_step == len(self._execution_steps)
+                      and self._expansion_outcome_policy is None):
                     self._terminal_state = _BROKER_COMPLETE
             else:
                 self._terminal_state = _BROKER_FAILED
@@ -14201,6 +14308,13 @@ class CodexGatewayBroker:
                 raise GatewayInvocationError(
                     "preview-from-draft must return one exact agent_result"
                 )
+            if self._expansion_outcome_policy is not None:
+                # Dynamic construction is approved against the independent
+                # fixture intent and the integrity-checked persisted artifact
+                # in the outcome observer, not a hidden exact command recipe.
+                if list(payload)[-1] != "agent_result":
+                    raise GatewayInvocationError("preview-from-draft must keep agent_result final")
+                return
             expected_request = self._replay_expected_operation_draft_request(step)
             actual_request = self._normalize_operation_draft_query_identities(
                 agent_result.get("request"),

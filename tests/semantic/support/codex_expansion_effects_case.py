@@ -196,4 +196,6 @@ def prepare_c09(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
             expected_class_id=class_id, expected_name=name, expected_notes=_REQUESTED_NOTES),
         archive_oracle_parameters={"expected_class_id": class_id, "expected_name": name,
                                    "expected_notes": _REQUESTED_NOTES},
+        archive_preview_parameters={"version": ctx.version, "owner_id": owner["id"],
+                                    "class_id": class_id, "name": name, "notes": _REQUESTED_NOTES},
     )

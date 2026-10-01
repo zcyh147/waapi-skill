@@ -16,7 +16,7 @@ import sys
 import tempfile
 import time
 from contextlib import ExitStack, contextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
@@ -1891,15 +1891,21 @@ class CodexCliHarness:
             windows_powershell_core_host=self._windows_powershell_core_host,
         )
 
-    def audit_prompt(self, prompt: str, *, env: Mapping[str, str]) -> CodexPromptAudit:
+    def audit_prompt(self, prompt: str, *, env: Mapping[str, str],
+                     timeout_seconds: float | None = None) -> CodexPromptAudit:
         command = build_prompt_audit_command(self.config, prompt=prompt)
         completed: ProcessResult | None = None
+        deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
         for attempt in range(1, PROMPT_AUDIT_MAX_ATTEMPTS + 1):
+            remaining = PROMPT_AUDIT_TIMEOUT_SECONDS if deadline is None else min(
+                PROMPT_AUDIT_TIMEOUT_SECONDS, deadline - time.monotonic())
+            if remaining <= 0:
+                raise CodexHarnessError("cumulative Agent budget exhausted during prompt audit")
             completed = run_process(
                 command,
                 cwd=self.config.workspace,
                 env=env,
-                timeout=PROMPT_AUDIT_TIMEOUT_SECONDS,
+                timeout=remaining,
             )
             if completed.exit_status == 0:
                 break
@@ -1938,7 +1944,13 @@ class CodexCliTask:
         config: CodexHarnessConfig,
         *,
         extra_env: Mapping[str, str] | None = None,
+        agent_case_budget: Any | None = None,
     ) -> None:
+        if agent_case_budget is not None:
+            from tests.semantic.support.codex_expansion_policy import CumulativeAgentBudget
+            if not isinstance(agent_case_budget, CumulativeAgentBudget):
+                raise TypeError("agent_case_budget must be CumulativeAgentBudget")
+        self.agent_case_budget = agent_case_budget
         self.config = config
         self._harness = CodexCliHarness(config)
         self._extra_env = dict(extra_env or {})
@@ -2066,8 +2078,12 @@ class CodexCliTask:
         output_dir: Path,
         command: Sequence[str],
     ) -> CodexRunResult:
+        budget = self.agent_case_budget
+        remaining = budget.start_turn(time.monotonic()) if budget is not None else None
         try:
-            result = self._run_turn(prompt, output_dir=output_dir, command=command)
+            result = (self._run_turn(prompt, output_dir=output_dir, command=command)
+                      if remaining is None else self._run_turn(
+                          prompt, output_dir=output_dir, command=command, timeout_seconds=remaining))
         except CodexInfrastructureError as exc:
             self._turn_results.append(exc.result)
             self._failed = True
@@ -2075,6 +2091,9 @@ class CodexCliTask:
         except BaseException:
             self._failed = True
             raise
+        finally:
+            if budget is not None:
+                budget.finish_turn(time.monotonic())
         self._turn_results.append(result)
         return result
 
@@ -2084,7 +2103,9 @@ class CodexCliTask:
         *,
         output_dir: Path,
         command: Sequence[str],
+        timeout_seconds: float | None = None,
     ) -> CodexRunResult:
+        budget_started = time.monotonic()
         execution_env = self._execution_env
         execution_environment = self._execution_environment
         if execution_env is None or execution_environment is None:
@@ -2114,7 +2135,11 @@ class CodexCliTask:
                 raise CodexHarnessError(
                     f"Prompt audit environment is not pristine: {prompt_environment}"
                 )
-            audit = self._harness.audit_prompt(prompt, env=audit_env)
+            audit_harness = (self._harness if timeout_seconds is None else
+                             CodexCliHarness(replace(self.config, timeout_seconds=timeout_seconds)))
+            audit = (audit_harness.audit_prompt(prompt, env=audit_env) if timeout_seconds is None
+                     else audit_harness.audit_prompt(prompt, env=audit_env,
+                         timeout_seconds=max(0.0, timeout_seconds - (time.monotonic() - budget_started))))
             if not audit.passed:
                 raise CodexHarnessError(f"Codex prompt isolation audit failed: {audit}")
         if snapshot_workspace(self.config.workspace) != before_workspace:
@@ -2129,11 +2154,15 @@ class CodexCliTask:
         ) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
 
+        remaining = (self.config.timeout_seconds if timeout_seconds is None else
+                     timeout_seconds - (time.monotonic() - budget_started))
+        if remaining <= 0:
+            raise CodexHarnessError("cumulative Agent budget exhausted during prompt audit")
         completed = run_process(
             command,
             cwd=self.config.workspace,
             env=execution_env,
-            timeout=self.config.timeout_seconds,
+            timeout=remaining,
         )
         return _finalize_codex_run(
             config=self.config,
