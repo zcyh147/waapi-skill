@@ -11488,7 +11488,9 @@ def _prepare_closed_import_plan(
                     row["objectPath"] = ""
                     row["importLocation"] = source_id
                     row.pop("objectType", None)
-                    row.pop("originalsSubFolder", None)
+                    # Source identity and copied-media destination are separate
+                    # native inputs. Retain the live-attested Originals folder:
+                    # dropping it flattens same-basename SFX rows onto one file.
                     native["object_path"] = ""
                     native["canonical_result_path"] = target["expected_audio_file_source_result_path"]
         plan = {**dict(plan), "dispatch_args": dispatch_args}

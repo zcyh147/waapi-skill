@@ -73,14 +73,41 @@ def test_same_basename_existing_sfx_keeps_distinct_originals_and_source_identity
     if version == '2025.1':
         assert [row['importLocation'] for row in rows] == [EN_SOURCE, JP_SOURCE]
         assert all(row['objectPath'] == '' for row in rows)
-        assert all('objectType' not in row and 'originalsSubFolder' not in row for row in rows)
+        assert all('objectType' not in row for row in rows)
     else:
-        assert [row['originalsSubFolder'] for row in rows] == [r'Expansion\Left', r'Expansion\Right']
         assert all('importLocation' not in row for row in rows)
+    # The frozen 2025 owned-copy failure returned Originals/SFX/Hit.wav twice
+    # after the Source-GUID adaptation discarded these attested destinations.
+    assert [row['originalsSubFolder'] for row in rows] == [r'Expansion\Left', r'Expansion\Right']
     targets = prepared['verification_plan']['targets']
     assert [target['existing_sfx_source_id'] for target in targets] == [EN_SOURCE, JP_SOURCE]
     assert all(target['expected_audio_file_source_result_path'].endswith(r'\Hit') for target in targets)
     assert validate_prepared_roles(prepared, read_call=reader)['ok']
+
+
+def test_2025_flattened_copy_collision_retains_all_frozen_verification_failures(tmp_path):
+    """Replay the failed owned-copy outcome without granting it native credit."""
+    from tests.unit.test_operation_registry_import_verifier import _result
+    prepared, reader = prepare_sfx(tmp_path, '2025.1')
+    flat = reader.originals_root / 'SFX' / 'Hit.wav'
+    flat.write_bytes(Path(prepared['dispatch']['args']['imports'][0]['audioFile']).read_bytes())
+    reader.sources[0]['originalFilePath'] = str(flat)
+    reader.sources[0]['originalWavFilePath'] = str(flat)
+    reader.owners[0]['originalFilePath'] = str(flat)
+    reader.owners[0]['sound:originalWavFilePath'] = str(flat)
+    # The actual result named only the original Left Source and reported the
+    # same flat file twice. Right retained its original media bytes/readback.
+    result = verify_prepared_operation(prepared, execution_result=_result(
+        '2025.1', [reader.sources[0]], [flat, flat]), read_call=reader)
+    assert not result.ok
+    failed = {assertion['name'] for assertion in result.assertions if not assertion['passed']}
+    assert failed == {
+        'import target 0 existing SFX source identities and placement preserved',
+        'import target 0 Originals subfolder matches',
+        'import target 0 copied original WAV is reported exactly once',
+        'import target 1 copied original WAV hash matches the source',
+        'import target 1 copied original WAV is reported exactly once',
+    }
 
 
 @pytest.mark.parametrize('version', VERSIONS)

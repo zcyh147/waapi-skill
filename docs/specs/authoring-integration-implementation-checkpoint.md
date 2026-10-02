@@ -42,6 +42,41 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Completed archive repair and native SFX proof — 2026-10-02:** frozen
+  `dcb747c` completed Non-live **12779 passed / 119 skipped / 27 deselected**,
+  exit zero in **869.50 seconds**; JUnit has zero errors/failures. Log SHA-256
+  is `fca49e4b849dcfc4424274a8b33d63c1a36cc016e8b7e629b3ef9786955912b7`;
+  JUnit SHA-256 is
+  `e5999574c388e4d13eff6a0742fe7dd48cb8a232e50ea179ca8b5c2000f9fa79`.
+  #144 is closed after both independent reviews and complete regression.
+  The new SFX real node first failed before mutation because its `config-set`
+  invocation used invalid positional arguments. Reviewed test-only `7a202e5`
+  corrects the public policy flag without changing Program/runtime/harness inputs.
+  On that candidate, sequential owned-copy proof passed **2022.1: 1 passed /
+  32 deselected, 24.82 seconds**, then failed **2025.1: 1 failed / 32 deselected,
+  25.45 seconds** after one authorized goal Execute. The strict verifier retained
+  five failed media-placement/hash assertions: Source-bound imports flattened
+  the Originals destination and collided on `Hit.wav`. Runtime repair #145
+  must preserve both sealed destinations and Source configuration; never weaken
+  those guards or reuse the failed sandbox. Both full source hashes, project
+  mtimes and tree metadata were unchanged, both trusted actors fully closed,
+  the PASS copy was deleted, the FAIL copy quarantined, and hosts cleaned with
+  no residual process. These are real Gateway proofs, not Fresh Agent results.
+  No new Fresh campaign started; all prepared launchers remain unused. After
+  #145 is reviewed and gated, rerun both real versions on new copies before
+  failed-unit Fresh reruns and final thirteen-Agent-unit plus boundary acceptance.
+  #145 retains each live-attested `originalsSubFolder` alongside its Source GUID;
+  no verifier, public contract, or older native shape changed. Five-version
+  preparation reproduced one 2025 RED; the related focused selection passed
+  **540 tests**, exit zero in **8.23 seconds**. The old failed outcome still
+  rejects all five original assertions. Both independent review axes are clear.
+  Log SHA-256 is
+  `5b98d5a653efbc44f79fe45fa46f625779d3bc39e1c40f064fd748fd19476207`;
+  JUnit SHA-256 is
+  `13809a91016e93182a3bf19fa206f8968f8642eb5ee1a3ea64ed13bd9e7dd226`.
+  Freeze and complete Program first, then new sequential owned-copy native proof.
+  Complete Non-live before the next Fresh root if both native proofs pass.
+
 - **Stable-candidate gates — 2026-10-02:** frozen `ebdc769` passed the
   fixed five-version Program gate: **6093 passed / 2 native-Windows skips**,
   exit zero in **288.27 seconds**. Log SHA-256 is
