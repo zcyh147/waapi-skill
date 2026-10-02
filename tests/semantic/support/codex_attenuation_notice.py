@@ -68,7 +68,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     """Every affirmative transitive edit must name this owner and curve role."""
     row = context["identity"]
     owner = "|".join(re.escape(value.casefold()) for value in (
-        row["id"], row["name"], row["path"], "该对象", "该衰减对象", "this attenuation"))
+        row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "该衰减对象", "该衰减", "this attenuation"))
     kind = "|".join(re.escape(value) for value in kind_aliases)
     field = rf"(?:的|'s|\s)*(?:{kind})(?:\s*(?:曲线|curve))?(?:的|:|：|\s)*(?:来源|source|形状|shape|点|points)?"
     source = "|".join(re.escape(value) for value in source_aliases)
@@ -112,7 +112,7 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
     row = context["identity"]
     if any(value != row["id"].casefold() for value in re.findall(_GUID, text)):
         return False
-    if not any(term.casefold() in text for term in (row["id"], row["name"], row["path"], "该对象", "该衰减对象", "this attenuation")):
+    if not any(term.casefold() in text for term in (row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "该衰减", "该衰减对象", "this attenuation")):
         return False
     kind_aliases = [context["kind"], context["kind"].replace("-", " ")]
     if context["kind"] == "volume-dry":
@@ -133,7 +133,18 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
     for key in _CURVE_SOURCES:
         if key not in {context["source"], context["kind"]} and _has(text, key):
             return False
-    stated = [(float(x), float(y)) for x, y in re.findall(rf"[（(]\s*({_NUMBER})\s*[,，]\s*({_NUMBER})\s*[)）]", text)]
+    # Only the sealed dry-volume ordinate is a disclosed decibel quantity.
+    # Units on x, other quantities, or unknown unit suffixes cannot disappear.
+    y_unit = r"(?:\s*db)?" if context["kind"] == "volume-dry" else ""
+    stated = []
+    for candidate in re.finditer(r"[（(]([^()（）]*[,，][^()（）]*)[)）]", text):
+        body = candidate.group(1)
+        if re.match(rf"\s*{_NUMBER}", body) is None:
+            continue
+        point = re.fullmatch(rf"\s*({_NUMBER})\s*[,，]\s*({_NUMBER}){y_unit}\s*", body)
+        if point is None:
+            return False
+        stated.append((float(point.group(1)), float(point.group(2))))
     if stated != [(point["x"], point["y"]) for point in context["points"]]:
         return False
     shapes = {point["shape"] for point in context["points"]}

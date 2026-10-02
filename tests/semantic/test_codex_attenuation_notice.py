@@ -24,6 +24,34 @@ def _notice(case):
         preview_artifact=case["artifact"], before_snapshot=case["before"])
 
 
+def _decibel_case():
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-contextual-notices-4d2c121.json").read_text())
+    case = next(case for case in fixture["cases"] if case["case"] == "008-EXP25-C08")
+    case["version"] = "2025.1"
+    return case
+
+
+@pytest.mark.parametrize("damage", ["wrong_y_unit", "wrong_x_unit", "extra_wrong_unit_point", "wrong_value", "wrong_source", "wrong_shape", "foreign_owner", "second_field", "other_quantity"])
+def test_decibel_notation_is_bound_to_the_sealed_curve_quantity_and_complete_points(damage):
+    case = _decibel_case()
+    post = case["events"][1]["item"]
+    if damage == "wrong_y_unit": post["text"] = post["text"].replace("-12 dB", "-12 Hz")
+    elif damage == "wrong_x_unit": post["text"] = post["text"].replace("50.0,", "50.0 dB,")
+    elif damage == "extra_wrong_unit_point": post["text"] += "另有点 (75,-24 Hz)。"
+    elif damage == "wrong_value": post["text"] = post["text"].replace("-12 dB", "-60 dB")
+    elif damage == "wrong_source": post["text"] = post["text"].replace("自定义", "project")
+    elif damage == "wrong_shape": post["text"] = post["text"].replace("线性", "非线性")
+    elif damage == "foreign_owner": post["text"] += "另外将 OtherOwner 的干声音量来源设为自定义。"
+    elif damage == "second_field": post["text"] += "另外将该衰减的 Pitch 设为 12。"
+    else:
+        args = case["artifact"]["request"]["arguments"]["args"]
+        args["curveType"] = "SpreadUsage"
+        case["artifact"]["prepared_operation"]["request"] = deepcopy(case["artifact"]["request"])
+        case["artifact"]["prepared_operation"]["dispatch"]["args"] = deepcopy(args)
+        post["text"] = post["text"].replace("干声音量", "spread")
+    assert not _notice(case)
+
+
 @pytest.mark.parametrize("version", ["2022.1", "2025.1"])
 def test_actual_attenuation_notice_states_exact_effect_before_execute(version):
     assert _notice(_case(version))

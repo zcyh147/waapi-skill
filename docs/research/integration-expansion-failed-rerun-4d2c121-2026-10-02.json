@@ -1,0 +1,438 @@
+{
+  "contract": "waapi-skill.integration-expansion-failed-rerun-report/v1",
+  "date": "2026-10-02",
+  "candidate": "4d2c1217ba6a6704b5c7bce183894e7cb0f7a689",
+  "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592",
+  "complete_acceptance": false,
+  "batch_complete": true,
+  "campaign_exit_code": 1,
+  "launch_runs": 1,
+  "launch_booted_out": true,
+  "scoped_processes_after_shutdown": 0,
+  "model": "gpt-6-luna",
+  "reasoning_effort": "high",
+  "service_tier": "default",
+  "agent_time_limit_seconds": 600,
+  "slow_threshold_seconds": 420,
+  "readiness_timeout_seconds": 180,
+  "selected_agent_units": 9,
+  "selected_runner_boundaries": 1,
+  "result": {
+    "agent_pass": 2,
+    "agent_fail": 7,
+    "boundary_proven": 1,
+    "pending": 0,
+    "early_stop": false
+  },
+  "failure_attribution": {
+    "notice_false_negative_correct_business": 6,
+    "agent_safe_incompletion_before_preview": 1
+  },
+  "no_verify_only_or_regrade": true,
+  "artifact_integrity": {
+    "artifact_count": 1473,
+    "artifact_bytes": 53908601,
+    "manifest_sha256": "04d83a71b7bd5c2a1f8735583aaa87469e356c6dab8b19ab7804ae65bdd6e846",
+    "sidecars": [
+      {
+        "path": "campaign-config.json",
+        "sha256": "ec146be7c34484796a082b3365d10174ed1010d28364d019f668cb877107d8c0"
+      },
+      {
+        "path": "attempt-ledger.json",
+        "sha256": "327175071fe2df6915b16cc4c33f5f60e58198d49786a443620a2e40ac186033"
+      },
+      {
+        "path": "consolidated-summary.json",
+        "sha256": "f6ff076593e26459b20961acfff191025f4fae9882b5e0099b791a136b6dbc0b"
+      },
+      {
+        "path": "expansion-accounting.json",
+        "sha256": "0418ef26fc2da7ad23ff3472cdc21f406f83dc634affcb8c9f2c880a62d34019"
+      },
+      {
+        "path": ".waapi-semantic-campaign-root.json",
+        "sha256": "85e230e5db19f5b4230ac7bdc78bbbf8e57796a7b87ff32e8b32525b123d13e4"
+      },
+      {
+        "path": "attempts/attempt-000001/attempt.json",
+        "sha256": "b8affa5b4c4abd2a7f30076f007f78a9e225492256aa28c57b396e8ce5fd7c53"
+      },
+      {
+        "path": "attempts/attempt-000001/attempt-manifest.json",
+        "sha256": "04d83a71b7bd5c2a1f8735583aaa87469e356c6dab8b19ab7804ae65bdd6e846"
+      }
+    ]
+  },
+  "agent_seconds": 1511.0529937925749,
+  "agent_turns": 11,
+  "slow_cases": 0,
+  "goal_execution_count": 8,
+  "goal_verification_attempt_count": 8,
+  "usage": {
+    "input_tokens": 5432307,
+    "cached_input_tokens": 4913664,
+    "output_tokens": 58200,
+    "reasoning_output_tokens": 29314,
+    "cache_write_input_tokens": 0,
+    "uncached_input_tokens": 518643
+  },
+  "usd_cost": null,
+  "usage_note": "Input includes cached input. Reasoning tokens are included in output tokens. No USD estimate.",
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "status": "BOUNDARY_PROVEN",
+      "campaign_status": "PASS",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-M05/evidence/quarantine.json",
+      "agent_started": false,
+      "agent_seconds": 0,
+      "agent_turns": 0,
+      "executions": 0,
+      "verification_attempts": 0,
+      "independent_assertions": {},
+      "failure": null
+    },
+    {
+      "id": "EXP22-C03",
+      "status": "PASS",
+      "campaign_status": "PASS",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "quarantine_record": null,
+      "agent_started": true,
+      "agent_seconds": 155.1915849170182,
+      "agent_turns": 2,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "exact_media_mapping": true,
+        "exact_target_set": true,
+        "fixture_membership_unchanged": true,
+        "media_destinations_preserved": true,
+        "sound_identities_and_configuration_preserved": true,
+        "source_identities_and_configuration_preserved": true
+      },
+      "failure": null,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "failure_reconciliation": null
+    },
+    {
+      "id": "EXP22-C06",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C06/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 158.51480849995278,
+      "agent_turns": 1,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "failure": {
+        "attribution": "Notice grader false negative; business result independently correct",
+        "meaning_not_recognized": "Current curve plus prospective middle-point delta, identity/notes/linear shape preserved",
+        "repair_issue": 147,
+        "original_formal_fail_retained": true
+      },
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 1.1682981248013675,
+        "snapshot_sha256": "93ddfb4658191f6a29cd584c9892f982de620d3b5b7e57d64a2a4d286dbee7ca"
+      }
+    },
+    {
+      "id": "EXP22-C08",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP22-C08/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 92.30845291703008,
+      "agent_turns": 1,
+      "executions": 0,
+      "verification_attempts": 0,
+      "independent_assertions": {},
+      "failure": {
+        "attribution": "Agent safe incompletion",
+        "command": [
+          "metadata",
+          "attenuation"
+        ],
+        "error": "metadata attenuation requires one object --path-segment or --exact-id scope",
+        "preview_or_execute_started": false,
+        "not_a_notice_false_negative": true
+      },
+      "gateway_verification_state": null,
+      "failed_gates": [
+        "broker_provenance",
+        "policy_checkpoint",
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 4.3278166248928756,
+        "snapshot_sha256": "286891fcd19e2308bd84e8a56fcdbb02a993e0400c8c1120334835b522069b0b"
+      }
+    },
+    {
+      "id": "EXP22-C09",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP22-C09/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 165.48703183303587,
+      "agent_turns": 1,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "failure": {
+        "attribution": "Notice grader false negative; business result independently correct",
+        "meaning_not_recognized": "Uniquely attested target Sound, exact new effect/plugin/notes",
+        "repair_issue": 147,
+        "original_formal_fail_retained": true
+      },
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 0.2601781249977648,
+        "snapshot_sha256": "12e6acd8e48fd7f3e6069f09a20cecc620f7bf8e331feceafbb30592b6000d8a"
+      }
+    },
+    {
+      "id": "EXP25-C03",
+      "status": "PASS",
+      "campaign_status": "PASS",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "quarantine_record": null,
+      "agent_started": true,
+      "agent_seconds": 188.27993870829232,
+      "agent_turns": 2,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "exact_media_mapping": true,
+        "exact_target_set": true,
+        "fixture_membership_unchanged": true,
+        "media_destinations_preserved": true,
+        "sound_identities_and_configuration_preserved": true,
+        "source_identities_and_configuration_preserved": true
+      },
+      "failure": null,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "failure_reconciliation": null
+    },
+    {
+      "id": "EXP25-C06",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-C06/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 124.54846783308312,
+      "agent_turns": 1,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "failure": {
+        "attribution": "Notice grader false negative; business result independently correct",
+        "meaning_not_recognized": "Current curve plus explicit -12 to -6 middle-point delta and endpoint preservation",
+        "repair_issue": 147,
+        "original_formal_fail_retained": true
+      },
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 1.1748812920413911,
+        "snapshot_sha256": "7da326a35ce6ed72c62dae4b5965edcfd5f904dd99d3836aaa4765832471dd74"
+      }
+    },
+    {
+      "id": "EXP25-C08",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/008-EXP25-C08/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 246.60742800007574,
+      "agent_turns": 1,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "attenuation_identity_unchanged": true,
+        "other_curves_unchanged": true,
+        "requested_curve_matches": true,
+        "source_attenuation_unchanged": true,
+        "users_and_references_unchanged": true
+      },
+      "failure": {
+        "attribution": "Notice grader false negative; business result independently correct",
+        "meaning_not_recognized": "This attenuation plus Custom Linear dry-volume coordinates annotated in dB",
+        "repair_issue": 147,
+        "original_formal_fail_retained": true
+      },
+      "gateway_verification_state": "result_schema_checked",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 4.3781135838944465,
+        "snapshot_sha256": "d15bb7efa9aec828e783884ef1d900a62e0078e2677af4876239459f26cd69eb"
+      }
+    },
+    {
+      "id": "EXP25-C09",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/009-EXP25-C09/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 192.46247833408415,
+      "agent_turns": 1,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "failure": {
+        "attribution": "Notice grader false negative; business result independently correct",
+        "meaning_not_recognized": "Exact owner path followed by this object, exact effect/plugin/notes and negated replacement",
+        "repair_issue": 147,
+        "original_formal_fail_retained": true
+      },
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 0.2778536668047309,
+        "snapshot_sha256": "aba79fc907d57016f68137084b1e7f598c6ac246ae4745caefa61d23646f5d70"
+      }
+    },
+    {
+      "id": "EXP25-M05",
+      "status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_full_hash_unchanged": true,
+      "source_project_mtime_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_record": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/010-EXP25-M05/evidence/quarantine.json",
+      "agent_started": true,
+      "agent_seconds": 187.6528027500026,
+      "agent_turns": 1,
+      "executions": 1,
+      "verification_attempts": 1,
+      "independent_assertions": {
+        "other_stingers_preserved": true,
+        "owner_unchanged": true,
+        "requested_trigger_matches": true,
+        "segment_reference_preserved": true,
+        "stinger_identity_and_other_configuration_preserved": true,
+        "target_and_segment_unchanged": true
+      },
+      "failure": {
+        "attribution": "Notice grader false negative; business result independently correct",
+        "meaning_not_recognized": "Target Stinger Trigger change, negated protected Segment/owner/Stinger changes",
+        "repair_issue": 147,
+        "original_formal_fail_retained": true
+      },
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "failure_reconciliation": {
+        "status": "completed",
+        "child_reaped": true,
+        "subprocesses_reaped": true,
+        "elapsed_seconds": 0.2771888750139624,
+        "snapshot_sha256": "84357909a9961d4b3d265a86d8f19932f7ea1f58260a6edcd974a13626d8c1fa"
+      }
+    }
+  ],
+  "next": "Consolidate the six notice-meaning defects without changing the actual outcome oracle or promoting history. Rerun failures fresh, then final full thirteen-Agent-unit plus one-boundary acceptance on one candidate."
+}

@@ -390,6 +390,149 @@ def _next_context_notice(case_id):
     return next(case for case in fixture["cases"] if case["case"] == case_id)
 
 
+def _coherent_context_notice(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-contextual-notices-4d2c121.json").read_text())
+    return next(case for case in fixture["cases"] if case["case"] == case_id)
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "005-EXP22-C09", "007-EXP25-C06", "008-EXP25-C08", "009-EXP25-C09", "010-EXP25-M05"])
+def test_archived_coherent_notice_states_match_the_attested_single_edit(case_id):
+    case = _coherent_context_notice(case_id)
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "005-EXP22-C09", "007-EXP25-C06", "008-EXP25-C08", "009-EXP25-C09", "010-EXP25-M05"])
+@pytest.mark.parametrize("damage", ["foreign_identity", "baseline", "version", "generic", "late", "extra_change"])
+def test_coherent_notice_context_cannot_certify_unattested_or_extra_effects(case_id, damage):
+    case = _coherent_context_notice(case_id)
+    post = case["events"][-2]["item"]
+    if damage == "foreign_identity": post["text"] += "目标是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。"
+    elif damage == "baseline":
+        key = "attenuation" if case_id.endswith("C08") else "stinger" if case_id.endswith("M05") else "owner"
+        case["before"][key]["id"] = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    elif damage == "version": case["artifact"]["request"]["version"] = "2024.1"
+    elif damage == "generic": post["text"] = "预览已授权，现在执行。"
+    elif damage == "late": case["events"][-2:] = case["events"][-2:][::-1]
+    else:
+        post["text"] += "同时修改备注。" if case_id.endswith("C06") else "该衰减的 Pitch 设为 12。" if case_id.endswith("C08") else "另外向 OtherOwner 新增名为 Expansion_" + case_id.split("-", 1)[1] + "_NewGain 的 Effect。" if case_id.endswith("C09") else "同时设为 OtherTrigger。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "007-EXP25-C06"])
+@pytest.mark.parametrize("damage", ["wrong_history", "wrong_value", "positive_value", "wrong_endpoint", "wrong_order", "extra_point", "wrong_from", "missing_point_role", "replace_curve", "wrong_shape", "foreign_property", "foreign_control", "second_delta", "wrong_y_unit", "extra_wrong_unit_point"])
+def test_before_state_and_only_middle_y_claim_require_the_exact_sealed_edit(case_id, damage):
+    case = _coherent_context_notice(case_id)
+    post = case["events"][-2]["item"]
+    text = post["text"]
+    if damage == "wrong_history": text = text.replace("(50, -12)", "(50, -24)").replace("(50,-12)", "(50,-24)")
+    elif damage == "wrong_value": text = text.replace("改为 -6", "改为 -60")
+    elif damage == "positive_value": text = text.replace("改为 -6", "改为 6")
+    elif damage == "wrong_endpoint": text = text.replace("(0, -48)", "(0, -20)").replace("(0,-48)", "(0,-20)")
+    elif damage == "wrong_order": text = text.replace("(0, -48)、(50, -12)", "(50, -12)、(0, -48)").replace("(0,-48)、(50,-12)", "(50,-12)、(0,-48)")
+    elif damage == "extra_point": text = text.replace("(100, 0)", "(100, 0)、(75,-3)").replace("(100,0)", "(100,0)、(75,-3)")
+    elif damage == "wrong_from": text = text.replace("从 -12", "从 -24") if "从 -12" in text else text.replace("中间点改为", "中间点从 -24 改为")
+    elif damage == "missing_point_role": text = text.replace("中间点", "该点")
+    elif damage == "replace_curve": text = text.replace("中间点改为 -6 dB", "曲线改为 (50,-6)").replace("曲线的中间点从 -12 改为 -6", "曲线改为 (50,-6)")
+    elif damage == "wrong_shape": text = text.replace("线性", "非线性")
+    elif damage == "foreign_property": text = text.replace("中间点", "Pitch 曲线的中间点")
+    elif damage == "foreign_control": text = text.replace("中间点", "Time 关联的中间点")
+    elif damage == "wrong_y_unit": text = text.replace("-6 dB", "-6 Hz") if "-6 dB" in text else text.replace("改为 -6", "改为 -6 Hz")
+    elif damage == "extra_wrong_unit_point": text += "另有点 (75,-3 Hz)。"
+    else: text += "但仅把中间点改为 -60，线性段保持原样。"
+    assert text != post["text"]
+    post["text"] = text
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("claim", [
+    "另外向 OtherOwner 新增名为 Expansion_EXP25-C09_NewGain 的 Effect。",
+    "另外在此对象和 OtherOwner 上新增名为 Expansion_EXP25-C09_NewGain 的 Effect。",
+    "另外新增名为 AnotherGain 的 Effect。",
+    "另外删除原效果。",
+])
+def test_this_object_in_attested_notice_never_inherits_a_second_owner_or_effect(claim):
+    case = _coherent_context_notice("009-EXP25-C09")
+    case["events"][-2]["item"]["text"] += claim
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+def test_before_state_with_precise_midpoint_delta_and_preserved_remainder_needs_no_only_keyword():
+    case = _coherent_context_notice("007-EXP25-C06")
+    case["events"][-2]["item"]["text"] = case["events"][-2]["item"]["text"].replace("仅把", "把")
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "007-EXP25-C06"])
+@pytest.mark.parametrize("claim,expected", [
+    ("但仅把中间点改为 -60 Hz，线性段保持原样。", False),
+    ("但仅把中间点改为 -60，线性段保持原样。", False),
+    ("但仅把中间点改为，线性段保持原样。", False),
+    ("但仅把中间点改为未知值，线性段保持原样。", False),
+    ("不会把中间点改为 -60 Hz。", True),
+    ("不会把中间点改为 -60 dB。", True),
+    ("当前中间点为 -12 dB。", True),
+    ("当前中间点为 -24 dB。", False),
+    ("当前中间点为 -12 Hz。", False),
+])
+def test_later_scalar_edit_intent_cannot_hide_behind_a_valid_effect(case_id, claim, expected):
+    case = _coherent_context_notice(case_id)
+    case["events"][-2]["item"]["text"] += claim
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "007-EXP25-C06"])
+@pytest.mark.parametrize("value,expected", [
+    ("(-60 Hz)", False), ("（-60 Hz）", False), ("(-60)", False), ("（-6）", False),
+    ("(50,-60)", False), ("（50,-60）", False), ("(50,)", False),
+    ("(50,-6", False), ("（50,-6", False), ("(50,-6))", False),
+    ("(50,-6)", True), ("（50,-6）", True),
+])
+def test_midpoint_tuple_intent_requires_a_complete_correct_coordinate_claim(case_id, value, expected):
+    case = _coherent_context_notice(case_id)
+    case["events"][-2]["item"]["text"] += f"但仅把中间点改为 {value}，线性段保持原样。"
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+@pytest.mark.parametrize("claim,expected", [
+    ("不会把中间点改为 (-60 Hz)。", True),
+    ("不会把中间点改为 (50,-60)。", True),
+    ("不会把中间点改为 (50,-6)。", False),
+    ("但仅把中间点从 (50,-24) 改为 (50,-6)，线性段保持原样。", False),
+    ("但仅把中间点从 -24 改为 (50,-6)，线性段保持原样。", False),
+])
+def test_tuple_edit_exception_preserves_polarity_and_asserted_before_state(claim, expected):
+    case = _coherent_context_notice("003-EXP22-C06")
+    case["events"][-2]["item"]["text"] += claim
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "007-EXP25-C06"])
+@pytest.mark.parametrize("value,expected", [
+    ("(-24 dB)", False), ("(-12 Hz)", False), ("（-24 dB）", False),
+    ("(50,-12)", True), ("（50,-12 dB）", True), ("(-12 dB)", True),
+    ("(50,-24)", False), ("(75,-12)", False), ("(50,-12 Hz)", False),
+    ("(50,-12", False), ("(-12 dB", False), ("(50,-12))", False),
+])
+def test_historical_midpoint_claim_requires_complete_exact_old_value(case_id, value, expected):
+    case = _coherent_context_notice(case_id)
+    case["events"][-2]["item"]["text"] += f"当前中间点为 {value}。"
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+def test_later_historical_conflict_cannot_borrow_a_valid_historical_tuple():
+    case = _coherent_context_notice("003-EXP22-C06")
+    case["events"][-2]["item"]["text"] += "当前中间点为 (50,-12)。当前中间点为 (-24 dB)。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id", ["003-EXP22-C06", "007-EXP25-C06"])
+@pytest.mark.parametrize("origin", ["(50,-24", "（50,-12"])
+def test_unclosed_origin_cannot_make_an_affirmative_midpoint_claim_disappear(case_id, origin):
+    case = _coherent_context_notice(case_id)
+    case["events"][-2]["item"]["text"] += f"但仅把中间点从 {origin} 改为 (0,-48)、(50,-6)、(100,0)，各段线性。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
 @pytest.mark.parametrize("case_id", ["005-EXP22-C09", "007-EXP25-C06", "009-EXP25-C09", "010-EXP25-M05"])
 def test_next_archived_notice_accounts_for_bound_owner_and_exact_effect(case_id):
     case = _next_context_notice(case_id)

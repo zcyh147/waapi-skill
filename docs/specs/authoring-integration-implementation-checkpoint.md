@@ -42,6 +42,52 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed notice repair #147 — 2026-10-02:** all six sealed contextual
+  notices now pass without changing Skill behavior, business oracles, prompts,
+  authorization, or historical outcomes. Notice grading resolves references
+  only against the uniquely attested target and distinguishes sealed old
+  midpoint claims from the requested new scalar or complete tuple. Compatible
+  units, finite values, complete syntax and boundaries remain mandatory;
+  wrong owners, extra changes, malformed origins and contradictory values
+  remain negative controls. Both independent Spec and Standards reviews are
+  clear. Author-focused validation passed **540 tests**, preserving all prior
+  controls; the root's combined archive, notice, task, matrix, campaign and
+  policy regression passed **913 tests**, exit zero in **15.45 seconds**.
+  Log SHA-256 is
+  `362865d0be85e9cbcd82f1200c9cd2af5e6480ef3f09e2e95cae8e395e4cf68e`;
+  JUnit SHA-256 is
+  `c666ae20abcd4c41b6973a66adab4cdea13f3fa9b744958490e0201c221ba5cc`.
+  No owned test process or diff-check error remained. New full Non-live and
+  failed-only C06/C08/C09/M05 validation remain required, followed by final
+  full acceptance and identical verify-only. The C03 import notice path is
+  unaffected; its two passing version units need no failed-only rerun.
+
+- **Complete failed-only batch — 2026-10-02:** frozen `4d2c121` completed
+  Non-live **12800 passed / 119 skipped / 27 deselected**, exit zero in
+  **834.11 seconds**. Log SHA-256 is
+  `d3f8f529fbbb31ea5c47366a69d639a3fefb631e14a8233c13e9ab034a79f2ed`;
+  JUnit SHA-256 is
+  `452f0bd863dd4c11294aa7b762438a7c9d8c8e66da4e8c0adf30871925be5803`.
+  The Skill and Program inputs remain byte-identical to `b4fd348`.
+  Root `expansion-failed8-4d2c121-luna-high-r1-cli1592` then completed all ten
+  selected units: **2 Agent PASS / 7 FAIL / 1 separate boundary**, zero pending
+  and no early stop. Both C03 version units formally passed. Six other units
+  completed the correct business effect with passing independent assertions;
+  their only failed gate was the notice interpretation. C08/2022 remained a
+  genuine safe-incompletion FAIL after omitting the required metadata scope.
+  #147 consolidates uniquely attested target references, before-state versus
+  prospective point deltas, and compatible curve units; it must preserve all
+  provenance and wrong-owner/extra-change negatives. Original FAILs remain
+  frozen without verify-only or regrading. The launcher ran once, exited 1,
+  was unloaded and left an empty scoped process set. All ten source hashes and
+  mtimes remained unchanged and all trusted actors closed; two PASS projects
+  were removed, seven FAIL projects plus the boundary stayed quarantined.
+  Independent evidence review rehashed **1473 artifacts / 53908601 bytes** and
+  seven metadata seals. Exact units, attribution and usage are in
+  `../research/integration-expansion-failed-rerun-4d2c121-2026-10-02.json`.
+  Fresh failed-only reruns and final thirteen-Agent-unit plus boundary acceptance
+  remain pending after the next reviewed, gated notice candidate.
+
 - **Partial failed-only root and archive stop — 2026-10-02:** frozen
   `b4fd348` passed Program **6094 / skipped 2**, exit zero in **290.39 seconds**
   (log SHA-256 `85bbc3ca79200477745353e67a3889a0f6d8bd74584bd53e773727718d40c02b`),

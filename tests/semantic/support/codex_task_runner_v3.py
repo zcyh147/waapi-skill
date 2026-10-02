@@ -347,7 +347,7 @@ def _bound_owner_anchor(text: str, context: Mapping[str, Any]) -> bool:
         return True
     # The descriptor resolves through sealed roles, never through a shortened
     # GUID. Its trailing grammar must not introduce a different named owner.
-    return re.search(rf"(?:已核对|指定)(?:的)?\s*{context['source_type']}\b\s*(?=[，,。；;：:]|\{{|上|$)", text) is not None
+    return re.search(rf"(?:已核对|指定|目标|该|此)(?:的)?\s*(?:{context['source_type']}\b|对象)\s*(?=[，,。；;：:]|\{{|上|的|$)", text) is not None
 
 
 def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any]) -> bool:
@@ -371,7 +371,7 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     for owner in owners:
         if owner in {context["source_id"].casefold(), *(value.casefold() for value in context["source_names"] if value)}:
             continue
-        if re.fullmatch(rf"(?:该|this)\s*{context['source_type']}", owner):
+        if re.fullmatch(rf"(?:该|此|目标|this|target)(?:的)?\s*(?:{context['source_type']}|对象|object)", owner):
             continue
         descriptor = re.fullmatch(rf"(?:已核对|指定)(?:的)?\s*{context['source_type']}\b\s*(\{{[^{{}}]+\}})?", owner)
         if descriptor:
@@ -419,11 +419,12 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             # Verification and the execute-summary noun do not author another
             # change. They cannot certify the expected effect by themselves.
             prefix = clause[:action.start()]
-            if action.group() == "变更" and re.match(r"(?:只将|范围)", clause[action.end():]):
+            if action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", clause[action.end():])
+                    or re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix)):
                 continue
             if action.group() == "设置" and re.search(r"其他\s*$", prefix) and re.match(r"和对象不在", clause[action.end():]):
                 continue
-            if re.search(r"(?:核验|verify|验收)\s*$", prefix) or (context["kind"] == "reference"
+            if re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix) or (context["kind"] == "reference"
                     and re.search(r"执行.*引用$", prefix) and action.group() == "更新"):
                 continue
             if not _bound_explicit_owners_agree(prefix, claim, context):
@@ -538,6 +539,36 @@ def _affirmative_linear_interpolation(effect_clause: str) -> bool:
     return bool(mentions)
 
 
+def _rtpc_volume_point_claims(text: str) -> list[tuple[float, float]] | None:
+    """Parse every numeric coordinate claim for the attested Volume role."""
+    number = r"[+-]?\d+(?:\.\d+)?"
+    points = []
+    for candidate in re.finditer(r"[（(]([^()（）]*[,，][^()（）]*)[)）]", text.replace("\u2212", "-")):
+        body = candidate.group(1)
+        if re.match(rf"\s*{number}", body) is None:
+            continue
+        point = re.fullmatch(rf"\s*({number})\s*[,，]\s*({number})(?:\s*db)?\s*", body)
+        if point is None:
+            return None
+        points.append((float(point.group(1)), float(point.group(2))))
+    return points
+
+
+def _rtpc_midpoint_value(text: str) -> tuple[float | tuple[float, float], int] | None:
+    """Read one complete midpoint value, never a parentheses-only exception."""
+    number = r"[+-]?\d+(?:\.\d+)?"
+    boundary = r"(?=\s*(?:[,，、。；;]|$))"
+    pair = re.match(rf"[（(]\s*({number})\s*[,，]\s*({number})(?:\s*db)?\s*[)）]{boundary}", text)
+    if pair:
+        value = (float(pair.group(1)), float(pair.group(2)))
+        return (value, pair.end()) if all(math.isfinite(item) for item in value) else None
+    scalar = re.match(rf"[（(]\s*({number})(?:\s*db)?\s*[)）]{boundary}|({number})(?:\s*db)?{boundary}", text)
+    if scalar:
+        value = float(scalar.group(1) or scalar.group(2))
+        return (value, scalar.end()) if math.isfinite(value) else None
+    return None
+
+
 def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | None:
     """Return the latest relevant plan's validity, or None for unrelated prose."""
     if not (("curve" in text or "曲线" in text) and ("点" in text or "points" in text)
@@ -545,8 +576,9 @@ def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | No
                  or any(name.casefold() in text for name in context["control_names"]))):
         return None
     number = r"[+-]?\d+(?:\.\d+)?"
-    stated_points = [(float(x), float(y)) for x, y in re.findall(
-        rf"[（(]\s*({number})\s*[,，]\s*({number})\s*[)）]", text.replace("\u2212", "-"))]
+    stated_points = _rtpc_volume_point_claims(text)
+    if stated_points is None:
+        return False
     arrow_points = [(float(x), float(y)) for x, y in re.findall(
         rf"({number})\s*→\s*({number})", text.replace("\u2212", "-"))]
     if arrow_points:
@@ -566,7 +598,10 @@ def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | No
 
 def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool, earlier_shape: bool = False) -> tuple[bool, bool]:
     """Recognize a full curve or accurate point delta in the attested context."""
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
     numeric = text.replace("\u2212", "-")
+    if _rtpc_volume_point_claims(numeric) is None:
+        return False, False
     ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
     if any(value not in {key.casefold() for key in context["ids"]} for value in ids):
         return False, False
@@ -588,8 +623,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             previous_end = change.end()
     number = r"[+-]?\d+(?:\.\d+)?"
     def pairs(part: str) -> list[tuple[float, float]]:
-        return [(float(x), float(y)) for x, y in re.findall(
-            rf"[（(]\s*({number})\s*[,，]\s*({number})\s*[)）]", part)]
+        return _rtpc_volume_point_claims(part) or []
     full = False
     effect = False
     clauses = re.split(r"[。；;\n]", numeric)
@@ -632,12 +666,53 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             else:
                 return False, False
         scalar_middles = tuple(re.finditer(
-            rf"(?:中点|中间点|midpoint|middle point)\s*(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*({number})(?![a-z\d_.])", clause))
+            rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*(?P<old>{number})(?:\s*db)?\s*)?"
+            rf"(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*(?P<new>{number})(?:\s*db)?(?=\s*(?:[,，、。；;]|$))", clause))
+        # Detect the requested edit role before interpreting its value. An
+        # unknown value/unit is a malformed affirmative claim, not no claim.
+        intents = tuple(re.finditer(
+            r"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*(?P<origin>.*?)\s*)?"
+            r"(?P<edit>改为|改成|设为|设置为|(?:will be )?set to|change to)", clause))
+        if intents and (len(context["old"]) != 3 or len(context["new"]) != 3):
+            return False, False
+        preserved_claims = set()
+        preserved_actions = set()
+        for intent in intents:
+            qualifier = re.split(r"[，,、]", clause[:intent.start()])[-1]
+            negated = _notice_qualifier_is_negated(qualifier)
+            parsed = next((claim for claim in scalar_middles if claim.start() == intent.start()), None)
+            value_claim = _rtpc_midpoint_value(clause[intent.end():].lstrip())
+            claimed_value = value_claim[0] if value_claim else None
+            if negated:
+                if claimed_value in (context["new"][1][1], context["new"][1]):
+                    return False, False
+                preserved_claims.add(intent.start())
+                preserved_actions.add(intent.start("edit"))
+            elif value_claim is None:
+                return False, False
+            elif parsed is None:
+                if claimed_value != context["new"][1]:
+                    return False, False
+                origin = intent.group("origin")
+                if origin is not None:
+                    origin = origin.strip()
+                    before_value = _rtpc_midpoint_value(origin)
+                    if (before_value is None or before_value[1] != len(origin)
+                            or before_value[0] not in (context["old"][1][1], context["old"][1])):
+                        return False, False
+        scalar_middles = tuple(claim for claim in scalar_middles if claim.start() not in preserved_claims)
+        for history in re.finditer(r"(?:当前|现有|current)\s*(?:中点|中间点|midpoint|middle point)\s*(?:为|是|is)\s*", clause):
+            if len(context["old"]) != 3:
+                return False, False
+            value = _rtpc_midpoint_value(clause[history.end():].lstrip())
+            if value is None or value[0] not in (context["old"][1][1], context["old"][1]):
+                return False, False
         target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
                          and any(term in clause for term in ("curve", "曲线", "rtpc"))) or whole_target
         historical = (any(term in clause for term in ("现有", "当前", "现状", "existing", "current"))
                       or re.search(r"(?:中点|中间点|midpoint|middle point)\s*(?:从|from)", clause) is not None)
-        if (target_clause or scalar_middles) and historical:
+        primary_history = clause in same_target_clauses and re.search(r"目标关系|现有关联|当前.*(?:曲线|节点)|current.*curve", clause) is not None
+        if (target_clause or scalar_middles or primary_history) and historical:
             # Validate claimed history before either tuple or scalar dispatch.
             previous = pairs(re.split(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause)[0])
             if any(point not in context["old"] for point in previous):
@@ -647,7 +722,8 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
         if scalar_middles:
             if len(context["new"]) != 3:
                 return False, False
-            if any(float(claim.group(1)) != context["new"][1][1]
+            if any(float(claim.group("new")) != context["new"][1][1]
+                   or (claim.group("old") is not None and float(claim.group("old")) != context["old"][1][1])
                    or _notice_qualifier_is_negated(re.split(r"[，,、]", clause[:claim.start()])[-1])
                    or any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
                                     re.split(r"[，,、]", clause[:claim.start()])[-1])
@@ -657,6 +733,18 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             scalar_middle = scalar_middles[-1]
             old, new = context["old"], context["new"]
             following = clause[scalar_middle.end():]
+            # A complete, attested before-state plus a prospective *only*
+            # middle-Y edit proves the retained remainder without duplicating
+            # its coordinates. This is not a one-point replacement curve.
+            prefix = re.split(r"[，,、]", clause[:scalar_middle.start()])[-1]
+            introduction = r"(?:预览|确认|即将|现在|我|会|将|仅|只|把|\s)*"
+            association = rf"(?:volume|voice volume|音量|增益)(?:\s*/\s*(?:{'|'.join(re.escape(name.casefold()) for name in context['control_names'])}))?\s*(?:曲线|curve)的?"
+            prospective_remainder = (complete_current_curve and middle_edit
+                and (re.search(r"只|仅|\bonly\b", prefix) is not None
+                     or (re.search(r"(?:另外|其余)(?:两|2)点", following) is not None
+                         and re.search(r"保持(?:原样|不变)|unchanged", following) is not None))
+                and re.fullmatch(rf"{introduction}(?:{association}|(?:该|目标)(?:现有)?关系的)?", prefix) is not None
+                and not pairs(following) and requested_shape(following))
             # This point role has one meaning only in an attested three-point
             # curve whose sole change is the middle y value. Endpoints must
             # be stated, not inferred from a generic preservation claim.
@@ -665,17 +753,19 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             if (len(old) != 3 or len(new) != 3 or not context["same_domain"]
                     or old[0] != new[0] or old[2] != new[2]
                     or context["delta"] != [new[1]] or old[1][1] == new[1][1]
-                    or float(scalar_middle.group(1)) != new[1][1]
-                    or not (inherited_endpoints or (pairs(following) == [new[0], new[2]]
+                    or float(scalar_middle.group("new")) != new[1][1]
+                    or not (prospective_remainder or inherited_endpoints or (pairs(following) == [new[0], new[2]]
                         and any(term in following for term in ("保持", "unchanged", "retain"))
                         and any(term in following for term in ("不变", "原值", "unchanged"))))
-                    or not _affirmative_linear_interpolation(following)):
+                    or not (requested_shape(following) if prospective_remainder else _affirmative_linear_interpolation(following))):
                 return False, False
             effect = True
             continue
         if not target_clause:
             continue
         for action in re.finditer(r"更新为|替换为|修改为|改为|改成|设为|设置为|update|replace|change|set", clause):
+            if action.start() in preserved_actions:
+                continue
             following = clause[action.end():]
             stated = pairs(following)
             if stated and any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
