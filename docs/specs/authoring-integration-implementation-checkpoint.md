@@ -42,6 +42,34 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Frozen failed-only root `expansion-failed9-c39b728-luna-high-r1-cli1592`
+  completed all ten selected units: **1 Agent PASS / 8 FAIL / 1 separate
+  BOUNDARY_PROVEN**, zero pending and no early stop. Independent audit rehashed
+  **1602 artifacts / 60832898 bytes** and eight metadata seals. All source full
+  hashes and mtimes were unchanged; the PASS copy was removed and eight FAIL
+  copies plus the boundary copy remained quarantined. The launcher ran once,
+  exited 1, was unloaded, and left zero scoped processes. Agent work totalled
+  **1431.191725 seconds / 11 turns / zero slow cases**. All nine Agent units
+  executed once and attempted Verify once. Seven units have complete passing
+  business-oracle assertions, including six formal notice FAILs; both C03
+  after-states remain unavailable and receive no business PASS credit.
+  Exact evidence and usage are in
+  `../research/integration-expansion-failed-rerun-c39b728-2026-10-02.json`.
+  The next consolidated repairs are #141 (2025 SFX Source targeting and proven
+  native-result omission), #142 (closed curve notice validation), and #143
+  (coherent owner/numerical/action/polarity notice evidence). No FAIL root was
+  replayed or regraded; new failed-unit reruns and final full acceptance remain
+  required after those reviewed repairs.
+
+- Candidate `c39b728` passed full Non-live **12587 / skipped 118 /
+  deselected 27**, exit zero in 838.44 seconds; JUnit has zero errors/failures.
+  Log SHA-256 is `07e02a6c2c726f2842b5c71f51924f54a7d836dbfd9dab753ac3c87c4c5a71e2`;
+  JUnit SHA-256 is `935ad4a3d45b75877405d33c0bb5a52985094950b2d46c43d34d37793c77aa01`.
+  The Skill/semantic/CI inputs remain byte-identical to `f16ab1c`, whose Program
+  evidence remains a component PASS. Sequential 2022.1/2025.1 smoke checks
+  completed in 6.260607/7.485409 readiness seconds and cleaned both copies with
+  unchanged source hashes and mtimes. Those checks establish readiness only.
+
 - Consolidated candidate `f16ab1c` completed the fixed five-version Program gate:
   **6043 passed / 2 native-Windows skips**, exit zero in 289.11 seconds;
   log SHA-256 `d974e6ea2ce988e257081978c8ae5fbb6fe45a8d19e0bf3b6400a11873666ebf`.
