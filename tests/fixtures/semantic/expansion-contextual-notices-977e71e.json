@@ -1,0 +1,862 @@
+{
+  "candidate": "977e71e",
+  "projection": "Original assistant wording and event indices; authenticated Preview/Execute normalized for existing notice seam; sealed request/preparation and independent baseline. Original FAILs unchanged.",
+  "cases": [
+    {
+      "case": "004-EXP22-C06",
+      "events_sha256": "f0222bbbe88ee5784a083a941a0aa8fde5fbf6562b3aa6b9c69eac2dabe82724",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_10",
+            "type": "agent_message",
+            "text": "我已将指定声音、音量字段和 Rain_Intensity 控制输入绑定到这次修改中。接下来会提交三点线性曲线（0→−48、50→−6、100→0），用更新现有曲线的方式处理，并省略备注输入以保留现有备注；目前尚未执行项目变更。"
+          },
+          "original_index": 20
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 26
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_14",
+            "type": "agent_message",
+            "text": "预览已核对到指定的 Rain_Intensity→音量关系及其备注“Preserve volume association”；它当前的中点是 (50,−12)。我将执行仅把该点改为 −6、保留两端点和各段线性，同时保留该关系身份与备注；同一声音上的 Pitch/Time 曲线保持不变。"
+          },
+          "original_index": 27
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 28
+        }
+      ],
+      "artifact": {
+        "request": {
+          "arguments": {
+            "control_input": {
+              "kind": "id",
+              "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+            },
+            "mode": "add_or_replace",
+            "object": {
+              "kind": "id",
+              "value": "{AE0B4674-5430-442D-ADBE-9170A15588E3}"
+            },
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume"
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.setRTPC",
+          "version": "2022.1"
+        },
+        "prepared_operation": {
+          "operation": "object.setRTPC",
+          "version": "2022.1",
+          "pre_state": {
+            "control_input": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity",
+              "notes": "",
+              "parent": {
+                "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+                "name": "Ambience"
+              },
+              "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+              "type": "GameParameter"
+            },
+            "object": {
+              "id": "{AE0B4674-5430-442D-ADBE-9170A15588E3}",
+              "name": "Expansion_EXP22-C06_Bed",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+              "type": "Sound"
+            },
+            "rtpc_snapshot": {
+              "fields": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "notes",
+                "@PropertyName",
+                "@ControlInput",
+                "@Curve"
+              ],
+              "object_id": "{AE0B4674-5430-442D-ADBE-9170A15588E3}",
+              "readback_compatibility": [],
+              "rows": [
+                {
+                  "@ControlInput": {
+                    "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                    "name": "Rain_Intensity"
+                  },
+                  "@Curve": {
+                    "@Flags": 3,
+                    "id": "{C3218392-36D7-4637-A796-A86186E7F4B4}",
+                    "points": [
+                      {
+                        "shape": "Linear",
+                        "x": 0.0,
+                        "y": -48.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 50.0,
+                        "y": -12.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  },
+                  "@PropertyName": "Volume",
+                  "id": "{B230DB27-4B8F-4F06-A092-8C1BC18ADFE9}",
+                  "name": "",
+                  "notes": "Preserve volume association",
+                  "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+                  "type": "RTPC"
+                },
+                {
+                  "@ControlInput": {
+                    "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                    "name": "Time"
+                  },
+                  "@Curve": {
+                    "@Flags": 65537,
+                    "id": "{BC8ECDA6-2121-4966-BE7C-66217F81F90E}",
+                    "points": [
+                      {
+                        "shape": "Linear",
+                        "x": 0.0,
+                        "y": -100.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 240.0,
+                        "y": 100.0
+                      }
+                    ]
+                  },
+                  "@PropertyName": "Pitch",
+                  "id": "{64734822-48D5-4880-84BE-9FFF3C9BD576}",
+                  "name": "",
+                  "notes": "Preserve pitch association",
+                  "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+                  "type": "RTPC"
+                }
+              ]
+            }
+          },
+          "verification_plan": {
+            "action": "update",
+            "before_rows": [
+              {
+                "@ControlInput": {
+                  "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                  "name": "Rain_Intensity"
+                },
+                "@Curve": {
+                  "@Flags": 3,
+                  "id": "{C3218392-36D7-4637-A796-A86186E7F4B4}",
+                  "points": [
+                    {
+                      "shape": "Linear",
+                      "x": 0.0,
+                      "y": -48.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 50.0,
+                      "y": -12.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 100.0,
+                      "y": 0.0
+                    }
+                  ]
+                },
+                "@PropertyName": "Volume",
+                "id": "{B230DB27-4B8F-4F06-A092-8C1BC18ADFE9}",
+                "name": "",
+                "notes": "Preserve volume association",
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+                "type": "RTPC"
+              },
+              {
+                "@ControlInput": {
+                  "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                  "name": "Time"
+                },
+                "@Curve": {
+                  "@Flags": 65537,
+                  "id": "{BC8ECDA6-2121-4966-BE7C-66217F81F90E}",
+                  "points": [
+                    {
+                      "shape": "Linear",
+                      "x": 0.0,
+                      "y": -100.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 240.0,
+                      "y": 100.0
+                    }
+                  ]
+                },
+                "@PropertyName": "Pitch",
+                "id": "{64734822-48D5-4880-84BE-9FFF3C9BD576}",
+                "name": "",
+                "notes": "Preserve pitch association",
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+                "type": "RTPC"
+              }
+            ],
+            "control_input_id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "existing_rtpc_id": "{B230DB27-4B8F-4F06-A092-8C1BC18ADFE9}",
+            "expected_notes": null,
+            "kind": "object-rtpc-state",
+            "notes_supplied": false,
+            "object_id": "{AE0B4674-5430-442D-ADBE-9170A15588E3}",
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume",
+            "version": "2022.1"
+          }
+        }
+      },
+      "before": {
+        "controls": [
+          {
+            "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "name": "Rain_Intensity",
+            "notes": "",
+            "parent": {
+              "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+              "name": "Ambience"
+            },
+            "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+            "type": "GameParameter"
+          },
+          {
+            "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+            "name": "Time",
+            "notes": "",
+            "parent": {
+              "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+              "name": "Ambience"
+            },
+            "path": "\\Game Parameters\\Ambience\\Time",
+            "type": "GameParameter"
+          }
+        ],
+        "media": {
+          "file": {
+            "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-977e71e-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP22-C06/owned/sandbox-root/sample-project-e15b0b94a2e547ee92a3e1108186157b/Originals/SFX/C06_bed.wav",
+            "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+          },
+          "source": {
+            "id": "{6831BDFB-AD1C-4E6D-8F8E-3CDC2A87D738}",
+            "name": "C06_bed",
+            "original_file_path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-acceptance-977e71e-luna-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\004-EXP22-C06\\owned\\sandbox-root\\sample-project-e15b0b94a2e547ee92a3e1108186157b\\Originals\\SFX\\C06_bed.wav",
+            "parent": {
+              "id": "{AE0B4674-5430-442D-ADBE-9170A15588E3}",
+              "name": "Expansion_EXP22-C06_Bed"
+            },
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\C06_bed",
+            "source_language": {
+              "id": "{85A66963-A627-476E-91C1-2770B39D245A}",
+              "name": "SFX"
+            },
+            "type": "AudioFileSource"
+          }
+        },
+        "owner": {
+          "@OutputBus": {
+            "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "name": "Master Audio Bus"
+          },
+          "@Volume": -3.0,
+          "id": "{AE0B4674-5430-442D-ADBE-9170A15588E3}",
+          "name": "Expansion_EXP22-C06_Bed",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+          "type": "Sound"
+        },
+        "rtpcs": {
+          "{64734822-48D5-4880-84BE-9FFF3C9BD576}": {
+            "@ControlInput": {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time"
+            },
+            "@Curve": {
+              "@Flags": 65537,
+              "id": "{BC8ECDA6-2121-4966-BE7C-66217F81F90E}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -100.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 240.0,
+                  "y": 100.0
+                }
+              ]
+            },
+            "@PropertyName": "Pitch",
+            "id": "{64734822-48D5-4880-84BE-9FFF3C9BD576}",
+            "name": "",
+            "notes": "Preserve pitch association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+            "type": "RTPC"
+          },
+          "{B230DB27-4B8F-4F06-A092-8C1BC18ADFE9}": {
+            "@ControlInput": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{C3218392-36D7-4637-A796-A86186E7F4B4}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -48.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            },
+            "@PropertyName": "Volume",
+            "id": "{B230DB27-4B8F-4F06-A092-8C1BC18ADFE9}",
+            "name": "",
+            "notes": "Preserve volume association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+            "type": "RTPC"
+          }
+        }
+      }
+    },
+    {
+      "case": "012-EXP25-C09",
+      "events_sha256": "06732ce9faaa168b48ad512e2f7107062b0e9f85be43dd2a74295b0c68921a22",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 26
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_14",
+            "type": "agent_message",
+            "text": "预览已通过并由当前 `allow_changes` 策略授权。即将向该 Sound 新增一个名为 `Expansion_EXP25-C09_NewGain` 的 `effect`，类型为 Wwise Gain，备注为“Expansion C09 appended gain”；请求未设置插件参数或平台值。现在执行这一项，并随后核验新增对象及效果链状态。"
+          },
+          "original_index": 27
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 28
+        }
+      ],
+      "artifact": {
+        "request": {
+          "arguments": {
+            "plugin": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP25-C09_NewGain",
+              "notes": "Expansion C09 appended gain"
+            },
+            "target": {
+              "kind": "id",
+              "value": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.createPlugin",
+          "version": "2025.1"
+        },
+        "prepared_operation": {
+          "operation": "object.createPlugin",
+          "version": "2025.1",
+          "pre_state": {
+            "target": {
+              "id": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}",
+              "name": "Expansion_EXP25-C09_EffectsOwner",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+              "type": "Sound"
+            },
+            "plugin_creation_guard": {
+              "descriptor": {
+                "class_id": 9109507,
+                "kind": "effect",
+                "name": "Expansion_EXP25-C09_NewGain",
+                "notes": "Expansion C09 appended gain",
+                "properties": []
+              },
+              "target_id": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}",
+              "target_type": "Sound",
+              "version": "2025.1"
+            }
+          },
+          "verification_plan": {
+            "descriptor": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP25-C09_NewGain",
+              "notes": "Expansion C09 appended gain",
+              "properties": []
+            },
+            "kind": "object-plugin-created",
+            "placement": {
+              "collection": "@Effects",
+              "create_only": true,
+              "effect_slot_type": "EffectSlot",
+              "kind": "effect_slot_append",
+              "list_mode": "append",
+              "raw_replace_all_allowed": false,
+              "replace_existing_allowed": false
+            },
+            "preexisting_effect_slot_ids": [
+              "{48EE6D2E-FBBB-4FFD-9BC6-8278D8FD6C2E}",
+              "{BE703E45-D617-4BB6-A478-D3A8CEA6F8BC}"
+            ],
+            "preexisting_plugin_ids": [
+              "{61FE4777-F00A-4766-84FC-F0CAFCEF9613}",
+              "{E518B9D2-4D09-42CD-9C71-1B3C39726A67}"
+            ],
+            "property_validation": [],
+            "readback_fields": [
+              "id",
+              "name",
+              "type",
+              "classId",
+              "parent",
+              "owner",
+              "notes"
+            ],
+            "readback_view": {
+              "language": null,
+              "platform": null
+            },
+            "target_id": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}",
+            "target_type": "Sound",
+            "version": "2025.1"
+          }
+        }
+      },
+      "before": {
+        "entries": [
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{E518B9D2-4D09-42CD-9C71-1B3C39726A67}",
+              "name": "Protected_Gain_1",
+              "notes": "protected effect 1",
+              "owner": {
+                "id": "{48EE6D2E-FBBB-4FFD-9BC6-8278D8FD6C2E}"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [1]: (Gain)]\\Protected_Gain_1",
+              "type": "Effect"
+            },
+            "slot": "{48EE6D2E-FBBB-4FFD-9BC6-8278D8FD6C2E}",
+            "slot_state": {
+              "@Effect": {
+                "id": "{E518B9D2-4D09-42CD-9C71-1B3C39726A67}",
+                "name": "Protected_Gain_1"
+              },
+              "id": "{48EE6D2E-FBBB-4FFD-9BC6-8278D8FD6C2E}",
+              "name": "",
+              "owner": {
+                "id": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}",
+                "name": "Expansion_EXP25-C09_EffectsOwner"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [1]: (Gain)]",
+              "type": "EffectSlot"
+            }
+          },
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{61FE4777-F00A-4766-84FC-F0CAFCEF9613}",
+              "name": "Protected_Gain_0",
+              "notes": "protected effect 0",
+              "owner": {
+                "id": "{BE703E45-D617-4BB6-A478-D3A8CEA6F8BC}"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [0]: (Gain)]\\Protected_Gain_0",
+              "type": "Effect"
+            },
+            "slot": "{BE703E45-D617-4BB6-A478-D3A8CEA6F8BC}",
+            "slot_state": {
+              "@Effect": {
+                "id": "{61FE4777-F00A-4766-84FC-F0CAFCEF9613}",
+                "name": "Protected_Gain_0"
+              },
+              "id": "{BE703E45-D617-4BB6-A478-D3A8CEA6F8BC}",
+              "name": "",
+              "owner": {
+                "id": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}",
+                "name": "Expansion_EXP25-C09_EffectsOwner"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [0]: (Gain)]",
+              "type": "EffectSlot"
+            }
+          }
+        ],
+        "owner": {
+          "@Volume": -3.0,
+          "id": "{9EE12941-BDC8-406D-8849-CB3D46C81F49}",
+          "name": "Expansion_EXP25-C09_EffectsOwner",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+          "type": "Sound"
+        },
+        "slot_order": [
+          "{BE703E45-D617-4BB6-A478-D3A8CEA6F8BC}",
+          "{48EE6D2E-FBBB-4FFD-9BC6-8278D8FD6C2E}"
+        ]
+      }
+    },
+    {
+      "case": "014-EXP25-M05",
+      "events_sha256": "f589e2a52463f29ae1ce18c3dd746e593b4feafcb82861f854a9f574105c1b86",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_12",
+            "type": "agent_message",
+            "text": "实时字段发现确认这是该对象的 `Trigger` 引用，目标 GUID 绑定回读为 `Backup_Team_Arrives`。我将预览仅把该 Stinger 的触发器从 Bonus 改为 Backup_Team_Arrives；音乐段与所属 Stealth 容器、其他 Stinger 均保持原样。策略允许本次明确变更继续执行。"
+          },
+          "original_index": 24
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 26
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_14",
+            "type": "agent_message",
+            "text": "预览已授权且显示只会改动该 `MusicStinger` 的 `Trigger` 引用，目标为 `Backup_Team_Arrives`；预览未包含音乐段或容器变更。现在执行这项单一引用更新，随后以网关回读结果验收。"
+          },
+          "original_index": 27
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 28
+        }
+      ],
+      "artifact": {
+        "request": {
+          "arguments": {
+            "object": {
+              "kind": "id",
+              "value": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+            },
+            "reference": "Trigger",
+            "target": {
+              "kind": "id",
+              "value": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.setReference",
+          "version": "2025.1"
+        },
+        "prepared_operation": {
+          "operation": "object.setReference",
+          "version": "2025.1",
+          "pre_state": {
+            "field_before": {
+              "field": "Trigger",
+              "platform": null,
+              "row": {
+                "Trigger": {
+                  "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+                  "name": "Bonus"
+                },
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "path": "[Stinger : Bonus,Stinger Bonus]"
+              },
+              "value": {
+                "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+                "name": "Bonus"
+              }
+            },
+            "field_info": {
+              "audioEngineId": 4294967295,
+              "default": null,
+              "dependencies": [],
+              "display": {
+                "group": "",
+                "index": 1698,
+                "name": "Trigger"
+              },
+              "name": "Trigger",
+              "restriction": {
+                "restrictions": [
+                  {
+                    "sharedOnlyTypes": [],
+                    "type": [
+                      "Trigger"
+                    ]
+                  }
+                ],
+                "type": "reference"
+              },
+              "supports": {
+                "randomizer": false,
+                "rtpc": "None",
+                "unlink": false
+              },
+              "type": "",
+              "ui": {
+                "autoUpdate": false,
+                "dataMeaning": "None",
+                "displayAs": {
+                  "bitfield": false,
+                  "lrMix": false,
+                  "musicNote": false,
+                  "percentage": false
+                },
+                "value": {
+                  "decimals": 0,
+                  "fine": 0.0,
+                  "infinity": 0,
+                  "max": 0.0,
+                  "min": 0.0,
+                  "step": 0.0
+                }
+              }
+            },
+            "object": {
+              "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+              "name": "",
+              "notes": "",
+              "path": "[Stinger : Bonus,Stinger Bonus]",
+              "type": "MusicStinger"
+            },
+            "target": {
+              "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+              "name": "Backup_Team_Arrives",
+              "notes": "",
+              "parent": {
+                "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+                "name": "Music"
+              },
+              "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+              "type": "Trigger"
+            }
+          },
+          "verification_plan": {
+            "expected_clear": false,
+            "expected_target_id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+            "field": "Trigger",
+            "kind": "same-guid-reference",
+            "object_id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "platform": null
+          }
+        }
+      },
+      "before": {
+        "owner": {
+          "@Stingers": [
+            {
+              "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+            }
+          ],
+          "id": "{20FA9A69-7ECC-4B05-BD6B-2C9527CD88C2}",
+          "name": "Stealth",
+          "parent": {
+            "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+            "name": "In-Game Music"
+          },
+          "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stealth",
+          "type": "MusicPlaylistContainer"
+        },
+        "protected": {
+          "owner": {
+            "@Stingers": [
+              {
+                "id": "{ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}"
+              }
+            ],
+            "id": "{52B9FAC3-636E-44F8-9015-E5F24E30E39E}",
+            "name": "Stress",
+            "parent": {
+              "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+              "name": "In-Game Music"
+            },
+            "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stress",
+            "type": "MusicPlaylistContainer"
+          },
+          "stinger": {
+            "@NumSegmentAdvance": 1,
+            "@PlaySegmentAt": 3,
+            "@Segment": {
+              "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+              "name": "Stinger Bonus"
+            },
+            "@Trigger": {
+              "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+              "name": "Bonus"
+            },
+            "id": "{ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}",
+            "name": "",
+            "notes": "",
+            "path": "[Stinger : Bonus,Stinger Bonus]",
+            "type": "MusicStinger"
+          }
+        },
+        "segment": {
+          "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+          "name": "Stinger Bonus",
+          "parent": {
+            "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+            "name": "In-Game Music"
+          },
+          "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stinger Bonus",
+          "type": "MusicSegment"
+        },
+        "siblings": [
+          {
+            "@NumSegmentAdvance": 1,
+            "@PlaySegmentAt": 3,
+            "@Segment": {
+              "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+              "name": "Stinger Bonus"
+            },
+            "@Trigger": {
+              "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+              "name": "Bonus"
+            },
+            "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "name": "",
+            "notes": "",
+            "path": "[Stinger : Bonus,Stinger Bonus]",
+            "type": "MusicStinger"
+          }
+        ],
+        "stinger": {
+          "@NumSegmentAdvance": 1,
+          "@PlaySegmentAt": 3,
+          "@Segment": {
+            "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+            "name": "Stinger Bonus"
+          },
+          "@Trigger": {
+            "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+            "name": "Bonus"
+          },
+          "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+          "name": "",
+          "notes": "",
+          "path": "[Stinger : Bonus,Stinger Bonus]",
+          "type": "MusicStinger"
+        },
+        "target": {
+          "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+          "name": "Backup_Team_Arrives",
+          "parent": {
+            "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+            "name": "Music"
+          },
+          "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+          "type": "Trigger"
+        }
+      }
+    }
+  ]
+}

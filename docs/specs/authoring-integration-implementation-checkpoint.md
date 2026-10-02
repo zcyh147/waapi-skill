@@ -42,6 +42,27 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Consolidated initial-batch repairs are tracked as children #137–#140 of #108
+  and native blockers of acceptance #122: existing SFX source/Originals
+  preservation, attenuation choice disclosure, expansion policy instructions,
+  and uniquely attested contextual notices. The expansion-only instruction
+  construction now distinguishes ask, allow, and read-only policies; historical
+  defaults and custom bases remain unchanged. Its focused construction/wiring
+  selection passed 25 tests after the new allow-mode reproduction failed first;
+  the full harness file passed 410 tests and skipped nine native-Windows proofs.
+  The consolidated repairs then passed **1441 focused tests / 9 native-Windows
+  skips in 27.82 seconds**, with zero JUnit failures or errors. Both independent
+  review axes are clear after fixing the notice extra-change finding; the final
+  notice file passed 241 checks. The two new public unit files are enrolled in
+  the fixed Program gate. Generated interface-depth inventory `--check` passed
+  without resource changes. The focused log SHA-256 is
+  `a644ea7437f0f3b3dbcb0cf01ff0e22611e1bc7eb022ec90200a032e278a6fe5`;
+  JUnit SHA-256 is
+  `01993c8ff779ce94725d467d8fd30eb68a7d40956cb5157068829ea061fbbdab`.
+  These are program checks, not new Fresh or live acceptance. Full Program and
+  Non-live gates, nine failed-unit reruns, and final complete acceptance remain
+  pending on the next frozen candidate. Original FAIL records are unchanged.
+
 - Initial full macOS acceptance on frozen `977e71e` completed **all fourteen
   units: 4 Agent PASS, 9 FAIL, and 1 separate BOUNDARY_PROVEN**, with no early
   stop, pending unit, same-root retry, or verify-only replay. Independent audit

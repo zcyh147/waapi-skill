@@ -2215,13 +2215,21 @@ def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolati
         )
 
 
+@pytest.mark.parametrize("policy", [None, "ask_before_changes", "allow_changes", "read_only"])
 def test_task_and_prompt_audit_commands_seal_bootstrap_developer_instructions(
-    tmp_path: Path,
+    tmp_path: Path, policy: str | None,
 ) -> None:
     bootstrap = (
         "Before any other action, read the injected waapi-skill SKILL.md exactly once "
         "using one standalone complete file-read command."
     )
+    if policy is not None:
+        bootstrap = codex_harness_module.semantic_task_developer_instructions(
+            "/repo/skills/waapi-skill/scripts/run.py",
+            task_skill_source="/task/.agents/skills/waapi-skill",
+            expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+            expansion_modification_policy=policy,
+        )
     config = CodexHarnessConfig(
         workspace=tmp_path,
         skill_source=tmp_path / "skill",
@@ -2426,6 +2434,78 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     assert "3 none" in instructions
     assert "not Real64/int16" in instructions
     assert len(instructions.encode("utf-8")) <= 2048
+
+
+@pytest.mark.parametrize("runner,source", [
+    ("/repo/skills/waapi-skill/scripts/run.py", "/task/.agents/skills/waapi-skill"),
+    (r"C:\repo\skills\waapi-skill\scripts\run.py", r"C:\task\.agents\skills\waapi-skill"),
+])
+def test_expansion_allow_instruction_follows_durable_authorization_without_extra_confirmation(runner, source):
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        runner, task_skill_source=source,
+        expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+        expansion_modification_policy="allow_changes",
+    )
+    assert "allow_changes: announce edits; Execute only with distinct durable policy authorization" in instructions
+    assert "only execution waits for confirmation" not in instructions
+    assert "requires_later_user_message" in instructions
+    assert "never reconstruct" in instructions
+    assert "Exact turn; no early/late/extra reads" in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+@pytest.mark.parametrize("policy,required,forbidden", [
+    ("ask_before_changes", "Execute waits for later explicit user confirmation", "distinct durable policy authorization"),
+    ("read_only", "read_only: no project changes", "distinct durable policy authorization"),
+])
+@pytest.mark.parametrize("runner,source", [
+    ("/repo/skills/waapi-skill/scripts/run.py", "/task/.agents/skills/waapi-skill"),
+    (r"C:\repo\skills\waapi-skill\scripts\run.py", r"C:\task\.agents\skills\waapi-skill"),
+])
+def test_expansion_instructions_keep_other_policy_boundaries(policy, required, forbidden, runner, source):
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        runner, task_skill_source=source,
+        expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+        expansion_modification_policy=policy,
+    )
+    assert required in instructions
+    assert forbidden not in instructions
+    assert len(instructions.encode("utf-8")) <= 2048
+
+
+@pytest.mark.parametrize("policy", ["allow", "", "ALLOW_CHANGES"])
+def test_expansion_instruction_policy_rejects_unknown_values(policy):
+    with pytest.raises(CodexHarnessError, match="modification policy is invalid"):
+        codex_harness_module.semantic_task_developer_instructions(
+            "/repo/skills/waapi-skill/scripts/run.py",
+            task_skill_source="/task/.agents/skills/waapi-skill",
+            expected_skill_reads=(("SKILL.md",),), expansion_modification_policy=policy,
+        )
+
+
+def test_expansion_policy_cannot_rewrite_historical_custom_instructions():
+    with pytest.raises(CodexHarnessError, match="cannot override a custom base"):
+        codex_harness_module.semantic_task_developer_instructions(
+            "/repo/skills/waapi-skill/scripts/run.py",
+            task_skill_source="/task/.agents/skills/waapi-skill",
+            expected_skill_reads=(("SKILL.md",),),
+            base_developer_instructions="historical custom instructions",
+            expansion_modification_policy="allow_changes",
+        )
+
+
+def test_historical_default_task_instructions_keep_the_original_policy_clause():
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        "/repo/skills/waapi-skill/scripts/run.py",
+        task_skill_source="/task/.agents/skills/waapi-skill",
+        expected_skill_reads=(("SKILL.md",),),
+    )
+    expected_base = (
+        codex_harness_module.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+        + " No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py"
+        + "; append disclosed argv verbatim."
+    )
+    assert instructions == expected_base + " Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md']. Exact turn; no early/late/extra reads."
 
 
 def test_prompt_audit_requires_exact_bootstrap_developer_instruction_once(

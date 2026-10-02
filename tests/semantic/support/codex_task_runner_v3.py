@@ -250,6 +250,111 @@ def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, A
     return tuple(groups) if groups and all(all(term for term in group) for group in groups) else ()
 
 
+def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Resolve a type pronoun only through matching sealed and independent roles."""
+    request, prepared = artifact.get("request", {}), artifact.get("prepared_operation", {})
+    if not isinstance(request, Mapping) or not isinstance(prepared, Mapping):
+        return None
+    args, state, plan = request.get("arguments", {}), prepared.get("pre_state", {}), prepared.get("verification_plan", {})
+    if not all(isinstance(value, Mapping) for value in (args, state, plan)):
+        return None
+    operation, version = request.get("operation"), request.get("version")
+    if (prepared.get("operation") != operation or prepared.get("version") != version
+            or version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}):
+        return None
+    def identity(row: Any, observed: Any) -> bool:
+        return (isinstance(row, Mapping) and isinstance(observed, Mapping)
+                and isinstance(row.get("id"), str)
+                and all(isinstance(row.get(key), str) for key in ("name", "type", "path"))
+                and re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", row["id"]) is not None
+                and all(row.get(key) == observed.get(key) for key in ("id", "name", "type", "path")))
+    if operation == "object.createPlugin":
+        source, observed = state.get("target"), before.get("owner")
+        guard, plugin = state.get("plugin_creation_guard", {}), args.get("plugin", {})
+        if not isinstance(guard, Mapping) or not isinstance(plugin, Mapping) or not identity(source, observed):
+            return None
+        descriptor = plan.get("descriptor")
+        if (source["type"] != "Sound" or args.get("target") != {"kind": "id", "value": source["id"]}
+                or plan.get("kind") != "object-plugin-created" or plan.get("target_id") != source["id"]
+                or plan.get("target_type") != "Sound" or plan.get("version") != version
+                or guard.get("target_id") != source["id"] or guard.get("target_type") != "Sound"
+                or guard.get("version") != version or guard.get("descriptor") != descriptor
+                or not isinstance(descriptor, Mapping) or descriptor.get("kind") != "effect"
+                or type(descriptor.get("class_id")) is not int or descriptor["class_id"] <= 0
+                or any(descriptor.get(key) != value for key, value in plugin.items())):
+            return None
+        placement = plan.get("placement", {})
+        if (not isinstance(placement, Mapping) or placement.get("kind") != "effect_slot_append"
+                or placement.get("create_only") is not True or placement.get("list_mode") != "append"
+                or placement.get("replace_existing_allowed") is not False):
+            return None
+        groups = [(source["id"], source["name"], source["path"], "该 sound", "this sound"),
+                  (descriptor.get("name", ""),), ("effect", "效果", "插件"), ("新增", "添加", "插入", "add", "create", "append")]
+        if descriptor.get("notes"):
+            groups.append((descriptor["notes"],))
+        return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
+                "action": r"新增|添加|插入|add|create|append", "kind": "plugin"}
+    if operation == "object.setReference":
+        source, target = state.get("object"), state.get("target")
+        observed, expected = before.get("stinger"), before.get("target")
+        if not identity(source, observed) or not identity(target, expected):
+            return None
+        owner, siblings = before.get("owner", {}), before.get("siblings")
+        if (source["type"] != "MusicStinger" or target["type"] != "Trigger"
+                or args.get("object") != {"kind": "id", "value": source["id"]}
+                or args.get("target") != {"kind": "id", "value": target["id"]} or args.get("reference") != "Trigger"
+                or plan.get("kind") != "same-guid-reference" or plan.get("object_id") != source["id"]
+                or plan.get("field") != "Trigger" or plan.get("expected_target_id") != target["id"]
+                or plan.get("expected_clear") is not False or not isinstance(owner, Mapping)
+                or not isinstance(siblings, list) or sum(isinstance(row, Mapping) and row.get("id") == source["id"] for row in siblings) != 1
+                or not isinstance(owner.get("@Stingers"), list)
+                or sum(isinstance(row, Mapping) and row.get("id") == source["id"] for row in owner["@Stingers"]) != 1):
+            return None
+        return {"groups": [(source["id"], source["path"], "该 musicstinger", "该 stinger", "this musicstinger"),
+                           (target["id"], target["name"], target["path"]), ("trigger", "触发器"),
+                           ("改动", "更新", "修改", "改为", "指向", "update", "change", "retarget")],
+                "ids": (source["id"], target["id"]), "protected": ("segment", "音乐段", "容器", "container"),
+                "action": r"改动|更新|修改|改为|指向|update|change|retarget", "kind": "reference"}
+    return None
+
+
+def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
+    if any(value not in {value.casefold() for value in context["ids"]} for value in ids):
+        return False
+    if not all(any(term and term.casefold() in text for term in group) for group in context["groups"]):
+        return False
+    affirmative = False
+    for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
+        anchored = any(term and term.casefold() in clause for term in context["groups"][0])
+        actions = tuple(re.finditer(r"新增|添加|插入|改动|更新|修改|改为|指向|变更|删除|移除|替换|设置|\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert)\b", clause))
+        for index, action in enumerate(actions):
+            claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
+            effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
+            approved_value = any(term and term.casefold() in claim for term in context["groups"][1])
+            expected = re.fullmatch(context["action"], action.group()) is not None
+            negated = _notice_qualifier_is_negated(clause[:action.start()])
+            if negated:
+                if expected and anchored and effect_anchor and (approved_value
+                        or re.search(r"目标|名为|为|\bto\b", claim) is None):
+                    return False
+                continue
+            # Verification and the execute-summary noun do not author another
+            # change. They cannot certify the expected effect by themselves.
+            prefix = clause[:action.start()]
+            if re.search(r"(?:核验|verify|验收)\s*$", prefix) or (context["kind"] == "reference"
+                    and re.search(r"执行.*引用$", prefix) and action.group() == "更新"):
+                continue
+            if any(term in clause for term in context["protected"]):
+                return False
+            if not expected or not effect_anchor or not approved_value:
+                return False
+            if expected and anchored:
+                affirmative = True
+    return affirmative
+
+
 def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
     """Attest one existing Volume association before inheriting its identity.
 
@@ -360,6 +465,12 @@ def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | No
     number = r"[+-]?\d+(?:\.\d+)?"
     stated_points = [(float(x), float(y)) for x, y in re.findall(
         rf"[（(]\s*({number})\s*[,，]\s*({number})\s*[)）]", text.replace("\u2212", "-"))]
+    arrow_points = [(float(x), float(y)) for x, y in re.findall(
+        rf"({number})\s*→\s*({number})", text.replace("\u2212", "-"))]
+    if arrow_points:
+        if stated_points:
+            return False
+        stated_points = arrow_points
     stated_ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
     return (all(value in {key.casefold() for key in context["ids"]} for value in stated_ids)
             and len(context["new"]) == 3 and (not stated_points or stated_points == context["new"])
@@ -378,7 +489,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     # A negated change preserves the field. Polarity is local to a clause;
     # an English coordinated verb may share it, but a later clause cannot.
     protected = r"(?:备注|身份|其他控制曲线|notes|identity|pitch|time)"
-    changes = re.compile(rf"(?:修改|更新|删除|改变|\b(?:change|update|delete|remove)\b)\s*(?:这条关系的)?{protected}|{protected}\s*(?:改为|改成|更新为|修改为)")
+    changes = re.compile(rf"(?:修改|更新|删除|改变|\b(?:change|update|delete|remove)\b)\s*(?:这条关系的|该\s*\w+\s*的\s*)?{protected}|{protected}\s*(?:改为|改成|更新为|修改为)")
     for clause in re.split(r"[。；;,，.\n]|\bbut\b|但", text):
         previous_end = 0
         negated = False
@@ -421,7 +532,15 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     middle_edit = (len(old) == len(new) == 3 and context["same_domain"]
                    and old[0] == new[0] and old[2] == new[2] and context["delta"] == [new[1]])
     complete_current_curve = False
-    for clause in clauses:
+    for clause_index, clause in enumerate(clauses):
+        point_reference = "该点" in clause
+        if point_reference and middle_edit:
+            prefix = "\n".join(clauses[:clause_index]) + clause.split("该点", 1)[0]
+            antecedents = pairs(prefix)
+            if antecedents == [old[1]] and re.search(r"中点|中间点|midpoint|middle point", prefix):
+                clause = clause.replace("该点", "中点")
+            else:
+                return False, False
         scalar_middles = tuple(re.finditer(
             rf"(?:中点|中间点|midpoint|middle point)\s*(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*({number})(?![a-z\d_.])", clause))
         target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
@@ -451,13 +570,15 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             # This point role has one meaning only in an attested three-point
             # curve whose sole change is the middle y value. Endpoints must
             # be stated, not inferred from a generic preservation claim.
+            inherited_endpoints = (point_reference and earlier_points and not pairs(following)
+                                   and re.search(r"保留(?:两端点|首尾点)", following) is not None)
             if (len(old) != 3 or len(new) != 3 or not context["same_domain"]
                     or old[0] != new[0] or old[2] != new[2]
                     or context["delta"] != [new[1]] or old[1][1] == new[1][1]
                     or float(scalar_middle.group(1)) != new[1][1]
-                    or pairs(following) != [new[0], new[2]]
-                    or not any(term in following for term in ("保持", "unchanged", "retain"))
-                    or not any(term in following for term in ("不变", "原值", "unchanged"))
+                    or not (inherited_endpoints or (pairs(following) == [new[0], new[2]]
+                        and any(term in following for term in ("保持", "unchanged", "retain"))
+                        and any(term in following for term in ("不变", "原值", "unchanged"))))
                     or not _affirmative_linear_interpolation(following)):
                 return False, False
             effect = True
@@ -517,6 +638,10 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
     rtpc_context = _rtpc_notice_context(preview_artifact, before_snapshot) if prepared_rtpc else None
     if prepared_rtpc and rtpc_context is None:
         return False
+    context_operation = preview_artifact.get("request", {}).get("operation") in {"object.createPlugin", "object.setReference"}
+    bound_context = _bound_context_notice(preview_artifact, before_snapshot) if context_operation and "prepared_operation" in preview_artifact else None
+    if context_operation and "prepared_operation" in preview_artifact and bound_context is None:
+        return False
     earlier_points = False
     earlier_shape = False
     notice_messages: list[str] = []
@@ -547,6 +672,12 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                                re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\d.])", text.replace("\u2212", "-")))
                 return term.casefold() in text
             effect = all(any(mentions(term) for term in group) for group in groups)
+            if bound_context is not None:
+                if preview_seen:
+                    notice_messages.append(text)
+                effect = _bound_context_effect("\n".join(notice_messages) if preview_seen else text, bound_context)
+                if preview_seen:
+                    notice_seen = effect
             if rtpc_context is not None:
                 if preview_seen:
                     notice_messages.append(text)
@@ -558,11 +689,16 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                     shape_plan = _rtpc_visible_shape_plan(text, rtpc_context)
                     if shape_plan is not None:
                         earlier_shape = shape_plan
+                        number = r"[+-]?\d+(?:\.\d+)?"
+                        arrow = [(float(x), float(y)) for x, y in re.findall(
+                            rf"({number})\s*→\s*({number})", text.replace("\u2212", "-"))]
+                        if arrow:
+                            earlier_points = shape_plan and arrow == rtpc_context["new"]
                 if preview_seen:
                     # Re-evaluate the complete notice so later contradictions
                     # cannot hide behind an earlier successful fragment.
                     notice_seen = effect
-            reference = rtpc_context is None and earlier_effect and any(term in text for term in (
+            reference = rtpc_context is None and bound_context is None and earlier_effect and any(term in text for term in (
                 "expected result above", "expected changes above", "changes described above",
                 "result just described", "plan above", "上述预期", "上面的预期", "刚才说明的", "上述变更", "按以上方案"))
             if preview_seen and (effect or reference):
@@ -640,6 +776,7 @@ def run_expansion_codex_task(
         developer_instructions=semantic_task_developer_instructions(
             options.skill_source / "scripts" / "run.py", task_skill_source=skill_install,
             expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+            expansion_modification_policy=prepared.policy,
         ),
     )
     broker = CodexGatewayBroker(

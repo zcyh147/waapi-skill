@@ -81,6 +81,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
 
 def semantic_skill_bootstrap_developer_instructions(
     runner_path: str | Path,
+    *, expansion_modification_policy: str | None = None,
 ) -> str:
     """Bind typed-profile model guidance to one exact packaged runner prefix."""
 
@@ -103,8 +104,21 @@ def semantic_skill_bootstrap_developer_instructions(
         raise CodexHarnessError(
             "semantic Skill runner path must be absolute in its owning path flavor"
         )
+    bootstrap = SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+    if expansion_modification_policy is not None:
+        policy_instructions = {
+            "ask_before_changes": "ask_before_changes: Preview now; Execute waits for later explicit user confirmation. ",
+            "allow_changes": "allow_changes: announce edits; Execute only with distinct durable policy authorization. ",
+            "read_only": "read_only: no project changes. ",
+        }
+        if expansion_modification_policy not in policy_instructions:
+            raise CodexHarnessError("expansion modification policy is invalid")
+        bootstrap = bootstrap.replace(
+            "Finish schema/metadata/Preview now; only execution waits for confirmation. ",
+            policy_instructions[expansion_modification_policy],
+        )
     return (
-        SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+        bootstrap
         + " No next_command: only "
         + command_prefix
         + "; append disclosed argv verbatim."
@@ -117,6 +131,7 @@ def semantic_task_developer_instructions(
     task_skill_source: str | Path,
     expected_skill_reads: Sequence[Sequence[str]],
     base_developer_instructions: str | None = None,
+    expansion_modification_policy: str | None = None,
 ) -> str:
     """Seal exact host-native Skill reads into one formal task instruction."""
 
@@ -169,7 +184,11 @@ def semantic_task_developer_instructions(
             + " then ".join(f"[{command}]" for command in commands)
         )
 
-    candidate_base = semantic_skill_bootstrap_developer_instructions(runner_path)
+    if expansion_modification_policy is not None and base_developer_instructions is not None:
+        raise CodexHarnessError("expansion instructions cannot override a custom base")
+    candidate_base = semantic_skill_bootstrap_developer_instructions(
+        runner_path, expansion_modification_policy=expansion_modification_policy,
+    )
     base = (
         candidate_base
         if base_developer_instructions is None
@@ -183,7 +202,9 @@ def semantic_task_developer_instructions(
             if is_windows
             else TASK_LOCAL_RUNNER_POSIX
         )
-        base = semantic_skill_bootstrap_developer_instructions(task_runner)
+        base = semantic_skill_bootstrap_developer_instructions(
+            task_runner, expansion_modification_policy=expansion_modification_policy,
+        )
     instructions = (
         base
         + " Reads: "

@@ -12053,7 +12053,7 @@ def dispatch_business_core_plan(
             raw,
             accepted={"platform_name_list", "language_name_list"},
         )
-    if args.curve_point:
+    if args.curve_point or field_types.get("points") == "attenuation_curve_points":
         if field_types.get("points") != "attenuation_curve_points":
             raise GatewayInputError("Curve points are unavailable for this Core operation")
         points: list[dict[str, Any]] = []

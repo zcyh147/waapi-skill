@@ -380,6 +380,106 @@ def test_incidental_middle_role_cannot_turn_one_point_replacement_into_preservin
         artifact=case["preview_artifact"], before=case["before_snapshot"])
 
 
+def _initial_context_notice(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-contextual-notices-977e71e.json").read_text())
+    return next(case for case in fixture["cases"] if case["case"] == case_id)
+
+
+@pytest.mark.parametrize("case_id", ["004-EXP22-C06", "012-EXP25-C09", "014-EXP25-M05"])
+def test_initial_frozen_notices_resolve_uniquely_attested_context(case_id):
+    case = _initial_context_notice(case_id)
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id,defect", [
+    ("004-EXP22-C06", "wrong_arrow"), ("004-EXP22-C06", "wrong_antecedent"),
+    ("004-EXP22-C06", "ambiguous_point"), ("004-EXP22-C06", "wrong_scalar"),
+    ("004-EXP22-C06", "wrong_shape"), ("004-EXP22-C06", "extra_point"),
+    ("012-EXP25-C09", "wrong_name"), ("012-EXP25-C09", "wrong_notes"),
+    ("012-EXP25-C09", "extra_change"), ("012-EXP25-C09", "negated"),
+    ("014-EXP25-M05", "wrong_target"), ("014-EXP25-M05", "segment_change"),
+    ("014-EXP25-M05", "negated"),
+])
+def test_contextual_notice_does_not_inherit_wrong_or_extra_effect_claims(case_id, defect):
+    case = _initial_context_notice(case_id)
+    post = next(event["item"] for event in case["events"] if event.get("original_index") == 27)
+    if defect == "wrong_arrow":
+        case["events"][0]["item"]["text"] = case["events"][0]["item"]["text"].replace("50→−6", "50→−60")
+    elif defect == "wrong_antecedent": post["text"] = post["text"].replace("(50,−12)", "(100,0)")
+    elif defect == "ambiguous_point": post["text"] = post["text"].replace("(50,−12)", "(50,−12) 和 (0,-48)")
+    elif defect == "wrong_scalar": post["text"] = post["text"].replace("改为 −6", "改为 −60")
+    elif defect == "wrong_shape": post["text"] = post["text"].replace("各段线性", "各段非线性")
+    elif defect == "extra_point": post["text"] = post["text"].replace("改为 −6", "改为 −6，同时 (75,-3)")
+    elif defect == "wrong_name": post["text"] = post["text"].replace("Expansion_EXP25-C09_NewGain", "AnotherGain")
+    elif defect == "wrong_notes": post["text"] = post["text"].replace("Expansion C09 appended gain", "wrong note")
+    elif defect == "extra_change": post["text"] += "同时修改该 Sound 音量为 -12。"
+    elif defect == "wrong_target": post["text"] = post["text"].replace("Backup_Team_Arrives", "Bonus")
+    elif defect == "segment_change": post["text"] += "音乐段改为 OtherSegment。"
+    else: post["text"] = post["text"].replace("即将向该 Sound 新增", "不会向该 Sound 新增") if case_id.endswith("C09") else post["text"].replace("只会改动", "不会改动")
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id", ["012-EXP25-C09", "014-EXP25-M05"])
+@pytest.mark.parametrize("defect", ["wrong_source", "wrong_verifier", "malformed_source", "foreign_id", "generic", "late"])
+def test_type_pronoun_requires_unique_attested_roles_and_advance_effect(case_id, defect):
+    case = _initial_context_notice(case_id)
+    prepared, before = case["artifact"]["prepared_operation"], case["before"]
+    key = "owner" if case_id.endswith("C09") else "stinger"
+    plan_key = "target_id" if case_id.endswith("C09") else "object_id"
+    post = next(event for event in case["events"] if event.get("original_index") == 27)
+    if defect == "wrong_source": before[key]["id"] = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    elif defect == "wrong_verifier": prepared["verification_plan"][plan_key] = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    elif defect == "malformed_source": before[key] = [before[key]]
+    elif defect == "foreign_id": post["item"]["text"] += "目标为 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。"
+    elif defect == "generic": post["item"]["text"] = "预览通过，现在处理。"
+    else:
+        post_index = case["events"].index(post)
+        case["events"][post_index], case["events"][post_index + 1] = case["events"][post_index + 1], post
+    assert not _notice(case["events"], artifact=case["artifact"], before=before)
+
+
+@pytest.mark.parametrize("case_id", ["012-EXP25-C09", "014-EXP25-M05"])
+@pytest.mark.parametrize("defect", ["request_disagrees", "prepared_disagrees", "later_contradiction", "ambiguous_binding"])
+def test_contextual_notice_rejects_disagreement_and_later_contradictions(case_id, defect):
+    case = _initial_context_notice(case_id)
+    artifact, before = case["artifact"], case["before"]
+    plugin = case_id.endswith("C09")
+    if defect == "request_disagrees":
+        artifact["request"]["arguments"]["target"]["value"] = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    elif defect == "prepared_disagrees":
+        state = artifact["prepared_operation"]["pre_state"]
+        if plugin: state["plugin_creation_guard"]["descriptor"]["notes"] = "wrong note"
+        else: state["target"]["name"] = "AnotherTrigger"
+    elif defect == "ambiguous_binding":
+        if plugin: artifact["prepared_operation"]["verification_plan"]["placement"]["replace_existing_allowed"] = True
+        else: before["owner"]["@Stingers"].append(dict(before["owner"]["@Stingers"][0]))
+    else:
+        contradiction = "不会向该 Sound 新增插件。" if plugin else "不会改动该 MusicStinger 的 Trigger 引用。"
+        case["events"].insert(-1, {"type": "item.completed", "item": {"type": "agent_message", "text": contradiction}})
+    assert not _notice(case["events"], artifact=artifact, before=before)
+
+
+@pytest.mark.parametrize("case_id,claim", [
+    ("012-EXP25-C09", "同时修改该 Sound 的 Pitch 为 12。"),
+    ("014-EXP25-M05", "同时修改该 MusicStinger 的 Probability 为 12。"),
+    ("004-EXP22-C06", "同时修改该 Sound 的 Pitch 为 12。"),
+    ("012-EXP25-C09", "同时删除原效果。"),
+    ("012-EXP25-C09", "同时替换原效果。"),
+    ("012-EXP25-C09", "同时移除原效果。"),
+    ("014-EXP25-M05", "同时修改该 MusicStinger 的 NumSegmentAdvance 为 12。"),
+    ("014-EXP25-M05", "同时修改 NumSegmentAdvance 为 2。"),
+    ("014-EXP25-M05", "同时修改 Trigger 为 Bonus。"),
+    ("014-EXP25-M05", "同时改动该 MusicStinger 的 Trigger 引用，目标为 Bonus。"),
+    ("012-EXP25-C09", "同时新增一个名为 AnotherGain 的 effect。"),
+])
+@pytest.mark.parametrize("preserve", [False, True])
+def test_contextual_notice_distinguishes_unapproved_field_changes_from_preservation(case_id, claim, preserve):
+    case = _initial_context_notice(case_id)
+    post = next(event["item"] for event in case["events"] if event.get("original_index") == 27)
+    post["text"] += claim.replace("同时", "同时不", 1) if preserve else claim
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is preserve
+
+
 def test_rtpc_context_accepts_independent_snapshot_row_permutations():
     case = _current_notice_case()
     case["preview_artifact"]["prepared_operation"]["verification_plan"]["before_rows"].reverse()
@@ -568,6 +668,9 @@ def test_expansion_returns_classified_failure_and_reconciles_only_after_broker_c
         thread_id = "failed-thread"
         def __init__(self, *args, **kwargs):
             self.budget = kwargs["agent_case_budget"]
+            instructions = args[0].developer_instructions
+            assert "allow_changes: announce edits; Execute only with distinct durable policy authorization" in instructions
+            assert "only execution waits for confirmation" not in instructions
         def __enter__(self):
             return self
         def __exit__(self, *_):
