@@ -43,6 +43,41 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Five successful business effects; contextual notice grading remains — 2026-10-03:**
+  candidate `eba698d9c9f461182b36c7c55ff9b8d2253d9d06` passed new Program
+  **6345 / skipped 2** in **303.27 seconds**, then complete Non-live
+  **14965 / skipped 119 / deselected 27** in **863.87 seconds**, both exit zero.
+  Root `expansion-retry5-eba698d-sol-high-r1-cli1592` completed all five retry
+  units plus the directly affected 2022 Stinger boundary. Independent business
+  effects passed **5/5, with 28/28 assertions**. Automatic verdicts remain
+  **1 Agent PASS / 4 notice-only FAIL / 1 separate boundary**; every other common
+  gate passed. The sole automatic PASS is EXP25-C08. No historical promotion:
+  - EXP22-C08 has a complete exact curve notice using the checked target's
+    pronoun; actual curve and preservation checks pass.
+  - EXP22-C09 discloses its exact named effect/notes before Preview, then confirms
+    the matching Preview and authorized execution of that sole append before
+    Execute. Repetition of all identifiers is unnecessary for this valid notice.
+  - EXP25-C09 states the checked target, authorization and full impending effect
+    across paragraphs; no substantive disclosure gap exists.
+  - EXP25-M05 gives the sole owned Trigger change from Bonus to Backup_Team_Arrives
+    and present authorized execution. The named-reference role repair is now
+    proven by fresh binding, field discovery, Execute and independent outcome.
+  EXP22-C08 consumes #154's corrected query-schema and performs successful
+  separate exact-object reads. EXP25-C08 does not consume that schema and earns
+  no additional Fresh disclosure credit. Honest Agent-owned baseline-proof
+  limitations stay separate from the trusted oracle's preservation evidence.
+  All 785 artifacts and metadata seals match; six source guards are unchanged,
+  every oracle/reconciliation child closed, one PASS copy removed, four FAIL
+  copies and one boundary copy quarantined, and scoped processes absent.
+  Agent time is **631.94 seconds / 5 turns**, with **zero slow units** and one
+  Preview/Execute/Verify per business unit. The launcher exited 1 and was unloaded.
+  See `../research/integration-expansion-retry5-eba698d-sol-high-2026-10-03.json`.
+  Preserve the mixed root without verify-only or regrading. Repair #147 using
+  bounded stage-aware attested context and independent negative controls,
+  then proceed directly to a new full thirteen-Agent-unit root plus boundary;
+  do not repeat another costly failed-only loop for these valid notices.
+
+
 - **Reviewed query-disclosure inventory refresh — 2026-10-03:** Program at
   `54930bd` completed with **6344 passed / 1 failed / 2 skipped**, exit 1 in
   **290.01 seconds**. The sole failure correctly detected an unsynchronized
