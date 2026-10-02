@@ -19,7 +19,8 @@ from tests.semantic.support.codex_attenuation_notice import (
 )
 from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
-    NoticeRoleContext, baseline_read_claim, execution_operation_claim, historical_creation, notice_clauses,
+    NoticeRoleContext, PlannedEffectReferent, baseline_read_claim, deictic_effect_claim,
+    effect_kind_label, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
     owner_inheritance, preview_operation_claim, prospective_role_owner,
 )
 
@@ -330,7 +331,7 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
         return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
                 "action": "|".join(_PLUGIN_CREATION_WORDS), "kind": "plugin", "source_type": "sound", "source_id": source["id"],
                 "source_names": (source["name"], source["path"]), "notes": descriptor.get("notes", ""),
-                "protected_effect_count": protected_count}
+                "protected_effect_count": protected_count, "descriptor": descriptor}
     if operation == "object.setReference":
         source, target = state.get("object"), state.get("target")
         observed, expected = before.get("stinger"), before.get("target")
@@ -501,9 +502,7 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
             if label == "名为":
                 continue  # A name introducer does not declare a native kind.
             label = re.sub(r"\s*名为$", "", label).strip()
-            if re.fullmatch(r"(?:effect|效果器|效果|插件)", label):
-                continue
-            if re.fullmatch(r"wwise\s+[a-z][a-z0-9._-]*(?:\s*(?:效果器|effect|插件))?", label):
+            if effect_kind_label(label):
                 continue
             return False
     return True
@@ -564,6 +563,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     affirmative = False
     source_referent = False
     pending_note_owner = None
+    matched_displays = set()
+    planned_effect = None
     clause_cursor = 0
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
         authorization = authorization_claim(clause)
@@ -594,6 +595,15 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 affirmative = True
         actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
         local_claims = notice_clauses(clause)
+        if context["kind"] == "plugin":
+            for local_claim in local_claims:
+                display = matched_display_claim(local_claim, role_context)
+                if display.role == "invalid":
+                    return False
+                if display.role == "matched-display":
+                    matched_displays.add(display.value)
+                    if len(matched_displays) > 1:
+                        return False
         read_summary = baseline_read_claim(local_claims[0], role_context) if local_claims else None
         if read_summary is not None and read_summary.role == "invalid":
             return False
@@ -601,6 +611,15 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             if local_claims and context["kind"] == "plugin" else None)
         execution_summary = (execution_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
+        if local_claims and context["kind"] == "plugin":
+            deictic = deictic_effect_claim(local_claims[0], context["action"], planned_effect)
+            if deictic.role == "invalid":
+                return False
+            if deictic.role == "execution-summary":
+                if (planned_effect.owner_id != context["source_id"] or planned_effect.name != context["groups"][1][0].casefold()
+                        or planned_effect.native_class_id != context["descriptor"]["class_id"]):
+                    return False
+                execution_summary = deictic
         prior_note_owner, pending_note_owner = pending_note_owner, None
         if context["kind"] == "plugin" and not actions and re.fullmatch(r"\s*(?:在|向|对)\s*.+?(?:上|下)?\s*", clause):
             new_target = context["groups"][1][0].casefold()
@@ -692,6 +711,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 affirmative = True
                 if context["kind"] == "plugin":
                     creation_position = action.start()
+                    quoted_notes = re.findall(r'备注(?:为|是)?\s*[“"]([^”"]*)[”"]', clause)
+                    if not context["notes"] or context["notes"].casefold() in quoted_notes:
+                        planned_effect = PlannedEffectReferent(context["groups"][1][0].casefold(), context["source_id"],
+                            context["descriptor"]["class_id"], next(iter(matched_displays)) if matched_displays else None)
     return affirmative
 
 

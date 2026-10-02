@@ -27,6 +27,14 @@ class NoticeClaim(NamedTuple):
     end: int
     text: str
     diagnostic: str = ""
+    value: str = ""
+
+
+class PlannedEffectReferent(NamedTuple):
+    name: str
+    owner_id: str
+    native_class_id: int
+    display_label: str | None
 
 
 def notice_clauses(text: str) -> tuple[NoticeClaim, ...]:
@@ -54,7 +62,7 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
     if value in {str(row[key]).casefold() for key in ("id", "name", "path")}:
         return True
     terms = "|".join(re.escape(term) for term in role_terms(row["type"]))
-    return re.fullmatch(rf"(?:目标|该|此|指定)\s*(?:{terms})(?:对象)?", value) is not None
+    return re.fullmatch(rf"(?:目标|该|此|(?:所)?指定)(?:的)?\s*(?:{terms})(?:对象)?", value) is not None
 
 
 def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
@@ -87,6 +95,8 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
             return clause._replace(role="invalid", diagnostic="conflicting-protected-baseline")
         if baseline_role == "read-summary":
             value = value[:coordinated.start()].strip()
+    if primary_role_atom(re.sub(r"^目标是\s*", "", value), context):
+        return clause._replace(role="owner-attestation")
     legacy = attested_primary_target(clause.text[:match.start(1)] + value, context.identity)
     if legacy.state == "attested":
         return clause._replace(role="owner-attestation")
@@ -116,6 +126,22 @@ def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> Noti
         if role == "read-summary" and owner_attestation(clause, context).role == "owner-attestation":
             return clause._replace(role="read-summary", start=clause.start + coordinator.start())
     return clause
+
+
+def matched_display_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
+    """An opaque display token is lexical context, never native class evidence."""
+    match = re.fullmatch(r"\s*并匹配到\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*", clause.text)
+    if match and context.identity["type"] == "Sound" and effect_kind_label(match.group(1)):
+        return clause._replace(role="matched-display", value=" ".join(match.group(1).split()))
+    if re.match(r"\s*并匹配到", clause.text):
+        return clause._replace(role="invalid", diagnostic="unclosed-matched-display")
+    return clause
+
+
+def effect_kind_label(label: str) -> bool:
+    """Existing Effect-kind/display syntax, without any label/class-ID mapping."""
+    return (re.fullmatch(r"(?:effect|效果器|效果|插件)", label) is not None
+            or re.fullmatch(r"wwise\s+[a-z][a-z0-9._-]*(?:\s*(?:效果器|effect|插件))?", label) is not None)
 
 
 def coordinate_points(text: str, *, decibels: bool) -> tuple[tuple[float, float], ...] | None:
@@ -221,7 +247,10 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
             baseline = baseline_read_role(tail.text, context)
             if baseline == "invalid":
                 return None
-            if baseline != "read-summary" and not (authorization.state == "ancillary" and not authorization.owner_prefix
+            display = matched_display_claim(tail, context)
+            if display.role == "invalid":
+                return None
+            if baseline != "read-summary" and display.role != "matched-display" and not (authorization.state == "ancillary" and not authorization.owner_prefix
                                      and not tail.text[authorization.end:].strip()):
                 compatible = False
         if compatible:
@@ -262,7 +291,7 @@ def historical_creation(prefix: str) -> bool:
 def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
     """A nominal Preview introduces an operation, leaving its effect unconsumed."""
     change = r"(?:(?:本次|该|此)?(?:修改|变更|改动))"
-    frame = rf"(?:(?:{change})?预览|预览(?:中)?的{change})"
+    frame = rf"(?:(?:{change})?预览|预览(?:中)?的{change}|待执行(?:的)?{change})"
     match = re.match(rf"\s*{frame}(?:为|是|显示为)\s*(?={action_pattern})", clause.text)
     if match is None:
         return clause
@@ -275,3 +304,19 @@ def execution_operation_claim(clause: NoticeClaim, action_pattern: str) -> Notic
     if match and prospective_intent(clause.text, operation_actions=action_pattern):
         return clause._replace(role="execution-summary")
     return clause
+
+
+def deictic_effect_claim(clause: NoticeClaim, action_pattern: str, referent: PlannedEffectReferent | None) -> NoticeClaim:
+    """A future summary may refer only to one earlier validated planned effect."""
+    refusal = r"(?:我)?(?:不会|不|暂不|不能|不再)"
+    match = re.fullmatch(rf"\s*(?P<intent>{_FUTURE}|{refusal})\s*(?:{action_pattern})\s*上述\s*(?P<value>.+?)\s*", clause.text)
+    if match is None:
+        return clause
+    if referent is None:
+        return clause._replace(role="invalid", diagnostic="missing-planned-effect-antecedent")
+    value = " ".join(match.group("value").split())
+    if value not in {referent.name, referent.display_label, "效果器", "effect"}:
+        return clause._replace(role="invalid", diagnostic="conflicting-planned-effect-referent")
+    if re.fullmatch(refusal, match.group("intent")):
+        return clause._replace(role="invalid", diagnostic="planned-effect-execution-refusal")
+    return clause._replace(role="execution-summary")

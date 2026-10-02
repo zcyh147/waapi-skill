@@ -2383,3 +2383,62 @@ def test_owned_operation_status_does_not_become_execution_refusal(prefix, expect
     post = case['events'][1]['item']
     post['text'] = post['text'].replace('现在执行追加', prefix + '执行追加')
     assert _grammatical_notice(case) is expected
+
+
+def _planned_effect_entity_case():
+    case = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-planned-effect-entity-notices-55df097.json').read_text())['case']
+    # The public test wrapper uses attested phase aliases as command keys.
+    # Raw messages and the separately hashed source fixture remain unchanged.
+    case['events'][0]['item']['command'] = 'preview-from-draft'
+    case['events'][-1]['item']['command'] = 'execute'
+    return case
+
+
+def test_actual_pending_named_effect_and_later_deictic_reference_share_one_binding():
+    assert _grammatical_notice(_planned_effect_entity_case())
+
+
+@pytest.mark.parametrize('kind', ['Sound', 'ActorMixer', 'Source'])
+def test_matched_label_and_deictic_reference_cannot_agree_on_wrong_native_kind(kind):
+    case = _planned_effect_entity_case()
+    for event in case['events'][1:3]:
+        event['item']['text'] = event['item']['text'].replace('Wwise Gain', kind)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('summary,expected', [
+    ('现在将追加上述 Wwise Gain', True),
+    ('随后将追加上述 Wwise Gain', True),
+    ('现在将追加上述效果器', True),
+    ('不会追加上述 Wwise Gain', False),
+    ('暂不追加上述 Wwise Gain', False),
+    ('现在将追加上述 Wwise Compressor', False),
+    ('现在将追加上述 Protected_Gain_0', False),
+    ('现在将追加上述 Sound', False),
+    ('在 OtherOwner 上追加上述 Wwise Gain', False),
+])
+def test_single_planned_effect_referent_keeps_kind_owner_value_and_polarity(summary, expected):
+    case = _planned_effect_entity_case()
+    case['events'][2]['item']['text'] = case['events'][2]['item']['text'].replace('现在将追加上述 Wwise Gain', summary)
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('damage', ['no_descriptor', 'historical', 'wrong_note', 'foreign_owner', 'wrong_policy', 'extra_edit', 'ambiguous_display'])
+def test_planned_effect_reference_requires_one_exact_validated_prospective_antecedent(damage):
+    case = _planned_effect_entity_case()
+    first, second = (event['item'] for event in case['events'][1:3])
+    if damage == 'no_descriptor':
+        first['text'] = '已确认目标是所指定的 Sound，并匹配到 Wwise Gain。'
+    elif damage == 'historical':
+        first['text'] = first['text'].replace('待执行变更为追加', '目标声音已经追加')
+    elif damage == 'wrong_note':
+        first['text'] = first['text'].replace('Expansion C09 appended gain', 'Wrong note')
+    elif damage == 'foreign_owner':
+        first['text'] = first['text'].replace('所指定的 Sound', 'OtherOwner 的 Sound')
+    elif damage == 'wrong_policy':
+        second['text'] = second['text'].replace('allow_changes', 'read_only')
+    elif damage == 'extra_edit':
+        second['text'] += '同时修改 Pitch 为12。'
+    else:
+        first['text'] = first['text'].replace('并匹配到 Wwise Gain', '并匹配到 Wwise Gain，并匹配到 Wwise Compressor')
+    assert not _grammatical_notice(case)

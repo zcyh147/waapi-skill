@@ -69,10 +69,13 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     bare_grant = rf"(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT}){_AUTHORIZATION}"
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
     record = r"(?:预览(?:之后|后)|本次)(?:已)?记录(?:了)?(?:独立)?(?:的)?\s*(?P<record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权(?:记录)?"
+    inspection = r"(?:已)?确认(?:保存的)?授权记录包含独立于(?:修改|变更|改动)预览的\s*(?P<inspection_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权"
     beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
-    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record})(?=[，,。；;]|\s*$)", clause)
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection})(?=[，,。；;]|\s*$)", clause)
     if match:
         if match.group('record_policy') is not None and match.group('record_policy') not in {'allow_changes', '**allow_changes**'}:
+            return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
+        if match.group('inspection_policy') is not None and match.group('inspection_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
         consumed_end = match.end()
         for qualifier in re.finditer(r"[，,]([^，,。；;\n]+)", clause[match.end():]):

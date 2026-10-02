@@ -43,6 +43,34 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Reviewed planned-effect reference repair — 2026-10-03:** #147 now links
+  an attested definite primary owner, a named prospective Effect descriptor,
+  a bounded saved-policy inspection and a later reference to that same effect.
+  Display labels remain lexical context, never native class-ID authority;
+  the immutable descriptor retains that authority. The existing Effect-kind
+  predicate rejects a Sound/Source/ActorMixer substituted as a created effect.
+  Wrong owners, competing descriptors, conflicting fields, extra changes and
+  refusal remain rejected. Direct deictic refusal controls reproduced two
+  failures before repair, then passed. Both Standards and Spec reviews are clear.
+  The independent twenty-node corpus repeats one exact valid two-message witness
+  against ten distinct substantive negatives; it is not ten positive paraphrases.
+  Its initial 10/10 audit used incompatible test-helper phase commands and is
+  preserved with an explicit seam erratum, not credited as predicate RED. Only
+  private command projections were corrected after checking the raw Gateway
+  phases; raw fixture/messages remain unchanged. Corrected 20/20 is post-repair
+  evidence. The first author singleton had the same seam limitation and receives
+  no predicate-RED credit. The real frozen notice rejection remains the original
+  diagnostic evidence and is not regraded.
+  Notice-focused validation passed **2131 tests**, retaining the prior 2091;
+  root combined validation passed **2798 / skipped 9**, exit zero in **6.04 seconds**.
+  Combined log SHA-256: `ddf551ab0ffa012afa98ca52180b0257146c7f7d2329ba149ffb47d2c5df9557`;
+  JUnit SHA-256: `e86f75a05a6bf6ffe468a464f6948267922d709ddcb80463294a70a56d260b13`.
+  No packaged Skill, public Gateway or #152 reconciliation behavior changed.
+  Next: a new complete Non-live gate, then one fresh full thirteen-Agent-unit
+  batch and the separate boundary. Do not spend another C09-only rerun or
+  promote old automatic FAIL records.
+
+
 - **Valid C09 workflow; notice-only grader false negative — 2026-10-03:**
   candidate `55df09712c37efa55026d3ae318f3b8983bae5ff` passed complete
   Non-live **14805 / skipped 119 / deselected 27**, exit zero in **848.28 seconds**.
