@@ -42,6 +42,26 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Initial full macOS acceptance on frozen `977e71e` completed **all fourteen
+  units: 4 Agent PASS, 9 FAIL, and 1 separate BOUNDARY_PROVEN**, with no early
+  stop, pending unit, same-root retry, or verify-only replay. Independent audit
+  rehashed **1931** artifacts and six campaign metadata seals. Source full hashes
+  and mtimes remained unchanged; four PASS copies were removed and nine FAIL
+  copies plus the boundary copy stayed quarantined. All fourteen oracles closed;
+  failure reconciliation reaped every owned child. The job was unloaded and
+  scoped processes were empty. Actual Agent work totalled **1960.95 seconds /
+  16 turns / zero slow cases**, with eight executions and eight verifications.
+  Exact records and attribution are in
+  `../research/integration-expansion-initial-acceptance-977e71e-2026-10-02.json`.
+- Consolidation must distinguish the actual SFX source-placement/media collision
+  in C03/2022, undisclosed curve choices in both C08 units, the expansion's
+  unconditional developer confirmation instruction, three correct executed
+  effects rejected by contextual notice grammar, and two safe but incomplete
+  Agent input/discovery workflows. No original FAIL is promoted. Complete all
+  reviewed repairs first, rerun nine failed units, then rerun the full thirteen
+  positive units plus the 2022 M05 boundary on one candidate. Acceptance remains
+  incomplete; the source-safe initial batch is preserved as failure evidence.
+
 - The final model pilot completed **nine tasks / twelve turns** on `977e71e`.
   Luna high and Sol medium each passed all three cases and identical verify-only;
   Luna medium passed two and retained one genuine continuation-copy FAIL, despite
