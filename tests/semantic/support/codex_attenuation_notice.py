@@ -17,6 +17,82 @@ _ACTION = (r"设置为|设为|改为|改成|更新|修改(?!范围|请求|策略
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 
 
+def prospective_preview_execution(text: str) -> bool:
+    """A local execution clause must affirm the owned Preview, never refuse it."""
+    affirmative = False
+    for clause in re.split(r"[，,。；;\n]|\bbut\b|但", text):
+        for execution in re.finditer(r"执行|应用", clause):
+            prefix, suffix = clause[:execution.start()], clause[execution.end():].strip()
+            # Unrelated refusals do not contradict this Preview. Only an
+            # omitted object or an explicit planned-change referent is owned.
+            owned = re.match(r"(?:该预览|此预览|本次(?:修改|变更|改动)|(?:这|此)(?:一)?项(?:修改|变更|改动))?(?=$|并|随后|[，,。；;])", suffix)
+            if owned is None:
+                continue
+            if re.search(_NEGATION, prefix):
+                return False
+            if re.fullmatch(r"\s*(?:我)?(?:现在|即将|随后)(?:按授权|按预览)?\s*", prefix):
+                affirmative = True
+    return affirmative
+
+
+def normalize_attested_preview_target(text: str, identity: Mapping[str, Any]) -> tuple[str, bool] | None:
+    """Normalize one adjacent Preview referent after a complete identity claim.
+
+    The caller supplies an independently attested operation role. Recognized
+    identity frames are checked even when they cannot seed inheritance; their
+    original sentences remain present for subsequent contradiction checks.
+    """
+    sentences = re.split(r"([。\n])", text)
+    attested = False
+    for position in range(0, len(sentences), 2):
+        sentence = sentences[position].strip()
+        declaration = re.fullmatch(
+            r"(?:核对确认|已核对(?:确认)?)该对象是指定路径下的\s*(.+?)\s*[，,、]且\s*guid\s*与你提供的一致", sentence)
+        named = re.fullmatch(
+            r"(?:当前绑定|该对象)已按所给\s*guid\s*(?:确认|核实)为名为\s*(.+?)\s*[、，,]类型为\s*(.+?)\s*的对象", sentence)
+        recognized = re.match(r"(?:核对确认|已核对(?:确认)?)该对象是|(?:当前绑定|该对象)已按所给", sentence)
+        if recognized:
+            if declaration:
+                valid = declaration.group(1).strip() == identity["type"].casefold()
+            elif named:
+                valid = (named.group(1).strip() == identity["name"].casefold()
+                         and named.group(2).strip() == identity["type"].casefold())
+            else:
+                valid = False
+            if not valid:
+                return None
+            if position == 0 and len(sentences) > 2 and sentences[2].strip().startswith("预览"):
+                attested = True
+    return "".join(sentences), attested
+
+
+def _normalize_curve_expected_frame(text: str, context: Mapping[str, Any], attested: bool) -> str:
+    """Consume only a complete owned prospective curve frame, not a verb."""
+    if not attested:
+        return text
+    sentences = re.split(r"([。\n])", text)
+    if len(sentences) < 3:
+        return text
+    frame = re.fullmatch(
+        r"\s*预览(?:已)?(?:确认|显示)(?:本次)?(?:只|仅)(?:调用|提交)(?:其|该对象的)([^：:]+)曲线[:：]([^，,]+)[，,]([^。；;]+)([；;].*)?", sentences[2])
+    if frame is None:
+        return text
+    kind = "干声音量" if context["kind"] == "volume-dry" else context["kind"]
+    source = "自定义" if context["source"] == "custom" else context["source"]
+    if frame.group(1).strip() != kind or frame.group(2).strip() not in {source, source + "源", source + "来源"}:
+        return text
+    # Coordinates and shapes are checked against the sealed ordered plan by
+    # attenuation_notice_effect. Count is derived from that complete sequence.
+    description = frame.group(3).strip()
+    if re.match(r"(?:线性|linear)点\s*[（(]", description) is None:
+        return text
+    if not prospective_preview_execution(text):
+        return text
+    sentences[2] = (f"预览已确认仅向{context['identity']['id'].casefold()}提交{kind}曲线："
+                    f"{source}来源、{len(context['points'])}{description}" + (frame.group(4) or ""))
+    return "".join(sentences)
+
+
 def attenuation_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any], version: str) -> Mapping[str, Any] | None:
     """Attest sealed target-plan agreement against the independent singleton."""
     request, prepared = artifact.get("request"), artifact.get("prepared_operation")
@@ -183,6 +259,13 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
         return False
     text = re.sub(r"`([^`\n]+)`", r"\1", text.casefold()).replace("\u2212", "-")
     row = context["identity"]
+    normalized = normalize_attested_preview_target(text, row)
+    if normalized is None:
+        return False
+    text, attested = normalized
+    text = _normalize_curve_expected_frame(text, context, attested)
+    if "调用" in text:
+        return False
     if any(value != row["id"].casefold() for value in re.findall(_GUID, text)):
         return False
     if not any(term.casefold() in text for term in (row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "指定衰减对象", "该衰减", "该衰减对象", "this attenuation")):

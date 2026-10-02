@@ -1482,3 +1482,106 @@ def test_note_write_full_owner_evidence_and_local_qualifier_are_both_required(cl
     case = _expected_state_case('003-EXP22-C09')
     case['events'][-2]['item']['text'] += claim
     assert _grammatical_notice(case) is expected
+
+
+def _attested_frame_case(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-attested-frame-notices-492c30a.json').read_text())
+    return next(case for case in fixture['cases'] if case['case'] == case_id)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+def test_actual_identity_attestation_and_owned_preview_effect_frame(case_id):
+    assert _grammatical_notice(_attested_frame_case(case_id))
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('damage', ['foreign_id', 'wrong_type', 'interposed_owner', 'foreign_identity',
+    'ambiguous_identity', 'refusal', 'extra_action', 'extra_owner_action', 'late', 'generic'])
+def test_attested_preview_frames_preserve_identity_polarity_and_remaining_claims(case_id, damage):
+    case = _attested_frame_case(case_id)
+    post = case['events'][1]['item']
+    text = post['text']
+    if damage == 'foreign_id': text += '目标为 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。'
+    elif damage == 'wrong_type': text = text.replace('Sound', 'ActorMixer').replace('Attenuation', 'Sound')
+    elif damage == 'interposed_owner': text = text.replace('。预览', '。目标是 OtherOwner。预览')
+    elif damage == 'foreign_identity':
+        text = text.replace('指定路径下的 `Sound`', 'OtherSound 路径下的 `Sound`').replace(
+            '`Expansion_EXP25-C08_Attenuation`', '`OtherOwner`')
+    elif damage == 'ambiguous_identity':
+        text = text.replace('指定路径下的 `Sound`', '指定路径下的 `Sound` 和 OtherSound').replace(
+            '`Expansion_EXP25-C08_Attenuation`', '`Expansion_EXP25-C08_Attenuation` 和 OtherOwner')
+    elif damage == 'refusal': text = text.replace('预览将新增', '预览不会新增').replace('只调用其', '不会调用其')
+    elif damage == 'extra_action': text += '同时修改 Pitch 为 12。'
+    elif damage == 'extra_owner_action': text += '在 OtherOwner 上新增另一个效果。'
+    elif damage == 'late': case['events'][1:] = case['events'][1:][::-1]
+    elif damage == 'generic': text = '已核对目标，预览已授权，我现在执行。'
+    post['text'] = text
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('old,new', [
+    ('我现在执行', '我现在等待'), ('自定义源', 'project 源'), ('线性点', '非线性点'),
+    ('(50.0, -12.0)', '(50.0, -60.0)'), ('(50.0, -12.0)', '(50.0, -12.0 Hz)'),
+    ('(50.0, -12.0)', '(50.0, -12.0'), ('`(50.0, -12.0)`、', ''),
+    ('只调用其', '只调用 OtherOwner 的'), ('干声音量', 'spread'),
+    ('预览确认本次', '当前状态确认本次'), ('预览确认本次', '此前已确认本次'),
+])
+def test_expected_curve_frame_requires_complete_prospective_owned_effect(old, new):
+    case = _attested_frame_case('004-EXP25-C08')
+    post = case['events'][1]['item']
+    assert old in post['text']
+    post['text'] = post['text'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('insert', ['预览已授权。', '预览仍待确认。目标是 OtherOwner。'])
+def test_identity_inheritance_cannot_skip_an_intervening_sentence(insert):
+    case = _attested_frame_case('003-EXP22-C09')
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('。预览将新增', '。' + insert + '预览将新增')
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('claim', ['我不会执行该预览。', '我不执行该预览。', '现在不执行该预览。',
+    '我暂不执行本次修改。', '我并非现在执行该预览。'])
+def test_normalized_expected_frames_reject_primary_execution_refusal(case_id, claim):
+    case = _attested_frame_case(case_id)
+    case['events'][1]['item']['text'] += claim
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('replacement', ['我现在等待', '我此前已执行', '我不会执行'])
+def test_normalized_expected_frames_require_current_prospective_intent(case_id, replacement):
+    case = _attested_frame_case(case_id)
+    post = case['events'][1]['item']
+    assert '我现在执行' in post['text']
+    post['text'] = post['text'].replace('我现在执行', replacement)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id,old,new', [
+    ('003-EXP22-C09', '核对确认', '已核对'),
+    ('003-EXP22-C09', '核对确认', '已核对确认'),
+    ('003-EXP22-C09', '，且 GUID', '、且 GUID'),
+    ('004-EXP25-C08', '当前绑定已按', '该对象已按'),
+    ('004-EXP25-C08', '确认为名为', '核实为名为'),
+    ('004-EXP25-C08', '、类型为', '，类型为'),
+    ('004-EXP25-C08', '预览确认本次只调用其', '预览已显示仅提交该对象的'),
+    ('004-EXP25-C08', '自定义源', '自定义来源'),
+])
+def test_complete_attested_frame_components_allow_equivalent_grammar(case_id, old, new):
+    case = _attested_frame_case(case_id)
+    post = case['events'][1]['item']
+    assert old in post['text']
+    post['text'] = post['text'].replace(old, new)
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('claim', ['不会修改 OtherOwner 的备注。', '不会执行其他对象的修改。'])
+def test_prospective_execution_polarity_does_not_confuse_unrelated_preservation(case_id, claim):
+    case = _attested_frame_case(case_id)
+    case['events'][1]['item']['text'] += claim
+    assert _grammatical_notice(case)

@@ -42,6 +42,53 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Complete three-failure rerun — 2026-10-02:** frozen `492c30a` passed
+  five-version Program **6258 / skipped 2** and complete Non-live
+  **13503 / skipped 119 / deselected 27**, both exit zero. The subsequent
+  `expansion-failed3-492c30a-luna-high-r1-cli1592` root completed all four
+  selected units: **zero Agent PASS / three FAIL / one separate boundary**,
+  zero pending and no early stop. EXP22-C08 received the correct declaration
+  field `attenuation_handle` in both schema and continuation, but submitted
+  `attenuation`; Gateway rejected it before Preview or mutation. This is a
+  genuine Agent input error, not missing disclosure or the earlier typed-role
+  ambiguity. EXP22-C09 and EXP25-C08 completed their intended business effects
+  with six/five independent assertions passing, but failed the visible notice
+  gate. C08's Gateway result-schema-only verification remains distinct from
+  the independent project's stronger outcome evidence. Neither C08 consumed
+  the getter schema, so no Fresh #149 getter credit is assigned.
+  The original FAIL root stays frozen without verify-only or regrading.
+  Its one-shot launcher exited 1, was unloaded, and left no scoped process.
+  All four source hash/mtime guards match; three failures and the boundary
+  remain quarantined. Audit validated **576 artifacts / 23514269 bytes / eight
+  metadata seals**; all retained process records show successful cleanup and
+  all three failure reconciliations were reaped. Agent time totaled
+  **471.49 seconds**, three turns, zero slow cases and two Execute/Verify pairs.
+  Exact gate hashes, usage and limitations are in
+  `../research/integration-expansion-failed-rerun-492c30a-2026-10-02.json`.
+  Root coordination now uses the user's Astra-high selection; the formal
+  tested model remains Luna high. Diagnose and consolidate the notice
+  false negatives before a fresh failed-only root; do not relax the public
+  declaration contract to conceal an Agent error. Final full acceptance
+  remains pending.
+  The #147 successor normalizes a complete attested identity only into its
+  immediately adjacent, operation-owned Preview effect. Ordered points supply
+  their own count; current/history-only descriptions and execution refusals
+  cannot establish prospective intent. Full original identity and remaining
+  clauses retain contradiction checks. Actual two-notice RED/GREEN and 63 new
+  contrast checks leave all 890 earlier notice checks passing (953 total).
+  Initial Spec and Standards reviews found two P2s: inheritance could reach a
+  later Preview and an explicit execution refusal could be ignored. Both were
+  repaired with RED/GREEN regressions; both final review axes are clear.
+  The coordinator's persisted notice/documentation check passed **962 tests**,
+  exit zero in **1.16 seconds**. Log SHA-256 is
+  `08262847706c5975e7189479cb1091efce5f0f9cfafedd7431ce4193308b938e`;
+  JUnit SHA-256 is
+  `d35478fe6a16cc53c7feb0237cec1cd631f8a4961b344e9fedff3f31f5216b56`.
+  This is harness-only work; packaged Skill and fixed Program inputs are
+  unchanged from `492c30a`. Complete successor Non-live and Fresh validation
+  are still required. The concrete historical notices are regression fixtures,
+  not a regrading or promotion of either frozen Agent FAIL.
+
 - **Complete failed-five batch and typed-role repair — 2026-10-02:** frozen
   `db82de6` passed complete Non-live **13349 / skipped 119 / deselected 27**,
   exit zero in **833.94 seconds**. Log SHA-256 is

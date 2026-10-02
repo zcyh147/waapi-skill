@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from tests.semantic.support.codex_attenuation_notice import (
-    ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect,
+    ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
+    prospective_preview_execution,
 )
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
@@ -460,6 +461,20 @@ def _note_owner_prefix_agrees(prefix: str, context: Mapping[str, Any], creation_
 
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    normalized = normalize_attested_preview_target(text, {"id": context["source_id"],
+        "name": context["source_names"][0], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
+    if normalized is None:
+        return False
+    text, attested = normalized
+    if attested and context["kind"] == "plugin":
+        # Only the immediately following owned Preview gains this referent.
+        # Retain its complete effect and every remaining clause for validation.
+        sentences = re.split(r"([。\n])", text)
+        if not prospective_preview_execution(text):
+            return False
+        sentences[2] = re.sub(r"^\s*预览将(?=新增|添加|插入|创建|追加)",
+            "预览将在 " + context["source_id"].casefold() + " 上", sentences[2], count=1)
+        text = "".join(sentences)
     ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
     if any(value not in {value.casefold() for value in context["ids"]} for value in ids):
         return False
