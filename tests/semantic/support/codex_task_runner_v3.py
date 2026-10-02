@@ -17,7 +17,7 @@ from tests.semantic.support.codex_attenuation_notice import (
     ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
     prospective_preview_execution,
 )
-from tests.semantic.support.codex_notice_language import planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
@@ -548,6 +548,12 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     source_referent = False
     pending_note_owner = None
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
+        authorization = authorization_claim(clause)
+        if authorization.state == "invalid":
+            return False
+        if authorization.state == "ancillary":
+            if not _bound_explicit_owners_agree(authorization.owner_prefix.strip().rstrip("，,").strip(), "", context):
+                return False
         anchored = _bound_owner_anchor(clause, context)
         source_referent = source_referent or anchored
         if source_referent and (re.search(r"(?:在|向)(?:其|它|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause)
@@ -573,6 +579,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             pending_note_owner = clause
         creation_position = -1
         for index, action in enumerate(actions):
+            if authorization.state == "ancillary" and authorization.start <= action.start() and action.end() <= authorization.end:
+                continue
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
             if noun_provider is not None and noun_provider.role in {"invalid-provider", "curve-range"}:

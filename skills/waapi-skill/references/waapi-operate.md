@@ -8,7 +8,7 @@ Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncatio
 - POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
 - Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
 - A rejected or nonzero Gateway invocation is also a hard stop. Only a successful result whose `fallback_detail_scan.status` is `partial` permits the one metadata retry below.
-- The one complete terminal `verify` result ends the transaction; no extra proof query/filesystem call.
+- The one complete terminal `verify` result closes the transaction. Follow Terminal states below for reporting and any requested read-only follow-up.
 
 ## Choose the phase and first Gateway command
 
@@ -166,9 +166,9 @@ The confirmation token binds the exact stored Preview. Never reconstruct/substit
 ## Terminal states
 
 - `verified`: report actual readback and stop.
-- `result_schema_checked`: report only schema proof.
+- `result_schema_checked`: report only schema proof. If the user explicitly requested actual readback, continue only through disclosed bounded Gateway read-only routes for the exact requested targets. The transaction stays closed: no execute, reverify or retry, filesystem proof, raw API or code workaround. Report current values separately; without a before-state baseline they do not prove preservation. If no suitable closed read route exists, report that boundary and stop.
 - `verification_deferred`: later verification is safe; never re-execute.
-- `verification_failed`, `repreview_required`, `execution_cancelled`: report without retry.
+- `verification_failed`, `repreview_required`, `execution_cancelled`: report and stop without retry or further proof calls.
 - `execution_succeeded_persistence_failed`: preserve uncertainty; never replay.
 - `indeterminate`: Do not verify, retry, call another Gateway route, or use another tool. A later diagnosis needs a new user request.
 

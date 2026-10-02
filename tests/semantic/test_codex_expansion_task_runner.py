@@ -1982,3 +1982,86 @@ def test_curve_range_noun_preserves_its_explicit_owner_prefix(change, foreign):
     owner = 'OtherOwner' if foreign else case['before']['attenuation']['name']
     case['events'][1]['item']['text'] += '在 ' + owner + ' 上本次' + change + '范围仅包含这一条曲线。'
     assert _grammatical_notice(case) is (not foreign)
+
+
+def _passive_authority_case(version):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-passive-authority-notices-7652745.json').read_text())
+    return next(case for case in fixture['cases'] if case['artifact']['request']['version'] == version)
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
+def test_actual_subject_first_authorization_notice_is_ancillary_not_a_physical_edit(version):
+    assert _grammatical_notice(_passive_authority_case(version))
+
+
+_AUTHORITY_CLAUSE_PAIRS = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-authorization-clause-cases-7652745.json').read_text())['pairs']
+
+
+@pytest.mark.parametrize('pair', _AUTHORITY_CLAUSE_PAIRS, ids=lambda pair: pair['id'])
+@pytest.mark.parametrize('polarity', ['positive', 'negative'])
+@pytest.mark.parametrize('family', ['curve', 'effect'])
+def test_independent_authorization_clause_roles_preserve_the_primary_effect(pair, polarity, family):
+    case = _role_notice_case('004-EXP25-C08' if family == 'curve' else '003-EXP22-C09')
+    entry = pair[polarity]
+    case['events'][1]['item']['text'] += entry['clause']
+    expected = entry['expected']['classification'] in {'ancillary_authorization', 'unrelated'}
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('pair', _AUTHORITY_CLAUSE_PAIRS, ids=lambda pair: pair['id'])
+@pytest.mark.parametrize('polarity', ['positive', 'negative'])
+def test_ancillary_authorization_clauses_never_fulfill_the_effect_notice(pair, polarity):
+    case = _role_notice_case('004-EXP25-C08')
+    case['events'][1]['item']['text'] = pair[polarity]['clause']
+    assert not _grammatical_notice(case)
+
+
+def _authorization_sentence(voice, change, provider, grant):
+    if voice == 'active': return provider + grant + change + '的独立授权。'
+    return change + provider + grant + '独立授权。'
+
+
+def _authorization_family_case(family):
+    if family == 'reference': return _grammatical_role_case('007-EXP25-M05')
+    return _role_notice_case('004-EXP25-C08' if family == 'curve' else '003-EXP22-C09')
+
+
+@pytest.mark.parametrize('family', ['curve', 'effect', 'reference'])
+@pytest.mark.parametrize('voice', ['active', 'passive'])
+@pytest.mark.parametrize('change', ['本次修改', '该变更', '这项独立改动'])
+@pytest.mark.parametrize('provider', ['已按 allow_changes 策略', '已按保存的 allow_changes 策略', '已按当前 allow_changes 策略'])
+@pytest.mark.parametrize('grant', ['取得', '获得'])
+@pytest.mark.parametrize('wrong_policy', [False, True])
+def test_authorization_components_compose_without_changing_any_notice_family(family, voice, change, provider, grant, wrong_policy):
+    case = _authorization_family_case(family)
+    clause = _authorization_sentence(voice, change, provider, grant)
+    if wrong_policy: clause = clause.replace('allow_changes', 'read_only')
+    case['events'][1]['item']['text'] += clause
+    assert _grammatical_notice(case) is (not wrong_policy)
+
+
+@pytest.mark.parametrize('family', ['curve', 'effect', 'reference'])
+@pytest.mark.parametrize('voice', ['active', 'passive'])
+def test_explicit_uncertainty_about_owned_authorization_never_becomes_an_exemption(family, voice):
+    case = _authorization_family_case(family)
+    clause = _authorization_sentence(voice, '本次修改', '已按 allow_changes 策略', '取得')
+    case['events'][1]['item']['text'] += '不确定' + clause
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('family', ['curve', 'effect', 'reference'])
+@pytest.mark.parametrize('grant', ['本次修改已取得独立授权', '取得本次修改的独立授权'])
+@pytest.mark.parametrize('qualifier', ['策略为 read_only', '当前策略为 read_only', '并且策略是 read_only'])
+def test_coordinated_current_policy_qualifier_cannot_contradict_the_owned_authorization(family, grant, qualifier):
+    case = _authorization_family_case(family)
+    case['events'][1]['item']['text'] += grant + '，' + qualifier + '。'
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('family', ['curve', 'effect', 'reference'])
+@pytest.mark.parametrize('tail', ['策略为 allow_changes', '当前策略为 allow_changes', '并且策略是 allow_changes',
+    '可用模式为 read_only、ask_before_changes、allow_changes', '文档中的策略名包括“read_only”'])
+def test_policy_tails_distinguish_current_claims_from_mode_lists_and_quotes(family, tail):
+    case = _authorization_family_case(family)
+    case['events'][1]['item']['text'] += '本次修改已取得独立授权，' + tail + '。'
+    assert _grammatical_notice(case)

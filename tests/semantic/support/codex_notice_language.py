@@ -18,7 +18,7 @@ _CHANGE = r"(?:修改|变更|改动)"
 _REFERENT = r"(?:该|此|本次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
-_PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
+_PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
 _GRANT = r"(?:已)?(?:取得|获得)"
 _AUTHORIZATION = r"(?:的)?(?:独立)?(?:策略)?授权"
 
@@ -33,9 +33,55 @@ class PrimaryTarget(NamedTuple):
     identity: Mapping[str, Any] | None
 
 
+class AuthorizationClaim(NamedTuple):
+    state: str
+    start: int
+    end: int
+    owner_prefix: str
+
+
+def authorization_claim(clause: str) -> AuthorizationClaim:
+    """Classify active/passive ancillary claims, retaining their original span.
+
+    A claim never grants authority or proves an expected effect. Its owner
+    prefix must still agree with the caller's independently attested role.
+    Unconsumed coordinated text remains available for action accounting.
+    """
+    change = rf"(?:{_REFERENT})(?:独立)?{_CHANGE}"
+    active = rf"(?:{_PROVIDER})?{_GRANT}{change}{_AUTHORIZATION}"
+    passive = rf"{change}(?:{_PROVIDER})?{_GRANT}{_AUTHORIZATION}"
+    beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
+    beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary})(?=[，,。；;]|\s*$)", clause)
+    if match:
+        consumed_end = match.end()
+        for qualifier in re.finditer(r"[，,]([^，,。；;\n]+)", clause[match.end():]):
+            policy = re.fullmatch(r"\s*(?:并(?:且)?)?(?:当前|本次)?策略(?:为|是)\s*(.+?)\s*", qualifier.group(1))
+            if policy is None:
+                continue
+            if re.fullmatch(r"(?:allow_changes|\*\*allow_changes\*\*)", policy.group(1)) is None:
+                return AuthorizationClaim("invalid", match.start(), len(clause), match.group("owner") or "")
+            # Consume only adjacent known policy qualifiers. Never sweep an
+            # intervening owner or action into the exempt authorization span.
+            if match.end() + qualifier.start() == consumed_end:
+                consumed_end = match.end() + qualifier.end()
+        return AuthorizationClaim("ancillary", match.start(), consumed_end, match.group("owner") or "")
+    # Restrict failure classification to an authorization claim about this
+    # change. Existing operation descriptions continue through their parser.
+    body = re.sub(r"^\s*(?:并(?:且)?)?\s*", "", clause)
+    relevant = re.search(change, body) is not None and "授权" in body
+    recognized = re.match(rf"(?:(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*)?(?:{change}|(?:已)?(?:按|取得|获得|为))|在|向|对", body)
+    if relevant and recognized:
+        return AuthorizationClaim("invalid", 0, len(clause), "")
+    return AuthorizationClaim("unrelated", 0, 0, "")
+
+
 def _authorization_clause(clause: str) -> bool:
     """A coordinated notice summary using the same closed grant components."""
-    return re.fullmatch(rf"\s*(?:并)?(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT})(?:{_CHANGE})?{_AUTHORIZATION}\s*", clause) is not None
+    claim = authorization_claim(clause)
+    if claim.state == "ancillary" and not claim.owner_prefix and not clause[claim.end:].strip():
+        return True
+    return re.fullmatch(rf"\s*(?:并)?(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT}){_AUTHORIZATION}\s*", clause) is not None
 
 
 def attested_primary_target(clause: str, identity: Mapping[str, Any]) -> PrimaryTarget:

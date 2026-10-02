@@ -42,6 +42,60 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+
+- **Authorization grammar and requested readback repair — 2026-10-03:** the
+  shared authorization classifier now retains original spans and owner evidence
+  for active, passive and beneficiary clause roles. Ancillary authorization
+  prose cannot grant authority or supply a missing expected effect. Independent
+  paired controls cover policy, owner, uncertainty, refusal and extra actions
+  across attenuation, effect and reference notices. Review found and repaired
+  a contradictory coordinated policy suffix; only adjacent valid policy
+  qualifiers extend the exempt span. All earlier negative controls remain.
+  Actual frozen notices remain fixture witnesses, not historical regrading.
+  Both Standards and Spec reviews are clear after repair. The combined
+  configuration, notice, Broker and documentation gate passed **1907 tests**,
+  exit zero in **4.26 seconds**. Log SHA-256:
+  `5035a98b162a2f24de95da39c0e52b841ddff027dc69c55a3b9a1df3c2cba53a`;
+  JUnit SHA-256:
+  `a058f194bad9f6defeaadf5677c8e12b12c62b25dbe86f34fa2c84ffbbc54fcb`.
+  Separate #151 clarifies the narrow requested-readback exception for
+  `result_schema_checked`; transaction execution and stronger-proof claims stay
+  closed. Complete Non-live and new affected Fresh validation remain required.
+
+
+- **Sol-high focused follow-up — 2026-10-02:** candidate `7652745` passed
+  offline model/profile validation before a new one-shot launcher. Root
+  `expansion-focused3-7652745-sol-high-r1-cli1592` completed **zero Agent PASS,
+  three FAIL, one separately proven boundary**, with no pending or early stop.
+  Both C08 units executed once and passed all five independent outcome checks,
+  but failed the notice gate: subject-first authorization clauses were mistaken
+  for additional physical edits. Independent diagnosis identified a grammatical
+  role defect; original FAILs remain frozen without verify-only or regrading.
+  C09 stopped safely before Preview after claiming incomplete catalog output.
+  Captured output is complete, but original output budget and model-facing
+  truncation metadata are unavailable, so false truncation is not proved.
+  C08/2025 also made 19 scoped read-only calls after terminal Verify, consuming
+  the #149 getter disclosure. This proves that component's use, not business
+  acceptance: the Broker admits these reads while the Skill's no-extra-proof
+  rule prohibits them. That policy mismatch needs explicit reconciliation.
+  The run took **476.57 Agent seconds** across three turns; none exceeded the
+  seven-minute slow threshold. All 582 archived artifacts and eight metadata
+  seals match, all four source guards are unchanged, failed copies are retained,
+  reconciliation children were reaped, and the launcher ran once, exited 1 and
+  was unloaded with no scoped processes. Detailed evidence and exact digests
+  are in `../research/integration-expansion-focused-rerun-7652745-sol-high-2026-10-02.json`.
+  A shared active/passive authorization-clause repair and independent paired
+  offline controls are being prepared before any further Fresh attempt.
+  Separate repair #151 reconciles explicitly requested actual-state readback
+  after `result_schema_checked` with the existing bounded public read lane.
+  The transaction remains closed; current values do not prove preservation
+  without a baseline. Its nine new authenticated Broker regressions cover
+  permitted scoped reads and rejection of writes, reverification and public
+  scope escapes. The focused Broker file passed **58 tests**, exit zero;
+  independent Standards/instruction-consistency review found no findings.
+  The Broker still permits bounded exact-ID reads within its owned project;
+  these tests do not claim a runtime requested-target allowlist.
+
 - **Explicit Sol-high configuration registration — 2026-10-02:** `a41d337`
   passed complete Non-live **13990 / skipped 119 / deselected 27**, exit zero
   in **870.64 seconds**. The attempted Sol-high focused launcher exited 2 at

@@ -521,3 +521,102 @@ def test_structured_indeterminate_execution_is_a_terminal_non_retryable_receipt(
         assert broker.evidence().terminal_indeterminate
         assert invoke()["exit_code"] != 0
         assert len(launches) == 1
+
+
+def _schema_checked_policy(state_directory):
+    from dataclasses import replace
+    from wwise_waapi.transactions import TransactionStore
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+
+    prepared = replace(make_policy().prepared,
+        accepted_verification_states=frozenset({"result_schema_checked"}))
+    policy = ExpansionBrokerPolicy(prepared=prepared, version="2025.1", skill_source=SKILL,
+                                   scoped_paths={OWNER: PATH})
+    policy.begin_turn(1)
+    store = TransactionStore(state_directory)
+    tx = "tx1-" + "6" * 20
+    artifact = {"request": {"operation": prepared.operation}}
+    record = store.create_preview(tx, artifact)
+    baseline = canonical_digest(prepared.before)
+    policy.transaction.seal_preview(transaction_id=tx, artifact=artifact,
+        artifact_sha256=record.artifact_hash, before_sha256=baseline, after_sha256=baseline)
+    permit = policy.transaction.authorize(turn_prompt_sha256=canonical_digest(prepared.prompt),
+                                          explicit_intent="perform_changes")
+    store.authorize_by_policy(tx, policy="allow_changes",
+                              authority=policy.gateway_module.POLICY_AUTHORIZATION_AUTHORITY)
+    policy.transaction.reserve_execute(permit, live_artifact_sha256=record.artifact_hash,
+                                        gateway_authorization_bound=True)
+    store.begin_execution(tx, expected_authorization="policy_authorized")
+    store.mark_executed_unverified(tx)
+    policy.transaction.observe_execution(transaction_id=tx, artifact_sha256=record.artifact_hash,
+                                          completed=True)
+    policy.transaction_id, policy.artifact_hash = tx, record.artifact_hash
+    step = policy.prepare(("verify", tx), state_directory=state_directory)
+    store.record_verification(tx, outcome="result_schema_checked")
+    policy.observe(step, {"ok": True, "command": "verify", "transaction_id": tx,
+                         "artifact_hash": record.artifact_hash, "state": "result_schema_checked"},
+                   state_directory=state_directory)
+    assert policy.complete
+    return policy, store, tx
+
+
+@pytest.mark.parametrize("argv", [
+    ("query-object", "--exact-id", OWNER),
+    ("metadata", "attenuation", "--exact-id", OWNER, "--curve-role", "volume-dry"),
+])
+def test_schema_checked_followup_dispatches_owned_project_reads_without_reopening_transaction(monkeypatch, tmp_path, argv):
+    from types import SimpleNamespace
+
+    policy, store, tx = _schema_checked_policy(tmp_path / "state")
+    terminal = store.load(tx)
+    events = store.read_events(tx)
+    assertions = dict(policy.assertions)
+    dispatched = []
+    with CodexGatewayBroker(skill_source=SKILL, expected_steps=(), runner_environment={},
+                            transport="tcp", expansion_outcome_policy=policy,
+                            working_root=tmp_path / "broker", existing_state_directory=tmp_path / "state") as broker:
+        def launch(command, *, runner_env):
+            dispatched.append(command[3:])
+            payload = {"contract": "waapi-skill.gateway-result/v1", "ok": True, "command": argv[0]}
+            if argv[0] == "query-object":
+                payload.update(objects=[], count=0, query_bound={"mode": "exact-object"})
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload))
+        monkeypatch.setattr(broker, "_launch_runner", launch)
+        monkeypatch.setattr(broker, "_communicate_runner", lambda process: (process.stdout, ""))
+        response = broker._handle_request({"token": broker._token, "interpreter": "python",
+            "argv": [str(broker.runner_path), "gateway.py", *argv]})
+        assert response["exit_code"] == 0, response
+        receipt = broker.evidence().records[0]
+        assert receipt.authenticated and receipt.accepted and receipt.succeeded
+    assert dispatched == [list(argv)]
+    assert len(policy.reads.receipts) == 1
+    assert store.load(tx) == terminal and store.read_events(tx) == events
+    assert policy.transaction.gateway_verification_state == "result_schema_checked"
+    assert policy.complete and dict(policy.assertions) == assertions
+
+
+@pytest.mark.parametrize("argv", [
+    ("execute", "tx1-" + "6" * 20),
+    ("verify", "tx1-" + "6" * 20),
+    ("draft-start", "audio.import"),
+    ("config-set", "--project-modification-policy", "allow_changes"),
+    ("--host", "foreign.example", "query-object", "--exact-id", OWNER),
+    ("metadata", "attenuation", "--exact-id", OWNER, "--curve-role", "unknown-role"),
+    ("call", "ak.wwise.core.object.get"),
+])
+def test_schema_checked_read_followup_never_admits_writes_reverification_or_public_scope_escape(monkeypatch, tmp_path, argv):
+    policy, store, tx = _schema_checked_policy(tmp_path / "state")
+    terminal = store.load(tx)
+    events = store.read_events(tx)
+    with CodexGatewayBroker(skill_source=SKILL, expected_steps=(), runner_environment={},
+                            transport="tcp", expansion_outcome_policy=policy,
+                            working_root=tmp_path / "broker", existing_state_directory=tmp_path / "state") as broker:
+        monkeypatch.setattr(broker, "_launch_runner", lambda *_args, **_kwargs: pytest.fail("rejection must precede dispatch"))
+        response = broker._handle_request({"token": broker._token, "interpreter": "python",
+            "argv": [str(broker.runner_path), "gateway.py", *argv]})
+        assert response["exit_code"] == 126, response
+        receipt = broker.evidence().records[0]
+        assert receipt.authenticated and not receipt.accepted and not receipt.succeeded
+        assert receipt.payload is None and receipt.runner_exit_code is None
+    assert store.load(tx) == terminal and store.read_events(tx) == events
+    assert policy.complete and not policy.reads.receipts

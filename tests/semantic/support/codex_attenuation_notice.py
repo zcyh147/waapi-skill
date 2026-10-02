@@ -4,7 +4,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import attested_primary_target, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import authorization_claim, attested_primary_target, planned_change_noun, prospective_intent, role_terms
 
 from wwise_waapi.core_business_contracts import (
     _CURVE_KINDS, _CURVE_SHAPES, _CURVE_SOURCES, attenuation_curve_value_domains,
@@ -246,7 +246,16 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     anaphor_spans = []
     target_assertion_spans = []
     inherited_target_spans = []
+    authorization_spans = []
     for assertion in re.finditer(r"[^。；;\n]+", text):
+        authorization = authorization_claim(assertion.group())
+        if authorization.state == "invalid":
+            return False
+        if authorization.state == "ancillary":
+            prefix = authorization.owner_prefix.strip().rstrip("，,").strip()
+            if prefix and re.fullmatch(rf"(?:在|向|对)\s*(?:{owner})\s*(?:上|下)", prefix) is None:
+                return False
+            authorization_spans.append((assertion.start() + authorization.start, assertion.start() + authorization.end))
         target = attested_primary_target(assertion.group(), row)
         if target.state == "invalid":
             return False
@@ -283,6 +292,8 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
             if noun_action.start() not in positions and noun is not None and noun.role == "curve-range":
                 actions.append(noun_action)
         for action in sorted(actions, key=lambda action: action.start()):
+            if any(start <= clause_start + action.start() and clause_start + action.end() <= end for start, end in authorization_spans):
+                continue
             noun = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
             if noun is not None and noun.role == "invalid-provider":
                 return False
