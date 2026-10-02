@@ -2065,3 +2065,160 @@ def test_policy_tails_distinguish_current_claims_from_mode_lists_and_quotes(fami
     case = _authorization_family_case(family)
     case['events'][1]['item']['text'] += '本次修改已取得独立授权，' + tail + '。'
     assert _grammatical_notice(case)
+
+
+def _temporal_notice_case(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-temporal-notices-a1979db.json').read_text())
+    return next(case for case in fixture['cases'] if case['case'] == case_id)
+
+
+@pytest.mark.parametrize('case_id', ['002-EXP22-C08', '003-EXP22-C09', '004-EXP25-C08'])
+def test_actual_typed_notice_roles_keep_current_state_separate_from_prospective_edits(case_id):
+    assert _grammatical_notice(_temporal_notice_case(case_id))
+
+
+@pytest.mark.parametrize('case_id', ['002-EXP22-C08', '003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('claim', [
+    '同时修改 Pitch 为 12。', '同时删除备注。',
+    '在 OtherOwner 上执行本次修改。', '我不会执行本次修改。',
+])
+def test_typed_notice_claims_account_for_remaining_edits_and_refusals(case_id, claim):
+    case = _temporal_notice_case(case_id)
+    messages = [event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message']
+    messages[-1]['text'] += claim
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('old,new', [
+    ('(100.0, 4.71844785465692e-16)', '(100.0, 0)'),
+    ('(100.0, 4.71844785465692e-16)', '(100.0, inf)'),
+    ('(100.0, 4.71844785465692e-16)', '(100.0, 4.71844785465692e-16 Hz)'),
+    ('自定义线性两点', '自定义线性三点'),
+    ('自定义线性两点', '自定义非线性两点'),
+    ('(100.0, 4.71844785465692e-16)', '(100.0, 4.71844785465692e-16)、(200, 0)'),
+    ('已告知的三点曲线修改', '已告知的四点曲线修改'),
+])
+def test_current_curve_observation_matches_exact_sealed_before_without_tolerance(old, new):
+    case = _temporal_notice_case('002-EXP22-C08')
+    message = next(event['item'] for event in case['events'] if '当前干声音量曲线' in event.get('item', {}).get('text', ''))
+    assert old in message['text']
+    message['text'] = message['text'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id,old,new', [
+    (case, '已核对目标', new) for case in ('003-EXP22-C09', '004-EXP25-C08')
+    for new in ('不能核对目标', '已核对 OtherOwner 的')
+] + [
+    ('003-EXP22-C09', '。将追加', '。处理对象是 OtherOwner，将追加'),
+    ('004-EXP25-C08', '。即将把', '。处理对象是 OtherOwner，即将把'),
+])
+def test_generic_role_attestation_is_positive_unique_and_immediately_adjacent(case_id, old, new):
+    case = _temporal_notice_case(case_id)
+    message = next(event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message')
+    assert old in message['text']
+    message['text'] = message['text'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['002-EXP22-C08', '004-EXP25-C08'])
+def test_sealed_prospective_coordinates_accept_equivalent_finite_scientific_rendering(case_id):
+    case = _temporal_notice_case(case_id)
+    message = next(event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message')
+    message['text'] = message['text'].replace('(50, -12)', '(5e1, -1.2e1)').replace('(50.0, -12 dB)', '(5e1, -1.2e1 dB)')
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id,term', [('003-EXP22-C09', '声音'), ('004-EXP25-C08', '衰减对象')])
+@pytest.mark.parametrize('verb', ['已核对', '已核实', '已确认'])
+@pytest.mark.parametrize('status', ['目前尚未执行。', '当前还未执行。', '尚未执行。'])
+def test_temporal_role_components_compose_without_adding_effect_authority(case_id, term, verb, status):
+    case = _temporal_notice_case(case_id)
+    message = next(event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message')
+    message['text'] = message['text'].replace('已核对目标' + term, verb + '目标' + term)
+    message['text'] += status
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('damage', ['current_only', 'old_point_as_future', 'extra_old_edit', 'foreign_pending_owner', 'wrong_policy'])
+def test_temporal_separation_does_not_turn_observations_into_effect_or_authorization(damage):
+    case = _temporal_notice_case('002-EXP22-C08')
+    messages = [event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message']
+    if damage == 'current_only':
+        messages[0]['text'] = '目前尚未执行。'
+    elif damage == 'old_point_as_future':
+        messages[0]['text'] = messages[0]['text'].replace('(100, -48)', '(100, 4.71844785465692e-16)')
+    elif damage == 'extra_old_edit':
+        messages[1]['text'] = messages[1]['text'].replace('自定义线性两点', '自定义线性两点并修改 Pitch 为12')
+    elif damage == 'foreign_pending_owner':
+        messages[0]['text'] = messages[0]['text'].replace('Expansion_EXP22-C08_Attenuation 的', 'OtherOwner 的')
+    else:
+        messages[0]['text'] = messages[0]['text'].replace('allow_changes', 'read_only')
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('claim', ['并更新 Pitch 为12', '并设置 Pitch 为12', '并改动 Pitch 为12', '且目标是 OtherOwner'])
+def test_current_state_span_cannot_consume_additional_owner_or_edit_claims(claim):
+    case = _temporal_notice_case('002-EXP22-C08')
+    message = next(event['item'] for event in case['events'] if '当前干声音量曲线' in event.get('item', {}).get('text', ''))
+    message['text'] = message['text'].replace('4.71844785465692e-16)。', '4.71844785465692e-16)' + claim + '。')
+    assert not _grammatical_notice(case)
+
+
+_ROLE_CONTEXT_PAIRS = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-notice-role-context-withheld-r2.json').read_text())['pairs']
+
+
+@pytest.mark.parametrize('pair', [pair for pair in _ROLE_CONTEXT_PAIRS if pair['id'] in {
+    'WITHHELD-02', 'WITHHELD-04', 'WITHHELD-05', 'WITHHELD-07', 'WITHHELD-10',
+    'WITHHELD-14', 'WITHHELD-18', 'WITHHELD-19', 'WITHHELD-20'}], ids=lambda pair: pair['id'])
+@pytest.mark.parametrize('claim,expected', [
+    ('不会修改其他对象的备注。', True),
+    ('同时修改 Pitch 为12。', False),
+    ('在 OtherOwner 上执行本次修改。', False),
+    ('我不会执行本次修改。', False),
+])
+def test_repaired_role_frames_keep_all_remaining_claims_accounted(pair, claim, expected):
+    case = _temporal_notice_case('002-EXP22-C08' if pair['family'] == 'curve' else '003-EXP22-C09')
+    post = case['events'][1]
+    post['item']['text'] = pair['positive'] + claim
+    case['events'] = [case['events'][0], post, case['events'][-1]]
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('damage', ['missing_points', 'missing_ordinate', 'nonfinite', 'invalid_curve_collection'])
+def test_current_state_requires_a_complete_finite_sealed_baseline(damage):
+    case = _temporal_notice_case('002-EXP22-C08')
+    curve = case['before']['curves']['volume-dry']
+    if damage == 'missing_points':
+        curve.pop('points')
+    elif damage == 'missing_ordinate':
+        curve['points'][0].pop('y')
+    elif damage == 'nonfinite':
+        curve['points'][0]['y'] = float('inf')
+    else:
+        case['before']['curves'] = None
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('frame', ['preview_before', 'past_before_owner', 'past_after_owner', 'preview_future'])
+def test_creation_temporal_claims_distinguish_preview_context_from_future_intent(frame):
+    case = _temporal_notice_case('003-EXP22-C09')
+    owner = case['before']['owner']['id']
+    prefixes = {
+        'preview_before': '预览之前目标声音已经',
+        'past_before_owner': '已向 ' + owner + ' ',
+        'past_after_owner': '在 ' + owner + ' 上已经',
+        'preview_future': '预览已确认将向 ' + owner + ' ',
+    }
+    post = case['events'][1]
+    post['item']['text'] = prefixes[frame] + '追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。目前尚未执行。'
+    case['events'] = [case['events'][0], post, case['events'][-1]]
+    assert _grammatical_notice(case) is (frame == 'preview_future')
+
+
+@pytest.mark.parametrize('count', ['两', '二', '2', '三', '3'])
+def test_declared_current_count_is_compared_with_the_sealed_old_point_count(count):
+    case = _temporal_notice_case('002-EXP22-C08')
+    message = next(event['item'] for event in case['events'] if '当前干声音量曲线' in event.get('item', {}).get('text', ''))
+    message['text'] = message['text'].replace('自定义线性两点', '自定义线性' + count + '点')
+    assert _grammatical_notice(case) is (count in {'两', '二', '2'})

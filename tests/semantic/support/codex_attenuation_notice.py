@@ -5,6 +5,10 @@ import re
 from typing import Any, Mapping, NamedTuple
 
 from tests.semantic.support.codex_notice_language import authorization_claim, attested_primary_target, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_claims import (
+    FINITE_NUMBER, NoticeClaim, NoticeRoleContext, current_curve_claim,
+    masked_claims, notice_clauses, owner_inheritance, pending_curve_claim,
+)
 
 from wwise_waapi.core_business_contracts import (
     _CURVE_KINDS, _CURVE_SHAPES, _CURVE_SOURCES, attenuation_curve_value_domains,
@@ -12,7 +16,7 @@ from wwise_waapi.core_business_contracts import (
 
 ATTENUATION_API = "ak.wwise.core.object.setAttenuationCurve"
 _GUID = r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}"
-_NUMBER = r"[+-]?\d+(?:\.\d+)?"
+_NUMBER = FINITE_NUMBER
 _ACTION = (r"设置为|设为|设成|改为|改成|更新|改动|变更|修改(?!范围|请求|策略|前|后|结果|状态)|替换|"
            r"提交|应用|写入|删除|移除|清空|重置|新增|添加|插入|创建|追加|"
            r"\b(?:set|change|update|replace|delete|remove|clear|reset|add|create)\b")
@@ -178,7 +182,9 @@ def attenuation_notice_context(artifact: Mapping[str, Any], before: Mapping[str,
                 or point["shape"] not in _CURVE_SHAPES.values()
                 or any(type(point[key]) not in {int, float} or not math.isfinite(point[key]) for key in ("x", "y"))):
             return None
-    return {"identity": row, "kind": kind, "source": use, "points": points}
+    curves = before.get("curves")
+    return {"identity": row, "kind": kind, "source": use, "points": points,
+            "before_curve": curves.get(kind) if isinstance(curves, Mapping) else None}
 
 
 def _has(text: str, token: str) -> bool:
@@ -186,6 +192,8 @@ def _has(text: str, token: str) -> bool:
 
 
 def _point_count(value: str) -> int | None:
+    if value == "两":
+        return 2
     if value.isascii() and value.isdigit():
         return int(value) if len(value) <= 2 else None
     digits = {character: index for index, character in enumerate("零一二三四五六七八九")}
@@ -234,18 +242,26 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     kind = "|".join(re.escape(value) for value in kind_aliases)
     field = rf"(?:的|'s|\s)*(?:{kind})(?:\s*(?:曲线|curve))?(?:的|:|：|\s)*(?:来源|source|形状|shape|点|points)?"
     source = "|".join(re.escape(value) for value in source_aliases)
+    role_context = NoticeRoleContext(row, tuple(kind_aliases), context.get("before_curve"))
+    inherited = owner_inheritance(text, role_context)
+    if inherited is None:
+        return False
+    semantic_claims = tuple(pending_curve_claim(clause, role_context, tuple(source_aliases)) for clause in notice_clauses(text))
+    if any(claim.role == "invalid" for claim in semantic_claims):
+        return False
     allowed_value = rf"(?:{source})(?:\s*(?:线性|linear))?(?:\s*(?:点|points|曲线|curve))?"
     introduction = r"(?:预览|已|核实|确认|修改范围|范围|仅|为|即将|只|把|将|对|同时|另外|我|会|:|：|\s|\b(?:i|will|shall|only|then|also|and)\b)*"
     # Coordinates have already been validated as the exact ordered plan.
     # Remove only their complete numeric syntax before parsing the source edit.
-    text = re.sub(rf"[（(]\s*{_NUMBER}\s*[,，]\s*{_NUMBER}(?:\s*db)?\s*[)）]", "", text)
-    text = re.sub(rf"{_NUMBER}\s*对应\s*{_NUMBER}(?:\s*db)?", "", text)
-    text = re.sub(r"、(?=\s*(?:、|[，,。；;]|$))", "", text)
-    frames = _curve_frames(text, context, owner, kind, source)
+    text = re.sub(rf"[（(]\s*{_NUMBER}\s*[,，]\s*{_NUMBER}(?:\s*db)?\s*[)）]", lambda match: " " * len(match.group()), text)
+    text = re.sub(rf"{_NUMBER}\s*对应\s*{_NUMBER}(?:\s*db)?", lambda match: " " * len(match.group()), text)
+    text = re.sub(r"、(?=\s*(?:、|[，,。；;]|$))", " ", text)
+    frames = (*_curve_frames(text, context, owner, kind, source),
+              *(_CurveFrame(claim.start, claim.end) for claim in semantic_claims if claim.role == "prospective-edit"))
     base_owner = owner
     anaphor_spans = []
     target_assertion_spans = []
-    inherited_target_spans = []
+    inherited_target_spans = list(inherited)
     authorization_spans = []
     for assertion in re.finditer(r"[^。；;\n]+", text):
         authorization = authorization_claim(assertion.group())
@@ -312,14 +328,19 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
                     and re.search(r"执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", clause[:action.start()])
                     and not clause[action.end():].strip()):
                 continue
+            summary = re.fullmatch(r"\s*(?:现在|即将|随后)执行已告知的([0-9零一二三四五六七八九十]+)点曲线(?:修改|变更|改动)\s*", clause)
+            if summary and _point_count(summary.group(1)) == len(context["points"]):
+                continue  # An exact-count execution summary adds no effect proof.
             if action.group() == "应用" and prospective_intent(clause) and re.fullmatch(r"\s*(?:该|此|本次)预览\s*", clause[action.end():]):
                 continue
             if action.group() in {"删除", "移除", "清空", "重置", "新增", "添加", "插入", "创建", "追加", "delete", "remove", "clear", "reset", "add", "create"}:
                 return False
             left, right = clause[:action.start()], clause[action.end():].strip()
+            inherited_prefixes = [clause[max(0, start - clause_start):action.start()].strip()
+                for start, end in inherited_target_spans if start <= clause_start + action.start() < end]
             if (any(start <= clause_start + action.start() < end for start, end in inherited_target_spans)
                     and action.group() in {"设置为", "设为", "设成", "改为", "改成"}
-                    and re.fullmatch(rf"(?:即将|现在|随后)(?:仅|只)?(?:将|把)?(?:{kind})(?:曲线|curve)", left.strip())
+                    and any(re.fullmatch(rf"(?:即将|现在|随后|将)(?:仅|只)?(?:将|把)?(?:{kind})(?:曲线|curve)", prefix) for prefix in inherited_prefixes)
                     and re.fullmatch(allowed_value, right)):
                 affirmative = True
                 continue
@@ -364,6 +385,22 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
     if not prospective_intent(text, require_affirmative=False, owners=tuple(term.casefold() for term in _owner_terms(context["identity"]))):
         return False
     row = context["identity"]
+    quantity = ("干声音量", "dry volume", "volume-dry") if context["kind"] == "volume-dry" else (context["kind"],)
+    role_context = NoticeRoleContext(row, quantity, context.get("before_curve"))
+    observations = tuple(current_curve_claim(NoticeClaim("unclassified", sentence.start(), sentence.end(), sentence.group()), role_context)
+                         for sentence in re.finditer(r"[^。；;\n]+", text))
+    if any(claim.role == "invalid" for claim in observations):
+        return False
+    for observation in observations:
+        if observation.role == "current-state":
+            for count in re.finditer(r"([0-9零一二两三四五六七八九十]+)(?:个)?点", observation.text):
+                if _point_count(count.group(1)) != len(role_context.before_curve["points"]):
+                    return False
+            expected_shapes = {point["shape"] for point in role_context.before_curve["points"]}
+            if any(native not in expected_shapes and (_has(observation.text, key) or _has(observation.text, native))
+                   for key, native in _CURVE_SHAPES.items()):
+                return False
+    text = masked_claims(text, observations, {"current-state"})
     normalized = normalize_attested_preview_target(text, row)
     if normalized is None:
         return False

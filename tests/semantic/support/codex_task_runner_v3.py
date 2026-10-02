@@ -18,6 +18,7 @@ from tests.semantic.support.codex_attenuation_notice import (
     prospective_preview_execution,
 )
 from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_claims import NoticeRoleContext, historical_creation, owner_inheritance, prospective_role_owner
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
@@ -365,7 +366,7 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     prepositions = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", source_prefix))
     if prepositions:
         owner = source_prefix[prepositions[-1].end():].strip()
-        if not owner and source_referent and re.fullmatch(r"\s*(?:其本次)?预览(?:将|会)\s*", source_prefix):
+        if not owner and source_referent and re.fullmatch(r"\s*(?:(?:其本次)?预览)?(?:即将|将|会)\s*", source_prefix):
             return True
         owner = re.sub(r"[，,]\s*(?:仅|只)$", "", owner).strip()
         if owner.endswith("上"):
@@ -502,6 +503,11 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
 
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
+        "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
+    inherited = owner_inheritance(text, role_context)
+    if inherited is None:
+        return False
     owner_terms = (context["source_id"].casefold(), *(name.casefold() for name in context["source_names"]),
         *(prefix + term for prefix in ("该", "此", "目标", "指定") for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")), "该对象", "此对象", "目标对象", "指定对象")
     if not prospective_intent(text, require_affirmative=False, owners=owner_terms):
@@ -542,11 +548,14 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     value_pattern = rf"(?<![a-z0-9_]){re.escape(context['groups'][1][0].casefold())}(?![a-z0-9_])"
     if context["kind"] == "plugin" and re.search(value_pattern, text) is None:
         return False
-    if not _bound_owner_anchor(text, context) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]}):
+    explicit_prospective_owner = any(prospective_role_owner(text[max(text.rfind('。', 0, action.start()), text.rfind('\n', 0, action.start())) + 1:action.start()], role_context)
+        for action in re.finditer(context["action"], text))
+    if not (_bound_owner_anchor(text, context) or explicit_prospective_owner) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]}):
         return False
     affirmative = False
     source_referent = False
     pending_note_owner = None
+    clause_cursor = 0
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
         authorization = authorization_claim(clause)
         if authorization.state == "invalid":
@@ -555,6 +564,11 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             if not _bound_explicit_owners_agree(authorization.owner_prefix.strip().rstrip("，,").strip(), "", context):
                 return False
         anchored = _bound_owner_anchor(clause, context)
+        clause_start = text.find(clause, clause_cursor)
+        clause_cursor = clause_start + len(clause)
+        substantive_start = clause_start + len(clause) - len(clause.lstrip())
+        adjacent_owner = any(clause_start <= start < clause_start + len(clause) for start, end in inherited)
+        anchored = anchored or adjacent_owner or any(prospective_role_owner(clause[:action.start()], role_context) for action in re.finditer(context["action"], clause))
         source_referent = source_referent or anchored
         if source_referent and (re.search(r"(?:在|向)(?:其|它|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause)
                 or re.match(r"\s*(?:其本次预览|预览将|拟创建)", clause)):
@@ -593,6 +607,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             approved_value = (re.search(value_pattern, claim) is not None if context["kind"] == "plugin"
                 else any(term and term.casefold() in claim for term in context["groups"][1]))
             expected = re.fullmatch(context["action"], action.group()) is not None or context["kind"] == "plugin" and action.group() == "加"
+            if context["kind"] == "plugin" and expected and approved_value and historical_creation(clause[:action.start()]):
+                return False
             negated = _notice_qualifier_is_negated(clause[:action.start()])
             if negated:
                 if expected and anchored and effect_anchor and (approved_value
@@ -614,6 +630,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             note_write = False
             noun_frame = planned_change_noun(action.group(), prefix, suffix) if noun else None
             owner_prefix = noun_frame.owner_prefix if noun_frame else _noun_owner_prefix(prefix) if noun else prefix
+            if not noun:
+                for start, end in inherited:
+                    if start <= clause_start + action.start() < end:
+                        owner_prefix = prefix[max(0, start - clause_start):]
             if action.group() == "写入":
                 # The create-only descriptor owns this note; a coordinated
                 # write may describe that same field, never arbitrary fields
@@ -630,7 +650,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 if not note_write:
                     return False
                 owner_prefix = qualifier
-            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent):
+            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent if owner_prefix.strip() not in {"将", "即将", "会"} else adjacent_owner):
                 return False
             if noun or note_write:
                 continue

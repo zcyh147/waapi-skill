@@ -15,12 +15,12 @@ def role_terms(live_type: str) -> tuple[str, ...]:
 
 
 _CHANGE = r"(?:修改|变更|改动)"
-_REFERENT = r"(?:该|此|本次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
+_REFERENT = r"(?:该|此|本次|此次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
 _PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
 _GRANT = r"(?:已)?(?:取得|获得)"
-_AUTHORIZATION = r"(?:的)?(?:独立)?(?:策略)?授权"
+_AUTHORIZATION = r"(?:的)?(?:独立)?(?:策略)?授权(?:记录)?"
 
 
 class PlannedNoun(NamedTuple):
@@ -49,10 +49,12 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     """
     change = rf"(?:{_REFERENT})(?:独立)?{_CHANGE}"
     active = rf"(?:{_PROVIDER})?{_GRANT}{change}{_AUTHORIZATION}"
-    passive = rf"{change}(?:{_PROVIDER})?{_GRANT}{_AUTHORIZATION}"
+    policy_attribute = r"(?:allow_changes|\*\*allow_changes\*\*)\s*策略"
+    passive = rf"{change}(?:{_PROVIDER})?{_GRANT}\s*(?:{policy_attribute})?{_AUTHORIZATION}"
+    bare_grant = rf"(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT}){_AUTHORIZATION}"
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
     beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
-    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary})(?=[，,。；;]|\s*$)", clause)
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant})(?=[，,。；;]|\s*$)", clause)
     if match:
         consumed_end = match.end()
         for qualifier in re.finditer(r"[，,]([^，,。；;\n]+)", clause[match.end():]):
@@ -139,7 +141,7 @@ def prospective_intent(text: str, *, require_affirmative: bool = True, owners: t
             prefix, suffix = clause[:execution.start()], clause[execution.end():].strip()
             if re.match(rf"(?:(?:{_REFERENT})(?:预览|{_CHANGE})?)?(?=$|并|随后|[，,。；;])", suffix) is None:
                 continue
-            if re.fullmatch(r"\s*(?:尚未|还未|未)\s*", prefix):
+            if re.fullmatch(r"\s*(?:目前|当前)?(?:尚未|还未|未)\s*", prefix):
                 continue  # Pre-Execute status is not a prospective refusal.
             excluded_owner = re.fullmatch(r"\s*(?:不|不会)(?:在|向)\s*(.+?)\s*(?:上|下)?\s*", prefix)
             if excluded_owner and owners:

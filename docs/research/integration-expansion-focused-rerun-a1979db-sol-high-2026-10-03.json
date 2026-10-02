@@ -1,0 +1,227 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "a1979dbc3fc4bfef443865e93be0c79633fa80a6",
+  "candidate_identity_limit": "Coordinator confirmed both worktrees at this revision with clean tracked files after the terminal Non-live gate and before launch; archived component digests remain authoritative.",
+  "date": "2026-10-03",
+  "host": "macOS",
+  "root": "expansion-focused3-a1979db-sol-high-r1-cli1592",
+  "status": "complete-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "cases": [
+      "EXP22-C08",
+      "EXP22-C09",
+      "EXP25-C08",
+      "EXP22-M05"
+    ],
+    "agent_budget_seconds": 600.0,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180.0,
+    "max_pre_action_retries": 0,
+    "codex_binary": "codex-cli 0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "frozen_candidate_digests": {
+    "skill_tree_sha256": "50719a332806fdcdab8a1543877027eee9a8f45e77bcad5d8f92398bd6c6b574",
+    "semantic_harness_tree_sha256": "770fb1bb56bd15a229cfb7290697b6d36a244fa3835ae4c0ca8c1edc06d9b7b0",
+    "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+  },
+  "development_gates": {
+    "nonlive": {
+      "passed": 14385,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 921.24,
+      "log_sha256": "3c500ffc71a0ee8855fee48e15b28364f374eedb152a979ac85f1a7e6eaf0779",
+      "junit_sha256": "527630e4402ce3e83bf6d5d750f839d47c0592a33c8527ad1d5a8899313b7abd",
+      "scope": "Completed full Non-live at a1979dbc3fc4bfef443865e93be0c79633fa80a6; coordinator observed terminal exit zero, no remaining test process and clean tracked files before Fresh launch.",
+      "exit_code": 0
+    },
+    "scope": "New completed macOS Non-live at this candidate. No new standalone Program count or native-Windows credit."
+  },
+  "result": {
+    "selected_units": 4,
+    "attempted_units": 4,
+    "agent_pass": 0,
+    "matrix_agent_fail": 3,
+    "canonical_agent_fail": 3,
+    "canonical_blocked": 0,
+    "boundary_proven": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "attempt_count": 1,
+    "child_exit_code": 1,
+    "launcher_exit_code": 1,
+    "launcher_exit_evidence": "Terminal exit 1 and bootout reported by root; sealed child-result and campaign output independently show returncode 1.",
+    "unloaded": true,
+    "unloaded_evidence": "Root reports LaunchAgent bootout; independent scoped ps is empty.",
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false,
+    "launcher_runs": 1
+  },
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "status": "BOUNDARY_PROVEN",
+      "agent_pass_credit": false
+    },
+    {
+      "id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 236.70912495907396,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "formal_after_available": true,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "required_business_assertions_total": 5,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "Formal broker_provenance and notice FAIL despite all five independent assertions passing. Reconciler paired Preview7 Execute continuation with read-only command8; eventual Execute27 copied the selected shell_command exactly. This is sequencing reconciliation, not demonstrated Execute reconstruction.",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "declaration_role": "attenuation_handle",
+      "schema_declaration_role": "attenuation_handle",
+      "formal_failed_gates": [
+        "broker_provenance",
+        "visible_preview_notice"
+      ],
+      "continuation_diagnosis": {
+        "preview_record_index_1based": 7,
+        "immediate_record_index_1based": 8,
+        "immediate_command": [
+          "request-schema",
+          "ak.wwise.core.object.getAttenuationCurve"
+        ],
+        "immediate_record_authenticated_accepted_succeeded": true,
+        "eventual_execute_record_index_1based": 27,
+        "eventual_execute_inner_shell_exact_selected_source": true,
+        "selected_source_field": "shell_command",
+        "selected_shell_command_sha256": "8f35db67dd9a42ab2bd5506e43c8555a34e099ae65ece4e54bb10b998e2a4de2",
+        "actual_record8_normalized_argv_sha256": "50824f8ef885e728511b9310680e886cc04eedd761cf7293dba84e0872ce4c9f",
+        "eventual_execute_normalized_argv_sha256": "b0b74ea7a2dfe12d7e1a6d403c3c4d9e640c7ed2e9ec5b52812ab91ef9bccab8",
+        "reconciliation_error": "command 8: Gateway continuation was not copied from its selected source field",
+        "scope_limit": "Broker admitted requested baseline reads before execution; generic immediate pairing disagrees with the read interlude. No historical regrading performed; pending-copy repair still needs review/negative controls."
+      }
+    },
+    {
+      "id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 131.04614474996924,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "formal_after_available": true,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "required_business_assertions_total": 6,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "Formal notice-only FAIL despite all six independent business assertions passing; Preview, Execute and Verify completed.",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ]
+    },
+    {
+      "id": "EXP25-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 141.97612391598523,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "formal_after_available": true,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "required_business_assertions_total": 5,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "Formal notice-only FAIL despite all five independent assertions passing. An ancillary post-Verify query mixed mutually exclusive view/projection options, was rejected by Gateway, and Agent stopped appropriately.",
+      "declaration_role": "attenuation_handle",
+      "schema_declaration_role": "attenuation_handle",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ],
+      "post_terminal_reads": {
+        "count": 4,
+        "command_counts": {
+          "request-schema": 1,
+          "metadata": 1,
+          "query-schema": 1,
+          "query-object": 1
+        },
+        "terminal_read_failure": {
+          "authenticated": true,
+          "accepted_by_broker": true,
+          "runner_exit_code": 2,
+          "error_code": "GatewayInputError",
+          "message": "query-object --view owns its complete projection and exact-object bound; do not combine it with relationship, include, predicate, custom-field, or max-results options.",
+          "no_further_calls": true
+        },
+        "scope": "#151 permits requested actual readback after result_schema_checked. Failed read remains a hard stop; this Agent stopped and accurately reported the missing preservation proof."
+      }
+    }
+  ],
+  "integrity": {
+    "artifact_count": 631,
+    "artifact_bytes": 26140249,
+    "metadata_seals": 8,
+    "manifest_sha256": "9009df2b38d0c2ce24c3633e3e20cb6c98c4c06719d130e145041a78ee943174",
+    "all_artifact_hashes_sizes_and_executable_flags_match": true,
+    "all_metadata_sidecar_hashes_match": true,
+    "source_full_hashes_and_project_mtimes_unchanged": 4,
+    "passing_projects_removed": 0,
+    "failed_projects_quarantined": 3,
+    "boundary_projects_quarantined": 1,
+    "retained_process_metadata_count": 4,
+    "retained_process_metadata": {
+      "cleanup_result": "cleaned",
+      "process_exited": true,
+      "residual_processes": []
+    },
+    "all_three_codex_sessions_exit_zero_and_complete": true,
+    "terminal_scoped_processes_empty": true,
+    "never_reuse": true,
+    "no_verify": true,
+    "all_three_failure_reconciliations_reaped": true
+  },
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 2349568,
+    "input_tokens": 2577504,
+    "output_tokens": 8750,
+    "uncached_input_tokens": 227936,
+    "agent_seconds": 509.73139362502843,
+    "agent_turns": 3,
+    "slow_units": 0,
+    "goal_execute_count": 3,
+    "goal_verify_count": 3,
+    "reasoning_output_tokens_included": 1246,
+    "usd_cost": null
+  },
+  "disclosure149_evidence_limit": "Both C08 units freshly consume the getter request-schema and metadata attenuation inputs. EXP22-C08 reads all seven target/Horns curve roles before and after execution; EXP25-C08 reads the changed curve then stops on a rejected ancillary query. This is scoped getter/readback component evidence, not Agent PASS or final acceptance.",
+  "remaining": "All three formal FAILs remain frozen without verify-only/regrading. Notice repairs and pending-continuation/read-interlude reconciliation require review, negative tests and a new candidate/root. Final complete thirteen-Agent-unit batch plus separate boundary and identical successful-root verify-only remain pending. No Windows acceptance.",
+  "model_evidence_limit": "No general Sol-high model ranking or historical Medium/Luna FAIL promotion."
+}

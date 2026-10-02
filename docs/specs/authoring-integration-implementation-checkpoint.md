@@ -43,6 +43,103 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Reviewed claim and continuation repairs — 2026-10-03:** the user resumed
+  work after the setting-change pause. Independent review reconciled the first
+  withheld matrix's blank-paragraph expectation with the existing substantive
+  adjacency contract: whitespace alone does not change the target. R1's corpus,
+  29/11 result and artifact hashes remain untouched. R2 explicitly records this
+  expectation erratum, retains the other nineteen pairs, accepts the original
+  blank-line witness and rejects an interposed foreign subject. Current tests
+  no longer append to the sealed first-audit artifacts.
+  #147 fixes nine genuine positive rejections and historical creation being
+  treated as a prospective effect. Typed spans prove current-state coordinates
+  against the sealed baseline before excluding them from prospective values;
+  owner inheritance, authorization and execution status have separate roles.
+  Additional review found and repaired historical markers before the owner
+  and a Preview-keyword exemption. The reported current-count concern was
+  disproved at the public adapter; no unnecessary count refactor was made.
+  All previous negative controls remain. Both review axes are clear after
+  repair; #147's focused gate passed **1900 tests**.
+  #152 retains the exact selected policy-Preview Execute across admitted,
+  authenticated successful complete reads, while keeping Ask turn boundaries
+  and default historical-profile behavior unchanged. Its review is clear.
+  The combined notice, continuation, Broker and complete Skill-document
+  regression passed **2510 tests / 9 native-Windows skips**, exit zero in
+  **6.28 seconds**. Log SHA-256:
+  `2dc3ede129e3b7fffe75be80a84aeced0ea96c993295e652f8aea2ec1ec664b6`;
+  JUnit SHA-256:
+  `11fd1557fe8c81ced50a360a1f16f62e1177657cc23b99175bf8ac3cef3c8809`.
+  These are program/regression proofs, not new Agent acceptance. Freeze the
+  combined candidate, complete its gates, then run a new three-case Fresh root
+  plus the separate boundary. Only a successful root may receive identical
+  verify-only, followed by the complete thirteen-Agent-unit acceptance batch.
+
+
+- **Requested setting-change pause — 2026-10-03:** the user requested a pause
+  after the current independent audit. #147's typed-role implementation passed
+  its two-file focused gate **1811 tests** (all prior 1754 retained), with actual
+  three-witness RED/GREEN and four extra-current-claim RED controls. Its first
+  independently withheld audit then completed **29 passed / 11 failed**:
+  nine expected-positive rejections and two expected-negative acceptances.
+  The latter concern blank-paragraph owner inheritance and historical creation
+  counted as a prospective edit. These are audit findings, not completed fixes;
+  reconcile the paragraph-reset expectation with previously accepted whitespace
+  inheritance before changing either implementation or a test expectation.
+  The first matrix, expected/actual rows and JUnit are sealed under ignored
+  `expansion-notice-role-context-withheld-r1/first-summary.json`.
+  First log SHA-256:
+  `b816af581cf2515408b725872a8d45d8db0d68ce1245957be60f8c4a56943385`;
+  JUnit SHA-256:
+  `ca3f24cb290cb3754eac2a0ed257cc3694676a42bddba58c4db6e5f8ed8005bc`.
+  #152 remains reviewed with **494 passed / 9 skipped**; neither repair has
+  been committed or run in a new Fresh campaign. All work is preserved in MAIN,
+  with no active test or Wwise process. Resume from the withheld findings,
+  preserve the first audit unchanged, then finish reviews and validation.
+
+
+- **Latest frozen candidate and resumed repairs — 2026-10-03:** complete
+  Non-live at `a1979dbc3fc4bfef443865e93be0c79633fa80a6` passed **14385 tests,
+  skipped 119, deselected 27**, exit zero in **921.24 seconds**. The coordinator
+  verified terminal process cleanup and clean tracked worktrees before launch.
+  Log SHA-256: `3c500ffc71a0ee8855fee48e15b28364f374eedb152a979ac85f1a7e6eaf0779`;
+  JUnit SHA-256: `527630e4402ce3e83bf6d5d750f839d47c0592a33c8527ad1d5a8899313b7abd`.
+  Fresh root `expansion-focused3-a1979db-sol-high-r1-cli1592` completed with
+  **zero Agent PASS, three FAIL and one separate boundary**. All sixteen
+  independent business assertions passed across the three executed goals;
+  this does not grant Agent acceptance. All three notices failed grammatical
+  interpretation. EXP22-C08 additionally failed immediate continuation pairing:
+  Preview 7 selected Execute, admitted baseline reads occupied records 8–26,
+  and Execute 27 copied the selected command exactly. This is sequencing
+  disagreement, not command reconstruction; #152 tracks the bounded repair.
+  EXP25-C08 stopped correctly after a rejected ancillary query; its formal
+  failure remains notice-only. The root is frozen without verify-only/regrading.
+  All 631 artifacts and eight metadata seals match; all source guards are
+  unchanged, retained projects remain quarantined and all scoped processes
+  are cleaned. Detailed evidence is in
+  `../research/integration-expansion-focused-rerun-a1979db-sol-high-2026-10-03.json`.
+  #147 is moving from whole-sentence exceptions to bounded span-preserving
+  owner, temporal, expected-effect and ancillary claim roles. Current-state
+  coordinates must match sealed before-state and never satisfy prospective
+  values; independent withheld positive/negative paragraphs will be checked
+  after implementation is held. #152 retains a pending exact Preview command
+  across admitted successful read-only baseline checks. Neither repair
+  rewrites historical verdicts or relaxes mutation authorization. The user
+  paused for a mode change and explicitly resumed; the Goal is active.
+  #151 is now closed for its scoped instruction/readback inconsistency, based
+  on reviewed wording, the completed Non-live gate, bounded readback use and
+  correct stopping on the rejected ancillary query. This grants no Agent PASS.
+  #152's pending-continuation implementation has reproduced the real sequence
+  and an incomplete-read negative before repair. Its full harness/Broker
+  focused gate passed **494 tests**, skipped nine native-Windows checks,
+  exit zero in **2.63 seconds**. Standards and root Spec review are clear;
+  the unchanged default profile remains strict, and expansion reads retain
+  the selected exact Execute obligation. Log SHA-256:
+  `65a72360bd8eea3112cd5b87bb9d9eec1aa569e3f24d3e45c9a84630dbe6e63c`;
+  JUnit SHA-256:
+  `c38260291664d02405e487c3cc8b6b73d5104a601c43f04c4b834cffdb10f90c`.
+  New-candidate Fresh validation remains pending; #152 stays open.
+
+
 - **Authorization grammar and requested readback repair — 2026-10-03:** the
   shared authorization classifier now retains original spans and owner evidence
   for active, passive and beneficiary clause roles. Ancillary authorization

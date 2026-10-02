@@ -1,0 +1,4408 @@
+{
+  "candidate": "a1979dbc3fc4bfef443865e93be0c79633fa80a6",
+  "scope": "Frozen Preview7/read8 through read26/Execute27 projection; no regrading of the original FAIL root.",
+  "records": [
+    {
+      "original_command_index": 7,
+      "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-7e42835200026e13ff9a86f87b68397b --task-authority da1-a9a2add4f3dd2f10c23f4e7fbd201eb30d171e17 --expected-revision 4'",
+      "payload": {
+        "agent_result": {
+          "artifact_hash": "79158449ab5b55b5d5dd6d3ab9b8883b6a4c1439bf2b2edd99b4db65fb1aba6b",
+          "authorization": {
+            "authority": "caller_asserted_current_user_change_request",
+            "explicit_confirmation": false,
+            "mode": "policy_authorization",
+            "notice_required": true,
+            "policy": "allow_changes"
+          },
+          "cleanup": {
+            "projection": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "cleanup_spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "phase": "preview",
+              "status": "not_required",
+              "warnings": []
+            },
+            "spec": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+              "warnings": []
+            },
+            "status": "not_required"
+          },
+          "executed": false,
+          "next_command": {
+            "command": "execute",
+            "contract": "waapi-skill.gateway-next-command/v2",
+            "copy_exactly": true,
+            "copy_instruction": {
+              "action": "execute_verbatim_as_one_shell_tool_call",
+              "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+              "forbidden_transformations": [
+                "reconstruct",
+                "shorten",
+                "normalize",
+                "substitute_path_segments",
+                "select_another_field"
+              ],
+              "source_field": "shell_command"
+            },
+            "full_argv": [
+              "python",
+              "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+              "gateway.py",
+              "execute",
+              "tx1-1j5t28xb8dekv0y0ktdx"
+            ],
+            "gateway_argv": [
+              "execute",
+              "tx1-1j5t28xb8dekv0y0ktdx"
+            ],
+            "shell_command": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-1j5t28xb8dekv0y0ktdx",
+            "shell_family": "posix-sh",
+            "shell_tool_timeout_ms": 30000
+          },
+          "operation": "waapi.call",
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": -48.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2022.1"
+          },
+          "state": "policy_authorized",
+          "transaction_id": "tx1-1j5t28xb8dekv0y0ktdx"
+        },
+        "artifact_hash": "79158449ab5b55b5d5dd6d3ab9b8883b6a4c1439bf2b2edd99b4db65fb1aba6b",
+        "authorization": {
+          "authority": "caller_asserted_current_user_change_request",
+          "explicit_confirmation": false,
+          "mode": "policy_authorization",
+          "notice_required": true,
+          "policy": "allow_changes"
+        },
+        "change_requested": true,
+        "cleanup": {
+          "projection": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "cleanup_spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "phase": "preview",
+            "status": "not_required",
+            "warnings": []
+          },
+          "spec": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+            "warnings": []
+          },
+          "status": "not_required"
+        },
+        "command": "preview-from-draft",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "event_count": 2,
+        "events": [
+          {
+            "event_hash": "1073b39986ed242181377e954a249d6ea59a40245be0e31502ca7a7bf6f3f1e8",
+            "event_type": "preview_created",
+            "sequence": 1,
+            "to_state": "draft"
+          },
+          {
+            "event_hash": "6ab67817fd596110195442d8ceb1230ed8328c98c697632607516ac1fbf3ba4e",
+            "event_type": "policy_authorized",
+            "from_state": "draft",
+            "sequence": 2,
+            "to_state": "policy_authorized"
+          }
+        ],
+        "executed": false,
+        "is_command_line": true,
+        "next_command": {
+          "command": "execute",
+          "contract": "waapi-skill.gateway-next-command/v2",
+          "copy_exactly": true,
+          "copy_instruction": {
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "forbidden_transformations": [
+              "reconstruct",
+              "shorten",
+              "normalize",
+              "substitute_path_segments",
+              "select_another_field"
+            ],
+            "source_field": "shell_command"
+          },
+          "full_argv": [
+            "python",
+            "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "execute",
+            "tx1-1j5t28xb8dekv0y0ktdx"
+          ],
+          "gateway_argv": [
+            "execute",
+            "tx1-1j5t28xb8dekv0y0ktdx"
+          ],
+          "shell_command": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-1j5t28xb8dekv0y0ktdx",
+          "shell_family": "posix-sh",
+          "shell_tool_timeout_ms": 30000
+        },
+        "ok": true,
+        "preview_summary": {
+          "cleanup": {
+            "projection": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "cleanup_spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-projection/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "phase": "preview",
+              "status": "not_required",
+              "warnings": []
+            },
+            "spec": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "automatic_cleanup": false,
+              "automatic_retry": false,
+              "binding": {
+                "kind": "none",
+                "materialized": true
+              },
+              "cleanup_requirement": "not_required",
+              "companion_request": null,
+              "contract": "waapi-skill.transaction-cleanup-spec/v1",
+              "lifecycle_action": "none",
+              "lifecycle_strategy": "not_required",
+              "spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+              "warnings": []
+            },
+            "status": "not_required"
+          },
+          "contract": "waapi-skill.transaction-preview/v2",
+          "dispatch": {
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.setAttenuationCurve"
+          },
+          "expires_at": "2026-10-02T17:56:26.417975Z",
+          "pre_state": {
+            "execution_contract": {
+              "accepted_authorization_modes": [
+                "explicit_confirmation",
+                "policy_authorization"
+              ],
+              "companion_uris": [],
+              "contract": "waapi-skill.public-execution-contract/v2",
+              "effect": "project_mutation",
+              "excluded_reason": null,
+              "executable": true,
+              "gateway_commands": [
+                "request-schema"
+              ],
+              "io_audit": null,
+              "item_type": "function",
+              "lifecycle_strategy": "none",
+              "post_execution_project_guard_policy": "revalidate",
+              "program_case": "transaction-result-schema",
+              "project_guard_mode": "invariant",
+              "request_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType",
+                  "use",
+                  "points"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg",
+                  "#/definitions/pointsDefinition"
+                ],
+                "uri": "ak.wwise.core.object.setAttenuationCurve",
+                "validated_nodes": 6,
+                "version": "2022.1"
+              },
+              "request_validation_strength": "partial_reflected_schema",
+              "requires_authorization": true,
+              "result_limit_bytes": 1048576,
+              "route": "transaction",
+              "timeout_seconds": 30.0,
+              "uri": "ak.wwise.core.object.setAttenuationCurve",
+              "verification_strategy": "result_schema",
+              "version": "2022.1"
+            }
+          },
+          "project_guard_fingerprint": "0b5ceff2b481fba313ec97b18f73c8ccce1bbafb4dbe9eae0a690fa7418b6623",
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": -48.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2022.1"
+          },
+          "resolved_roles": {},
+          "runtime_guard_fingerprint": "6a84501cbbb8c5a7bc12a21d7d7664fb5b5ae0090bc38129c6b57983dc325656",
+          "verification_plan": {
+            "kind": "result-schema",
+            "strategy": "result_schema",
+            "uri": "ak.wwise.core.object.setAttenuationCurve",
+            "version": "2022.1"
+          }
+        },
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "category": "core",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790961986399252000-997ea481f26644ae91166150014f9a9d-ak_wwise_core_getProjectInfo.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 149.9498359579593,
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "state": "policy_authorized",
+        "status": "policy_authorized",
+        "summary_only": true,
+        "transaction_id": "tx1-1j5t28xb8dekv0y0ktdx",
+        "verified": false
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "preview-from-draft",
+          "od1-7e42835200026e13ff9a86f87b68397b",
+          "--task-authority",
+          "da1-a9a2add4f3dd2f10c23f4e7fbd201eb30d171e17",
+          "--expected-revision",
+          "4"
+        ]
+      }
+    },
+    {
+      "original_command_index": 8,
+      "command": "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py gateway.py request-schema ak.wwise.core.object.getAttenuationCurve'",
+      "payload": {
+        "command": "request-schema",
+        "commands": [
+          {
+            "arguments": [
+              "attenuation"
+            ],
+            "business_values_required": true,
+            "command_templates": [
+              [
+                "metadata",
+                "attenuation",
+                "--exact-id",
+                "<canonical-object-guid>",
+                "--curve-role",
+                "<curve-role>"
+              ],
+              [
+                "metadata",
+                "attenuation",
+                "--path-segment",
+                "<literal-hierarchy-name>",
+                "--curve-role",
+                "<curve-role>"
+              ]
+            ],
+            "input_forms": {
+              "curve_role": {
+                "arguments": [
+                  "--curve-role",
+                  "<curve-role>"
+                ],
+                "choices": [
+                  "volume-dry",
+                  "game-defined-aux-send-volume",
+                  "user-defined-aux-send-volume",
+                  "low-pass-filter",
+                  "high-pass-filter",
+                  "spread",
+                  "focus"
+                ]
+              },
+              "object": {
+                "exact_id": {
+                  "arguments": [
+                    "--exact-id",
+                    "<canonical-object-guid>"
+                  ],
+                  "format": "canonical GUID with braces from a bounded object read"
+                },
+                "exactly_one_of": [
+                  "exact_id",
+                  "path_segments"
+                ],
+                "path_segments": {
+                  "arguments": [
+                    "--path-segment",
+                    "<literal-hierarchy-name>"
+                  ],
+                  "control_free": true,
+                  "forbidden_characters": [
+                    "\\",
+                    "/",
+                    "\"",
+                    "<",
+                    ">"
+                  ],
+                  "maximum_item_utf8_bytes": 512,
+                  "maximum_items": 64,
+                  "maximum_path_utf8_bytes": 8192,
+                  "minimum_items": 1,
+                  "order": "one literal object hierarchy name per level",
+                  "repeat": true,
+                  "trimmed": true
+                }
+              },
+              "platform": {
+                "arguments": [
+                  "--platform",
+                  "<exact-platform-name>"
+                ],
+                "control_free": true,
+                "maximum_characters": 256,
+                "meaning": "Exact project-platform name; omit for the default platform",
+                "trimmed": true
+              }
+            },
+            "optional_inputs": [
+              "platform"
+            ],
+            "required_inputs": [
+              "object",
+              "curve_role"
+            ],
+            "subcommand": "metadata",
+            "template_instruction": "Static input templates: fill one object selector and one disclosed curve role; repeat --path-segment in hierarchy order for a path, and optionally append --platform <exact-platform-name>. These are not exact-copy typed continuations."
+          }
+        ],
+        "continuation": {
+          "arguments": [
+            "attenuation"
+          ],
+          "business_values_required": true,
+          "command_templates": [
+            [
+              "metadata",
+              "attenuation",
+              "--exact-id",
+              "<canonical-object-guid>",
+              "--curve-role",
+              "<curve-role>"
+            ],
+            [
+              "metadata",
+              "attenuation",
+              "--path-segment",
+              "<literal-hierarchy-name>",
+              "--curve-role",
+              "<curve-role>"
+            ]
+          ],
+          "input_forms": {
+            "curve_role": {
+              "arguments": [
+                "--curve-role",
+                "<curve-role>"
+              ],
+              "choices": [
+                "volume-dry",
+                "game-defined-aux-send-volume",
+                "user-defined-aux-send-volume",
+                "low-pass-filter",
+                "high-pass-filter",
+                "spread",
+                "focus"
+              ]
+            },
+            "object": {
+              "exact_id": {
+                "arguments": [
+                  "--exact-id",
+                  "<canonical-object-guid>"
+                ],
+                "format": "canonical GUID with braces from a bounded object read"
+              },
+              "exactly_one_of": [
+                "exact_id",
+                "path_segments"
+              ],
+              "path_segments": {
+                "arguments": [
+                  "--path-segment",
+                  "<literal-hierarchy-name>"
+                ],
+                "control_free": true,
+                "forbidden_characters": [
+                  "\\",
+                  "/",
+                  "\"",
+                  "<",
+                  ">"
+                ],
+                "maximum_item_utf8_bytes": 512,
+                "maximum_items": 64,
+                "maximum_path_utf8_bytes": 8192,
+                "minimum_items": 1,
+                "order": "one literal object hierarchy name per level",
+                "repeat": true,
+                "trimmed": true
+              }
+            },
+            "platform": {
+              "arguments": [
+                "--platform",
+                "<exact-platform-name>"
+              ],
+              "control_free": true,
+              "maximum_characters": 256,
+              "meaning": "Exact project-platform name; omit for the default platform",
+              "trimmed": true
+            }
+          },
+          "optional_inputs": [
+            "platform"
+          ],
+          "required_inputs": [
+            "object",
+            "curve_role"
+          ],
+          "subcommand": "metadata",
+          "template_instruction": "Static input templates: fill one object selector and one disclosed curve role; repeat --path-segment in hierarchy order for a path, and optionally append --platform <exact-platform-name>. These are not exact-copy typed continuations."
+        },
+        "contract": "waapi-skill.fixed-command-route/v1",
+        "input_shape": "fixed_business_command",
+        "native_request_fields_disclosed": false,
+        "ok": true,
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "configured",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok",
+        "uri": "ak.wwise.core.object.getAttenuationCurve",
+        "version": "2022.1"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "request-schema",
+          "ak.wwise.core.object.getAttenuationCurve"
+        ]
+      }
+    },
+    {
+      "original_command_index": 9,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role volume-dry\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "volume-dry",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 4.71844785465692e-16
+            }
+          ],
+          "use": "Custom"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962010590623000-afb4edbd0c24493da526d9efaee276ab-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.96132449992001,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "volume-dry"
+        ]
+      }
+    },
+    {
+      "original_command_index": 10,
+      "command": "/bin/bash -lc 'python .agents/skills/waapi-skill/scripts/run.py gateway.py query-schema'",
+      "payload": {
+        "advanced_fallback": {
+          "available": true,
+          "disclose_with": "query-schema --advanced",
+          "use_only_when": "server-side query semantics require a read-only WAQL construct that the business declaration cannot express; final answer sorting or grouping does not qualify"
+        },
+        "business_outputs": [
+          "notes",
+          "volume-db",
+          "pitch-cents",
+          "output-bus",
+          "source-language",
+          "parent",
+          "owner",
+          "included",
+          "playable",
+          "explicitly-muted",
+          "explicitly-soloed",
+          "child-count",
+          "plugin-name",
+          "category",
+          "file-path",
+          "original-file-path",
+          "active-source",
+          "override-output",
+          "action-type",
+          "target",
+          "work-unit",
+          "source-duration",
+          "max-radius"
+        ],
+        "command": "query-schema",
+        "continuation": {
+          "business_output": "--include <business-field> (repeat)",
+          "diagnostic_view": "--view <business-view>",
+          "predicate": "--predicate <business-condition> <value>",
+          "relationship": "--relationship <business-relationship>",
+          "result_bound": "--max-results <1..1000>",
+          "subcommand": "query-object"
+        },
+        "contract": "waapi-skill.object-query-business-schema/v1",
+        "custom_outputs": {
+          "authority": "live WAAPI metadata bound by the Gateway before object.get",
+          "field_meaning": "--include-field <user-facing property/reference meaning>",
+          "repair": "refine the meaning when live discovery is not unique"
+        },
+        "identity_projection": [
+          "id",
+          "name",
+          "type",
+          "path"
+        ],
+        "input_shape": "business_declaration",
+        "kind_semantics": {
+          "all-sounds": "every Wwise Sound, including SFX and Voice",
+          "sound": "alias of all-sounds; every Wwise Sound, including SFX and Voice",
+          "sound-sfx": "only Sound objects whose source language is SFX",
+          "sound-voice": "only Sound objects whose source language is not SFX"
+        },
+        "offline": true,
+        "ok": true,
+        "predicates": {
+          "category-is": {
+            "value_type": "string"
+          },
+          "children-at-least": {
+            "value_type": "integer"
+          },
+          "explicitly-muted-is": {
+            "value_type": "boolean"
+          },
+          "explicitly-soloed-is": {
+            "value_type": "boolean"
+          },
+          "included-is": {
+            "value_type": "boolean"
+          },
+          "kind-is": {
+            "choices": [
+              "actor-mixer",
+              "all-sounds",
+              "blend-container",
+              "music-playlist-container",
+              "music-segment",
+              "music-switch-container",
+              "music-track",
+              "project",
+              "random-container",
+              "saved-query",
+              "sequence-container",
+              "sound",
+              "sound-sfx",
+              "sound-voice",
+              "switch-container",
+              "virtual-folder"
+            ],
+            "value_type": "business-kind"
+          },
+          "name-contains": {
+            "value_type": "string"
+          },
+          "name-is": {
+            "value_type": "string"
+          },
+          "notes-contain": {
+            "value_type": "string"
+          },
+          "playable-is": {
+            "value_type": "boolean"
+          },
+          "plugin-name-is": {
+            "value_type": "string"
+          },
+          "volume-db-at-least": {
+            "value_type": "number"
+          },
+          "volume-db-at-most": {
+            "value_type": "number"
+          }
+        },
+        "presentation_boundary": {
+          "advanced_required_only_when": "server-side ordering, skip, distinct, regex, or another native construct changes which rows enter the bounded result",
+          "sort_or_group_complete_result": "agent-owned presentation"
+        },
+        "query_contract": "waapi-skill.object-query-business/v1",
+        "query_layer": "business-declaration",
+        "relationship_presets": {
+          "event-actions": {
+            "automatic_outputs": [
+              "action-type",
+              "target"
+            ],
+            "fixed_max_results": 100,
+            "native_relationship": "children",
+            "source": "one exact Event path or GUID"
+          }
+        },
+        "relationships": [
+          "descendants",
+          "ancestors",
+          "references-to",
+          "children",
+          "event-actions",
+          "parent"
+        ],
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "configured",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "source_rules": {
+          "common_kind_is_a_source": "--kind is valid only when no path, id, search, or Query Editor source is present",
+          "exactly_one_source": true,
+          "kind_filter_after_another_source": "--predicate kind-is <business-kind>"
+        },
+        "sources": {
+          "common_kind": "--kind <closed business kind>",
+          "custom_kind": "--custom-kind <user-facing type meaning>",
+          "exact_object_id": "--exact-id <canonical GUID>",
+          "object_path": "--path-segment <one literal name> (repeat)",
+          "query_id": "--query-id <canonical GUID>",
+          "query_path": "--query-path-segment <one literal name> (repeat)",
+          "search": "--search-text <literal text>"
+        },
+        "status": "ok",
+        "version": "2022.1",
+        "versions": [
+          "2022.1"
+        ],
+        "views": {
+          "sound-routing-diagnostics": {
+            "automatic_outputs": [
+              "override-output",
+              "active-source",
+              "output-bus"
+            ],
+            "native_projection_owned_by_gateway": true,
+            "source": "one exact Sound path or GUID"
+          }
+        }
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-schema"
+        ]
+      }
+    },
+    {
+      "original_command_index": 11,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --include notes\"",
+      "payload": {
+        "agent_result": [
+          {
+            "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+            "name": "Horns",
+            "notes": "",
+            "path": "\\Attenuations\\Ambience\\Horns",
+            "type": "Attenuation"
+          }
+        ],
+        "command": "query-object",
+        "contract": "waapi-skill.gateway-result/v1",
+        "count": 1,
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "objects": [
+          {
+            "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+            "name": "Horns",
+            "notes": "",
+            "path": "\\Attenuations\\Ambience\\Horns",
+            "type": "Attenuation"
+          }
+        ],
+        "ok": true,
+        "query_bound": {
+          "mode": "exact-object"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--include",
+          "notes"
+        ]
+      }
+    },
+    {
+      "original_command_index": 12,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{4257A815-1F95-4436-9485-9DC0FD451C8B}' --include volume-db --include output-bus --include override-output --include-field 'attenuation'\"",
+      "payload": {
+        "agent_result": [
+          {
+            "id": "{4257A815-1F95-4436-9485-9DC0FD451C8B}",
+            "name": "Expansion_EXP22-C08_AttenuatedSound",
+            "output_bus": {
+              "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "name": "Master Audio Bus"
+            },
+            "override_output": false,
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C08_AttenuatedSound",
+            "references": {
+              "Attenuation": {
+                "id": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+                "name": "Expansion_EXP22-C08_Attenuation"
+              }
+            },
+            "type": "Sound",
+            "volume_db": -3.0
+          }
+        ],
+        "command": "query-object",
+        "contract": "waapi-skill.gateway-result/v1",
+        "count": 1,
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "objects": [
+          {
+            "id": "{4257A815-1F95-4436-9485-9DC0FD451C8B}",
+            "name": "Expansion_EXP22-C08_AttenuatedSound",
+            "output_bus": {
+              "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "name": "Master Audio Bus"
+            },
+            "override_output": false,
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C08_AttenuatedSound",
+            "references": {
+              "Attenuation": {
+                "id": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+                "name": "Expansion_EXP22-C08_Attenuation"
+              }
+            },
+            "type": "Sound",
+            "volume_db": -3.0
+          }
+        ],
+        "ok": true,
+        "query_bound": {
+          "mode": "exact-object"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{4257A815-1F95-4436-9485-9DC0FD451C8B}",
+          "--include",
+          "volume-db",
+          "--include",
+          "output-bus",
+          "--include",
+          "override-output",
+          "--include-field",
+          "attenuation"
+        ]
+      }
+    },
+    {
+      "original_command_index": 13,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py query-object --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --include notes\"",
+      "payload": {
+        "agent_result": [
+          {
+            "id": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+            "name": "Expansion_EXP22-C08_Attenuation",
+            "notes": "",
+            "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+            "type": "Attenuation"
+          }
+        ],
+        "command": "query-object",
+        "contract": "waapi-skill.gateway-result/v1",
+        "count": 1,
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "objects": [
+          {
+            "id": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+            "name": "Expansion_EXP22-C08_Attenuation",
+            "notes": "",
+            "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+            "type": "Attenuation"
+          }
+        ],
+        "ok": true,
+        "query_bound": {
+          "mode": "exact-object"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "query-object",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--include",
+          "notes"
+        ]
+      }
+    },
+    {
+      "original_command_index": 14,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role game-defined-aux-send-volume\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "game-defined-aux-send-volume",
+          "points": [],
+          "use": "UseVolumeDry"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962037140873000-d7951cec29f548a9b1a497864bdcd161-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.974973041797057,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "VolumeWetGameUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "VolumeWetGameUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "game-defined-aux-send-volume"
+        ]
+      }
+    },
+    {
+      "original_command_index": 15,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role user-defined-aux-send-volume\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "user-defined-aux-send-volume",
+          "points": [],
+          "use": "UseVolumeDry"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962037410365000-86c50d02545a4268b05108a3c1a84117-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.974829874932766,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "VolumeWetUserUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "VolumeWetUserUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "user-defined-aux-send-volume"
+        ]
+      }
+    },
+    {
+      "original_command_index": 16,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role low-pass-filter\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "low-pass-filter",
+          "points": [],
+          "use": "None"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962037687484000-3fbd0b8d2af848a2b18d03b44e45e09b-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.97626266698353,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "LowPassFilterUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "LowPassFilterUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "low-pass-filter"
+        ]
+      }
+    },
+    {
+      "original_command_index": 17,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role high-pass-filter\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "high-pass-filter",
+          "points": [],
+          "use": "None"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962037948389000-5c06b909c4ca4395b5e5a3a958d47ca4-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.975715916138142,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "HighPassFilterUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "HighPassFilterUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "high-pass-filter"
+        ]
+      }
+    },
+    {
+      "original_command_index": 18,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role spread\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "spread",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 50.34965
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 0.0
+            }
+          ],
+          "use": "Custom"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962049564261000-edbfefa51cc84db3a7ec335d6eec5e15-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.976264666998759,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "SpreadUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "SpreadUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "spread"
+        ]
+      }
+    },
+    {
+      "original_command_index": 19,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}' --curve-role focus\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "focus",
+          "points": [],
+          "use": "None"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962049824382000-f78290b878a241efb6c489a700f7ae1b-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.975822541862726,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "FocusUsage",
+              "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "FocusUsage",
+                "object": "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{6A49C80C-43EE-4D31-BFD4-018BC8E091FC}",
+          "--curve-role",
+          "focus"
+        ]
+      }
+    },
+    {
+      "original_command_index": 20,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role volume-dry\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "volume-dry",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 4.71844785465692e-16
+            }
+          ],
+          "use": "Custom"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962050082778000-a8d443520d184e08bc4b756595a25b92-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.976881166920066,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "volume-dry"
+        ]
+      }
+    },
+    {
+      "original_command_index": 21,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role game-defined-aux-send-volume\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "game-defined-aux-send-volume",
+          "points": [],
+          "use": "UseVolumeDry"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962050344181000-f7874808960a408685afbff46bd87c79-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.976875624852255,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "VolumeWetGameUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "VolumeWetGameUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "game-defined-aux-send-volume"
+        ]
+      }
+    },
+    {
+      "original_command_index": 22,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role user-defined-aux-send-volume\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "user-defined-aux-send-volume",
+          "points": [],
+          "use": "UseVolumeDry"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962058865867000-d429d7a9a1ab4d5085e4428efe72ddce-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.974193458911031,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "VolumeWetUserUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "VolumeWetUserUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "user-defined-aux-send-volume"
+        ]
+      }
+    },
+    {
+      "original_command_index": 23,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role low-pass-filter\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "low-pass-filter",
+          "points": [],
+          "use": "None"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962059137254000-2fb76cc423234256b2d70c4b15fb6c5e-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.97458420903422,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "LowPassFilterUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "LowPassFilterUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "low-pass-filter"
+        ]
+      }
+    },
+    {
+      "original_command_index": 24,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role spread\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "spread",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 50.34965
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 0.0
+            }
+          ],
+          "use": "Custom"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962059402949000-47cf88938c1641deaa7ac42bed67757d-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.972692499868572,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "SpreadUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "SpreadUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "spread"
+        ]
+      }
+    },
+    {
+      "original_command_index": 25,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role high-pass-filter\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "high-pass-filter",
+          "points": [],
+          "use": "None"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962059670453000-724d0e79440340d2aa8618fe9d3e8a75-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.975142707815394,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "HighPassFilterUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "HighPassFilterUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "high-pass-filter"
+        ]
+      }
+    },
+    {
+      "original_command_index": 26,
+      "command": "/bin/bash -lc \"python .agents/skills/waapi-skill/scripts/run.py gateway.py metadata attenuation --exact-id '{D7B7A627-3D4A-4921-842E-0A38A2DB2492}' --curve-role focus\"",
+      "payload": {
+        "agent_result": {
+          "curve_role": "focus",
+          "points": [],
+          "use": "None"
+        },
+        "call": {
+          "api": "ak.wwise.core.object.getAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962060555697000-fb0e22719c5046ff940cdd358d3bb5bb-ak_wwise_core_object_getAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 9.506601125001907,
+          "version": "2022.1"
+        },
+        "command": "metadata",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "is_command_line": true,
+        "ok": true,
+        "operation": "attenuation",
+        "semantic_preview": {
+          "envelope": {
+            "args": {
+              "curveType": "FocusUsage",
+              "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+            },
+            "metadata": {
+              "builder_family": "property-reference",
+              "operation": "getAttenuationCurve",
+              "read_only": true,
+              "return_expectation": {
+                "allow_documented_empty": true,
+                "parser": "parse_get_attenuation_curve_result",
+                "required_fields": [
+                  "curveType",
+                  "use"
+                ],
+                "shape": "object-or-documented-empty-object"
+              },
+              "schema_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              },
+              "source_note": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              },
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.getAttenuationCurve"
+          },
+          "evidence_plan": [
+            {
+              "family": "property-reference",
+              "kind": "source-note",
+              "status": {
+                "allowed": true,
+                "cited_fields": [
+                  "ak.wwise.core.object.getTypes: no required fields",
+                  "ak.wwise.core.object.getPropertyAndReferenceNames: classId",
+                  "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                  "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                  "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                  "ak.wwise.core.object.setName: object, value",
+                  "ak.wwise.core.object.setNotes: object, value",
+                  "ak.wwise.core.object.setProperty: object, property, value",
+                  "ak.wwise.core.object.setReference: object, reference, value",
+                  "ak.wwise.core.object.setRandomizer: object, property, and one of enabled, min, max",
+                  "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points"
+                ],
+                "error_code": null,
+                "family": "property-reference",
+                "missing_fields": [],
+                "reason": "Semantic source note is grounded.",
+                "uncited_fields": [],
+                "version": "2022.1"
+              }
+            },
+            {
+              "kind": "schema",
+              "validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg"
+                ],
+                "uri": "ak.wwise.core.object.getAttenuationCurve",
+                "validated_nodes": 4,
+                "version": "2022.1"
+              }
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "readback_plan": [
+            {
+              "args": {
+                "curveType": "FocusUsage",
+                "object": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}"
+              },
+              "description": "parse metadata result with parse_get_attenuation_curve_result",
+              "options": {},
+              "uri": "ak.wwise.core.object.getAttenuationCurve"
+            }
+          ],
+          "requires_destructive_gate": false,
+          "source_note_family": "property-reference",
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "status": "ok"
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "metadata",
+          "attenuation",
+          "--exact-id",
+          "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+          "--curve-role",
+          "focus"
+        ]
+      }
+    },
+    {
+      "original_command_index": 27,
+      "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-1j5t28xb8dekv0y0ktdx'",
+      "payload": {
+        "agent_control": {
+          "next": "execute next_command.copy_instruction.source_field in same turn",
+          "reply_before_next_command": "invalid",
+          "required_outcome_before_reply": "verified_or_structured_verification_failure",
+          "terminal": false
+        },
+        "artifact_hash": "79158449ab5b55b5d5dd6d3ab9b8883b6a4c1439bf2b2edd99b4db65fb1aba6b",
+        "automatic_retry": false,
+        "cleanup": {
+          "projection": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "cleanup_spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-projection/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "phase": "executed",
+            "status": "not_required",
+            "warnings": []
+          },
+          "spec": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+            "warnings": []
+          },
+          "status": "not_required"
+        },
+        "command": "execute",
+        "contract": "waapi-skill.gateway-result/v1",
+        "detected_version": "2022.1",
+        "dispatch_result": {
+          "api": "ak.wwise.core.object.setAttenuationCurve",
+          "category": "core.object",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962073727659000-c73fa5bbeb964ce090132148dbdda053-ak_wwise_core_object_setAttenuationCurve.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "result": {},
+          "risk_level": "medium",
+          "timeout": 30.0,
+          "version": "2022.1"
+        },
+        "endpoint": {
+          "host": "127.0.0.1",
+          "port": 30581,
+          "url": "ws://127.0.0.1:30581/waapi"
+        },
+        "executed": true,
+        "game_object_binding_validation": null,
+        "game_object_collection_validation": null,
+        "guard_validation": {
+          "expires_at": "2026-10-02T17:56:26.417975Z",
+          "ok": true,
+          "project_guard_fingerprint": "0b5ceff2b481fba313ec97b18f73c8ccce1bbafb4dbe9eae0a690fa7418b6623",
+          "project_guard_mode": "invariant",
+          "project_guard_phase": "pre_execution",
+          "project_transition": null,
+          "runtime_guard_fingerprint": "6a84501cbbb8c5a7bc12a21d7d7664fb5b5ae0090bc38129c6b57983dc325656",
+          "status": "valid"
+        },
+        "is_command_line": true,
+        "next_command": {
+          "command": "verify",
+          "contract": "waapi-skill.gateway-next-command/v2",
+          "copy_exactly": true,
+          "copy_instruction": {
+            "action": "execute_verbatim_as_one_shell_tool_call",
+            "contract": "waapi-skill.gateway-command-copy-instruction/v2",
+            "forbidden_transformations": [
+              "reconstruct",
+              "shorten",
+              "normalize",
+              "substitute_path_segments",
+              "select_another_field"
+            ],
+            "source_field": "shell_command"
+          },
+          "full_argv": [
+            "python",
+            "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+            "gateway.py",
+            "verify",
+            "tx1-1j5t28xb8dekv0y0ktdx"
+          ],
+          "gateway_argv": [
+            "verify",
+            "tx1-1j5t28xb8dekv0y0ktdx"
+          ],
+          "shell_command": "python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py verify tx1-1j5t28xb8dekv0y0ktdx",
+          "shell_family": "posix-sh",
+          "shell_tool_timeout_ms": 30000
+        },
+        "ok": true,
+        "playing_binding_validation": null,
+        "project_call": {
+          "api": "ak.wwise.core.getProjectInfo",
+          "category": "core",
+          "dry_run": false,
+          "error_code": null,
+          "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-focused3-a1979db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C08/evidence/codex-task/broker/evidence/1790962073581491000-10cf04ff79b843389c22f2a3897e00e1-ak_wwise_core_getProjectInfo.json",
+          "item_type": "function",
+          "message": "ok",
+          "ok": true,
+          "risk_level": "low",
+          "timeout": 149.96614516689442,
+          "version": "2022.1"
+        },
+        "role_validation": {
+          "assertion_count": 1,
+          "assertions_canonical_sha256": "b3919c69f193b35c3d6a872592e257de78ae90e8fbcd2ee3e1388f78a6d35b51",
+          "contract": "waapi-skill.role-validation/v1",
+          "full_evidence_in_stdout": false,
+          "ok": true,
+          "operation": "waapi.call",
+          "passed_assertion_count": 1,
+          "readback_count": 0,
+          "readbacks_canonical_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "status": "valid",
+          "summary_contract": "waapi-skill.transaction-role-validation-summary/v1"
+        },
+        "schema_validation": {
+          "required_families": [],
+          "required_fields": [
+            "object",
+            "curveType",
+            "use",
+            "points"
+          ],
+          "section": "request",
+          "unresolved_refs": [
+            "#/definitions/objectArg",
+            "#/definitions/pointsDefinition"
+          ],
+          "uri": "ak.wwise.core.object.setAttenuationCurve",
+          "validated_nodes": 6,
+          "version": "2022.1"
+        },
+        "session_context": {
+          "adapter_version": "2022.1",
+          "adapter_version_source": "live_detection",
+          "available": true,
+          "available_project_modification_policies": [
+            "read_only",
+            "ask_before_changes",
+            "allow_changes"
+          ],
+          "contract": "waapi-skill.session-context/v2",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30581,
+            "url": "ws://127.0.0.1:30581/waapi"
+          },
+          "one_time_introduction": {
+            "atomic": true,
+            "contract": "waapi-skill.session-introduction/v2",
+            "emit_condition": "visible_conversation_intro_absent",
+            "emit_timing": "first_agent_message_after_gateway_result",
+            "facts": {
+              "adapter_version": "2022.1",
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "endpoint_url": "ws://127.0.0.1:30581/waapi",
+              "project_modification_policy": "allow_changes",
+              "skill_name": "waapi-skill"
+            },
+            "machine_readable_result_policy": "separate_progress_message",
+            "style": "natural_prose_in_user_language"
+          },
+          "project_modification_policy": "allow_changes"
+        },
+        "state": "executed_unverified",
+        "status": "executed_unverified",
+        "stdout_projection": {
+          "contract": "waapi-skill.transaction-execute-success-summary/v1",
+          "detail_level": "full-dispatch-result",
+          "fixed_projection_limit_bytes": 22528,
+          "full_dispatch_result_in_stdout": true,
+          "full_execution_evidence_persisted": true,
+          "full_role_validation_in_stdout": false,
+          "journal_event": "execution_completed",
+          "projected_payload_bytes": 6433,
+          "session_context_reserve_bytes": 2048,
+          "stdout_budget_bytes": 24576,
+          "truncated": false
+        },
+        "transaction_id": "tx1-1j5t28xb8dekv0y0ktdx",
+        "transport_binding_validation": null,
+        "verified": false
+      },
+      "receipt": {
+        "authenticated": true,
+        "accepted": true,
+        "succeeded": true,
+        "exit_code": 0,
+        "runner_exit_code": 0,
+        "gateway_arguments": [
+          "execute",
+          "tx1-1j5t28xb8dekv0y0ktdx"
+        ]
+      }
+    }
+  ]
+}

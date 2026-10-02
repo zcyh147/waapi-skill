@@ -3670,6 +3670,31 @@ def _business_draft_continuation_candidates(
     return found_contract, tuple(sorted(candidates))
 
 
+def _expansion_pending_preview_execute(payload: Any, record: Any, command: Any, *, platform_name: str) -> bool:
+    """Only an authenticated policy Preview can defer its selected Execute."""
+    if not isinstance(payload, Mapping):
+        return False
+    authorization, continuation = payload.get("authorization"), payload.get("next_command")
+    return (
+        payload.get("ok") is True
+        and payload.get("command") == "preview-from-draft"
+        and payload.get("state") == "policy_authorized"
+        and isinstance(payload.get("transaction_id"), str)
+        and isinstance(authorization, Mapping)
+        and authorization.get("mode") == "policy_authorization"
+        and authorization.get("policy") == "allow_changes"
+        and authorization.get("explicit_confirmation") is False
+        and isinstance(continuation, Mapping)
+        and continuation.get("gateway_argv") == ["execute", payload["transaction_id"]]
+        and not continuation.get("requires_later_user_message")
+        and not continuation.get("requires_explicit_user_confirmation")
+        and _selected_gateway_continuation(continuation, platform_name=platform_name) is not None
+        and all(_record_field(record, key) is True for key in ("authenticated", "accepted", "succeeded"))
+        and _record_field(record, "exit_code") == _record_field(record, "runner_exit_code") == 0
+        and _command_output_matches_payload(command, payload)
+    )
+
+
 def gateway_continuation_binding_errors(
     command_records: Sequence[CodexCommandRecord | Mapping[str, Any]],
     broker_records: Sequence[Any],
@@ -3697,6 +3722,7 @@ def gateway_continuation_binding_errors(
     active_platform = os.name if platform_name is None else platform_name
     errors: list[str] = []
     pending_business_index: int | None = None
+    pending_preview_execute = False
     if allow_expansion_read_interleaving and len(command_records) != len(broker_records):
         return ("expansion continuation command/receipt count mismatch",)
     compound_parent_candidates: tuple[tuple[str, str], ...] = ()
@@ -3743,10 +3769,15 @@ def gateway_continuation_binding_errors(
             # Only the expansion caller enables this after positional Broker
             # reconciliation. Accepted reads have passed its bounded public
             # admission policy; they do not consume or replace a Draft copy.
-            if isinstance(prior_payload, Mapping):
+            if pending_business_index is None and isinstance(prior_payload, Mapping):
                 is_business, _ = _business_draft_continuation_candidates(prior_payload, platform_name=active_platform)
-                if is_business and "next_command" not in prior_payload:
+                if _expansion_pending_preview_execute(prior_payload, prior_broker,
+                        command_records[prior_index], platform_name=active_platform):
                     pending_business_index = prior_index
+                    pending_preview_execute = True
+                elif is_business and "next_command" not in prior_payload:
+                    pending_business_index = prior_index
+                    pending_preview_execute = False
             if pending_business_index is not None:
                 current = broker_records[index]
                 arguments = _record_field(current, "gateway_arguments", ())
@@ -3756,6 +3787,12 @@ def gateway_continuation_binding_errors(
                     if (all(_record_field(current, key) is True for key in ("authenticated", "accepted", "succeeded"))
                             and _record_field(current, "exit_code") == _record_field(current, "runner_exit_code") == 0
                             and isinstance(payload, Mapping) and payload.get("command") == arguments[0]
+                            and (not pending_preview_execute or (
+                                payload.get("ok") is True and payload.get("limit_reached") is not True
+                                and ("response_integrity" not in payload or (
+                                    isinstance(payload["response_integrity"], Mapping)
+                                    and payload["response_integrity"].get("complete") is True
+                                    and payload["response_integrity"].get("truncated") is False))))
                             and _command_output_matches_payload(command_records[index], payload)):
                         continue
                     errors.append(f"command {index + 1}: interleaved read lacks authenticated successful evidence")
@@ -3764,6 +3801,7 @@ def gateway_continuation_binding_errors(
                 prior_broker = broker_records[prior_index]
                 prior_payload = _record_field(prior_broker, "payload")
                 pending_business_index = None
+                pending_preview_execute = False
         if not isinstance(prior_payload, Mapping):
             continue
         business_contract, business_candidates = (
@@ -3940,6 +3978,13 @@ def gateway_continuation_binding_errors(
                 f"command {command_number}: Gateway continuation was not copied "
                 "from its selected source field"
             )
+    if allow_expansion_read_interleaving and (
+        pending_preview_execute
+        or broker_records and _expansion_pending_preview_execute(
+            _record_field(broker_records[-1], "payload"), broker_records[-1], command_records[-1],
+            platform_name=active_platform)
+    ):
+        errors.append("pending policy Preview Execute continuation was not consumed")
     return tuple(errors)
 
 
