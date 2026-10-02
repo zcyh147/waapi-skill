@@ -34,7 +34,7 @@ def test_existing_sfx_reimport_preserves_sources_and_distinct_media(expansion_ru
               'agent_pass': False, 'business_effect_verified': False}
     failure = None
     try:
-        gateway(['config-set', 'project_modification_policy', 'ask_before_changes'])
+        gateway(['config-set', '--project-modification-policy', 'ask_before_changes'])
         ctx = ExpansionCaseContext(
             version=runtime.version, scenario_id=f'EXP{runtime.version[2:4]}-C03',
             project_path=runtime.sandbox.sandbox_project,
