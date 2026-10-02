@@ -19,9 +19,9 @@ from tests.semantic.support.codex_attenuation_notice import (
 )
 from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
-    NoticeRoleContext, PlannedEffectReferent, baseline_read_claim, deictic_effect_claim,
+    NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, ancillary_claims, baseline_read_claim, deictic_effect_claim,
     effect_kind_label, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
-    owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner,
+    owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner, primary_role_atom, staged_operation_adoption,
 )
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
@@ -348,12 +348,18 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
                 or not isinstance(owner.get("@Stingers"), list)
                 or sum(isinstance(row, Mapping) and row.get("id") == source["id"] for row in owner["@Stingers"]) != 1):
             return None
+        old_reference = observed.get("@Trigger")
+        field_before = state.get("field_before", {})
+        if (not isinstance(old_reference, Mapping) or not isinstance(field_before, Mapping)
+                or field_before.get("field") != "Trigger" or not isinstance(field_before.get("value"), Mapping)
+                or any(field_before["value"].get(key) != old_reference.get(key) for key in ("id", "name"))):
+            old_reference = None  # A display path never proves the old target.
         return {"groups": [(source["id"], source["path"], "该 musicstinger", "该 stinger", "this musicstinger"),
                            (target["id"], target["name"], target["path"]), ("trigger", "触发器"),
                            ("改动", "更新", "修改", "改为", "设为", "指向", "update", "change", "retarget")],
                 "ids": (source["id"], target["id"]), "protected": ("segment", "音乐段", "容器", "container"),
                 "action": r"改动|更新|修改|改为|设为|指向|update|change|retarget", "kind": "reference", "source_type": "(?:music)?stinger", "source_id": source["id"],
-                "source_names": (source["name"], source["path"])}
+                "source_names": (source["name"], source["path"]), "old_reference": old_reference}
     return None
 
 
@@ -508,7 +514,13 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
     return True
 
 
-def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
+def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: PlannedEffectReferent | None = None,
+                          require_adoption: bool = True) -> bool:
+    if staged is not None and (context["kind"] != "plugin" or staged.owner_id != context["source_id"]
+            or staged.name != context["groups"][1][0].casefold()
+            or staged.native_class_id != context["descriptor"]["class_id"]
+            or staged.display_label is not None and not effect_kind_label(staged.display_label)):
+        return False
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
     role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
         "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
@@ -554,20 +566,27 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 and re.fullmatch(rf"指定\s*guid\s*对应的\s*{context['source_type']}", value) is None):
             return False
     value_pattern = rf"(?<![a-z0-9_]){re.escape(context['groups'][1][0].casefold())}(?![a-z0-9_])"
-    if context["kind"] == "plugin" and re.search(value_pattern, text) is None:
+    if context["kind"] == "plugin" and staged is None and re.search(value_pattern, text) is None:
         return False
     explicit_prospective_owner = any(prospective_role_owner(text[max(text.rfind('。', 0, action.start()), text.rfind('\n', 0, action.start())) + 1:action.start()], role_context)
         for action in re.finditer(context["action"], text))
-    if not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]}):
+    if staged is None and (not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]})):
         return False
-    affirmative = False
+    affirmative = staged is not None
+    adoption = False
     source_referent = False
     pending_note_owner = None
     matched_displays = set()
-    planned_effect = None
+    planned_effect = staged
     clause_cursor = 0
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
         local_claims = notice_clauses(clause)
+        ancillary = ancillary_claims(clause, role_context)
+        if any(claim.role == "invalid" for claim in ancillary):
+            return False
+        for claim in ancillary:
+            if claim.role in {"authorization", "preview-status"} and not _bound_explicit_owners_agree(claim.value.strip().rstrip("，,").strip(), "", context):
+                return False
         preview_status = preview_status_claim(local_claims[0]) if local_claims else None
         authorization = authorization_claim(local_claims[0].text if preview_status is not None
             and preview_status.role == "preview-status" else clause)
@@ -629,6 +648,14 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             if local_claims and context["kind"] == "plugin" else None)
         execution_summary = (execution_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
+        if staged is not None:
+            for local in local_claims:
+                adopted = staged_operation_adoption(local, context["action"], staged)
+                if adopted.role == "invalid":
+                    return False
+                if adopted.role == "execution-summary":
+                    execution_summary = adopted
+                    adoption = True
         if local_claims and context["kind"] == "plugin":
             deictic = deictic_effect_claim(local_claims[0], context["action"], planned_effect)
             if deictic.role == "invalid":
@@ -646,7 +673,24 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 return False
             pending_note_owner = clause
         creation_position = -1
+        sole_assignment = False
         for index, action in enumerate(actions):
+            if sole_assignment:
+                continue  # The complete exact assignment was validated below.
+            if any(claim.role in {"authorization", "preview-status", "read-summary"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
+                continue
+            if context["kind"] == "reference" and action.group() == "写入":
+                scope = re.fullmatch(r"\s*(?:预览已完成[:：])?唯一写入项是(.+)\s*", clause)
+                assignment = re.fullmatch(r"将(.+?)的(?:trigger|触发器)从\s*(.+?)\s*改为\s*(.+?)", scope.group(1)) if scope else None
+                old = context.get("old_reference")
+                if assignment and isinstance(old, Mapping) and isinstance(old.get("id"), str) and isinstance(old.get("name"), str):
+                    if (not primary_role_atom(assignment.group(1), role_context)
+                            or assignment.group(2).strip() not in {old["id"].casefold(), old["name"].casefold()}
+                            or assignment.group(3).strip() not in {value.casefold() for value in context["groups"][1]}):
+                        return False
+                    affirmative = True
+                    sole_assignment = True
+                    continue
             if any(start <= action.start() and action.end() <= end for start, end in coordinated_authorizations):
                 continue
             if (preview_status is not None and preview_status.role == "preview-status"
@@ -738,7 +782,19 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                     if not context["notes"] or context["notes"].casefold() in quoted_notes:
                         planned_effect = PlannedEffectReferent(context["groups"][1][0].casefold(), context["source_id"],
                             context["descriptor"]["class_id"], next(iter(matched_displays)) if matched_displays else None)
-    return affirmative
+    return affirmative and (staged is None or not require_adoption or adoption)
+
+
+def _staged_claim_state(text: str, context: Mapping[str, Any], candidate: StagedNoticeEvidence) -> NoticeClaim:
+    """Validate one intervening message without requiring another effect plan.
+
+    The attested descriptor supplies only the already-established value role.
+    All owner, value, polarity and affirmative-action checks still run; absence
+    of a new effect or execution claim is compatible neutral progress.
+    """
+    compatible = _bound_context_effect(text, context, staged=candidate.referent, require_adoption=False)
+    return NoticeClaim("compatible" if compatible else "contradiction", 0, len(text), text,
+                       "" if compatible else "intervening-plan-contradiction")
 
 
 def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -1230,7 +1286,11 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
     preview_seen = False
     notice_seen = False
     earlier_effect = False
-    for event in parse_jsonl_events(result.stdout):
+    artifact_digest = hashlib.sha256(json.dumps(preview_artifact, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    candidate: StagedNoticeEvidence | None = None
+    competing_candidate = False
+    sealed_candidate: StagedNoticeEvidence | None = None
+    for event_index, event in enumerate(parse_jsonl_events(result.stdout)):
         item = event.get("item")
         if not isinstance(item, Mapping):
             continue
@@ -1241,6 +1301,9 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
             continue
         if item.get("type") == "command_execution" and command == "preview-from-draft":
             preview_seen = True
+            notice_messages.clear()
+            notice_seen = False
+            sealed_candidate = candidate if not competing_candidate else None
         elif item.get("type") == "agent_message":
             text = str(item.get("text", "")).casefold()
             def mentions(term: str) -> bool:
@@ -1258,7 +1321,27 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
             if bound_context is not None:
                 if preview_seen:
                     notice_messages.append(text)
+                staged = sealed_candidate.referent if sealed_candidate is not None and sealed_candidate.artifact_digest == artifact_digest else None
                 effect = _bound_context_effect("\n".join(notice_messages) if preview_seen else text, bound_context)
+                if not effect and preview_seen and staged is not None:
+                    effect = _bound_context_effect("\n".join(notice_messages), bound_context, staged=staged)
+                if not preview_seen and bound_context["kind"] == "plugin":
+                    if effect:
+                        role = NoticeRoleContext({"id": bound_context["source_id"], "name": bound_context["source_names"][0],
+                            "path": bound_context["source_names"][-1], "type": "Sound"})
+                        labels = {claim.value for claim in (matched_display_claim(clause, role) for clause in notice_clauses(text))
+                            if claim.role == "matched-display"}
+                        proposed = StagedNoticeEvidence(artifact_digest, event_index,
+                            PlannedEffectReferent(bound_context["groups"][1][0].casefold(), bound_context["source_id"],
+                                bound_context["descriptor"]["class_id"], next(iter(labels)) if len(labels) == 1 else None))
+                        if candidate is not None and candidate.referent != proposed.referent:
+                            competing_candidate = True
+                        candidate = proposed
+                    elif candidate is not None and _staged_claim_state(text, bound_context, candidate).role == "contradiction":
+                        # A subsequent active competing plan must not leave a
+                        # previous successful descriptor sticky. Neutral tool
+                        # output never enters this Agent-only ledger.
+                        competing_candidate = True
                 if preview_seen:
                     notice_seen = effect
             if rtpc_context is not None:

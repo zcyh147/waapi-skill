@@ -42,6 +42,34 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed staged-notice grading repair — 2026-10-03:** #147 now resolves
+  local owner and ancillary claims through shared typed roles, accepts an exact
+  complete pre-Preview Effect plan followed by operation-specific post-Preview
+  adoption, and validates a Stinger's stated old Trigger against both independent
+  baseline and prepared pre-state. A private descriptor binds the planned effect
+  to the immutable artifact; prose supplies no policy or native-class authority.
+  Four distinct actual valid notice witnesses failed before repair. The
+  independent corpus's first 19-pass/1-fail audit used a partially repaired
+  snapshot, so it is not pre-repair RED evidence. Review then found separate
+  intervening contradictions and stale post-Preview notice state: the new
+  controls reproduced **9 failures / 6 passes**, then passed all **15** after
+  correction. Explicit changed owners, values, refusal and policy conflicts
+  invalidate the staged plan; neutral progress remains legal. Every Preview
+  clears prior post-Preview notice state. The helper's repeated-Preview controls
+  do not broaden formal admission: the archive still requires exactly one
+  accepted Preview and matching transaction/hash receipts.
+  Both independent review lanes are clear. All seven notice files passed
+  **2229 tests** in **3.55 seconds**. Root's combined notice, harness, Broker,
+  Skill-contract, documentation and interface-inventory gate passed
+  **2828 / skipped 9 native-Windows checks**, exit zero in **22.81 seconds**.
+  Log SHA-256: `a4e7634ff2dd5b72a0d3c3014dc21e7afe2b64268d65d58ae33ee8cc86a6fd03`;
+  JUnit SHA-256: `4770d3799ae3e85b297dd3c14b8cc0e66da099ea721d729bc85986ce60ef5cf3`.
+  Packaged Skill and Program inputs are unchanged from eba698d; its 6345/2
+  Program result remains component evidence, not a new run. A complete new
+  Non-live gate and then a new full thirteen-Agent-unit campaign plus boundary
+  are next. Original automatic FAILs remain frozen, separately from the proven
+  successful business outcomes; no historical replay or verdict promotion.
+
 
 - **Five successful business effects; contextual notice grading remains — 2026-10-03:**
   candidate `eba698d9c9f461182b36c7c55ff9b8d2253d9d06` passed new Program

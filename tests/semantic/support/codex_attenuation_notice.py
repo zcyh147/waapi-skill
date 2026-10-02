@@ -6,7 +6,7 @@ from typing import Any, Mapping, NamedTuple
 
 from tests.semantic.support.codex_notice_language import authorization_claim, attested_primary_target, notice_count as _point_count, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
-    FINITE_NUMBER, NoticeClaim, NoticeRoleContext, current_curve_claim,
+    FINITE_NUMBER, NoticeClaim, NoticeRoleContext, ancillary_claims, current_curve_claim,
     masked_claims, notice_clauses, owner_inheritance, pending_curve_claim,
 )
 
@@ -245,10 +245,16 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     frames = (*_curve_frames(text, context, owner, kind, source),
               *(_CurveFrame(claim.start, claim.end) for claim in semantic_claims if claim.role == "prospective-edit"))
     base_owner = owner
-    anaphor_spans = []
     target_assertion_spans = []
     inherited_target_spans = list(inherited)
     authorization_spans = []
+    for claim in ancillary_claims(text, role_context):
+        if claim.role == "invalid":
+            return False
+        if claim.role in {"authorization", "preview-status"}:
+            if claim.value.strip() and re.fullmatch(rf"\s*(?:在|向|对)\s*(?:{owner})\s*(?:上|下)?\s*", claim.value) is None:
+                return False
+            authorization_spans.append((claim.start, claim.end))
     for assertion in re.finditer(r"[^。；;\n]+", text):
         authorization = authorization_claim(assertion.group())
         if authorization.state == "invalid":
@@ -266,10 +272,6 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
             following = _following_first_clause(text, assertion.end())
             if following is not None:
                 inherited_target_spans.append(following)
-        if re.fullmatch(r"\s*(?:目标已核对为请求中的 attenuation|这个衰减对象已按 guid 核实)\s*", assertion.group()):
-            following = _following_first_clause(text, assertion.end())
-            if following is not None:
-                anaphor_spans.append(following)
     affirmative = bool(frames)
     antecedent = None
     clauses = re.split(r"([。；;,，\n]|\bbut\b|但)", text)
@@ -277,7 +279,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
         clause = clauses[position]
         clause_start = sum(len(part) for part in clauses[:position])
         substantive_start = clause_start + len(clause) - len(clause.lstrip())
-        owner = base_owner + "|其" if any(start <= substantive_start < end for start, end in anaphor_spans) else base_owner
+        owner = base_owner + "|其" if any(start <= substantive_start < end for start, end in inherited_target_spans) else base_owner
         prior = antecedent if position > 0 and clauses[position - 1] in {",", "，"} else None
         antecedent = None
         subject = re.fullmatch(rf"{introduction}目标是\s*(.+?)\s*", clause)

@@ -37,6 +37,27 @@ class PlannedEffectReferent(NamedTuple):
     display_label: str | None
 
 
+class StagedNoticeEvidence(NamedTuple):
+    """A complete Agent plan, privately tied to the one attested Preview."""
+    artifact_digest: str
+    event_index: int
+    referent: PlannedEffectReferent
+
+
+def staged_operation_adoption(clause: NoticeClaim, action_pattern: str, referent: PlannedEffectReferent) -> NoticeClaim:
+    """Specific prospective adoption never grants policy or proves the plan."""
+    refusal = r"(?:我)?(?:不会|不|暂不|不能|不再)"
+    match = re.fullmatch(rf"\s*(?P<intent>{_FUTURE}|{refusal})执行(?:{_REFERENT})?(?:{action_pattern})(?:\s+(?P<value>.+?))?\s*", clause.text)
+    if match is None:
+        return clause
+    value = " ".join((match.group("value") or "").split())
+    if value and value not in {referent.name, referent.display_label}:
+        return clause._replace(role="invalid", diagnostic="conflicting-staged-descriptor")
+    if re.fullmatch(refusal, match.group("intent")):
+        return clause._replace(role="invalid", diagnostic="staged-adoption-refusal")
+    return clause._replace(role="execution-summary")
+
+
 def notice_clauses(text: str) -> tuple[NoticeClaim, ...]:
     """Separate clauses without splitting the comma inside a coordinate."""
     result = []
@@ -61,6 +82,8 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
     row = context.identity
     if value in {str(row[key]).casefold() for key in ("id", "name", "path")}:
         return True
+    if re.fullmatch(r"(?:所)?指定\s*guid", value):
+        return True  # A definite referent to the adapter's singleton sealed ID.
     terms = "|".join(re.escape(term) for term in role_terms(row["type"]))
     return re.fullmatch(rf"(?:目标|该|此|(?:所)?指定)(?:的)?\s*(?:{terms})(?:对象)?", value) is not None
 
@@ -82,8 +105,24 @@ def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> s
 
 def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """A complete affirmative generic/exact role assertion, with no lookup."""
+    terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
+    established = re.fullmatch(rf"\s*(?:目标已核对为请求中的\s*(?:{terms})|这个(?:{terms})已按\s*guid\s*核实)\s*", clause.text)
+    if established:
+        return clause._replace(role="owner-attestation")
+    subject = re.fullmatch(r"\s*目标是\s*(.+?)\s*", clause.text)
+    if subject:
+        value = subject.group(1)
+        if context.quantity_terms:
+            field = "|".join(re.escape(term) for term in context.quantity_terms)
+            value = re.sub(rf"\s*的(?:{field})\s*曲线$", "", value)
+        return clause._replace(role="owner-attestation" if primary_role_atom(value, context)
+                               else "invalid", diagnostic="conflicting-owner-attestation")
     match = re.fullmatch(r"\s*(?:已)?(?:核对|核实|确认)(.+?)\s*", clause.text)
     if match is None:
+        reverse = re.fullmatch(r"\s*(.+?)\s*已(?:核对|核实|确认|匹配)\s*", clause.text)
+        if reverse and (reverse.group(1).startswith("目标") or primary_role_atom(reverse.group(1), context)):
+            return clause._replace(role="owner-attestation" if primary_role_atom(reverse.group(1), context)
+                                   else "invalid", diagnostic="conflicting-owner-attestation")
         return clause
     from tests.semantic.support.codex_notice_language import attested_primary_target
 
@@ -116,6 +155,40 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
     return clause
 
 
+def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim, ...]:
+    """Classify every local ancillary role, retaining source and owner spans.
+
+    These claims never establish the requested effect or authorization. The
+    operation adapter still checks their owner payload against its sealed role.
+    """
+    from tests.semantic.support.codex_notice_language import authorization_claim
+
+    result = []
+    for clause in notice_clauses(text):
+        local = re.sub(r"^(\s*)且", r"\1并", clause.text)
+        colon = re.search(r"[:：]", local)
+        owner = owner_attestation(clause._replace(text=local[:colon.start()] if colon else local), context)
+        if owner.role in {"owner-attestation", "invalid"}:
+            result.append(owner._replace(text=clause.text, end=clause.start + colon.start() if colon else clause.end))
+            continue
+        status = preview_status_claim(clause._replace(text=local))
+        if status.role == "preview-status":
+            result.append(status._replace(text=clause.text))
+            continue
+        if (context.identity["type"] == "Sound" and re.fullmatch(r"\s*(?:接下来)?核对追加位置和现有配置的保护条件\s*", local)):
+            result.append(clause._replace(role="read-summary"))
+            continue
+        auth = authorization_claim(local)
+        if auth.state == "invalid":
+            result.append(clause._replace(role="invalid", diagnostic="conflicting-authorization"))
+        elif auth.state == "ancillary" and not local[auth.end:].strip():
+            result.append(clause._replace(role="authorization", start=clause.start + auth.start,
+                                         end=clause.start + auth.end, value=auth.owner_prefix))
+        else:
+            result.append(clause)
+    return tuple(result)
+
+
 def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """An ancillary span follows a separately validated complete owner atom."""
     coordinator = re.search(r"并", clause.text)
@@ -130,10 +203,10 @@ def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> Noti
 
 def matched_display_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """An opaque display token is lexical context, never native class evidence."""
-    match = re.fullmatch(r"\s*并匹配到\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*", clause.text)
+    match = re.fullmatch(r"\s*(?:并匹配到|已从实时插件目录确认)\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*", clause.text)
     if match and context.identity["type"] == "Sound" and effect_kind_label(match.group(1)):
         return clause._replace(role="matched-display", value=" ".join(match.group(1).split()))
-    if re.match(r"\s*并匹配到", clause.text):
+    if re.match(r"\s*(?:并匹配到|已从实时插件目录确认)", clause.text):
         return clause._replace(role="invalid", diagnostic="unclosed-matched-display")
     return clause
 
@@ -227,7 +300,7 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
 
     windows = []
     for sentence in re.finditer(r"[^。；;\n]+", text):
-        clauses = notice_clauses(sentence.group())
+        clauses = ancillary_claims(sentence.group(), context)
         if not clauses:
             continue
         first = clauses[0]
@@ -239,10 +312,14 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
             continue
         if colon:
             start = sentence.start() + first.start + colon.end()
-            windows.append((start, sentence.start() + first.end))
+            windows.append((start, sentence.start() + notice_clauses(sentence.group())[0].end))
             continue
         compatible = True
         for tail in clauses[1:]:
+            if tail.role == "invalid":
+                return None
+            if tail.role in {"authorization", "preview-status"} and not tail.value:
+                continue
             authorization = authorization_claim(tail.text)
             baseline = baseline_read_role(tail.text, context)
             if baseline == "invalid":
@@ -254,9 +331,15 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
                                      and not tail.text[authorization.end:].strip()):
                 compatible = False
         if compatible:
-            following = re.match(r"[。；;\n]\s*([^，,。；;\n]+)", text[sentence.end():])
-            if following:
-                windows.append((sentence.end() + following.start(1), sentence.end() + following.end(1)))
+            offset = sentence.end()
+            while following := re.match(r"[。；;\n]\s*([^，,。；;\n]+)", text[offset:]):
+                first_start, first_end = offset + following.start(1), offset + following.end(1)
+                status = re.fullmatch(r"(?:目前|当前)?(?:工程)?尚未(?:修改|执行)(?:工程)?", following.group(1))
+                if status:
+                    offset = first_end
+                    continue
+                windows.append((first_start, first_end))
+                break
     return tuple(windows)
 
 
@@ -300,10 +383,10 @@ def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeC
 
 def preview_status_claim(clause: NoticeClaim) -> NoticeClaim:
     """Preview-generation status is ancillary and retains any explicit owner."""
-    preview = r"(?:具体|本次|这次|该|此)?(?:修改|变更|改动)?预览"
+    preview = r"(?:可执行|具体|本次|这次|该|此)?(?:修改|变更|改动)?预览"
     generated = r"(?:已)?生成"
     owner = r"(?P<owner>(?:在|向|对)\s*[^，,。；;\n]+?(?:上|下)\s*)?"
-    match = re.fullmatch(rf"\s*{owner}(?:{preview}{generated}|{generated}{preview})\s*", clause.text)
+    match = re.fullmatch(rf"\s*(?:并)?{owner}(?:{preview}{generated}|{generated}{preview})\s*", clause.text)
     return clause._replace(role="preview-status", value=match.group("owner") or "") if match else clause
 
 
