@@ -348,7 +348,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 195
+    assert len(nodes) == 197
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_host_ui_debug_business_adapter.py"
     assert len(nodes) == len(set(nodes))
@@ -357,6 +357,8 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_cross_family_bus_gateway.py",
         "tests/unit/test_cross_family_collection_gateway.py",
         "tests/unit/test_cross_family_voice_import.py",
+        "tests/unit/test_existing_sfx_import.py",
+        "tests/unit/test_attenuation_curve_business_gateway.py",
         "tests/unit/test_cross_family_game_sync_gateway.py",
         "tests/unit/test_script_helpers.py::test_environment_ready_marker_binds_requirements_and_rejects_symlink",
         "tests/unit/test_script_helpers.py::test_run_bootstrap_repairs_existing_venv_without_ready_marker",

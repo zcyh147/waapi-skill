@@ -42,6 +42,23 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- Consolidated candidate `f16ab1c` completed the fixed five-version Program gate:
+  **6043 passed / 2 native-Windows skips**, exit zero in 289.11 seconds;
+  log SHA-256 `d974e6ea2ce988e257081978c8ae5fbb6fe45a8d19e0bf3b6400a11873666ebf`.
+  Its full Non-live run preserved **12586 passed / 1 failed / 118 skipped /
+  27 deselected** in 824.44 seconds. The sole failure was the old manifest
+  cardinality assertion (195 instead of 197 after two new files were enrolled),
+  not a runtime failure. The correction updates that count and explicitly
+  requires both new files; its focused file passed **43 / skipped 11 native
+  Windows executors**. Non-live log SHA-256 is
+  `cdbbf24d7a1e32d6832627a7e7cc17eaa1353ead3c873856713baeed32e1ccce`;
+  JUnit SHA-256 is
+  `25194f79c96778ee1459637cb4aa767605980f7b8e88c43d21770bcadfa4d5d8`.
+  A new all-green Non-live run remains required. No Fresh root was launched;
+  the prepared `f16ab1c` launcher is retained unused. The correction changes
+  only a Non-live test and this checkpoint, leaving Program inputs, Skill,
+  suite, runner, and semantic harness unchanged.
+
 - Consolidated initial-batch repairs are tracked as children #137–#140 of #108
   and native blockers of acceptance #122: existing SFX source/Originals
   preservation, attenuation choice disclosure, expansion policy instructions,
