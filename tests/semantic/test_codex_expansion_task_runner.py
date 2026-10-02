@@ -1585,3 +1585,196 @@ def test_prospective_execution_polarity_does_not_confuse_unrelated_preservation(
     case = _attested_frame_case(case_id)
     case['events'][1]['item']['text'] += claim
     assert _grammatical_notice(case)
+
+
+def _role_notice_case(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-role-notices-1faaa5d.json').read_text())
+    return next(case for case in fixture['cases'] if case['case'] == case_id)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+def test_actual_closed_role_language_and_planned_change_nouns(case_id):
+    assert _grammatical_notice(_role_notice_case(case_id))
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('claim', [
+    '在 OtherOwner 上执行该变更。', '在该对象和 OtherOwner 上执行该变更。',
+    '在 OtherOwner 上将本次修改独立授权为 allow_changes 策略操作。',
+    '在 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 上执行该变更。',
+    '同时修改 Pitch 为 12。', '同时删除备注。', '同时创建另一个对象。',
+])
+def test_planned_change_noun_frames_never_drop_owner_evidence_or_extra_actions(case_id, claim):
+    case = _role_notice_case(case_id)
+    case['events'][1]['item']['text'] += claim
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('old,new', [
+    ('该声音上', 'OtherSound 上'), ('该声音上', '该声音和 OtherSound 上'),
+    ('该声音上', '该 ActorMixer 上'), ('备注为“Expansion C09 appended gain”', '备注为“Wrong”'),
+    ('新增名为', '不会新增名为'),
+])
+def test_closed_sound_role_alias_never_proves_another_owner_or_effect(old, new):
+    case = _role_notice_case('003-EXP22-C09')
+    post = case['events'][1]['item']
+    assert old in post['text']
+    post['text'] = post['text'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('claim', [
+    '检查新增效果器及原有两个效果器的身份，并修改 Pitch 为 12。',
+    '在 OtherSound 上检查新增效果器及原有两个效果器的身份、绑定与顺序。',
+    '检查新增效果器及原有两个效果器的身份，同时删除原效果器。',
+])
+def test_verification_object_noun_never_consumes_extra_edits_or_foreign_owners(claim):
+    case = _role_notice_case('003-EXP22-C09')
+    case['events'][1]['item']['text'] += claim
+    assert not _grammatical_notice(case)
+
+
+_PARAPHRASE_PAIRS = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-notice-language-paraphrases-1faaa5d.json').read_text())['pairs']
+
+
+@pytest.mark.parametrize('pair', _PARAPHRASE_PAIRS, ids=lambda pair: pair['id'])
+@pytest.mark.parametrize('polarity,expected', [('positive', True), ('negative', False)])
+def test_independent_closed_fact_notice_paraphrases(pair, polarity, expected):
+    case = _role_notice_case('003-EXP22-C09' if pair['id'].startswith('C09') else '004-EXP25-C08')
+    case['events'][1]['item']['text'] = pair[polarity]
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('pair', _PARAPHRASE_PAIRS, ids=lambda pair: pair['id'])
+@pytest.mark.parametrize('claim,expected', [
+    ('不会修改其他对象的备注。', True),
+    ('同时修改 Pitch 为 12。', False),
+    ('在 OtherOwner 上执行该变更。', False),
+    ('我不会执行该变更。', False),
+    ('，并修改 Pitch 为 12。', False),
+])
+def test_each_independent_positive_retains_preservation_and_rejects_appended_contradictions(pair, claim, expected):
+    case = _role_notice_case('003-EXP22-C09' if pair['id'].startswith('C09') else '004-EXP25-C08')
+    case['events'][1]['item']['text'] = pair['positive'] + claim
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('old,new', [
+    ('三个点', '四个点'), ('0 对应 0 dB', '0 对应 0 Hz'),
+    ('50 对应 -12 dB', '50 对应 12 dB'),
+    ('0 对应 0 dB、50 对应 -12 dB', '50 对应 -12 dB、0 对应 0 dB'),
+    ('、100 对应 -48 dB', ''), ('、100 对应 -48 dB', '、100 对应 -48 dB、150 对应 -60 dB'),
+    ('三个点', '若干个点'), ('都是线性', '都是非线性'),
+])
+def test_scalar_point_rendering_retains_quantity_count_order_and_shape(old, new):
+    pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == 'C08-08')
+    case = _role_notice_case('004-EXP25-C08')
+    assert old in pair['positive']
+    case['events'][1]['item']['text'] = pair['positive'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('pair_id,old,new', [
+    ('C09-05', '该声音的效果链', 'OtherSound 的效果链'),
+    ('C09-05', '该声音的效果链', '该声音和 OtherSound 的效果链'),
+    ('C09-03', '新增项是 Wwise Gain', '新增项是 OtherSound 的 Wwise Gain'),
+    ('C08-06', '只作用于该衰减对象', '只作用于 OtherOwner'),
+    ('C08-06', '从距离 0 到 100', '从距离 0 到 200'),
+])
+def test_expected_state_frames_keep_explicit_owner_and_domain_claims(pair_id, old, new):
+    pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == pair_id)
+    case = _role_notice_case('003-EXP22-C09' if pair_id.startswith('C09') else '004-EXP25-C08')
+    assert old in pair['positive']
+    case['events'][1]['item']['text'] = pair['positive'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('kind', ['Sound', 'ActorMixer', 'MusicSegment', 'Source'])
+def test_explicit_new_object_kind_must_match_the_sealed_effect(kind):
+    case = _role_notice_case('003-EXP22-C09')
+    case['events'][1]['item']['text'] = case['events'][1]['item']['text'].replace('的效果器', '的 ' + kind)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('qualification', ['Sound', 'ActorMixer'])
+def test_music_stinger_guid_cannot_inherit_a_different_live_type_qualifier(qualification):
+    case = _grammatical_role_case('007-EXP25-M05')
+    post = case['events'][1]['item']
+    stinger_id = case['before']['stinger']['id']
+    post['text'] += f'在 {qualification} {stinger_id} 上执行此项修改。'
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('replacement', [
+    '不能确认这个衰减对象已按 GUID 核实。',
+    '这个衰减对象已按 GUID 核实。目标是 OtherOwner。',
+    '这个衰减对象已按 GUID 核实。当前改动属于 OtherOwner。',
+])
+def test_attenuation_anaphor_requires_immediate_affirmative_complete_attestation(replacement):
+    pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == 'C08-11')
+    case = _role_notice_case('004-EXP25-C08')
+    case['events'][1]['item']['text'] = pair['positive'].replace('这个衰减对象已按 GUID 核实。', replacement)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+@pytest.mark.parametrize('owner', ['目标对象', 'qualified', 'ambiguous'])
+def test_primary_or_ambiguous_owner_execution_refusal_is_not_foreign_preservation(case_id, owner):
+    case = _role_notice_case(case_id)
+    if owner == 'qualified':
+        row = case['before']['owner'] if case_id.endswith('C09') else case['before']['attenuation']
+        owner = row['type'] + ' ' + row['id']
+    elif owner == 'ambiguous': owner = '该声音和 OtherOwner' if case_id.endswith('C09') else '该衰减对象和 OtherOwner'
+    case['events'][1]['item']['text'] += f'不在{owner}上执行本次修改。'
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('kind', ['Effect', '效果器', None])
+def test_closed_effect_kind_can_be_equivalent_or_omitted_but_not_contradicted(kind):
+    case = _role_notice_case('003-EXP22-C09')
+    replacement = '' if kind is None else '的 ' + kind
+    case['events'][1]['item']['text'] = case['events'][1]['item']['text'].replace('的效果器', replacement)
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('qualification', ['MusicStinger', 'Stinger'])
+def test_music_stinger_accepts_its_attested_live_type_qualifier(qualification):
+    case = _grammatical_role_case('007-EXP25-M05')
+    stinger_id = case['before']['stinger']['id']
+    case['events'][1]['item']['text'] += f'在 {qualification} {stinger_id} 上执行此项修改。'
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['003-EXP22-C09', '004-EXP25-C08'])
+def test_complete_named_foreign_execution_exclusion_still_preserves_the_primary_edit(case_id):
+    case = _role_notice_case(case_id)
+    case['events'][1]['item']['text'] += '不在 OtherOwner 上执行本次修改。'
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('kind', ['Sound', 'ActorMixer', 'MusicSegment', 'Source', 'RandomNativeKind'])
+@pytest.mark.parametrize('position', ['state', 'creation'])
+def test_all_accepted_plugin_frames_reject_explicit_non_effect_kind(kind, position):
+    case = _role_notice_case('003-EXP22-C09')
+    if position == 'state':
+        pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == 'C09-03')
+        text = pair['positive'].replace('新增项是 Wwise Gain：', '新增项是 ' + kind + '：')
+    else:
+        text = ('预览拟在该声音上新增一个' + kind + '，名为 Expansion_EXP22-C09_NewGain，'
+                '备注为“Expansion C09 appended gain”。我现在执行该变更。')
+    case['events'][1]['item']['text'] = text
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('kind', ['Effect', 'Wwise Gain'])
+@pytest.mark.parametrize('position', ['state', 'creation'])
+def test_effect_kind_assertion_at_each_promotion_position_accepts_effect_or_plugin_display_class(kind, position):
+    case = _role_notice_case('003-EXP22-C09')
+    if position == 'state':
+        pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == 'C09-03')
+        text = pair['positive'].replace('新增项是 Wwise Gain：', '新增项是 ' + kind + '：')
+    else:
+        text = ('预览拟在该声音上新增一个' + kind + '，名为 Expansion_EXP22-C09_NewGain，'
+                '备注为“Expansion C09 appended gain”。我现在执行该变更。')
+    case['events'][1]['item']['text'] = text
+    assert _grammatical_notice(case)

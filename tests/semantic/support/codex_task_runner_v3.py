@@ -17,6 +17,7 @@ from tests.semantic.support.codex_attenuation_notice import (
     ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
     prospective_preview_execution,
 )
+from tests.semantic.support.codex_notice_language import planned_change_noun, prospective_intent, role_terms
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
@@ -351,8 +352,10 @@ def _bound_owner_anchor(text: str, context: Mapping[str, Any]) -> bool:
         return True
     # The descriptor resolves through sealed roles, never through a shortened
     # GUID. Its trailing grammar must not introduce a different named owner.
-    return (re.search(rf"(?:已核对|指定|目标|该|此)(?:的)?\s*(?:{context['source_type']}\b|对象)\s*(?=[，,。；;：:]|\{{|上|下|的|$)", text) is not None
-            or re.search(rf"目标(?:已)?(?:核实|确认)为指定\s*guid\s*对应的\s*{context['source_type']}\b", text) is not None)
+    types = "|".join(re.escape(term) for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger"))
+    return (re.search(rf"(?:已核对|指定|目标|该|此)(?:的)?\s*(?:{types}|对象)(?![a-z0-9_])\s*(?=[，,。；;：:]|\{{|上|下|的|已|仍|一致|加|$)", text) is not None
+            or re.search(rf"目标(?:已)?(?:核实|确认)为指定\s*guid\s*对应的\s*{context['source_type']}\b", text) is not None
+            or context["kind"] == "plugin" and re.search(r"(?:^|[。\n])\s*已确认这就是请求中的声音(?=[。\n]|$)", text) is not None)
 
 
 def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any], *, source_referent: bool = False) -> bool:
@@ -362,6 +365,9 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     prepositions = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", source_prefix))
     if prepositions:
         owner = source_prefix[prepositions[-1].end():].strip()
+        if not owner and source_referent and re.fullmatch(r"\s*(?:其本次)?预览(?:将|会)\s*", source_prefix):
+            return True
+        owner = re.sub(r"[，,]\s*(?:仅|只)$", "", owner).strip()
         if owner.endswith("上"):
             owner = owner[:-1].strip()
         owners.append(owner)
@@ -376,11 +382,14 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     for owner in owners:
         # Location is a relationship of the same owner, not another identity.
         owner = re.sub(r"(?:的)?效果链(?:末尾|尾部)?$|(?:上|下)$", "", owner).strip()
-        if source_referent and owner in {"其", "该对象", "此对象"}:
+        if source_referent and owner in {"其", "它", "该对象", "此对象"}:
             continue
+        qualifiers = role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")
+        owner = re.sub(rf"^(?:{'|'.join(re.escape(term) for term in qualifiers)})(?:对象)?\s+", "", owner)
         if owner in {context["source_id"].casefold(), *(value.casefold() for value in context["source_names"] if value)}:
             continue
-        if re.fullmatch(rf"(?:该|此|目标|this|target)(?:的)?\s*(?:{context['source_type']}|对象|object)", owner):
+        types = "|".join(re.escape(term) for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger"))
+        if re.fullmatch(rf"(?:该|此|目标|this|target)(?:的)?\s*(?:{types}|对象|object)", owner):
             continue
         descriptor = re.fullmatch(rf"(?:已核对|指定)(?:的)?\s*{context['source_type']}\b\s*(\{{[^{{}}]+\}})?", owner)
         if descriptor:
@@ -396,12 +405,14 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     return True
 
 
-_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|写入|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|"
+_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|写入|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|(?<=给)加|加(?=一个)|"
                      r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
 
 
 def _notice_mutation_is_noun(action: str, prefix: str, suffix: str) -> bool:
     """Only complete request/authorization and execute-summary noun roles."""
+    if planned_change_noun(action, prefix, suffix) is not None:
+        return True
     if action not in {"修改", "变更", "改动"}:
         return False
     return bool((re.match(r"请求(?=[，,]|$)", suffix) and re.search(r"(?:这次|本次|明确的|针对).*?$", prefix))
@@ -459,8 +470,42 @@ def _note_owner_prefix_agrees(prefix: str, context: Mapping[str, Any], creation_
     return True
 
 
+def _plugin_kind_claims_agree(text: str, name: str) -> bool:
+    """Explicit creation nouns must denote Effect, not another native kind.
+
+    Wwise-prefixed labels describe a plugin display class, not a native
+    object kind. This language check does not map display names to class IDs.
+    Omitted nouns inherit the already sealed Effect descriptor.
+    """
+    value = re.escape(name.casefold())
+    creation = "|".join(re.escape(word) for word in _PLUGIN_CREATION_WORDS)
+    patterns = (
+        rf"新增项(?:是|为)\s*([^:：，,。；;\n]+)[:：]\s*{value}(?![a-z0-9_])",
+        rf"(?:{creation})(?:一个|一项)?\s*([^，,。；;\n]+)[，,]\s*名为\s*{value}(?![a-z0-9_])",
+        rf"{value}\s*的\s*([^，,。；;\n]+)(?=[，,。；;]|$)",
+        rf"(?:{creation})(?!项|[:：])(?:一个|一项)?\s*([^，,。；;\n]+?)\s+{value}(?![a-z0-9_])",
+        rf"效果链将多一个\s*([^，,。；;\n]+)[，,]\s*名称\s*{value}(?![a-z0-9_])",
+    )
+    for pattern in patterns:
+        for claim in re.finditer(pattern, text):
+            label = claim.group(1).strip()
+            if label == "名为":
+                continue  # A name introducer does not declare a native kind.
+            label = re.sub(r"\s*名为$", "", label).strip()
+            if re.fullmatch(r"(?:effect|效果器|效果|插件)", label):
+                continue
+            if re.fullmatch(r"wwise\s+[a-z][a-z0-9._-]*(?:\s*(?:效果器|effect|插件))?", label):
+                continue
+            return False
+    return True
+
+
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    owner_terms = (context["source_id"].casefold(), *(name.casefold() for name in context["source_names"]),
+        *(prefix + term for prefix in ("该", "此", "目标", "指定") for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")), "该对象", "此对象", "目标对象", "指定对象")
+    if not prospective_intent(text, require_affirmative=False, owners=owner_terms):
+        return False
     normalized = normalize_attested_preview_target(text, {"id": context["source_id"],
         "name": context["source_names"][0], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
     if normalized is None:
@@ -484,6 +529,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 or not context["source_id"][1:].casefold().startswith(prefix)):
             return False
     if context["kind"] == "plugin":
+        if not _plugin_kind_claims_agree(text, context["groups"][1][0]):
+            return False
         for note in re.findall(r"备注(?:为|是)?\s*[“\"]([^”\"]*)[”\"]", text):
             if note != context["notes"].casefold():
                 return False
@@ -492,7 +539,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         if (value not in {context["source_id"].casefold(), *(name.casefold() for name in context["source_names"])}
                 and re.fullmatch(rf"指定\s*guid\s*对应的\s*{context['source_type']}", value) is None):
             return False
-    if not _bound_owner_anchor(text, context) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:]):
+    value_pattern = rf"(?<![a-z0-9_]){re.escape(context['groups'][1][0].casefold())}(?![a-z0-9_])"
+    if context["kind"] == "plugin" and re.search(value_pattern, text) is None:
+        return False
+    if not _bound_owner_anchor(text, context) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]}):
         return False
     affirmative = False
     source_referent = False
@@ -500,8 +550,19 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
         anchored = _bound_owner_anchor(clause, context)
         source_referent = source_referent or anchored
-        if source_referent and re.search(r"(?:在|向)(?:其|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause):
+        if source_referent and (re.search(r"(?:在|向)(?:其|它|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause)
+                or re.match(r"\s*(?:其本次预览|预览将|拟创建)", clause)):
             anchored = True
+        if context["kind"] == "plugin" and (anchored or source_referent):
+            state = re.search(r"(?:预览(?:的)?新增项是|预览显示[:：].*?效果链将多一个)", clause)
+            if state and re.search(value_pattern, clause) and context["notes"].casefold() in clause:
+                subject = re.match(r"\s*预览显示[:：](.+?)的效果链将多一个", clause)
+                if subject and not _bound_explicit_owners_agree("在 " + subject.group(1), "", context, source_referent=source_referent):
+                    return False
+                noun_owner = re.match(r"\s*预览(?:的)?新增项是\s*(.+?)的\s*", clause)
+                if noun_owner and not _bound_explicit_owners_agree("在 " + noun_owner.group(1), "", context, source_referent=source_referent):
+                    return False
+                affirmative = True
         actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
         prior_note_owner, pending_note_owner = pending_note_owner, None
         if context["kind"] == "plugin" and not actions and re.fullmatch(r"\s*(?:在|向|对)\s*.+?(?:上|下)?\s*", clause):
@@ -514,10 +575,13 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         for index, action in enumerate(actions):
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
+            if context["kind"] == "plugin" and re.search(value_pattern, claim):
+                effect_anchor = True
             if context["kind"] == "reference" and re.search(r"(?:trigger|触发器)\s*(?:引用)?\s*$", clause[:action.start()]):
                 effect_anchor = True
-            approved_value = any(term and term.casefold() in claim for term in context["groups"][1])
-            expected = re.fullmatch(context["action"], action.group()) is not None
+            approved_value = (re.search(value_pattern, claim) is not None if context["kind"] == "plugin"
+                else any(term and term.casefold() in claim for term in context["groups"][1]))
+            expected = re.fullmatch(context["action"], action.group()) is not None or context["kind"] == "plugin" and action.group() == "加"
             negated = _notice_qualifier_is_negated(clause[:action.start()])
             if negated:
                 if expected and anchored and effect_anchor and (approved_value
@@ -529,6 +593,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             prefix = clause[:action.start()]
             suffix = clause[action.end():].strip()
             noun = (_notice_mutation_is_noun(action.group(), prefix, suffix)
+                or (context["kind"] == "plugin" and action.group() == "新增" and re.search(r"预览的$", prefix) and re.match(r"项是", suffix))
                 or (context["kind"] == "plugin" and _plugin_description_is_noun(action.group(), prefix, suffix))
                 or (action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", suffix)
                     or re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix)))
@@ -536,7 +601,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 or re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix)
                 or (context["kind"] == "reference" and re.search(r"执行.*引用$", prefix) and action.group() == "更新"))
             note_write = False
-            owner_prefix = _noun_owner_prefix(prefix) if noun else prefix
+            noun_frame = planned_change_noun(action.group(), prefix, suffix) if noun else None
+            owner_prefix = noun_frame.owner_prefix if noun_frame else _noun_owner_prefix(prefix) if noun else prefix
             if action.group() == "写入":
                 # The create-only descriptor owns this note; a coordinated
                 # write may describe that same field, never arbitrary fields
@@ -549,7 +615,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 qualifier = re.split(r"[，,]|并", prefix)[-1].strip()
                 note_write = (context["kind"] == "plugin" and affirmative and note is not None
                     and note.group(1) == context["notes"].casefold()
-                    and qualifier in {"", "该效果器的", context["groups"][1][0].casefold() + "的"})
+                    and qualifier in {"", "该效果器的", "为新效果器", context["groups"][1][0].casefold() + "的"})
                 if not note_write:
                     return False
                 owner_prefix = qualifier

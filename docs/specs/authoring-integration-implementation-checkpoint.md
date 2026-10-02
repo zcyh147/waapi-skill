@@ -42,6 +42,65 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Repeated Agent error and remaining notice-language gaps — 2026-10-02:**
+  `1faaa5d` completed Non-live with **13566 passed / 119 skipped / 27 deselected**,
+  exit zero in **862.89 seconds**. Its packaged Skill and Program inputs remain
+  unchanged from the passing `492c30a` component. New root
+  `expansion-failed3-1faaa5d-luna-high-r1-cli1592` finished all four units:
+  **zero Agent PASS / three FAIL / one boundary**, no pending or early stop.
+  EXP22-C08 again used `attenuation` where both schema and continuation
+  explicitly required `attenuation_handle`, and stopped before Preview.
+  EXP22-C09 and EXP25-C08 again completed the business effects with all six/five
+  independent assertions passing, but retained notice-only FAILs. Their new
+  wording exposes shared language gaps: the sealed Sound role's Chinese
+  pronoun, a planned-change noun in execution/authorization sentences, and
+  prospective intent expressed by the actual edit clause. This warrants a
+  consolidated offline language check before further Fresh expense; accepting
+  a wrong declaration-field alias is not a repair.
+  The root is frozen without verify-only/regrading, launcher unloaded, all
+  four source guards unchanged and all retained processes cleaned. Audit
+  validated **576 artifacts / 23520085 bytes / eight metadata seals** and
+  reaped all three reconciliation scopes. Agent time was **523.59 seconds**,
+  three turns, zero slow cases, two Execute/Verify pairs. Exact hashes, usage
+  and evidence limits are in
+  `../research/integration-expansion-failed-rerun-1faaa5d-2026-10-02.json`.
+  Repairs #148/#149/#150 are closed for their independently reviewed,
+  program-proven scoped changes; none claims full business acceptance or
+  Fresh getter consumption. #147 and #122 remain open. After consolidated
+  notice verification, the next fresh failed-three selection will use
+  **GPT-6.1 Sol medium / default** to combine repair validation with the
+  targeted C08 model follow-up. Luna twice ignored an explicitly disclosed
+  declaration field; the earlier Sol-medium pilot passed its three different
+  units. These observations justify a bounded follow-up, not a general model
+  ranking or Luna PASS. The next complete acceptance must use the same frozen
+  candidate and Sol settings as its successful failed-only root; no model
+  change inside an existing root is permitted. Previously prepared Luna
+  launchers remain unused and preserved.
+  The #147 successor shares closed role-language, planned-change noun and
+  execution-polarity rules. Operation validators retain exact independent
+  identities, immutable Preview agreement, values, curve order/shape/units,
+  remaining owner/action spans and timing. Prospective curve frames retain
+  source spans rather than reconstructing paragraphs. The separate reviewer
+  authored 24 positive/negative pairs from closed business facts before
+  executing the new implementation; the reviewer had legacy-code context,
+  so this is not a blind benchmark or Agent evidence. Initial execution
+  rejected 22/24 valid positives while rejecting all 24 negatives. All 48 now
+  pass, together with 120 cross-product preservation/contradiction checks and
+  every prior notice control. Reviews additionally exposed explicit-kind,
+  cross-role qualifier, negated antecedent and primary-refusal exemptions;
+  RED/GREEN regressions resolve each. Final Spec and Standards reviews are
+  clear. Effect-native-kind claims are checked separately from Wwise-prefixed
+  plugin display labels; no display-name-to-class-ID proof is invented.
+  The final affected-file gate passed **1194 tests**; the coordinator's
+  persisted notice/documentation gate passed **1203 tests**, exit zero in
+  **1.62 seconds**. Log SHA-256 is
+  `d25b398efec64672cc655c0e584dafa6a577bb695129f9248bd5e705153b4317`;
+  JUnit SHA-256 is
+  `c35921cadf72ba6fb5b2b2d40fcd662f975376ed9d85aaf21fed46d75564d13a`.
+  Packaged Skill and fixed Program inputs remain unchanged from `492c30a`.
+  Successor complete Non-live and fresh acceptance are pending. Neither
+  historical FAIL root was replayed or promoted.
+
 - **Complete three-failure rerun — 2026-10-02:** frozen `492c30a` passed
   five-version Program **6258 / skipped 2** and complete Non-live
   **13503 / skipped 119 / deselected 27**, both exit zero. The subsequent
