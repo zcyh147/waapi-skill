@@ -12,6 +12,18 @@ The coordinating model is now GPT-6.1 Sol high. Implementation subagents use GPT
 
 The audited Action-creation timing gap was resolved through repair #123's permitted explicit unsupported boundary. Direct Action creation does not receive positive timing coverage; existing Action edits and import-owned Event/Action generation retain their separate supported contracts.
 
+## Targeted reasoning-depth follow-up — 2026-10-02
+
+The coordinator uses the user's Astra-high selection. Implementation and review
+subagents retain the user's lower-cost choices. After two frozen Sol-medium
+C09 runs stopped for human confirmation despite an explicitly policy-authorized
+Preview and `execute` continuation, the coordinator selected GPT-6.1 Sol high
+with the default service tier for the next focused follow-up. The separately
+reviewed expansion configuration is added explicitly; no silent fallback or
+in-place change to a frozen run is allowed. This is not a general model ranking
+or retrospective change to the original pilot. Final complete acceptance must
+use the successful focused candidate and identical model/settings.
+
 ## Problem Statement
 
 The existing six business integration workflows demonstrate several common tasks, but do not represent every public parameter, object family, or music-authoring behavior. The large Python test suite also cannot establish parameter coverage from test counts alone. We need more valuable real-workflow coverage without duplicating tests, relying on rigid grading, or incurring unnecessary model costs.

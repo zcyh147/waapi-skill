@@ -93,7 +93,8 @@ def test_expansion_filters_are_exact_including_boundary_only(tmp_path, monkeypat
     ("--version", "2024.1"), ("--case-id", "C99"),
     ("--case-id", "C01", "--case-id", "EXP25-C01"),
     ("--case-id", "EXP22-C01", "--version", "2025.1"),
-    ("--model", "gpt-6.1-sol", "--reasoning-effort", "high"),
+    ("--model", "gpt-6.1-sol", "--reasoning-effort", "xhigh"),
+    ("--model", "gpt-6.1-sol", "--reasoning-effort", "high", "--service-tier", "priority"),
     ("--service-tier", "priority"), ("--timeout", "599"),
     ("--offline-only",), ("--pair-id", "C01"),
 ))
@@ -102,11 +103,13 @@ def test_expansion_rejects_unreviewed_or_ambiguous_selection(tmp_path, monkeypat
         _options(tmp_path, monkeypatch, surface, *extra)
 
 
-@pytest.mark.parametrize("model,effort", (("gpt-6-luna", "high"), ("gpt-6.1-sol", "medium"), ("gpt-6-luna", "medium")))
-def test_expansion_accepts_only_reviewed_pilot_options(tmp_path, monkeypatch, model, effort):
-    options = _options(tmp_path, monkeypatch, "campaign", "--model", model, "--reasoning-effort", effort)
+@pytest.mark.parametrize("surface", ("matrix", "campaign"))
+@pytest.mark.parametrize("model,effort", (("gpt-6-luna", "high"), ("gpt-6.1-sol", "medium"), ("gpt-6.1-sol", "high"), ("gpt-6-luna", "medium")))
+def test_expansion_accepts_only_reviewed_model_options(tmp_path, monkeypatch, surface, model, effort):
+    options = _options(tmp_path, monkeypatch, surface, "--model", model, "--reasoning-effort", effort)
     assert options.model == model and options.reasoning_effort == effort
-    assert options.max_pre_action_retries == 0
+    if surface == "campaign":
+        assert options.max_pre_action_retries == 0
 
 
 def test_expansion_requires_new_matrix_root_and_no_same_root_retry(tmp_path, monkeypatch):

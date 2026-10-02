@@ -29,13 +29,15 @@ def test_boundary_only_selection_does_not_become_a_successful_agent_case():
 
 @pytest.mark.parametrize("values", [("gpt-6-luna", "high", "default"),
                                     ("gpt-6.1-sol", "medium", "default"),
+                                    ("gpt-6.1-sol", "high", "default"),
                                     ("gpt-6-luna", "medium", "default")])
 def test_reviewed_model_configuration(values):
     validate_model_configuration(*values)
 
 
 @pytest.mark.parametrize("values", [("gpt-5.6-terra", "medium", "default"),
-                                    ("gpt-6.1-sol", "high", "default"),
+                                    ("gpt-6.1-sol", "xhigh", "default"),
+                                    ("gpt-6.1-sol", "high", "priority"),
                                     ("gpt-6-luna", "high", "priority")])
 def test_no_silent_model_or_tier_fallback(values):
     with pytest.raises(ValueError):

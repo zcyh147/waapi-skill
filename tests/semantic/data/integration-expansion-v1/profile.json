@@ -9,6 +9,7 @@
   "model_configurations": [
     {"model": "gpt-6-luna", "reasoning_effort": "high", "service_tier": "default"},
     {"model": "gpt-6.1-sol", "reasoning_effort": "medium", "service_tier": "default"},
+    {"model": "gpt-6.1-sol", "reasoning_effort": "high", "service_tier": "default"},
     {"model": "gpt-6-luna", "reasoning_effort": "medium", "service_tier": "default"}
   ],
   "pilot_cases": ["C01", "M01", "C06"],

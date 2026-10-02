@@ -42,6 +42,33 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Explicit Sol-high configuration registration — 2026-10-02:** `a41d337`
+  passed complete Non-live **13990 / skipped 119 / deselected 27**, exit zero
+  in **870.64 seconds**. The attempted Sol-high focused launcher exited 2 at
+  argument validation: the reviewed expansion configuration set still contained
+  Luna high/medium and Sol medium only. No campaign root was created, no Agent
+  or Wwise execution receives credit, and the one-shot launcher was unloaded.
+  Its stdout/stderr and preflight-rejection record remain preserved. This was
+  a missed coordinator preflight check, not a business or model failure.
+  The development expansion profile now explicitly adds only
+  `(gpt-6.1-sol, high, default)` to the matching code/data allowlists, following
+  the already documented reasoning-depth follow-up. Defaults, cases, policies,
+  budgets, service tier and retry constraints remain unchanged. Historical
+  profile snapshots/roots are not edited; the changed definition digest
+  requires a new candidate and root. Tests first reproduced the three model,
+  matrix and campaign validation rejections, then passed the newly reviewed
+  configuration on both entrypoints while still rejecting unreviewed effort
+  and priority-tier combinations. The persisted configuration/CLI/notice/docs
+  gate passed **1472 tests**, exit zero in **2.25 seconds**. Log SHA-256 is
+  `c461a672a8ba3705da66c757efb47acf38137199681045c0b4e0fdf99d013f0b`;
+  JUnit SHA-256 is
+  `6eeb6fc99d2d6aa331cc47b88da25dcdf4f583701d5d4c55f2cb57b2b232e262`.
+  The completed `a41d337` full Non-live is unchanged-component evidence, not
+  a new full-suite run for this configuration-only successor. No notice,
+  verifier, runtime or public Gateway behavior changed in this registration.
+  Independent Standards and Spec reviews found no findings. A new Sol-high
+  focused root remains required; final acceptance remains pending.
+
 - **Repeated Medium policy interruption and composition gap — 2026-10-02:**
   frozen `d6430a0` passed complete Non-live **13863 / skipped 119 / deselected 27**,
   exit zero in **843.76 seconds**. New root

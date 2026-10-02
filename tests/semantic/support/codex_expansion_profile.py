@@ -22,6 +22,7 @@ _APIS = {
 }
 MODEL_CONFIGURATIONS = frozenset({("gpt-6-luna", "high", "default"),
                                   ("gpt-6.1-sol", "medium", "default"),
+                                  ("gpt-6.1-sol", "high", "default"),
                                   ("gpt-6-luna", "medium", "default")})
 
 
