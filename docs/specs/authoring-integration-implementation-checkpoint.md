@@ -42,6 +42,33 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Stable-candidate gates — 2026-10-02:** frozen `ebdc769` passed the
+  fixed five-version Program gate: **6093 passed / 2 native-Windows skips**,
+  exit zero in **288.27 seconds**. Log SHA-256 is
+  `5de2a493242173d611edf4707efabb208f091068f96aab8c08c49531ade114b9`.
+  Complete Non-live then retained **12770 passed / 4 failed / 119 skipped /
+  27 deselected**, exit one in **835.08 seconds**. All four failures are in
+  the synthetic C08 archive fixture, at the new closed post-Preview notice
+  attestation. Its old fixture lacks prepared-request/dispatch and independent
+  identity/source fields and an exact point/source/shape notice. Repair #144
+  updates synthetic evidence only; production checks and real frozen records
+  remain unchanged. Log SHA-256 is
+  `8ef69ebd223c9be6484dd7106b2f2d3bbd4ad8fe6d548671b8521afd5f62f393`;
+  JUnit SHA-256 is
+  `076ab93c0039df0739b27d95d08b8c38c21b1553c686f68e183766d125fcefe2`.
+  No real or Fresh process started. The new failed-only launcher is prepared
+  but unused; require repaired, reviewed Non-live and sequential SFX proofs
+  before bootstrapping a new campaign root.
+  Fixture repair #144 reproduced **4 failed / 79 passed**, then passed all
+  **88 archive tests**, including five new internally sealed semantic negatives.
+  Combined archive/attenuation/notice validation passed **466 tests**, exit zero
+  in **3.08 seconds**. Log SHA-256 is
+  `cf73e8913fa8b2e2bb561c7ce27c082b61813ecc0d86a8753f44aa4b7cc46c94`;
+  JUnit SHA-256 is
+  `cceb803ac44b854d77c3cc323a220a147452f13763ffd8d51da10efed7d79d9d`.
+  The production Skill and semantic support modules remain byte-identical to
+  `ebdc769`; repaired complete Non-live evidence remains required.
+
 - **Resumed repair batch — 2026-10-02:** the user explicitly resumed after
   the requested pause. Consolidated #141–#143 repairs received both independent
   review axes. Spec findings for an extra curve-field/deletion claim and a

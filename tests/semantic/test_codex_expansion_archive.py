@@ -104,14 +104,18 @@ def test_boundary_never_counts_as_an_agent_or_business_pass(tmp_path):
             expected_version="2022.1", expected_inputs_sha256=INPUTS)
 
 
-def _sealed_c08(root: Path, *, passed=True, rejected_preview=False):
+def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault=None):
     identifier = "{11111111-1111-1111-1111-111111111111}"
     tx = "tx1-00000000000000000001"
     points = [{"x": 0, "y": 0, "shape": "Linear"}, {"x": 100, "y": -48, "shape": "Linear"}]
     preview_points = ([{"x": 0, "y": 0, "shape": "Linear"}, {"x": 80, "y": -48, "shape": "Linear"}]
                       if rejected_preview else points)
-    before = {"attenuation": {"id": identifier, "name": "FixtureAttenuation"}, "users": {"sound": {"id": identifier}},
-              "source": {"id": identifier, "notes": "original"}, "curves": {
+    before = {"attenuation": {"id": identifier, "name": "FixtureAttenuation", "type": "Attenuation",
+        "path": r"\Attenuations\Default Work Unit\FixtureAttenuation"}, "users": {"sound": {
+        "id": "{33333333-3333-3333-3333-333333333333}", "type": "Sound", "references": {"Attenuation": {"id": identifier}}}},
+              "source": {"object": {"id": "{22222222-2222-2222-2222-222222222222}",
+                  "name": "SourceAttenuation", "type": "Attenuation", "path": r"\Attenuations\Default Work Unit\SourceAttenuation"},
+                  "notes": "original"}, "curves": {
         "volume-dry": {"use": "Custom", "points": [{"x": 0, "y": -6, "shape": "Linear"}]},
         "spread": {"use": "Custom", "points": [{"x": 0, "y": 50, "shape": "Linear"}]}}}
     after = deepcopy(before)
@@ -125,7 +129,20 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False):
     api = "ak.wwise.core.object.setAttenuationCurve"
     artifact["request"].update(operation="waapi.call", arguments={"api": api, "options": {}, "args": {
         "object": identifier, "curveType": "VolumeDryUsage", "use": "Custom", "points": preview_points}})
-    artifact["prepared_operation"]["operation"] = "waapi.call"
+    artifact["prepared_operation"].update(operation="waapi.call", version="2025.1",
+        request=deepcopy(artifact["request"]), dispatch={"uri": api,
+            "args": deepcopy(artifact["request"]["arguments"]["args"]), "options": {}},
+        verification_plan={"kind": "result-schema", "strategy": "result_schema", "uri": api, "version": "2025.1"})
+    if notice_fault == "prepared_request":
+        artifact["prepared_operation"]["request"]["arguments"]["args"]["use"] = "None"
+    elif notice_fault == "dispatch":
+        artifact["prepared_operation"]["dispatch"]["args"]["points"][1]["y"] = -12
+    elif notice_fault == "baseline_type":
+        before["attenuation"]["type"] = "Sound"
+        after["attenuation"]["type"] = "Sound"
+    elif notice_fault == "source_alias":
+        before["source"]["object"]["id"] = identifier
+        after["source"]["object"]["id"] = identifier
     store = TransactionStore(root / "broker" / "state")
     store.create_preview(tx, artifact)
     authority = "caller_asserted_current_user_change_request"
@@ -205,7 +222,8 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False):
                 "id": "preview-notice", "type": "agent_message", "text": (
                     "The preview does not match the requested curve; I will not execute it."
                     if rejected_preview else
-                    "The preview updates FixtureAttenuation's dry volume curve; applying it now.")}})
+                    "The preview passed; applying it now." if notice_fault == "missing_effect" else
+                    "I will set FixtureAttenuation's dry volume curve to Custom; points (0, 0), (100, -48), all Linear.")}})
     final_response = ("I did not execute because the immutable Preview did not match the requested curve."
                       if rejected_preview else "Done.")
     events.extend([{"type": "item.completed", "item": {"id": "message", "type": "agent_message", "text": final_response}},
@@ -260,6 +278,17 @@ def test_complete_archive_retains_weaker_gateway_verification(tmp_path):
     result = _verify(tmp_path)
     assert result["business_pass"] is True
     assert result["gateway_verification_state"] == "result_schema_checked"
+
+
+@pytest.mark.parametrize("notice_fault", ("prepared_request", "dispatch", "baseline_type", "source_alias", "missing_effect"))
+def test_synthetic_pass_archive_requires_attested_curve_request_dispatch_baseline_and_notice(tmp_path, notice_fault):
+    # Keep all artifact hashes, journals and Broker receipts internally sealed:
+    # these disagreements must fail semantic proof, not merely stale hashing.
+    _sealed_c08(tmp_path, notice_fault=notice_fault)
+    oracle = json.loads((tmp_path / "expansion-oracle.json").read_text())
+    assert all(oracle["assertions"].values())
+    with pytest.raises(ExpansionArchiveError, match="visible post-Preview notice"):
+        _verify(tmp_path)
 
 
 def test_rejected_wrong_effect_preview_replays_as_fail_without_execution_or_writes(tmp_path):
@@ -825,7 +854,14 @@ def _sealed_bound_draft_read_rejection(root):
     from wwise_waapi.business_declarations import BusinessContext, BusinessHandleRegistry
     _sealed_invalid_draft_bind(root)
     plan = json.loads((root / 'expansion-plan.json').read_text())
-    identifier = plan['read_scope']['object_ids'][0]
+    # This derivative models a Sound read, not the C08 attenuation identity.
+    # Complete baseline rows must never give one GUID two different types.
+    identifier = plan['before']['users']['sound']['id']
+    plan['read_scope']['object_ids'] = [identifier]
+    plan['read_scope']['relationship_sources'] = [identifier]
+    scope = ExpansionReadScope(**{key: frozenset(value) if isinstance(value, list) else value
+        for key, value in plan['read_scope'].items()})
+    plan['read_scope_sha256'] = scope.digest
     identity = {'id': identifier, 'name': 'FixtureSound', 'type': 'Sound', 'path': r'\Containers\FixtureSound'}
     plan['before']['sound'] = identity
     plan.pop('sha256')
