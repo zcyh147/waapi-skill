@@ -42,6 +42,22 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Resumed repair batch — 2026-10-02:** the user explicitly resumed after
+  the requested pause. Consolidated #141–#143 repairs received both independent
+  review axes. Spec findings for an extra curve-field/deletion claim and a
+  second explicit reference owner were reproduced, repaired, and rechecked;
+  neither review has a remaining concrete finding. The combined focused gate
+  passed **1328 tests / 9 native-Windows skips**, exit zero in **10.14 seconds**.
+  Log SHA-256 is `4d342280ea5ac7f3fab7255100a72dd36ec18d853e4ceac2e706f2a5bfe2f491`;
+  JUnit SHA-256 is `1de6c115bb761422a77c7e011c1d1d7792f73b1938fe46716fc0d61d0cd06fcc`.
+  These checks do not grant live or Fresh acceptance. The new owned-copy SFX
+  node is still unrun. Freeze this reviewed candidate, complete Program and
+  Non-live, then use its exact `-k` selector for sequential 2022.1/2025.1
+  real proofs; the driver adds default nodes to a bare-path invocation.
+  Rerun the eight failed Agent units plus the directly affected 2022 C06 control
+  and separate M05/2022 boundary before final complete acceptance. Preserve both
+  frozen FAIL roots and all unrelated user drafts; no historical FAIL is regraded.
+
 - Frozen failed-only root `expansion-failed9-c39b728-luna-high-r1-cli1592`
   completed all ten selected units: **1 Agent PASS / 8 FAIL / 1 separate
   BOUNDARY_PROVEN**, zero pending and no early stop. Independent audit rehashed

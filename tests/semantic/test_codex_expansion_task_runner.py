@@ -385,6 +385,115 @@ def _initial_context_notice(case_id):
     return next(case for case in fixture["cases"] if case["case"] == case_id)
 
 
+def _next_context_notice(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-contextual-notices-c39b728.json").read_text())
+    return next(case for case in fixture["cases"] if case["case"] == case_id)
+
+
+@pytest.mark.parametrize("case_id", ["005-EXP22-C09", "007-EXP25-C06", "009-EXP25-C09", "010-EXP25-M05"])
+def test_next_archived_notice_accounts_for_bound_owner_and_exact_effect(case_id):
+    case = _next_context_notice(case_id)
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id", ["005-EXP22-C09", "007-EXP25-C06", "009-EXP25-C09", "010-EXP25-M05"])
+@pytest.mark.parametrize("defect", ["foreign_identity", "wrong_baseline", "generic", "late", "extra_action"])
+def test_next_context_cannot_supply_foreign_generic_late_or_extra_changes(case_id, defect):
+    case = _next_context_notice(case_id)
+    post = case["events"][-2]
+    if defect == "foreign_identity": post["item"]["text"] += "目标是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。"
+    elif defect == "wrong_baseline":
+        key = "stinger" if case_id.endswith("M05") else "owner"
+        case["before"][key]["id"] = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+    elif defect == "generic": post["item"]["text"] = "预览通过，现在执行。"
+    elif defect == "late": case["events"][-2:] = case["events"][-2:][::-1]
+    else:
+        post["item"]["text"] += "同时修改备注。" if case_id.endswith("C06") else "同时删除原效果。" if case_id.endswith("C09") else "同时设为 OtherTrigger。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("defect", ["wrong_prefix", "foreign_owner", "wrong_name", "wrong_notes", "occupied_slot", "unproven_slot", "wrong_refs", "wrong_version"])
+def test_checked_sound_discourse_cannot_authorize_a_different_legacy_effect(defect):
+    case = _next_context_notice("005-EXP22-C09")
+    post = case["events"][-2]["item"]
+    plan = case["artifact"]["prepared_operation"]["verification_plan"]
+    if defect == "wrong_prefix": post["text"] = post["text"].replace("44BD...", "AAAA...")
+    elif defect == "foreign_owner": post["text"] = post["text"].replace("已核对的 Sound", "另一条 Sound")
+    elif defect == "wrong_name": post["text"] = post["text"].replace("Expansion_EXP22-C09_NewGain", "AnotherGain")
+    elif defect == "wrong_notes": post["text"] = post["text"].replace("Expansion C09 appended gain", "AnotherNote")
+    elif defect == "occupied_slot": plan["pre_effect_references"]["@Effect2"] = plan["pre_effect_references"]["@Effect0"]
+    elif defect == "unproven_slot": plan["placement"]["requires_proven_empty_slot"] = False
+    elif defect == "wrong_refs": plan["pre_effect_references"]["@Effect0"] = None
+    else:
+        case["artifact"]["request"]["version"] = "2025.1"
+        case["artifact"]["prepared_operation"]["version"] = "2025.1"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("defect", ["wrong_delta", "wrong_history", "wrong_endpoints", "missing_endpoint", "extra_endpoint", "wrong_order", "wrong_shape", "stale_shape", "wrong_count"])
+def test_exact_retained_endpoint_claim_requires_the_sealed_numerical_curve(defect):
+    case = _next_context_notice("007-EXP25-C06")
+    post, earlier = case["events"][-2]["item"], case["events"][0]["item"]
+    changes = {"wrong_delta": ("(50,−6)", "(50,−60)"), "wrong_history": ("(50,−12)", "(50,−24)"),
+        "wrong_endpoints": ("(0,−48)", "(0,−20)"), "missing_endpoint": (" 与 (100,0)", ""),
+        "extra_endpoint": ("与 (100,0)", "与 (100,0)、(75,-3)"),
+        "wrong_order": ("(0,−48) 与 (100,0)", "(100,0) 与 (0,−48)")}
+    if defect in changes: post["text"] = post["text"].replace(*changes[defect])
+    elif defect == "wrong_shape": post["text"] += "各段非线性。"
+    elif defect == "stale_shape": earlier["text"] = earlier["text"].replace("线性段", "非线性段")
+    else: earlier["text"] = earlier["text"].replace("三个控制点", "四个控制点")
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("case_id,original,replacement", [
+    ("009-EXP25-C09", "指定的 Sound", "指定的 Sound OtherOwner"),
+    ("009-EXP25-C09", "Expansion_EXP25-C09_NewGain", "AnotherGain"),
+    ("010-EXP25-M05", "该 Stinger", "另一条 Stinger"),
+    ("010-EXP25-M05", "Backup_Team_Arrives", "Bonus"),
+])
+def test_contextual_owner_status_cannot_mask_an_explicit_wrong_owner_or_effect(case_id, original, replacement):
+    case = _next_context_notice(case_id)
+    post = case["events"][-2]["item"]
+    assert original in post["text"]
+    post["text"] = post["text"].replace(original, replacement)
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("owner", ["OtherOwner", "AnotherSound", "该 Sound 和 OtherOwner", "该 Sound 或另一条 Sound",
+    "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"])
+def test_each_additional_effect_owner_must_agree_with_the_sealed_source(owner):
+    case = _next_context_notice("009-EXP25-C09")
+    case["events"][-2]["item"]["text"] += f"另外向 {owner} 新增名为 Expansion_EXP25-C09_NewGain 的 effect。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("claim,expected", [
+    ("另外不向 OtherOwner 新增名为 Expansion_EXP25-C09_NewGain 的 effect。", True),
+    ("另外向该 Sound 新增名为 Expansion_EXP25-C09_NewGain 的 effect。", True),
+    ("该新增 effect 名为 Expansion_EXP25-C09_NewGain。", True),
+    ("另外在 OtherOwner 上新增名为 Expansion_EXP25-C09_NewGain 的 effect。", False),
+    ("另外新增名为 Expansion_EXP25-C09_NewGain 的 effect on OtherOwner。", False),
+    ("另外新增名为 Expansion_EXP25-C09_NewGain 的 effect 到 OtherOwner。", False),
+])
+def test_explicit_owner_claims_are_distinct_from_omitted_owner_or_negated_preservation(claim, expected):
+    case = _next_context_notice("009-EXP25-C09")
+    case["events"][-2]["item"]["text"] += claim
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+@pytest.mark.parametrize("owner", ["OtherOwner", "该 Stinger 和 OtherOwner", "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"])
+def test_reference_source_cannot_inherit_a_foreign_named_or_target_guid_owner(owner):
+    case = _next_context_notice("010-EXP25-M05")
+    case["events"][-2]["item"]["text"] += f"另外将 {owner} 的 Trigger 引用设为 Backup_Team_Arrives。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+def test_reference_action_cannot_apply_the_right_target_to_a_foreign_possessive_owner():
+    case = _next_context_notice("010-EXP25-M05")
+    case["events"][-2]["item"]["text"] += "另外修改 OtherOwner 的 Trigger 引用为 Backup_Team_Arrives。"
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
 @pytest.mark.parametrize("case_id", ["004-EXP22-C06", "012-EXP25-C09", "014-EXP25-M05"])
 def test_initial_frozen_notices_resolve_uniquely_attested_context(case_id):
     case = _initial_context_notice(case_id)

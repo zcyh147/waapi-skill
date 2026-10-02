@@ -13,6 +13,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+from tests.semantic.support.codex_attenuation_notice import (
+    ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect,
+)
+
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
     BusinessOraclePlanEvidence,
@@ -242,9 +246,7 @@ def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, A
         groups.extend((("trigger", "触发器"),
                        ("retarget", "change", "set", "replace", "指向", "改为", "修改", "替换", "设置")))
     elif operation == "waapi.call" and arguments.get("api") == "ak.wwise.core.object.setAttenuationCurve":
-        target(arguments.get("args", {}).get("object"))
-        groups.extend((("volume", "音量", "干声", "dry"), ("curve", "曲线"),
-                       ("update", "set", "change", "replace", "更新", "修改", "替换", "设置", "改成")))
+        groups.append(("curve", "曲线"))
     else:
         return ()
     return tuple(groups) if groups and all(all(term for term in group) for group in groups) else ()
@@ -284,16 +286,37 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
                 or any(descriptor.get(key) != value for key, value in plugin.items())):
             return None
         placement = plan.get("placement", {})
-        if (not isinstance(placement, Mapping) or placement.get("kind") != "effect_slot_append"
-                or placement.get("create_only") is not True or placement.get("list_mode") != "append"
+        if (not isinstance(placement, Mapping) or placement.get("create_only") is not True
                 or placement.get("replace_existing_allowed") is not False):
+            return None
+        if version == "2022.1":
+            references, entries = plan.get("pre_effect_references"), before.get("entries")
+            slot = placement.get("effect_slot")
+            if (placement.get("kind") != "fixed_effect_reference" or slot not in {"@Effect0", "@Effect1", "@Effect2", "@Effect3"}
+                    or placement.get("collection") != slot or placement.get("requires_proven_empty_slot") is not True
+                    or not isinstance(references, Mapping) or set(references) != {"@Effect0", "@Effect1", "@Effect2", "@Effect3"}
+                    or references.get(slot) is not None or not isinstance(entries, list)):
+                return None
+            occupied = {key: value for key, value in references.items() if value is not None}
+            observed_refs = {}
+            for entry in entries:
+                if not isinstance(entry, Mapping) or entry.get("slot") not in {"0", "1", "2", "3"} or not isinstance(entry.get("effect"), Mapping):
+                    return None
+                field = "@Effect" + entry["slot"]
+                if field in observed_refs:
+                    return None
+                observed_refs[field] = entry["effect"].get("id")
+            if occupied != observed_refs:
+                return None
+        elif placement.get("kind") != "effect_slot_append" or placement.get("list_mode") != "append":
             return None
         groups = [(source["id"], source["name"], source["path"], "该 sound", "this sound"),
                   (descriptor.get("name", ""),), ("effect", "效果", "插件"), ("新增", "添加", "插入", "add", "create", "append")]
         if descriptor.get("notes"):
             groups.append((descriptor["notes"],))
         return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
-                "action": r"新增|添加|插入|add|create|append", "kind": "plugin"}
+                "action": r"新增|添加|插入|add|create|append", "kind": "plugin", "source_type": "sound", "source_id": source["id"],
+                "source_names": (source["name"], source["path"])}
     if operation == "object.setReference":
         source, target = state.get("object"), state.get("target")
         observed, expected = before.get("stinger"), before.get("target")
@@ -312,10 +335,56 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
             return None
         return {"groups": [(source["id"], source["path"], "该 musicstinger", "该 stinger", "this musicstinger"),
                            (target["id"], target["name"], target["path"]), ("trigger", "触发器"),
-                           ("改动", "更新", "修改", "改为", "指向", "update", "change", "retarget")],
+                           ("改动", "更新", "修改", "改为", "设为", "指向", "update", "change", "retarget")],
                 "ids": (source["id"], target["id"]), "protected": ("segment", "音乐段", "容器", "container"),
-                "action": r"改动|更新|修改|改为|指向|update|change|retarget", "kind": "reference"}
+                "action": r"改动|更新|修改|改为|设为|指向|update|change|retarget", "kind": "reference", "source_type": "(?:music)?stinger", "source_id": source["id"],
+                "source_names": (source["name"], source["path"])}
     return None
+
+
+def _bound_owner_anchor(text: str, context: Mapping[str, Any]) -> bool:
+    if any(term and term.casefold() in text for term in context["groups"][0]):
+        return True
+    # The descriptor resolves through sealed roles, never through a shortened
+    # GUID. Its trailing grammar must not introduce a different named owner.
+    return re.search(rf"(?:已核对|指定)(?:的)?\s*{context['source_type']}\b\s*(?=[，,。；;：:]|\{{|上|$)", text) is not None
+
+
+def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any]) -> bool:
+    """Check owner-bearing grammar; omitted owners do not add an identity."""
+    owners = []
+    source_prefix = re.sub(r"\s*的\s*(?:trigger|触发器)\s*(?:引用)?\s*$", "", prefix)
+    prepositions = tuple(re.finditer(r"向|在|将|把|对(?=\s|该|指定|已)", source_prefix))
+    if prepositions:
+        owner = source_prefix[prepositions[-1].end():].strip()
+        if owner.endswith("上"):
+            owner = owner[:-1].strip()
+        owners.append(owner)
+    if context["kind"] == "plugin":
+        following = re.search(r"(?:\b(?:on|to)\s+|到\s*)(.+?)\s*$", claim)
+        if following:
+            owners.append(following.group(1))
+    else:
+        possessive = re.search(r"^(?:改动|更新|修改|改为|设为|指向|update|change|retarget)\s*(.+?)\s*的\s*(?:trigger|触发器)", claim)
+        if possessive:
+            owners.append(possessive.group(1))
+    for owner in owners:
+        if owner in {context["source_id"].casefold(), *(value.casefold() for value in context["source_names"] if value)}:
+            continue
+        if re.fullmatch(rf"(?:该|this)\s*{context['source_type']}", owner):
+            continue
+        descriptor = re.fullmatch(rf"(?:已核对|指定)(?:的)?\s*{context['source_type']}\b\s*(\{{[^{{}}]+\}})?", owner)
+        if descriptor:
+            # The abbreviation can contradict a sealed identity, but cannot
+            # prove one. The unique sealed descriptor supplies that proof.
+            token = descriptor.group(1)
+            if token is None or token == context["source_id"].casefold():
+                continue
+            shortened = re.fullmatch(r"\{([0-9a-f-]{4,})\.\.\.\}", token)
+            if shortened and context["source_id"][1:].casefold().startswith(shortened.group(1)):
+                continue
+        return False
+    return True
 
 
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
@@ -323,15 +392,22 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
     if any(value not in {value.casefold() for value in context["ids"]} for value in ids):
         return False
-    if not all(any(term and term.casefold() in text for term in group) for group in context["groups"]):
+    for abbreviation in re.finditer(r"\{([^{}]*\.\.\.)\}", text):
+        prefix = abbreviation.group(1)[:-3]
+        if (re.fullmatch(r"[0-9a-f-]{4,}", prefix) is None
+                or not context["source_id"][1:].casefold().startswith(prefix)):
+            return False
+    if not _bound_owner_anchor(text, context) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:]):
         return False
     affirmative = False
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
-        anchored = any(term and term.casefold() in clause for term in context["groups"][0])
-        actions = tuple(re.finditer(r"新增|添加|插入|改动|更新|修改|改为|指向|变更|删除|移除|替换|设置|\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert)\b", clause))
+        anchored = _bound_owner_anchor(clause, context)
+        actions = tuple(re.finditer(r"新增|添加|插入|改动|更新|修改|改为|设为|指向|变更|删除|移除|替换|设置|\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert)\b", clause))
         for index, action in enumerate(actions):
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
+            if context["kind"] == "reference" and re.search(r"(?:trigger|触发器)\s*(?:引用)?\s*$", clause[:action.start()]):
+                effect_anchor = True
             approved_value = any(term and term.casefold() in claim for term in context["groups"][1])
             expected = re.fullmatch(context["action"], action.group()) is not None
             negated = _notice_qualifier_is_negated(clause[:action.start()])
@@ -343,9 +419,15 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             # Verification and the execute-summary noun do not author another
             # change. They cannot certify the expected effect by themselves.
             prefix = clause[:action.start()]
+            if action.group() == "变更" and re.match(r"(?:只将|范围)", clause[action.end():]):
+                continue
+            if action.group() == "设置" and re.search(r"其他\s*$", prefix) and re.match(r"和对象不在", clause[action.end():]):
+                continue
             if re.search(r"(?:核验|verify|验收)\s*$", prefix) or (context["kind"] == "reference"
                     and re.search(r"执行.*引用$", prefix) and action.group() == "更新"):
                 continue
+            if not _bound_explicit_owners_agree(prefix, claim, context):
+                return False
             if any(term in clause for term in context["protected"]):
                 return False
             if not expected or not effect_anchor or not approved_value:
@@ -440,7 +522,7 @@ def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any])
 
 
 def _notice_qualifier_is_negated(qualifier: str) -> bool:
-    return re.search(r"不|未|非|(?<![a-z])(?:not|never|without|non)(?![a-z])|n't", qualifier) is not None
+    return re.search(r"不|未|非|没有|(?<![a-z])(?:not|never|without|non)(?![a-z])|n't", qualifier) is not None
 
 
 def _affirmative_linear_interpolation(effect_clause: str) -> bool:
@@ -472,11 +554,13 @@ def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | No
             return False
         stated_points = arrow_points
     stated_ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
+    counts = re.findall(r"([一二两三四五六七八九]|\d+)\s*(?:个)?(?:控制)?点|(?<!\w)(\d+)\s*points", text)
+    count_matches = all((cn or en) in {"三", "3"} for cn, en in counts)
     return (all(value in {key.casefold() for key in context["ids"]} for value in stated_ids)
             and len(context["new"]) == 3 and (not stated_points or stated_points == context["new"])
             and any(term in text for term in ("volume", "音量", "增益"))
             and any(name.casefold() in text for name in context["control_names"])
-            and re.search(r"三(?:个)?点|(?<!\d)3\s*points|three points", text) is not None
+            and count_matches and (bool(stated_points) or re.search(r"三(?:个)?(?:控制)?点|(?<!\d)3\s*points|three points", text) is not None)
             and _affirmative_linear_interpolation(text))
 
 
@@ -529,6 +613,12 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
         return notice_shape and (not ("linear" in part or "线性" in part)
                                  or _affirmative_linear_interpolation(part))
     old, new = context["old"], context["new"]
+    explicit_retained_endpoints = False
+    for remainder in same_target_clauses:
+        if re.search(r"两端(?:点)?\s*仍为", remainder):
+            if len(old) != 3 or len(new) != 3 or pairs(remainder) != [new[0], new[2]] or old[0] != new[0] or old[2] != new[2]:
+                return False, False
+            explicit_retained_endpoints = True
     middle_edit = (len(old) == len(new) == 3 and context["same_domain"]
                    and old[0] == new[0] and old[2] == new[2] and context["delta"] == [new[1]])
     complete_current_curve = False
@@ -606,7 +696,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             if stated == context["new"] and requested_shape(following):
                 full = effect = True
             elif (stated == context["delta"] and stated and context["same_domain"]
-                  and (rest_already_matches or (middle_edit and direct_middle_claim and complete_current_curve) or
+                  and (rest_already_matches or explicit_retained_endpoints or (middle_edit and direct_middle_claim and complete_current_curve) or
                        (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
                         and any(term in retention for term in ("保持", "不变", "unchanged"))))
                   and requested_shape(following)):
@@ -637,6 +727,11 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                      and "prepared_operation" in preview_artifact)
     rtpc_context = _rtpc_notice_context(preview_artifact, before_snapshot) if prepared_rtpc else None
     if prepared_rtpc and rtpc_context is None:
+        return False
+    attenuation_operation = (preview_artifact.get("request", {}).get("operation") == "waapi.call"
+        and preview_artifact.get("request", {}).get("arguments", {}).get("api") == ATTENUATION_API)
+    attenuation_context = attenuation_notice_context(preview_artifact, before_snapshot, version) if attenuation_operation else None
+    if attenuation_operation and attenuation_context is None:
         return False
     context_operation = preview_artifact.get("request", {}).get("operation") in {"object.createPlugin", "object.setReference"}
     bound_context = _bound_context_notice(preview_artifact, before_snapshot) if context_operation and "prepared_operation" in preview_artifact else None
@@ -672,6 +767,12 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                                re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\d.])", text.replace("\u2212", "-")))
                 return term.casefold() in text
             effect = all(any(mentions(term) for term in group) for group in groups)
+            if attenuation_context is not None:
+                if preview_seen:
+                    notice_messages.append(text)
+                effect = attenuation_notice_effect("\n".join(notice_messages) if preview_seen else text, attenuation_context)
+                if preview_seen:
+                    notice_seen = effect
             if bound_context is not None:
                 if preview_seen:
                     notice_messages.append(text)
@@ -698,7 +799,7 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
                     # Re-evaluate the complete notice so later contradictions
                     # cannot hide behind an earlier successful fragment.
                     notice_seen = effect
-            reference = rtpc_context is None and bound_context is None and earlier_effect and any(term in text for term in (
+            reference = attenuation_context is None and rtpc_context is None and bound_context is None and earlier_effect and any(term in text for term in (
                 "expected result above", "expected changes above", "changes described above",
                 "result just described", "plan above", "上述预期", "上面的预期", "刚才说明的", "上述变更", "按以上方案"))
             if preview_seen and (effect or reference):

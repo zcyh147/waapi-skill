@@ -11473,6 +11473,24 @@ def _prepare_closed_import_plan(
             dispatch_args=dispatch_args,
             targets=targets,
         )
+        if request.version == "2025.1":
+            # This lane has proven source-GUID importLocation support. Bind only
+            # media rows; expanded Sound property rows retain their own target.
+            for mapping in native_row_mapping:
+                target = targets[mapping["logical_index"]]
+                source_id = target.get("existing_sfx_source_id")
+                if source_id is None:
+                    continue
+                for native in mapping["native_rows"]:
+                    row = dispatch_args["imports"][native["native_index"]]
+                    if "audioFile" not in row and "audioFileBase64" not in row:
+                        continue
+                    row["objectPath"] = ""
+                    row["importLocation"] = source_id
+                    row.pop("objectType", None)
+                    row.pop("originalsSubFolder", None)
+                    native["object_path"] = ""
+                    native["canonical_result_path"] = target["expected_audio_file_source_result_path"]
         plan = {**dict(plan), "dispatch_args": dispatch_args}
 
     language_inventory: Mapping[str, Any] | None = None
@@ -18010,15 +18028,30 @@ def verify_prepared_operation(
                 if isinstance(expected_source_path, str)
                 else []
             )
-            # A source-bound localized reimport can omit its unchanged source
-            # from the native result. Only that preview-bound GUID permits the
-            # exception, with exact live ownership/language/hash proof below.
-            # This does not relax ordinary SFX or MusicTrack result contracts.
+            # An unchanged, preview-bound source may be omitted from the native
+            # result only when exact live ownership/language/hash and complete
+            # source collection proofs below still establish the postcondition.
+            sfx_snapshot = target.get("existing_sfx_source_snapshot")
+            sfx_source_id = target.get("existing_sfx_source_id")
+            bound_sfx_source = (
+                isinstance(sfx_source_id, str) and _PLUGIN_GUID.fullmatch(sfx_source_id) is not None
+                and isinstance(sfx_snapshot, Mapping) and sfx_snapshot.get("version") == version
+                and sfx_snapshot.get("owner_id") == target.get("preexisting_id")
+                and target.get("requested_language") == "SFX"
+                and isinstance(sfx_snapshot.get("rows"), list)
+                and sum(isinstance(row, Mapping) and row.get("id") == sfx_source_id
+                        and row.get("path") == expected_source_path
+                        and _object_type_token(row.get("type")) == "audiofilesource"
+                        and _same_identity(_reference_identity(row.get("parent")), target.get("preexisting_id"))
+                        and isinstance(row.get("audioSource:language"), Mapping)
+                        and row["audioSource:language"].get("name") == "SFX"
+                        for row in sfx_snapshot["rows"]) == 1
+            )
             omitted_sound_source = (
                 existing_use_existing
                 and isinstance(expected_source_path, str)
                 and not returned_source_matches
-                and _valid_object_id(target.get("localized_audio_file_source_id"))
+                and (_valid_object_id(target.get("localized_audio_file_source_id")) or bound_sfx_source)
                 and _object_type_token(target.get("requested_object_type", "Sound"))
                 in {"sound", "soundsfx", "soundvoice"}
             )
@@ -18154,7 +18187,8 @@ def verify_prepared_operation(
                     _field_value(live_row, "activeSource")
                 )
                 if music_media or (version == "2021.1" and active_source_id is None):
-                    active_source_id = returned_source_id or target.get("localized_audio_file_source_id")
+                    active_source_id = (returned_source_id or target.get("localized_audio_file_source_id")
+                                        or (sfx_source_id if omitted_sound_source and bound_sfx_source else None))
                 if omitted_sound_source:
                     check(
                         f"{label} omitted source result has a canonical live active source",

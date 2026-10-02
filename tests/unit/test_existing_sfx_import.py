@@ -70,7 +70,13 @@ def prepare_sfx(tmp_path, version, mutate=None):
 def test_same_basename_existing_sfx_keeps_distinct_originals_and_source_identity(tmp_path, version):
     prepared, reader = prepare_sfx(tmp_path, version)
     rows = prepared['dispatch']['args']['imports']
-    assert [row['originalsSubFolder'] for row in rows] == [r'Expansion\Left', r'Expansion\Right']
+    if version == '2025.1':
+        assert [row['importLocation'] for row in rows] == [EN_SOURCE, JP_SOURCE]
+        assert all(row['objectPath'] == '' for row in rows)
+        assert all('objectType' not in row and 'originalsSubFolder' not in row for row in rows)
+    else:
+        assert [row['originalsSubFolder'] for row in rows] == [r'Expansion\Left', r'Expansion\Right']
+        assert all('importLocation' not in row for row in rows)
     targets = prepared['verification_plan']['targets']
     assert [target['existing_sfx_source_id'] for target in targets] == [EN_SOURCE, JP_SOURCE]
     assert all(target['expected_audio_file_source_result_path'].endswith(r'\Hit') for target in targets)
@@ -175,3 +181,59 @@ def test_existing_sfx_source_discovery_is_bounded_and_closed(tmp_path, version, 
     with pytest.raises(OperationContractError) as rejected:
         prepare_sfx(tmp_path, version, corrupt)
     assert rejected.value.error_code == ('SFX_SOURCE_LIMIT_EXCEEDED' if fault == 'limit' else 'INVALID_READBACK')
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_bound_existing_sfx_source_may_be_omitted_from_native_result_with_complete_live_proof(tmp_path, version):
+    from tests.unit.test_operation_registry_import_verifier import _result
+    prepared, reader = prepare_sfx(tmp_path, version)
+    copied = []
+    for row, source in zip(prepared['dispatch']['args']['imports'], reader.sources):
+        original = Path(source['originalFilePath'])
+        original.write_bytes(Path(row['audioFile']).read_bytes())
+        copied.append(original)
+    result = verify_prepared_operation(prepared, execution_result=_result(
+        version, reader.owners, copied), read_call=reader)
+    assert result.ok, [a for a in result.assertions if not a['passed']]
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('fault', ['unbound', 'wrong-bound-id', 'missing', 'new-source', 'extra', 'foreign-parent', 'wrong-language', 'wrong-media'])
+def test_omitted_existing_sfx_source_requires_every_bound_live_proof(tmp_path, version, fault):
+    from tests.unit.test_operation_registry_import_verifier import _result
+    prepared, reader = prepare_sfx(tmp_path, version)
+    copied = []
+    for row, source in zip(prepared['dispatch']['args']['imports'], reader.sources):
+        original = Path(source['originalFilePath'])
+        original.write_bytes(Path(row['audioFile']).read_bytes())
+        copied.append(original)
+    target = prepared['verification_plan']['targets'][0]
+    other_guid = '{88888888-8888-8888-8888-888888888888}'
+    if fault == 'unbound':
+        target.pop('existing_sfx_source_snapshot')
+    elif fault == 'wrong-bound-id':
+        target['existing_sfx_source_id'] = other_guid
+    elif fault == 'missing':
+        reader.sources.pop(0)
+    elif fault == 'new-source':
+        reader.sources[0]['id'] = other_guid
+        reader.owners[0]['activeSource']['id'] = other_guid
+    elif fault == 'extra':
+        extra = deepcopy(reader.sources[0]); extra['id'] = other_guid
+        reader.sources.append(extra)
+    elif fault == 'foreign-parent':
+        reader.sources[0]['parent']['id'] = RIGHT
+    elif fault == 'wrong-language':
+        reader.sources[0]['audioSource:language']['name'] = 'Japanese'
+    else:
+        copied[0].write_bytes(b'incorrect replacement')
+    result = verify_prepared_operation(prepared, execution_result=_result(
+        version, reader.owners, copied), read_call=reader)
+    assert result.ok is False, fault
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_source_bound_reimport_still_rejects_changed_input_media_before_execute(tmp_path, version):
+    prepared, reader = prepare_sfx(tmp_path, version)
+    Path(prepared['dispatch']['args']['imports'][0]['audioFile']).write_bytes(b'changed after Preview')
+    assert validate_prepared_roles(prepared, read_call=reader)['ok'] is False
