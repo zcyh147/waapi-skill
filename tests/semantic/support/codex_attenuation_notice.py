@@ -73,17 +73,31 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     field = rf"(?:的|'s|\s)*(?:{kind})(?:\s*(?:曲线|curve))?(?:的|:|：|\s)*(?:来源|source|形状|shape|点|points)?"
     source = "|".join(re.escape(value) for value in source_aliases)
     allowed_value = rf"(?:{source})(?:\s*(?:线性|linear))?(?:\s*(?:点|points|曲线|curve))?"
-    introduction = r"(?:预览|已|核实|确认|修改范围|范围|仅|为|即将|只|把|将|同时|另外|我|会|\s|\b(?:i|will|shall|only|then|also|and)\b)*"
+    introduction = r"(?:预览|已|核实|确认|修改范围|范围|仅|为|即将|只|把|将|对|同时|另外|我|会|:|：|\s|\b(?:i|will|shall|only|then|also|and)\b)*"
     # Coordinates have already been validated as the exact ordered plan.
     # Remove only their complete numeric syntax before parsing the source edit.
     text = re.sub(rf"[（(]\s*{_NUMBER}\s*[,，]\s*{_NUMBER}(?:\s*db)?\s*[)）]", "", text)
     text = re.sub(r"、(?=\s*(?:、|[。；;]|$))", "", text)
     affirmative = False
-    for clause in re.split(r"[。；;,，\n]|\bbut\b|但", text):
+    antecedent = None
+    clauses = re.split(r"([。；;,，\n]|\bbut\b|但)", text)
+    for position in range(0, len(clauses), 2):
+        clause = clauses[position]
+        prior = antecedent if position > 0 and clauses[position - 1] in {",", "，"} else None
+        antecedent = None
+        subject = re.fullmatch(rf"{introduction}目标是\s*(.+?)\s*", clause)
+        if subject:
+            if re.fullmatch(rf"(?:{owner}){field}", subject.group(1)) is None:
+                return False
+            antecedent = subject.group(1)
         for action in re.finditer(_ACTION, clause):
             if re.match(r"操作(?:没有|尚未|未)执行\s*$", clause[action.end():]):
                 continue
             if re.search(_NEGATION, clause[:action.start()]):
+                continue
+            if (action.group() in {"修改", "变更", "改动"}
+                    and re.search(r"执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", clause[:action.start()])
+                    and not clause[action.end():].strip()):
                 continue
             if action.group() in {"删除", "移除", "清空", "重置", "新增", "添加", "delete", "remove", "clear", "reset", "add", "create"}:
                 return False
@@ -91,6 +105,12 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
             # Chinese suffix verbs carry the subject on their left; English
             # transitive verbs carry it on their right. Neither may inherit an
             # arbitrary property or a second owner from the surrounding prose.
+            if prior is not None and not left.strip() and action.group() in {"设置为", "设为", "改为", "改成"}:
+                value = right
+                if re.fullmatch(allowed_value, value.strip(" 、")) is None:
+                    return False
+                affirmative = True
+                continue
             matches = list(re.finditer(rf"(?<![a-z0-9_])(?:{owner})(?![a-z0-9_])", left))
             if (len(matches) == 1 and re.fullmatch(introduction, left[:matches[0].start()])
                     and re.fullmatch(field, left[matches[0].end():])):
@@ -130,7 +150,11 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
         for match in re.finditer(rf"(?<![a-z0-9_]){re.escape(token)}(?![a-z0-9_])", text):
             prefix = re.split(r"[，,、。；;\n]", text[:match.start()])[-1]
             if re.search(_NEGATION, prefix):
-                return False
+                preservation = re.fullmatch(r"\s*不(?:会)?(?:修改|更新|改变)\s*([\w.-]+)\s*的\s*", prefix)
+                primary = {value.casefold() for value in (row["id"], row["name"], row["path"],
+                    "该对象", "此对象", "目标对象", "指定衰减对象", "该衰减对象", "该衰减")}
+                if preservation is None or preservation.group(1) in primary:
+                    return False
     for key in _CURVE_KINDS:
         if key != context["kind"] and _has(text, key):
             return False

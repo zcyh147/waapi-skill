@@ -42,6 +42,51 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Complete exact-unit rerun and grammatical-role repair — 2026-10-02:**
+  frozen `fa51197` passed five-version Program **6176 / skipped 2**, exit zero
+  in **294.77 seconds** (log SHA-256
+  `1a42f8d5cc3876ea4c7440dc939fbfdf4c5b7ff2bbdb7be5dd3f77f41e4061d4`),
+  and complete Non-live **13207 / skipped 119 / deselected 27**, exit zero in
+  **852.65 seconds**. Non-live log SHA-256 is
+  `45bb27057343b2e8493fcd224be4e70c557f76fd3813444020deda38091bf23d`;
+  JUnit SHA-256 is
+  `aa89faf8dfbdfb3eb5e2400df8f783a93d0ae0cf080946fc868e14012407e618`.
+  Exact-unit root `expansion-failed6-fa51197-luna-high-r1-cli1592` completed
+  all seven selected units: **one Agent PASS / five notice FAILs / one separate
+  boundary**, zero pending and no early stop. All six Agent workflows executed
+  and verified once, with every independent business assertion passing.
+  Both C08 units retain the weaker Gateway `result_schema_checked` state.
+  Neither C08 Agent called the attenuation getter or discovered its schema;
+  this root grants no Fresh #149 getter-consumption or functional coverage.
+  Disclosure-to-parser and fake-dispatch proof remains five-version Program
+  evidence. EXP25-C06 passed; five other notices failed grammatical parsing.
+  The #147 follow-up now binds target-bearing introductions, adjacent-clause
+  owner/field continuity and semantic creation verbs, while distinguishing
+  operation, authorization and execution nouns. All owner-bearing positive
+  noun exemptions validate their explicit owner before exemption; unsupported
+  target-subject declarations fail rather than disappearing. A separately
+  valid primary effect is still required. Contradictory quoted notes, wrong or
+  ambiguous owners, extra changes, values/units/shapes and timing remain negative
+  controls. All five actual witnesses and **818 focused notice tests** pass;
+  final independent Spec and Standards rechecks are clear. Root combined
+  regression passed **1568 tests**, exit zero in **24.30 seconds**. Log SHA-256
+  is `13b6b01a08f711d567361362c354b7f63088b3a8fba93bf838221c10aac9b603`;
+  JUnit SHA-256 is
+  `ae0f36e6e8ceac32e87360d8614ecd693832591381143e126882738bbe9d570b`.
+  No owned test process or diff-check error remained. Packaged Skill and
+  Program inputs are unchanged by this notice-only repair.
+  The original FAIL root remains frozen without campaign verify-only or
+  regrading. Its launcher ran once, exited 1, was unloaded, and left no scoped
+  process. All seven source hashes and project mtimes remained unchanged;
+  trusted actors closed and reconciliation children were reaped. The one PASS
+  copy was removed; five failed copies and the boundary remain quarantined.
+  Evidence and report reviews validated **975 artifacts / 38928303 bytes /
+  eight metadata seals**. Exact results and usage are in
+  `../research/integration-expansion-failed-rerun-fa51197-2026-10-02.json`.
+  New complete Non-live, exact failed-five-Agent-unit plus boundary validation,
+  identical verify-only, and final full thirteen-Agent-unit plus boundary
+  acceptance remain required. Unused full launchers remain unused.
+
 - **Complete failed-only batch and consolidated repairs — 2026-10-02:**
   frozen `86b475e` passed complete Non-live **13042 / skipped 119 /
   deselected 27**, exit zero in **817.38 seconds**. Log SHA-256 is

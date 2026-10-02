@@ -252,6 +252,9 @@ def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, A
     return tuple(groups) if groups and all(all(term for term in group) for group in groups) else ()
 
 
+_PLUGIN_CREATION_WORDS = ("新增", "添加", "插入", "创建", "追加", "add", "create", "append")
+
+
 def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
     """Resolve a type pronoun only through matching sealed and independent roles."""
     request, prepared = artifact.get("request", {}), artifact.get("prepared_operation", {})
@@ -311,12 +314,12 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
         elif placement.get("kind") != "effect_slot_append" or placement.get("list_mode") != "append":
             return None
         groups = [(source["id"], source["name"], source["path"], "该 sound", "this sound"),
-                  (descriptor.get("name", ""),), ("effect", "效果", "插件"), ("新增", "添加", "插入", "add", "create", "append")]
+                  (descriptor.get("name", ""),), ("effect", "效果", "插件"), _PLUGIN_CREATION_WORDS]
         if descriptor.get("notes"):
             groups.append((descriptor["notes"],))
         return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
-                "action": r"新增|添加|插入|add|create|append", "kind": "plugin", "source_type": "sound", "source_id": source["id"],
-                "source_names": (source["name"], source["path"])}
+                "action": "|".join(_PLUGIN_CREATION_WORDS), "kind": "plugin", "source_type": "sound", "source_id": source["id"],
+                "source_names": (source["name"], source["path"]), "notes": descriptor.get("notes", "")}
     if operation == "object.setReference":
         source, target = state.get("object"), state.get("target")
         observed, expected = before.get("stinger"), before.get("target")
@@ -355,7 +358,7 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     """Check owner-bearing grammar; omitted owners do not add an identity."""
     owners = []
     source_prefix = re.sub(r"\s*的\s*(?:trigger|触发器)\s*(?:引用)?\s*$", "", prefix)
-    prepositions = tuple(re.finditer(r"向|在|将|把|对(?=\s|该|指定|已)", source_prefix))
+    prepositions = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", source_prefix))
     if prepositions:
         owner = source_prefix[prepositions[-1].end():].strip()
         if owner.endswith("上"):
@@ -392,17 +395,44 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     return True
 
 
-_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|"
+_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|"
                      r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
 
 
 def _notice_mutation_is_noun(action: str, prefix: str, suffix: str) -> bool:
     """Only complete request/authorization and execute-summary noun roles."""
-    if action not in {"修改", "变更"}:
+    if action not in {"修改", "变更", "改动"}:
         return False
     return bool((re.match(r"请求(?=[，,]|$)", suffix) and re.search(r"(?:这次|本次|明确的|针对).*?$", prefix))
-        or (re.match(r"(?:[，,]|$)", suffix) and re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix))
-        or (re.match(r"的(?:独立)?授权(?=[，,]|$)", suffix) and re.search(r"针对(?:这项|本次)$", prefix)))
+        or (re.match(r"(?:[，,]|$)", suffix) and re.search(r"执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", prefix))
+        or (re.match(r"的(?:独立)?授权(?=[，,]|$)", suffix) and re.search(r"(?:针对|获得|取得)(?:(?:这|此)(?:一)?项|本次)$", prefix)))
+
+
+def _plugin_description_is_noun(action: str, prefix: str, suffix: str) -> bool:
+    """An operation-description noun must describe this create-only effect lane."""
+    creation = "|".join(re.escape(word) for word in _PLUGIN_CREATION_WORDS)
+    changes = r"(?:修改|变更|改动)"
+    if action in _PLUGIN_CREATION_WORDS:
+        if (re.search(r"执行(?:(?:这|此)(?:一)?项|本次)$", prefix)
+                and re.match(r"(?:[，,]|$)", suffix)):
+            return True
+        return bool(re.search(r"(?:采用|使用)的是$", prefix)
+                    and re.match(rf"(?:效果器|effect)的{changes}(?=[，,]|$)", suffix))
+    return bool(action in {"修改", "变更", "改动"}
+                and re.search(rf"(?:{creation})(?:效果器|effect)的$", prefix)
+                and re.match(r"(?:[，,]|$)", suffix))
+
+
+def _noun_owner_prefix(prefix: str) -> str:
+    """Remove only noun-frame tails, retaining any explicit owner subject."""
+    creation = "|".join(re.escape(word) for word in _PLUGIN_CREATION_WORDS)
+    prefix = re.sub(rf"(?:{creation})(?:效果器|effect)的$", "", prefix)
+    prefix = re.sub(r"(?:采用|使用)的是$", "", prefix)
+    prefix = re.sub(r"(?:我)?(?:现在)?(?:按(?:该)?授权)?执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", "", prefix)
+    prefix = re.sub(r"(?:获得|取得|针对)(?:(?:这|此)(?:一)?项|本次)$", "", prefix)
+    prefix = re.sub(r"(?:本次|这次|明确的)$", "", prefix)
+    prefix = re.sub(r"(?:现在)?(?:我)?(?:将|会)$", "", prefix)
+    return prefix
 
 
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
@@ -415,6 +445,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         if (re.fullmatch(r"[0-9a-f-]{4,}", prefix) is None
                 or not context["source_id"][1:].casefold().startswith(prefix)):
             return False
+    if context["kind"] == "plugin":
+        for note in re.findall(r"备注(?:为|是)\s*[“\"]([^”\"]*)[”\"]", text):
+            if note != context["notes"].casefold():
+                return False
     for source_claim in re.finditer(r"目标(?:已)?(?:核实|确认)为\s*([^。；;\n]+)", text):
         value = source_claim.group(1).strip()
         if (value not in {context["source_id"].casefold(), *(name.casefold() for name in context["source_names"])}
@@ -447,18 +481,18 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             # change. They cannot certify the expected effect by themselves.
             prefix = clause[:action.start()]
             suffix = clause[action.end():].strip()
-            if _notice_mutation_is_noun(action.group(), prefix, suffix):
-                continue
-            if action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", clause[action.end():])
-                    or re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix)):
-                continue
-            if action.group() == "设置" and re.search(r"其他\s*$", prefix) and re.match(r"和对象不在", clause[action.end():]):
-                continue
-            if re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix) or (context["kind"] == "reference"
-                    and re.search(r"执行.*引用$", prefix) and action.group() == "更新"):
-                continue
-            if not _bound_explicit_owners_agree(prefix, claim, context, source_referent=source_referent):
+            noun = (_notice_mutation_is_noun(action.group(), prefix, suffix)
+                or (context["kind"] == "plugin" and _plugin_description_is_noun(action.group(), prefix, suffix))
+                or (action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", suffix)
+                    or re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix)))
+                or (action.group() == "设置" and re.search(r"其他\s*$", prefix) and re.match(r"和对象不在", suffix))
+                or re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix)
+                or (context["kind"] == "reference" and re.search(r"执行.*引用$", prefix) and action.group() == "更新"))
+            owner_prefix = _noun_owner_prefix(prefix) if noun else prefix
+            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent):
                 return False
+            if noun:
+                continue
             if any(term in clause for term in context["protected"]):
                 return False
             if not expected or not effect_anchor or not approved_value:

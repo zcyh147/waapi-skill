@@ -1,0 +1,186 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "fa51197cf0e27a35f3cfc24a4a0325ef9ea7b6b4",
+  "date": "2026-10-02",
+  "host": "macOS",
+  "root": "expansion-failed6-fa51197-luna-high-r1-cli1592",
+  "status": "complete-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6-luna",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "cases": [
+      "EXP22-C08",
+      "EXP22-C09",
+      "EXP25-C06",
+      "EXP25-C08",
+      "EXP25-C09",
+      "EXP25-M05",
+      "EXP22-M05"
+    ],
+    "agent_budget_seconds": 600,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180,
+    "max_pre_action_retries": 0,
+    "codex_binary": "0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "development_gates": {
+    "focused": {
+      "passed": 1426,
+      "seconds": 25.51,
+      "exit_code": 0,
+      "log_sha256": "cf94c69a824bc519aed2c784c6e303746f6598692c1d05d5ffd2a7a32a71432b",
+      "junit_sha256": "24fa7a8562e27ec2718882b60cd8192e49373bbfe511dbe54e2db79355155432"
+    },
+    "nonlive": {
+      "passed": 13207,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 852.65,
+      "exit_code": 0,
+      "log_sha256": "45bb27057343b2e8493fcd224be4e70c557f76fd3813444020deda38091bf23d",
+      "junit_sha256": "aa89faf8dfbdfb3eb5e2400df8f783a93d0ae0cf080946fc868e14012407e618"
+    },
+    "program": {
+      "passed": 6176,
+      "skipped": 2,
+      "seconds": 294.77,
+      "exit_code": 0,
+      "log_sha256": "1a42f8d5cc3876ea4c7440dc939fbfdf4c5b7ff2bbdb7be5dd3f77f41e4061d4",
+      "skip_boundary": "Two native-Windows checks; this is macOS evidence."
+    }
+  },
+  "result": {
+    "selected_units": 7,
+    "attempted_units": 7,
+    "agent_pass": 1,
+    "matrix_agent_fail": 5,
+    "canonical_agent_fail": 5,
+    "canonical_blocked": 0,
+    "boundary_proven": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "launcher_runs": 1,
+    "launcher_exit_code": 1,
+    "unloaded": true,
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false
+  },
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "status": "BOUNDARY_PROVEN",
+      "agent_pass_credit": false
+    },
+    {
+      "id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 119.16478554089554,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "gateway_verification_state": "result_schema_checked",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    },
+    {
+      "id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 155.74090575007722,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    },
+    {
+      "id": "EXP25-C06",
+      "matrix_status": "PASS",
+      "canonical_status": "PASS",
+      "agent_seconds": 143.63208816596307,
+      "business_assertions_passed": 7,
+      "business_assertions_total": 7,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "All required business and Agent gates passed"
+    },
+    {
+      "id": "EXP25-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 123.12192495795898,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "gateway_verification_state": "result_schema_checked",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    },
+    {
+      "id": "EXP25-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 135.035758666927,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    },
+    {
+      "id": "EXP25-M05",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 111.6271751250606,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    }
+  ],
+  "integrity": {
+    "artifact_count": 975,
+    "artifact_bytes": 38928303,
+    "metadata_seals": 8,
+    "manifest_sha256": "cee3bb897e6f54a18eb88d9d92466dadef89e82dcc3dd129f878971c8eb3110d",
+    "source_full_hashes_and_project_mtimes_unchanged": 7,
+    "trusted_oracles_closed": 7,
+    "reconciliation_children_and_subprocesses_reaped": true,
+    "passing_projects_removed": 1,
+    "failed_projects_quarantined": 5,
+    "boundary_projects_quarantined": 1,
+    "never_reuse": true,
+    "no_verify": true
+  },
+  "usage": {
+    "input_tokens": 2646732,
+    "cached_input_tokens": 2370816,
+    "uncached_input_tokens": 275916,
+    "output_tokens": 28619,
+    "reasoning_output_tokens_included": 14576,
+    "cache_write_input_tokens": 0,
+    "agent_seconds": 788.3226382068824,
+    "agent_turns": 6,
+    "slow_units": 0,
+    "goal_execute_count": 6,
+    "goal_verify_count": 6,
+    "usd_cost": null
+  },
+  "remaining": "Consolidate grammatical notice-role defects (#147), review and gate a new candidate, then new failed-only five-Agent-unit batch. Final complete thirteen-Agent-unit batch plus separate boundary and identical verify-only remain required. No Windows acceptance is claimed.",
+  "disclosure149_evidence_limit": "Neither Fresh C08 task calls metadata attenuation or discovers the getter schema. Both use the setter schema and complete Draft/Preview/Execute/Verify. This root proves their business effects, but grants no specific Fresh consumption or functional coverage credit to the newly disclosed getter inputs. Five-version program tests prove that disclosure-to-parser/fake-dispatch contract."
+}
