@@ -60,7 +60,26 @@ pilot, and acceptance may proceed after their prerequisite gates.
   `a058f194bad9f6defeaadf5677c8e12b12c62b25dbe86f34fa2c84ffbbc54fcb`.
   Separate #151 clarifies the narrow requested-readback exception for
   `result_schema_checked`; transaction execution and stronger-proof claims stay
-  closed. Complete Non-live and new affected Fresh validation remain required.
+  closed. Complete Non-live at `ab2dbb9` then completed with **14383 passed,
+  two failed, 119 skipped and 27 deselected**, exit one in **893.05 seconds**.
+  Both failures concern #151's operate reference: an existing terminal-phrase
+  assertion and the unchanged 20000-byte CRLF UTF-8 complete-read ceiling
+  (the edited reference measured 20502 bytes). The first focused selection had
+  missed these unit-level documentation contracts. This root is a FAIL; no
+  Fresh campaign started. Preserve the ceiling and terminal semantics while
+  compacting the reference, then run both affected unit files before a new gate.
+  Failed gate log SHA-256:
+  `46d373cbe2e1a39902154df867f0491563e9f9e6b75c61a45ccc05d6c2d919da`;
+  JUnit SHA-256:
+  `0d251340f81b4b941bf2f3418db0c4c65b8843ed7379a57b4bf6262d3dac23a0`.
+  The doc-only follow-up restores the established terminal wording and removes
+  duplicated control-plane prose without changing routes, metadata boundaries,
+  output integrity or failure stops. The reference is **19826 CRLF UTF-8 bytes**;
+  the 20000-byte ceiling and tests are unchanged. Both complete affected unit
+  files plus the Broker file passed **132 tests**, exit zero in **1.91 seconds**.
+  Log SHA-256: `50c9b4ab9461ee12524525079f6cb152261e013f27f491424b80990d0dc49d46`;
+  JUnit SHA-256: `3cceda8744e32df4ac56ce0d19edd48e1bc242cadde8dedad556cc2a0685b5f1`.
+  New candidate validation and affected Fresh acceptance remain required.
 
 
 - **Sol-high focused follow-up — 2026-10-02:** candidate `7652745` passed

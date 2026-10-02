@@ -8,7 +8,7 @@ Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncatio
 - POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
 - Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
 - A rejected or nonzero Gateway invocation is also a hard stop. Only a successful result whose `fallback_detail_scan.status` is `partial` permits the one metadata retry below.
-- The one complete terminal `verify` result closes the transaction. Follow Terminal states below for reporting and any requested read-only follow-up.
+- The one complete terminal `verify` result ends the transaction; see Terminal states.
 
 ## Choose the phase and first Gateway command
 
@@ -72,7 +72,7 @@ If root type is unproven, first exact-query the unchanged root. Then open `opera
 | Existing caller-owned import TSV or explicit Wwise table workflow | `audio.importTabDelimited` | direct import because the table is large |
 | Wholly new structure-only object hierarchy whose requested root does not already exist and has no media or import-manifest intent | `object.create` | `audio.import` |
 | One existing object's single rename, notes, scalar-property, or reference edit | `object.setName`, `object.setNotes`, `object.setProperty`, or `object.setReference` | broad `object.set` |
-| Larger atomic existing-target batch: several fields/properties/references on one root; an ordinary closed object-list change; multiple roots; a root edit plus a new subtree; or insertion into a named existing descendant | `object.set` | `object.create` or a dedicated operation |
+| Larger atomic existing-target batch: several fields/properties/references on one root; an ordinary closed object-list change; other conditions above | `object.set` | `object.create` or a dedicated operation |
 | Platform link, plug-in, or RTPC curve | dedicated operation | generic mutation |
 | Add/remove an independent Switch assignment between existing objects | `switchContainer.addAssignment` / `switchContainer.removeAssignment`; copy the exact operation, never an invented alias | generic mutation or same-row import side effect |
 | Direct saved SoundBank inclusions | `soundbank.setInclusions` | Definition TSV |
@@ -93,9 +93,9 @@ Keep domains distinct: durable Authoring project edits use `ak.wwise.core.*`; ru
 
 Users never supply internal tokens. Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence.
 
-For `object.setProperty`, `object.setReference`, and `object.setLinked`, read the schema, start, bind the target, then run returned `draft-discover-fields`. Bind the exact existing owner first; that fixes the metadata scope inside the Draft. Copy one handle; never a token, scope, or type. No match stops; ambiguity needs one behavior question.
+`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. No match stops; ambiguity needs one behavior question.
 
-For `object.create`, `object.set`, and direct `audio.import`, start the business Draft, bind exact object/type scope, then use only returned discovery/binding commands. The returned type, restrictions, and opaque handle are the only value authority. A remaining Composer lane's returned start preconditions may require metadata first. For every `business_declaration` lane, start the Draft first and use its returned live binding or discovery command.
+Business Drafts start before exact object/type binding and returned live discovery. Returned type, restrictions and opaque handle alone authorize values. Remaining Composer lanes follow returned metadata-first start preconditions.
 
 1. Bind the exact existing owner or the disclosed new-object type first.
 2. Run the returned discovery once with short English Wwise UI/technical meanings; separate distinct meanings.
@@ -147,7 +147,7 @@ Unless a trusted caller supplied an override, omit `--state-dir`; the Gateway ow
 - `ask_before_changes`: present expected result/risk, say unchanged, and ask.
 - `allow_changes`: after Preview, announce the concrete impending change and continue.
 
-Normal prose covers only objects, changes, results, risks, and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands. Keep exact `agent_result` machine-readable.
+Prose covers objects, changes, results, risks and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands.
 
 ## Continue only from Gateway-owned commands
 
@@ -166,9 +166,9 @@ The confirmation token binds the exact stored Preview. Never reconstruct/substit
 ## Terminal states
 
 - `verified`: report actual readback and stop.
-- `result_schema_checked`: report only schema proof. If the user explicitly requested actual readback, continue only through disclosed bounded Gateway read-only routes for the exact requested targets. The transaction stays closed: no execute, reverify or retry, filesystem proof, raw API or code workaround. Report current values separately; without a before-state baseline they do not prove preservation. If no suitable closed read route exists, report that boundary and stop.
+- `result_schema_checked`: schema proof only. Explicitly requested actual readback may use disclosed bounded Gateway read-only routes for exact requested targets; otherwise report the boundary and stop. Transaction stays closed: no execute/reverify/retry, filesystem/raw API/code proof. Current values without a before-state baseline do not prove preservation.
 - `verification_deferred`: later verification is safe; never re-execute.
-- `verification_failed`, `repreview_required`, `execution_cancelled`: report and stop without retry or further proof calls.
+- `verification_failed`, `repreview_required`, `execution_cancelled`: report and stop; no retry/proof calls.
 - `execution_succeeded_persistence_failed`: preserve uncertainty; never replay.
 - `indeterminate`: Do not verify, retry, call another Gateway route, or use another tool. A later diagnosis needs a new user request.
 
