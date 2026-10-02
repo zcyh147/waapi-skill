@@ -660,6 +660,78 @@ def test_authenticated_predispatch_read_rejection_stays_fail_and_zero_mutation(t
     assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
 
 
+def _sealed_parser_rejected_query(root):
+    """The b4fd348 C09 unsupported effects projection, with no dispatch."""
+    _sealed_read_rejection(root)
+    plan = json.loads((root / 'expansion-plan.json').read_text())
+    broker = json.loads((root / 'expansion-broker.json').read_text())
+    record = broker['records'][-1]
+    record['gateway_arguments'] = ['query-object', '--exact-id', plan['read_scope']['object_ids'][0],
+        '--include', 'effects', '--max-results', '100']
+    record['rejection'] = 'expansion policy rejected command: command does not satisfy the public Gateway parser'
+    record['stderr'] = 'Gateway broker rejected command: ' + record['rejection'] + '\n'
+    _refresh_bound_rejection_receipts(root, broker)
+
+
+def test_authenticated_invalid_effects_query_is_an_isolated_fail_without_archive_writes(tmp_path):
+    _sealed_parser_rejected_query(tmp_path)
+    before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
+              for path in tmp_path.rglob('*') if path.is_file()}
+    result = _verify(tmp_path)
+    assert result['archive_valid'] is True and result['original_status'] == 'FAIL'
+    assert result['business_pass'] is False
+    assert result['executions'] == result['execution_reservations'] == 0
+    assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns)
+            for path in tmp_path.rglob('*') if path.is_file()} == before
+
+
+@pytest.mark.parametrize('damage', ('authentication', 'runner_exit', 'payload', 'payload_digest',
+    'raw_hash', 'normalized_hash', 'token', 'extra_token', 'reason', 'stderr', 'valid_syntax', 'help', 'mutation',
+    'admitted_invalid', 'missing_receipt', 'later_dispatch', 'duplicate_rejection', 'reconciliation', 'pass'))
+def test_parser_rejected_query_requires_exact_terminal_authenticated_negative_proof(tmp_path, damage):
+    _sealed_parser_rejected_query(tmp_path)
+    broker = json.loads((tmp_path / 'expansion-broker.json').read_text())
+    row = broker['records'][-1]
+    if damage == 'authentication': row['authenticated'] = False
+    elif damage == 'runner_exit': row['runner_exit_code'] = 2
+    elif damage == 'payload': row['payload'] = {'ok': False}
+    elif damage == 'payload_digest': row['payload_sha256'] = 'b' * 64
+    elif damage == 'raw_hash': row['raw_argv_sha256'] = 'b' * 64
+    elif damage == 'normalized_hash': row['argv_sha256'] = 'b' * 64
+    elif damage == 'token': row['gateway_arguments'][-3] = 'another-output'
+    elif damage == 'extra_token': row['gateway_arguments'].append('--unrecorded')
+    elif damage == 'reason': row['rejection'] = 'unsupported query'
+    elif damage == 'stderr': row['stderr'] = row['stderr'].rstrip()
+    elif damage in ('valid_syntax', 'help', 'mutation', 'admitted_invalid'):
+        if damage == 'valid_syntax': row['gateway_arguments'][-3] = 'parent'
+        elif damage == 'help': row['gateway_arguments'] = ['query-object', '--help']
+        elif damage == 'mutation': row['gateway_arguments'] = ['execute', '--invalid']
+        else: row['accepted'] = True
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'missing_receipt': broker['records'].pop()
+    elif damage == 'later_dispatch':
+        extra = deepcopy(broker['records'][0])
+        extra.update(sequence=3, step_name='expansion.step.0002')
+        broker['records'].append(extra)
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'duplicate_rejection':
+        extra = deepcopy(row)
+        extra['sequence'] = 3
+        broker['records'].append(extra)
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'reconciliation':
+        oracle = json.loads((tmp_path / 'expansion-oracle.json').read_text())
+        oracle['reconciliation']['child_reaped'] = False
+        _write(tmp_path / 'expansion-oracle.json', oracle)
+    else:
+        result = json.loads((tmp_path / 'expansion-task-result.json').read_text())
+        result.update(passed=True, status='PASS')
+        _write(tmp_path / 'expansion-task-result.json', result)
+    _write(tmp_path / 'expansion-broker.json', broker)
+    with pytest.raises(ExpansionArchiveError):
+        _verify(tmp_path)
+
+
 @pytest.mark.parametrize('damage', ('unauthenticated', 'runner_evidence', 'payload', 'mutation', 'raw_bypass'))
 def test_predispatch_read_rejection_requires_closed_negative_proof(tmp_path, damage):
     _sealed_read_rejection(tmp_path)

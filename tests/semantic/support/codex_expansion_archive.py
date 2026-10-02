@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import io
 import json
 import math
 import re
 import sys
 from dataclasses import asdict
+from contextlib import redirect_stderr, redirect_stdout
 from types import SimpleNamespace
 from pathlib import Path
 from typing import Any, Mapping
@@ -171,6 +173,22 @@ def _validate_rejected_read(record, *, argv, gate):
     Replay deliberately does not ask the current admission policy to reject
     again: its bound may have been repaired since this original FAIL.
     """
+    parser_rejection = "expansion policy rejected command: command does not satisfy the public Gateway parser"
+    if record.get("rejection") == parser_rejection:
+        _validate_predispatch_rejection(record, parser_rejection)
+        _require(bool(argv) and argv[0] == "query-object", "parser rejection is not a read-only object query")
+        # Invalid syntax is the original failure, not evidence of dispatch.
+        # Only an actual parser error (not successful parsing or --help) can
+        # support this exact authenticated terminal pre-dispatch receipt.
+        try:
+            with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
+                gate.public_parser(argv)
+        except ExpansionArchiveError as exc:
+            _require(isinstance(exc.__cause__, SystemExit) and exc.__cause__.code == 2,
+                "rejected read lacks its public parser error")
+        else:
+            raise ExpansionArchiveError("parser-rejected read has valid public syntax")
+        return
     rejection = "expansion policy rejected command: project query requires a bounded public source"
     _validate_predispatch_rejection(record, rejection)
     _require(bool(argv) and argv[0] == "query-object" and len(argv[1:]) % 2 == 0,
@@ -331,9 +349,9 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             shim_directory=root / "broker" / "bin")
         _require(list(resolved.gateway_arguments) == argv
             and list(resolved.normalized_model_argv) == record["normalized_model_argv"], "recorded Gateway argv differs from actual invocation")
-        gate.public_parser(argv)  # Reject non-public flags for every receipt.
         if record.get("accepted") is not True:
             if argv[:1] == ["draft-bind-object"]:
+                gate.public_parser(argv)
                 _validate_rejected_draft_bind(record, argv=argv, gate=gate,
                     draft_id=draft_id, authority=authority, revision=revision)
             else:
@@ -341,6 +359,7 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             _require(index == len(records), "dispatch followed a rejected read")
             failed_accepted = True
             continue
+        gate.public_parser(argv)  # Admitted receipts must always be public syntax.
         runner = str((Path(plan["skill_source"]) / "scripts" / "run.py").resolve())
         _require(record.get("runner_command_sha256") == canonical_digest(
             [plan["trusted_python"], runner, "gateway.py", *argv]), "trusted runner command digest mismatch")

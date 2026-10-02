@@ -42,6 +42,48 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Partial failed-only root and archive stop — 2026-10-02:** frozen
+  `b4fd348` passed Program **6094 / skipped 2**, exit zero in **290.39 seconds**
+  (log SHA-256 `85bbc3ca79200477745353e67a3889a0f6d8bd74584bd53e773727718d40c02b`),
+  then sequential SFX owned-copy proof on 2022.1/2025.1, **one PASS each** in
+  **28.66/27.73 seconds**. Each passed seven independent assertions; an
+  independent evidence review validated 49/49 and 53/53 Gateway checks,
+  single goal execution, both prepared/PENDING → final/PASS lifecycle histories,
+  unchanged full source hashes/mtimes/tree metadata, closed actors, deleted
+  copies and empty process scopes. Complete Non-live then passed **12780 /
+  skipped 119 / deselected 27**, exit zero in **850.13 seconds**. Log SHA-256
+  is `bc0eac4160b281085e222a5cd0706346a58203264498e1c3967df2fb394e8bd4`;
+  JUnit SHA-256 is
+  `f19d78b1bdf6fb900863782aa4e799c137892bf6bce6a1999a4746fb8170c89b`.
+  Fresh root `expansion-failed8-b4fd348-luna-high-r1-cli1592` then stopped
+  after five of ten units. Matrix: **2 Agent PASS / 2 FAIL / 1 boundary /
+  5 pending**. Canonical campaign: **2 Agent PASS / 1 FAIL / 1 BLOCKED /
+  1 boundary / 5 pending**. C08 safely stopped at an undisclosed Core role;
+  C09's invalid `--include effects` query was authenticated and rejected
+  before dispatch, but archive replay rejected that malformed-read evidence.
+  #146 repairs canonical failure evidence without granting Agent PASS.
+  The one-shot launcher ran once, exited 3, was unloaded, and left no scoped
+  process. All five source hashes and mtimes remained unchanged; both PASS
+  copies were removed, both failures and the boundary were quarantined.
+  Independent reviews rehashed **553 artifacts / 18489646 bytes** and seven
+  metadata seals. Exact partial results and usage are in
+  `../research/integration-expansion-partial-b4fd348-2026-10-02.json`.
+  This incomplete root remains frozen without verify-only or regrading.
+  All unused launchers remain unused; new failed-only and final full acceptance
+  still require new roots after the reviewed harness repair and regression.
+  #146 now validates only an authenticated terminal `query-object` parser
+  rejection, with exact rejection reason, null runner/payload evidence and an
+  actual public parser exit 2. Admitted commands and all provenance, ordering,
+  reconciliation and source guards retain their prior checks. The reproduction
+  failed first; the combined archive/task/matrix/campaign/policy selection passed
+  **674 tests**, exit zero in **16.28 seconds**. Both independent review axes
+  are clear. Log SHA-256 is
+  `0f607b9c9bf3e9d5c6ce0688e5af77e416a2155ee591c632a809a2dcc1a87173`;
+  JUnit SHA-256 is
+  `92c3caff2970eac2543886576a6ea30ddef1f3421bd510405409ed4a84608a5f`.
+  Skill, CI and Program inputs remain byte-identical to `b4fd348`; complete
+  Non-live and new Fresh evidence remain required for this archive candidate.
+
 - **Completed archive repair and native SFX proof — 2026-10-02:** frozen
   `dcb747c` completed Non-live **12779 passed / 119 skipped / 27 deselected**,
   exit zero in **869.50 seconds**; JUnit has zero errors/failures. Log SHA-256
