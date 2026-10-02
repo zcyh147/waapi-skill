@@ -1880,3 +1880,105 @@ def test_immediate_anaphoric_curve_owner_allows_whitespace_only(pair_id, followi
     case = _role_notice_case('004-EXP25-C08')
     case['events'][1]['item']['text'] = pair['positive'].replace('。' + following, '。' + whitespace + following)
     assert _grammatical_notice(case)
+
+
+def _composed_authority_case(version):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-composed-authority-notices-d6430a0.json').read_text())
+    return next(case for case in fixture['cases'] if case['artifact']['request']['version'] == version)
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
+def test_actual_composed_identity_role_and_authorization_components(version):
+    assert _grammatical_notice(_composed_authority_case(version))
+
+
+_AUTHORIZATION_COMPONENTS = [
+    '并取得本次独立策略授权',
+    '并按保存的 allow_changes 策略取得本次修改授权',
+    '并取得本次修改的独立授权',
+]
+
+
+@pytest.mark.parametrize('identity_key', ['id', 'name', 'path'])
+@pytest.mark.parametrize('qualifier', ['', 'Attenuation before', 'Attenuation after', '衰减对象 before', '衰减对象 after'])
+@pytest.mark.parametrize('authorization', _AUTHORIZATION_COMPONENTS)
+def test_closed_identity_role_and_authorization_components_compose_at_the_public_seam(identity_key, qualifier, authorization):
+    case = _composed_authority_case('2022.1')
+    row = case['before']['attenuation']
+    atom = row[identity_key]
+    if qualifier:
+        role, position = qualifier.split()
+        atom = role + ' ' + atom if position == 'before' else atom + ' ' + role
+    post = case['events'][1]['item']
+    rest = post['text'].split('。', 1)[1]
+    post['text'] = '已确认目标是 ' + atom + '，' + authorization + '。' + rest
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('identity_key', ['id', 'name', 'path'])
+@pytest.mark.parametrize('qualifier', ['', 'Attenuation before', 'Attenuation after', '衰减对象 before', '衰减对象 after'])
+@pytest.mark.parametrize('authorization', _AUTHORIZATION_COMPONENTS)
+def test_composed_target_and_authorization_never_hide_a_foreign_identity(identity_key, qualifier, authorization):
+    case = _composed_authority_case('2022.1')
+    row = case['before']['attenuation']
+    atom = row[identity_key] + ' 和 OtherOwner'
+    if qualifier:
+        role, position = qualifier.split()
+        atom = role + ' ' + atom if position == 'before' else atom + ' ' + role
+    post = case['events'][1]['item']
+    rest = post['text'].split('。', 1)[1]
+    post['text'] = '已确认目标是 ' + atom + '，' + authorization + '。' + rest
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('damage', ['wrong_role', 'compound_role', 'wrong_policy', 'unknown_provider',
+    'foreign_authorization_owner', 'compound_authorization_owner', 'negative_identity', 'history_identity',
+    'foreign_guid', 'unattested_name_suffix', 'nonadjacent', 'same_sentence_interposed', 'current_effect', 'history_effect',
+    'refusal', 'extra_edit', 'shape', 'point', 'unknown_grant', 'authorization_only'])
+def test_composed_identity_role_and_authorization_components_remain_closed(damage):
+    case = _composed_authority_case('2022.1')
+    post = case['events'][1]['item']
+    row = case['before']['attenuation']
+    replacements = {
+        'wrong_role': ('` 衰减对象', '` Sound'),
+        'compound_role': ('` 衰减对象', '` 衰减对象和 Sound'),
+        'wrong_policy': ('`allow_changes`', '`read_only`'),
+        'unknown_provider': ('按保存的', '按未知提供方的'),
+        'foreign_authorization_owner': ('并按保存的', '并在 OtherOwner 上按保存的'),
+        'compound_authorization_owner': ('并按保存的', '并在该对象和 OtherOwner 上按保存的'),
+        'negative_identity': ('已确认目标是', '不能确认目标是'),
+        'history_identity': ('已确认目标是', '此前已确认目标是'),
+        'foreign_guid': (row['name'], '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'),
+        'unattested_name_suffix': (row['name'], row['name'] + '2'),
+        'nonadjacent': ('。即将只把', '。预览已授权。即将只把'),
+        'same_sentence_interposed': ('。即将只把', '。处理对象是 OtherOwner，即将只把'),
+        'current_effect': ('即将只把', '当前状态把'), 'history_effect': ('即将只把', '此前已把'),
+        'refusal': ('即将只把', '不会把'), 'shape': ('均为线性', '均为非线性'),
+        'point': ('(50, -12)', '(50, -60)'), 'unknown_grant': ('取得本次修改授权', '猜测本次修改授权'),
+    }
+    if damage in replacements:
+        old, new = replacements[damage]
+        assert old in post['text']
+        post['text'] = post['text'].replace(old, new)
+    elif damage == 'extra_edit': post['text'] += '同时修改 Pitch 为 12。'
+    else: post['text'] = '已按保存的 allow_changes 策略取得本次修改授权。'
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('family', ['effect', 'reference', 'attenuation'])
+@pytest.mark.parametrize('change', ['修改', '变更', '改动'])
+def test_curve_range_noun_is_valid_only_in_a_curve_notice_context(family, change):
+    if family == 'effect': case = _role_notice_case('003-EXP22-C09')
+    elif family == 'reference': case = _grammatical_role_case('007-EXP25-M05')
+    else: case = _composed_authority_case('2022.1')
+    case['events'][1]['item']['text'] += '本次' + change + '范围仅包含这一条曲线。'
+    assert _grammatical_notice(case) is (family == 'attenuation')
+
+
+@pytest.mark.parametrize('change', ['修改', '变更', '改动'])
+@pytest.mark.parametrize('foreign', [False, True])
+def test_curve_range_noun_preserves_its_explicit_owner_prefix(change, foreign):
+    case = _composed_authority_case('2022.1')
+    owner = 'OtherOwner' if foreign else case['before']['attenuation']['name']
+    case['events'][1]['item']['text'] += '在 ' + owner + ' 上本次' + change + '范围仅包含这一条曲线。'
+    assert _grammatical_notice(case) is (not foreign)

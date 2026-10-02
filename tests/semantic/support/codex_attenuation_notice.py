@@ -276,7 +276,13 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
                 return False
             if not identity_only:
                 antecedent = subject.group(1)
-        for action in re.finditer(_ACTION, clause):
+        actions = list(re.finditer(_ACTION, clause))
+        positions = {action.start() for action in actions}
+        for noun_action in re.finditer(r"修改|变更|改动", clause):
+            noun = planned_change_noun(noun_action.group(), clause[:noun_action.start()], clause[noun_action.end():].strip())
+            if noun_action.start() not in positions and noun is not None and noun.role == "curve-range":
+                actions.append(noun_action)
+        for action in sorted(actions, key=lambda action: action.start()):
             noun = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
             if noun is not None and noun.role == "invalid-provider":
                 return False
@@ -288,7 +294,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
                 continue
             if noun is not None:
                 # A grammatical noun may not conceal a different owner.
-                if noun.owner_prefix.strip() and re.fullmatch(rf"\s*(?:在|向|对)\s*(?:{owner})(?:上|下)?\s*", noun.owner_prefix) is None:
+                if noun.owner_prefix.strip() and re.fullmatch(rf"\s*(?:在|向|对)\s*(?:{owner})\s*(?:上|下)?\s*", noun.owner_prefix) is None:
                     return False
                 continue
             if (action.group() in {"修改", "变更", "改动"}

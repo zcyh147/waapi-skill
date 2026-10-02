@@ -18,6 +18,9 @@ _CHANGE = r"(?:修改|变更|改动)"
 _REFERENT = r"(?:该|此|本次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
+_PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
+_GRANT = r"(?:已)?(?:取得|获得)"
+_AUTHORIZATION = r"(?:的)?(?:独立)?(?:策略)?授权"
 
 
 class PlannedNoun(NamedTuple):
@@ -30,14 +33,22 @@ class PrimaryTarget(NamedTuple):
     identity: Mapping[str, Any] | None
 
 
+def _authorization_clause(clause: str) -> bool:
+    """A coordinated notice summary using the same closed grant components."""
+    return re.fullmatch(rf"\s*(?:并)?(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT})(?:{_CHANGE})?{_AUTHORIZATION}\s*", clause) is not None
+
+
 def attested_primary_target(clause: str, identity: Mapping[str, Any]) -> PrimaryTarget:
     """A complete positive exact target assertion, never a prose identity lookup."""
     introduction = r"(?:已确认|已核实)目标是"
     if re.search(introduction, clause) is None:
         return PrimaryTarget("unrelated", None)
     values = "|".join(re.escape(identity[key].casefold()) for key in ("id", "name", "path"))
-    summary = r"(?:[，,]\s*并(?:已)?(?:取得|获得)(?:本次|此项|这项)(?:独立)?(?:策略)?授权)?"
-    if re.fullmatch(rf"\s*{introduction}\s*(?:{values})\s*{summary}\s*", clause):
+    roles = "|".join(re.escape(term) for term in role_terms(identity["type"]))
+    atom = rf"(?:(?:{values})|(?:{roles})\s+(?:{values})|(?:{values})\s+(?:{roles}))"
+    parts = re.split(r"[，,]", clause, maxsplit=1)
+    if (re.fullmatch(rf"\s*{introduction}\s*{atom}\s*", parts[0])
+            and (len(parts) == 1 or _authorization_clause(parts[1]))):
         return PrimaryTarget("attested", identity)
     return PrimaryTarget("invalid", None)
 
@@ -54,17 +65,18 @@ def planned_change_noun(action: str, prefix: str, suffix: str) -> PlannedNoun | 
         return None
     frames = (
         ("execution", rf"(?:{_FUTURE})?(?:按(?:该)?授权)?(?:执行|应用)(?:{_REFERENT})(?:单字段|单一引用|单一)?$", r"(?=[，,]|并|$)"),
-        ("authorization", rf"(?:已)?(?:获得|取得|针对|为)(?:{_REFERENT})$", r"的(?:独立)?授权(?=[，,]|$)"),
+        ("authorization", rf"(?:并)?(?:{_GRANT}|针对|为)(?:{_REFERENT})$", rf"{_AUTHORIZATION}(?=[，,]|$)"),
         ("authorization", rf"为(?:{_REFERENT})$", r"提供(?:独立|持久)?(?:策略)?授权(?=[，,]|$)"),
         ("authorization", rf"(?:已)?为(?:{_REFERENT})$", r"取得(?:独立)?授权(?=[，,]|$)"),
         ("authorization", rf"(?:预览(?:已)?|已)?将(?:{_REFERENT})$", r"(?:独立)?授权为\s*(?:allow_changes|策略)(?:\s*策略)?操作\s*$"),
+        ("curve-range", rf"(?:{_REFERENT})$", r"范围(?:仅|只)包含(?:这一|该|此)条曲线\s*$"),
     )
     for role, left, right in frames:
         match = re.search(left, prefix)
         if match and re.match(right, suffix):
             owner_prefix = prefix[:match.start()]
             if role == "authorization":
-                provider = re.search(r"(?:已)?按(?:保存的|已保存的|当前)\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*$", owner_prefix)
+                provider = re.search(rf"(?:并)?{_PROVIDER}$", owner_prefix)
                 if provider:
                     owner_prefix = owner_prefix[:provider.start()]
                 elif re.search(r"按[^，,。；;]*策略\s*$", owner_prefix):

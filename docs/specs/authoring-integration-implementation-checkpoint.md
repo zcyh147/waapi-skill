@@ -42,6 +42,59 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Repeated Medium policy interruption and composition gap — 2026-10-02:**
+  frozen `d6430a0` passed complete Non-live **13863 / skipped 119 / deselected 27**,
+  exit zero in **843.76 seconds**. New root
+  `expansion-failed3-d6430a0-sol-medium-r1-cli1592` completed all four units:
+  **one Agent PASS / two FAIL / one boundary**, no pending or early stop.
+  EXP25-C08 passed. EXP22-C08 again completed its effect with all five
+  independent assertions true, but its valid combination of exact target,
+  attested Attenuation qualifier and policy-authorization summary failed the
+  notice grammar. EXP22-C09 again requested human confirmation despite a
+  `policy_authorized` Preview with `explicit_confirmation=false` and next
+  command `execute`. Its safe stop remains genuine Agent incompletion, with
+  no goal execution or formal after-state.
+  The mixed root is frozen without verify-only/regrading. Its launcher ran
+  once, exited 1, was unloaded and left no scoped process. All four source
+  guards match; the passing sandbox was removed, two failures and the boundary
+  remain quarantined, and both failure reconciliations were reaped. The three
+  retained process records show cleaned/exited/no residuals. Deleted PASS
+  process details are not separately sealed; only its sealed lifecycle,
+  directory removal and terminal empty scope are claimed. Audit validated
+  **455 artifacts / 18901730 bytes / eight metadata seals**. Agent time was
+  **346.55 seconds**, three turns, zero slow, two Execute/Verify pairs. Exact
+  digests, usage and limits are in
+  `../research/integration-expansion-failed-rerun-d6430a0-sol-2026-10-02.json`.
+  After compositional notice validation, the next new focused root will use
+  **GPT-6.1 Sol high / default** for the two failed units, with EXP25-C08 as a
+  directly related regression control and the separate EXP22-M05 boundary.
+  Medium twice made the same explicit-policy-flow error; this justifies the
+  targeted reasoning-depth follow-up, not a general model ranking or rewriting
+  Medium FAILs. Final complete acceptance must use the successful focused
+  candidate and identical model/settings. Previously prepared Medium full
+  launchers remain unused and preserved. No public authorization relaxation,
+  prompt workaround or automatic approval is introduced.
+  The #147 successor composes an exact identity atom, optional qualifier of
+  its independently attested live role, and a coordinated authorization
+  summary from shared closed provider/grant/referent/change-noun components.
+  Optional grammatical particles do not discard preceding owner spans. The
+  real failing 2022 notice and passing 2025 notice remain immutable fixtures;
+  45 component combinations and 45 paired foreign-identity negatives exercise
+  their composition. Additional wrong-role, provider, policy, polarity,
+  adjacency, value and extra-edit controls pass. Review exposed a curve-range
+  noun exemption leaking into plugin/reference contexts; typed curve-range
+  handling now rejects those contexts before generic fallbacks, and the curve
+  lane still validates the complete owner prefix. Final Spec and Standards
+  rechecks are clear. **1377 affected-file tests** pass; the coordinator's
+  persisted notice/documentation gate passed **1386 tests**, exit zero in
+  **2.20 seconds**. Log SHA-256 is
+  `2e0b3a50af30dcedfd672c7d7c2a0b17ed745257d0bc8605c237cc730c688d7e`;
+  JUnit SHA-256 is
+  `2595e7489cd17b56b3cc51ea4685688aed0a26d806e9d132de1fe7a1fffb2314`.
+  Packaged Skill and fixed Program inputs remain unchanged. Complete successor
+  Non-live and new Sol-high focused/Fresh evidence remain pending; no frozen
+  result was replayed or regraded.
+
 - **Sol-medium focused follow-up — 2026-10-02:** frozen `5278a15` passed
   complete Non-live **13807 / skipped 119 / deselected 27**, exit zero in
   **859.44 seconds**. Root
