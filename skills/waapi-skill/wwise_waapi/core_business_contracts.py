@@ -58,6 +58,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.object.setAttenuationCurve": {
         "versions": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
         "roles": ("attenuation",),
+        "role_live_types": {"attenuation": "Attenuation"},
         "required_fields": ("attenuation_handle", "curve_kind", "curve_source", "points"),
         "optional_fields": ("platform_name",),
         "field_types": {
@@ -365,6 +366,18 @@ def core_business_operations() -> frozenset[str]:
     return frozenset(_CONTRACTS)
 
 
+def core_business_role_live_type(operation: str, version: str, role: str | None) -> str | None:
+    """Return a pinned role's required live class, never a creatable kind.
+
+    Only explicit per-operation facts qualify. Other roles retain their normal
+    semantic/discriminator resolution and ambiguity boundary.
+    """
+    row = _CONTRACTS[operation]
+    if version not in row["versions"]:
+        raise ValueError("generic Core business operation is unavailable in this version")
+    return row.get("role_live_types", {}).get(role)
+
+
 def core_business_versions(operation: str) -> tuple[str, ...]:
     try:
         return tuple(_CONTRACTS[operation]["versions"])
@@ -551,4 +564,5 @@ __all__ = [
     "core_business_operations",
     "core_business_read_operations",
     "core_business_versions",
+    "core_business_role_live_type",
 ]

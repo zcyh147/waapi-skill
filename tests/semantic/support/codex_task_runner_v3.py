@@ -395,7 +395,7 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     return True
 
 
-_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|"
+_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|写入|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|"
                      r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
 
 
@@ -405,7 +405,8 @@ def _notice_mutation_is_noun(action: str, prefix: str, suffix: str) -> bool:
         return False
     return bool((re.match(r"请求(?=[，,]|$)", suffix) and re.search(r"(?:这次|本次|明确的|针对).*?$", prefix))
         or (re.match(r"(?:[，,]|$)", suffix) and re.search(r"执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", prefix))
-        or (re.match(r"的(?:独立)?授权(?=[，,]|$)", suffix) and re.search(r"(?:针对|获得|取得)(?:(?:这|此)(?:一)?项|本次)$", prefix)))
+        or (re.match(r"的(?:独立)?授权(?=[，,]|$)", suffix) and re.search(r"(?:针对|获得|取得)(?:(?:这|此)(?:一)?项|本次)$", prefix))
+        or (re.match(r"提供(?:独立|持久)?(?:策略)?授权(?=[，,]|$)", suffix) and re.search(r"为(?:(?:这|此)(?:一)?项|本次)$", prefix)))
 
 
 def _plugin_description_is_noun(action: str, prefix: str, suffix: str) -> bool:
@@ -429,10 +430,32 @@ def _noun_owner_prefix(prefix: str) -> str:
     prefix = re.sub(rf"(?:{creation})(?:效果器|effect)的$", "", prefix)
     prefix = re.sub(r"(?:采用|使用)的是$", "", prefix)
     prefix = re.sub(r"(?:我)?(?:现在)?(?:按(?:该)?授权)?执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", "", prefix)
-    prefix = re.sub(r"(?:获得|取得|针对)(?:(?:这|此)(?:一)?项|本次)$", "", prefix)
+    prefix = re.sub(r"(?:获得|取得|针对|为)(?:(?:这|此)(?:一)?项|本次)$", "", prefix)
     prefix = re.sub(r"(?:本次|这次|明确的)$", "", prefix)
     prefix = re.sub(r"(?:现在)?(?:我)?(?:将|会)$", "", prefix)
     return prefix
+
+
+def _note_owner_prefix_agrees(prefix: str, context: Mapping[str, Any], creation_position: int) -> bool:
+    """Retain every explicit owner span before applying local coordination."""
+    new_targets = {context["groups"][1][0].casefold(), "该效果器", "此效果器", "新效果器"}
+    for segment in re.finditer(r"[^，,并;；]+", prefix):
+        text = segment.group()
+        action = re.search(_NOTICE_MUTATIONS, text)
+        owner_text = text[:action.start()] if action else text
+        operators = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", owner_text))
+        for index, operator in enumerate(operators):
+            end = operators[index + 1].start() if index + 1 < len(operators) else len(owner_text)
+            owner = owner_text[operator.end():end].strip()
+            if not owner:  # A nested '将在' supplies one owner, not two.
+                continue
+            owner = re.sub(r"(?:上|下)$", "", owner).strip()
+            if owner in new_targets:
+                continue
+            if (segment.start() + operator.start() >= creation_position
+                    or not _bound_explicit_owners_agree("在 " + owner, "", context)):
+                return False
+    return True
 
 
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
@@ -446,7 +469,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 or not context["source_id"][1:].casefold().startswith(prefix)):
             return False
     if context["kind"] == "plugin":
-        for note in re.findall(r"备注(?:为|是)\s*[“\"]([^”\"]*)[”\"]", text):
+        for note in re.findall(r"备注(?:为|是)?\s*[“\"]([^”\"]*)[”\"]", text):
             if note != context["notes"].casefold():
                 return False
     for source_claim in re.finditer(r"目标(?:已)?(?:核实|确认)为\s*([^。；;\n]+)", text):
@@ -458,12 +481,21 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         return False
     affirmative = False
     source_referent = False
+    pending_note_owner = None
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
         anchored = _bound_owner_anchor(clause, context)
         source_referent = source_referent or anchored
         if source_referent and re.search(r"(?:在|向)(?:其|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause):
             anchored = True
         actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
+        prior_note_owner, pending_note_owner = pending_note_owner, None
+        if context["kind"] == "plugin" and not actions and re.fullmatch(r"\s*(?:在|向|对)\s*.+?(?:上|下)?\s*", clause):
+            new_target = context["groups"][1][0].casefold()
+            frame_context = {**context, "source_names": (*context["source_names"], new_target, "该效果器", "此效果器", "新效果器")}
+            if not _bound_explicit_owners_agree(clause, "", frame_context):
+                return False
+            pending_note_owner = clause
+        creation_position = -1
         for index, action in enumerate(actions):
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
@@ -488,10 +520,27 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 or (action.group() == "设置" and re.search(r"其他\s*$", prefix) and re.match(r"和对象不在", suffix))
                 or re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix)
                 or (context["kind"] == "reference" and re.search(r"执行.*引用$", prefix) and action.group() == "更新"))
+            note_write = False
             owner_prefix = _noun_owner_prefix(prefix) if noun else prefix
+            if action.group() == "写入":
+                # The create-only descriptor owns this note; a coordinated
+                # write may describe that same field, never arbitrary fields
+                # or another object. It cannot supply the primary effect.
+                note = re.fullmatch(r"备注\s*[“\"]([^”\"]*)[”\"]", suffix)
+                full_owner_prefix = (prior_note_owner + ";" if prior_note_owner else "") + prefix
+                full_creation_position = creation_position + (len(prior_note_owner) + 1 if prior_note_owner else 0) if creation_position >= 0 else -1
+                if not _note_owner_prefix_agrees(full_owner_prefix, context, full_creation_position):
+                    return False
+                qualifier = re.split(r"[，,]|并", prefix)[-1].strip()
+                note_write = (context["kind"] == "plugin" and affirmative and note is not None
+                    and note.group(1) == context["notes"].casefold()
+                    and qualifier in {"", "该效果器的", context["groups"][1][0].casefold() + "的"})
+                if not note_write:
+                    return False
+                owner_prefix = qualifier
             if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent):
                 return False
-            if noun:
+            if noun or note_write:
                 continue
             if any(term in clause for term in context["protected"]):
                 return False
@@ -499,6 +548,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                 return False
             if expected and anchored:
                 affirmative = True
+                if context["kind"] == "plugin":
+                    creation_position = action.start()
     return affirmative
 
 

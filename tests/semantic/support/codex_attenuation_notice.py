@@ -12,7 +12,7 @@ ATTENUATION_API = "ak.wwise.core.object.setAttenuationCurve"
 _GUID = r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}"
 _NUMBER = r"[+-]?\d+(?:\.\d+)?"
 _ACTION = (r"设置为|设为|改为|改成|更新|修改(?!范围|请求|策略|前|后|结果|状态)|替换|"
-           r"删除|移除|清空|重置|新增|添加|"
+           r"提交|应用|写入|删除|移除|清空|重置|新增|添加|插入|创建|追加|"
            r"\b(?:set|change|update|replace|delete|remove|clear|reset|add|create)\b")
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 
@@ -64,6 +64,48 @@ def _has(text: str, token: str) -> bool:
     return re.search(rf"(?<![a-z0-9_]){re.escape(token.casefold())}(?![a-z0-9_])", text) is not None
 
 
+def _point_count(value: str) -> int | None:
+    if value.isascii() and value.isdigit():
+        return int(value) if len(value) <= 2 else None
+    digits = {character: index for index, character in enumerate("零一二三四五六七八九")}
+    if value in digits:
+        return digits[value]
+    parts = value.split("十")
+    if len(parts) == 2 and (not parts[0] or parts[0] in digits) and (not parts[1] or parts[1] in digits):
+        return (digits[parts[0]] if parts[0] else 1) * 10 + (digits[parts[1]] if parts[1] else 0)
+    return None
+
+
+def _point_description(text: str, context: Mapping[str, Any]) -> bool:
+    """A complete quantity/count/shape label for already verified coordinates."""
+    shapes = {point["shape"] for point in context["points"]}
+    if len(shapes) != 1:
+        return False
+    native = next(iter(shapes))
+    shape = next(key for key, value in _CURVE_SHAPES.items() if value == native)
+    shape = rf"(?:{re.escape(shape)}|线性)" if shape == "linear" else re.escape(shape)
+    unit = r"(?:\s*db)?" if context["kind"] == "volume-dry" else ""
+    description = re.fullmatch(rf"(?P<count>[0-9零一二三四五六七八九十]+)(?:个)?\s*{shape}(?:点|points)[:：]?[、\s]*{unit}\s*", text)
+    return description is not None and _point_count(description.group("count")) == len(context["points"])
+
+
+def _prospective_submission(left: str, right: str, text: str, context: Mapping[str, Any], owner: str, kind: str, source: str) -> bool:
+    """A complete owned-Preview result description with prospective execution."""
+    if re.fullmatch(rf"预览(?:已)?(?:显示|确认|表明|限定)[:：]?(?:仅|只)?(?:将|会)?(?:向|对)(?:{owner})", left.strip()) is None:
+        return False
+    description = re.fullmatch(rf"(?:{kind})(?:曲线|curve)?[:：]\s*(?:{source})(?:来源|source)?[、，,\s]*(.+)", right)
+    if description is None or not _point_description(description.group(1), context):
+        return False
+    intent = False
+    for execution in re.finditer(r"(?:现在|即将|随后)(?:按授权|按预览)?(?:执行|应用)", text):
+        qualifier = re.split(r"[，,、。；;\n]", text[:execution.start()])[-1]
+        if re.search(_NEGATION, qualifier) is None:
+            intent = True
+    if re.search(r"(?:不|不会)(?:执行|应用)(?:本次|这项|此项|该预览)?(?:修改|变更|改动)?(?=[，,。；;]|$)", text):
+        return False
+    return intent
+
+
 def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases: list[str], source_aliases: list[str]) -> bool:
     """Every affirmative transitive edit must name this owner and curve role."""
     row = context["identity"]
@@ -99,7 +141,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
                     and re.search(r"执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", clause[:action.start()])
                     and not clause[action.end():].strip()):
                 continue
-            if action.group() in {"删除", "移除", "清空", "重置", "新增", "添加", "delete", "remove", "clear", "reset", "add", "create"}:
+            if action.group() in {"删除", "移除", "清空", "重置", "新增", "添加", "插入", "创建", "追加", "delete", "remove", "clear", "reset", "add", "create"}:
                 return False
             left, right = clause[:action.start()], clause[action.end():].strip()
             # Chinese suffix verbs carry the subject on their left; English
@@ -108,6 +150,13 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
             if prior is not None and not left.strip() and action.group() in {"设置为", "设为", "改为", "改成"}:
                 value = right
                 if re.fullmatch(allowed_value, value.strip(" 、")) is None:
+                    return False
+                affirmative = True
+                continue
+            if action.group() in {"提交", "应用", "写入"}:
+                if action.group() == "写入" and affirmative and left.strip() in {"", "并"} and _point_description(right, context):
+                    continue
+                if not _prospective_submission(left, right, text, context, owner, kind, source):
                     return False
                 affirmative = True
                 continue

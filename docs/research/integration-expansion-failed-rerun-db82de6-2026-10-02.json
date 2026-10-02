@@ -1,0 +1,184 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "db82de6b8d9561aac59839abd5fd52cc075fcca4",
+  "date": "2026-10-02",
+  "host": "macOS",
+  "root": "expansion-failed5-db82de6-luna-high-r1-cli1592",
+  "status": "complete-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6-luna",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "cases": [
+      "EXP22-C08",
+      "EXP22-C09",
+      "EXP25-C08",
+      "EXP25-C09",
+      "EXP25-M05",
+      "EXP22-M05"
+    ],
+    "agent_budget_seconds": 600,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180,
+    "max_pre_action_retries": 0,
+    "codex_binary": "0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "development_gates": {
+    "focused": {
+      "passed": 1568,
+      "seconds": 24.3,
+      "exit_code": 0,
+      "log_sha256": "13b6b01a08f711d567361362c354b7f63088b3a8fba93bf838221c10aac9b603",
+      "junit_sha256": "ae0f36e6e8ceac32e87360d8614ecd693832591381143e126882738bbe9d570b"
+    },
+    "nonlive": {
+      "passed": 13349,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 833.94,
+      "exit_code": 0,
+      "log_sha256": "73dfddcc86fb4279f9bd160c1544184f3ffba01beaaa8ed1cefe515b6f19f959",
+      "junit_sha256": "271810c84395827a83941f1c1ce33294cf706d14eee02a013c24c77bb496d008"
+    },
+    "program": {
+      "passed": 6176,
+      "skipped": 2,
+      "seconds": 294.77,
+      "exit_code": 0,
+      "log_sha256": "1a42f8d5cc3876ea4c7440dc939fbfdf4c5b7ff2bbdb7be5dd3f77f41e4061d4",
+      "skip_boundary": "Two native-Windows checks; this is macOS evidence.",
+      "scope": "Unchanged fa51197 packaged Skill and Program-input component evidence, not a new Program run at db82de6."
+    }
+  },
+  "result": {
+    "selected_units": 6,
+    "attempted_units": 6,
+    "agent_pass": 2,
+    "matrix_agent_fail": 3,
+    "canonical_agent_fail": 3,
+    "canonical_blocked": 0,
+    "boundary_proven": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "launcher_runs": 1,
+    "launcher_exit_code": 1,
+    "unloaded": true,
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false
+  },
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "status": "BOUNDARY_PROVEN",
+      "agent_pass_credit": false
+    },
+    {
+      "id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 289.1375313340686,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "gateway_verification_state": "result_schema_checked",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    },
+    {
+      "id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 115.03738695778884,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "visible_preview_notice failed despite complete passing business assertions"
+    },
+    {
+      "id": "EXP25-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 79.35557191702537,
+      "business_assertions_passed": 0,
+      "business_assertions_total": 0,
+      "gateway_verification_state": null,
+      "goal_execute_count": 0,
+      "goal_verify_count": 0,
+      "cause": "Safe unprepared workflow: correct Attenuation-role binding returned ambiguous business-kind resolution with empty candidates; Agent followed the disclosed stop boundary",
+      "goal_preview_count": 0,
+      "terminal_state": "unprepared",
+      "binding_reflected_type": "Attenuation",
+      "binding_resolution_status": "ambiguous",
+      "binding_resolution_candidates": []
+    },
+    {
+      "id": "EXP25-C09",
+      "matrix_status": "PASS",
+      "canonical_status": "PASS",
+      "agent_seconds": 152.64877912518568,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "All required business and Agent gates passed"
+    },
+    {
+      "id": "EXP25-M05",
+      "matrix_status": "PASS",
+      "canonical_status": "PASS",
+      "agent_seconds": 151.8356768330559,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "All required business and Agent gates passed"
+    }
+  ],
+  "integrity": {
+    "artifact_count": 685,
+    "artifact_bytes": 25838575,
+    "metadata_seals": 8,
+    "manifest_sha256": "b7af41f322758022eb1cb49c77a3686d761f3001cd5ad9ecf813990a83b383ed",
+    "source_full_hashes_and_project_mtimes_unchanged": 6,
+    "passing_projects_removed": 2,
+    "failed_projects_quarantined": 3,
+    "boundary_projects_quarantined": 1,
+    "retained_process_metadata": {
+      "process_exited": true,
+      "residual_processes": []
+    },
+    "all_three_failure_reconciliations_reaped": true,
+    "terminal_scoped_processes_empty": true,
+    "pass_cleanup_detail_limit": "Deleted PASS process-cleanup metadata are not separately persisted in attempt manifest; sealed lifecycle PASS/deletion and terminal empty scope verified.",
+    "never_reuse": true,
+    "no_verify": true
+  },
+  "usage": {
+    "input_tokens": 2085689,
+    "cached_input_tokens": 1831936,
+    "uncached_input_tokens": 253753,
+    "output_tokens": 25603,
+    "reasoning_output_tokens_included": 14227,
+    "cache_write_input_tokens": 0,
+    "agent_seconds": 788.0149461671244,
+    "agent_turns": 5,
+    "slow_units": 0,
+    "goal_execute_count": 4,
+    "goal_verify_count": 4,
+    "usd_cost": null
+  },
+  "remaining": "Repair typed Attenuation-role comparison (#150) and bounded prospective notice/authorization grammar (#147), review and gate a new candidate, then exact failed-three-Agent-unit batch plus separate boundary. Final complete thirteen-Agent-unit batch plus separate boundary and identical verify-only remain required. No Windows acceptance is claimed.",
+  "disclosure149_evidence_limit": "Neither Fresh C08 task calls metadata attenuation or discovers the getter schema. Both use the setter schema. EXP22-C08 completes Draft/Preview/Execute/Verify with passing independent business assertions; EXP25-C08 stops after binding, without Preview, mutation or after-state assertions. Neither unit grants specific Fresh consumption or functional coverage credit to the newly disclosed getter inputs. Five-version program tests prove that disclosure-to-parser/fake-dispatch contract."
+}

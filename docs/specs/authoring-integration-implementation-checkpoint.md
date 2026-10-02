@@ -42,6 +42,52 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Complete failed-five batch and typed-role repair — 2026-10-02:** frozen
+  `db82de6` passed complete Non-live **13349 / skipped 119 / deselected 27**,
+  exit zero in **833.94 seconds**. Log SHA-256 is
+  `73dfddcc86fb4279f9bd160c1544184f3ffba01beaaa8ed1cefe515b6f19f959`;
+  JUnit SHA-256 is
+  `271810c84395827a83941f1c1ce33294cf706d14eee02a013c24c77bb496d008`.
+  Packaged Skill and Program inputs remain the passing `fa51197` component.
+  Root `expansion-failed5-db82de6-luna-high-r1-cli1592` completed all six
+  selected units: **two Agent PASS / three FAIL / one separate boundary**,
+  zero pending and no early stop. EXP25-C09/M05 passed. EXP22-C08/C09 completed
+  the business effects with all five/six independent assertions passing, but
+  their prospective result and provider-authorization notices failed grading.
+  EXP25-C08 stopped safely after correct Attenuation binding returned an
+  ambiguous business-kind comparison with no candidates. It did not Preview,
+  execute or produce after-state assertions. Neither C08 consumed the #149
+  getter schema; no Fresh getter credit is assigned.
+  #150 now resolves only the pinned attenuation role from its exact live
+  `Attenuation` class, checks identity/role/version before handle storage, and
+  marks comparison provenance `closed_role_live_type`. `semantic_kind` and
+  global creation kinds remain unchanged. Focused Core Gateway/adapter tests
+  passed **244 tests**. The #147 follow-up accepts complete prospective,
+  owned Preview descriptions with temporal intent without requiring an
+  imperative verb; current/history-only, refusal, contradictory and extra
+  changes remain negative. Coordinated notes retain full owner-prefix proof
+  before qualifier trimming and may target only the planned new Effect.
+  **890 focused notice tests** pass; final independent Spec and Standards
+  reviews for both repairs are clear. Combined root regression passed
+  **1884 tests**, exit zero in **33.82 seconds**. Log SHA-256 is
+  `917f15724f6d18e26d7b3c7f6c8c4bc8476f80408572ef59d662f1d58627f50d`;
+  JUnit SHA-256 is
+  `171fedf27377200d5f30bdb885e7f18580014b84fccdfbfc5c0e91d09e3a4a93`.
+  No owned test process or diff-check error remained.
+  The original FAIL root stays frozen without campaign verify-only or regrading.
+  Its launcher ran once, exited 1, was unloaded and left no scoped process.
+  All six source hash/mtime guards match. Two passing copies were removed;
+  three failures and the boundary stay quarantined. Three failure reconciliation
+  scopes were reaped; retained metadata record exited processes and no residuals.
+  Deleted PASS process-cleanup details are not separately in the attempt
+  manifest; sealed PASS lifecycle/deletion and terminal empty scope are verified.
+  Evidence/report audits validated **685 artifacts / 25838575 bytes / eight
+  metadata seals**. Exact results, usage and limitations are in
+  `../research/integration-expansion-failed-rerun-db82de6-2026-10-02.json`.
+  New fixed Program and complete Non-live gates are required for the #150
+  packaged Gateway/contract change, followed by exact three-failed-Agent-unit
+  plus boundary validation, identical verify-only, and final full acceptance.
+
 - **Complete exact-unit rerun and grammatical-role repair — 2026-10-02:**
   frozen `fa51197` passed five-version Program **6176 / skipped 2**, exit zero
   in **294.77 seconds** (log SHA-256

@@ -287,6 +287,7 @@ from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: igno
     core_business_catalog_rows,
     core_business_contract_data,
     core_business_operations,
+    core_business_role_live_type,
     core_business_versions,
 )
 from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -17457,6 +17458,16 @@ def dispatch_business_object_binding(
             details={"required_fields": ["id", "name", "type", "path"]},
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
+    role_live_type = (
+        core_business_role_live_type(binding.record.operation, detected_version, args.role)
+        if adapter.family == "core-project-object" else None
+    )
+    if role_live_type is not None and identity.object_type != role_live_type:
+        raise GatewayResultShapeError(
+            "Live business object class does not match its Gateway-owned role.",
+            details={"role": args.role, "expected_type": role_live_type, "actual_type": identity.object_type},
+            error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
+        )
     compatible_business_kinds = semantic_kinds_for_live_type(
         str(row["type"]),
         version=detected_version,
@@ -17526,7 +17537,13 @@ def dispatch_business_object_binding(
             else None
         )
     )
-    if (
+    if role_live_type is not None:
+        # The contract role and exact live class provide the comparison noun;
+        # no user label or global SemanticKind/create-kind table is involved.
+        business_kind = args.role
+        business_kind_candidates = (args.role,)
+        business_kind_source = "closed_role_live_type"
+    elif (
         business_kind is None
         and isinstance(args.role, str)
         and closed_selector.expected_type is not None

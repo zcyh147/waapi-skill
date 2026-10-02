@@ -1013,3 +1013,141 @@ def test_randomizer_core_plan_discovers_field_by_meaning_then_closes_values(
         "check_complete_core_plan"
     )
     assert all(call[0] != operation for call in declare_client.calls)
+
+
+ATTENUATION_URI = "ak.wwise.core.object.setAttenuationCurve"
+# Exact live identity in frozen db82de6 EXP25-C08: the role binding returned
+# Attenuation but an empty 'ambiguous' classification and instructed a stop.
+ATTENUATION_ROW = {
+    "id": "{112E0906-8BA7-4A12-AA46-D9147F0462A9}",
+    "name": "Expansion_EXP25-C08_Attenuation", "type": "Attenuation",
+    "path": r"\Attenuations\Default Work Unit\Expansion_EXP25-C08_Attenuation",
+}
+
+
+def _core_role_binding_case(tmp_path: Path, version: str, *, operation: str = ATTENUATION_URI):
+    env = _env(tmp_path)
+    env["WWISE_VERSION"] = version
+    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
+    env["WWISE_WAAPI_PORT"] = "31337"
+    state_dir = tmp_path / "state"
+    code, started = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "draft-start", operation], env=env,
+        client_factory=lambda _url: pytest.fail("start must remain offline"),
+    )
+    assert code == 0, started
+    info = _info()
+    info["version"]["year"] = int(version.split(".")[0])
+    info["version"]["displayName"] = f"v{version}.0.1"
+    return env, state_dir, started, info
+
+
+def _bind_core_role(env, state_dir, started, info, tmp_path, rows, *, role="attenuation", selector=None):
+    project = _project(tmp_path)
+    object_results = [{"return": rows}]
+    if info.get("version", {}).get("year") == 2021:
+        object_results.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"]}]})
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [info],
+        "ak.wwise.core.getProjectInfo": [project],
+        "ak.wwise.core.object.get": object_results,
+    })
+    code, payload = gateway.execute_gateway([
+        "--state-dir", str(state_dir), "draft-bind-object", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", "1",
+        *([] if role is None else ["--role", role]),
+        *(selector or ["--object-id", ATTENUATION_ROW["id"]]),
+    ], env=env, client_factory=lambda _url: client)
+    return code, payload, client
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("scope", ("id", "path"))
+def test_exact_frozen_attenuation_role_has_resolved_live_class_comparison(version, tmp_path, scope):
+    env, state, started, info = _core_role_binding_case(tmp_path, version)
+    selector = (["--object-id", ATTENUATION_ROW["id"]] if scope == "id" else
+                [token for name in ("Attenuations", "Default Work Unit", ATTENUATION_ROW["name"])
+                 for token in ("--object-path-segment", name)])
+    code, bound, client = _bind_core_role(env, state, started, info, tmp_path, [dict(ATTENUATION_ROW)], selector=selector)
+    assert code == 0, bound
+    assert bound["bound_object"]["business_kind"] == "attenuation"
+    assert bound["bound_object"]["business_kind_resolution"] == {
+        "status": "resolved", "candidates": ["attenuation"], "reflected_type": "Attenuation",
+        "source": "closed_role_live_type",
+    }
+    assert bound["bound_object"]["semantic_kind"] is None  # Not a new creatable kind.
+    next_action = bound["draft"]["next_action_binding"]
+    assert next_action["required_next_phase"] == "declare_complete_core_plan"
+    assert next_action["object_binding"]["next_role"] == "attenuation"
+    assert next_action["declaration"]["append_fields"]["required_fields"][0] == "attenuation_handle"
+    assert "when_status_is_ambiguous_stop_only" in next_action["object_binding"]["result_validation_rule"]
+    assert client.calls[-1] == (
+        "ak.wwise.core.object.get", {"from": {scope: [ATTENUATION_ROW[scope]]}},
+        {"return": ["id", "name", "type", "path"]},
+    )
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("damage", ("wrong_id", "missing_id", "duplicate", "missing_row", "missing_name", "missing_path", "wrong_path", "missing_class", "wrong_class", "wrong_role", "missing_role", "version_drift", "missing_version"))
+def test_attenuation_role_classification_never_certifies_invalid_binding(version, damage, tmp_path):
+    env, state, started, info = _core_role_binding_case(tmp_path, version)
+    row = dict(ATTENUATION_ROW)
+    rows = [row]
+    role = "attenuation"
+    selector = None
+    if damage == "wrong_id": row["id"] = TARGET_ID
+    elif damage == "missing_id": row.pop("id")
+    elif damage == "duplicate": rows.append(dict(row))
+    elif damage == "missing_row": rows.clear()
+    elif damage == "missing_name": row.pop("name")
+    elif damage == "missing_path": row.pop("path")
+    elif damage == "wrong_path":
+        selector = [token for name in ("Attenuations", "Default Work Unit", ATTENUATION_ROW["name"])
+                    for token in ("--object-path-segment", name)]
+        row["path"] = r"\Attenuations\Default Work Unit\AnotherAttenuation"
+    elif damage == "missing_class": row.pop("type")
+    elif damage == "wrong_class": row["type"] = "Sound"
+    elif damage == "wrong_role": role = "object"
+    elif damage == "missing_role": role = None
+    elif damage == "missing_version": info.pop("version")
+    else:
+        actual = "2022.1" if version == "2021.1" else "2021.1"
+        info["version"]["year"] = int(actual.split(".")[0])
+        info["version"]["displayName"] = f"v{actual}.0.1"
+    code, rejected, client = _bind_core_role(env, state, started, info, tmp_path, rows, role=role, selector=selector)
+    assert code == 2, rejected
+    assert rejected["ok"] is False
+    assert "bound_object" not in rejected
+    assert all(call[0] != ATTENUATION_URI for call in client.calls)
+    inspect_code, inspected = gateway.execute_gateway([
+        "--state-dir", str(state), "draft-inspect", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"],
+    ], env=env, client_factory=lambda _url: pytest.fail("inspect must remain offline"))
+    assert inspect_code == 0, inspected
+    assert inspected["draft"]["revision"] == 1
+    assert "boh1-" not in json.dumps(inspected)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_attenuation_live_class_is_not_a_global_business_or_creatable_kind(version, tmp_path):
+    env, state, started, info = _core_role_binding_case(
+        tmp_path, version, operation="ak.wwise.core.object.setRandomizer",
+    )
+    code, bound, _client = _bind_core_role(env, state, started, info, tmp_path, [dict(ATTENUATION_ROW)], role="object")
+    assert code == 0, bound
+    assert bound["bound_object"]["business_kind"] is None
+    assert bound["bound_object"]["business_kind_resolution"] == {
+        "status": "ambiguous", "candidates": [], "reflected_type": "Attenuation",
+    }
+    assert "when_status_is_ambiguous_stop_only" in bound["draft"]["next_action_binding"]["object_binding"]["result_validation_rule"]
+
+
+@pytest.mark.parametrize("version", ("2020.1", "2026.1"))
+def test_attenuation_role_contract_is_unavailable_outside_pinned_versions(version, tmp_path):
+    env = _env(tmp_path)
+    env["WWISE_VERSION"] = version
+    code, rejected = gateway.execute_gateway(["draft-start", ATTENUATION_URI], env=env,
+        client_factory=lambda _url: pytest.fail("unsupported version must fail offline"))
+    assert code == 2, rejected
+    assert rejected["ok"] is False
+    assert "draft" not in rejected

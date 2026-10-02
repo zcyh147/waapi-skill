@@ -1370,3 +1370,115 @@ def test_negated_foreign_noun_or_action_is_preservation_not_an_explicit_owner_as
     case = _grammatical_role_case('006-EXP25-C09')
     case['events'][-2]['item']['text'] += claim
     assert _grammatical_notice(case)
+
+
+def _expected_state_case(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-expected-state-notices-db82de6.json').read_text())
+    return next(case for case in fixture['cases'] if case['case'] == case_id)
+
+
+@pytest.mark.parametrize('case_id', ['002-EXP22-C08', '003-EXP22-C09'])
+def test_actual_prospective_expected_state_and_authorization_roles_match_the_owned_preview(case_id):
+    assert _grammatical_notice(_expected_state_case(case_id))
+
+
+@pytest.mark.parametrize('damage', ['current', 'history', 'generic', 'no_intent', 'refusal', 'foreign_owner', 'ambiguous_owner',
+    'wrong_kind', 'wrong_source', 'wrong_point', 'wrong_order', 'wrong_shape', 'wrong_count', 'wrong_unit',
+    'unclosed_point', 'extra_point', 'extra_action', 'extra_create', 'extra_write', 'late'])
+def test_prospective_attenuation_description_requires_complete_bound_effect_and_temporal_intent(damage):
+    case = _expected_state_case('002-EXP22-C08')
+    post = case['events'][-2]['item']
+    replacements = {
+        'current': ('预览已显示仅向', '当前状态显示向'), 'history': ('预览已显示仅向', '此前已经向'),
+        'no_intent': ('我现在执行', '我现在等待'), 'refusal': ('仅向该衰减对象提交', '不向该衰减对象提交'),
+        'foreign_owner': ('该衰减对象', 'OtherOwner'), 'ambiguous_owner': ('该衰减对象', '该衰减对象和 OtherOwner'),
+        'wrong_kind': ('干声音量', 'spread'), 'wrong_source': ('自定义来源', 'project 来源'),
+        'wrong_point': ('(50.0, -12)', '(50.0, -60)'), 'wrong_order': ('(0.0, 0)`、`(50.0, -12)', '(50.0, -12)`、`(0.0, 0)'),
+        'wrong_shape': ('线性', '非线性'), 'wrong_count': ('三个', '四个'), 'wrong_unit': (' dB；', ' Hz；'),
+        'unclosed_point': ('(50.0, -12)', '(50.0, -12'),
+    }
+    if damage in replacements:
+        old, new = replacements[damage]
+        assert old in post['text']
+        post['text'] = post['text'].replace(old, new)
+    elif damage == 'generic': post['text'] = '预览已授权，现在执行。'
+    elif damage == 'late': case['events'][-2:] = case['events'][-2:][::-1]
+    else: post['text'] += {'extra_point': '另外有点 (75,-24)。', 'extra_action': '同时修改 Pitch 为 12。',
+                          'extra_create': '同时创建另一个对象。', 'extra_write': '同时写入 Pitch 为 12。'}[damage]
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('frame,count,expected', [
+    ('预览已确认：仅向', '3个', True), ('预览已表明只对', '三', True),
+    ('预览已限定仅向', '3', True), ('预览已显示仅向', '30个', False),
+    ('预览已显示仅向', '三十个', False), ('预览已显示仅向', '若干', False),
+])
+def test_prospective_description_count_and_frame_roles_are_general_but_closed(frame, count, expected):
+    case = _expected_state_case('002-EXP22-C08')
+    post = case['events'][-2]['item']
+    post['text'] = post['text'].replace('预览已显示仅向', frame).replace('三个', count)
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('owner,expected', [('OtherSound', False), ('该 Sound 和 OtherSound', False),
+    ('{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}', False), ('该 Sound', True), ('', True)])
+def test_provider_authorization_noun_still_validates_its_explicit_owner(owner, expected):
+    case = _expected_state_case('003-EXP22-C09')
+    prefix = '' if not owner else f'在 {owner} 上'
+    case['events'][-2]['item']['text'] += prefix + '为此项变更提供独立授权。'
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('damage', ['name', 'notes', 'foreign_owner', 'extra_write', 'noun_only', 'late'])
+def test_creation_descriptor_and_provider_noun_require_one_independent_primary_effect(damage):
+    case = _expected_state_case('003-EXP22-C09')
+    post = case['events'][-2]['item']
+    if damage == 'name': post['text'] = post['text'].replace('NewGain', 'OtherGain')
+    elif damage == 'notes': post['text'] = post['text'].replace('Expansion C09 appended gain', 'Different notes')
+    elif damage == 'foreign_owner': post['text'] = post['text'].replace('该 Sound', 'OtherSound')
+    elif damage == 'extra_write': post['text'] += '同时写入 Pitch 为 12。'
+    elif damage == 'noun_only': post['text'] = '当前策略为这项变更提供独立授权，我现在执行并核验。'
+    else: case['events'][-2:] = case['events'][-2:][::-1]
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('claim', ['我不会执行这项修改。', '不应用此项变更。', '不会执行该预览。'])
+def test_prospective_expected_state_cannot_survive_a_later_requested_execution_refusal(claim):
+    case = _expected_state_case('002-EXP22-C08')
+    case['events'][-2]['item']['text'] += claim
+    assert not _grammatical_notice(case)
+
+
+def test_sealed_note_write_cannot_target_another_named_plugin():
+    case = _expected_state_case('003-EXP22-C09')
+    post = case['events'][-2]['item']
+    post['text'] = post['text'].replace('并写入备注', '并 OtherGain 的写入备注')
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('separator', ['，', '，并', '；', '并'])
+@pytest.mark.parametrize('owner_kind,expected', [('foreign', False), ('foreign_guid', False), ('ambiguous', False),
+    ('source', False), ('old_effect', False), ('new_effect', True)])
+def test_coordinated_note_write_keeps_full_owner_frame_evidence(separator, owner_kind, expected):
+    case = _expected_state_case('003-EXP22-C09')
+    owner = {
+        'foreign': 'OtherSound', 'foreign_guid': '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}',
+        'ambiguous': '该 Sound 和 OtherSound', 'source': '该 Sound',
+        'old_effect': case['before']['entries'][0]['effect']['name'],
+        'new_effect': case['artifact']['request']['arguments']['plugin']['name'],
+    }[owner_kind]
+    case['events'][-2]['item']['text'] += f'在 {owner} 上{separator}写入备注“Expansion C09 appended gain”。'
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('claim,expected', [
+    ('写入备注“Expansion C09 appended gain”。', True),
+    ('该效果器的写入备注“Expansion C09 appended gain”。', True),
+    ('在 OtherSound 上向该 Sound，写入备注“Expansion C09 appended gain”。', False),
+    ('不在 OtherSound 上写入备注“Expansion C09 appended gain”。', True),
+    ('在该 Sound 上新增名为 Expansion_EXP22-C09_NewGain 的效果器，并写入备注“Expansion C09 appended gain”。', True),
+])
+def test_note_write_full_owner_evidence_and_local_qualifier_are_both_required(claim, expected):
+    case = _expected_state_case('003-EXP22-C09')
+    case['events'][-2]['item']['text'] += claim
+    assert _grammatical_notice(case) is expected

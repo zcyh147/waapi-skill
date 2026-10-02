@@ -1,0 +1,623 @@
+{
+  "candidate": "db82de6",
+  "projection": "Two bounded actual post-Preview notices and Execute ordering; immutable request/prepared fields and independent baseline. Original FAILs unchanged.",
+  "cases": [
+    {
+      "case": "002-EXP22-C08",
+      "events_sha256": "4a34ad76a187798a55eaa8a515b61e94a2604e1a212a882d35c958b0941e3408",
+      "preview_sha256": "67259411ecd3adc2bca2be30ce01c7dcf1be982dd464257d6577ef7e369d42de",
+      "events": [
+        {
+          "original_index": 23,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "original_index": 24,
+          "type": "item.completed",
+          "item": {
+            "id": "item_13",
+            "type": "agent_message",
+            "text": "预览已显示仅向该衰减对象提交干声音量曲线：自定义来源、三个线性点 `(0.0, 0)`、`(50.0, -12)`、`(100.0, -48)` dB；未包含对象备注、声音衰减引用、音量、路由或其他曲线字段。已保存的 `allow_changes` 策略已将该预览标记为本次授权，我现在执行并按网关结果核验。"
+          }
+        },
+        {
+          "original_index": 25,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        }
+      ],
+      "artifact": {
+        "request": {
+          "arguments": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{9BF4A3D8-46FC-4B6B-8C7F-325427657BFF}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "options": {}
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "waapi.call",
+          "version": "2022.1"
+        },
+        "prepared_operation": {
+          "operation": "waapi.call",
+          "version": "2022.1",
+          "verification_plan": {
+            "kind": "result-schema",
+            "strategy": "result_schema",
+            "uri": "ak.wwise.core.object.setAttenuationCurve",
+            "version": "2022.1"
+          },
+          "pre_state": {
+            "execution_contract": {
+              "accepted_authorization_modes": [
+                "explicit_confirmation",
+                "policy_authorization"
+              ],
+              "companion_uris": [],
+              "contract": "waapi-skill.public-execution-contract/v2",
+              "effect": "project_mutation",
+              "excluded_reason": null,
+              "executable": true,
+              "gateway_commands": [
+                "request-schema"
+              ],
+              "io_audit": null,
+              "item_type": "function",
+              "lifecycle_strategy": "none",
+              "post_execution_project_guard_policy": "revalidate",
+              "program_case": "transaction-result-schema",
+              "project_guard_mode": "invariant",
+              "request_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType",
+                  "use",
+                  "points"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "#/definitions/objectArg",
+                  "#/definitions/pointsDefinition"
+                ],
+                "uri": "ak.wwise.core.object.setAttenuationCurve",
+                "validated_nodes": 6,
+                "version": "2022.1"
+              },
+              "request_validation_strength": "partial_reflected_schema",
+              "requires_authorization": true,
+              "result_limit_bytes": 1048576,
+              "route": "transaction",
+              "timeout_seconds": 30.0,
+              "uri": "ak.wwise.core.object.setAttenuationCurve",
+              "verification_strategy": "result_schema",
+              "version": "2022.1"
+            }
+          },
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{9BF4A3D8-46FC-4B6B-8C7F-325427657BFF}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": -48.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2022.1"
+          },
+          "dispatch": {
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{9BF4A3D8-46FC-4B6B-8C7F-325427657BFF}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.setAttenuationCurve"
+          }
+        }
+      },
+      "before": {
+        "attenuation": {
+          "id": "{9BF4A3D8-46FC-4B6B-8C7F-325427657BFF}",
+          "name": "Expansion_EXP22-C08_Attenuation",
+          "notes": "",
+          "parent": {
+            "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+          "type": "Attenuation"
+        },
+        "curves": {
+          "focus": {
+            "points": [],
+            "use": "None"
+          },
+          "game-defined-aux-send-volume": {
+            "points": [],
+            "use": "UseVolumeDry"
+          },
+          "high-pass-filter": {
+            "points": [],
+            "use": "None"
+          },
+          "low-pass-filter": {
+            "points": [],
+            "use": "None"
+          },
+          "spread": {
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0.0,
+                "y": 50.34965
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 0.0
+              }
+            ],
+            "use": "Custom"
+          },
+          "user-defined-aux-send-volume": {
+            "points": [],
+            "use": "UseVolumeDry"
+          },
+          "volume-dry": {
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0.0,
+                "y": 0.0
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 4.71844785465692e-16
+              }
+            ],
+            "use": "Custom"
+          }
+        },
+        "source": {
+          "curves": {
+            "focus": {
+              "points": [],
+              "use": "None"
+            },
+            "game-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "high-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "low-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "spread": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 50.34965
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "user-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "volume-dry": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 4.71844785465692e-16
+                }
+              ],
+              "use": "Custom"
+            }
+          },
+          "object": {
+            "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+            "name": "Horns",
+            "notes": "",
+            "parent": {
+              "id": "{77ED99BF-A13C-437D-AAC6-63B399AA2E8C}",
+              "name": "Ambience"
+            },
+            "path": "\\Attenuations\\Ambience\\Horns",
+            "type": "Attenuation"
+          }
+        },
+        "users": {
+          "{26F57469-40AB-4005-AEC2-0E59DDD22BED}": {
+            "id": "{26F57469-40AB-4005-AEC2-0E59DDD22BED}",
+            "name": "Expansion_EXP22-C08_AttenuatedSound",
+            "notes": "",
+            "output_bus": {
+              "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "name": "Master Audio Bus"
+            },
+            "parent": {
+              "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C08_AttenuatedSound",
+            "references": {
+              "Attenuation": {
+                "id": "{9BF4A3D8-46FC-4B6B-8C7F-325427657BFF}",
+                "name": "Expansion_EXP22-C08_Attenuation"
+              }
+            },
+            "type": "Sound",
+            "volume_db": -3.0
+          }
+        }
+      }
+    },
+    {
+      "case": "003-EXP22-C09",
+      "events_sha256": "bd9fb4000ae481763abc0daec1f1114e42b7267810b078f79f75dfa3becfabeb",
+      "preview_sha256": "b62e137b9b987029bba05ee5202cd796d72894c22585bddac90127f10869ac5d",
+      "events": [
+        {
+          "original_index": 25,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "original_index": 26,
+          "type": "item.completed",
+          "item": {
+            "id": "item_13",
+            "type": "agent_message",
+            "text": "预览确认将在该 Sound 上新增名为 `Expansion_EXP22-C09_NewGain` 的 Wwise Gain 效果器，并写入备注“Expansion C09 appended gain”；没有请求其他插件参数或平台值。当前 `allow_changes` 策略已为这项变更提供独立授权，我现在执行并核验。"
+          }
+        },
+        {
+          "original_index": 27,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        }
+      ],
+      "artifact": {
+        "request": {
+          "arguments": {
+            "plugin": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP22-C09_NewGain",
+              "notes": "Expansion C09 appended gain"
+            },
+            "target": {
+              "kind": "id",
+              "value": "{4A10274F-78B0-47B4-8D17-6CA420D80928}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.createPlugin",
+          "version": "2022.1"
+        },
+        "prepared_operation": {
+          "operation": "object.createPlugin",
+          "version": "2022.1",
+          "verification_plan": {
+            "descriptor": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP22-C09_NewGain",
+              "notes": "Expansion C09 appended gain",
+              "properties": []
+            },
+            "kind": "object-plugin-created",
+            "placement": {
+              "collection": "@Effect2",
+              "create_only": true,
+              "effect_slot": "@Effect2",
+              "kind": "fixed_effect_reference",
+              "raw_replace_all_allowed": false,
+              "replace_existing_allowed": false,
+              "requires_proven_empty_slot": true
+            },
+            "pre_effect_references": {
+              "@Effect0": "{3387BC75-7593-4B4E-91B6-7433351EBAD1}",
+              "@Effect1": "{6981DF7B-B3BE-4EFE-B0D5-2EF794818A1A}",
+              "@Effect2": null,
+              "@Effect3": null
+            },
+            "preexisting_plugin_ids": [
+              "{3387BC75-7593-4B4E-91B6-7433351EBAD1}",
+              "{6981DF7B-B3BE-4EFE-B0D5-2EF794818A1A}"
+            ],
+            "property_validation": [],
+            "readback_fields": [
+              "id",
+              "name",
+              "type",
+              "classId",
+              "parent",
+              "owner",
+              "notes"
+            ],
+            "readback_view": {
+              "language": null,
+              "platform": null
+            },
+            "target_id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+            "target_type": "Sound",
+            "version": "2022.1"
+          },
+          "pre_state": {
+            "plugin_creation_guard": {
+              "descriptor": {
+                "class_id": 9109507,
+                "kind": "effect",
+                "name": "Expansion_EXP22-C09_NewGain",
+                "notes": "Expansion C09 appended gain",
+                "properties": []
+              },
+              "plan": {
+                "dispatch": {
+                  "args": {
+                    "autoAddToSourceControl": false,
+                    "objects": [
+                      {
+                        "@Effect2": {
+                          "classId": 9109507,
+                          "name": "Expansion_EXP22-C09_NewGain",
+                          "notes": "Expansion C09 appended gain",
+                          "type": "Effect"
+                        },
+                        "object": "{4A10274F-78B0-47B4-8D17-6CA420D80928}"
+                      }
+                    ]
+                  },
+                  "options": {},
+                  "uri": "ak.wwise.core.object.set"
+                },
+                "operation": "object.createPlugin",
+                "placement": {
+                  "collection": "@Effect2",
+                  "create_only": true,
+                  "effect_slot": "@Effect2",
+                  "kind": "fixed_effect_reference",
+                  "raw_replace_all_allowed": false,
+                  "replace_existing_allowed": false,
+                  "requires_proven_empty_slot": true
+                },
+                "plugin": {
+                  "class_id": 9109507,
+                  "kind": "effect",
+                  "name": "Expansion_EXP22-C09_NewGain",
+                  "notes": "Expansion C09 appended gain",
+                  "properties": []
+                },
+                "property_validation": [],
+                "target": {
+                  "id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+                  "type": "Sound"
+                },
+                "verification": {
+                  "business_state_verified_only_by_readback": true,
+                  "expected_plugin": {
+                    "classId": 9109507,
+                    "name": "Expansion_EXP22-C09_NewGain",
+                    "notes": "Expansion C09 appended gain",
+                    "owner": {
+                      "kind": "id",
+                      "value": "{4A10274F-78B0-47B4-8D17-6CA420D80928}"
+                    },
+                    "parent": {
+                      "kind": "id",
+                      "value": "{4A10274F-78B0-47B4-8D17-6CA420D80928}"
+                    },
+                    "properties": [],
+                    "type": "Effect"
+                  },
+                  "readback_fields": [
+                    "id",
+                    "name",
+                    "type",
+                    "classId",
+                    "parent",
+                    "owner",
+                    "notes"
+                  ],
+                  "readback_view": {
+                    "language": null,
+                    "platform": null
+                  },
+                  "require_new_plugin_id": true
+                },
+                "version": "2022.1"
+              },
+              "property_metadata": [],
+              "snapshot": {
+                "args": {
+                  "from": {
+                    "id": [
+                      "{4A10274F-78B0-47B4-8D17-6CA420D80928}"
+                    ]
+                  }
+                },
+                "fixed_effects": {
+                  "@Effect0": "{3387BC75-7593-4B4E-91B6-7433351EBAD1}",
+                  "@Effect1": "{6981DF7B-B3BE-4EFE-B0D5-2EF794818A1A}",
+                  "@Effect2": null,
+                  "@Effect3": null
+                },
+                "kind": "fixed_effect_references",
+                "options": {
+                  "return": [
+                    "id",
+                    "@Effect0",
+                    "@Effect1",
+                    "@Effect2",
+                    "@Effect3"
+                  ]
+                },
+                "preexisting_plugin_ids": [
+                  "{3387BC75-7593-4B4E-91B6-7433351EBAD1}",
+                  "{6981DF7B-B3BE-4EFE-B0D5-2EF794818A1A}"
+                ],
+                "uri": "ak.wwise.core.object.get"
+              },
+              "target_id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+              "target_type": "Sound",
+              "version": "2022.1"
+            },
+            "target": {
+              "id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+              "name": "Expansion_EXP22-C09_EffectsOwner",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+              "type": "Sound"
+            }
+          }
+        }
+      },
+      "before": {
+        "entries": [
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{3387BC75-7593-4B4E-91B6-7433351EBAD1}",
+              "name": "Protected_Gain_0",
+              "notes": "protected effect 0",
+              "owner": {
+                "id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+                "name": "Expansion_EXP22-C09_EffectsOwner"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Protected_Gain_0",
+              "type": "Effect"
+            },
+            "slot": "0",
+            "slot_state": null
+          },
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{6981DF7B-B3BE-4EFE-B0D5-2EF794818A1A}",
+              "name": "Protected_Gain_1",
+              "notes": "protected effect 1",
+              "owner": {
+                "id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+                "name": "Expansion_EXP22-C09_EffectsOwner"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Protected_Gain_1",
+              "type": "Effect"
+            },
+            "slot": "1",
+            "slot_state": null
+          }
+        ],
+        "owner": {
+          "@Volume": -3.0,
+          "id": "{4A10274F-78B0-47B4-8D17-6CA420D80928}",
+          "name": "Expansion_EXP22-C09_EffectsOwner",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+          "type": "Sound"
+        },
+        "slot_order": [
+          "0",
+          "1"
+        ]
+      }
+    }
+  ]
+}
