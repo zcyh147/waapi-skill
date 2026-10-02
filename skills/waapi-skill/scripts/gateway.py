@@ -6856,6 +6856,54 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri == "ak.wwise.core.object.getAttenuationCurve":
+        # This existing fixed read requires business values. Disclose the
+        # complete CLI input forms without exposing native curveType tokens.
+        commands[0].update({
+            "required_inputs": ["object", "curve_role"],
+            "optional_inputs": ["platform"],
+            "input_forms": {
+                "object": {
+                    "exactly_one_of": ["exact_id", "path_segments"],
+                    "exact_id": {
+                        "arguments": ["--exact-id", "<canonical-object-guid>"],
+                        "format": "canonical GUID with braces from a bounded object read",
+                    },
+                    "path_segments": {
+                        "arguments": ["--path-segment", "<literal-hierarchy-name>"],
+                        "repeat": True,
+                        "minimum_items": 1,
+                        "maximum_items": MAX_BUSINESS_OBJECT_PATH_SEGMENTS,
+                        "maximum_item_utf8_bytes": MAX_BUSINESS_NAME_BYTES,
+                        "maximum_path_utf8_bytes": MAX_BUSINESS_PATH_BYTES,
+                        "trimmed": True,
+                        "control_free": True,
+                        "forbidden_characters": ["\\", "/", '"', "<", ">"],
+                        "order": "one literal object hierarchy name per level",
+                    },
+                },
+                "curve_role": {
+                    "arguments": ["--curve-role", "<curve-role>"],
+                    "choices": list(METADATA_CURVE_ROLES),
+                },
+                "platform": {
+                    "arguments": ["--platform", "<exact-platform-name>"],
+                    "maximum_characters": MAX_METADATA_PLATFORM_NAME_CHARS,
+                    "trimmed": True,
+                    "control_free": True,
+                    "meaning": "Exact project-platform name; omit for the default platform",
+                },
+            },
+            "command_templates": [
+                ["metadata", "attenuation", "--exact-id", "<canonical-object-guid>", "--curve-role", "<curve-role>"],
+                ["metadata", "attenuation", "--path-segment", "<literal-hierarchy-name>", "--curve-role", "<curve-role>"],
+            ],
+            "template_instruction": (
+                "Static input templates: fill one object selector and one disclosed curve role; "
+                "repeat --path-segment in hierarchy order for a path, and optionally append "
+                "--platform <exact-platform-name>. These are not exact-copy typed continuations."
+            ),
+        })
     return {
         "contract": "waapi-skill.fixed-command-route/v1",
         "ok": True,

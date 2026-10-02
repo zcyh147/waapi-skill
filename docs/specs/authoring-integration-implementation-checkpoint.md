@@ -42,6 +42,49 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Complete failed-only batch and consolidated repairs — 2026-10-02:**
+  frozen `86b475e` passed complete Non-live **13042 / skipped 119 /
+  deselected 27**, exit zero in **817.38 seconds**. Log SHA-256 is
+  `dd2a401037f266523bb5501e03b1a52a169a3dd812313395da99a859b5754a8d`;
+  JUnit SHA-256 is
+  `94e20a1c3d6018e5cf772ba240ca1f18f54f6c3d2ec76b86d4c6947b5369c4a4`.
+  Root `expansion-failed7-86b475e-luna-high-r1-cli1592` completed all eight
+  selected units: **one Agent PASS / six FAIL / one separate boundary**,
+  zero pending and no early stop. EXP22-C06 passed; five other units completed
+  their business effect with all independent assertions passing, but failed
+  notice interpretation. EXP25-C08 retains the weaker Gateway
+  `result_schema_checked` boundary. EXP22-C08 safely stopped before Preview
+  after bare `metadata attenuation` received exit 2. Its fixed-route schema
+  omitted mandatory selector and curve-role guidance; #149 repairs that
+  disclosure without changing parser or dispatch behavior. Five-version tests
+  consume the actual schema and check exact dispatch and `agent_result`;
+  focused metadata/typed-request validation passed **226 tests**.
+  The consolidated #147 notice repair resolves attested target references and
+  placement, distinguishes request/authorization nouns from edits, and checks
+  coherent historical, delta and complete prospective curve statements. It
+  requires affirmative exact midpoint intent and the three-point single-middle-Y
+  guard before indexing; foreign owners, contradictions, malformed values and
+  extra changes remain negative controls. All five actual witnesses and
+  **676 focused notice tests** pass. Final independent Spec and Standards
+  reviews for both repairs are clear. Root combined regression passed
+  **1426 tests**, exit zero in **25.51 seconds**. Log SHA-256 is
+  `cf94c69a824bc519aed2c784c6e303746f6598692c1d05d5ffd2a7a32a71432b`;
+  JUnit SHA-256 is
+  `24fa7a8562e27ec2718882b60cd8192e49373bbfe511dbe54e2db79355155432`.
+  The frozen FAIL root is unchanged, without campaign verify-only or regrading.
+  Its launcher exited 1, was unloaded, and left no scoped process. All eight
+  source full hashes and project mtimes remained unchanged; actors closed and
+  children were reaped. The sole PASS copy was removed; six failed copies and
+  the boundary remain quarantined. Evidence/report reviews validated
+  **1188 artifacts / 44947559 bytes / eight metadata seals**. Exact units,
+  attribution, gates and usage are in
+  `../research/integration-expansion-failed-rerun-86b475e-2026-10-02.json`.
+  New fixed Program and complete Non-live gates are required because #149
+  changes the packaged Gateway. Existing exact-unit filters can select only
+  the six failed Agent units plus the separate boundary, avoiding a repeated
+  EXP22-C06 control. Fresh failed-only, identical verify-only and final full
+  thirteen-Agent-unit plus boundary acceptance remain outstanding.
+
 - **Frozen partial root and follow-up repairs — 2026-10-02:** candidate
   `719e3e0` passed complete Non-live **12962 / skipped 119 / deselected 27**,
   exit zero in **860.71 seconds**. Log SHA-256 is

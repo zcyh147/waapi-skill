@@ -68,12 +68,16 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     """Every affirmative transitive edit must name this owner and curve role."""
     row = context["identity"]
     owner = "|".join(re.escape(value.casefold()) for value in (
-        row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "该衰减对象", "该衰减", "this attenuation"))
+        row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "指定衰减对象", "该衰减对象", "该衰减", "this attenuation"))
     kind = "|".join(re.escape(value) for value in kind_aliases)
     field = rf"(?:的|'s|\s)*(?:{kind})(?:\s*(?:曲线|curve))?(?:的|:|：|\s)*(?:来源|source|形状|shape|点|points)?"
     source = "|".join(re.escape(value) for value in source_aliases)
-    allowed_value = rf"(?:{source})(?:\s*(?:曲线|curve))?"
+    allowed_value = rf"(?:{source})(?:\s*(?:线性|linear))?(?:\s*(?:点|points|曲线|curve))?"
     introduction = r"(?:预览|已|核实|确认|修改范围|范围|仅|为|即将|只|把|将|同时|另外|我|会|\s|\b(?:i|will|shall|only|then|also|and)\b)*"
+    # Coordinates have already been validated as the exact ordered plan.
+    # Remove only their complete numeric syntax before parsing the source edit.
+    text = re.sub(rf"[（(]\s*{_NUMBER}\s*[,，]\s*{_NUMBER}(?:\s*db)?\s*[)）]", "", text)
+    text = re.sub(r"、(?=\s*(?:、|[。；;]|$))", "", text)
     affirmative = False
     for clause in re.split(r"[。；;,，\n]|\bbut\b|但", text):
         for action in re.finditer(_ACTION, clause):
@@ -98,7 +102,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
                 if match is None:
                     return False
                 value = match.group(2)
-            if re.fullmatch(allowed_value, value) is None:
+            if re.fullmatch(allowed_value, value.strip(" 、")) is None:
                 return False
             affirmative = True
     return affirmative
@@ -112,7 +116,7 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
     row = context["identity"]
     if any(value != row["id"].casefold() for value in re.findall(_GUID, text)):
         return False
-    if not any(term.casefold() in text for term in (row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "该衰减", "该衰减对象", "this attenuation")):
+    if not any(term.casefold() in text for term in (row["id"], row["name"], row["path"], "该对象", "此对象", "目标对象", "指定衰减对象", "该衰减", "该衰减对象", "this attenuation")):
         return False
     kind_aliases = [context["kind"], context["kind"].replace("-", " ")]
     if context["kind"] == "volume-dry":

@@ -366,6 +366,14 @@ def test_metadata_attenuation_compiles_business_curve_role(
     curve_role: str,
     native_curve_type: str,
 ) -> None:
+    schema_exit, schema = waapi_gateway.execute_gateway(
+        ["request-schema", GET_ATTENUATION_CURVE_URI],
+        env=_gateway_env(tmp_path, version=version),
+        client_factory=lambda _url: pytest.fail("schema discovery must be offline"),
+    )
+    assert schema_exit == 0, schema
+    forms = schema["continuation"]["input_forms"]
+    assert curve_role in forms["curve_role"]["choices"]
     responses = _metadata_responses(tmp_path, version=version)
     responses[GET_ATTENUATION_CURVE_URI] = {
         "curveType": native_curve_type,
@@ -374,17 +382,12 @@ def test_metadata_attenuation_compiles_business_curve_role(
     }
     client = FakeClient(responses)
     scope_argv = (
-        ["--exact-id", OBJECT_GUID]
+        [forms["object"]["exact_id"]["arguments"][0], OBJECT_GUID]
         if exact_id_scope
         else [
-            "--path-segment",
-            "Attenuations",
-            "--path-segment",
-            "Default Work Unit",
-            "--path-segment",
-            "Outdoor",
-            "--platform",
-            "Windows",
+            *[token for name in ("Attenuations", "Default Work Unit", "Outdoor")
+              for token in (forms["object"]["path_segments"]["arguments"][0], name)],
+            forms["platform"]["arguments"][0], "Windows",
         ]
     )
 
@@ -393,7 +396,7 @@ def test_metadata_attenuation_compiles_business_curve_role(
             "metadata",
             "attenuation",
             *scope_argv,
-            "--curve-role",
+            forms["curve_role"]["arguments"][0],
             curve_role,
         ],
         env=_gateway_env(tmp_path, version=version),
@@ -1209,3 +1212,99 @@ def test_metadata_discover_never_invents_rejected_property_name(
 
     assert surfaced_names <= set(live_names)
     assert "OverrideMaxSoundPerInstance" not in surfaced_names
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_attenuation_read_schema_discloses_complete_business_inputs(
+    tmp_path: Path, version: str,
+) -> None:
+    exit_code, schema = waapi_gateway.execute_gateway(
+        ["request-schema", GET_ATTENUATION_CURVE_URI], env=_gateway_env(tmp_path, version=version),
+        client_factory=lambda _url: pytest.fail("request schema must be offline"),
+    )
+    assert exit_code == 0, schema
+    command = schema["continuation"]
+    assert command == schema["commands"][0]
+    assert command["subcommand"] == "metadata" and command["arguments"] == ["attenuation"]
+    assert command["required_inputs"] == ["object", "curve_role"]
+    forms = command["input_forms"]
+    assert forms["object"]["exactly_one_of"] == ["exact_id", "path_segments"]
+    assert forms["object"]["exact_id"]["arguments"] == ["--exact-id", "<canonical-object-guid>"]
+    assert forms["object"]["exact_id"]["format"] == "canonical GUID with braces from a bounded object read"
+    assert forms["object"]["path_segments"]["arguments"] == ["--path-segment", "<literal-hierarchy-name>"]
+    assert forms["object"]["path_segments"]["repeat"] is True
+    assert forms["object"]["path_segments"]["minimum_items"] == 1
+    assert forms["object"]["path_segments"]["maximum_items"] == 64
+    assert forms["object"]["path_segments"]["maximum_item_utf8_bytes"] == 512
+    assert forms["object"]["path_segments"]["maximum_path_utf8_bytes"] == 8192
+    assert forms["curve_role"] == {"arguments": ["--curve-role", "<curve-role>"], "choices": [
+        "volume-dry", "game-defined-aux-send-volume", "user-defined-aux-send-volume",
+        "low-pass-filter", "high-pass-filter", "spread", "focus",
+    ]}
+    assert command["optional_inputs"] == ["platform"]
+    assert forms["platform"]["arguments"] == ["--platform", "<exact-platform-name>"]
+    assert forms["platform"]["maximum_characters"] == 256
+    assert forms["platform"]["trimmed"] is True and forms["platform"]["control_free"] is True
+    assert command["command_templates"] == [
+        ["metadata", "attenuation", "--exact-id", "<canonical-object-guid>", "--curve-role", "<curve-role>"],
+        ["metadata", "attenuation", "--path-segment", "<literal-hierarchy-name>", "--curve-role", "<curve-role>"],
+    ]
+    assert command["template_instruction"].startswith("Static input templates")
+    assert schema["native_request_fields_disclosed"] is False
+    assert "curveType" not in json.dumps(schema) and "VolumeDryUsage" not in json.dumps(schema)
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("inputs", [
+    ["--curve-role", "volume-dry"],
+    ["--exact-id", OBJECT_GUID],
+    ["--exact-id", OBJECT_GUID.strip("{}"), "--curve-role", "volume-dry"],
+    ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--platform", ""],
+    ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--platform", " Windows "],
+    ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--platform", "Windows\n"],
+    ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--platform", "W" * 257],
+    ["--path-segment", r"Attenuations\Outdoor", "--curve-role", "volume-dry"],
+    ["--path-segment", " Outdoor ", "--curve-role", "volume-dry"],
+    ["--path-segment", "N" * 513, "--curve-role", "volume-dry"],
+    [*[token for _ in range(65) for token in ("--path-segment", "Level")], "--curve-role", "volume-dry"],
+    [*[token for _ in range(17) for token in ("--path-segment", "N" * 512)], "--curve-role", "volume-dry"],
+])
+def test_disclosed_attenuation_inputs_fail_closed_before_connecting(
+    tmp_path: Path, version: str, inputs: list[str],
+) -> None:
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["metadata", "attenuation", *inputs], env=_gateway_env(tmp_path, version=version),
+        client_factory=lambda _url: pytest.fail("invalid disclosed input must not connect"),
+    )
+    assert exit_code == 2, payload
+    assert payload["ok"] is False
+
+
+@pytest.mark.parametrize("version", ["2020.1", "2026.1"])
+def test_attenuation_read_schema_rejects_unavailable_version_without_connecting(
+    tmp_path: Path, version: str,
+) -> None:
+    exit_code, payload = waapi_gateway.execute_gateway(
+        ["request-schema", GET_ATTENUATION_CURVE_URI], env=_gateway_env(tmp_path, version=version),
+        client_factory=lambda _url: pytest.fail("unsupported version must not connect"),
+    )
+    assert exit_code == 2, payload
+    assert payload["ok"] is False
+    assert "continuation" not in payload
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("inputs", [
+    ["--exact-id", OBJECT_GUID, "--path-segment", "Outdoor", "--curve-role", "volume-dry"],
+    ["--exact-id", OBJECT_GUID, "--curve-role", "arbitrary-curve"],
+    ["--exact-id", OBJECT_GUID, "--curve-role", "volume-dry", "--curve-type", "VolumeDryUsage"],
+])
+def test_attenuation_cli_parser_rejects_ambiguous_unknown_and_native_inputs(
+    tmp_path: Path, version: str, inputs: list[str],
+) -> None:
+    with pytest.raises(SystemExit) as rejected:
+        waapi_gateway.execute_gateway(
+            ["metadata", "attenuation", *inputs], env=_gateway_env(tmp_path, version=version),
+            client_factory=lambda _url: pytest.fail("parser rejection must precede connection"),
+        )
+    assert rejected.value.code == 2

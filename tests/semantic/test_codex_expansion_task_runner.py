@@ -1073,3 +1073,145 @@ def test_preview_scalar_inheritance_rejects_add_remove_clear_actions_not_preserv
     case = _preview_bound_midpoint_case()
     case["events"][-2]["item"]["text"] += claim
     assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+def _consolidated_notice_case(case_id):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-contextual-notices-86b475e.json').read_text())
+    return next(case for case in fixture['cases'] if case['case'] == case_id)
+
+
+@pytest.mark.parametrize('case_id', ['004-EXP22-C09', '005-EXP25-C06', '006-EXP25-C08', '007-EXP25-C09', '008-EXP25-M05'])
+def test_consolidated_actual_notice_has_one_attested_effect_before_execute(case_id):
+    case = _consolidated_notice_case(case_id)
+    assert _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('case_id', ['004-EXP22-C09', '005-EXP25-C06', '006-EXP25-C08', '007-EXP25-C09', '008-EXP25-M05'])
+@pytest.mark.parametrize('damage', ['foreign_id', 'baseline', 'version', 'late', 'generic', 'extra_action'])
+def test_consolidated_context_does_not_inherit_foreign_late_or_additional_changes(case_id, damage):
+    case = _consolidated_notice_case(case_id)
+    post = case['events'][-2]['item']
+    if damage == 'foreign_id': post['text'] += '目标是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。'
+    elif damage == 'baseline':
+        key = 'attenuation' if case_id.endswith('C08') else 'stinger' if case_id.endswith('M05') else 'owner'
+        case['before'][key]['id'] = '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'
+    elif damage == 'version': case['artifact']['request']['version'] = '2024.1'
+    elif damage == 'late': case['events'][-2:] = case['events'][-2:][::-1]
+    elif damage == 'generic': post['text'] = '预览已授权，现在执行。'
+    else: post['text'] += '同时清空另一条曲线。'
+    assert not _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('case_id', ['004-EXP22-C09', '007-EXP25-C09'])
+@pytest.mark.parametrize('damage', ['foreign_owner', 'extra_owner', 'wrong_name', 'wrong_notes', 'noun_edit', 'pronoun_without_antecedent'])
+def test_effect_chain_location_and_request_nouns_are_not_new_owner_or_edit_authority(case_id, damage):
+    case = _consolidated_notice_case(case_id)
+    post = case['events'][-2]['item']
+    if damage == 'foreign_owner': post['text'] = post['text'].replace('其效果链末尾', 'OtherSound 的效果链末尾').replace('该 Sound 下', 'OtherSound 下')
+    elif damage == 'extra_owner': post['text'] += '另外在 OtherSound 下新增 Wwise Gain 效果器。'
+    elif damage == 'wrong_name': post['text'] = post['text'].replace('NewGain', 'OtherGain')
+    elif damage == 'wrong_notes': post['text'] = post['text'].replace('Expansion C09 appended gain', 'Different notes')
+    elif damage == 'noun_edit': post['text'] += '本次修改请求，随后修改 Lowpass 为 12。'
+    else:
+        post['text'] = post['text'].replace('目标已核实为指定 GUID 对应的 Sound。', '').replace('该 Sound 下', '其效果链末尾')
+    assert not _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('damage', ['old_value', 'old_x', 'new_value', 'new_x', 'final_value', 'final_order', 'final_missing',
+    'final_extra', 'wrong_unit', 'shape', 'foreign_property', 'extra_edit', 'unclosed', 'conflicting_final'])
+def test_coherent_midpoint_delta_and_full_final_curve_validate_every_numeric_and_edit_claim(damage):
+    case = _consolidated_notice_case('005-EXP25-C06')
+    post = case['events'][-2]['item']
+    replacements = {
+        'old_value': ('(50,-12)', '(50,-24)'), 'old_x': ('(50,-12)', '(75,-12)'),
+        'new_value': ('将改为 (50,-6)', '将改为 (50,-60)'), 'new_x': ('将改为 (50,-6)', '将改为 (75,-6)'),
+        'final_value': ('曲线为 (0,-48)、(50,-6)、(100,0)', '曲线为 (0,-48)、(50,-60)、(100,0)'),
+        'final_order': ('曲线为 (0,-48)、(50,-6)、(100,0)', '曲线为 (50,-6)、(0,-48)、(100,0)'),
+        'final_missing': ('曲线为 (0,-48)、(50,-6)、(100,0)', '曲线为 (0,-48)、(50,-6)'),
+        'final_extra': ('曲线为 (0,-48)、(50,-6)、(100,0)', '曲线为 (0,-48)、(50,-6)、(75,-3)、(100,0)'),
+        'wrong_unit': ('将改为 (50,-6)', '将改为 (50,-6 Hz)'),
+        'shape': ('各段线性', '各段非线性'), 'foreign_property': ('提交后曲线为', 'Pitch 提交后曲线为'),
+        'unclosed': ('(50,-12)', '(50,-12'),
+    }
+    if damage in replacements:
+        old, new = replacements[damage]
+        assert old in post['text']
+        post['text'] = post['text'].replace(old, new)
+    else: post['text'] += '同时修改 Lowpass 为 12。' if damage == 'extra_edit' else '最终曲线为 (0,-20)、(50,-6)、(100,0)，各段线性。'
+    assert not _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('damage', ['source', 'shape', 'kind', 'point', 'order', 'unit', 'foreign_owner', 'extra_edit'])
+def test_owned_custom_linear_points_phrase_is_exactly_the_sealed_attenuation_effect(damage):
+    case = _consolidated_notice_case('006-EXP25-C08')
+    post = case['events'][-2]['item']
+    old, new = {
+        'source': ('自定义', 'project'), 'shape': ('线性点', '非线性点'), 'kind': ('干声音量', 'spread'),
+        'point': ('(50.0, -12)', '(50.0, -24)'), 'order': ('(0.0, 0)、(50.0, -12)', '(50.0, -12)、(0.0, 0)'),
+        'unit': ('(50.0, -12)', '(50.0, -12 Hz)'), 'foreign_owner': ('指定衰减对象', 'OtherAttenuation'),
+        'extra_edit': ('我现在执行', '同时修改 Pitch 为 12。我现在执行'),
+    }[damage]
+    assert old in post['text']
+    post['text'] = post['text'].replace(old, new)
+    assert not _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('case_id', ['004-EXP22-C09', '007-EXP25-C09'])
+def test_explicit_foreign_source_claim_cannot_be_overridden_by_a_later_pronoun(case_id):
+    case = _consolidated_notice_case(case_id)
+    case['events'][-2]['item']['text'] += '目标已核实为 OtherSound。'
+    assert not _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('replacement', ['(50,-12 dB)，将改为 (50,-6 dB)', '(50,-12)，将改为 -6 dB'])
+def test_coherent_final_plan_accepts_quantity_compatible_midpoint_notation(replacement):
+    case = _consolidated_notice_case('005-EXP25-C06')
+    post = case['events'][-2]['item']
+    post['text'] = post['text'].replace('(50,-12)，将改为 (50,-6)', replacement)
+    assert _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+@pytest.mark.parametrize('replacement,expected', [
+    ('不会更新该 RTPC 关系。', False), ('不修改 Voice Volume 曲线。', False),
+    ('不会更新 Rain_Intensity 关系。', False), ('', False),
+    ('当前中间点是 (50,-12)，将改为 (50,-6)。不修改 Voice Pitch/Time 曲线。', True),
+    ('当前中间点是 (50,-12)，将改为 (50,-6)。不修改关系身份与备注。', True),
+])
+def test_exact_final_curve_requires_affirmative_target_edit_not_negated_or_missing_edit(replacement, expected):
+    case = _consolidated_notice_case('005-EXP25-C06')
+    post = case['events'][-2]['item']
+    post['text'] = post['text'].replace('当前中间点是 (50,-12)，将改为 (50,-6)。', replacement)
+    assert _notice(case['events'], artifact=case['artifact'], before=case['before']) is expected
+
+
+def _coherent_curve_case(old, new):
+    case = _consolidated_notice_case('005-EXP25-C06')
+    def points(values): return [{'x': x, 'y': y, 'shape': 'Linear'} for x, y in values]
+    case['artifact']['request']['arguments']['points'] = points(new)
+    prepared = case['artifact']['prepared_operation']
+    prepared['verification_plan']['points'] = points(new)
+    for rows in (case['before']['rtpcs'].values(), prepared['pre_state']['rtpc_snapshot']['rows'],
+                 prepared['verification_plan']['before_rows']):
+        for row in rows:
+            if row['@PropertyName'] == 'Volume': row['@Curve']['points'] = points(old)
+    return case
+
+
+@pytest.mark.parametrize('old,new', [
+    ([(0,-12)], [(0,-6)]),
+    ([(0,-48),(50,-12)], [(0,-48),(50,-6)]),
+    ([(0,-48),(50,-12),(100,0)], [(0,-20),(50,-6),(100,0)]),
+])
+def test_coherent_middle_promotion_requires_unique_three_point_single_middle_y_edit(old, new):
+    case = _coherent_curve_case(old, new)
+    middle = min(1, len(old)-1)
+    final = '、'.join(f'({x},{y})' for x,y in new)
+    case['events'][-2]['item']['text'] = (f'Voice Volume/Rain_Intensity 关系及备注保持原样。当前中间点是 ({old[middle][0]},{old[middle][1]})，'
+        f'将改为 ({new[middle][0]},{new[middle][1]})。提交后曲线为 {final}，各段线性。')
+    assert not _notice(case['events'], artifact=case['artifact'], before=case['before'])
+
+
+def test_ordinary_exact_full_curve_notice_remains_valid_for_one_point_edit():
+    case = _coherent_curve_case([(0,-12)], [(0,-6)])
+    case['events'][-2]['item']['text'] = '将 Voice Volume/Rain_Intensity 曲线设为 (0,-6)，各段线性。'
+    assert _notice(case['events'], artifact=case['artifact'], before=case['before'])

@@ -347,10 +347,11 @@ def _bound_owner_anchor(text: str, context: Mapping[str, Any]) -> bool:
         return True
     # The descriptor resolves through sealed roles, never through a shortened
     # GUID. Its trailing grammar must not introduce a different named owner.
-    return re.search(rf"(?:已核对|指定|目标|该|此)(?:的)?\s*(?:{context['source_type']}\b|对象)\s*(?=[，,。；;：:]|\{{|上|的|$)", text) is not None
+    return (re.search(rf"(?:已核对|指定|目标|该|此)(?:的)?\s*(?:{context['source_type']}\b|对象)\s*(?=[，,。；;：:]|\{{|上|下|的|$)", text) is not None
+            or re.search(rf"目标(?:已)?(?:核实|确认)为指定\s*guid\s*对应的\s*{context['source_type']}\b", text) is not None)
 
 
-def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any]) -> bool:
+def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any], *, source_referent: bool = False) -> bool:
     """Check owner-bearing grammar; omitted owners do not add an identity."""
     owners = []
     source_prefix = re.sub(r"\s*的\s*(?:trigger|触发器)\s*(?:引用)?\s*$", "", prefix)
@@ -369,6 +370,10 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
         if possessive:
             owners.append(possessive.group(1))
     for owner in owners:
+        # Location is a relationship of the same owner, not another identity.
+        owner = re.sub(r"(?:的)?效果链(?:末尾|尾部)?$|(?:上|下)$", "", owner).strip()
+        if source_referent and owner in {"其", "该对象", "此对象"}:
+            continue
         if owner in {context["source_id"].casefold(), *(value.casefold() for value in context["source_names"] if value)}:
             continue
         if re.fullmatch(rf"(?:该|此|目标|this|target)(?:的)?\s*(?:{context['source_type']}|对象|object)", owner):
@@ -387,6 +392,19 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     return True
 
 
+_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|"
+                     r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
+
+
+def _notice_mutation_is_noun(action: str, prefix: str, suffix: str) -> bool:
+    """Only complete request/authorization and execute-summary noun roles."""
+    if action not in {"修改", "变更"}:
+        return False
+    return bool((re.match(r"请求(?=[，,]|$)", suffix) and re.search(r"(?:这次|本次|明确的|针对).*?$", prefix))
+        or (re.match(r"(?:[，,]|$)", suffix) and re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix))
+        or (re.match(r"的(?:独立)?授权(?=[，,]|$)", suffix) and re.search(r"针对(?:这项|本次)$", prefix)))
+
+
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
     ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
@@ -397,12 +415,21 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         if (re.fullmatch(r"[0-9a-f-]{4,}", prefix) is None
                 or not context["source_id"][1:].casefold().startswith(prefix)):
             return False
+    for source_claim in re.finditer(r"目标(?:已)?(?:核实|确认)为\s*([^。；;\n]+)", text):
+        value = source_claim.group(1).strip()
+        if (value not in {context["source_id"].casefold(), *(name.casefold() for name in context["source_names"])}
+                and re.fullmatch(rf"指定\s*guid\s*对应的\s*{context['source_type']}", value) is None):
+            return False
     if not _bound_owner_anchor(text, context) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:]):
         return False
     affirmative = False
+    source_referent = False
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
         anchored = _bound_owner_anchor(clause, context)
-        actions = tuple(re.finditer(r"新增|添加|插入|改动|更新|修改|改为|设为|指向|变更|删除|移除|替换|设置|\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert)\b", clause))
+        source_referent = source_referent or anchored
+        if source_referent and re.search(r"(?:在|向)(?:其|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause):
+            anchored = True
+        actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
         for index, action in enumerate(actions):
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
@@ -419,6 +446,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             # Verification and the execute-summary noun do not author another
             # change. They cannot certify the expected effect by themselves.
             prefix = clause[:action.start()]
+            suffix = clause[action.end():].strip()
+            if _notice_mutation_is_noun(action.group(), prefix, suffix):
+                continue
             if action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", clause[action.end():])
                     or re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix)):
                 continue
@@ -427,7 +457,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             if re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix) or (context["kind"] == "reference"
                     and re.search(r"执行.*引用$", prefix) and action.group() == "更新"):
                 continue
-            if not _bound_explicit_owners_agree(prefix, claim, context):
+            if not _bound_explicit_owners_agree(prefix, claim, context, source_referent=source_referent):
                 return False
             if any(term in clause for term in context["protected"]):
                 return False
@@ -597,6 +627,42 @@ def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | No
             and _affirmative_linear_interpolation(text))
 
 
+def _rtpc_coherent_actions(text: str, context: Mapping[str, Any]) -> bool:
+    """Account for every edit in a midpoint history/delta/full-result story."""
+    affirmative = False
+    for clause in re.split(r"[。；;\n]", text):
+        for action in re.finditer(_NOTICE_MUTATIONS, clause):
+            prefix, suffix = clause[:action.start()], clause[action.end():].strip()
+            qualifier = re.split(r"[，,、]", prefix)[-1]
+            if _notice_mutation_is_noun(action.group(), prefix, suffix):
+                continue
+            if _notice_qualifier_is_negated(qualifier):
+                # A refusal to edit the requested curve contradicts its final
+                # result claim. Preservation of identity/notes or a sibling
+                # remains distinct from declining this attested target edit.
+                preservation = re.fullmatch(r"(?:关系)?(?:身份|备注)(?:(?:与|和|及)(?:身份|备注))*", suffix) is not None
+                target = (re.search(r"rtpc|volume|音量|(?:该|这条|目标)(?:关系|曲线)|中点|中间点", suffix) is not None
+                          or any(name.casefold() in suffix for name in context["control_names"]))
+                if target and not preservation:
+                    return False
+                continue
+            if action.group() not in {"改为", "改成", "设为"}:
+                return False
+            value = _rtpc_midpoint_value(suffix)
+            if value is None or value[0] not in (context["new"][1], context["new"][1][1]):
+                return False
+            history = re.fullmatch(r"(?:当前|现有)(?:中点|中间点)(?:是|为)\s*(.+?)\s*[,，]\s*(?:将|会)", prefix.strip())
+            direct = re.fullmatch(r"(?:仅|只|将|把|会|现在|\s)*(?:中点|中间点)", prefix.strip())
+            if not (history or direct):
+                return False
+            if history and (
+                    _rtpc_midpoint_value(history.group(1)) is None
+                    or _rtpc_midpoint_value(history.group(1))[0] != context["old"][1]):
+                return False
+            affirmative = True
+    return affirmative
+
+
 def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool, earlier_shape: bool = False) -> tuple[bool, bool]:
     """Recognize a full curve or accurate point delta in the attested context."""
     # The immutable Preview noun is not a negated edit qualifier.
@@ -659,6 +725,17 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
                    and old[0] == new[0] and old[2] == new[2] and context["delta"] == [new[1]])
     complete_current_curve = False
     current_midpoint_seen = False
+    coherent_final = False
+    for final_clause in clauses:
+        if re.search(r"(?:提交后|修改后|更新后|最终)(?:的)?曲线(?:为|是)", final_clause):
+            if re.match(r"\s*(?:提交后|修改后|更新后|最终)(?:的)?曲线(?:为|是)", final_clause) is None:
+                return False, False
+            if pairs(final_clause) != new or not requested_shape(final_clause):
+                return False, False
+            coherent_final = True
+    coherent_final = coherent_final and middle_edit
+    if coherent_final and not _rtpc_coherent_actions(numeric, context):
+        return False, False
     # Preview inheritance covers only the sealed midpoint edit. Every other
     # affirmative mutation remains a contradiction, even without an owner label.
     sibling_names = [name for name in context["foreign_names"] if "\\" not in name]
@@ -668,7 +745,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
         # It cannot hide a second clause or an instruction following the count.
         if re.fullmatch(r"(?:新增|移除)关系计数为(?:零|0)", action_clause.strip()):
             continue
-        for mutation in re.finditer(r"新增|添加|插入|创建|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b", action_clause):
+        for mutation in re.finditer(_NOTICE_MUTATIONS, action_clause):
             qualifier = re.split(r"[，,、]", action_clause[:mutation.start()])[-1]
             if _notice_qualifier_is_negated(qualifier):
                 continue
@@ -814,6 +891,11 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             direct_middle_claim = re.search(
                 rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*[（(]\s*{number}\s*[,，]\s*{number}\s*[)）])?\s*$",
                 clause[:action.start()]) is not None
+            coherent_middle = re.fullmatch(
+                rf".*?(?:当前|现有)(?:中点|中间点)(?:是|为)\s*[（(]\s*{number}\s*[,，]\s*{number}(?:\s*db)?\s*[)）]\s*[,，]\s*(?:将|会)",
+                clause[:action.start()]) is not None
+            if coherent_middle and pairs(clause[:action.start()]) != [old[1]]:
+                return False, False
             first_pair = re.search(rf"[（(]\s*{number}\s*[,，]\s*{number}\s*[)）]", following)
             separate_result = (first_pair is not None and re.match(
                 r"\s*[,，]\s*(?:曲线点(?:为|是)|curve points(?: are| will be)?)\s*[（(]",
@@ -823,7 +905,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             if stated == context["new"] and requested_shape(following):
                 full = effect = True
             elif (stated == context["delta"] and stated and context["same_domain"]
-                  and (rest_already_matches or explicit_retained_endpoints or (middle_edit and direct_middle_claim and complete_current_curve) or
+                  and (rest_already_matches or explicit_retained_endpoints or (middle_edit and coherent_final and coherent_middle) or (middle_edit and direct_middle_claim and complete_current_curve) or
                        (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
                         and any(term in retention for term in ("保持", "不变", "unchanged"))))
                   and requested_shape(following)):
@@ -834,7 +916,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
                 effect = True
             elif stated:
                 return False, False
-    return effect, full
+    return effect or coherent_final, full or coherent_final
 
 
 def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
