@@ -43,6 +43,41 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Complete frozen pass and outcome-based attribution — 2026-10-03:**
+  candidate `534fdde5eeac8466a766514e131f63c3d6656deb` passed Non-live
+  **14845 / skipped 119 / deselected 27**, exit zero in **836.47 seconds**.
+  Program inputs remain unchanged from 6b906cb; its 6258/2 result is component
+  evidence only. Fresh root `expansion-acceptance-534fdde-sol-high-r1-cli1592`
+  completed all thirteen Agent units plus the separate 2022 Stinger boundary,
+  using Sol 6.1 high/default. Automatic results are **8 PASS / 5 FAIL**, with
+  one boundary proven and no pending units or early stop. Independent outcomes
+  prove **10/13 business effects**, not complete Agent acceptance:
+  - EXP22-C08: all five business/preservation assertions pass; valid notice
+    falsely rejected. A real supplementary query mixed view/include options,
+    was rejected, and Agent honestly reported incomplete personal readback.
+  - EXP25-C09: all six business assertions pass; complete prospective notice
+    falsely rejected. Independent review accepts the workflow.
+  - EXP22-C09: no execution; Agent misunderstood the available distinct durable
+    policy authorization. This is not a missing authorization mechanism.
+  - EXP25-C08: no execution; Agent claimed batched-read truncation. Captured
+    Gateway JSON is complete, but presentation-budget telemetry is absent;
+    actual presentation truncation versus mistaken inference remains unresolved.
+  - EXP25-M05: no Preview/mutation after exact native MusicStinger binding was
+    disclosed as ambiguous. Code diagnosis identified the named-reference
+    existing-role attestation gap, tracked separately in #153. This is not the
+    genuine 2022 capability boundary.
+  All 1503 artifacts and metadata seals match; fourteen source hashes/mtimes are
+  unchanged, eight PASS copies are removed, five FAIL copies and one boundary
+  copy are quarantined, all oracles/reconciliation children closed, and scoped
+  processes are absent. Agent execution totaled **1783.28 seconds / 17 turns**,
+  with **zero slow units**. The one-shot launcher exited 1 and was unloaded.
+  Preserve this mixed root without verify-only or regrading. The audited report
+  is `../research/integration-expansion-full-534fdde-sol-high-2026-10-03.json`.
+  Consolidate #147 notice-claim repairs and #153 typed existing-role disclosure;
+  keep genuine Agent errors separate. Required final acceptance remains a new
+  complete successful candidate/root plus identical verify-only.
+
+
 - **Reviewed planned-effect reference repair — 2026-10-03:** #147 now links
   an attested definite primary owner, a named prospective Effect descriptor,
   a bounded saved-policy inspection and a later reference to that same effect.
