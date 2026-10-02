@@ -644,6 +644,237 @@ def test_policy_preview_without_its_selected_execute_remains_an_obligation():
         allow_expansion_read_interleaving=True)
 
 
+def _expansion_preview_snapshot_interlude():
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json"
+    rows = json.loads(path.read_text())["records"]
+    return ([completed_record(row["command"], row["payload"]) for row in rows],
+        [{**row["receipt"], "payload": row["payload"]} for row in rows])
+
+
+def test_actual_policy_preview8_snapshot9_execute10_preserves_original_selected_copy():
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    assert receipts[0]["payload"]["next_command"] == receipts[1]["payload"]["next_command"]
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix")
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def _snapshot_dataclass_receipts():
+    from dataclasses import fields
+    from tests.semantic.support.codex_gateway_broker import GatewayBrokerRecord
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json"
+    rows = json.loads(path.read_text())["records"]
+    records = []
+    for row in rows:
+        values = {field.name: row["broker_record"][field.name] for field in fields(GatewayBrokerRecord)
+            if field.name in row["broker_record"]}
+        for key in ("model_argv", "normalized_model_argv", "gateway_arguments", "allowed_exit_codes"):
+            values[key] = tuple(values[key])
+        records.append(GatewayBrokerRecord(**values, payload=row["payload"]))
+    return records
+
+
+def test_pending_snapshot_accepts_real_tuple_backed_gateway_broker_records():
+    commands, _ = _expansion_preview_snapshot_interlude()
+    receipts = _snapshot_dataclass_receipts()
+    assert isinstance(receipts[1].gateway_arguments, tuple)
+    assert all(record.succeeded for record in receipts)
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+@pytest.mark.parametrize("arguments", ["transaction-show tx1-other", {"transaction-show": "tx1-other"},
+    {"transaction-show", "tx1-other"}, ["transaction-show", 0]])
+def test_pending_snapshot_rejects_non_argv_containers_and_non_string_arguments(arguments):
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    receipts[1]["gateway_arguments"] = arguments
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", ["false_as_zero", "true_as_one", "float_event_count", "float_event_sequence",
+    "float_summary_count", "integer_copy_flag"])
+@pytest.mark.parametrize("record_form", ["json", "native"])
+def test_pending_snapshot_requires_type_exact_immutable_fields_even_when_broker_succeeds(damage, record_form):
+    commands, _ = _expansion_preview_snapshot_interlude()
+    receipts = _snapshot_dataclass_receipts()
+    snapshot = receipts[1].payload
+    if damage == "false_as_zero":
+        snapshot["authorization"]["explicit_confirmation"] = 0
+    elif damage == "true_as_one":
+        snapshot["authorization"]["notice_required"] = 1
+    elif damage == "float_event_count":
+        snapshot["event_count"] = float(snapshot["event_count"])
+    elif damage == "float_event_sequence":
+        snapshot["events"][0]["sequence"] = float(snapshot["events"][0]["sequence"])
+    elif damage == "float_summary_count":
+        snapshot["preview_summary"]["dispatch"]["argument_key_count"] = float(snapshot["preview_summary"]["dispatch"]["argument_key_count"])
+    else:
+        snapshot["next_command"]["copy_exactly"] = 1
+    commands[1] = completed_record(commands[1].command, snapshot)
+    assert receipts[1].succeeded  # Broker execution success does not validate an unchanged snapshot projection.
+    if record_form == "json":
+        receipts = [{"gateway_arguments": list(record.gateway_arguments), "payload": record.payload,
+            **{key: getattr(record, key) for key in ("authenticated", "accepted", "succeeded", "exit_code", "runner_exit_code")}}
+            for record in receipts]
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", ["unauthenticated", "rejected", "failed", "incomplete", "truncated",
+    "missing_raw", "wrong_raw", "foreign_tx", "stale_hash", "changed_state", "new_authorization",
+    "wrong_current_policy", "unknown_authorization", "changed_event_hash", "extra_event", "changed_count",
+    "changed_summary", "changed_selected_field", "rebuilt_continuation", "wrong_snapshot_argv",
+    "wrong_execute_tx", "rebuilt_execute", "duplicate_execute", "missing_execute"])
+def test_pending_execute_rejects_untrusted_or_changed_transaction_snapshots(damage):
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    snapshot = receipts[1]["payload"]
+    if damage in {"unauthenticated", "rejected"}:
+        receipts[1]["authenticated" if damage == "unauthenticated" else "accepted"] = False
+    elif damage == "failed":
+        receipts[1].update(succeeded=False, exit_code=2, runner_exit_code=2)
+    elif damage == "incomplete":
+        snapshot["response_integrity"] = {"complete": False, "truncated": False}
+    elif damage == "truncated":
+        snapshot["limit_reached"] = True
+    elif damage == "foreign_tx":
+        snapshot["transaction_id"] = "tx1-" + "0" * 20
+    elif damage == "stale_hash":
+        snapshot["artifact_hash"] = "0" * 64
+    elif damage == "changed_state":
+        snapshot["state"] = "executed_unverified"
+    elif damage == "new_authorization":
+        snapshot["authorization"]["explicit_confirmation"] = True
+    elif damage == "wrong_current_policy":
+        snapshot["authorization"]["current_policy"] = "read_only"
+    elif damage == "unknown_authorization":
+        snapshot["authorization"]["new_authority"] = True
+    elif damage == "changed_event_hash":
+        snapshot["events"][1]["event_hash"] = "0" * 64
+    elif damage == "extra_event":
+        snapshot["events"].append(dict(snapshot["events"][-1]))
+        snapshot["event_count"] += 1
+    elif damage == "changed_count":
+        snapshot["event_count"] += 1
+    elif damage == "changed_summary":
+        snapshot["preview_summary"]["dispatch"]["canonical_sha256"] = "0" * 64
+    elif damage == "changed_selected_field":
+        snapshot["next_command"]["copy_instruction"]["source_field"] = "model_command"
+    elif damage == "rebuilt_continuation":
+        snapshot["next_command"]["shell_command"] = snapshot["next_command"]["shell_command"].replace("python ", "'python' ", 1)
+    elif damage == "wrong_snapshot_argv":
+        receipts[1]["gateway_arguments"] = ["transaction-show", "tx1-" + "0" * 20]
+    elif damage in {"wrong_execute_tx", "rebuilt_execute"}:
+        inner = shlex.split(commands[2].command)[-1]
+        inner = (inner.replace(receipts[2]["gateway_arguments"][1], "tx1-" + "0" * 20)
+            if damage == "wrong_execute_tx" else inner.replace("python ", "'python' ", 1))
+        commands[2] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), receipts[2]["payload"])
+    elif damage == "duplicate_execute":
+        commands.insert(3, commands[2])
+        receipts.insert(3, receipts[2])
+    elif damage == "missing_execute":
+        commands, receipts = commands[:2], receipts[:2]
+    if damage == "missing_raw":
+        commands[1] = completed_record(commands[1].command)
+    elif damage == "wrong_raw":
+        commands[1] = completed_record(commands[1].command, {"ok": True, "command": "transaction-show"})
+    else:
+        commands[1] = completed_record(commands[1].command, snapshot)
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("projection", ["original", "without_current_policy", "complete", "repeated"])
+def test_unchanged_snapshot_projection_retains_the_original_pending_obligation(projection):
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    if projection == "without_current_policy":
+        receipts[1]["payload"]["authorization"].pop("current_policy")
+    elif projection == "complete":
+        receipts[1]["payload"]["response_integrity"] = {"complete": True, "truncated": False}
+    commands[1] = completed_record(commands[1].command, receipts[1]["payload"])
+    if projection == "repeated":
+        commands.insert(2, commands[1])
+        receipts.insert(2, receipts[1])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def test_snapshot_cannot_rebind_the_pending_execute_even_when_its_copy_is_followed():
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    selected = receipts[1]["payload"]["next_command"]
+    tx = "tx1-" + "0" * 20
+    for key in ("full_argv", "gateway_argv"):
+        selected[key][-1] = tx
+    selected["shell_command"] = selected["shell_command"].replace(receipts[2]["gateway_arguments"][1], tx)
+    commands[1] = completed_record(commands[1].command, receipts[1]["payload"])
+    receipts[2]["gateway_arguments"] = ["execute", tx]
+    commands[2] = completed_record(shlex.join(("/bin/bash", "-lc", selected["shell_command"])), receipts[2]["payload"])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", [None, "foreign_endpoint", "changed_transaction", "rejected", "unrecorded"])
+def test_snapshot_interlude_requires_positional_broker_receipt_correlation(damage):
+    from tests.semantic.support.codex_gateway_broker import reconcile_gateway_commands, resolve_gateway_invocation
+    from tests.semantic.support.codex_task_runner_v3 import _bind_gateway_prefix_reconciliation
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json"
+    text = path.read_text()
+    original = json.loads(text)
+    old_runner = original["records"][0]["payload"]["next_command"]["full_argv"][1]
+    skill = Path(__file__).parents[2] / "skills/waapi-skill"
+    runner = str(skill / "scripts/run.py")
+    rows = json.loads(text.replace(old_runner, runner).replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
+    commands = [completed_record(row["command"], row["payload"]) for row in rows]
+    accepted = []
+    for row, command in zip(rows, commands):
+        resolved = resolve_gateway_invocation(command.argv, skill_source=skill)
+        accepted.append(SimpleNamespace(**row["receipt"], payload=row["payload"],
+            normalized_model_argv=resolved.normalized_model_argv, argv_sha256=resolved.argv_sha256))
+    rejected = ()
+    if damage in {"foreign_endpoint", "changed_transaction"}:
+        inner = shlex.split(commands[1].command)[-1]
+        inner = (inner.replace("gateway.py ", "gateway.py --host foreign.example ", 1)
+            if damage == "foreign_endpoint" else inner.replace(rows[1]["receipt"]["gateway_arguments"][1], "tx1-" + "0" * 20))
+        commands[1] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), rows[1]["payload"])
+    elif damage == "rejected":
+        rejected = (accepted.pop(1),)
+    elif damage == "unrecorded":
+        commands.insert(2, commands[1])
+    evidence = SimpleNamespace(accepted_records=tuple(accepted), rejected_records=rejected,
+        complete=True, passed=True, terminal_state="RUNNING")
+    raw = reconcile_gateway_commands(tuple(command.argv for command in commands), evidence, skill_source=skill)
+    bound = _bind_gateway_prefix_reconciliation(raw, command_records=commands, broker_evidence=evidence,
+        platform_name="posix", allow_expansion_read_interleaving=True)
+    assert bound.passed is (damage is None)
+    if damage is not None:
+        assert not raw.passed
+
+
+@pytest.mark.parametrize("select_model,tamper", [(True, None), (False, None),
+    (True, "legacy_field"), (True, "outer_wrapper"), (False, "outer_wrapper")])
+def test_pending_snapshot_preserves_windows_selected_field_and_attested_envelope(select_model, tamper):
+    from copy import deepcopy
+    _, receipts = _expansion_preview_snapshot_interlude()
+    preview = receipts[0]["payload"]
+    tx = preview["transaction_id"]
+    continuation = _closed_next_command(("python", r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py", "execute", tx), platform_name="nt", select_model_command=select_model)
+    preview["next_command"] = continuation
+    snapshot = deepcopy(preview)
+    snapshot["command"] = "transaction-show"
+    snapshot["authorization"]["current_policy"] = "allow_changes"
+    receipts[1]["payload"] = snapshot
+    selected = continuation["copy_instruction"]["source_field"]
+    observed = continuation["shell_command" if tamper == "legacy_field" else selected]
+    commands = [completed_windows_record(windows_powershell_recording("python preview.py"), preview),
+        completed_windows_record(windows_powershell_recording("python snapshot.py"), snapshot),
+        completed_windows_record(observed if tamper == "outer_wrapper" else windows_powershell_recording(observed), {})]
+    receipts[2]["payload"] = {}
+    errors = gateway_continuation_binding_errors(commands, receipts[:3], platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST, allow_expansion_read_interleaving=True)
+    assert bool(errors) is (tamper is not None)
+
+
 @pytest.mark.parametrize("damage", [None, "foreign_endpoint", "changed_read_owner", "rejected_read", "unrecorded_read"])
 def test_preview_interlude_requires_positional_gateway_receipts_before_copy_admission(damage):
     from tests.semantic.support.codex_gateway_broker import reconcile_gateway_commands, resolve_gateway_invocation

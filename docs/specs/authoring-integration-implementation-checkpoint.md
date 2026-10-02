@@ -43,6 +43,60 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Reviewed same-transaction snapshot and coordinated notice repair — 2026-10-03:**
+  the user emphasized that the valid C09 workflow must not be mislabeled as a
+  business failure. Its accepted independent evidence review and original
+  automatic FAIL are recorded separately in the 6b906cb report.
+  #152 now admits only an authenticated successful complete snapshot of the
+  same pending policy-authorized transaction, with unchanged artifact, event
+  journal, summary, original authorization and exact selected continuation.
+  Only a matching `current_policy` projection may be added. The original
+  pending Execute remains authoritative. Review caught list-only fixture bias;
+  actual tuple-backed Broker records now pass, while malformed argv and JSON
+  type-changing projections reject. Its focused gate passed **551 / skipped 9**.
+  #147 decomposes coordinated baseline summaries, nominal Preview effects,
+  recorded-policy claims and operation-matched execution summaries. Summaries
+  never establish the primary effect. Wrong protected counts, foreign subjects,
+  policy contradictions and refusal remain failures; present not-yet-executed
+  status is accepted. The first independent 24-case audit remains sealed at
+  **20 passed / 4 failed**; all four issues were repaired without changing the
+  corpus. The notice-focused gate passed **2091 tests**, including all prior
+  controls. Both review axes are clear after repair.
+  The root combined gate passed **2758 / skipped 9**, exit zero in **5.93 seconds**.
+  Log SHA-256: `5935ce40c735423ded24e05666b348828e15a3011cb27bda84cbca37658ba4f3`;
+  JUnit SHA-256: `a8657ef711ac80efc3eae2ad6ea7957f360f3521bbf1a9f476514c39f873c710`.
+  The packaged Skill and Program inputs remain unchanged from 6b906cb; retain
+  that completed Program gate as component evidence, not a new run. A new full
+  Non-live gate and fresh C09-only confirmation remain pending, followed by
+  the full thirteen-Agent-unit selection and separate boundary on one candidate.
+
+
+- **Two curve passes and one confirmed grading false negative — 2026-10-03:**
+  candidate `6b906cb4436310c1902452ea92d676a5022deb9d` passed Program
+  **6258 / skipped 2** in **318.00 seconds**, then complete Non-live
+  **14557 / skipped 119 / deselected 27** in **880.21 seconds**, both exit zero.
+  New root `expansion-focused3-6b906cb-sol-high-r1-cli1592` completed with
+  **two automatic Agent PASS, one automatic FAIL and one separate boundary**.
+  Both C08 versions passed. EXP22-C09's independent evidence review accepts the
+  workflow: all six actual outcome/preservation assertions passed; same-tx
+  snapshot 9 left Preview 8's artifact and authorization journal unchanged;
+  Execute 10 exactly copied both selected continuations and executed once.
+  Its notice clearly states the intended append. The automatic FAIL is a
+  grader false negative, not an Agent or Wwise business failure. Preserve that
+  original verdict while reporting this attribution explicitly.
+  The mixed root is frozen without verify-only; 373 artifacts, all metadata
+  seals and all four source guards match. PASS copies were removed; FAIL and
+  boundary copies remain quarantined; no scoped process remained. See
+  `../research/integration-expansion-focused-rerun-6b906cb-sol-high-2026-10-03.json`.
+  #152 is extending only unchanged same-transaction snapshot admission while
+  retaining the original exact Execute obligation. #147 is accounting for
+  coordinated baseline summaries, nominal Preview effects and execution
+  summaries without treating them as new edits. The next expensive rerun will
+  focus on C09; shared notice paths retain offline witness/negative coverage,
+  and final complete acceptance still runs all thirteen Agent units plus the
+  separate boundary on one frozen candidate. No historical verdict is rewritten.
+
+
 - **Reviewed claim and continuation repairs — 2026-10-03:** the user resumed
   work after the setting-change pause. Independent review reconciled the first
   withheld matrix's blank-paragraph expectation with the existing substantive

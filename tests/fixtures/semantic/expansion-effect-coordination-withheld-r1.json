@@ -1,0 +1,122 @@
+{
+  "status": "independent_withheld_review_matrix_not_executed",
+  "withhold_from_author_until_source_held": true,
+  "context": {
+    "case": "EXP22-C09",
+    "primary_role": "one immutable-Preview-attested Sound owner",
+    "effect": {
+      "kind": "Effect",
+      "display_class": "Wwise Gain",
+      "name": "Expansion_EXP22-C09_NewGain",
+      "notes": "Expansion C09 appended gain"
+    },
+    "authority": "Gateway-bound allow_changes; prose never grants authority",
+    "preservation": "original two effects and source Sound protected fields",
+    "timing": "one full post-Preview pre-Execute notice"
+  },
+  "interpretation": [
+    "Every positive states the same sealed append; ancillary baseline/status/authorization/execution summaries cannot fulfill the effect alone.",
+    "An explicit current policy record is checked even without 修改/变更/改动 words; read_only/ask_before_changes/unknown_policy must not be ignored.",
+    "Quoted policy labels and available-mode lists differ from a current authorization record.",
+    "Operation-matched execute summaries are ancillary; an opposite operation or refusal is a contradiction.",
+    "No actual campaign status is changed and no runtime permission is implied."
+  ],
+  "pairs": [
+    {
+      "id": "EFFECT-COORD-01",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 read_only 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "explicit policy authorization record contradicts sealed mode"
+    },
+    {
+      "id": "EFFECT-COORD-02",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 ask_before_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "different policy record cannot masquerade as current authority"
+    },
+    {
+      "id": "EFFECT-COORD-03",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 unknown_policy 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "unknown authorization mode record"
+    },
+    {
+      "id": "EFFECT-COORD-04",
+      "positive": "已核实目标声音，并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核实目标声音和 OtherSound，并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "compound baseline owner"
+    },
+    {
+      "id": "EFFECT-COORD-05",
+      "positive": "已确认目标声音并保存修改前基线。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已确认 OtherSound 并保存修改前基线。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "foreign baseline owner"
+    },
+    {
+      "id": "EFFECT-COORD-06",
+      "positive": "已核对目标 Sound，并记录原有两个效果器的状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "未核对目标 Sound，并记录原有两个效果器的状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "negative primary attestation cannot authorize omitted owner"
+    },
+    {
+      "id": "EFFECT-COORD-07",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。当前结果为已追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "historical state cannot fulfill prospective effect"
+    },
+    {
+      "id": "EFFECT-COORD-08",
+      "positive": "已核对目标声音并记录执行前状态。本次变更预览是追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain2，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong complete planned effect name"
+    },
+    {
+      "id": "EFFECT-COORD-09",
+      "positive": "已核对目标声音并记录执行前状态。预览中的变更为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Different notes”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong planned note value"
+    },
+    {
+      "id": "EFFECT-COORD-10",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行删除，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "execution summary must match the sealed operation"
+    },
+    {
+      "id": "EFFECT-COORD-11",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。接下来执行这次追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。同时将声音音量设为 -12 dB。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "extra protected field mutation after valid execution summary"
+    },
+    {
+      "id": "EFFECT-COORD-12",
+      "positive": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。现在执行本次追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "已核对目标声音并记录执行前状态。变更预览为追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。预览之后已记录独立的 allow_changes 策略授权。不会执行追加，随后核验新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "refusal of primary operation"
+    }
+  ]
+}

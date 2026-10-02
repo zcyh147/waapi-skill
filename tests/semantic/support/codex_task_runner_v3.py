@@ -18,7 +18,10 @@ from tests.semantic.support.codex_attenuation_notice import (
     prospective_preview_execution,
 )
 from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
-from tests.semantic.support.codex_notice_claims import NoticeRoleContext, historical_creation, owner_inheritance, prospective_role_owner
+from tests.semantic.support.codex_notice_claims import (
+    NoticeRoleContext, baseline_read_claim, execution_operation_claim, historical_creation, notice_clauses,
+    owner_inheritance, preview_operation_claim, prospective_role_owner,
+)
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
@@ -320,9 +323,14 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
                   (descriptor.get("name", ""),), ("effect", "效果", "插件"), _PLUGIN_CREATION_WORDS]
         if descriptor.get("notes"):
             groups.append((descriptor["notes"],))
+        protected_entries = before.get("entries")
+        protected_count = (len(protected_entries) if isinstance(protected_entries, list)
+            and all(isinstance(entry, Mapping) and isinstance(entry.get("effect"), Mapping)
+                and isinstance(entry["effect"].get("id"), str) for entry in protected_entries) else None)
         return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
                 "action": "|".join(_PLUGIN_CREATION_WORDS), "kind": "plugin", "source_type": "sound", "source_id": source["id"],
-                "source_names": (source["name"], source["path"]), "notes": descriptor.get("notes", "")}
+                "source_names": (source["name"], source["path"]), "notes": descriptor.get("notes", ""),
+                "protected_effect_count": protected_count}
     if operation == "object.setReference":
         source, target = state.get("object"), state.get("target")
         observed, expected = before.get("stinger"), before.get("target")
@@ -504,13 +512,14 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
 def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
     role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
-        "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
+        "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
+        protected_effect_count=context.get("protected_effect_count"))
     inherited = owner_inheritance(text, role_context)
     if inherited is None:
         return False
     owner_terms = (context["source_id"].casefold(), *(name.casefold() for name in context["source_names"]),
         *(prefix + term for prefix in ("该", "此", "目标", "指定") for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")), "该对象", "此对象", "目标对象", "指定对象")
-    if not prospective_intent(text, require_affirmative=False, owners=owner_terms):
+    if not prospective_intent(text, require_affirmative=False, owners=owner_terms, operation_actions=context["action"]):
         return False
     normalized = normalize_attested_preview_target(text, {"id": context["source_id"],
         "name": context["source_names"][0], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
@@ -550,7 +559,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         return False
     explicit_prospective_owner = any(prospective_role_owner(text[max(text.rfind('。', 0, action.start()), text.rfind('\n', 0, action.start())) + 1:action.start()], role_context)
         for action in re.finditer(context["action"], text))
-    if not (_bound_owner_anchor(text, context) or explicit_prospective_owner) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]}):
+    if not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]}):
         return False
     affirmative = False
     source_referent = False
@@ -584,6 +593,14 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                     return False
                 affirmative = True
         actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
+        local_claims = notice_clauses(clause)
+        read_summary = baseline_read_claim(local_claims[0], role_context) if local_claims else None
+        if read_summary is not None and read_summary.role == "invalid":
+            return False
+        operation_intro = (preview_operation_claim(local_claims[0], context["action"])
+            if local_claims and context["kind"] == "plugin" else None)
+        execution_summary = (execution_operation_claim(local_claims[0], context["action"])
+            if local_claims and context["kind"] == "plugin" else None)
         prior_note_owner, pending_note_owner = pending_note_owner, None
         if context["kind"] == "plugin" and not actions and re.fullmatch(r"\s*(?:在|向|对)\s*.+?(?:上|下)?\s*", clause):
             new_target = context["groups"][1][0].casefold()
@@ -593,8 +610,18 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             pending_note_owner = clause
         creation_position = -1
         for index, action in enumerate(actions):
+            if (read_summary is not None and read_summary.role == "read-summary"
+                    and read_summary.start <= action.start() < read_summary.end):
+                continue  # A validated read-state noun is not another edit.
             if authorization.state == "ancillary" and authorization.start <= action.start() and action.end() <= authorization.end:
                 continue
+            if operation_intro is not None and operation_intro.role == "prospective-operation" and action.end() <= operation_intro.end:
+                continue  # Only the intro noun is consumed; its effect remains.
+            if (execution_summary is not None and execution_summary.role == "execution-summary"
+                    and execution_summary.start <= action.start() < execution_summary.end):
+                if not affirmative:
+                    return False
+                continue  # The already proven operation is the summary referent.
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
             if noun_provider is not None and noun_provider.role in {"invalid-provider", "curve-range"}:
@@ -630,6 +657,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             note_write = False
             noun_frame = planned_change_noun(action.group(), prefix, suffix) if noun else None
             owner_prefix = noun_frame.owner_prefix if noun_frame else _noun_owner_prefix(prefix) if noun else prefix
+            if (operation_intro is not None and operation_intro.role == "prospective-operation"
+                    and operation_intro.end == action.start()):
+                owner_prefix = ""
             if not noun:
                 for start, end in inherited:
                     if start <= clause_start + action.start() < end:

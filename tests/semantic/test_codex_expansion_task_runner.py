@@ -2222,3 +2222,164 @@ def test_declared_current_count_is_compared_with_the_sealed_old_point_count(coun
     message = next(event['item'] for event in case['events'] if '当前干声音量曲线' in event.get('item', {}).get('text', ''))
     message['text'] = message['text'].replace('自定义线性两点', '自定义线性' + count + '点')
     assert _grammatical_notice(case) is (count in {'两', '二', '2'})
+
+
+def _nominal_preview_case():
+    return json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-nominal-preview-6b906cb.json').read_text())
+
+
+def test_actual_owned_nominal_preview_and_operation_matched_execution_summary():
+    assert _grammatical_notice(_nominal_preview_case())
+
+
+@pytest.mark.parametrize('family', ['plugin', 'curve', 'reference'])
+@pytest.mark.parametrize('policy,expected', [('allow_changes', True), ('read_only', False), ('ask_before_changes', False)])
+def test_current_preview_authorization_record_cannot_contradict_the_immutable_mode(family, policy, expected):
+    case = (_nominal_preview_case() if family == 'plugin' else _temporal_notice_case('004-EXP25-C08')
+            if family == 'curve' else _grammatical_role_case('007-EXP25-M05'))
+    messages = [event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message']
+    if family == 'plugin':
+        messages[-1]['text'] = messages[-1]['text'].replace('`allow_changes`', '`' + policy + '`')
+    else:
+        messages[-1]['text'] += '预览之后已记录独立的 ' + policy + ' 策略授权。'
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('verb,noun', [('记录', '状态'), ('保存', '状态快照'), ('建立', '核验基线')])
+@pytest.mark.parametrize('time', ['当前', '执行前', '修改前'])
+@pytest.mark.parametrize('preview', ['变更预览为', '修改预览是', '预览显示为'])
+@pytest.mark.parametrize('summary', ['现在执行追加', '即将执行追加', '随后执行追加'])
+def test_coordinated_read_nominal_preview_and_execution_roles_compose(verb, noun, time, preview, summary):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = (post['text'].replace('记录执行前状态', verb + time + noun)
+                    .replace('变更预览为', preview).replace('现在执行追加', summary))
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('preview', ['变更预览为', '修改预览是', '预览显示为'])
+@pytest.mark.parametrize('claim,expected', [
+    ('不会修改其他对象的备注。', True),
+    ('同时修改 Pitch 为12。', False),
+    ('在 OtherOwner 上执行追加。', False),
+    ('我不会执行本次修改。', False),
+])
+def test_nominal_preview_roles_leave_remaining_owner_and_action_claims_visible(preview, claim, expected):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('变更预览为', preview) + claim
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('old,new', [
+    ('目标声音并记录', '目标声音和 OtherOwner 并记录'),
+    ('记录执行前状态', '记录 OtherOwner 的执行前状态'),
+    ('记录执行前状态', '记录执行前状态并修改 Pitch 为12'),
+    ('目标声音并记录', '目标 ActorMixer 并记录'),
+    ('变更预览为', '在 OtherOwner 上变更预览为'),
+    ('变更预览为追加', '变更预览为替换'),
+    ('Wwise Gain 效果器', 'Wwise Gain Sound'),
+    ('Expansion_EXP22-C09_NewGain', 'WrongGain'),
+    ('Expansion C09 appended gain', 'Wrong note'),
+    ('现在执行追加', '现在执行替换'),
+])
+def test_nominal_claim_components_require_exact_owner_operation_and_descriptor(old, new):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    assert old in post['text']
+    post['text'] = post['text'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('text', [
+    '已核对目标声音并记录执行前状态。目前尚未执行。',
+    '已核对目标声音并记录执行前状态。现在执行追加。',
+    '预览之后已记录独立的 allow_changes 策略授权。现在执行追加。',
+])
+def test_read_authorization_and_execution_summaries_never_prove_the_effect(text):
+    case = _nominal_preview_case()
+    case['events'][1]['item']['text'] = text
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('key', ['id', 'name', 'path'])
+@pytest.mark.parametrize('time', ['执行前', '修改前'])
+def test_coordinated_read_summary_retains_exact_primary_identity_atom(key, time):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('已核对目标声音并记录执行前状态',
+        '已确认目标是 ' + case['before']['owner'][key] + ' 并保存' + time + '状态')
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('time', ['当前', '执行前', '修改前'])
+def test_shared_read_summary_role_retains_owned_curve_effect_and_rejects_foreign_owner(time):
+    case = _temporal_notice_case('004-EXP25-C08')
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('已核对目标衰减对象', '已核对目标衰减对象并记录' + time + '状态')
+    assert _grammatical_notice(case)
+    post['text'] = post['text'].replace('并记录' + time + '状态', '并记录 OtherOwner 的' + time + '状态')
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('count,expected', [('两', True), ('二', True), ('2', True), ('三', False), ('3', False), ('若干', False)])
+def test_protected_effect_read_summary_claim_matches_the_sealed_existing_inventory(count, expected):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    owner = case['before']['owner']['id']
+    post['text'] = post['text'].replace('已核对目标声音并记录执行前状态',
+        '已核对目标 Sound，并记录原有' + count + '个效果器的状态')
+    # An explicit future owner prevents a failed inheritance window from
+    # accidentally serving as the only wrong-count negative check.
+    post['text'] = post['text'].replace('变更预览为追加', '即将向 ' + owner + ' 追加')
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('verb', ['记录', '保存', '建立'])
+@pytest.mark.parametrize('noun', ['状态', '基线', '状态快照'])
+def test_protected_effect_read_status_is_ancillary_and_keeps_owner_span(verb, noun):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('已核对目标声音并记录执行前状态',
+        '已核对目标 Sound，并' + verb + '原有两个效果器的' + noun)
+    assert _grammatical_notice(case)
+    post['text'] = post['text'].replace('原有两个效果器', 'OtherOwner 的原有两个效果器')
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('preview', ['预览中的变更为', '预览中的修改是', '预览的改动为'])
+@pytest.mark.parametrize('claim,expected', [
+    ('不会修改其他对象的备注。', True),
+    ('同时修改 Pitch 为12。', False),
+    ('在 OtherOwner 上执行追加。', False),
+    ('不会执行追加。', False),
+])
+def test_preview_word_order_does_not_change_exact_owner_effect_or_polarity(preview, claim, expected):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('变更预览为', preview) + claim
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('summary,expected', [
+    ('接下来执行这次追加', True), ('随后执行本次追加', True), ('现在执行该追加', True),
+    ('不会执行追加', False), ('不执行本次追加', False), ('暂不执行这次追加', False),
+    ('不会在目标声音上执行追加', False), ('不会在该声音和 OtherOwner 上执行追加', False),
+    ('不会在 OtherOwner 上执行追加', True), ('尚未执行追加', True),
+])
+def test_operation_referent_execution_summary_uses_shared_owned_polarity(summary, expected):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('现在执行追加', summary)
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('prefix,expected', [
+    ('项目此刻尚未', True), ('项目当前还未', True), ('目前尚未', True),
+    ('项目此刻不会', False), ('项目当前不再', False),
+])
+def test_owned_operation_status_does_not_become_execution_refusal(prefix, expected):
+    case = _nominal_preview_case()
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('现在执行追加', prefix + '执行追加')
+    assert _grammatical_notice(case) is expected

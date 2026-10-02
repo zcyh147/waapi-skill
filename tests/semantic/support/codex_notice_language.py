@@ -15,7 +15,7 @@ def role_terms(live_type: str) -> tuple[str, ...]:
 
 
 _CHANGE = r"(?:修改|变更|改动)"
-_REFERENT = r"(?:该|此|本次|此次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
+_REFERENT = r"(?:该|此|本次|此次|这次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
 _PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
@@ -40,6 +40,21 @@ class AuthorizationClaim(NamedTuple):
     owner_prefix: str
 
 
+def notice_count(value: str) -> int | None:
+    """Bounded Chinese/ASCII cardinal claims used by sealed notice adapters."""
+    if value == "两":
+        return 2
+    if value.isascii() and value.isdigit():
+        return int(value) if len(value) <= 2 else None
+    digits = {character: index for index, character in enumerate("零一二三四五六七八九")}
+    if value in digits:
+        return digits[value]
+    parts = value.split("十")
+    if len(parts) == 2 and (not parts[0] or parts[0] in digits) and (not parts[1] or parts[1] in digits):
+        return (digits[parts[0]] if parts[0] else 1) * 10 + (digits[parts[1]] if parts[1] else 0)
+    return None
+
+
 def authorization_claim(clause: str) -> AuthorizationClaim:
     """Classify active/passive ancillary claims, retaining their original span.
 
@@ -53,9 +68,12 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     passive = rf"{change}(?:{_PROVIDER})?{_GRANT}\s*(?:{policy_attribute})?{_AUTHORIZATION}"
     bare_grant = rf"(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT}){_AUTHORIZATION}"
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
+    record = r"(?:预览(?:之后|后)|本次)(?:已)?记录(?:了)?(?:独立)?(?:的)?\s*(?P<record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权(?:记录)?"
     beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
-    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant})(?=[，,。；;]|\s*$)", clause)
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record})(?=[，,。；;]|\s*$)", clause)
     if match:
+        if match.group('record_policy') is not None and match.group('record_policy') not in {'allow_changes', '**allow_changes**'}:
+            return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
         consumed_end = match.end()
         for qualifier in re.finditer(r"[，,]([^，,。；;\n]+)", clause[match.end():]):
             policy = re.fullmatch(r"\s*(?:并(?:且)?)?(?:当前|本次)?策略(?:为|是)\s*(.+?)\s*", qualifier.group(1))
@@ -133,15 +151,17 @@ def planned_change_noun(action: str, prefix: str, suffix: str) -> PlannedNoun | 
     return None
 
 
-def prospective_intent(text: str, *, require_affirmative: bool = True, owners: tuple[str, ...] = ()) -> bool:
+def prospective_intent(text: str, *, require_affirmative: bool = True, owners: tuple[str, ...] = (), operation_actions: str | None = None) -> bool:
     """Owned execution polarity; this cannot promote a noun or prove an edit."""
     affirmative = False
     for clause in re.split(r"[，,。；;\n]|\bbut\b|但", text):
         for execution in re.finditer(r"执行|应用", clause):
             prefix, suffix = clause[:execution.start()], clause[execution.end():].strip()
-            if re.match(rf"(?:(?:{_REFERENT})(?:预览|{_CHANGE})?)?(?=$|并|随后|[，,。；;])", suffix) is None:
+            legacy_referent = rf"(?:(?:{_REFERENT})(?:预览|{_CHANGE})?)?"
+            operation = rf"|(?:{_REFERENT})?(?:{operation_actions})" if operation_actions else ""
+            if re.match(rf"(?:{legacy_referent}{operation})(?=$|并|随后|[，,。；;])", suffix) is None:
                 continue
-            if re.fullmatch(r"\s*(?:目前|当前)?(?:尚未|还未|未)\s*", prefix):
+            if re.fullmatch(r"\s*(?:项目)?(?:目前|当前|此刻|现在)?(?:尚未|还未|未)\s*", prefix):
                 continue  # Pre-Execute status is not a prospective refusal.
             excluded_owner = re.fullmatch(r"\s*(?:不|不会)(?:在|向)\s*(.+?)\s*(?:上|下)?\s*", prefix)
             if excluded_owner and owners:

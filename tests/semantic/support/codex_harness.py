@@ -3695,6 +3695,55 @@ def _expansion_pending_preview_execute(payload: Any, record: Any, command: Any, 
     )
 
 
+def _expansion_same_json(left: Any, right: Any) -> bool:
+    """Immutable JSON equality keeps booleans distinct from numeric values."""
+    try:
+        return json.dumps(left, sort_keys=True, separators=(",", ":"), allow_nan=False) == json.dumps(
+            right, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError):
+        return False
+
+
+def _expansion_unchanged_transaction_snapshot(origin: Any, record: Any, command: Any) -> bool:
+    """A read-only snapshot cannot replace the pending Preview binding."""
+    payload = _record_field(record, "payload")
+    if not isinstance(origin, Mapping) or not isinstance(payload, Mapping):
+        return False
+    authorization, snapshot_authorization = origin.get("authorization"), payload.get("authorization")
+    integrity = payload.get("response_integrity")
+    arguments = _record_field(record, "gateway_arguments")
+    if not isinstance(arguments, (list, tuple)) or not all(isinstance(value, str) for value in arguments):
+        return False
+    immutable_keys = ("transaction_id", "artifact_hash", "state", "event_count", "events", "preview_summary", "next_command")
+    return (
+        all(_record_field(record, key) is True for key in ("authenticated", "accepted", "succeeded"))
+        and _record_field(record, "exit_code") == _record_field(record, "runner_exit_code") == 0
+        and tuple(arguments) in (
+            ("transaction-show", origin.get("transaction_id")),
+            ("transaction-show", origin.get("transaction_id"), "--summary-only"))
+        and payload.get("ok") is True
+        and payload.get("command") == "transaction-show"
+        and payload.get("limit_reached") is not True
+        and ("response_integrity" not in payload or isinstance(integrity, Mapping)
+             and integrity.get("complete") is True and integrity.get("truncated") is False)
+        and isinstance(origin.get("artifact_hash"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", origin["artifact_hash"]) is not None
+        and _expansion_same_json({key: payload.get(key) for key in immutable_keys},
+                                 {key: origin.get(key) for key in immutable_keys})
+        and origin.get("state") == "policy_authorized"
+        and isinstance(origin.get("event_count"), int)
+        and isinstance(origin.get("events"), list)
+        and origin["event_count"] == len(origin["events"])
+        and isinstance(origin.get("preview_summary"), Mapping)
+        and isinstance(authorization, Mapping)
+        and isinstance(snapshot_authorization, Mapping)
+        and set(snapshot_authorization) in (set(authorization), set(authorization) | {"current_policy"})
+        and _expansion_same_json({key: snapshot_authorization.get(key) for key in authorization}, authorization)
+        and snapshot_authorization.get("current_policy", "allow_changes") == "allow_changes"
+        and _command_output_matches_payload(command, payload)
+    )
+
+
 def gateway_continuation_binding_errors(
     command_records: Sequence[CodexCommandRecord | Mapping[str, Any]],
     broker_records: Sequence[Any],
@@ -3781,6 +3830,15 @@ def gateway_continuation_binding_errors(
             if pending_business_index is not None:
                 current = broker_records[index]
                 arguments = _record_field(current, "gateway_arguments", ())
+                if not isinstance(arguments, (list, tuple)) or not all(isinstance(value, str) for value in arguments):
+                    errors.append(f"command {index + 1}: interleaved command lacks valid Gateway argv evidence")
+                    continue
+                if pending_preview_execute and arguments and arguments[0] == "transaction-show":
+                    origin = _record_field(broker_records[pending_business_index], "payload")
+                    if _expansion_unchanged_transaction_snapshot(origin, current, command_records[index]):
+                        continue
+                    errors.append(f"command {index + 1}: transaction snapshot changed the pending Preview binding")
+                    continue
                 if arguments and arguments[0] in {"status", "operations", "query-schema", "operation-schema",
                                                    "request-schema", "query-object", "metadata"}:
                     payload = _record_field(current, "payload")

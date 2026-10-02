@@ -4,7 +4,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import authorization_claim, attested_primary_target, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import authorization_claim, attested_primary_target, notice_count as _point_count, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
     FINITE_NUMBER, NoticeClaim, NoticeRoleContext, current_curve_claim,
     masked_claims, notice_clauses, owner_inheritance, pending_curve_claim,
@@ -189,20 +189,6 @@ def attenuation_notice_context(artifact: Mapping[str, Any], before: Mapping[str,
 
 def _has(text: str, token: str) -> bool:
     return re.search(rf"(?<![a-z0-9_]){re.escape(token.casefold())}(?![a-z0-9_])", text) is not None
-
-
-def _point_count(value: str) -> int | None:
-    if value == "两":
-        return 2
-    if value.isascii() and value.isdigit():
-        return int(value) if len(value) <= 2 else None
-    digits = {character: index for index, character in enumerate("零一二三四五六七八九")}
-    if value in digits:
-        return digits[value]
-    parts = value.split("十")
-    if len(parts) == 2 and (not parts[0] or parts[0] in digits) and (not parts[1] or parts[1] in digits):
-        return (digits[parts[0]] if parts[0] else 1) * 10 + (digits[parts[1]] if parts[1] else 0)
-    return None
 
 
 def _point_description(text: str, context: Mapping[str, Any]) -> bool:

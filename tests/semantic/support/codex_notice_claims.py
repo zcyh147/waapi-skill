@@ -9,7 +9,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import role_terms
+from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, notice_count, prospective_intent, role_terms
 
 FINITE_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
 
@@ -18,6 +18,7 @@ class NoticeRoleContext(NamedTuple):
     identity: Mapping[str, Any]
     quantity_terms: tuple[str, ...] = ()
     before_curve: Mapping[str, Any] | None = None
+    protected_effect_count: int | None = None
 
 
 class NoticeClaim(NamedTuple):
@@ -56,6 +57,21 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
     return re.fullmatch(rf"(?:目标|该|此|指定)\s*(?:{terms})(?:对象)?", value) is not None
 
 
+def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
+    """A complete coordinated read-state summary, with no owner/edit payload."""
+    if re.fullmatch(r"\s*并(?:为当前配置)?(?:记录|保存|建立)(?:了)?(?:当前|执行前|修改前)?(?:的)?(?:状态|(?:核验)?基线)(?:快照)?\s*", text):
+        return "read-summary"
+    effects = re.fullmatch(r"\s*并(?:记录|保存|建立)(?:了)?原有([0-9零一二两三四五六七八九十]+)(?:个)?效果器的(?:状态|基线)(?:快照)?\s*", text)
+    if effects:
+        if (context is not None and context.identity["type"] == "Sound" and context.protected_effect_count is not None
+                and notice_count(effects.group(1)) == context.protected_effect_count):
+            return "read-summary"
+        return "invalid"
+    if re.match(r"\s*并(?:记录|保存|建立)", text) and re.search(r"原有.*效果器.*(?:状态|基线)", text):
+        return "invalid"  # Unknown count/owner qualifiers retain their meaning.
+    return "unclassified"
+
+
 def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """A complete affirmative generic/exact role assertion, with no lookup."""
     match = re.fullmatch(r"\s*(?:已)?(?:核对|核实|确认)(.+?)\s*", clause.text)
@@ -63,12 +79,19 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
         return clause
     from tests.semantic.support.codex_notice_language import attested_primary_target
 
-    legacy = attested_primary_target(clause.text, context.identity)
+    value = match.group(1).strip()
+    coordinated = re.search(r"并", value)
+    if coordinated:
+        baseline_role = baseline_read_role(value[coordinated.start():], context)
+        if baseline_role == "invalid":
+            return clause._replace(role="invalid", diagnostic="conflicting-protected-baseline")
+        if baseline_role == "read-summary":
+            value = value[:coordinated.start()].strip()
+    legacy = attested_primary_target(clause.text[:match.start(1)] + value, context.identity)
     if legacy.state == "attested":
         return clause._replace(role="owner-attestation")
     if legacy.state == "invalid":
         return clause._replace(role="invalid", diagnostic="conflicting-owner-attestation")
-    value = match.group(1).strip()
     if primary_role_atom(value, context):
         return clause._replace(role="owner-attestation")
     path_claim = re.fullmatch(r"目标\s*guid\s*对应路径\s+(.+?)", value)
@@ -80,6 +103,18 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
     # adapter. A narrow role assertion cannot silently introduce a new owner.
     if re.match(r"目标(?!是)", value):
         return clause._replace(role="invalid", diagnostic="conflicting-owner-attestation")
+    return clause
+
+
+def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
+    """An ancillary span follows a separately validated complete owner atom."""
+    coordinator = re.search(r"并", clause.text)
+    if coordinator:
+        role = baseline_read_role(clause.text[coordinator.start():], context)
+        if role == "invalid":
+            return clause._replace(role="invalid", diagnostic="conflicting-protected-baseline")
+        if role == "read-summary" and owner_attestation(clause, context).role == "owner-attestation":
+            return clause._replace(role="read-summary", start=clause.start + coordinator.start())
     return clause
 
 
@@ -183,8 +218,10 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
         compatible = True
         for tail in clauses[1:]:
             authorization = authorization_claim(tail.text)
-            baseline = re.fullmatch(r"\s*并为当前配置建立执行前核验基线\s*", tail.text)
-            if not baseline and not (authorization.state == "ancillary" and not authorization.owner_prefix
+            baseline = baseline_read_role(tail.text, context)
+            if baseline == "invalid":
+                return None
+            if baseline != "read-summary" and not (authorization.state == "ancillary" and not authorization.owner_prefix
                                      and not tail.text[authorization.end:].strip()):
                 compatible = False
         if compatible:
@@ -220,3 +257,21 @@ def historical_creation(prefix: str) -> bool:
     # elsewhere in the clause does not turn that completed event into intent;
     # affirmative Preview confirmation followed by 将 retains its future role.
     return re.search(r"(?:已经|已)(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?$", local) is not None
+
+
+def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
+    """A nominal Preview introduces an operation, leaving its effect unconsumed."""
+    change = r"(?:(?:本次|该|此)?(?:修改|变更|改动))"
+    frame = rf"(?:(?:{change})?预览|预览(?:中)?的{change})"
+    match = re.match(rf"\s*{frame}(?:为|是|显示为)\s*(?={action_pattern})", clause.text)
+    if match is None:
+        return clause
+    return clause._replace(role="prospective-operation", end=clause.start + match.end())
+
+
+def execution_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
+    """A complete operation-matched summary; it never establishes the effect."""
+    match = re.fullmatch(rf"\s*(?:{_FUTURE})执行(?:{_REFERENT})?(?:{action_pattern})\s*", clause.text)
+    if match and prospective_intent(clause.text, operation_actions=action_pattern):
+        return clause._replace(role="execution-summary")
+    return clause
