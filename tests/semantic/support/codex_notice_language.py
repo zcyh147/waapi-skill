@@ -5,7 +5,7 @@ Callers retain operation-specific identity, value and timing validation.
 """
 
 import re
-from typing import NamedTuple
+from typing import Any, Mapping, NamedTuple
 
 
 def role_terms(live_type: str) -> tuple[str, ...]:
@@ -23,6 +23,23 @@ _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:�
 class PlannedNoun(NamedTuple):
     role: str
     owner_prefix: str
+
+
+class PrimaryTarget(NamedTuple):
+    state: str
+    identity: Mapping[str, Any] | None
+
+
+def attested_primary_target(clause: str, identity: Mapping[str, Any]) -> PrimaryTarget:
+    """A complete positive exact target assertion, never a prose identity lookup."""
+    introduction = r"(?:已确认|已核实)目标是"
+    if re.search(introduction, clause) is None:
+        return PrimaryTarget("unrelated", None)
+    values = "|".join(re.escape(identity[key].casefold()) for key in ("id", "name", "path"))
+    summary = r"(?:[，,]\s*并(?:已)?(?:取得|获得)(?:本次|此项|这项)(?:独立)?(?:策略)?授权)?"
+    if re.fullmatch(rf"\s*{introduction}\s*(?:{values})\s*{summary}\s*", clause):
+        return PrimaryTarget("attested", identity)
+    return PrimaryTarget("invalid", None)
 
 
 def planned_change_noun(action: str, prefix: str, suffix: str) -> PlannedNoun | None:
@@ -45,7 +62,14 @@ def planned_change_noun(action: str, prefix: str, suffix: str) -> PlannedNoun | 
     for role, left, right in frames:
         match = re.search(left, prefix)
         if match and re.match(right, suffix):
-            return PlannedNoun(role, prefix[:match.start()])
+            owner_prefix = prefix[:match.start()]
+            if role == "authorization":
+                provider = re.search(r"(?:已)?按(?:保存的|已保存的|当前)\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*$", owner_prefix)
+                if provider:
+                    owner_prefix = owner_prefix[:provider.start()]
+                elif re.search(r"按[^，,。；;]*策略\s*$", owner_prefix):
+                    return PlannedNoun("invalid-provider", owner_prefix)
+            return PlannedNoun(role, owner_prefix)
     return None
 
 

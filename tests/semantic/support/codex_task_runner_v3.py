@@ -574,6 +574,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
         creation_position = -1
         for index, action in enumerate(actions):
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
+            noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
+            if noun_provider is not None and noun_provider.role == "invalid-provider":
+                return False
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
             if context["kind"] == "plugin" and re.search(value_pattern, claim):
                 effect_anchor = True

@@ -4,7 +4,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import attested_primary_target, planned_change_noun, prospective_intent, role_terms
 
 from wwise_waapi.core_business_contracts import (
     _CURVE_KINDS, _CURVE_SHAPES, _CURVE_SOURCES, attenuation_curve_value_domains,
@@ -27,6 +27,14 @@ def _owner_terms(row: Mapping[str, Any]) -> tuple[str, ...]:
 class _CurveFrame(NamedTuple):
     start: int
     end: int
+
+
+def _following_first_clause(text: str, assertion_end: int) -> tuple[int, int] | None:
+    """One adjacent substantive clause; whitespace never changes the owner."""
+    following = re.match(r"[。；;\n]\s*([^，,。；;\n]+)", text[assertion_end:])
+    if following is None:
+        return None
+    return assertion_end + following.start(1), assertion_end + following.end(1)
 
 
 def _curve_frames(text: str, context: Mapping[str, Any], owner: str, kind: str, source: str) -> list[_CurveFrame]:
@@ -236,33 +244,48 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     frames = _curve_frames(text, context, owner, kind, source)
     base_owner = owner
     anaphor_spans = []
+    target_assertion_spans = []
+    inherited_target_spans = []
     for assertion in re.finditer(r"[^。；;\n]+", text):
+        target = attested_primary_target(assertion.group(), row)
+        if target.state == "invalid":
+            return False
+        if target.state == "attested":
+            target_assertion_spans.append((assertion.start(), assertion.end()))
+            following = _following_first_clause(text, assertion.end())
+            if following is not None:
+                inherited_target_spans.append(following)
         if re.fullmatch(r"\s*(?:目标已核对为请求中的 attenuation|这个衰减对象已按 guid 核实)\s*", assertion.group()):
-            following = re.match(r"[。；;\n]([^。；;\n]+)", text[assertion.end():])
-            if following:
-                anaphor_spans.append((assertion.end() + 1, assertion.end() + following.end()))
+            following = _following_first_clause(text, assertion.end())
+            if following is not None:
+                anaphor_spans.append(following)
     affirmative = bool(frames)
     antecedent = None
     clauses = re.split(r"([。；;,，\n]|\bbut\b|但)", text)
     for position in range(0, len(clauses), 2):
         clause = clauses[position]
         clause_start = sum(len(part) for part in clauses[:position])
-        owner = base_owner + "|其" if any(start <= clause_start < end for start, end in anaphor_spans) else base_owner
+        substantive_start = clause_start + len(clause) - len(clause.lstrip())
+        owner = base_owner + "|其" if any(start <= substantive_start < end for start, end in anaphor_spans) else base_owner
         prior = antecedent if position > 0 and clauses[position - 1] in {",", "，"} else None
         antecedent = None
         subject = re.fullmatch(rf"{introduction}目标是\s*(.+?)\s*", clause)
         if subject:
-            if re.fullmatch(rf"(?:{owner}){field}", subject.group(1)) is None:
+            identity_only = any(start <= clause_start < end for start, end in target_assertion_spans)
+            if not identity_only and re.fullmatch(rf"(?:{owner}){field}", subject.group(1)) is None:
                 return False
-            antecedent = subject.group(1)
+            if not identity_only:
+                antecedent = subject.group(1)
         for action in re.finditer(_ACTION, clause):
+            noun = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
+            if noun is not None and noun.role == "invalid-provider":
+                return False
             if any(frame.start <= clause_start + action.start() and clause_start + action.end() <= frame.end for frame in frames):
                 continue
             if re.match(r"操作(?:没有|尚未|未)执行\s*$", clause[action.end():]):
                 continue
             if re.search(_NEGATION, clause[:action.start()]):
                 continue
-            noun = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
             if noun is not None:
                 # A grammatical noun may not conceal a different owner.
                 if noun.owner_prefix.strip() and re.fullmatch(rf"\s*(?:在|向|对)\s*(?:{owner})(?:上|下)?\s*", noun.owner_prefix) is None:
@@ -277,6 +300,12 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
             if action.group() in {"删除", "移除", "清空", "重置", "新增", "添加", "插入", "创建", "追加", "delete", "remove", "clear", "reset", "add", "create"}:
                 return False
             left, right = clause[:action.start()], clause[action.end():].strip()
+            if (any(start <= clause_start + action.start() < end for start, end in inherited_target_spans)
+                    and action.group() in {"设置为", "设为", "设成", "改为", "改成"}
+                    and re.fullmatch(rf"(?:即将|现在|随后)(?:仅|只)?(?:将|把)?(?:{kind})(?:曲线|curve)", left.strip())
+                    and re.fullmatch(allowed_value, right)):
+                affirmative = True
+                continue
             # Chinese suffix verbs carry the subject on their left; English
             # transitive verbs carry it on their right. Neither may inherit an
             # arbitrary property or a second owner from the surrounding prose.
@@ -323,8 +352,12 @@ def attenuation_notice_effect(text: str, context: Mapping[str, Any]) -> bool:
         return False
     text, attested = normalized
     text = _normalize_curve_expected_frame(text, context, attested)
-    if re.search(r"调用(?!回执)", text):
-        return False
+    for call in re.finditer(r"调用", text):
+        suffix = text[call.end():]
+        prefix = re.split(r"[，,。；;\n]", text[:call.start()])[-1]
+        if (re.match(r"(?:回执|结果)(?=[，,。；;\s]|$)", suffix) is None
+                or re.search(r"(?:核验|验证|检查)(?:(?:只|仅)?检查)?\s*$", prefix) is None):
+            return False
     if any(value != row["id"].casefold() for value in re.findall(_GUID, text)):
         return False
     if not any(term.casefold() in text for term in _owner_terms(row)) and re.search(r"目标已核对为请求中的 attenuation", text) is None:

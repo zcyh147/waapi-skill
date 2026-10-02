@@ -42,6 +42,56 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Sol-medium focused follow-up — 2026-10-02:** frozen `5278a15` passed
+  complete Non-live **13807 / skipped 119 / deselected 27**, exit zero in
+  **859.44 seconds**. Root
+  `expansion-failed3-5278a15-sol-medium-r1-cli1592` completed all four units:
+  **zero Agent PASS / three FAIL / one boundary**, no pending or early stop.
+  Both C08 units correctly used the disclosed `attenuation_handle` field and
+  completed the intended effects, with all five independent assertions passing
+  on each version. Their notices still failed: C08/2022 retained a policy
+  qualifier as an alleged object-owner prefix; C08/2025 rejected an exact
+  identity-only target statement and the adjacent owner-omitted curve edit.
+  These are separate notice-interpretation gaps, not another declaration error.
+  EXP22-C09 reached a Preview whose authorization was `policy_authorization`,
+  `explicit_confirmation=false`, state `policy_authorized` and next command
+  `execute`, but the Agent requested human confirmation and stopped. There was
+  no goal execution or formal after-state; this is genuine safe Agent
+  incompletion, not a reason to weaken the authorization contract.
+  The root remains frozen without verify-only/regrading. The launcher ran once,
+  exited 1, was unloaded and left no scoped process. All four source guards
+  match, all retained process scopes were cleaned and all three reconciliations
+  reaped. Audit validated **578 artifacts / 24460497 bytes / eight seals**.
+  Agent time was **324.92 seconds**, three turns, zero slow cases and two
+  Execute/Verify pairs. Exact gate digests, usage and evidence limitations are
+  in `../research/integration-expansion-failed-rerun-5278a15-sol-2026-10-02.json`.
+  This follow-up does not establish a general model ranking: Sol completed the
+  previously incorrect declarations but made a different policy-flow error.
+  Keep Sol medium for the next bounded failed-only validation. Consolidate the
+  confirmed provider-qualifier and adjacent exact-target notice gaps first;
+  final complete same-candidate acceptance remains pending.
+  The #147 successor consumes only closed policy-provider qualifiers inside
+  complete authorization nouns, preserving prior owner spans and rejecting
+  unknown providers/policies. Exact positive ID/name/path target statements
+  are distinct from curve-subject declarations. Both owner-omitted and `其`
+  edits may inherit only within the first substantive clause of the immediately
+  following sentence; comma-separated intervening subjects cannot borrow the
+  earlier identity. Source, ordered points, shape, polarity, remaining edits
+  and Preview/Execute timing retain their independent checks. Honest
+  result-schema-only verification wording remains permitted without granting
+  readback credit. Actual two-notice RED/GREEN, provider/target contrasts and
+  the main-review same-sentence antecedent regressions all pass. Final Spec
+  and Standards rechecks are clear; **1250 affected-file tests** pass.
+  The coordinator's persisted notice/documentation gate passed **1259 tests**,
+  exit zero in **1.82 seconds**. Log SHA-256 is
+  `1eb401f1c2989c41a13ce626e9fe1e41288a01aefb2ec4383511cbc77d420515`;
+  JUnit SHA-256 is
+  `cba7eff62a0a1426c6b3e38c1711ab057e47e4dcf5e932712d76852b301285af`.
+  No packaged Skill, public authorization rule, prompt or fixed Program input
+  changed. Complete successor Non-live and fresh failed-only validation remain
+  prerequisites for final acceptance; the Agent's C09 confirmation mistake
+  receives no API workaround or historical PASS promotion.
+
 - **Repeated Agent error and remaining notice-language gaps — 2026-10-02:**
   `1faaa5d` completed Non-live with **13566 passed / 119 skipped / 27 deselected**,
   exit zero in **862.89 seconds**. Its packaged Skill and Program inputs remain

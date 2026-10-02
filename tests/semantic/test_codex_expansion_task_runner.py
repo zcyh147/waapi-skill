@@ -1778,3 +1778,105 @@ def test_effect_kind_assertion_at_each_promotion_position_accepts_effect_or_plug
                 '备注为“Expansion C09 appended gain”。我现在执行该变更。')
     case['events'][1]['item']['text'] = text
     assert _grammatical_notice(case)
+
+
+def _authority_target_case(version):
+    fixture = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-authority-target-notices-5278a15.json').read_text())
+    return next(case for case in fixture['cases'] if case['artifact']['request']['version'] == version)
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
+def test_actual_policy_provider_and_adjacent_attested_target_are_not_extra_changes(version):
+    assert _grammatical_notice(_authority_target_case(version))
+
+
+@pytest.mark.parametrize('provider', ['已按保存的 allow_changes 策略', '按已保存的 allow_changes 策略', '已按当前 allow_changes 策略'])
+def test_complete_authorization_noun_accepts_only_closed_policy_provider_qualifiers(provider):
+    case = _authority_target_case('2022.1')
+    case['events'][1]['item']['text'] = case['events'][1]['item']['text'].replace('已按保存的 `allow_changes` 策略', provider)
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('provider', ['已按保存的 read_only 策略', '已按保存的 unknown_policy 策略',
+    '已按未知提供方的 allow_changes 策略', '在 OtherOwner 上已按保存的 allow_changes 策略',
+    '在该对象和 OtherOwner 上已按保存的 allow_changes 策略'])
+def test_provider_qualifier_never_hides_unknown_policy_or_preceding_owner(provider):
+    case = _authority_target_case('2022.1')
+    case['events'][1]['item']['text'] = case['events'][1]['item']['text'].replace('已按保存的 `allow_changes` 策略', provider)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('identity_key', ['id', 'name', 'path'])
+@pytest.mark.parametrize('verb', ['已确认', '已核实'])
+def test_immediate_prospective_curve_edit_inherits_only_complete_exact_target(identity_key, verb):
+    case = _authority_target_case('2025.1')
+    row = case['before']['attenuation']
+    case['events'][1]['item']['text'] = case['events'][1]['item']['text'].replace('已确认目标是 ' + row['name'], verb + '目标是 ' + row[identity_key])
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('damage', ['foreign_name', 'foreign_guid', 'compound', 'negative', 'history_identity',
+    'interposed', 'foreign_interposed', 'current_edit', 'history_edit', 'refusal', 'wrong_point', 'wrong_shape', 'extra_action',
+    'actual_call', 'auth_only', 'unrelated_identity'])
+def test_adjacent_target_claim_never_substitutes_for_identity_polarity_or_complete_effect(damage):
+    case = _authority_target_case('2025.1')
+    row = case['before']['attenuation']
+    post = case['events'][1]['item']
+    replacements = {
+        'foreign_name': (row['name'], 'OtherOwner'), 'foreign_guid': (row['name'], '{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}'),
+        'compound': (row['name'], row['name'] + ' 和 OtherOwner'),
+        'negative': ('已确认目标是', '不能确认目标是'), 'history_identity': ('已确认目标是', '此前已确认目标是'),
+        'interposed': ('。即将', '。预览已授权。即将'),
+        'foreign_interposed': ('。即将', '。目标是 OtherOwner。即将'),
+        'current_edit': ('即将仅将', '当前状态仅将'), 'history_edit': ('即将仅将', '此前已经将'),
+        'refusal': ('即将仅将', '不会将'), 'wrong_point': ('(50.0, -12)', '(50.0, -60)'),
+        'wrong_shape': ('线性插值', '非线性插值'), 'unrelated_identity': ('已确认目标是', '本段提及的对象是'),
+    }
+    if damage in replacements:
+        old, new = replacements[damage]
+        assert old in post['text']
+        post['text'] = post['text'].replace(old, new)
+    elif damage == 'extra_action': post['text'] += '同时修改 Pitch 为 12。'
+    elif damage == 'actual_call': post['text'] += '另外调用 OtherOwner 的曲线。'
+    elif damage == 'auth_only': post['text'] = '已按保存的 allow_changes 策略取得本次修改的独立授权。'
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('interposed', [
+    '处理对象是 OtherOwner，', '这里先讨论其他事项，',
+    '在 OtherOwner 上，', '针对该对象和 OtherOwner，',
+])
+def test_owner_omitted_curve_edit_cannot_inherit_after_an_interposed_same_sentence_clause(interposed):
+    case = _authority_target_case('2025.1')
+    post = case['events'][1]['item']
+    assert '。即将仅将' in post['text']
+    post['text'] = post['text'].replace('。即将仅将', '。' + interposed + '即将仅将')
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('whitespace', [' ', '  ', '\n', '\n  '])
+def test_immediate_owner_omitted_curve_clause_allows_only_whitespace_before_the_edit(whitespace):
+    case = _authority_target_case('2025.1')
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('。即将仅将', '。' + whitespace + '即将仅将')
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('pair_id,following', [('C08-03', '将其'), ('C08-11', '预览只会把其')])
+@pytest.mark.parametrize('interposed', ['处理对象是 OtherOwner，', '这里先讨论其他事项，',
+    '在 OtherOwner 上，', '针对该对象和 OtherOwner，'])
+def test_anaphoric_curve_owner_cannot_skip_an_interposed_same_sentence_clause(pair_id, following, interposed):
+    pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == pair_id)
+    case = _role_notice_case('004-EXP25-C08')
+    assert '。' + following in pair['positive']
+    case['events'][1]['item']['text'] = pair['positive'].replace('。' + following, '。' + interposed + following)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('pair_id,following', [('C08-03', '将其'), ('C08-11', '预览只会把其')])
+@pytest.mark.parametrize('whitespace', [' ', '  ', '\n', '\n  '])
+def test_immediate_anaphoric_curve_owner_allows_whitespace_only(pair_id, following, whitespace):
+    pair = next(pair for pair in _PARAPHRASE_PAIRS if pair['id'] == pair_id)
+    case = _role_notice_case('004-EXP25-C08')
+    case['events'][1]['item']['text'] = pair['positive'].replace('。' + following, '。' + whitespace + following)
+    assert _grammatical_notice(case)
