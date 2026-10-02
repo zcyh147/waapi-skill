@@ -43,6 +43,26 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Reviewed query-disclosure inventory refresh — 2026-10-03:** Program at
+  `54930bd` completed with **6344 passed / 1 failed / 2 skipped**, exit 1 in
+  **290.01 seconds**. The sole failure correctly detected an unsynchronized
+  public-continuation seal after #154. Its log remains frozen (SHA-256
+  `4e4c73d0cc66ab7dbb70ac4a5d524d4f8e0602d2b694e42e14cb420e720aaf22`).
+  A precise before/after comparison proves only the five object.get rows'
+  diagnostic-view disclosure changed; the other three source-contract digests,
+  advanced query layer and all lane classifications are identical. Normal
+  generation changed only the reviewed public-continuation digest and derived
+  inventory digest in two JSON files. Markdown and counts remain unchanged:
+  849 native lanes and 153 operation lanes, with no new coverage claim.
+  Root reviewed that exact generated diff; the focused inventory gate passed
+  **16 tests**, exit zero in **16.47 seconds**. Log SHA-256:
+  `589577fa6e6a71631c05d7a6d7e95d3d59852edf75f672d4834255626af4cb59`.
+  No Fresh run used 54930bd. Its prepared launcher remains unused. A new full
+  Program gate and then Non-live are required on the refreshed candidate;
+  future discovery-contract focused selections should include this inventory
+  test before the broad gate.
+
+
 - **Consolidated #147/#153/#154 repair candidate — 2026-10-03:**
   #147 recognizes bounded Preview-status and policy-record claims plus a
   curve-only scope noun; these cannot establish the primary effect or hide
