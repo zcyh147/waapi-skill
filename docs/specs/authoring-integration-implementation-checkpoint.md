@@ -79,7 +79,27 @@ pilot, and acceptance may proceed after their prerequisite gates.
   files plus the Broker file passed **132 tests**, exit zero in **1.91 seconds**.
   Log SHA-256: `50c9b4ab9461ee12524525079f6cb152261e013f27f491424b80990d0dc49d46`;
   JUnit SHA-256: `3cceda8744e32df4ac56ce0d19edd48e1bc242cadde8dedad556cc2a0685b5f1`.
-  New candidate validation and affected Fresh acceptance remain required.
+  Complete Non-live at `7f512f1` then preserved another FAIL: **14382 passed,
+  three failed, 119 skipped, 27 deselected**, exit one in **894.71 seconds**.
+  The additional failures were stale exact prose assertions in
+  `test_skill_contract.py` and `test_skill_gateway_contract.py`, omitted from
+  the previous focused selection. Log SHA-256:
+  `c8b6ec862678108bcdc3594e07a973a4348636437fefd777a4d857048fae3a9d`;
+  JUnit SHA-256:
+  `f6553aff959324ee179e125e05c3d0ace517d2eb587a3e3183dc23fa90ab31f7`.
+  The follow-up explicitly retains binding-owned metadata scope and updates
+  prose assertions to the independently reviewed equivalent shared-step wording,
+  including numbered binding-before-discovery checks and verbatim machine output.
+  Both review axes found no weakened obligation. All `test_skill*.py` unit
+  files, the semantic builder audit, documentation inventory and Broker file
+  passed **174 tests**, exit zero in **1.84 seconds**. The reference measures
+  **19877 CRLF UTF-8 bytes**; its ceiling remains unchanged.
+  Focused log SHA-256:
+  `515ae2c2058aff283c11e00b063f3fc7be09baa137317dbcbb55e834b52ded85`;
+  JUnit SHA-256:
+  `5b83a7f72cc991d1605a556ce2af390ab295619a03932a3fe7092f3cb41c264b`.
+  No Fresh run used either failed gate candidate. New complete validation and
+  affected Fresh acceptance remain required.
 
 
 - **Sol-high focused follow-up — 2026-10-02:** candidate `7652745` passed

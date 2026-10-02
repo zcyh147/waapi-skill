@@ -262,19 +262,19 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     )
 
     assert "never exact live metadata evidence" in operate
-    assert "remaining Composer lane's returned start preconditions" in operate
-    assert "For every `business_declaration` lane, start the Draft first" in operate
-    assert "returned live binding or discovery command" in operate
-    assert "For `object.create`, `object.set`, and direct `audio.import`" in operate
-    assert "opaque handle are the only value authority" in operate
-    assert "For `object.setProperty`, `object.setReference`, and `object.setLinked`" in operate
-    assert "read the schema, start, bind the target, then run returned `draft-discover-fields`" in operate
-    assert "Copy one handle; never a token, scope, or type" in operate
+    assert "Remaining Composer lanes follow returned metadata-first start preconditions" in operate
+    assert "Business Drafts start before exact object/type binding and returned live discovery" in operate
+    assert "Returned type, restrictions and opaque handle alone authorize values" in operate
+    assert "`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner" in operate
+    assert "copy one handle, never token/scope/type" in operate
+    assert "Binding fixes the metadata scope inside the Draft" in operate
     assert "No match stops; ambiguity needs one behavior question" in operate
     assert "For business declarations, bind only user-requested custom properties/references" in operate
     assert "common outcomes such as volume, infinite looping, output bus" in operate
     assert "use stable business fields" in operate
     assert "Bind the exact existing owner or the disclosed new-object type first" in operate
+    assert "Run the returned discovery once with short English Wwise UI/technical meanings; separate distinct meanings" in operate
+    assert operate.index("1. Bind the exact existing owner") < operate.index("2. Run the returned discovery once")
     assert "Submit business values against those handles" in operate
 
 
@@ -309,18 +309,12 @@ def test_normal_change_prose_stays_business_facing() -> None:
         encoding="utf-8"
     )
 
-    for document in (skill, operate):
-        assert (
-            "Normal prose covers only objects, changes, results, risks, and whether "
-            "anything changed."
-            in document
-        )
-        assert (
-            "Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, "
-            "states, and commands."
-            in document
-        )
-        assert "Keep exact `agent_result` machine-readable" in document
+    assert "Normal prose covers only objects, changes, results, risks, and whether anything changed." in skill
+    assert "Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands." in skill
+    assert "Keep exact `agent_result` machine-readable" in skill
+    assert "Prose covers objects, changes, results, risks and whether anything changed." in operate
+    assert "Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands." in operate
+    assert "serialize the successful Gateway `agent_result` verbatim" in operate
 
 
 def test_public_readmes_keep_setup_and_usage_user_facing() -> None:

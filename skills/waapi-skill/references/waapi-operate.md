@@ -93,7 +93,7 @@ Keep domains distinct: durable Authoring project edits use `ak.wwise.core.*`; ru
 
 Users never supply internal tokens. Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence.
 
-`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. No match stops; ambiguity needs one behavior question.
+`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. Binding fixes the metadata scope inside the Draft. No match stops; ambiguity needs one behavior question.
 
 Business Drafts start before exact object/type binding and returned live discovery. Returned type, restrictions and opaque handle alone authorize values. Remaining Composer lanes follow returned metadata-first start preconditions.
 
