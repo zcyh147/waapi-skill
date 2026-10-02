@@ -42,6 +42,48 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen partial root and follow-up repairs — 2026-10-02:** candidate
+  `719e3e0` passed complete Non-live **12962 / skipped 119 / deselected 27**,
+  exit zero in **860.71 seconds**. Log SHA-256 is
+  `c165a27b9598b6a77260f5c51e2d4cc68efdc3078c28aed272a86348cbd89256`;
+  JUnit SHA-256 is
+  `84d72f3a640213c0742b4b1a22ace58f754cf65125d6ee233b2dc704523abc14`.
+  Fresh root `expansion-failed7-719e3e0-luna-high-r1-cli1592` stopped after
+  three of eight units: **zero Agent PASS / one canonical FAIL / one BLOCKED /
+  one separate boundary / five pending**. Matrix records two Agent FAILs.
+  C06 executed and verified once with all seven independent business assertions
+  passing, but its midpoint-only post-Preview notice remained a grading FAIL.
+  C08 contains a genuine split-handle declaration error, authenticated and
+  rejected before dispatch with exit 126 and null runner/payload. No Preview,
+  authorization or execution occurred. The archive's read-only-query rejection
+  branch could not represent that declaration rejection, causing BLOCKED.
+  #148 adds a narrow terminal negative-evidence lane requiring exact parser,
+  authority/revision, unchanged bound composition and reconciliation proof;
+  malformed declarations remain prohibited and the Agent result remains FAIL.
+  Its focused archive/CLI/Broker regression passed **259 tests**; independent
+  Spec and Standards review is clear. The #147 follow-up instead permits the
+  attested exact earlier plan to supply unchanged endpoints/shape only when a
+  distinct post-Preview notice identifies the old/new midpoint, references the
+  Preview, preserves identity/notes and excludes the attested sibling. Its
+  author-focused regression passed **593 tests**, retaining all prior controls
+  and rejecting the additional creation/removal/clear actions found in review.
+  Final independent Spec and Standards rechecks are clear. The root's combined
+  archive, notice, policy, Broker, CLI, task, matrix and campaign regression
+  passed **1117 tests**, exit zero in **19.39 seconds**. Log SHA-256 is
+  `2fa6e0b9cce496913e72becf111148b38e1a12bc78d1e221076c1d7b7b391ccb`;
+  JUnit SHA-256 is
+  `ee219bf835a265a5de4e13ec18c2b65cbdea393eebe7065b4494cc1ce79d101b`.
+  No owned test process or diff-check error remained.
+  The original partial root stays frozen without verify-only or regrading.
+  Its one-shot launcher exited 3, was unloaded and left no scoped process.
+  All three source hashes/mtimes remained unchanged; actors closed, children
+  were reaped and all three projects remain quarantined. Independent evidence
+  and report reviews validated **477 artifacts / 15473104 bytes / eight seals**.
+  Exact partial results, gates and usage are in
+  `../research/integration-expansion-partial-719e3e0-2026-10-02.json`.
+  A new gated candidate, failed-only batch and final full acceptance remain
+  required; unused full launchers remain unused.
+
 - **Reviewed notice repair #147 — 2026-10-02:** all six sealed contextual
   notices now pass without changing Skill behavior, business oracles, prompts,
   authorization, or historical outcomes. Notice grading resolves references

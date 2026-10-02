@@ -968,3 +968,108 @@ def test_expansion_returns_classified_failure_and_reconciles_only_after_broker_c
     assert calls == ["broker-open", "broker-closed-reaped", "independent-read"]
     oracle = json.loads((tmp_path / "task" / "expansion-oracle.json").read_text())
     assert oracle["reconciliation"]["child_reaped"] is True
+
+
+def _preview_bound_midpoint_case():
+    return json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-midpoint-719e3e0.json").read_text())
+
+
+def test_actual_post_preview_scalar_delta_inherits_only_the_attested_full_plan():
+    case = _preview_bound_midpoint_case()
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("replacement", ["按不可变预览把", "现在按预览将该关系的", "按预览把"])
+def test_preview_bound_midpoint_notice_does_not_require_repeated_endpoints_or_shape(replacement):
+    case = _preview_bound_midpoint_case()
+    case["events"][-2]["item"]["text"] = case["events"][-2]["item"]["text"].replace("现在按预览把", replacement)
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("damage", [
+    "no_plan", "wrong_plan", "wrong_plan_shape", "no_preview", "late", "no_reference", "wrong_history",
+    "no_history", "wrong_midpoint", "wrong_unit", "missing_value", "wrong_owner", "foreign_guid",
+    "no_identity", "no_notes", "wrong_notes", "no_sibling", "changed_sibling", "wrong_property",
+    "wrong_control", "extra_endpoint", "wrong_shape", "extra_edit", "conflicting_scalar", "changed_preview",
+])
+def test_preview_reference_cannot_inherit_unknown_or_conflicting_rtpc_effects(damage):
+    case = _preview_bound_midpoint_case()
+    post = case["events"][-2]["item"]
+    text = post["text"]
+    if damage == "no_plan": case["events"].pop(0)
+    elif damage == "wrong_plan": case["events"][0]["item"]["text"] = case["events"][0]["item"]["text"].replace("(50, -6)", "(50, -60)")
+    elif damage == "wrong_plan_shape": case["events"][0]["item"]["text"] = case["events"][0]["item"]["text"].replace("线性", "非线性")
+    elif damage == "no_preview": case["events"].pop(1)
+    elif damage == "late": case["events"][-2:] = case["events"][-2:][::-1]
+    elif damage == "changed_preview": case["artifact"]["prepared_operation"]["verification_plan"]["points"][1]["y"] = -60
+    else:
+        replacements = {
+            "no_reference": ("现在按预览把", "现在把"),
+            "wrong_history": ("`-12 dB`", "`-24 dB`"),
+            "no_history": ("当前中点是 `-12 dB`。", ""),
+            "wrong_midpoint": ("`-6 dB`", "`-60 dB`"),
+            "wrong_unit": ("`-6 dB`", "`-6 Hz`"),
+            "missing_value": ("`-6 dB`", "未知值"),
+            "wrong_owner": ("现在按预览把", "现在按预览把 OtherSound 的"),
+            "no_identity": ("身份与备注", "备注"),
+            "no_notes": ("身份与备注", "身份"),
+            "wrong_notes": ("Preserve volume association", "Different notes"),
+            "no_sibling": ("另有一条 Voice Pitch／Time 曲线，预览显示它不在本次改动范围内。", ""),
+            "changed_sibling": ("不在本次改动范围内", "也在本次改动范围内"),
+            "wrong_property": ("把中点", "把 Pitch 曲线的中点"),
+            "wrong_control": ("Volume／Rain_Intensity", "Volume／Time"),
+        }
+        if damage in replacements:
+            old, new = replacements[damage]
+            assert old in text
+            text = text.replace(old, new)
+        else:
+            text += {
+                "foreign_guid": "目标是 {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。",
+                "extra_endpoint": "两端改为 (0,-20)、(100,0)。",
+                "wrong_shape": "各段非线性。",
+                "extra_edit": "同时修改备注。",
+                "conflicting_scalar": "但仅把中间点改为 (-60 Hz)，线性段保持原样。",
+            }[damage]
+        post["text"] = text
+    assert not _notice(case["events"], artifact=case["artifact"], before=case["before"])
+
+
+@pytest.mark.parametrize("claim,expected", [
+    ("同时修改 Lowpass 为 12。", False),
+    ("同时删除另一条关系。", False),
+    ("同时替换原曲线。", False),
+    ("同时把端点改为 -20 dB。", False),
+    ("不修改 Lowpass，也不删除另一条关系。", True),
+    ("不替换原曲线。", True),
+])
+def test_preview_scalar_inheritance_accounts_for_every_additional_edit(claim, expected):
+    case = _preview_bound_midpoint_case()
+    case["events"][-2]["item"]["text"] += claim
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected
+
+
+@pytest.mark.parametrize("claim,expected", [
+    ("同时新增另一条关系。", False),
+    ("同时移除另一条关系。", False),
+    ("同时添加另一条关系。", False),
+    ("同时创建另一条关系。", False),
+    ("同时清空原曲线。", False),
+    ("Also add another relationship.", False),
+    ("Also create another relationship.", False),
+    ("Also clear the curve.", False),
+    ("不新增另一条关系。", True),
+    ("不移除另一条关系。", True),
+    ("不添加另一条关系。", True),
+    ("不创建另一条关系。", True),
+    ("不清空原曲线。", True),
+    ("Do not add another relationship.", True),
+    ("Do not create another relationship.", True),
+    ("Do not clear the curve.", True),
+    ("新增关系计数为零；移除关系计数为零。", True),
+    ("No relationships were created or removed.", True),
+])
+def test_preview_scalar_inheritance_rejects_add_remove_clear_actions_not_preservation_or_status(claim, expected):
+    case = _preview_bound_midpoint_case()
+    case["events"][-2]["item"]["text"] += claim
+    assert _notice(case["events"], artifact=case["artifact"], before=case["before"]) is expected

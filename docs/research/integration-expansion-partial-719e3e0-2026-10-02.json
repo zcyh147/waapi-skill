@@ -1,0 +1,126 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "719e3e0d67d6cb39b88921b29dc68d2ae6a2d109",
+  "date": "2026-10-02",
+  "host": "macOS",
+  "root": "expansion-failed7-719e3e0-luna-high-r1-cli1592",
+  "status": "partial-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6-luna",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "cases": [
+      "C06",
+      "C08",
+      "C09",
+      "M05"
+    ],
+    "agent_budget_seconds": 600,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180,
+    "max_pre_action_retries": 0,
+    "codex_binary": "0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "development_gates": {
+    "focused": {
+      "passed": 913,
+      "seconds": 15.45,
+      "exit_code": 0,
+      "log_sha256": "362865d0be85e9cbcd82f1200c9cd2af5e6480ef3f09e2e95cae8e395e4cf68e",
+      "junit_sha256": "c666ae20abcd4c41b6973a66adab4cdea13f3fa9b744958490e0201c221ba5cc"
+    },
+    "nonlive": {
+      "passed": 12962,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 860.71,
+      "exit_code": 0,
+      "log_sha256": "c165a27b9598b6a77260f5c51e2d4cc68efdc3078c28aed272a86348cbd89256",
+      "junit_sha256": "84d72f3a640213c0742b4b1a22ace58f754cf65125d6ee233b2dc704523abc14"
+    },
+    "unchanged_program_component": "Packaged Skill and Program inputs remain byte-identical to b4fd348: 6094 passed, 2 native-Windows skips. This is component evidence, not a new Program run."
+  },
+  "result": {
+    "selected_units": 8,
+    "attempted_units": 3,
+    "agent_pass": 0,
+    "matrix_agent_fail": 2,
+    "canonical_agent_fail": 1,
+    "canonical_blocked": 1,
+    "boundary_proven": 1,
+    "pending": 5,
+    "stopped_early": true,
+    "stop_reason": "fail:EXP22-C08",
+    "launcher_runs": 1,
+    "launcher_exit_code": 3,
+    "unloaded": true,
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false
+  },
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "status": "BOUNDARY_PROVEN",
+      "agent_pass_credit": false
+    },
+    {
+      "id": "EXP22-C06",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "cause": "visible_preview_notice false negative for exact midpoint-only delta referencing immutable Preview",
+      "business_assertions_passed": 7,
+      "business_assertions_total": 7,
+      "gateway_verification_state": "verified",
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "agent_seconds": 147.13061499991454
+    },
+    {
+      "id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "BLOCKED",
+      "cause": "Genuine malformed declaration handle safely rejected before dispatch; canonical archive lacks this declaration rejection lane",
+      "accepted": false,
+      "rejected_exit_code": 126,
+      "runner_exit_code": null,
+      "payload": null,
+      "goal_preview_count": 0,
+      "goal_execute_count": 0,
+      "goal_verify_count": 0,
+      "agent_seconds": 73.19210054189898
+    }
+  ],
+  "integrity": {
+    "artifact_count": 477,
+    "artifact_bytes": 15473104,
+    "metadata_seals": 8,
+    "manifest_sha256": "112bd8fe7d75f853e90123c83099af1e2fa0c38b3ab9c15d5fc11930304096bc",
+    "all_sources_unchanged": true,
+    "actors_closed": true,
+    "reaped": true,
+    "quarantined": 3,
+    "c06": "all7businessasserts passed; 1exec1verify;noticeFAIL",
+    "c08": "genuine malformed handle split declaration; predispatch rejected126 nullpayload nullrunner; archive only covers query-object rejection soBLOCKED",
+    "no_verify": true
+  },
+  "usage": {
+    "input_tokens": 690200,
+    "cached_input_tokens": 599552,
+    "uncached_input_tokens": 90648,
+    "output_tokens": 8432,
+    "reasoning_output_tokens_included": 4941,
+    "cache_write_input_tokens": 0,
+    "agent_seconds": 220.32271554181352,
+    "agent_turns": 2,
+    "slow_units": 0,
+    "usd_cost": null
+  },
+  "remaining": "Repair notice context and canonical rejected-declaration evidence, review and gate a new candidate, then new failed-only seven-Agent-unit batch plus boundary. Final complete thirteen-Agent-unit batch plus boundary and identical verify-only remain required."
+}

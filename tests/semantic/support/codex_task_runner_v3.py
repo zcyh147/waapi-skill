@@ -519,7 +519,8 @@ def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any])
             "foreign_names": tuple(sorted(foreign_names)),
             "control_names": tuple(matched[0][key] for key in ("name", "path")
                                    if isinstance(matched[0].get(key), str) and matched[0][key]),
-            "same_domain": [p[0] for p in old] == [p[0] for p in new]}
+            "same_domain": [p[0] for p in old] == [p[0] for p in new],
+            "notes": volume[0].get("notes", "")}
 
 
 def _notice_qualifier_is_negated(qualifier: str) -> bool:
@@ -598,7 +599,8 @@ def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | No
 
 def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool, earlier_shape: bool = False) -> tuple[bool, bool]:
     """Recognize a full curve or accurate point delta in the attested context."""
-    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    # The immutable Preview noun is not a negated edit qualifier.
+    text = re.sub(r"`([^`\n]+)`", r"\1", text).replace("不可变预览", "预览")
     numeric = text.replace("\u2212", "-")
     if _rtpc_volume_point_claims(numeric) is None:
         return False, False
@@ -656,6 +658,23 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     middle_edit = (len(old) == len(new) == 3 and context["same_domain"]
                    and old[0] == new[0] and old[2] == new[2] and context["delta"] == [new[1]])
     complete_current_curve = False
+    current_midpoint_seen = False
+    # Preview inheritance covers only the sealed midpoint edit. Every other
+    # affirmative mutation remains a contradiction, even without an owner label.
+    sibling_names = [name for name in context["foreign_names"] if "\\" not in name]
+    preview_actions_accounted = True
+    for action_clause in re.split(r"[。；;\n]", text):
+        # A complete zero-count status is a noun observation, not an action.
+        # It cannot hide a second clause or an instruction following the count.
+        if re.fullmatch(r"(?:新增|移除)关系计数为(?:零|0)", action_clause.strip()):
+            continue
+        for mutation in re.finditer(r"新增|添加|插入|创建|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b", action_clause):
+            qualifier = re.split(r"[，,、]", action_clause[:mutation.start()])[-1]
+            if _notice_qualifier_is_negated(qualifier):
+                continue
+            if (re.search(r"(?:中点|中间点|midpoint|middle point)\s*$", qualifier) is None
+                    or mutation.group() not in {"改为", "改成", "设为", "set", "change"}):
+                preview_actions_accounted = False
     for clause_index, clause in enumerate(clauses):
         point_reference = "该点" in clause
         if point_reference and middle_edit:
@@ -707,6 +726,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             value = _rtpc_midpoint_value(clause[history.end():].lstrip())
             if value is None or value[0] not in (context["old"][1][1], context["old"][1]):
                 return False, False
+            current_midpoint_seen = True
         target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
                          and any(term in clause for term in ("curve", "曲线", "rtpc"))) or whole_target
         historical = (any(term in clause for term in ("现有", "当前", "现状", "existing", "current"))
@@ -750,14 +770,31 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             # be stated, not inferred from a generic preservation claim.
             inherited_endpoints = (point_reference and earlier_points and not pairs(following)
                                    and re.search(r"保留(?:两端点|首尾点)", following) is not None)
+            preview_remainder = (preview_actions_accounted and middle_edit and earlier_points and earlier_shape and current_midpoint_seen
+                and re.fullmatch(r"(?:现在)?按(?:不可变)?预览(?:把|将)(?:(?:该|同一|原)(?:关系)?的)?", prefix.strip()) is not None
+                and any(name.casefold() in text for name in context["control_names"])
+                and whole_target and not pairs(numeric) and bool(sibling_names)
+                and isinstance(context["notes"], str)
+                and re.search(r"保留(?:同一|原)(?:关系)?身份(?:与|和|及)备注", retention) is not None
+                and any(all(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", sibling)
+                            for name in sibling_names)
+                        and re.search(r"不在本次改动范围|保持原样|不(?:会)?修改", sibling) is not None
+                        for sibling in clauses if sibling not in same_target_clauses)
+                and requested_shape(following))
+            if preview_remainder:
+                # A quoted before-state note must still agree with the sealed
+                # relationship; preservation cannot rescue a false history.
+                note_claims = re.findall(r"备注为[“\"]([^”\"]*)[”\"]", text)
+                if any(note != context["notes"].casefold() for note in note_claims):
+                    return False, False
             if (len(old) != 3 or len(new) != 3 or not context["same_domain"]
                     or old[0] != new[0] or old[2] != new[2]
                     or context["delta"] != [new[1]] or old[1][1] == new[1][1]
                     or float(scalar_middle.group("new")) != new[1][1]
-                    or not (prospective_remainder or inherited_endpoints or (pairs(following) == [new[0], new[2]]
+                    or not (preview_remainder or prospective_remainder or inherited_endpoints or (pairs(following) == [new[0], new[2]]
                         and any(term in following for term in ("保持", "unchanged", "retain"))
                         and any(term in following for term in ("不变", "原值", "unchanged"))))
-                    or not (requested_shape(following) if prospective_remainder else _affirmative_linear_interpolation(following))):
+                    or not (requested_shape(following) if (preview_remainder or prospective_remainder) else _affirmative_linear_interpolation(following))):
                 return False, False
             effect = True
             continue

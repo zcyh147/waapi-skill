@@ -177,17 +177,7 @@ def _validate_rejected_read(record, *, argv, gate):
     if record.get("rejection") == parser_rejection:
         _validate_predispatch_rejection(record, parser_rejection)
         _require(bool(argv) and argv[0] == "query-object", "parser rejection is not a read-only object query")
-        # Invalid syntax is the original failure, not evidence of dispatch.
-        # Only an actual parser error (not successful parsing or --help) can
-        # support this exact authenticated terminal pre-dispatch receipt.
-        try:
-            with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
-                gate.public_parser(argv)
-        except ExpansionArchiveError as exc:
-            _require(isinstance(exc.__cause__, SystemExit) and exc.__cause__.code == 2,
-                "rejected read lacks its public parser error")
-        else:
-            raise ExpansionArchiveError("parser-rejected read has valid public syntax")
+        _validate_parser_error(argv, gate)
         return
     rejection = "expansion policy rejected command: project query requires a bounded public source"
     _validate_predispatch_rejection(record, rejection)
@@ -205,6 +195,30 @@ def _validate_rejected_read(record, *, argv, gate):
         _require(args.relationships == ["children"] and (
             args.max_results is None or not 1 <= args.max_results <= gate.scope.max_rows),
             "rejected owned relationship read does not violate its sealed row bound")
+
+
+def _validate_parser_error(argv, gate):
+    """The frozen public parser must reject with usage error, never help."""
+    try:
+        with redirect_stderr(io.StringIO()), redirect_stdout(io.StringIO()):
+            gate.public_parser(argv)
+    except ExpansionArchiveError as exc:
+        _require(isinstance(exc.__cause__, SystemExit) and exc.__cause__.code == 2,
+            "rejected command lacks its public parser error")
+    else:
+        raise ExpansionArchiveError("parser-rejected command has valid public syntax")
+
+
+def _validate_rejected_core_declaration(record, *, argv, gate, draft_id, authority, revision, operation):
+    """One malformed attenuation declaration is authenticated but undispatched."""
+    _validate_predispatch_rejection(record,
+        "expansion policy rejected command: command does not satisfy the public Gateway parser")
+    _require(operation == "ak.wwise.core.object.setAttenuationCurve" and revision == 2
+        and argv[:6] == ["draft-declare-core-plan", draft_id, "--task-authority", authority,
+            "--expected-revision", "2"]
+        and argv.count("--task-authority") == argv.count("--expected-revision") == 1,
+        "rejected declaration changed its bound Draft authority or revision")
+    _validate_parser_error(argv, gate)
 
 
 def _validate_predispatch_rejection(record, rejection):
@@ -259,10 +273,12 @@ def _pristine_rejected_draft(root, plan, records):
     _require(not (root / "broker/state/transactions").exists(), "rejected binding contains transaction evidence")
 
 
-def _bound_draft_rejected_read(root, plan, records):
+def _bound_draft_rejected_read(root, plan, records, *, declaration=False):
     """Prove the one unchanged editable binding preceding an owned-read FAIL."""
-    _require(plan["read_scope"].get("owned_project_reads") is True
-        and plan.get("operation") == "audio.import", "rejected bound Draft lacks its owned import scope")
+    operation = plan.get("request_schema_uri") or plan.get("operation")
+    _require((declaration and operation == "ak.wwise.core.object.setAttenuationCurve")
+        or (not declaration and plan["read_scope"].get("owned_project_reads") is True
+            and operation == "audio.import"), "rejected bound Draft lacks its approved operation scope")
     starts = [row for row in records if row["gateway_arguments"][0] == "draft-start"]
     binds = [row for row in records if row["gateway_arguments"][0] == "draft-bind-object"]
     _require(len(starts) == len(binds) == 1
@@ -272,13 +288,14 @@ def _bound_draft_rejected_read(root, plan, records):
     start, bound = starts[0]["payload"], binds[0]["payload"]
     draft, bound_draft = start["draft"], bound["draft"]
     argv = binds[0]["gateway_arguments"]
-    _require(len(argv) == 8 and argv == ["draft-bind-object", draft["draft_id"],
-        "--task-authority", start["task_authority"], "--expected-revision", "1", "--object-id", argv[-1]]
+    expected_bind = ["draft-bind-object", draft["draft_id"], "--task-authority", start["task_authority"],
+        "--expected-revision", "1", *(["--role", "attenuation"] if declaration else []), "--object-id", argv[-1]]
+    _require(argv == expected_bind
         and argv[-1] in plan["read_scope"]["object_ids"], "rejected read has another Draft selector")
     stored = load_operation_draft_archive_records((root / "broker/state").absolute(), [draft["draft_id"]])[draft["draft_id"]]
     binding = {"operation": stored.operation, "version": stored.version, "schema_digest": stored.schema_digest}
     _require(stored.state.value == "editable" and stored.revision == bound_draft.get("revision") == 2
-        and stored.operation == plan["operation"] and stored.version == plan["version"]
+        and stored.operation == operation and stored.version == plan["version"]
         and stored.schema_digest == _public_gateway(plan).operation_draft_schema_digest(stored.operation, stored.version)
         and stored.composer_digest == operation_composer_digest(stored.operation, stored.version)
         and stored.authority_digest == operation_draft_authority_digest(start["task_authority"])
@@ -305,7 +322,9 @@ def _bound_draft_rejected_read(root, plan, records):
         "rejected read carries Draft declarations, fields, settings or Preview state")
     obj = objects[0]
     receipt = bound.get("bound_object", {})
-    _require(obj["object_id"] == argv[-1] and all(receipt.get(key) == obj[value] for key, value in
+    _require((not declaration or (obj.get("role") == receipt.get("role") == "attenuation"
+            and obj["object_type"] == "Attenuation"))
+        and obj["object_id"] == argv[-1] and all(receipt.get(key) == obj[value] for key, value in
         (("handle", "handle"), ("name", "name"), ("type", "object_type"), ("semantic_kind", "semantic_kind"))),
         "rejected read binding differs from its authenticated receipt")
     pending, identities, count = [plan["before"]], [], 0
@@ -354,6 +373,9 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
                 gate.public_parser(argv)
                 _validate_rejected_draft_bind(record, argv=argv, gate=gate,
                     draft_id=draft_id, authority=authority, revision=revision)
+            elif argv[:1] == ["draft-declare-core-plan"]:
+                _validate_rejected_core_declaration(record, argv=argv, gate=gate,
+                    draft_id=draft_id, authority=authority, revision=revision, operation=expected_operation)
             else:
                 _validate_rejected_read(record, argv=argv, gate=gate)
             _require(index == len(records), "dispatch followed a rejected read")
@@ -580,10 +602,14 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(oracle.get("before") == plan["before"], "independent pre-state changed")
     rejected_read = any(record.get("accepted") is False for record in records)
     if rejected_read:
+        rejected_declaration = records[-1]["gateway_arguments"][:1] == ["draft-declare-core-plan"]
+        allowed_prefix = _READS | {"draft-start", "draft-bind-object"}
+        _require(all(record["gateway_arguments"][0] in allowed_prefix for record in records[:-1]),
+            "rejected command has another mutation or declaration in its accepted prefix")
         _require(result["passed"] is False and result.get("status") == "FAIL"
             and result.get("terminal_state") == "unprepared"
             and len(turns) == 1 and not turns[0].get("incomplete")
-            and all(record["gateway_arguments"][0] in _READS | {"draft-start", "draft-bind-object"} for record in records)
+            and (rejected_declaration or records[-1]["gateway_arguments"][0] in allowed_prefix)
             and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
             and oracle.get("authorization") is None and oracle.get("permit") is None
             and oracle.get("after") is None and result.get("assertions") == {}
@@ -597,7 +623,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                 "rejected binding carries preparation or verification evidence")
         else:
             if any(record["gateway_arguments"][0] == "draft-start" for record in records):
-                _bound_draft_rejected_read(root, plan, records)
+                _bound_draft_rejected_read(root, plan, records, declaration=rejected_declaration)
                 _require(all(key in oracle and oracle[key] is None for key in
                     ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
                     and result.get("gateway_verification_state") is None,

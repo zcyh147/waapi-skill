@@ -854,20 +854,22 @@ def test_completed_rejected_read_turn_cannot_omit_terminal_receipt(tmp_path):
         _verify(tmp_path)
 
 
-def _sealed_invalid_draft_bind(root):
+def _sealed_invalid_draft_bind(root, operation="audio.import"):
     _sealed_read_rejection(root)
     plan = json.loads((root / 'expansion-plan.json').read_text())
-    plan['operation'] = 'audio.import'
+    plan['operation'] = 'audio.import' if operation == 'audio.import' else 'waapi.call'
     plan.pop('request_schema_uri', None)
-    plan['read_scope']['operations'] = ['audio.import']
+    if operation != 'audio.import':
+        plan['request_schema_uri'] = operation
+    plan['read_scope']['operations'] = [operation]
     scope = ExpansionReadScope(**{key: frozenset(value) if isinstance(value, list) else value
         for key, value in plan['read_scope'].items()})
     plan['read_scope_sha256'] = scope.digest
     plan.pop('sha256')
     plan['sha256'] = canonical_digest(plan)
     _write(root / 'expansion-plan.json', plan)
-    start = OperationDraftStore(root / 'broker/state').start(operation='audio.import', version='2025.1',
-        schema_digest=_GATEWAY.operation_draft_schema_digest('audio.import', '2025.1'), composer_digest=operation_composer_digest('audio.import', '2025.1'))
+    start = OperationDraftStore(root / 'broker/state').start(operation=operation, version='2025.1',
+        schema_digest=_GATEWAY.operation_draft_schema_digest(operation, '2025.1'), composer_digest=operation_composer_digest(operation, '2025.1'))
     record = start.record
     draft = {'contract': 'waapi-skill.operation-draft/v1', 'draft_id': start.draft_id,
         'revision': 1, 'business_revision': 0, 'lifecycle_state': 'editable',
@@ -876,7 +878,7 @@ def _sealed_invalid_draft_bind(root):
         'declarations': [], 'check': None, 'seal': None, 'preview': None}
     broker = json.loads((root / 'expansion-broker.json').read_text())
     first, last = broker['records']
-    first['gateway_arguments'] = ['draft-start', 'audio.import']
+    first['gateway_arguments'] = ['draft-start', operation]
     first['payload'] = {'ok': True, 'command': 'draft-start', 'draft': draft, 'task_authority': start.task_authority}
     first['payload_sha256'] = canonical_digest(first['payload'])
     first['stdout'] = json.dumps(first['payload'])
@@ -921,21 +923,23 @@ def test_terminal_invalid_guid_draft_bind_preserves_failed_zero_mutation_archive
     assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
 
 
-def _sealed_bound_draft_read_rejection(root):
+def _sealed_bound_draft_read_rejection(root, *, declaration=False):
     """Production Draft update plus the terminal owned-read pattern from #132."""
     from wwise_waapi.business_declarations import BusinessContext, BusinessHandleRegistry
-    _sealed_invalid_draft_bind(root)
+    operation = 'ak.wwise.core.object.setAttenuationCurve' if declaration else 'audio.import'
+    _sealed_invalid_draft_bind(root, operation)
     plan = json.loads((root / 'expansion-plan.json').read_text())
     # This derivative models a Sound read, not the C08 attenuation identity.
     # Complete baseline rows must never give one GUID two different types.
-    identifier = plan['before']['users']['sound']['id']
+    identifier = plan['before']['attenuation']['id'] if declaration else plan['before']['users']['sound']['id']
     plan['read_scope']['object_ids'] = [identifier]
     plan['read_scope']['relationship_sources'] = [identifier]
     scope = ExpansionReadScope(**{key: frozenset(value) if isinstance(value, list) else value
         for key, value in plan['read_scope'].items()})
     plan['read_scope_sha256'] = scope.digest
-    identity = {'id': identifier, 'name': 'FixtureSound', 'type': 'Sound', 'path': r'\Containers\FixtureSound'}
-    plan['before']['sound'] = identity
+    identity = plan['before']['attenuation'] if declaration else {'id': identifier, 'name': 'FixtureSound', 'type': 'Sound', 'path': r'\Containers\FixtureSound'}
+    if not declaration:
+        plan['before']['sound'] = identity
     plan.pop('sha256')
     plan['sha256'] = canonical_digest(plan)
     _write(root / 'expansion-plan.json', plan)
@@ -948,12 +952,13 @@ def _sealed_bound_draft_read_rejection(root):
     def bind(session):
         handles = BusinessHandleRegistry.from_dict(session.handles.as_dict())
         captured.append(handles.bind_object(object_id=identifier, name=identity['name'],
-            object_type='Sound', path=identity['path'], semantic_kind='sound-voice'))
+            object_type=identity['type'], path=identity['path'], semantic_kind=None if declaration else 'sound-voice',
+            role='attenuation' if declaration else None))
         return session.with_handle_registry(handles)
     updated = OperationDraftStore(root / 'broker/state').apply_business_update(start['draft']['draft_id'],
         task_authority=start['task_authority'], expected_revision=1,
         schema_digest=start['draft']['binding']['schema_digest'],
-        composer_digest=operation_composer_digest('audio.import', '2025.1'),
+        composer_digest=operation_composer_digest(operation, '2025.1'),
         context=context, update=bind, event_type='handles.bound')
     bound = captured[0]
     payload = {'ok': True, 'command': 'draft-bind-object', 'draft': {
@@ -965,12 +970,23 @@ def _sealed_bound_draft_read_rejection(root):
     accepted.update(sequence=2, step_name='expansion.step.0002', payload=payload,
         payload_sha256=canonical_digest(payload), stdout=json.dumps(payload), gateway_arguments=[
         'draft-bind-object', updated.draft_id, '--task-authority', start['task_authority'],
-        '--expected-revision', '1', '--object-id', identifier])
+        '--expected-revision', '1', *(['--role', 'attenuation'] if declaration else []), '--object-id', identifier])
+    if declaration:
+        payload['bound_object']['role'] = 'attenuation'
+        accepted['payload_sha256'] = canonical_digest(payload)
+        accepted['stdout'] = json.dumps(payload)
     rejected = deepcopy(broker['records'][-1])
     rejected.update(sequence=3, gateway_arguments=['query-object', '--exact-id', identifier,
         '--relationship', 'children', '--include', 'parent', '--include', 'file-path', '--max-results', '100'],
         rejection='expansion policy rejected command: project query requires a bounded public source')
     rejected['stderr'] = 'Gateway broker rejected command: ' + rejected['rejection'] + '\n'
+    if declaration:
+        witness = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-rejected-declaration-719e3e0.json').read_text())['record']
+        rejected.update({key: witness[key] for key in ('rejection', 'stderr', 'gateway_arguments')})
+        argv = rejected['gateway_arguments']
+        argv[1] = updated.draft_id
+        argv[argv.index('--task-authority') + 1] = start['task_authority']
+        argv[argv.index('--role') + 2:argv.index('--role') + 4] = ['bo', bound.handle[2:]]
     broker.update(records=[first, accepted, rejected],
         expected_step_names=['expansion.step.0001', 'expansion.step.0002'],
         consumed_step_names=['expansion.step.0001', 'expansion.step.0002'])
@@ -1231,4 +1247,79 @@ def test_rejected_bind_rejects_self_consistent_wrong_gateway_schema_digest(tmp_p
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)
     with pytest.raises(ExpansionArchiveError, match='pristine'):
+        _verify(tmp_path)
+
+
+def test_sealed_malformed_core_declaration_is_a_zero_dispatch_isolated_fail(tmp_path):
+    _sealed_bound_draft_read_rejection(tmp_path, declaration=True)
+    before = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+    replay = _verify(tmp_path)
+    assert replay['archive_valid'] is True and replay['original_status'] == 'FAIL'
+    assert replay['business_pass'] is False and replay['executions'] == replay['execution_reservations'] == 0
+    assert {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()} == before
+
+
+@pytest.mark.parametrize('damage', ('authority', 'missing_authority', 'duplicate_authority', 'draft_id',
+    'revision', 'raw_hash', 'normalized_hash', 'argv', 'missing_receipt', 'duplicate_receipt',
+    'runner_exit', 'payload', 'dispatch_digest', 'authentication', 'valid_syntax', 'later_dispatch',
+    'stored_revision', 'stored_authority', 'stored_settings', 'stored_role', 'stored_audit',
+    'projection', 'transaction', 'reconciliation', 'cleanup', 'passed'))
+def test_rejected_declaration_requires_exact_bound_draft_and_terminal_no_dispatch_proof(tmp_path, damage):
+    _sealed_bound_draft_read_rejection(tmp_path, declaration=True)
+    broker = json.loads((tmp_path / 'expansion-broker.json').read_text())
+    row = broker['records'][-1]
+    argv = row['gateway_arguments']
+    if damage in ('authority', 'missing_authority', 'duplicate_authority', 'draft_id', 'revision', 'valid_syntax'):
+        if damage == 'authority': argv[3] = 'da1-' + 'a' * 40
+        elif damage == 'missing_authority': del argv[2:4]
+        elif damage == 'duplicate_authority': argv.extend(['--task-authority', argv[3]])
+        elif damage == 'draft_id': argv[1] = 'od1-' + 'a' * 32
+        elif damage == 'revision': argv[5] = '1'
+        else:
+            handle = broker['records'][1]['payload']['bound_object']['handle']
+            argv[argv.index('--role') + 1:argv.index('--value')] = ['attenuation_handle', handle]
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'raw_hash': row['raw_argv_sha256'] = 'b' * 64
+    elif damage == 'normalized_hash': row['argv_sha256'] = 'b' * 64
+    elif damage == 'argv': argv.append('--unrecorded')
+    elif damage == 'missing_receipt': broker['records'].pop()
+    elif damage == 'duplicate_receipt':
+        extra = deepcopy(row)
+        extra['sequence'] = 4
+        broker['records'].append(extra)
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'runner_exit': row['runner_exit_code'] = 2
+    elif damage == 'payload': row['payload'] = {'ok': False}
+    elif damage == 'dispatch_digest': row['runner_command_sha256'] = 'b' * 64
+    elif damage == 'authentication': row['authenticated'] = False
+    elif damage == 'later_dispatch':
+        extra = deepcopy(broker['records'][0])
+        extra.update(sequence=4, step_name='expansion.step.0003')
+        broker['records'].append(extra)
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage.startswith('stored_'):
+        path = next((tmp_path / 'broker/state/operation-drafts-v1/records').glob('*.json'))
+        stored = json.loads(path.read_text())
+        if damage == 'stored_revision': stored['revision'] = 3
+        elif damage == 'stored_authority': stored['authority_digest'] = 'b' * 64
+        elif damage == 'stored_settings': stored['composition']['business_session']['settings'] = {'foreign': True}
+        elif damage == 'stored_role': stored['composition']['business_session']['handles']['objects'][0]['role'] = 'foreign'
+        else: stored['audit'][-1]['event_type'] = 'declaration.appended'
+        stored['record_digest'] = _record_digest(stored)
+        _write(path, stored)
+    elif damage == 'projection':
+        broker['records'][1]['payload']['bound_object']['name'] = 'OtherAttenuation'
+        _refresh_bound_rejection_receipts(tmp_path, broker)
+    elif damage == 'transaction': _write(tmp_path / 'broker/state/transactions/forged/state.json', {})
+    elif damage in ('reconciliation', 'cleanup'):
+        oracle = json.loads((tmp_path / 'expansion-oracle.json').read_text())
+        if damage == 'cleanup': oracle['reconciliation']['subprocesses_reaped'] = False
+        else: oracle['reconciliation']['snapshot'] = {}
+        _write(tmp_path / 'expansion-oracle.json', oracle)
+    else:
+        result = json.loads((tmp_path / 'expansion-task-result.json').read_text())
+        result.update(passed=True, status='PASS')
+        _write(tmp_path / 'expansion-task-result.json', result)
+    _write(tmp_path / 'expansion-broker.json', broker)
+    with pytest.raises(ExpansionArchiveError):
         _verify(tmp_path)
