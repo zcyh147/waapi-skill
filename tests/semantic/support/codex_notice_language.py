@@ -70,12 +70,15 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
     record = r"(?:预览(?:之后|后)|本次)(?:已)?记录(?:了)?(?:独立)?(?:的)?\s*(?P<record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权(?:记录)?"
     inspection = r"(?:已)?确认(?:保存的)?授权记录包含独立于(?:修改|变更|改动)预览的\s*(?P<inspection_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权"
+    provider_record = rf"(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:已)?为{change}(?:记录|保存)(?:了)?(?:独立)?(?:策略)?授权"
     beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
-    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection})(?=[，,。；;]|\s*$)", clause)
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record})(?=[，,。；;]|\s*$)", clause)
     if match:
         if match.group('record_policy') is not None and match.group('record_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
         if match.group('inspection_policy') is not None and match.group('inspection_policy') not in {'allow_changes', '**allow_changes**'}:
+            return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
+        if match.group('provider_record_policy') is not None and match.group('provider_record_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
         consumed_end = match.end()
         for qualifier in re.finditer(r"[，,]([^，,。；;\n]+)", clause[match.end():]):
@@ -138,7 +141,7 @@ def planned_change_noun(action: str, prefix: str, suffix: str) -> PlannedNoun | 
         ("authorization", rf"为(?:{_REFERENT})$", r"提供(?:独立|持久)?(?:策略)?授权(?=[，,]|$)"),
         ("authorization", rf"(?:已)?为(?:{_REFERENT})$", r"取得(?:独立)?授权(?=[，,]|$)"),
         ("authorization", rf"(?:预览(?:已)?|已)?将(?:{_REFERENT})$", r"(?:独立)?授权为\s*(?:allow_changes|策略)(?:\s*策略)?操作\s*$"),
-        ("curve-range", rf"(?:{_REFERENT})$", r"范围(?:仅|只)包含(?:这一|该|此)条曲线\s*$"),
+        ("curve-range", rf"(?:{_REFERENT})?$", r"范围(?:仅|只)包含(?:这一|该|此)条曲线\s*$"),
     )
     for role, left, right in frames:
         match = re.search(left, prefix)

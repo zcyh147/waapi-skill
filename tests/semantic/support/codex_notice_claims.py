@@ -298,6 +298,15 @@ def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeC
     return clause._replace(role="prospective-operation", end=clause.start + match.end())
 
 
+def preview_status_claim(clause: NoticeClaim) -> NoticeClaim:
+    """Preview-generation status is ancillary and retains any explicit owner."""
+    preview = r"(?:具体|本次|这次|该|此)?(?:修改|变更|改动)?预览"
+    generated = r"(?:已)?生成"
+    owner = r"(?P<owner>(?:在|向|对)\s*[^，,。；;\n]+?(?:上|下)\s*)?"
+    match = re.fullmatch(rf"\s*{owner}(?:{preview}{generated}|{generated}{preview})\s*", clause.text)
+    return clause._replace(role="preview-status", value=match.group("owner") or "") if match else clause
+
+
 def execution_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
     """A complete operation-matched summary; it never establishes the effect."""
     match = re.fullmatch(rf"\s*(?:{_FUTURE})执行(?:{_REFERENT})?(?:{action_pattern})\s*", clause.text)

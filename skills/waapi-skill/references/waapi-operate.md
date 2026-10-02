@@ -147,6 +147,8 @@ Unless a trusted caller supplied an override, omit `--state-dir`; the Gateway ow
 - `ask_before_changes`: present expected result/risk, say unchanged, and ask.
 - `allow_changes`: after Preview, announce the concrete impending change and continue.
 
+Preview's `policy_authorized` is separate durable authorization; no extra approval is needed.
+
 Prose covers objects, changes, results, risks and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands.
 
 ## Continue only from Gateway-owned commands

@@ -214,6 +214,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     operation_business_contract,
     build_undo_group_execution_plan,
     describe_operation,
+    existing_reference_source_business_kind,
     list_operation_specs,
     operation_input_mode,
     operation_uses_business_declaration,
@@ -1978,7 +1979,9 @@ def build_parser() -> argparse.ArgumentParser:
         dest="business_view",
         help=(
             "Select one Gateway-owned diagnostic view; the Gateway owns its "
-            "complete native projection and stable business result keys"
+            "complete projection and one exact-object bound. Do not combine "
+            "--include, --include-field, --relationship, --predicate, or "
+            "--max-results; use a separate exact-object query for extra fields"
         ),
     )
     query_object.add_argument(
@@ -8355,7 +8358,19 @@ def query_business_schema_payload(
         "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
         "views": {
             "sound-routing-diagnostics": {
-                "source": "one exact Sound path or GUID",
+                "source": (
+                    "one exact Sound GUID (--exact-id) OR one exact Sound path "
+                    "built from repeated literal --path-segment names"
+                ),
+                "exact_object_bound": 1,
+                "cannot_combine_with": [
+                    "--include", "--include-field", "--relationship", "--predicate", "--max-results",
+                ],
+                "additional_fields": {
+                    "route": "a separate query-object for the same exact GUID or object path",
+                    "omit_options": ["--view"],
+                    "field_options": ["--include", "--include-field"],
+                },
                 "automatic_outputs": [
                     "override-output",
                     "active-source",
@@ -17543,6 +17558,20 @@ def dispatch_business_object_binding(
         business_kind = args.role
         business_kind_candidates = (args.role,)
         business_kind_source = "closed_role_live_type"
+    elif binding.record.operation == "object.setReference" and args.role is None:
+        # This adapter's first bound object is the existing field owner. Later
+        # reference targets do not inherit its operation-local comparison role.
+        raw_session = binding.record.composition.get("business_session")
+        source_unbound = raw_session is None or not BusinessDeclarationSession.from_dict(
+            raw_session
+        ).handles.as_dict()["objects"]
+        source_kind = (existing_reference_source_business_kind(
+            binding.record.operation, detected_version, str(row["type"])
+        ) if source_unbound else None)
+        if source_kind is not None:
+            business_kind = source_kind
+            business_kind_candidates = (source_kind,)
+            business_kind_source = "named_reference_source_live_type"
     elif (
         business_kind is None
         and isinstance(args.role, str)

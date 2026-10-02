@@ -43,6 +43,38 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Consolidated #147/#153/#154 repair candidate — 2026-10-03:**
+  #147 recognizes bounded Preview-status and policy-record claims plus a
+  curve-only scope noun; these cannot establish the primary effect or hide
+  conflicting owners, policy modes, refusal or extra edits. Two actual witness
+  regressions were RED before repair; the full notice gate passed **2164 tests**,
+  retaining all prior 2131 controls.
+  #153 attests the exact existing MusicStinger source only at the first binding
+  of the named reference operation. Five pinned native-type indexes prove its
+  class; creation kinds, later reference targets and genuine ambiguity remain
+  unchanged. Its public binding RED5 became GREEN5; the combined binding/metadata
+  gate passed **380 tests**. Two intermediate test failures incorrectly assumed
+  older setLinked availability and were fixed to prove the existing boundary;
+  a mistyped test path collected no tests and grants no evidence.
+  #154 discloses the existing diagnostic view's one-object bound and five
+  incompatible flags in query-schema/help, with a separate exact-object query
+  for extra fields. Five missing-disclosure regressions were RED; the final
+  affected query gate passed **49 tests** without changing parser/dispatch rules.
+  A short operate clarification explains that returned policy_authorized is
+  separate durable authorization, with no extra approval required. Review caught
+  its initial CRLF size excess; the compact final reference is **19974 bytes**
+  under canonical CRLF and retains the unchanged 20000-byte ceiling.
+  Independent Standards and Spec reviews of each component are clear. Root
+  combined validation passed **3564 / skipped 9**, exit zero in **28.38 seconds**.
+  Log SHA-256: `c3b6e9698b7a66213e134fbe468f78cce99f73b44dc289f8c40bff60732cbc6d`;
+  JUnit SHA-256: `88ce5203c07bccbec2a66c4b7fb9af8618b33d771043069754a43798a17cac0b`.
+  New Program and Non-live gates are required because the packaged Skill changed.
+  Then rerun the five failed units on a new candidate/root, followed by the full
+  thirteen-Agent selection plus boundary once the affected units pass. Original
+  534fdde results remain frozen; independent successful business effects are
+  preserved separately from automatic failures.
+
+
 - **Complete frozen pass and outcome-based attribution — 2026-10-03:**
   candidate `534fdde5eeac8466a766514e131f63c3d6656deb` passed Non-live
   **14845 / skipped 119 / deselected 27**, exit zero in **836.47 seconds**.

@@ -2442,3 +2442,78 @@ def test_planned_effect_reference_requires_one_exact_validated_prospective_antec
     else:
         first['text'] = first['text'].replace('并匹配到 Wwise Gain', '并匹配到 Wwise Gain，并匹配到 Wwise Compressor')
     assert not _grammatical_notice(case)
+
+
+def _auxiliary_claim_case(case_id):
+    data = json.loads((Path(__file__).parents[1] / 'fixtures/semantic/expansion-auxiliary-claims-534fdde.json').read_text())
+    return next(case for case in data['cases'] if case['case'] == case_id)
+
+
+@pytest.mark.parametrize('case_id', ['005-EXP22-C08', '012-EXP25-C09'])
+def test_actual534_auxiliary_claim_roles_do_not_hide_the_valid_expected_effect(case_id):
+    assert _grammatical_notice(_auxiliary_claim_case(case_id))
+
+
+@pytest.mark.parametrize('status', ['具体变更预览已生成', '本次修改预览已生成', '已生成这次改动预览'])
+@pytest.mark.parametrize('referent', ['这次', '本次', '该'])
+def test_current534_preview_status_and_policy_record_compose_as_auxiliary_roles(status, referent):
+    case = _auxiliary_claim_case('012-EXP25-C09')
+    post = case['events'][1]['item']
+    post['text'] = post['text'].replace('具体变更预览已生成', status).replace('为这次修改', '为' + referent + '修改')
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('case_id', ['005-EXP22-C08', '012-EXP25-C09'])
+@pytest.mark.parametrize('claim,expected', [
+    ('不会修改其他对象的备注。', True),
+    ('同时修改 Pitch 为12。', False),
+    ('在 OtherOwner 上执行本次修改。', False),
+    ('不会执行本次修改。', False),
+])
+def test_current534_auxiliary_roles_keep_remaining_owner_and_edit_claims_visible(case_id, claim, expected):
+    case = _auxiliary_claim_case(case_id)
+    case['events'][1]['item']['text'] += claim
+    assert _grammatical_notice(case) is expected
+
+
+@pytest.mark.parametrize('old,new', [
+    ('allow_changes 已为', 'read_only 已为'),
+    ('allow_changes 已为', 'ask_before_changes 已为'),
+    ('allow_changes 已为', 'unknown_policy 已为'),
+    ('具体变更预览已生成', '在 OtherOwner 上具体变更预览已生成'),
+    ('具体变更预览已生成', '具体变更预览已生成并修改 Pitch 为12'),
+    ('目标声音的效果链末尾', 'OtherOwner 的效果链末尾'),
+    ('Expansion_EXP25-C09_NewGain', 'WrongGain'),
+    ('Expansion C09 appended gain', 'Wrong note'),
+])
+def test_current534_auxiliary_record_status_cannot_hide_wrong_mode_owner_or_descriptor(old, new):
+    case = _auxiliary_claim_case('012-EXP25-C09')
+    post = case['events'][1]['item']
+    assert old in post['text']
+    post['text'] = post['text'].replace(old, new)
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize('change', ['修改', '变更', '改动'])
+def test_bare_curve_scope_noun_requires_a_curve_operation_and_retains_owner_span(change):
+    curve = _auxiliary_claim_case('005-EXP22-C08')
+    curve['events'][1]['item']['text'] = curve['events'][1]['item']['text'].replace('变更范围', change + '范围')
+    assert _grammatical_notice(curve)
+    for case in (_auxiliary_claim_case('012-EXP25-C09'), _grammatical_role_case('007-EXP25-M05')):
+        messages = [event['item'] for event in case['events'] if event.get('item', {}).get('type') == 'agent_message']
+        messages[-1]['text'] += change + '范围仅包含这一条曲线。'
+        assert not _grammatical_notice(case)
+    curve['events'][1]['item']['text'] += '在 OtherOwner 上' + change + '范围仅包含这一条曲线。'
+    assert not _grammatical_notice(curve)
+
+
+@pytest.mark.parametrize('text', [
+    '具体变更预览已生成，allow_changes 已为这次修改记录独立策略授权。',
+    'allow_changes 已为本次修改记录独立策略授权。',
+    '变更范围仅包含这一条曲线。',
+])
+def test_auxiliary_status_record_and_scope_never_fulfill_expected_effect_alone(text):
+    for case_id in ('005-EXP22-C08', '012-EXP25-C09'):
+        case = _auxiliary_claim_case(case_id)
+        case['events'][1]['item']['text'] = text
+        assert not _grammatical_notice(case)

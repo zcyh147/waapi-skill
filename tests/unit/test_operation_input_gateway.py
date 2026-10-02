@@ -1521,3 +1521,145 @@ def test_schema_input_mode_projection_is_isolated_by_exact_operation_key(
 
         assert exit_code == 0
         assert payload["operation"]["input_mode"] == expected
+
+
+# Frozen EXP25-M05: an exact native embedded Stinger was falsely ambiguous.
+STINGER_BINDING_ROW = {
+    "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}", "name": "",
+    "type": "MusicStinger", "path": "[Stinger : Bonus,Stinger Bonus]",
+}
+
+
+def _reference_stinger_binding(tmp_path, version, *, operation="object.setReference", rows=None, role=None):
+    state = tmp_path / "stinger-state"
+    env = gateway_env(tmp_path, version=version)
+    code, started = waapi_gateway.execute_gateway([
+        "--state-dir", str(state), "draft-start", operation,
+    ], env=env, client_factory=lambda _url: pytest.fail("start must remain offline"))
+    assert code == 0, started
+    project = project_row()
+    results = [{"return": [dict(STINGER_BINDING_ROW)] if rows is None else rows}]
+    if version == "2021.1":
+        results.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"]}]})
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [live_info(year=int(version.split('.')[0]))],
+        "ak.wwise.core.getProjectInfo": [project], "ak.wwise.core.object.get": results,
+    })
+    code, payload = waapi_gateway.execute_gateway([
+        "--state-dir", str(state), "draft-bind-object", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", "1",
+        "--object-id", STINGER_BINDING_ROW["id"], *([] if role is None else ["--role", role]),
+    ], env=env, client_factory=lambda _url: client)
+    return code, payload, client, state, started, env
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_named_reference_source_discloses_exact_existing_music_stinger_kind(version, tmp_path):
+    code, bound, client, _state, _started, _env = _reference_stinger_binding(tmp_path, version)
+    assert code == 0, bound
+    assert bound["bound_object"]["business_kind"] == "music-stinger"
+    assert bound["bound_object"]["business_kind_resolution"] == {
+        "status": "resolved", "candidates": ["music-stinger"], "reflected_type": "MusicStinger",
+        "source": "named_reference_source_live_type",
+    }
+    assert bound["bound_object"]["semantic_kind"] is None
+    assert bound["bound_object"]["name"] == ""
+    assert "path" not in bound["bound_object"]  # Compact identity projection is unchanged.
+    continuation = bound["draft"]["next_action_binding"]
+    assert continuation["required_next_phase"] == "discover_field_for_bound_object"
+    assert "--object-handle" in continuation["field_discovery"]["append"]
+    assert client.calls[-1] == ("ak.wwise.core.object.get", {"from": {"id": [STINGER_BINDING_ROW["id"]]}},
+                               {"return": ["id", "name", "type", "path"]})
+    assert not any(call[0] == "ak.wwise.core.object.setReference" for call in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("damage", ["wrong_id", "missing_id", "missing_type", "missing_name", "missing_path", "duplicate", "empty", "wrong_role"])
+def test_named_reference_stinger_classification_requires_valid_exact_binding(version, damage, tmp_path):
+    row = dict(STINGER_BINDING_ROW)
+    rows = [row]
+    role = None
+    if damage == "wrong_id": row["id"] = OBJECT_GUID
+    elif damage == "missing_id": row.pop("id")
+    elif damage == "missing_type": row.pop("type")
+    elif damage == "missing_name": row.pop("name")
+    elif damage == "missing_path": row.pop("path")
+    elif damage == "duplicate": rows.append(dict(row))
+    elif damage == "empty": rows.clear()
+    else: role = "object"  # This named adapter does not disclose a --role flag.
+    code, rejected, client, state, started, env = _reference_stinger_binding(tmp_path, version, rows=rows, role=role)
+    assert code == 2, rejected
+    assert "bound_object" not in rejected
+    assert not any(call[0] == "ak.wwise.core.object.setReference" for call in client.calls)
+    code, inspected = waapi_gateway.execute_gateway([
+        "--state-dir", str(state), "draft-inspect", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"],
+    ], env=env, client_factory=lambda _url: pytest.fail("inspect remains offline"))
+    assert code == 0, inspected
+    assert inspected["draft"]["revision"] == 1
+    assert "boh1-" not in json.dumps(inspected)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", ["object.setProperty", "object.setLinked"])
+def test_music_stinger_binding_fact_does_not_leak_into_other_named_operations(version, operation, tmp_path):
+    if operation == "object.setLinked" and version in {"2021.1", "2022.1"}:
+        code, rejected = waapi_gateway.execute_gateway([
+            "draft-start", operation], env=gateway_env(tmp_path, version=version),
+            client_factory=lambda _url: pytest.fail("unavailable lane fails offline"))
+        assert code == 2, rejected
+        assert rejected["error_code"] == "UNAVAILABLE_IN_VERSION"
+        assert "draft" not in rejected
+        return
+    code, bound, _client, _state, _started, _env = _reference_stinger_binding(tmp_path, version, operation=operation)
+    assert code == 0, bound
+    assert bound["bound_object"]["business_kind"] is None
+    assert bound["bound_object"]["business_kind_resolution"] == {
+        "status": "ambiguous", "candidates": [], "reflected_type": "MusicStinger",
+    }
+    assert bound["bound_object"]["semantic_kind"] is None
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("live_type,candidates", [("UnknownNativeType", []), ("Sound", ["sound-sfx", "sound-voice"])])
+def test_reference_source_preserves_unknown_or_multiple_live_kind_ambiguity(version, live_type, candidates, tmp_path):
+    row = {"id": STINGER_BINDING_ROW["id"], "type": live_type, "name": "ExistingObject",
+           "path": r"\Actor-Mixer Hierarchy\Default Work Unit\ExistingObject"}
+    code, bound, _client, _state, _started, _env = _reference_stinger_binding(tmp_path, version, rows=[row])
+    assert code == 0, bound
+    assert bound["bound_object"]["business_kind"] is None
+    assert bound["bound_object"]["business_kind_resolution"] == {
+        "status": "ambiguous", "candidates": candidates, "reflected_type": live_type,
+    }
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_reference_target_binding_does_not_inherit_source_comparison_role(version, tmp_path):
+    code, _source, _client, state, started, env = _reference_stinger_binding(tmp_path, version)
+    assert code == 0
+    row = {**STINGER_BINDING_ROW, "id": OBJECT_GUID}
+    project = project_row()
+    results = [{"return": [row]}]
+    if version == "2021.1":
+        results.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"]}]})
+    client = FakeClient({"ak.wwise.core.getInfo": [live_info(year=int(version.split('.')[0]))],
+        "ak.wwise.core.getProjectInfo": [project], "ak.wwise.core.object.get": results})
+    code, target = waapi_gateway.execute_gateway([
+        "--state-dir", str(state), "draft-bind-object", started["draft"]["draft_id"],
+        "--task-authority", started["task_authority"], "--expected-revision", "2", "--object-id", OBJECT_GUID,
+    ], env=env, client_factory=lambda _url: client)
+    assert code == 0, target
+    assert target["bound_object"]["business_kind"] is None
+    assert target["bound_object"]["business_kind_resolution"] == {
+        "status": "ambiguous", "candidates": [], "reflected_type": "MusicStinger",
+    }
+    assert not any(call[0] == "ak.wwise.core.object.setReference" for call in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2020.1", "2026.1"])
+def test_reference_music_stinger_binding_is_unavailable_outside_pinned_versions(version, tmp_path):
+    code, rejected = waapi_gateway.execute_gateway([
+        "draft-start", "object.setReference"], env=gateway_env(tmp_path, version=version),
+        client_factory=lambda _url: pytest.fail("unsupported version fails offline"))
+    assert code == 2, rejected
+    assert "draft" not in rejected

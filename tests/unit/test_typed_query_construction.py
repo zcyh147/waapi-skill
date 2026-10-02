@@ -504,6 +504,55 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
         assert "schema_digest" not in payload
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_query_schema_discloses_diagnostic_view_exclusions_before_transport(tmp_path: Path, version: str) -> None:
+    env = _env(tmp_path, version)
+    code, schema = gateway.execute_gateway(["query-schema"], env=env,
+        client_factory=lambda _url: pytest.fail("query-schema must stay offline"))
+    assert code == 0
+    view = schema["views"]["sound-routing-diagnostics"]
+    assert view["exact_object_bound"] == 1
+    assert "--exact-id" in view["source"] and "--path-segment" in view["source"]
+    assert "literal" in view["source"] and "one exact" in view["source"]
+    forbidden = {
+        "--include": ["volume-db"], "--include-field": ["attenuation"],
+        "--relationship": ["children"], "--predicate": ["name-is", "Sound"], "--max-results": ["1"],
+    }
+    assert set(view["cannot_combine_with"]) == set(forbidden)
+    assert view["additional_fields"]["omit_options"] == ["--view"]
+    assert view["additional_fields"]["field_options"] == ["--include", "--include-field"]
+    identity = ["--exact-id", "{33333333-3333-3333-3333-333333333333}"]
+    for option in view["cannot_combine_with"]:
+        code, payload = gateway.execute_gateway(["query-object", *identity,
+            "--view", "sound-routing-diagnostics", option, *forbidden[option]], env=env,
+            client_factory=lambda _url: pytest.fail("view conflict must reject before transport"))
+        assert code == 2, (option, payload)
+        assert payload["error_code"] == "GatewayInputError"
+        assert "owns its complete projection" in payload["message"]
+    # The actual failed Agent combination must remain invalid after disclosure.
+    code, _ = gateway.execute_gateway(["query-object", *identity, "--view", "sound-routing-diagnostics",
+        "--include", "volume-db", "--include-field", "attenuation"], env=env,
+        client_factory=lambda _url: pytest.fail("combined view projection must reject before transport"))
+    assert code == 2
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("source", [
+    ["--exact-id", "{33333333-3333-3333-3333-333333333333}"],
+    ["--path-segment", "Actor-Mixer Hierarchy", "--path-segment", "Default Work Unit", "--path-segment", "Sound"],
+])
+def test_diagnostic_view_and_separate_extra_field_query_keep_existing_input_boundaries(tmp_path: Path, version: str, source: list[str]) -> None:
+    env = _env(tmp_path, version)
+    parser = gateway.build_parser()
+    view = parser.parse_args(["query-object", *source, "--view", "sound-routing-diagnostics", "--detail"])
+    gateway.preflight_query_object_input(view, env=env)
+    ordinary = parser.parse_args(["query-object", *source, "--include", "volume-db",
+        "--include-field", "attenuation", "--max-results", "1"])
+    gateway.preflight_query_object_input(ordinary, env=env)
+    assert view.detail and view.business_view == "sound-routing-diagnostics"
+    assert ordinary.business_view is None and ordinary.max_results == 1
+
+
 def test_query_object_parser_has_no_typed_fact_or_projection_escape() -> None:
     parser = gateway.build_parser()
     subparsers = next(

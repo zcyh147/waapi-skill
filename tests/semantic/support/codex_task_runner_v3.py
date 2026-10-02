@@ -21,7 +21,7 @@ from tests.semantic.support.codex_notice_language import authorization_claim, pl
 from tests.semantic.support.codex_notice_claims import (
     NoticeRoleContext, PlannedEffectReferent, baseline_read_claim, deictic_effect_claim,
     effect_kind_label, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
-    owner_inheritance, preview_operation_claim, prospective_role_owner,
+    owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner,
 )
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
@@ -567,7 +567,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
     planned_effect = None
     clause_cursor = 0
     for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
-        authorization = authorization_claim(clause)
+        local_claims = notice_clauses(clause)
+        preview_status = preview_status_claim(local_claims[0]) if local_claims else None
+        authorization = authorization_claim(local_claims[0].text if preview_status is not None
+            and preview_status.role == "preview-status" else clause)
         if authorization.state == "invalid":
             return False
         if authorization.state == "ancillary":
@@ -594,7 +597,22 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
                     return False
                 affirmative = True
         actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
-        local_claims = notice_clauses(clause)
+        if preview_status is not None and preview_status.role == "preview-status":
+            if not _bound_explicit_owners_agree(preview_status.value, "", context):
+                return False
+        coordinated_authorizations = []
+        if preview_status is not None and preview_status.role == "preview-status":
+            # Only a fully classified preceding status permits local record
+            # composition. Broader owner proof is retained above; unknown
+            # coordinated text is left for ordinary action validation.
+            for local_claim in local_claims[1:]:
+                record = authorization_claim(local_claim.text)
+                if record.state == "invalid":
+                    return False
+                if record.state == "ancillary":
+                    if not _bound_explicit_owners_agree(record.owner_prefix.strip().rstrip("，,").strip(), "", context):
+                        return False
+                    coordinated_authorizations.append((local_claim.start + record.start, local_claim.start + record.end))
         if context["kind"] == "plugin":
             for local_claim in local_claims:
                 display = matched_display_claim(local_claim, role_context)
@@ -629,6 +647,11 @@ def _bound_context_effect(text: str, context: Mapping[str, Any]) -> bool:
             pending_note_owner = clause
         creation_position = -1
         for index, action in enumerate(actions):
+            if any(start <= action.start() and action.end() <= end for start, end in coordinated_authorizations):
+                continue
+            if (preview_status is not None and preview_status.role == "preview-status"
+                    and preview_status.start <= action.start() < preview_status.end):
+                continue  # Preview bookkeeping is never the expected effect.
             if (read_summary is not None and read_summary.role == "read-summary"
                     and read_summary.start <= action.start() < read_summary.end):
                 continue  # A validated read-state noun is not another edit.

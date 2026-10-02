@@ -3744,6 +3744,24 @@ def describe_operation(name: str) -> OperationSpec:
         ) from exc
 
 
+def existing_reference_source_business_kind(
+    operation: str, version: str, live_type: str,
+) -> str | None:
+    """Comparison noun for the named reference operation's existing source.
+
+    The five pinned object-type indexes reflect MusicStinger (class 2490384).
+    It is a native embedded-object class, not a creatable
+    SemanticKind. This fact classifies an already singleton-bound source;
+    it grants neither reference availability nor metadata/value authority.
+    """
+    if (operation == "object.setReference"
+            and version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            and version in OPERATION_SPECS[operation].supported_versions
+            and live_type == "MusicStinger"):
+        return "music-stinger"
+    return None
+
+
 def operation_request_machine_contract(name: str, version: str) -> dict[str, Any]:
     """Return the versioned machine contract that governs request validity.
 
