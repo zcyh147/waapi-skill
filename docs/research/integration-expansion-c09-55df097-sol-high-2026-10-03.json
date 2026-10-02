@@ -1,0 +1,177 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "55df09712c37efa55026d3ae318f3b8983bae5ff",
+  "candidate_identity_limit": "Exact revision supplied by the coordinator; archived Skill/harness tree digests remain authoritative.",
+  "date": "2026-10-03",
+  "host": "macOS",
+  "root": "expansion-c09-55df097-sol-high-r1-cli1592",
+  "status": "complete-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1"
+    ],
+    "cases": [
+      "EXP22-C09"
+    ],
+    "agent_budget_seconds": 600.0,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180.0,
+    "max_pre_action_retries": 0,
+    "codex_binary": "codex-cli 0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "frozen_candidate_digests": {
+    "skill_tree_sha256": "50719a332806fdcdab8a1543877027eee9a8f45e77bcad5d8f92398bd6c6b574",
+    "semantic_harness_tree_sha256": "bde9189b9199ec13898e053576f0077a47b7b2908f8a8c503fbbfc8b714a7af7",
+    "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+  },
+  "development_gates": {
+    "program": {
+      "passed": 6258,
+      "skipped": 2,
+      "seconds": 318.0,
+      "log_sha256": "c1e79b4e5bdfedd32557cfa4bb0ea89ac89ccdcf2c38d9e62644f410e99ab49d",
+      "scope": "Unchanged 6b906cb Program component reused; not a newly run 55df097 Program gate."
+    },
+    "nonlive": {
+      "passed": 14805,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 848.28,
+      "log_sha256": "14991d84049dbef272e7f8a62b02e884f79d45e7320c29040bff14086570c5f2",
+      "junit_sha256": "13366e3e72e9c896b5233538c92f3b362b088d49544aef0906497296fa6236c0",
+      "scope": "New completed gate log/XML checked; exact candidate source binding and exit 0 attested by coordinator before launch."
+    }
+  },
+  "result": {
+    "selected_units": 1,
+    "attempted_units": 1,
+    "agent_pass": 0,
+    "matrix_agent_fail": 1,
+    "canonical_agent_fail": 1,
+    "canonical_blocked": 0,
+    "boundary_proven": 0,
+    "pending": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "attempt_count": 1,
+    "child_exit_code": 1,
+    "launcher_exit_code": 1,
+    "launcher_exit_evidence": "Terminal exit 1 and bootout reported by root; sealed child-result and campaign output independently show returncode 1.",
+    "unloaded": true,
+    "unloaded_evidence": "Root reports LaunchAgent bootout; independent scoped ps is empty.",
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false,
+    "launcher_runs": 1
+  },
+  "units": [
+    {
+      "id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 140.45198412495665,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "formal_after_available": true,
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "required_business_assertions_total": 6,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ],
+      "cause": "The frozen automatic notice-only FAIL is a grader false positive under independent semantic evidence review: the two post-Preview pre-Execute messages collectively state the unique Sound owner, matched Wwise Gain, exact prospective new name/notes, unchanged parameter/platform scope, recorded allow_changes authorization and intent to append that same Gain. All six independent business assertions and broker_provenance pass.",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "continuation_diagnosis": {
+        "preview_record_index_1based": 8,
+        "snapshot_record_index_1based": 9,
+        "execute_record_index_1based": 10,
+        "verify_record_index_1based": 11,
+        "snapshot_authenticated_accepted_succeeded": true,
+        "snapshot_exit_zero": true,
+        "transaction_id_matches": true,
+        "artifact_hash_matches": true,
+        "artifact_hash": "1a9e168d31b4082a4c4859b8dd96416d80aa9f234785665ac3928867648f596c",
+        "state_matches": true,
+        "events_and_count_identical": true,
+        "preview_summary_identical": true,
+        "next_command_identical": true,
+        "authorization_binding_fields_unchanged": true,
+        "snapshot_added_current_policy": "allow_changes",
+        "execute_exact_to_preview_and_snapshot": true,
+        "selected_source_field": "shell_command",
+        "selected_shell_command_sha256": "de2e503514848d399b7ec00ae9cc4228b68fc39dfef428c4dbf508aec4865874",
+        "snapshot_normalized_argv_sha256": "b63e56c1a744ecdbd7f1bc4e127de9d31d91b5b56fdd52eaadf13bf3de142358",
+        "execute_normalized_argv_sha256": "cd2d6c9d4b92cb74d2394e7eeb3be230943f7772b013ccea94e80969c5096a44",
+        "automatic_broker_provenance_passed": true,
+        "original_selected_execute_kept": true,
+        "scope": "Fresh #152 transaction-show --summary-only interlude exercised successfully: same immutable tx/hash/state/events/summary/original authorization and entire next_command; snapshot adds matching current_policy only."
+      },
+      "independent_workflow_review": {
+        "status": "accepted_workflow",
+        "automatic_agent_pass_credit": false,
+        "formal_status_unchanged": "FAIL",
+        "evidence_event_indices_zero_based": [
+          23,
+          26
+        ],
+        "preview_completed_event_index_zero_based": 22,
+        "execute_started_event_index_zero_based": 27,
+        "execute_completed_event_index_zero_based": 28,
+        "notice_context": "Event23 attests the specified Sound and matched Wwise Gain, pending append name Expansion_EXP22-C09_NewGain and exact note Expansion C09 appended gain. Event26 confirms the independent saved allow_changes policy authorization and plans append of the above Wwise Gain with preservation verification. No conflicting owner/effect/field/value/refusal or late notice observed.",
+        "scope_limit": "Independent acceptance/attribution is recorded separately from the original automatic verdict; no historical replay/regrading or final profile acceptance."
+      }
+    }
+  ],
+  "integrity": {
+    "artifact_count": 173,
+    "artifact_bytes": 5402560,
+    "metadata_seals": 8,
+    "manifest_sha256": "1702a677789a304bc802333a9ed7c4ed526ff94fa3036324640985060814f849",
+    "all_artifact_hashes_sizes_and_executable_flags_match": true,
+    "all_metadata_sidecar_hashes_match": true,
+    "source_full_hashes_and_project_mtimes_unchanged": 1,
+    "passing_projects_removed": 0,
+    "failed_projects_quarantined": 1,
+    "boundary_projects_quarantined": 0,
+    "retained_process_metadata_count": 1,
+    "retained_process_metadata": {
+      "cleanup_result": "cleaned",
+      "process_exited": true,
+      "residual_processes": []
+    },
+    "terminal_scoped_processes_empty": true,
+    "never_reuse": true,
+    "no_verify": true,
+    "failure_reconciliations_reaped": 1,
+    "metadata_seal_scope": "Eight business/campaign metadata sidecars, plus independently checked attempt-manifest sidecar and two root identity/lock sidecars (eleven total).",
+    "codex_sessions_exit_zero_and_complete": 1
+  },
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 573952,
+    "input_tokens": 623360,
+    "output_tokens": 2924,
+    "uncached_input_tokens": 49408,
+    "agent_seconds": 140.45198412495665,
+    "agent_turns": 1,
+    "slow_units": 0,
+    "goal_execute_count": 1,
+    "goal_verify_count": 1,
+    "reasoning_output_tokens_included": 776,
+    "usd_cost": null
+  },
+  "remaining": "No more costly C09-only loops are needed for this valid workflow. Repair the bounded notice false positive offline, then use a new candidate for the complete thirteen-Agent-unit batch plus separate boundary. Identical successful-root verify-only remains pending; this FAIL root stays frozen. No Windows acceptance or historical FAIL promotion.",
+  "model_evidence_limit": "No general Sol-high model ranking or historical Medium/Luna FAIL promotion.",
+  "reconciliation152_component_evidence": "Fresh actual tuple-backed Broker reconciliation now accepts Preview8 -> same-tx transaction-show9 --summary-only -> exact Execute10 -> Verify11. broker_provenance is true. This supports scoped #152 closure; it does not turn the preserved notice FAIL into automatic Agent PASS or prove full profile acceptance."
+}

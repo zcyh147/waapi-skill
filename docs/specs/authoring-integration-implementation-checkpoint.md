@@ -43,6 +43,31 @@ pilot, and acceptance may proceed after their prerequisite gates.
 ### Completed entry-repair gates and next compact-directory candidate
 
 
+- **Valid C09 workflow; notice-only grader false negative — 2026-10-03:**
+  candidate `55df09712c37efa55026d3ae318f3b8983bae5ff` passed complete
+  Non-live **14805 / skipped 119 / deselected 27**, exit zero in **848.28 seconds**.
+  Program inputs stayed byte-identical to 6b906cb, whose completed gate remains
+  component evidence only. Fresh root `expansion-c09-55df097-sol-high-r1-cli1592`
+  preserved one automatic notice FAIL. Independent review accepts the actual
+  workflow: all six outcome/preservation assertions, authorization, exact command
+  provenance and the single Execute/Verify passed. The two pre-execution notices
+  collectively identify the requested Sound and one named Wwise Gain append.
+  Missing repeated identifiers are not missing business intent.
+  Preview 8 -> unchanged same-transaction summary 9 -> exact Execute 10 -> Verify 11
+  freshly exercises #152 with automatic Broker provenance passing. The snapshot
+  preserves the artifact, event journal, summary, authorization and complete
+  continuation; only matching current policy is added. This is scoped #152 proof,
+  not an automatic Agent PASS or full-profile acceptance.
+  The original FAIL root is frozen without replay/regrading: all **173 artifacts**,
+  metadata seals and the source hash/mtime guard match; the sandbox is quarantined,
+  cleanup completed and no scoped process remains. See
+  `../research/integration-expansion-c09-55df097-sol-high-2026-10-03.json`.
+  Repair #147's bounded entity references offline, preserving substantive negative
+  controls. Do not repeat another C09-only loop: the next fresh candidate runs
+  all thirteen Agent units plus the separate boundary, then identical verify-only
+  if the complete root passes. No historical automatic verdict is rewritten.
+
+
 - **Reviewed same-transaction snapshot and coordinated notice repair — 2026-10-03:**
   the user emphasized that the valid C09 workflow must not be mislabeled as a
   business failure. Its accepted independent evidence review and original
