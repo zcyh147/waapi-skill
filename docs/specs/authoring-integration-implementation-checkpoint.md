@@ -42,6 +42,40 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen complete db2299c campaign — 2026-10-03:** complete Non-live passed
+  **15269 / skipped 119 / deselected 27**, exit zero in **871.83 seconds**.
+  Candidate `db2299c7ceab6814247a68132098f023f3ae1d8b` then attempted all
+  fourteen selected units: **7 Agent PASS / 6 FAIL / 1 separate boundary**,
+  with no blocked or pending units. Twelve business goals and **77 assertions**
+  succeeded. EXP22-C01 stopped after a valid Preview, before its confirmation
+  turn or Execute, so its nine required business assertions receive no credit.
+  - EXP22-C01, EXP25-C06 and EXP25-C08 each attempted an Apps-based process
+    tool; approval policy rejected each call with a null result. Later local
+    shell execution does not erase the unexpected-tool session-audit failure.
+    The latter two units completed their business effects. `completed_turn`
+    is the umbrella gate; each process exited zero with a completed turn and
+    no unfinished shell commands. Default Apps exposure is tracked in #156;
+    the clean disposable homes do not establish user-config leakage.
+  - EXP22-C09, EXP25-C08, EXP25-C09 and EXP25-M05 have valid notices rejected
+    by the current grammar. Their actual business assertions all pass. The
+    consolidated #147 repair covers current-change/provider composition,
+    before-state synonyms, and submitted or Preview scope nouns; MusicStinger
+    display evidence must come from the independently observed old Trigger,
+    never an invented object name or label-based native type inference.
+  Independent audit and root rehash agree on **1672 artifacts / 59767700 bytes**,
+  eleven metadata seals and fourteen unchanged source full hashes/mtimes and
+  closed oracles. Seven PASS copies were removed; six FAIL copies and the
+  boundary copy remain quarantined with clean process records. All six failure
+  reconciliation children were reaped. The one-shot launcher exited 1, was
+  unloaded, and left no scoped/Wwise process. Agent usage was **1916.77 seconds
+  / 16 turns**, with no slow units; authenticated phase counts are thirteen
+  Preview, twelve Execute and twelve Verify receipts. C08 Gateway schema-only
+  verification remains distinct from independent preservation proof. Full
+  evidence is in `../research/integration-expansion-full-db2299c-sol-high-2026-10-03.json`.
+  The mixed root stays frozen without resume, verify-only or regrading. After
+  reviewed repairs and development gates, rerun its six failed units before
+  another final full selection. No final acceptance or Windows claim is made.
+
 - **Reviewed rejected-check and notice repairs — 2026-10-03:** #155 now admits
   a narrowly proven ordinary Agent FAIL after the observed audio.import
   start/bind/batch prefix and a final wrong-authority `draft-check`. The proof
