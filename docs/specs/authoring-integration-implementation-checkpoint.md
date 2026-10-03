@@ -42,6 +42,32 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen e49354a failed-four rerun — 2026-10-03:** complete Non-live passed
+  **15416 / skipped 119 / deselected 27**, exit zero in **870.92 seconds**.
+  Candidate `e49354a8899e38db7ac25c3f68327750ca9a32b1` then completed all
+  selected units: **3 Agent PASS / 1 notice-only FAIL / 1 separate boundary**,
+  with no pending, blocked or early-stopped units. EXP22-C09, EXP25-C06 and
+  EXP25-M05 passed; EXP25-C09 achieved its business goal with six passing
+  independent assertions and Gateway verification but retained a valid-notice
+  false rejection. All four business goals and **25 assertions** succeeded.
+  The remaining parser gaps are a Preview-subject before-baseline noun and an
+  owned append relationship with an explicit Sound possessor and the after
+  suffix. Independent review found no genuine notice omission. The Agent's
+  inability to itemize preservation from its compact readback is recorded
+  separately from trusted business proof; authorization remains machine-bound.
+  Root and independent audits agree on **453 artifacts / 14678000 bytes**,
+  eleven metadata seals, five unchanged source full hashes/mtimes and closed
+  oracles. Three PASS copies were removed; the FAIL and boundary copies remain
+  quarantined with clean process records. The failure reconciliation child was
+  reaped. Four Preview/Execute/Verify sequences completed, all four Agent argv
+  disable Apps and memories, and no MCP event was observed. Agent time was
+  **463.54 seconds / 4 turns**. The one-shot launcher exited 1, was unloaded,
+  and left no scoped process. Report:
+  `../research/integration-expansion-retry4-e49354a-sol-high-2026-10-03.json`.
+  This mixed root stays frozen without resume, verify-only or regrading. Repair
+  the two shared role gaps, rerun EXP25-C09 fresh, then require final full
+  same-candidate acceptance and identical successful-root verify-only.
+
 - **Reviewed structural notice components — 2026-10-03:** #147 now shares
   bounded change/Preview noun components across authorization, execution and
   refusal; resolves typed owner attributes and before-state nouns; and accepts
