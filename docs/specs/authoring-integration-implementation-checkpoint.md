@@ -42,6 +42,41 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Full business success with four notice false negatives — 2026-10-03:**
+  frozen candidate `87f9dc8d09cbd93e9dac5ad41220bc5c338d6078` passed complete
+  Non-live **15030 / skipped 119 / deselected 27**, exit zero in **871.39 seconds**.
+  Its full Sol 6.1 high/default root
+  `expansion-acceptance-87f9dc8-sol-high-r1-cli1592` then completed all thirteen
+  Agent units and the separate 2022 Stinger boundary. Every business goal and
+  all **86 independent assertions passed**. Automatic results remain
+  **9 Agent PASS / 4 notice-only FAIL / 1 boundary**, with no pending units,
+  early stop or other failed common gate. All four notices are independently
+  valid and correctly placed after Preview and before Execute:
+  - EXP22-C09: passive owner/display/baseline descriptions break the grader's
+    owner inheritance; the complete append and authorization are valid.
+  - EXP25-C08: the sole-curve write-scope sentence is mistaken for another
+    affirmative write, despite exact preceding curve values and shape.
+  - EXP25-C09: append placement is mistaken for a target owner, and a coordinated
+    execution/read summary is rescanned as a nameless creation.
+  - EXP25-M05: protected objects in an explicit exclusion contaminate the
+    preceding valid Trigger edit through a whole-sentence keyword check.
+  Honest Agent-owned baseline/readback limitations remain distinct from the
+  independent oracle's preservation proof; C08's Gateway verifier remains
+  result-schema-only. This is complete business outcome evidence on one frozen
+  candidate, not complete automatic Agent acceptance.
+  Independent audit and root checks agree on **1426 artifacts / 50547450 bytes**,
+  all hash/size/executable checks, eleven metadata seals, fourteen unchanged
+  source full hashes/mtimes and oracle closures. Nine PASS copies were removed;
+  four FAIL copies and the boundary copy remain quarantined with clean retained
+  process records. Four reconciliation children exited. The launcher ran once,
+  exited 1 and was unloaded; no scoped/Wwise process remained.
+  Agent time was **1966.41 seconds / 17 turns**, with **zero slow cases**.
+  See `../research/integration-expansion-full-87f9dc8-sol-high-2026-10-03.json`
+  for exact usage, seals and development-gate records. Keep this mixed root
+  frozen without verify-only or regrading. The four exact notices reproduced
+  offline RED before the next consolidated grammatical repair; independent
+  contrast controls and review precede any further Fresh expense.
+
 - **Reviewed staged-notice grading repair — 2026-10-03:** #147 now resolves
   local owner and ancillary claims through shared typed roles, accepts an exact
   complete pre-Preview Effect plan followed by operation-specific post-Preview

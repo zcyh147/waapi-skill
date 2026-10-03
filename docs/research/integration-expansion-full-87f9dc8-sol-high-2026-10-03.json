@@ -1,0 +1,1221 @@
+{
+  "contract": "waapi-skill.integration-expansion-evidence-audit/v1",
+  "candidate": "87f9dc8d09cbd93e9dac5ad41220bc5c338d6078",
+  "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592",
+  "status": "Frozen automatic FAIL; independent business goals completed",
+  "options": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "host": "macOS",
+    "attempts": 1,
+    "profile": "integration_expansion_v1",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "timeout_seconds": 600.0,
+    "wwise_readiness_timeout_seconds": 180.0,
+    "max_pre_action_retries": 0,
+    "cli_version": "codex-cli 0.159.2",
+    "cli_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704",
+    "memory": "disabled",
+    "slow_threshold_seconds": 420,
+    "ask_cases": [
+      "C01",
+      "C03"
+    ],
+    "allow_cases": [
+      "C06",
+      "C08",
+      "C09",
+      "M01",
+      "M05"
+    ]
+  },
+  "result": {
+    "selected": 14,
+    "agent_pass": 9,
+    "agent_fail": 4,
+    "separate_boundary": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "independent_business_goals_completed": 13,
+    "independent_assertions_true": 86,
+    "automatic_acceptance_complete": false,
+    "goal_preview_count": 13,
+    "goal_execute_count": 13,
+    "goal_verify_count": 13
+  },
+  "integrity": {
+    "artifact_count": 1426,
+    "artifact_bytes": 50547450,
+    "manifest_sha256": "f99ddf6c88ca7ea7ac6a59ccdf1ff5f0c3c41baf8c65a5d960d72f9e38f70e8b",
+    "all_artifact_hashes_sizes_executable_flags_match": true,
+    "attempt_inventory_extras": [
+      "attempt-manifest.json",
+      "attempt-manifest.json.sha256"
+    ],
+    "sidecar_count": 11,
+    "sidecars": {
+      "campaign-config.json.sha256": {
+        "target_sha256": "1f006d65bffbdbd63dff7d49c23306c194e7eb5822cfe2e1ffe972d2ccf69efa",
+        "matches": true
+      },
+      "expansion-accounting.json.sha256": {
+        "target_sha256": "0e60d035ffba4a014e91d02356d781d76f0893850810fb414986b59bfb337001",
+        "matches": true
+      },
+      "consolidated-summary.json.sha256": {
+        "target_sha256": "a5aef9263efca6808c37f0c37229513427cab236582782ebf6e6f2e0f95425d6",
+        "matches": true
+      },
+      "attempt-ledger.json.sha256": {
+        "target_sha256": "91b178c6e98c88c5ab7be43fb7dc45d834e36c8549c4c5416f4b8e082d56a1a4",
+        "matches": true
+      },
+      ".campaign-lock-owner.json.sha256": {
+        "target_sha256": "06c8314e75ea9be9a38beac1d9dc35cdab25dbf3e7a06c07f89c2381011beec2",
+        "matches": true
+      },
+      ".waapi-semantic-campaign-root.json.sha256": {
+        "target_sha256": "a126b0a22baa09d6f834ae0328e3bf6084d07ff651d51a25a2818f28a1403950",
+        "matches": true
+      },
+      "attempts/attempt-000001/attempt.json.sha256": {
+        "target_sha256": "0e0ec58822d6bf79d06d3a89dddb8f1bd7190bb4709cb7d6b657f9be02069b0b",
+        "matches": true
+      },
+      "attempts/attempt-000001/attempt-manifest.json.sha256": {
+        "target_sha256": "f99ddf6c88ca7ea7ac6a59ccdf1ff5f0c3c41baf8c65a5d960d72f9e38f70e8b",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/child-result.json.sha256": {
+        "target_sha256": "73a973d15b47f05d18f3a2f8bd7347d3b3ad3c91af8b30d3791c5cda9e86b44a",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/classification.json.sha256": {
+        "target_sha256": "9a9136657b05fdfab44444ab381b0572cb2b9a6c598a1897c1ff0613eba9ce6e",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/child-request.json.sha256": {
+        "target_sha256": "a65338e2772b21c6bc1225375a7f803e0a367fd9eaef09e9fea8bff552d887f3",
+        "matches": true
+      }
+    },
+    "source_guard_count": 14,
+    "trusted_oracle_closed_count": 14,
+    "passing_projects_removed": 9,
+    "retained_cleanup_metadata": [
+      {
+        "unit_id": "EXP22-M05",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP22-C09",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP25-C08",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP25-C09",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP25-M05",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      }
+    ],
+    "reconciliation_children_reaped": 4,
+    "terminal_scoped_process_matches": [],
+    "launcher_lifecycle": "Root observed exactly one launch and exit 1, zero scoped/Wwise processes, then successfully booted out the LaunchAgent. Independent audit confirms the job is absent and scoped processes remain empty.",
+    "deleted_pass_process_detail_limit": "Nine PASS project paths are absent and sealed lifecycle records record removal. Deleted sandbox detailed process metadata is not separately sealed. Five retained FAIL/boundary metadata records prove cleaned/exited/no residuals.",
+    "metadata_seal_scope": "Eight campaign/business metadata sidecars, plus manifest and two root identity/lock sidecars: eleven total independently checked.",
+    "launchagent_absent": true,
+    "launchagent_absence_probe": "launchctl print gui/501/local.codex.waapi.expansion-acceptance-87f9dc8-sol-high-r1-cli1592 returned113: service not found.",
+    "terminal_wwise_processes_empty": true,
+    "launcher_stdout_sha256": "7d08ae7b870bd939f36d28eba41b37ca9447504e03964e529701af240d852b87"
+  },
+  "usage": {
+    "agent_seconds": 1966.4089677960146,
+    "agent_turns": 17,
+    "slow_units": 0,
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 9560448,
+    "input_tokens": 10448300,
+    "output_tokens": 43326,
+    "reasoning_output_tokens": 5139,
+    "uncached_input_tokens": 887852,
+    "reasoning_tokens_included_in_output": true,
+    "usd": null,
+    "usd_limit": "No authoritative per-run USD measurement; no estimate."
+  },
+  "units": [
+    {
+      "unit_id": "EXP22-M05",
+      "automatic_status": "BOUNDARY_PROVEN",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-M05",
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true
+    },
+    {
+      "unit_id": "EXP22-C01",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 205.8255278749857,
+      "slow": false,
+      "turns": 2,
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "event_and_action_unchanged": true,
+        "exact_language_set": true,
+        "fixture_membership_unchanged": true,
+        "other_language_unchanged": true,
+        "requested_language_media_matches": true,
+        "requested_language_source_identity_preserved": true,
+        "sound_identity_and_configuration_unchanged": true,
+        "source_gain_unchanged": true
+      },
+      "required_assertions": [
+        "distractor_unchanged",
+        "event_and_action_unchanged",
+        "exact_language_set",
+        "fixture_membership_unchanged",
+        "other_language_unchanged",
+        "requested_language_media_matches",
+        "requested_language_source_identity_preserved",
+        "sound_identity_and_configuration_unchanged",
+        "source_gain_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1547008,
+        "input_tokens": 1660637,
+        "output_tokens": 5562,
+        "reasoning_output_tokens": 495
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 18,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP22-C03",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C03",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 175.1018008752726,
+      "slow": false,
+      "turns": 2,
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "exact_media_mapping": true,
+        "exact_target_set": true,
+        "fixture_membership_unchanged": true,
+        "media_destinations_preserved": true,
+        "sound_identities_and_configuration_preserved": true,
+        "source_identities_and_configuration_preserved": true
+      },
+      "required_assertions": [
+        "distractor_unchanged",
+        "exact_media_mapping",
+        "exact_target_set",
+        "fixture_membership_unchanged",
+        "media_destinations_preserved",
+        "sound_identities_and_configuration_preserved",
+        "source_identities_and_configuration_preserved"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1121792,
+        "input_tokens": 1225491,
+        "output_tokens": 5715,
+        "reasoning_output_tokens": 1059
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 12,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP22-C06",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP22-C06",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 119.47061833390035,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "required_assertions": [
+        "control_identity_notes_and_parent_unchanged",
+        "media_unchanged",
+        "owner_configuration_unchanged",
+        "rtpc_identity_set_unchanged",
+        "sibling_curves_unchanged",
+        "target_curve_matches",
+        "target_identity_and_binding_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 429312,
+        "input_tokens": 472595,
+        "output_tokens": 2289,
+        "reasoning_output_tokens": 299
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 11,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP22-C08",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP22-C08",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 148.26663208403625,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "attenuation_identity_unchanged": true,
+        "other_curves_unchanged": true,
+        "requested_curve_matches": true,
+        "source_attenuation_unchanged": true,
+        "users_and_references_unchanged": true
+      },
+      "required_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "result_schema_checked",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 603136,
+        "input_tokens": 677211,
+        "output_tokens": 2653,
+        "reasoning_output_tokens": 630
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 14,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP22-C09",
+      "automatic_status": "FAIL",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP22-C09",
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 116.9549373339396,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.32202891702763736,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "1b4a6c1f2c71b49985a30e33c203cbe6fcdaaa8653430c15c627fe4d5bbfae21",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 427392,
+        "input_tokens": 465200,
+        "output_tokens": 2114,
+        "reasoning_output_tokens": 132
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 10,
+      "broker_terminal_state": "RUNNING",
+      "final_responses": [
+        "已追加并完成核验：\n\n- 新效果器：Expansion_EXP22-C09_NewGain，类型 Wwise Gain。\n- GUID：`{372CCF50-1240-4C02-AF2E-CA7D82D6C9A3}`。\n- 绑定：Effect2（第三个 slot），位于原有两个效果器之后。\n- 备注：`Expansion C09 appended gain`；未另设插件参数或平台值。\n\n核验通过；原有效果器的顺序、GUID、slot 绑定、类型、名称和备注，以及声音的音量、备注和父级均保持。"
+      ],
+      "pre_execute_agent_messages": [
+        {
+          "after_preview": false,
+          "text": "已加载 waapi-skill；已配置 WAAPI 端口 30346，Wwise 适配版本为 2022.1。\n\n当前修改策略为 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会核对现有效果器与声音状态，告知具体追加内容，并取得策略提供的独立授权后执行、核验。"
+        },
+        {
+          "after_preview": true,
+          "text": "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。即将追加 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”；不提交额外插件参数或平台值。\n\n预览已取得 allow_changes 策略的独立持久授权，目前尚未修改。现在执行，随后核验新增身份、slot 绑定及原有效果器顺序和配置的保持情况。"
+        }
+      ],
+      "semantic_notice_assessment": "Valid prospective notice: exact attested target and requested effect, value/name/notes or complete ordered curve/shape, before Execute. No contradictory or extra write claim. Frozen automatic notice FAIL is preserved.",
+      "notice_artifact_source_sha256": "605bf8e06ae562a8bbdbc7ee4c7746d51a637ecddfa624acbb2c270931965f1a"
+    },
+    {
+      "unit_id": "EXP22-M01",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309484673590,
+      "source_project_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 109.61133174994029,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "clip_media_matches_its_source": true,
+        "each_track_has_one_sequence_and_clip": true,
+        "exact_segment_track_source_topology": true,
+        "media_hashes_match_each_requested_track": true,
+        "only_track_has_requested_volume": true,
+        "parent_and_protected_sibling_unchanged": true
+      },
+      "required_assertions": [
+        "clip_media_matches_its_source",
+        "each_track_has_one_sequence_and_clip",
+        "exact_segment_track_source_topology",
+        "media_hashes_match_each_requested_track",
+        "only_track_has_requested_volume",
+        "parent_and_protected_sibling_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 375296,
+        "input_tokens": 419516,
+        "output_tokens": 1976,
+        "reasoning_output_tokens": 139
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 9,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP25-C01",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/008-EXP25-C01",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 192.03276691678911,
+      "slow": false,
+      "turns": 2,
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "event_and_action_unchanged": true,
+        "exact_language_set": true,
+        "fixture_membership_unchanged": true,
+        "other_language_unchanged": true,
+        "requested_language_media_matches": true,
+        "requested_language_source_identity_preserved": true,
+        "sound_identity_and_configuration_unchanged": true,
+        "source_gain_unchanged": true
+      },
+      "required_assertions": [
+        "distractor_unchanged",
+        "event_and_action_unchanged",
+        "exact_language_set",
+        "fixture_membership_unchanged",
+        "other_language_unchanged",
+        "requested_language_media_matches",
+        "requested_language_source_identity_preserved",
+        "sound_identity_and_configuration_unchanged",
+        "source_gain_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1568768,
+        "input_tokens": 1679970,
+        "output_tokens": 5704,
+        "reasoning_output_tokens": 379
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 18,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP25-C03",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/009-EXP25-C03",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 222.25402312586084,
+      "slow": false,
+      "turns": 2,
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "exact_media_mapping": true,
+        "exact_target_set": true,
+        "fixture_membership_unchanged": true,
+        "media_destinations_preserved": true,
+        "sound_identities_and_configuration_preserved": true,
+        "source_identities_and_configuration_preserved": true
+      },
+      "required_assertions": [
+        "distractor_unchanged",
+        "exact_media_mapping",
+        "exact_target_set",
+        "fixture_membership_unchanged",
+        "media_destinations_preserved",
+        "sound_identities_and_configuration_preserved",
+        "source_identities_and_configuration_preserved"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 913024,
+        "input_tokens": 1037998,
+        "output_tokens": 4885,
+        "reasoning_output_tokens": 404
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 12,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP25-C06",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/010-EXP25-C06",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 135.98411366692744,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "required_assertions": [
+        "control_identity_notes_and_parent_unchanged",
+        "media_unchanged",
+        "owner_configuration_unchanged",
+        "rtpc_identity_set_unchanged",
+        "sibling_curves_unchanged",
+        "target_curve_matches",
+        "target_identity_and_binding_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 437632,
+        "input_tokens": 480992,
+        "output_tokens": 2608,
+        "reasoning_output_tokens": 397
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 11,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP25-C08",
+      "automatic_status": "FAIL",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08",
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 190.7690284170676,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "attenuation_identity_unchanged": true,
+        "other_curves_unchanged": true,
+        "requested_curve_matches": true,
+        "source_attenuation_unchanged": true,
+        "users_and_references_unchanged": true
+      },
+      "required_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "result_schema_checked",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 4.600586583139375,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "a33b495aa7bb541e0c1e609e5b2ece58efe0ea7daa9dade11b0aaeb6324463d0",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 777600,
+        "input_tokens": 843217,
+        "output_tokens": 3477,
+        "reasoning_output_tokens": 700
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 23,
+      "broker_terminal_state": "RUNNING",
+      "final_responses": [
+        "已按保存的 allow_changes 策略取得本次独立授权并完成执行。Expansion_EXP25-C08_Attenuation 的干声音量曲线实际回读为 **Custom**：\n\n| 距离 | 分贝 | 插值 |\n|---:|---:|---|\n| 0.0 | 0 | Linear |\n| 50.0 | -12 | Linear |\n| 100.0 | -48 | Linear |\n\n其余六条曲线当前数据：\n\n- 游戏及用户辅助发送：均为 UseVolumeDry，点列表为空。\n- 低通、高通、Focus：均为 None，点列表为空。\n- Spread：Custom，线性点为 `(0.0, 50.34965)`、`(100.0, 0.0)`。\n\n声音当前仍引用该衰减，音量为 **-3 dB**，输出为 **Main Audio Bus**，输出覆盖为 false。目标衰减的身份与指定路径匹配，备注为空。此次唯一写入是目标干声音量曲线，未向声音或 Horns 写入修改。\n\n执行前遗漏了完整基线读取，因此目标曲线已通过实际数据核验，但不能宣称其余保护项已通过前后一致性核验。"
+      ],
+      "pre_execute_agent_messages": [
+        {
+          "after_preview": false,
+          "text": "已加载 waapi-skill，配置的 WAAPI 端口为 31984，Wwise 适配版本为 2025.1。\n\n已保存的修改策略为 allow_changes；支持 read_only、ask_before_changes 和 allow_changes。我会核对当前曲线及保护范围，只修改指定干声音量曲线，并取得本次独立授权后执行和核验。"
+        },
+        {
+          "after_preview": true,
+          "text": "本次修改已按 allow_changes 策略取得独立授权。即将把 Expansion_EXP25-C08_Attenuation 的干声音量曲线设为自定义曲线，三个点均使用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。此次写入仅涉及这一条曲线；执行后将读取实际数据核验。"
+        }
+      ],
+      "semantic_notice_assessment": "Valid prospective notice: exact attested target and requested effect, value/name/notes or complete ordered curve/shape, before Execute. No contradictory or extra write claim. Frozen automatic notice FAIL is preserved.",
+      "notice_artifact_source_sha256": "c44440cc80c349a85427fbc3dc5f416158083115161239089b2dad09e7ed4c87"
+    },
+    {
+      "unit_id": "EXP25-C09",
+      "automatic_status": "FAIL",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/012-EXP25-C09",
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 109.89267358300276,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.3084717500023544,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "68cda5f3ece3bdf40a1c428216e3aa31d0e500b9dbb4eacac27756ba4c78793d",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 418432,
+        "input_tokens": 457752,
+        "output_tokens": 2057,
+        "reasoning_output_tokens": 222
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 10,
+      "broker_terminal_state": "RUNNING",
+      "final_responses": [
+        "已实际新增并通过回读核验：\n\n- 名称：`Expansion_EXP25-C09_NewGain`\n- 类型：Wwise Gain\n- GUID：`{5ECA0279-38F8-45E0-A666-FE6C21CF5C9A}`\n- slot GUID：`{5DE93633-505A-4879-A07B-55C38B2F8D56}`，绑定上述新增效果器\n- 备注：`Expansion C09 appended gain`\n- 未另设插件参数或平台值。\n\n核验摘要显示 6 项检查全部通过，但未披露原有两个效果器及声音属性的逐项前后对比，因此无法据此确认身份、绑定和配置顺序等全部保持要求。"
+      ],
+      "pre_execute_agent_messages": [
+        {
+          "after_preview": false,
+          "text": "已加载 waapi-skill；已配置 WAAPI 端口 31689，Wwise 适配版本为 2025.1。\n\n当前修改策略为 `allow_changes`，可用模式为 `read_only`、`ask_before_changes` 和 `allow_changes`。我会先核对现有配置，说明追加内容，再取得独立授权后执行并核验。"
+        },
+        {
+          "after_preview": true,
+          "text": "已核对目标声音并记录修改前状态。将于现有效果器之后追加 `Expansion_EXP25-C09_NewGain`，类型为 Wwise Gain，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定与配置顺序，以及声音本身的音量、备注和父级保持情况。\n\n预览已取得 `allow_changes` 策略的独立持久授权，目前尚未修改；现在执行追加并读取结果核验。"
+        }
+      ],
+      "semantic_notice_assessment": "Valid prospective notice: exact attested target and requested effect, value/name/notes or complete ordered curve/shape, before Execute. No contradictory or extra write claim. Frozen automatic notice FAIL is preserved.",
+      "notice_artifact_source_sha256": "c16a47173a16fc1c78888c2520a1f31f433394df94962e995f054573523f9279"
+    },
+    {
+      "unit_id": "EXP25-M01",
+      "automatic_status": "PASS",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/013-EXP25-M01",
+      "passing_project_absent": true,
+      "owned_root_absent": true,
+      "agent_seconds": 107.20802158419974,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "clip_media_matches_its_source": true,
+        "each_track_has_one_sequence_and_clip": true,
+        "exact_segment_track_source_topology": true,
+        "media_hashes_match_each_requested_track": true,
+        "only_track_has_requested_volume": true,
+        "parent_and_protected_sibling_unchanged": true
+      },
+      "required_assertions": [
+        "clip_media_matches_its_source",
+        "each_track_has_one_sequence_and_clip",
+        "exact_segment_track_source_topology",
+        "media_hashes_match_each_requested_track",
+        "only_track_has_requested_volume",
+        "parent_and_protected_sibling_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 427520,
+        "input_tokens": 470621,
+        "output_tokens": 1905,
+        "reasoning_output_tokens": 53
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 9,
+      "broker_terminal_state": "COMPLETE"
+    },
+    {
+      "unit_id": "EXP25-M05",
+      "automatic_status": "FAIL",
+      "source_full_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_full_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_project_mtime_before_ns": 1790531309503233691,
+      "source_project_mtime_after_ns": 1790531309503233691,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05",
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 133.03749225009233,
+      "slow": false,
+      "turns": 1,
+      "independent_assertions": {
+        "other_stingers_preserved": true,
+        "owner_unchanged": true,
+        "requested_trigger_matches": true,
+        "segment_reference_preserved": true,
+        "stinger_identity_and_other_configuration_preserved": true,
+        "target_and_segment_unchanged": true
+      },
+      "required_assertions": [
+        "other_stingers_preserved",
+        "owner_unchanged",
+        "requested_trigger_matches",
+        "segment_reference_preserved",
+        "stinger_identity_and_other_configuration_preserved",
+        "target_and_segment_unchanged"
+      ],
+      "after_available": true,
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.2690930829849094,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "84357909a9961d4b3d265a86d8f19932f7ea1f58260a6edcd974a13626d8c1fa",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 513536,
+        "input_tokens": 557100,
+        "output_tokens": 2381,
+        "reasoning_output_tokens": 230
+      },
+      "goal_transaction_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "authenticated_gateway_command_count": 11,
+      "broker_terminal_state": "RUNNING",
+      "final_responses": [
+        "已完成预览、策略授权和执行，并通过回读确认：指定 Stinger 的触发器已改为 Backup_Team_Arrives。\n\n本次仅修改 Trigger，未向关联音乐段、Stealth 容器或其他 Stinger（包括 Stress 中指定项）提交修改。未进行播放测试。\n\n验收仅覆盖触发器替换；其他设置和保留对象未做独立前后对比，不能宣称已逐项验证不变。"
+      ],
+      "pre_execute_agent_messages": [
+        {
+          "after_preview": false,
+          "text": "已加载 waapi-skill，配置的 WAAPI 端口为 32510，Wwise 适配版本为 2025.1。\n\n当前修改策略为 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会先核对实际对象并生成预览，再按授权执行并回读验收，不进行播放测试。"
+        },
+        {
+          "after_preview": false,
+          "text": "已读取目标对象，确认其类型为 Stinger，并核对新触发器为 Backup_Team_Arrives。接下来生成仅替换触发器的预览，核对原触发器、关联音乐段及保留范围。"
+        },
+        {
+          "after_preview": true,
+          "text": "预览已生成：仅将指定 Stinger 的 Trigger 改为 Backup_Team_Arrives，未包含音乐段、容器或其他设置的修改。预览已获得 allow_changes 策略授权；现在执行这项修改，随后回读验收。"
+        }
+      ],
+      "semantic_notice_assessment": "Valid prospective notice: exact attested target and requested effect, value/name/notes or complete ordered curve/shape, before Execute. No contradictory or extra write claim. Frozen automatic notice FAIL is preserved.",
+      "notice_artifact_source_sha256": "a6eb670cf281fb7de9d9f6755017c2a1ebea762127db429a1d4eac5ddf7c0f2f"
+    }
+  ],
+  "semantic_assessment": {
+    "notice_only_failures": [
+      "EXP22-C09",
+      "EXP25-C08",
+      "EXP25-C09",
+      "EXP25-M05"
+    ],
+    "business_failure_count": 0,
+    "gateway_schema_only_limit": "Both C08 Gateway terminal verifications are result_schema_checked; independent before/after oracles prove the requested effects and preservation. Gateway schema checking alone does not establish those outcomes.",
+    "agent_baseline_limits": "EXP25-C08 explicitly reports missing complete pre-change baseline; EXP25-C09 notes missing per-field before/after disclosure; EXP25-M05 limits personal acceptance to Trigger readback. These honest Agent proof limits do not invalidate the separately sealed independent preservation assertions.",
+    "notice_semantically_valid_independent_review_count": 4,
+    "formal_verdicts_unchanged": true
+  },
+  "remaining": [
+    "Four original automatic notice FAILs remain frozen; no replay, verify-only, or regrade performed.",
+    "Final full Agent acceptance remains pending.",
+    "No native-Windows, playback, subscription, load-retest, or general model ranking credit."
+  ],
+  "anomalies": [],
+  "frozen_candidate_digests": {
+    "candidate": {
+      "excluded_names": [
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".DS_Store",
+        ".coverage"
+      ],
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill",
+      "tree_sha256": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422"
+    },
+    "harness": {
+      "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b",
+      "excluded_names": [
+        "__pycache__",
+        ".pytest_cache",
+        ".DS_Store",
+        ".coverage"
+      ],
+      "semantic_tree_sha256": "3ef3c6b8729e011591b091e10678c826d34047d5344e71ef7f4ae7501c34c565"
+    },
+    "suite": {
+      "dependency_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1",
+      "dependency_tree_sha256": "4065e57bfe7b896c222f104903ba067c8ba3d9f4dbf5f1013565f2b1216f3226",
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1/profile.json",
+      "sha256": "af1813d5d6b453f5541ccbb443eff724c23935df556e44c9ef16ee43e19103fe"
+    },
+    "runner": {
+      "campaign_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "campaign_sha256": "9bf2eb02ac91c6f7402a47ce9bb5b3d70aaa6e49c45132f128464de1277610cd",
+      "matrix_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/run_codex_skill_matrix.py",
+      "matrix_sha256": "c9241d911fc7db05f94f58ff6e792e42f28bb9227feb642a22da228ee1cad79d"
+    }
+  },
+  "candidate_identity_limit": "Root verified the same full Git HEAD before launch and after terminal cleanup, with no tracked worktree changes. The frozen campaign independently seals Skill, suite, harness and runner digests.",
+  "development_gates": {
+    "program": {
+      "candidate": "eba698d9c9f461182b36c7c55ff9b8d2253d9d06",
+      "passed": 6345,
+      "skipped": 2,
+      "seconds": 303.27,
+      "exit_code": 0,
+      "scope": "Unchanged packaged Skill and Program inputs; component evidence, not a new run.",
+      "log_sha256": "3b0231dd1b3bf9ac0e2a023c3ac52ae78bae032a35f10455639d996bcaac6040"
+    },
+    "root_focused": {
+      "passed": 2828,
+      "skipped": 9,
+      "seconds": 22.81,
+      "exit_code": 0,
+      "scope": "Notice, harness, Broker, Skill contracts, semantic documentation and interface inventory.",
+      "log_sha256": "a4e7634ff2dd5b72a0d3c3014dc21e7afe2b64268d65d58ae33ee8cc86a6fd03",
+      "junit_sha256": "4770d3799ae3e85b297dd3c14b8cc0e66da099ea721d729bc85986ce60ef5cf3"
+    },
+    "nonlive": {
+      "candidate": "87f9dc8d09cbd93e9dac5ad41220bc5c338d6078",
+      "passed": 15030,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 871.39,
+      "exit_code": 0,
+      "log_sha256": "6c2e1a1ee8c146febb2d350b626528905d222fa6bf06ab4675e9a940f5c20424",
+      "junit_sha256": "d104b49b007a077eab14698073c1319f29e5c551ea5bf3c38637b3796530d4a3"
+    }
+  }
+}
