@@ -42,6 +42,29 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed target attestation and preflight bookkeeping — 2026-10-03:**
+  the exact 595cc85 notice reproduced one failure. The independent 13-vector
+  matrix, frozen before implementation, passed its complete primary control
+  and recorded **10 PASS / 3 FAIL**: target confirmation with the equivalent
+  copula and a role or GUID, plus preflight bookkeeping, were rejected; the
+  existing copula/Preview forms and seven contradictory claims behaved as
+  expected. The repair adds the copula only inside affirmative target
+  attestation. A single bounded producer parser now classifies complete
+  Preview/preflight before-state bookkeeping and lets the immediately relevant
+  owner context cross only that neutral span. Descriptor behavior is unchanged.
+  Intermediate regressions exposed an overbroad standalone target assertion
+  that conflicted with six existing reference-assignment positives; the final
+  patch leaves that bare assignment grammar unchanged. All failed iterations
+  remain in the native logs. The retained gate passed **2549 tests in 4.28
+  seconds**, including all 2532 earlier controls; the combined gate passed
+  **3674 / skipped 9** in **46.49 seconds**, exit zero. Both independent review
+  axes are clear, and frozen contrast files remain unchanged. Evidence is in
+  `expansion-target-preflight-595cc85-r1`,
+  `expansion-target-preflight-components-review-595cc85-r1` and
+  `expansion-target-preflight-root-focused-r1` under the ignored remediation
+  tree. Complete Non-live, a new C09 attempt and final full acceptance remain
+  outstanding. No Skill, prompt, suite, oracle or historical verdict changed.
+
 - **Frozen 595cc85 C09 rerun — 2026-10-03:** complete Non-live passed
   **15432 / skipped 119 / deselected 27**, exit zero in **919.06 seconds**.
   The sole EXP25-C09 Fresh unit then completed its business goal and all six

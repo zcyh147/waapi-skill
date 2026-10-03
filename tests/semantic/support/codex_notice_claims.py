@@ -109,6 +109,12 @@ def before_state_noun_pattern() -> str:
     return r"(?:当前|(?:执行|修改|变更|改动)前)?(?:的)?(?:配置)?(?:状态|(?:核验)?基线)(?:快照)?"
 
 
+def _baseline_producer(text: str, context: NoticeRoleContext) -> bool:
+    return re.fullmatch(
+        rf"\s*(?:{preview_noun_pattern(reference_change=context.reference_change)}|预检)已(?:记录|保存|建立){before_state_noun_pattern()}\s*",
+        text) is not None
+
+
 def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
     """A complete coordinated read-state summary, with no owner/edit payload."""
     record = r"(?:记录|保存|建立)"
@@ -116,8 +122,7 @@ def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> s
         return "read-summary"
     if re.fullmatch(rf"\s*{before_state_noun_pattern()}已{record}\s*", text):
         return "read-summary"
-    if context is not None and re.fullmatch(
-            rf"\s*{preview_noun_pattern(reference_change=context.reference_change)}已{record}{before_state_noun_pattern()}\s*", text):
+    if context is not None and _baseline_producer(text, context):
         return "read-summary"  # Preview-local bookkeeping cannot prove an edit.
     if context is not None and context.reference_change:
         terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
@@ -173,7 +178,7 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
             return clause._replace(role="invalid", diagnostic="conflicting-protected-baseline")
         if baseline_role == "read-summary":
             value = value[:coordinated.start()].strip()
-    if primary_role_atom(re.sub(r"^目标是\s*", "", value), context) or primary_role_attribute(value, context):
+    if primary_role_atom(re.sub(r"^目标(?:是|为)\s*", "", value), context) or primary_role_attribute(value, context):
         return clause._replace(role="owner-attestation")
     legacy = attested_primary_target(clause.text[:match.start(1)] + value, context.identity)
     if legacy.state == "attested":
@@ -406,7 +411,7 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
             while following := re.match(r"[。；;\n]\s*([^，,。；;\n]+)", text[offset:]):
                 first_start, first_end = offset + following.start(1), offset + following.end(1)
                 status = re.fullmatch(r"(?:目前|当前)?(?:工程)?尚未(?:修改|执行)(?:工程)?", following.group(1))
-                if status:
+                if status or _baseline_producer(following.group(1), context):
                     offset = first_end
                     continue
                 windows.append((first_start, first_end))
