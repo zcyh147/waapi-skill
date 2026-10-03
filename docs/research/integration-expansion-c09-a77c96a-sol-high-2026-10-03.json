@@ -480,6 +480,17 @@
     ],
     "proof_limit": "The ancillary purpose supplies no baseline-completeness, effect, permission or verification proof.",
     "final_disclosure_limit": "Personal inability to itemize preserved fields from compact Gateway output remains separate from six independent business assertions.",
-    "historical_verdict_changed": false
+    "historical_verdict_changed": false,
+    "diagnosis_revision": {
+      "initial_static_diagnosis_incomplete": true,
+      "additional_independent_cause": "After purpose repair, native public-seam isolation showed that the descriptor parser misread the verification question token as the copula for a field/value claim.",
+      "native_isolation_red": {
+        "failed": 2,
+        "passed": 2
+      },
+      "correction": "Distinguish the copula from the question token while retaining ordinary action accounting and real descriptor-field checks.",
+      "evidence_directory": ".waapi-skill-state/evidence/waapi-test-remediation/expansion-baseline-purpose-a77c96a-r1",
+      "original_verdict_and_execution_evidence_unchanged": true
+    }
   }
 }

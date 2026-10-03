@@ -42,16 +42,39 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed baseline purpose and verification-question boundary — 2026-10-03:**
+  the exact a77c96a witness reproduced one failure. An independent 13-vector
+  matrix passed its complete core and recorded **9 PASS / 4 FAIL** before
+  implementation: four valid purpose forms were rejected and eight substantive
+  contradictions were rejected. The shared purpose component now accepts a
+  bounded read-only comparison/verification head with an optional temporal
+  modifier; the remaining complete clause must still be a baseline record.
+  It supplies no timing, baseline-completeness, effect or permission proof.
+  The first implementation passed all thirteen contrasts but still failed the
+  raw witness, exposing a second independent lexical collision: the descriptor
+  parser treated the verification question token as a field-value copula.
+  Native controls recorded **2 FAIL / 2 PASS** before the narrow token-boundary
+  correction. Questions remain subject to ordinary action accounting; actual
+  field assertions and adjacent writes retain their checks. The final retained
+  gate passed **2566 tests in 4.31 seconds**, including all 2549 prior controls;
+  the combined gate passed **3691 / skipped 9** in **45.95 seconds**, exit zero.
+  Both independent review axes are clear. All failed iterations and frozen
+  contrast vectors are preserved in `expansion-baseline-purpose-a77c96a-r1`,
+  `expansion-baseline-purpose-components-review-a77c96a-r1` and
+  `expansion-baseline-purpose-root-focused-r1` under the ignored remediation
+  tree. Complete Non-live, new C09 proof and final full acceptance remain.
+
 - **Frozen a77c96a C09 rerun — 2026-10-03:** complete Non-live passed
   **15449 / skipped 119 / deselected 27**, exit zero in **863.53 seconds**.
   The sole EXP25-C09 Fresh unit again achieved its business goal and all six
   independent assertions with Gateway verification, while retaining one
   notice-only FAIL. Independent assessment found no substantive omission.
-  One shared grammar gap causes two downstream rejections: a read-only
+  Initial static diagnosis found a shared gap with two downstream rejections: a read-only
   verification-purpose complement prevents the before-state record from
   matching, losing the owner cursor before creation and exposing its temporal
   modification noun to action scanning. The remaining notice roles are already
-  supported. The planned correction composes the bounded purpose with existing
+  supported except for the later isolated verification-question/copula collision
+  recorded above. The correction composes the bounded purpose with existing
   baseline roles without granting proof credit or consuming adjacent actions.
   Root and independent audits agree on **177 artifacts / 6767624 bytes** and
   eleven metadata seals. Source protection, oracle closure, quarantine,

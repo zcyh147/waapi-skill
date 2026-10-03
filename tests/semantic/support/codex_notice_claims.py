@@ -109,20 +109,31 @@ def before_state_noun_pattern() -> str:
     return r"(?:当前|(?:执行|修改|变更|改动)前)?(?:的)?(?:配置)?(?:状态|(?:核验)?基线)(?:快照)?"
 
 
+def _without_verification_purpose(text: str) -> str:
+    """Remove only a complete trailing read-purpose component.
+
+    The remaining complete clause must still validate as a baseline record.
+    Its temporal modifier conveys purpose, never phase or verification proof.
+    """
+    return re.sub(r"(?:用于|供|以便)(?:执行后|后续|随后)?(?:比较|核验|验证|验收|检查)\s*$", "", text)
+
+
 def _baseline_producer(text: str, context: NoticeRoleContext) -> bool:
     return re.fullmatch(
         rf"\s*(?:{preview_noun_pattern(reference_change=context.reference_change)}|预检)已(?:记录|保存|建立){before_state_noun_pattern()}\s*",
-        text) is not None
+        _without_verification_purpose(text)) is not None
 
 
 def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
     """A complete coordinated read-state summary, with no owner/edit payload."""
+    original_text = text
+    text = _without_verification_purpose(text)
     record = r"(?:记录|保存|建立)"
     if re.fullmatch(rf"\s*并(?:为当前配置)?{record}(?:了)?{before_state_noun_pattern()}\s*", text):
         return "read-summary"
     if re.fullmatch(rf"\s*{before_state_noun_pattern()}已{record}\s*", text):
         return "read-summary"
-    if context is not None and _baseline_producer(text, context):
+    if context is not None and _baseline_producer(original_text, context):
         return "read-summary"  # Preview-local bookkeeping cannot prove an edit.
     if context is not None and context.reference_change:
         terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
@@ -497,7 +508,7 @@ def effect_descriptor_value_claim(clause: NoticeClaim, *, name: str, notes: str)
         return clause  # Its complete predicate still goes through polarity checks.
     if re.match(rf"\s*(?:{_FUTURE})?以", clause.text) and re.search(r"核验|验证|验收|检查", clause.text):
         return clause  # A verification basis is not a copular descriptor field.
-    match = re.fullmatch(r"\s*(?:(?:并|且|同时|另外)\s*)?([a-z_][a-z0-9_-]*|[\u4e00-\u9fff]{1,16})\s*(?:为|是|=)\s*(.+?)\s*", clause.text)
+    match = re.fullmatch(r"\s*(?:(?:并|且|同时|另外)\s*)?([a-z_][a-z0-9_-]*|[\u4e00-\u9fff]{1,16})\s*(?:为|是(?!否)|=)\s*(.+?)\s*", clause.text)
     if match is None:
         return clause
     field, value = match.groups()
