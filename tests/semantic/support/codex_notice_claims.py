@@ -181,6 +181,10 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if baseline in {"read-summary", "invalid"}:
             result.append(clause._replace(role=baseline, diagnostic="conflicting-baseline" if baseline == "invalid" else ""))
             continue
+        verification = verification_basis_claim(clause._replace(text=local))
+        if verification.role == "verification-basis":
+            result.append(verification._replace(text=clause.text))
+            continue
         if (context.identity["type"] == "Sound" and re.fullmatch(r"\s*(?:接下来)?核对追加位置和现有配置的保护条件\s*", local)):
             result.append(clause._replace(role="read-summary"))
             continue
@@ -201,6 +205,18 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
             else:
                 result.append(clause)
     return tuple(result)
+
+
+def verification_basis_claim(clause: NoticeClaim) -> NoticeClaim:
+    """A before-state noun is ancillary only inside a bounded verification frame.
+
+    Consume the basis and verifier prefix, never the objects, fields or other
+    predicates that follow it. This intent neither asserts baseline values nor
+    supplies the prospective edit or permission.
+    """
+    match = re.match(r"\s*(?:执行后|随后)?(?:会|将)?(?:对照|依据)"
+                     r"(?:修改前|执行前)(?:状态|基线)(?:核验|检查|验证|验收)", clause.text)
+    return clause._replace(role="verification-basis", end=clause.start + match.end()) if match else clause
 
 
 def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:

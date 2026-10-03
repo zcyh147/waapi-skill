@@ -62,7 +62,7 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     prefix must still agree with the caller's independently attested role.
     Unconsumed coordinated text remains available for action accounting.
     """
-    change = rf"(?:{_REFERENT})(?:独立)?{_CHANGE}"
+    change = rf"(?:{_REFERENT})(?:具体)?(?:独立)?{_CHANGE}"
     active = rf"(?:{_PROVIDER})?{_GRANT}{change}{_AUTHORIZATION}"
     policy_attribute = r"(?:allow_changes|\*\*allow_changes\*\*)\s*策略"
     passive = rf"{change}(?:{_PROVIDER})?{_GRANT}\s*(?:{policy_attribute})?{_AUTHORIZATION}"

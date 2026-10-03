@@ -45,6 +45,8 @@ from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
 from wwise_waapi.operation_drafts import load_operation_draft_archive_records, operation_draft_authority_digest
 from wwise_waapi.operation_composer import new_composition, operation_composer_digest
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.business_declarations import BusinessHandleRegistry, NewDescendantTarget
+from wwise_waapi.business_adapters import business_adapter
 from wwise_waapi.transactions import _validate_event, confirmation_token_for, validate_transaction_id
 
 
@@ -221,6 +223,19 @@ def _validate_rejected_core_declaration(record, *, argv, gate, draft_id, authori
     _validate_parser_error(argv, gate)
 
 
+def _validate_rejected_draft_check(record, *, argv, gate, draft_id, authority, revision, operation):
+    """Only the exact current import Draft with a different authority is safe."""
+    _validate_predispatch_rejection(record,
+        "expansion policy rejected command: Draft identity, authority or revision is stale")
+    args = gate.public_parser(argv)
+    _require(operation == "audio.import" and revision == 3 and isinstance(authority, str)
+        and len(argv) == 6 and argv[:2] == ["draft-check", draft_id]
+        and argv[2] == "--task-authority" and bool(argv[3]) and argv[3] != authority
+        and argv[4:] == ["--expected-revision", "3"]
+        and args.draft_id == draft_id and args.expected_revision == revision,
+        "rejected check is not the exact current import Draft with stale authority")
+
+
 def _validate_predispatch_rejection(record, rejection):
     _require(record.get("authenticated") is True and record.get("accepted") is False
         and record.get("succeeded") is False and record.get("exit_code") == 126
@@ -344,6 +359,122 @@ def _bound_draft_rejected_read(root, plan, records, *, declaration=False):
     _require(not (root / "broker/state/transactions").exists(), "rejected read contains transaction evidence")
 
 
+def _declared_import_rejected_check(root, plan, records):
+    """Rebuild the bounded editable import prefix without dispatch or writes."""
+    _require(plan.get("operation") == "audio.import" and plan.get("unit_id", "").endswith("-M01")
+        and plan["read_scope"].get("owned_project_reads") is True,
+        "rejected check lacks its approved music import scope")
+    drafts = [row for row in records[:-1] if row["gateway_arguments"][0] not in _READS]
+    _require([row["gateway_arguments"][0] for row in drafts] ==
+        ["draft-start", "draft-bind-object", "draft-declare-import-batch"]
+        and all(row.get("accepted") is True and row.get("succeeded") is True for row in drafts),
+        "rejected check changed its accepted editable import prefix")
+    start, bound, declared = [row["payload"] for row in drafts]
+    initial, binding, final = [row["draft"] for row in (start, bound, declared)]
+    draft_id, authority = initial["draft_id"], start["task_authority"]
+    stored = load_operation_draft_archive_records((root / "broker/state").absolute(), [draft_id])[draft_id]
+    directory = root / "broker/state/operation-drafts-v1/records"
+    _require([path.name for path in directory.iterdir()] == [draft_id + ".json"], "rejected check contains another Draft record")
+    public = _public_gateway(plan)
+    schema = public.operation_draft_schema_digest("audio.import", plan["version"])
+    expected_binding = {"operation": "audio.import", "version": plan["version"], "schema_digest": schema}
+    _require(stored.state.value == "editable" and stored.revision == 3 and stored.operation == "audio.import"
+        and stored.version == plan["version"] and stored.schema_digest == schema
+        and stored.composer_digest == operation_composer_digest("audio.import", plan["version"])
+        and stored.authority_digest == operation_draft_authority_digest(authority) and stored.schema_version == 2
+        and stored.check is stored.seal is stored.terminal_at is None
+        and stored.created_at == initial.get("created_at") == initial.get("updated_at")
+        and stored.expires_at == initial.get("expires_at")
+        and len(stored.audit) == 3 and [row["event_type"] for row in stored.audit] ==
+            ["started", "handles.bound", "declaration.batch-added"]
+        and stored.updated_at == stored.audit[-1]["timestamp"]
+        and all(row.get("contract") == "waapi-skill.operation-draft/v1" and row.get("draft_id") == draft_id
+            and row.get("lifecycle_state") == "editable" and row.get("revision") == revision
+            and row.get("binding") == expected_binding for row, revision in ((initial, 1), (binding, 2), (final, 3)))
+        and initial.get("business_revision") == binding.get("business_revision") == 0
+        and initial.get("declarations") == []
+        and all(row.get(key) is None for row in (initial, binding, final) for key in ("check", "seal", "preview")),
+        "rejected check changed its Draft binding, projection or audit")
+    argv = drafts[1]["gateway_arguments"]
+    parent = plan["before"].get("parent")
+    _require(isinstance(parent, dict) and parent.get("type") == "MusicPlaylistContainer"
+        and parent.get("id") in plan["read_scope"]["object_ids"]
+        and argv == ["draft-bind-object", draft_id, "--task-authority", authority, "--expected-revision", "1", "--object-id", parent["id"]],
+        "rejected check changed its independent parent binding")
+    session = BusinessDeclarationSession.from_dict(stored.composition.get("business_session"))
+    _require(session.context.task_authority_digest == stored.authority_digest
+        and session.context.wwise_version == stored.version and session.active_preview is None
+        and not session.preview_audit and not session.settings,
+        "rejected check changed its business context or Preview state")
+    call = bound.get("project_call")
+    _require(isinstance(call, dict) and isinstance(call.get("evidence_path"), str), "rejected check lacks its project binding evidence")
+    relative = Path(call["evidence_path"]).relative_to(root)
+    _require(relative.parts[:2] == ("broker", "evidence"), "rejected check project evidence escaped its archive")
+    project_call = _json(root, relative.as_posix())
+    project = project_call.get("result")
+    _require({key: value for key, value in project_call.items() if key != "result"} == call
+        and call.get("api") == "ak.wwise.core.getProjectInfo" and call.get("ok") is True
+        and call.get("dry_run") is False and call.get("version") == plan["version"]
+        and isinstance(project, dict) and project.get("id") == session.context.project_id
+        and project.get("path") == session.context.project_path,
+        "rejected check project context differs from its authenticated read")
+    expected = BusinessDeclarationSession.create(session.context)
+    handles = BusinessHandleRegistry.from_dict(session.handles.as_dict())
+    registry = handles.as_dict()
+    receipt_object = bound.get("bound_object", {})
+    _require(len(registry["objects"]) == 1 and not registry["fields"] and not registry["types"]
+        and isinstance(receipt_object.get("handle"), str), "rejected check carries extra handles")
+    obj = registry["objects"][0]
+    _require(obj["handle"] == receipt_object["handle"] and obj["object_id"] == parent["id"]
+        and obj["name"] == parent["name"] and obj["object_type"] == parent["type"]
+        and obj["path"] == parent["path"] and obj["semantic_kind"] is obj.get("role") is None,
+        "rejected check stored handle differs from its independent parent")
+    expected = expected.with_handle_registry(handles)
+    _require(all(receipt_object.get(key) == value for key, value in
+        (("handle", obj["handle"]), ("name", obj["name"]), ("type", obj["object_type"]), ("semantic_kind", None))),
+        "rejected check handle differs from its independent parent")
+    args = _scope(plan).public_parser(drafts[2]["gateway_arguments"])
+    _require(args.draft_id == draft_id and args.task_authority == authority and args.expected_revision == 2
+        and args.new_row and not any((args.new_root_row, args.new_child_row, args.existing_row,
+            args.field_value, args.switch_value, args.event)), "rejected check carries another import declaration form")
+    order = [identifier for group in args.row_order for identifier in group]
+    rows = {identifier: (parent_reference, name, kind) for identifier, parent_reference, name, kind in args.new_row}
+    _require(len(rows) == len(args.new_row) == len(order) <= public.AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS
+        and len(set(order)) == len(order) and set(order) == set(rows), "rejected check import row order is inconsistent")
+    fields = {identifier: [] for identifier in order}
+    for identifier, key, value in args.field:
+        _require(identifier in fields, "rejected check field has another declaration")
+        fields[identifier].append((key, value))
+    media = plan.get("preview_parameters", {}).get("media")
+    _require(isinstance(media, dict) and all(isinstance(value, str) for value in media.values())
+        and isinstance(args.media_directory, str), "rejected check lacks its sealed media scope")
+    media_ids = set()
+    for identifier, filename in args.media_file:
+        _require(identifier in fields and identifier not in media_ids and filename not in {"", ".", ".."}
+            and not any(character in filename for character in ("/", "\\", "\x00")), "rejected check media row is malformed")
+        path = str(Path(args.media_directory) / filename)
+        _require(path in media.values(), "rejected check media path exceeds its sealed scope")
+        media_ids.add(identifier)
+        fields[identifier].append(("media_file", path))
+    for identifier in order:
+        parent_reference, name, kind = rows[identifier]
+        parents = [row for row in expected.declarations if row.declaration_id == parent_reference]
+        parent_handle = parents[0].result_handle if len(parents) == 1 else parent_reference
+        expected = expected.with_new_declaration(declaration_id=identifier,
+            target=NewDescendantTarget(parent_handle, name, kind),
+            fields=public._parse_audio_import_business_fields(expected, fields[identifier], allow_switch_value_pair=False))
+    business_adapter("audio.import").materialize(expected)
+    _require(session.as_dict() == expected.as_dict()
+        and stored.composition == {**new_composition(stored.operation, stored.version), "business_session": expected.as_dict()},
+        "rejected check composition differs from its accepted public declaration")
+    _require(final.get("batch_receipt") == {"contract": "waapi-skill.business-declaration-batch-receipt/v1",
+        "chunk_declaration_count": len(order), "cumulative_declaration_count": len(order), "switch_assignment_count": 0}
+        and final.get("next_command", {}).get("command") == "draft-check"
+        and final["next_command"].get("gateway_argv") == ["draft-check", draft_id, "--task-authority", authority, "--expected-revision", "3"],
+        "rejected check declaration projection differs from its stored composition")
+    _require(not (root / "broker/state/transactions").exists(), "rejected check contains transaction evidence")
+
+
 def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     records = broker.get("records")
     _require(isinstance(records, list) and len(records) <= 128, "broker receipt count is invalid")
@@ -375,6 +506,9 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
                     draft_id=draft_id, authority=authority, revision=revision)
             elif argv[:1] == ["draft-declare-core-plan"]:
                 _validate_rejected_core_declaration(record, argv=argv, gate=gate,
+                    draft_id=draft_id, authority=authority, revision=revision, operation=expected_operation)
+            elif argv[:1] == ["draft-check"]:
+                _validate_rejected_draft_check(record, argv=argv, gate=gate,
                     draft_id=draft_id, authority=authority, revision=revision, operation=expected_operation)
             else:
                 _validate_rejected_read(record, argv=argv, gate=gate)
@@ -603,19 +737,28 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     rejected_read = any(record.get("accepted") is False for record in records)
     if rejected_read:
         rejected_declaration = records[-1]["gateway_arguments"][:1] == ["draft-declare-core-plan"]
+        rejected_check = records[-1]["gateway_arguments"][:1] == ["draft-check"]
         allowed_prefix = _READS | {"draft-start", "draft-bind-object"}
+        if rejected_check:
+            allowed_prefix |= {"draft-declare-import-batch"}
         _require(all(record["gateway_arguments"][0] in allowed_prefix for record in records[:-1]),
             "rejected command has another mutation or declaration in its accepted prefix")
         _require(result["passed"] is False and result.get("status") == "FAIL"
             and result.get("terminal_state") == "unprepared"
             and len(turns) == 1 and not turns[0].get("incomplete")
-            and (rejected_declaration or records[-1]["gateway_arguments"][0] in allowed_prefix)
+            and (rejected_declaration or rejected_check or records[-1]["gateway_arguments"][0] in allowed_prefix)
             and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
             and oracle.get("authorization") is None and oracle.get("permit") is None
             and oracle.get("after") is None and result.get("assertions") == {}
             and broker.get("passed") is False and broker.get("complete") is False,
             "rejected read cannot carry a Preview, mutation or successful outcome")
-        if records[-1]["gateway_arguments"][0] == "draft-bind-object":
+        if rejected_check:
+            _declared_import_rejected_check(root, plan, records)
+            _require(all(key in oracle and oracle[key] is None for key in
+                ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
+                and result.get("gateway_verification_state") is None and oracle.get("assertions") == {},
+                "rejected check carries preparation or verification evidence")
+        elif records[-1]["gateway_arguments"][0] == "draft-bind-object":
             _pristine_rejected_draft(root, plan, records)
             _require(all(key in oracle and oracle[key] is None for key in
                 ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))

@@ -702,7 +702,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         for index, action in enumerate(actions):
             if sole_assignment:
                 continue  # The complete exact assignment was validated below.
-            if any(claim.role in {"authorization", "preview-status", "read-summary"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
+            if any(claim.role in {"authorization", "preview-status", "read-summary", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
                 continue
             if any(claim.role == "exclusion" and claim.start <= action.start() and action.end() <= claim.end for claim in exclusions):
                 continue

@@ -42,6 +42,33 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed rejected-check and notice repairs — 2026-10-03:** #155 now admits
+  a narrowly proven ordinary Agent FAIL after the observed audio.import
+  start/bind/batch prefix and a final wrong-authority `draft-check`. The proof
+  reconstructs the editable declaration from accepted public arguments and
+  validates the original opaque parent handle, independent parent identity,
+  owned project evidence, version/schema/composer/authority binding, audit,
+  media scope and absence of Preview, execution or successful assertions.
+  Gateway and Broker authorization behavior is unchanged. Native 2022 facts
+  are explicitly distinguished from regenerated offline 2022/2025 archives;
+  the original RED used the regenerated 2025 derivative, not a byte-identical
+  native archive. Independent Standards review caught a missing empty-oracle-
+  assertions guard: four resealed negative cases reproduced the defect before
+  repair. The final archive/classification/Broker gate passed **305 tests in
+  9.10 seconds**, and both review axes are clear.
+  The #147 notice repair accepts the ancillary current-change qualifier and
+  before-state verification-basis prefix from the actual C09 notice, without
+  replacing the primary effect or authorization checks or consuming later
+  edits. Its exact witness reproduced RED then GREEN; **2380 notice tests**
+  passed, and independent Standards and Spec reviews are clear. Root combined
+  validation passed **3284 / skipped 9 native-Windows checks in 33.17 seconds**,
+  exit zero. Packaged Skill and Program inputs remain byte-identical to the
+  completed eba698d Program gate; its **6345 / skipped 2** remains component
+  evidence, not a new run. Complete Non-live and a new frozen Fresh root remain
+  pending. All historical verdicts and evidence are unchanged; the previously
+  accepted C09 business outcome remains a grader false negative, not an Agent
+  business failure.
+
 - **Frozen early stop and separate failure attribution — 2026-10-03:**
   candidate `0e04c8c6578eb7d8cba8d6b60074a520ff9ecf1b` passed complete Non-live
   **15156 / skipped 119 / deselected 27**, exit zero in **864.05 seconds**.
