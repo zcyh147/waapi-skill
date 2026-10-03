@@ -9384,6 +9384,7 @@ def test_heavy_fingerprint_covers_runner_model_options_and_mutable_inputs(
     assert effective["runner"]["campaign_sha256"]
     assert effective["codex"]["model"] == "gpt-5.6-terra"
     assert effective["codex"]["allow_login_shell"] is False
+    assert effective["codex"]["apps"] == "disabled"
     if os.name == "nt":
         assert effective["codex"]["windows_shell_backend"] == (
             campaign.WINDOWS_SHELL_BACKEND

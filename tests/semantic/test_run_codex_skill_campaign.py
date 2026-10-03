@@ -562,6 +562,7 @@ def test_ordinary_effective_config_records_shell_policy(
 
     assert effective["live_config"]["readiness_timeout_seconds"] == 60.0
     assert effective["codex"]["allow_login_shell"] is False
+    assert effective["codex"]["apps"] == "disabled"
     if os.name == "nt":
         assert effective["codex"]["windows_shell_backend"] == (
             campaign.WINDOWS_SHELL_BACKEND

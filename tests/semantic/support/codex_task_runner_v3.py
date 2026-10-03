@@ -487,7 +487,7 @@ def _note_owner_prefix_agrees(prefix: str, context: Mapping[str, Any], creation_
     return True
 
 
-def _plugin_kind_claims_agree(text: str, name: str) -> bool:
+def _plugin_kind_claims_agree(text: str, name: str, *, notes: str) -> bool:
     """Explicit creation nouns must denote Effect, not another native kind.
 
     Wwise-prefixed labels describe a plugin display class, not a native
@@ -504,6 +504,14 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
         rf"效果链将多一个\s*([^，,。；;\n]+)[，,]\s*名称\s*{value}(?![a-z0-9_])",
         rf"{value}[，,]\s*类型为\s*([^，,。；;\n]+)",
     )
+    for opening in re.finditer(rf"{value}\s*[（(]", text):
+        kind = re.match(r"([^()（）]+)[)）]", text[opening.end():])
+        if kind is None or not effect_kind_label(kind.group(1).strip()):
+            return False  # A parenthesized kind claim must be complete and Effect-like.
+        tail = re.split(r"[，,。；;\n]", text[opening.end() + kind.end():], maxsplit=1)[0]
+        continuation = effect_descriptor_value_claim(NoticeClaim("unclassified", 0, len(tail), tail), name=name.casefold(), notes=notes)
+        if continuation.role == "invalid":
+            return False  # A valid parenthesis cannot hide a second field/kind claim.
     for pattern in patterns:
         for claim in re.finditer(pattern, text):
             label = claim.group(1).strip()
@@ -516,6 +524,52 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
     return True
 
 
+def _reference_scope_evidence(text: str, context: Mapping[str, Any]) -> tuple[tuple[NoticeClaim, ...], bool]:
+    """Compose a sole-reference Preview from independently attested roles.
+
+    A display label refers only to the stored old reference, never the source
+    object's name or diagnostic path. Each role stays separate and cannot
+    supply the edit unless the exact source, old value, new value and scope
+    all agree with the same immutable reference operation.
+    """
+    if context["kind"] != "reference":
+        return (), False
+    claims = []
+    seen = set()
+    old = context.get("old_reference")
+    for clause in notice_clauses(text):
+        prefix = r"\s*(?:(?:并|且|同时|另外)\s*)?"
+        source = re.fullmatch(prefix + r"(?:预览已生成[:：])?目标对象确认为\s*(.+?)\s*", clause.text)
+        current = re.fullmatch(prefix + r"当前显示为\s*(.+?)\s*", clause.text)
+        target = re.fullmatch(prefix + r"新的引用目标已核对为\s*(.+?)\s*", clause.text)
+        scope = re.fullmatch(prefix + r"预览(?:只|仅)包含(?:这|此)(?:一)?项(?:trigger|触发器)引用(?:修改|变更|改动)\s*", clause.text)
+        role = None
+        valid = False
+        if source:
+            role = "reference-source"
+            valid = source.group(1) in role_terms("MusicStinger")
+        elif current:
+            role = "current-reference"
+            valid = isinstance(old, Mapping) and isinstance(old.get("name"), str) and bool(old["name"]) and current.group(1) == old["name"].casefold()
+        elif target:
+            role = "reference-target"
+            valid = target.group(1) in {value.casefold() for value in context["groups"][1]}
+        elif scope:
+            role = "prospective-reference"
+            valid = True
+        elif (re.match(prefix + r"(?:预览已生成[:：])?(?:目标对象(?:未|不|可能)?确认|当前(?:未|不|可能)?显示|新的引用目标)", clause.text)
+              or (re.match(prefix + r"预览(?:只|仅|不|未|可能)包含", clause.text)
+                  and re.search(r"(?:trigger|触发器)\s*引用", clause.text))):
+            # A recognized role with unsupported polarity or incomplete
+            # grammar cannot disappear behind an earlier affirmative fact.
+            role = "unresolved-reference"
+        if role:
+            claims.append(clause._replace(role=role if valid else "invalid", diagnostic="" if valid else "contradictory-reference-role"))
+            if valid:
+                seen.add(role)
+    return tuple(claims), seen == {"reference-source", "current-reference", "reference-target", "prospective-reference"}
+
+
 def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: PlannedEffectReferent | None = None,
                           require_adoption: bool = True) -> bool:
     if staged is not None and (context["kind"] != "plugin" or staged.owner_id != context["source_id"]
@@ -524,6 +578,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             or staged.display_label is not None and not effect_kind_label(staged.display_label)):
         return False
     text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    reference_claims, reference_effect = _reference_scope_evidence(text, context)
+    if any(claim.role == "invalid" for claim in reference_claims):
+        return False
     role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
         "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
         protected_effect_count=context.get("protected_effect_count"))
@@ -557,7 +614,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 or not context["source_id"][1:].casefold().startswith(prefix)):
             return False
     if context["kind"] == "plugin":
-        if not _plugin_kind_claims_agree(text, context["groups"][1][0]):
+        if not _plugin_kind_claims_agree(text, context["groups"][1][0], notes=context["notes"].casefold()):
             return False
         for note in re.findall(r"备注(?:为|是)?\s*[“\"]([^”\"]*)[”\"]", text):
             if note != context["notes"].casefold():
@@ -572,9 +629,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         return False
     explicit_prospective_owner = any(prospective_role_owner(text[max(text.rfind('。', 0, action.start()), text.rfind('\n', 0, action.start())) + 1:action.start()], role_context)
         for action in re.finditer(context["action"], text))
-    if staged is None and (not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]})):
+    if staged is None and (not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited or reference_effect) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]})):
         return False
-    affirmative = staged is not None
+    affirmative = staged is not None or reference_effect
     adoption = False
     source_referent = False
     pending_note_owner = None
@@ -702,6 +759,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         for index, action in enumerate(actions):
             if sole_assignment:
                 continue  # The complete exact assignment was validated below.
+            absolute_action = clause_start + action.start()
+            if any(claim.role == "prospective-reference" and claim.start <= absolute_action and clause_start + action.end() <= claim.end for claim in reference_claims):
+                continue
             if any(claim.role in {"authorization", "preview-status", "read-summary", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
                 continue
             if any(claim.role == "exclusion" and claim.start <= action.start() and action.end() <= claim.end for claim in exclusions):

@@ -2937,6 +2937,83 @@ def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_ho
     assert command[-3:] == ["debug", "prompt-input", "List buses."]
 
 
+@pytest.mark.parametrize("windows", [False, True], ids=("posix", "windows"))
+@pytest.mark.parametrize("phase", ["prompt-audit", "ephemeral-exec", "initial-task", "resume-task"])
+def test_formal_command_builders_disable_connected_apps_without_relaxing_isolation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, windows: bool, phase: str,
+) -> None:
+    monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: windows)
+    config = CodexHarnessConfig(
+        workspace=tmp_path, skill_source=tmp_path / "skill", codex_binary=tmp_path / "codex",
+    )
+    if phase == "prompt-audit":
+        command = build_prompt_audit_command(config, prompt="Inspect the requested object.")
+    elif phase == "ephemeral-exec":
+        command = build_exec_command(config, prompt="Inspect the requested object.", writable_dir=tmp_path)
+    elif phase == "initial-task":
+        command = build_task_exec_command(config, prompt="Preview the requested change.", writable_dir=tmp_path)
+    else:
+        command = build_task_resume_command(config, thread_id="exact-thread", prompt="Confirm it.", writable_dir=tmp_path)
+
+    disabled = [command[index + 1] for index, value in enumerate(command) if value == "--disable"]
+    assert disabled == ["memories", "apps"]
+    assert not any(value.startswith("mcp_servers.") for value in command)
+    if phase == "prompt-audit":
+        assert command[-3:-1] == ["debug", "prompt-input"]
+    else:
+        assert 'approval_policy="never"' in command
+        assert "--ignore-user-config" in command
+        assert command[command.index("--sandbox") + 1] == "workspace-write"
+
+
+def test_prompt_audit_process_receives_apps_override_and_retains_skill_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill = workspace_skill_install_path(tmp_path)
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("target skill\n", encoding="utf-8")
+    config = CodexHarnessConfig(
+        workspace=tmp_path, skill_source=skill, codex_binary=tmp_path / "codex",
+        developer_instructions="Use the local Gateway only.",
+    )
+    payload = [
+        {"role": "developer", "content": config.developer_instructions},
+        {"role": "developer", "content": f"- waapi-skill: target (file: {skill / 'SKILL.md'})"},
+    ]
+    calls = []
+
+    def fake_process(command, *, cwd, env, timeout):
+        calls.append(command)
+        disabled = [command[index + 1] for index, value in enumerate(command) if value == "--disable"]
+        assert disabled == ["memories", "apps"]
+        assert command[-3:] == ["debug", "prompt-input", "Inspect it."]
+        return codex_harness_module.ProcessResult(0, json.dumps(payload), "", 0.1)
+
+    monkeypatch.setattr(codex_harness_module, "run_process", fake_process)
+    audit = CodexCliHarness(config).audit_prompt("Inspect it.", env={"CODEX_HOME": str(tmp_path / "state")})
+    assert len(calls) == 1
+    assert audit.passed is True
+    assert audit.target_skill_count == 1
+    assert audit.developer_instructions_exact is True
+
+
+@pytest.mark.parametrize("status", ["failed", "completed"])
+def test_session_audit_still_rejects_connected_app_calls_even_when_turn_completes(status: str) -> None:
+    item = {"id": "app-call", "type": "mcp_tool_call", "server": "codex_apps",
+            "tool": "remote_desktop_commander.start_process", "status": status}
+    events = [
+        {"type": "thread.started", "thread_id": "exact-thread"},
+        {"type": "turn.started"},
+        {"type": "item.completed", "item": item},
+        {"type": "turn.completed", "usage": {}},
+    ]
+    audit = audit_session_events(events)
+    assert audit.turn_completed_count == 1
+    assert audit.incomplete_command_count == 0
+    assert audit.unexpected_item_types == ("mcp_tool_call",)
+    assert audit.passed is False
+
+
 def test_native_windows_commands_disable_each_ambient_user_skill_by_exact_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

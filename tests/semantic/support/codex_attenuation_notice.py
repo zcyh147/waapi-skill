@@ -251,7 +251,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     for claim in ancillary_claims(text, role_context):
         if claim.role == "invalid":
             return False
-        if claim.role in {"authorization", "preview-status"}:
+        if claim.role in {"authorization", "preview-status", "curve-range"}:
             if claim.value.strip() and re.fullmatch(rf"\s*(?:在|向|对)\s*(?:{owner})\s*(?:上|下)?\s*", claim.value) is None:
                 return False
             authorization_spans.append((claim.start, claim.end))

@@ -90,9 +90,9 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
 
 def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
     """A complete coordinated read-state summary, with no owner/edit payload."""
-    if re.fullmatch(r"\s*并(?:为当前配置)?(?:记录|保存|建立)(?:了)?(?:当前|执行前|修改前)?(?:的)?(?:状态|(?:核验)?基线)(?:快照)?\s*", text):
+    if re.fullmatch(r"\s*并(?:为当前配置)?(?:记录|保存|建立)(?:了)?(?:当前|执行前|修改前|变更前|改动前)?(?:的)?(?:状态|(?:核验)?基线)(?:快照)?\s*", text):
         return "read-summary"
-    if re.fullmatch(r"\s*(?:当前|执行前|修改前)(?:的)?(?:状态|基线)(?:快照)?已(?:记录|保存|建立)\s*", text):
+    if re.fullmatch(r"\s*(?:当前|执行前|修改前|变更前|改动前)(?:的)?(?:状态|基线)(?:快照)?已(?:记录|保存|建立)\s*", text):
         return "read-summary"
     effects = re.fullmatch(r"\s*并(?:记录|保存|建立)(?:了)?原有([0-9零一二两三四五六七八九十]+)(?:个)?效果器的(?:状态|基线)(?:快照)?\s*", text)
     if effects:
@@ -177,6 +177,9 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if status.role == "preview-status":
             result.append(status._replace(text=clause.text))
             continue
+        if context.quantity_terms and re.fullmatch(r"\s*提交的(?:修改|变更|改动)范围(?:仅|只)(?:包含|涉及)(?:这一|该|此)条曲线\s*", local):
+            result.append(clause._replace(role="curve-range"))
+            continue
         baseline = baseline_read_role(local, context)
         if baseline in {"read-summary", "invalid"}:
             result.append(clause._replace(role=baseline, diagnostic="conflicting-baseline" if baseline == "invalid" else ""))
@@ -215,7 +218,7 @@ def verification_basis_claim(clause: NoticeClaim) -> NoticeClaim:
     supplies the prospective edit or permission.
     """
     match = re.match(r"\s*(?:执行后|随后)?(?:会|将)?(?:对照|依据)"
-                     r"(?:修改前|执行前)(?:状态|基线)(?:核验|检查|验证|验收)", clause.text)
+                     r"(?:修改前|变更前|改动前|执行前)(?:状态|基线)(?:核验|检查|验证|验收)", clause.text)
     return clause._replace(role="verification-basis", end=clause.start + match.end()) if match else clause
 
 
@@ -449,7 +452,7 @@ def effect_descriptor_value_claim(clause: NoticeClaim, *, name: str, notes: str)
         return clause  # Its complete predicate still goes through polarity checks.
     if re.match(rf"\s*(?:{_FUTURE})?以", clause.text) and re.search(r"核验|验证|验收|检查", clause.text):
         return clause  # A verification basis is not a copular descriptor field.
-    match = re.fullmatch(r"\s*([a-z_][a-z0-9_-]*|[\u4e00-\u9fff]{1,16})\s*(?:为|是|=)\s*(.+?)\s*", clause.text)
+    match = re.fullmatch(r"\s*(?:(?:并|且|同时|另外)\s*)?([a-z_][a-z0-9_-]*|[\u4e00-\u9fff]{1,16})\s*(?:为|是|=)\s*(.+?)\s*", clause.text)
     if match is None:
         return clause
     field, value = match.groups()

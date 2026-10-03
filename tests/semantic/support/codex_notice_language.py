@@ -15,10 +15,10 @@ def role_terms(live_type: str) -> tuple[str, ...]:
 
 
 _CHANGE = r"(?:修改|变更|改动)"
-_REFERENT = r"(?:该|此|本次|此次|这次|(?:这|此)(?:一)?项)(?:已授权)?|这个已授权的"
+_REFERENT = r"(?:该|此|本次|此次|这次|(?:这|此)(?:一)?(?:项|份))(?:已授权)?|这个已授权的"
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
-_PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
+_PROVIDER = r"(?:已)?(?:按|依据)(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
 _GRANT = r"(?:已)?(?:取得|获得)"
 _AUTHORIZATION = r"(?:的)?(?:独立)?(?:持久)?(?:策略)?授权(?:记录)?"
 
@@ -64,16 +64,17 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     """
     change = rf"(?:{_REFERENT})(?:具体)?(?:独立)?{_CHANGE}"
     active = rf"(?:{_PROVIDER})?{_GRANT}{change}{_AUTHORIZATION}"
-    policy_attribute = r"(?:allow_changes|\*\*allow_changes\*\*)\s*策略"
+    policy_attribute = r"(?:当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略"
     passive = rf"{change}(?:{_PROVIDER})?{_GRANT}\s*(?:{policy_attribute})?{_AUTHORIZATION}"
     bare_grant = rf"(?:{_PROVIDER})?{_GRANT}(?:{_REFERENT}){_AUTHORIZATION}"
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
     record = r"(?:预览(?:之后|后)|本次)(?:已)?记录(?:了)?(?:独立)?(?:的)?\s*(?P<record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权(?:记录)?"
     inspection = r"(?:已)?确认(?:保存的)?授权记录包含独立于(?:修改|变更|改动)预览的\s*(?P<inspection_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权"
     preview = r"(?:(?:本次|当前|该|此)?(?:修改|变更|改动)?预览)?"
-    attributed_grant = rf"{preview}{_GRANT}\s*(?P<grant_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略{_AUTHORIZATION}"
-    provider_record = rf"(?:当前)?\s*(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:策略)?(?:已)?(?:为(?:{_REFERENT})(?:具体)?{_CHANGE}(?:记录|保存|授予)(?:了)?(?:独立)?(?:执行|策略)?授权|授予(?:{_REFERENT}){_CHANGE}(?:的)?(?:独立)?(?:执行)?授权)"
-    beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
+    attributed_grant = rf"{preview}{_GRANT}\s*(?:当前)?\s*(?P<grant_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略{_AUTHORIZATION}"
+    provider_record = rf"(?:当前)?\s*(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:策略)?(?:已)?(?:为(?:{_REFERENT})(?:具体)?{_CHANGE}(?:记录|保存|授予|提供)(?:了)?(?:独立)?(?:执行|策略)?授权|授予(?:{_REFERENT}){_CHANGE}(?:的)?(?:独立)?(?:执行)?授权)"
+    coordinator = r"(?:并(?:且)?|且|同时|另外)"
+    beginning = rf"\s*(?:{coordinator})?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
     match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record}|{attributed_grant})(?=[，,。；;]|\s*$)", clause)
     if match:
         if match.group('grant_policy') is not None and match.group('grant_policy') not in {'allow_changes', '**allow_changes**'}:
@@ -98,9 +99,9 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
         return AuthorizationClaim("ancillary", match.start(), consumed_end, match.group("owner") or "")
     # Restrict failure classification to an authorization claim about this
     # change. Existing operation descriptions continue through their parser.
-    body = re.sub(r"^\s*(?:并(?:且)?)?\s*", "", clause)
+    body = re.sub(rf"^\s*(?:{coordinator})?\s*", "", clause)
     relevant = re.search(change, body) is not None and "授权" in body
-    recognized = re.match(rf"(?:(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*)?(?:{change}|(?:已)?(?:按|取得|获得|为))|在|向|对", body)
+    recognized = re.match(rf"(?:(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*)?(?:{change}|(?:已)?(?:按|依据|取得|获得|为))|在|向|对|(?:当前)?\s*[a-z_]+\s*策略", body)
     if relevant and recognized:
         return AuthorizationClaim("invalid", 0, len(clause), "")
     return AuthorizationClaim("unrelated", 0, 0, "")

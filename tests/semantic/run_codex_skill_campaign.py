@@ -2084,6 +2084,7 @@ def build_effective_config(
             "service_tier": options.service_tier,
             "timeout_seconds": options.timeout_seconds,
             "memory": "disabled",
+            "apps": "disabled",
             "fresh_session_per_phase": True,
         },
         "auth": {
@@ -2340,6 +2341,7 @@ def build_heavy_v3_effective_config(
             "service_tier": options.service_tier,
             "timeout_seconds": options.timeout_seconds,
             "memory": "disabled",
+            "apps": "disabled",
             "fresh_process_thread_and_task_per_scenario": True,
             **(
                 {"approval_policy": "never"}

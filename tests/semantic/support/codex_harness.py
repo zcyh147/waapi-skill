@@ -2938,6 +2938,8 @@ def build_prompt_audit_command(config: CodexHarnessConfig, *, prompt: str) -> li
         str(config.codex_binary),
         "--disable",
         "memories",
+        "--disable",
+        "apps",
     ]
     command.extend(_disabled_user_skill_config_argv(config.disabled_user_skill_paths))
     command.extend(_developer_instructions_config_argv(config.developer_instructions))
@@ -3031,6 +3033,8 @@ def _build_exec_prefix(
             f"sandbox_workspace_write.network_access={'true' if config.network_access else 'false'}",
             "--disable",
             "memories",
+            "--disable",
+            "apps",
             "--ignore-user-config",
             "--json",
             "--sandbox",

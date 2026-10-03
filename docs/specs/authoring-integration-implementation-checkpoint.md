@@ -42,6 +42,38 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed Apps isolation and contextual notice repair — 2026-10-03:** #156
+  explicitly disables Apps in prompt audit and the shared initial, ephemeral
+  and resume execution prefix; both effective-config builders seal
+  `codex.apps=disabled`. The unexpected-MCP audit remains strict. Eight command
+  variants and two configuration assertions reproduced the missing override;
+  the final focused gate passed **714 / skipped 9** in **14.28 seconds**.
+  A read-only check of pinned CLI 0.159.2 confirms the supported Apps override
+  is false. Its debug prompt audit does not expose a complete tool inventory,
+  so this is not an enumeration-based tool-absence proof. No additional model
+  turn, load-skill case, daemon or second harness was added.
+  The #147 repair composes shared current-change/provider phrases, before-state
+  synonyms and sole-change scope descriptions. Its MusicStinger conjunction
+  needs a unique attested source, independently observed old Trigger agreeing
+  with prepared state, exact new Trigger and prospective sole-reference scope;
+  a display label never establishes native identity. Four actual notice
+  witnesses reproduced failures before repair. Those initial outputs are
+  retained as conversation tool records, not reconstructed native RED logs.
+  Counterexamples and retained tests caught negated/contradictory role claims
+  and an existing preservation-expression regression; all were fixed before
+  final review. The review then found an adjacent type/property continuation
+  hidden after a valid parenthesis: native logs preserve **4 FAIL / 3 PASS**
+  before its fix. Final notice validation passed **2459 tests in 4.22 seconds**,
+  with both review axes clear. An extra repeated-identical-name phrasing probe
+  remains a documented pre-existing unsupported expression outside this repair;
+  its failed log is preserved, and no claim of exhaustive prose acceptance is
+  made. Root combined validation passed **3584 / skipped 9** in **46.29 seconds**,
+  exit zero. Packaged Skill and Program inputs remain unchanged; the completed
+  eba698d Program result is component evidence only. Complete Non-live, the
+  six failed-unit rerun and final full acceptance remain pending. Archive repair
+  #155 is closed with its separate program proof and completed batch-isolation
+  evidence, without claiming a fresh occurrence of its rejected-check branch.
+
 - **Frozen complete db2299c campaign — 2026-10-03:** complete Non-live passed
   **15269 / skipped 119 / deselected 27**, exit zero in **871.83 seconds**.
   Candidate `db2299c7ceab6814247a68132098f023f3ae1d8b` then attempted all
