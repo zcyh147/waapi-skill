@@ -42,6 +42,27 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen 595cc85 C09 rerun — 2026-10-03:** complete Non-live passed
+  **15432 / skipped 119 / deselected 27**, exit zero in **919.06 seconds**.
+  The sole EXP25-C09 Fresh unit then completed its business goal and all six
+  independent assertions with Gateway verification, but retained one
+  `visible_preview_notice` FAIL. Independent assessment found a timely,
+  substantive notice with no missing required effect. Static diagnosis isolates
+  two existing-role gaps: an equivalent target-confirmation copula before the
+  definite primary Sound role, and a preflight-subject before-state noun.
+  Matched descriptor introduction, prospective creation, exact name/notes,
+  authorization, exclusions and verification intent are already supported.
+  Root and independent audits agree on **177 artifacts / 6767707 bytes** and
+  eleven metadata seals. The source full hash/mtime and oracle closure pass;
+  the failed copy stays quarantined, reconciliation children were reaped, and
+  no scoped process remains. One Preview/Execute/Verify sequence completed;
+  the Agent turn disables Apps and memories with no observed MCP call. Agent
+  time was **120.08 seconds**. The one-shot launcher exited 1 and was unloaded.
+  Report: `../research/integration-expansion-c09-595cc85-sol-high-2026-10-03.json`.
+  Preserve the automatic FAIL without replay or regrading. Close the two
+  shared-role gaps with independent component controls before another Fresh
+  C09 attempt; final full acceptance remains pending.
+
 - **Reviewed Preview bookkeeping and owned append placement — 2026-10-03:**
   the exact e49354a EXP25-C09 witness reproduced one notice failure before
   implementation. An independent 13-vector matrix, frozen before the patch,
