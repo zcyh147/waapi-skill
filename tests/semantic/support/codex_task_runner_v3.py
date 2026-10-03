@@ -352,6 +352,8 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
         old_reference = observed.get("@Trigger")
         field_before = state.get("field_before", {})
         if (not isinstance(old_reference, Mapping) or not isinstance(field_before, Mapping)
+                or not isinstance(old_reference.get("id"), str)
+                or re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", old_reference["id"]) is None
                 or field_before.get("field") != "Trigger" or not isinstance(field_before.get("value"), Mapping)
                 or any(field_before["value"].get(key) != old_reference.get(key) for key in ("id", "name"))):
             old_reference = None  # A display path never proves the old target.
@@ -360,7 +362,14 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
                            ("改动", "更新", "修改", "改为", "设为", "指向", "update", "change", "retarget")],
                 "ids": (source["id"], target["id"]), "protected": ("segment", "音乐段", "容器", "container"),
                 "action": r"改动|更新|修改|改为|设为|指向|update|change|retarget", "kind": "reference", "source_type": "(?:music)?stinger", "source_id": source["id"],
-                "source_names": (source["name"], source["path"]), "old_reference": old_reference}
+                "source_names": (source["name"], source["path"]), "old_reference": old_reference,
+                "parent": owner,
+                "segment": observed.get("@Segment") if isinstance(before.get("segment"), Mapping)
+                    and before["segment"].get("type") == "MusicSegment"
+                    and isinstance(before["segment"].get("id"), str)
+                    and re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", before["segment"]["id"]) is not None
+                    and isinstance(observed.get("@Segment"), Mapping)
+                    and all(observed["@Segment"].get(key) == before["segment"].get(key) for key in ("id", "name")) else None}
     return None
 
 
@@ -426,9 +435,9 @@ _NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|写入|改动|更新|�
                      r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
 
 
-def _notice_mutation_is_noun(action: str, prefix: str, suffix: str) -> bool:
+def _notice_mutation_is_noun(action: str, prefix: str, suffix: str, *, reference_change: bool = False) -> bool:
     """Only complete request/authorization and execute-summary noun roles."""
-    if planned_change_noun(action, prefix, suffix) is not None:
+    if planned_change_noun(action, prefix, suffix, reference_change=reference_change) is not None:
         return True
     if action not in {"修改", "变更", "改动"}:
         return False
@@ -537,15 +546,30 @@ def _reference_scope_evidence(text: str, context: Mapping[str, Any]) -> tuple[tu
     claims = []
     seen = set()
     old = context.get("old_reference")
+    role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
+        "path": context["source_names"][-1], "type": "MusicStinger"}, reference_change=True, parent=context.get("parent"))
+    assignment_seen = False
     for clause in notice_clauses(text):
         prefix = r"\s*(?:(?:并|且|同时|另外)\s*)?"
         source = re.fullmatch(prefix + r"(?:预览已生成[:：])?目标对象确认为\s*(.+?)\s*", clause.text)
         current = re.fullmatch(prefix + r"当前显示为\s*(.+?)\s*", clause.text)
         target = re.fullmatch(prefix + r"新的引用目标已核对为\s*(.+?)\s*", clause.text)
         scope = re.fullmatch(prefix + r"预览(?:只|仅)包含(?:这|此)(?:一)?项(?:trigger|触发器)引用(?:修改|变更|改动)\s*", clause.text)
+        assignment = re.fullmatch(prefix + r"(?:预览已完成[:：])?(?:只|仅)(?:将|把)(.+?)的(?:trigger|触发器)(?:引用)?从\s*(.+?)\s*改为\s*(.+?)\s*", clause.text)
+        segment = re.fullmatch(prefix + r"关联音乐段保持为\s*(.+?)\s*", clause.text)
         role = None
         valid = False
-        if source:
+        if assignment:
+            role = "prospective-reference"
+            valid = (primary_role_atom(assignment.group(1), role_context) and isinstance(old, Mapping)
+                     and assignment.group(2).strip() in {str(old.get(key, "")).casefold() for key in ("id", "name") if old.get(key)}
+                     and assignment.group(3).strip() in {value.casefold() for value in context["groups"][1] if value})
+            assignment_seen = assignment_seen or valid
+        elif segment:
+            role = "preserved-segment"
+            value = context.get("segment")
+            valid = isinstance(value, Mapping) and segment.group(1) in {str(value.get(key, "")).casefold() for key in ("id", "name")}
+        elif source:
             role = "reference-source"
             valid = source.group(1) in role_terms("MusicStinger")
         elif current:
@@ -567,7 +591,7 @@ def _reference_scope_evidence(text: str, context: Mapping[str, Any]) -> tuple[tu
             claims.append(clause._replace(role=role if valid else "invalid", diagnostic="" if valid else "contradictory-reference-role"))
             if valid:
                 seen.add(role)
-    return tuple(claims), seen == {"reference-source", "current-reference", "reference-target", "prospective-reference"}
+    return tuple(claims), assignment_seen or {"reference-source", "current-reference", "reference-target", "prospective-reference"}.issubset(seen)
 
 
 def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: PlannedEffectReferent | None = None,
@@ -583,13 +607,14 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         return False
     role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
         "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
-        protected_effect_count=context.get("protected_effect_count"))
+        protected_effect_count=context.get("protected_effect_count"), reference_change=context["kind"] == "reference",
+        parent=context.get("parent"))
     inherited = owner_inheritance(text, role_context)
     if inherited is None:
         return False
     owner_terms = (context["source_id"].casefold(), *(name.casefold() for name in context["source_names"]),
         *(prefix + term for prefix in ("该", "此", "目标", "指定") for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")), "该对象", "此对象", "目标对象", "指定对象")
-    if not prospective_intent(text, require_affirmative=False, owners=owner_terms, operation_actions=context["action"]):
+    if not prospective_intent(text, require_affirmative=False, owners=owner_terms, operation_actions=context["action"], reference_change=context["kind"] == "reference"):
         return False
     normalized = normalize_attested_preview_target(text, {"id": context["source_id"],
         "name": context["source_names"][0], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
@@ -605,8 +630,11 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         sentences[2] = re.sub(r"^\s*预览将(?=新增|添加|插入|创建|追加)",
             "预览将在 " + context["source_id"].casefold() + " 上", sentences[2], count=1)
         text = "".join(sentences)
-    ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
-    if any(value not in {value.casefold() for value in context["ids"]} for value in ids):
+    ids = tuple(re.finditer(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text))
+    if any(match.group() not in {value.casefold() for value in context["ids"]}
+           and not any(claim.role in {"prospective-reference", "preserved-segment"}
+                       and claim.start <= match.start() and match.end() <= claim.end
+                       for claim in reference_claims) for match in ids):
         return False
     for abbreviation in re.finditer(r"\{([^{}]*\.\.\.)\}", text):
         prefix = abbreviation.group(1)[:-3]
@@ -646,9 +674,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         for claim in ancillary:
             if claim.role in {"authorization", "preview-status"} and not _bound_explicit_owners_agree(claim.value.strip().rstrip("，,").strip(), "", context):
                 return False
-        preview_status = preview_status_claim(local_claims[0]) if local_claims else None
+        preview_status = preview_status_claim(local_claims[0], reference_change=context["kind"] == "reference") if local_claims else None
         authorization = authorization_claim(local_claims[0].text if preview_status is not None
-            and preview_status.role == "preview-status" else clause)
+            and preview_status.role == "preview-status" else clause, reference_change=context["kind"] == "reference")
         if authorization.state == "invalid":
             return False
         if authorization.state == "ancillary":
@@ -684,7 +712,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             # composition. Broader owner proof is retained above; unknown
             # coordinated text is left for ordinary action validation.
             for local_claim in local_claims[1:]:
-                record = authorization_claim(local_claim.text)
+                record = authorization_claim(local_claim.text, reference_change=context["kind"] == "reference")
                 if record.state == "invalid":
                     return False
                 if record.state == "ancillary":
@@ -705,7 +733,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             return False
         operation_intro = (preview_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
-        placement = (append_placement_claim(local_claims[0], context["action"], after_existing=context["append_after_existing"])
+        placement = (append_placement_claim(local_claims[0], context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"))
             if local_claims and context["kind"] == "plugin" else None)
         if placement is not None and placement.role == "invalid":
             return False
@@ -720,7 +748,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if any(claim.role in {"owner-attestation", "authorization", "preview-status", "read-summary"}
                        and claim.start <= local.start and local.end <= claim.end for claim in ancillary):
                     continue
-                descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"])
+                descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"))
                 if descriptor_placement.role == "invalid":
                     return False
                 if descriptor_placement.role == "placement-modifier":
@@ -730,6 +758,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                     return False
         execution_summary = (execution_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
+        execution_summaries = tuple(execution_operation_claim(local, context["action"])
+            for local in local_claims) if context["kind"] == "plugin" else ()
         if staged is not None:
             for local in local_claims:
                 adopted = staged_operation_adoption(local, context["action"], staged)
@@ -795,12 +825,17 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if not affirmative:
                     return False
                 continue  # The already proven operation is the summary referent.
+            if any(summary.role == "execution-summary" and summary.start <= action.start() < summary.end
+                   for summary in execution_summaries):
+                if not affirmative:
+                    return False
+                continue
             local_effect = next((local for local in local_claims if local.start <= action.start() < local.end), None)
             # One descriptor may state its name/target in a following comma
             # component. Preserve that existing projection; only exclusion
             # polarity and protected-field checks use the local edit span.
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
-            noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
+            noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip(), reference_change=context["kind"] == "reference")
             if noun_provider is not None and noun_provider.role in {"invalid-provider", "curve-range"}:
                 return False
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
@@ -832,7 +867,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             # change. They cannot certify the expected effect by themselves.
             prefix = clause[:action.start()]
             suffix = clause[action.end():].strip()
-            noun = (_notice_mutation_is_noun(action.group(), prefix, suffix)
+            noun = (_notice_mutation_is_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference")
                 or (context["kind"] == "plugin" and action.group() == "新增" and re.search(r"预览的$", prefix) and re.match(r"项是", suffix))
                 or (context["kind"] == "plugin" and _plugin_description_is_noun(action.group(), prefix, suffix))
                 or (action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", suffix)
@@ -841,7 +876,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 or re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix)
                 or (context["kind"] == "reference" and re.search(r"执行.*引用$", prefix) and action.group() == "更新"))
             note_write = False
-            noun_frame = planned_change_noun(action.group(), prefix, suffix) if noun else None
+            noun_frame = planned_change_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference") if noun else None
             owner_prefix = noun_frame.owner_prefix if noun_frame else _noun_owner_prefix(prefix) if noun else prefix
             if (operation_intro is not None and operation_intro.role == "prospective-operation"
                     and operation_intro.end == action.start()):

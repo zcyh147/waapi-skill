@@ -9,7 +9,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, notice_count, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, notice_count, preview_noun_pattern, prospective_intent, role_terms
 
 FINITE_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
 
@@ -19,6 +19,8 @@ class NoticeRoleContext(NamedTuple):
     quantity_terms: tuple[str, ...] = ()
     before_curve: Mapping[str, Any] | None = None
     protected_effect_count: int | None = None
+    reference_change: bool = False
+    parent: Mapping[str, Any] | None = None
 
 
 class NoticeClaim(NamedTuple):
@@ -80,7 +82,21 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
     """Exact identities or a definite generic descriptor of the sealed role."""
     value = value.strip()
     row = context.identity
-    if value in {str(row[key]).casefold() for key in ("id", "name", "path")}:
+    if context.reference_change and row["type"] == "MusicStinger" and context.parent is not None:
+        membership = re.fullmatch(r"(.+?)\s*中(?:的)?\s*(.+)", value)
+        if membership:
+            parent = context.parent
+            members = parent.get("@Stingers")
+            if (all(isinstance(parent.get(key), str) for key in ("id", "name", "type", "path"))
+                    and parent["type"] == "MusicPlaylistContainer"
+                    and re.fullmatch(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", parent["id"].casefold())
+                    and isinstance(members, list)
+                    and sum(isinstance(member, Mapping) and member.get("id") == row["id"] for member in members) == 1
+                    and membership.group(1).strip()
+                    and membership.group(1).strip() in {parent[key].casefold() for key in ("id", "name", "path") if parent[key]}):
+                return primary_role_atom(membership.group(2), context._replace(parent=None))
+            return False
+    if value and value in {str(row[key]).casefold() for key in ("id", "name", "path")}:
         return True
     if re.fullmatch(r"(?:所)?指定\s*guid", value):
         return True  # A definite referent to the adapter's singleton sealed ID.
@@ -88,12 +104,25 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
     return re.fullmatch(rf"(?:目标|该|此|(?:所)?指定)(?:的)?\s*(?:{terms})(?:对象)?", value) is not None
 
 
+def before_state_noun_pattern() -> str:
+    """Temporal and configuration modifiers of one nonwriting snapshot noun."""
+    return r"(?:当前|(?:执行|修改|变更|改动)前)?(?:的)?(?:配置)?(?:状态|(?:核验)?基线)(?:快照)?"
+
+
 def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
     """A complete coordinated read-state summary, with no owner/edit payload."""
-    if re.fullmatch(r"\s*并(?:为当前配置)?(?:记录|保存|建立)(?:了)?(?:当前|执行前|修改前|变更前|改动前)?(?:的)?(?:状态|(?:核验)?基线)(?:快照)?\s*", text):
+    record = r"(?:记录|保存|建立)"
+    if re.fullmatch(rf"\s*并(?:为当前配置)?{record}(?:了)?{before_state_noun_pattern()}\s*", text):
         return "read-summary"
-    if re.fullmatch(r"\s*(?:当前|执行前|修改前|变更前|改动前)(?:的)?(?:状态|基线)(?:快照)?已(?:记录|保存|建立)\s*", text):
+    if re.fullmatch(rf"\s*{before_state_noun_pattern()}已{record}\s*", text):
         return "read-summary"
+    if context is not None and context.reference_change:
+        terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
+        cardinal = r"(?:[0-9]{1,9}|[零一二两三四五六七八九十]{1,3})"
+        if re.fullmatch(rf"\s*(?:并)?已?{record}\s*(?:全部\s*)?{cardinal}\s*(?:个\s*)?(?:{terms})\s*的\s*引用\s*(?:和|及|与)\s*设置\s*基线\s*", text):
+            # The cardinal is descriptive syntax only. This noun does not
+            # certify project-wide read counts, scope, effects or verification.
+            return "read-summary"
     effects = re.fullmatch(r"\s*并(?:记录|保存|建立)(?:了)?原有([0-9零一二两三四五六七八九十]+)(?:个)?效果器的(?:状态|基线)(?:快照)?\s*", text)
     if effects:
         if (context is not None and context.identity["type"] == "Sound" and context.protected_effect_count is not None
@@ -103,6 +132,11 @@ def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> s
     if re.match(r"\s*并(?:记录|保存|建立)", text) and re.search(r"原有.*效果器.*(?:状态|基线)", text):
         return "invalid"  # Unknown count/owner qualifiers retain their meaning.
     return "unclassified"
+
+
+def primary_role_attribute(value: str, context: NoticeRoleContext) -> bool:
+    attribute = re.fullmatch(r"(.+?)(?:的)?(?:身份|配置)", value.strip())
+    return attribute is not None and primary_role_atom(attribute.group(1), context)
 
 
 def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
@@ -136,7 +170,7 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
             return clause._replace(role="invalid", diagnostic="conflicting-protected-baseline")
         if baseline_role == "read-summary":
             value = value[:coordinated.start()].strip()
-    if primary_role_atom(re.sub(r"^目标是\s*", "", value), context):
+    if primary_role_atom(re.sub(r"^目标是\s*", "", value), context) or primary_role_attribute(value, context):
         return clause._replace(role="owner-attestation")
     legacy = attested_primary_target(clause.text[:match.start(1)] + value, context.identity)
     if legacy.state == "attested":
@@ -173,7 +207,7 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if owner.role in {"owner-attestation", "invalid"}:
             result.append(owner._replace(text=clause.text, end=clause.start + colon.start() if colon else clause.end))
             continue
-        status = preview_status_claim(clause._replace(text=local))
+        status = preview_status_claim(clause._replace(text=local), reference_change=context.reference_change)
         if status.role == "preview-status":
             result.append(status._replace(text=clause.text))
             continue
@@ -191,7 +225,7 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if (context.identity["type"] == "Sound" and re.fullmatch(r"\s*(?:接下来)?核对追加位置和现有配置的保护条件\s*", local)):
             result.append(clause._replace(role="read-summary"))
             continue
-        auth = authorization_claim(local)
+        auth = authorization_claim(local, reference_change=context.reference_change)
         if auth.state == "invalid":
             result.append(clause._replace(role="invalid", diagnostic="conflicting-authorization"))
         elif auth.state == "ancillary" and not local[auth.end:].strip():
@@ -217,8 +251,7 @@ def verification_basis_claim(clause: NoticeClaim) -> NoticeClaim:
     predicates that follow it. This intent neither asserts baseline values nor
     supplies the prospective edit or permission.
     """
-    match = re.match(r"\s*(?:执行后|随后)?(?:会|将)?(?:对照|依据)"
-                     r"(?:修改前|变更前|改动前|执行前)(?:状态|基线)(?:核验|检查|验证|验收)", clause.text)
+    match = re.match(rf"\s*(?:执行后|随后)?(?:会|将)?(?:对照|依据){before_state_noun_pattern()}(?:核验|检查|验证|验收)", clause.text)
     return clause._replace(role="verification-basis", end=clause.start + match.end()) if match else clause
 
 
@@ -355,7 +388,7 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
                 return None
             if tail.role in {"authorization", "preview-status"} and not tail.value:
                 continue
-            authorization = authorization_claim(tail.text)
+            authorization = authorization_claim(tail.text, reference_change=context.reference_change)
             baseline = baseline_read_role(tail.text, context)
             if baseline == "invalid":
                 return None
@@ -416,16 +449,17 @@ def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeC
     return clause._replace(role="prospective-operation", end=clause.start + match.end())
 
 
-def append_placement_claim(clause: NoticeClaim, action_pattern: str, *, after_existing: bool) -> NoticeClaim:
+def append_placement_claim(clause: NoticeClaim, action_pattern: str, *, after_existing: bool,
+                           existing_count: int | None = None) -> NoticeClaim:
     """Placement is an operation modifier, never an object-owner assertion."""
-    match = re.match(rf"\s*(?:将|即将)于(?:现有|原有)效果器(之前|之后)\s*(?={action_pattern})", clause.text)
+    match = re.match(rf"\s*(?:将|即将)(?:在|于)(?:现有|原有)(?:(?P<count>[0-9零一二两三四五六七八九十]+)(?:个)?)?效果器(之前|之后)\s*(?={action_pattern})", clause.text)
     if match is None:
         ending = re.fullmatch(r"\s*作为(?:效果链(?:的)?)?(?:新)?(末项|首项|第一项)\s*", clause.text)
         if ending:
             return clause._replace(role="placement-modifier" if ending.group(1) == "末项" and after_existing else "invalid",
                                    diagnostic="conflicting-append-placement" if ending.group(1) != "末项" or not after_existing else "")
         return clause
-    if match.group(1) != "之后" or not after_existing:
+    if match.group(2) != "之后" or not after_existing or (match.group("count") is not None and notice_count(match.group("count")) != existing_count):
         return clause._replace(role="invalid", diagnostic="conflicting-append-placement")
     return clause._replace(role="placement-intro", end=clause.start + match.end())
 
@@ -468,9 +502,9 @@ def effect_descriptor_value_claim(clause: NoticeClaim, *, name: str, notes: str)
     return clause._replace(role="descriptor-value" if valid else "invalid", diagnostic="" if valid else "unapproved-descriptor-field-or-value")
 
 
-def preview_status_claim(clause: NoticeClaim) -> NoticeClaim:
+def preview_status_claim(clause: NoticeClaim, *, reference_change: bool = False) -> NoticeClaim:
     """Preview-generation status is ancillary and retains any explicit owner."""
-    preview = r"(?:可执行|具体|本次|这次|该|此)?(?:修改|变更|改动)?预览"
+    preview = preview_noun_pattern(reference_change=reference_change)
     generated = r"(?:已)?生成"
     owner = r"(?P<owner>(?:在|向|对)\s*[^，,。；;\n]+?(?:上|下)\s*)?"
     match = re.fullmatch(rf"\s*(?:并)?{owner}(?:{preview}{generated}|{generated}{preview})\s*", clause.text)

@@ -42,6 +42,37 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed structural notice components — 2026-10-03:** #147 now shares
+  bounded change/Preview noun components across authorization, execution and
+  refusal; resolves typed owner attributes and before-state nouns; and accepts
+  owned append placement and independently bound parent-qualified Trigger
+  assignments. Every remaining modification claim still receives normal
+  owner/value/policy validation. Descriptive Stinger baseline cardinality grants
+  no project-wide read-count, effect or verification credit.
+  Three exact a7381ac notice witnesses initially failed. An independent matrix
+  frozen before implementation passed its three complete-effect controls, then
+  recorded **22 PASS / 9 FAIL** across 31 nodes: seven valid expressions were
+  rejected and two explicit refusals were accepted. All vectors remain unchanged.
+  Review found two further defects: canonical parent/old-Trigger/Segment GUIDs
+  were rejected by the global identity filter, and matching absent/malformed
+  Segment IDs could certify a preservation claim. Native controls reproduced
+  **5 FAIL / 6 PASS** before repair. GUID admission now requires a fully
+  validated role span; Segment preservation requires a canonical independently
+  bound identity. All eleven controls pass, and both review axes are clear.
+  The retained notice gate passed **2516 tests in 4.24 seconds**; the root
+  combined gate passed **3641 / skipped 9** in **47.04 seconds**, exit zero.
+  Skips require native Windows. Logs and failed iterations remain under
+  `.waapi-skill-state/evidence/waapi-test-remediation/expansion-noun-span-notices-a7381ac-r1`
+  and `expansion-noun-components-root-focused-r1`.
+  Packaged Skill, CI and Program inputs are unchanged from the completed
+  eba698d Program gate; that result remains component evidence, not a new run.
+  A requirements preparation audit mapped 54 child-issue criteria and eight
+  parent obligation groups without identifying an additional authorized
+  implementation deliverable. Complete Non-live, four failed-unit reruns,
+  final same-candidate 13-positive-plus-boundary acceptance and identical
+  successful-root verify-only remain outstanding. No historical verdict was
+  rewritten and no telemetry, prompt, suite or public Gateway change was made.
+
 - **Frozen a7381ac failed-six rerun — 2026-10-03:** complete Non-live passed
   **15359 / skipped 119 / deselected 27**, exit zero in **870.97 seconds**.
   Candidate `a7381ac3c7746b306350a11b53ffff98b7c1a161` then completed the six
