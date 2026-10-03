@@ -116,6 +116,9 @@ def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> s
         return "read-summary"
     if re.fullmatch(rf"\s*{before_state_noun_pattern()}已{record}\s*", text):
         return "read-summary"
+    if context is not None and re.fullmatch(
+            rf"\s*{preview_noun_pattern(reference_change=context.reference_change)}已{record}{before_state_noun_pattern()}\s*", text):
+        return "read-summary"  # Preview-local bookkeeping cannot prove an edit.
     if context is not None and context.reference_change:
         terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
         cardinal = r"(?:[0-9]{1,9}|[零一二两三四五六七八九十]{1,3})"
@@ -450,16 +453,19 @@ def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeC
 
 
 def append_placement_claim(clause: NoticeClaim, action_pattern: str, *, after_existing: bool,
-                           existing_count: int | None = None) -> NoticeClaim:
+                           existing_count: int | None = None, context: NoticeRoleContext | None = None) -> NoticeClaim:
     """Placement is an operation modifier, never an object-owner assertion."""
-    match = re.match(rf"\s*(?:将|即将)(?:在|于)(?:现有|原有)(?:(?P<count>[0-9零一二两三四五六七八九十]+)(?:个)?)?效果器(之前|之后)\s*(?={action_pattern})", clause.text)
+    match = re.match(rf"\s*(?:将|即将)(?:在|于)(?:(?P<owner>[^，,。；;]+?)的)?(?:现有|原有)(?:(?P<count>[0-9零一二两三四五六七八九十]+)(?:个)?)?效果器(?P<position>之前|之后|前|后)\s*(?={action_pattern})", clause.text)
     if match is None:
         ending = re.fullmatch(r"\s*作为(?:效果链(?:的)?)?(?:新)?(末项|首项|第一项)\s*", clause.text)
         if ending:
             return clause._replace(role="placement-modifier" if ending.group(1) == "末项" and after_existing else "invalid",
                                    diagnostic="conflicting-append-placement" if ending.group(1) != "末项" or not after_existing else "")
         return clause
-    if match.group(2) != "之后" or not after_existing or (match.group("count") is not None and notice_count(match.group("count")) != existing_count):
+    if (match.group("position") not in {"之后", "后"} or not after_existing
+            or (match.group("owner") is not None and (context is None or context.identity["type"] != "Sound"
+                or not primary_role_atom(match.group("owner"), context)))
+            or (match.group("count") is not None and notice_count(match.group("count")) != existing_count)):
         return clause._replace(role="invalid", diagnostic="conflicting-append-placement")
     return clause._replace(role="placement-intro", end=clause.start + match.end())
 

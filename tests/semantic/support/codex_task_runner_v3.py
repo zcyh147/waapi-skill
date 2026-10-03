@@ -733,7 +733,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             return False
         operation_intro = (preview_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
-        placement = (append_placement_claim(local_claims[0], context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"))
+        placement = (append_placement_claim(local_claims[0], context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"), context=role_context)
             if local_claims and context["kind"] == "plugin" else None)
         if placement is not None and placement.role == "invalid":
             return False
@@ -748,7 +748,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if any(claim.role in {"owner-attestation", "authorization", "preview-status", "read-summary"}
                        and claim.start <= local.start and local.end <= claim.end for claim in ancillary):
                     continue
-                descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"))
+                descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"), context=role_context)
                 if descriptor_placement.role == "invalid":
                     return False
                 if descriptor_placement.role == "placement-modifier":

@@ -42,6 +42,29 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed Preview bookkeeping and owned append placement — 2026-10-03:**
+  the exact e49354a EXP25-C09 witness reproduced one notice failure before
+  implementation. An independent 13-vector matrix, frozen before the patch,
+  passed its complete primary-effect control and recorded **11 PASS / 2 FAIL**:
+  both valid component compositions were rejected; ten contradictory claims
+  were rejected. The repair recognizes a complete Preview-subject before-state
+  bookkeeping noun and validates an explicit Effect-chain possessor against the
+  independently attested Sound before accepting after-placement. Neither noun
+  supplies effect or policy authority, and remaining action spans stay visible.
+  The first implementation run exposed a denied attributed grant after the
+  baseline became readable (**15 PASS / 1 FAIL**); the same full grant grammar
+  now rejects denied or uncertain authorization. All 16 new controls pass.
+  The retained gate passed **2532 tests in 4.37 seconds**; the combined gate
+  passed **3657 / skipped 9** in **46.29 seconds**, exit zero. Both independent
+  review axes are clear. The older 31-vector and new 13-vector files remain
+  byte-identical to their frozen versions. Evidence is retained under
+  `expansion-preview-baseline-placement-e49354a-r1`,
+  `expansion-preview-components-review-e49354a-r1` and
+  `expansion-preview-components-root-focused-r1` in the ignored remediation
+  evidence tree. Complete Non-live and a new EXP25-C09 attempt must precede
+  final full acceptance. No Skill, prompt, suite, oracle or historic verdict
+  changed.
+
 - **Frozen e49354a failed-four rerun — 2026-10-03:** complete Non-live passed
   **15416 / skipped 119 / deselected 27**, exit zero in **870.92 seconds**.
   Candidate `e49354a8899e38db7ac25c3f68327750ca9a32b1` then completed all

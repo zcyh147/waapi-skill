@@ -122,6 +122,9 @@ def authorization_claim(clause: str, *, reference_change: bool = False) -> Autho
     # Restrict failure classification to an authorization claim about this
     # change. Existing operation descriptions continue through their parser.
     body = re.sub(rf"^\s*(?:{coordinator})?\s*", "", clause)
+    denied_grant = re.fullmatch(r"(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*(.+)", body)
+    if denied_grant and re.fullmatch(attributed_grant, denied_grant.group(1)):
+        return AuthorizationClaim("invalid", 0, len(clause), "")
     relevant = re.search(change, body) is not None and "授权" in body
     recognized = re.match(rf"(?:(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*)?(?:{change}|(?:已)?(?:按|依据|取得|获得|为))|在|向|对|(?:当前)?\s*[a-z_]+\s*策略", body)
     if relevant and recognized:
