@@ -92,6 +92,8 @@ def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> s
     """A complete coordinated read-state summary, with no owner/edit payload."""
     if re.fullmatch(r"\s*并(?:为当前配置)?(?:记录|保存|建立)(?:了)?(?:当前|执行前|修改前)?(?:的)?(?:状态|(?:核验)?基线)(?:快照)?\s*", text):
         return "read-summary"
+    if re.fullmatch(r"\s*(?:当前|执行前|修改前)(?:的)?(?:状态|基线)(?:快照)?已(?:记录|保存|建立)\s*", text):
+        return "read-summary"
     effects = re.fullmatch(r"\s*并(?:记录|保存|建立)(?:了)?原有([0-9零一二两三四五六七八九十]+)(?:个)?效果器的(?:状态|基线)(?:快照)?\s*", text)
     if effects:
         if (context is not None and context.identity["type"] == "Sound" and context.protected_effect_count is not None
@@ -119,7 +121,7 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
                                else "invalid", diagnostic="conflicting-owner-attestation")
     match = re.fullmatch(r"\s*(?:已)?(?:核对|核实|确认)(.+?)\s*", clause.text)
     if match is None:
-        reverse = re.fullmatch(r"\s*(.+?)\s*已(?:核对|核实|确认|匹配)\s*", clause.text)
+        reverse = re.fullmatch(r"\s*(.+?)\s*已(?:核对|核实|确认|匹配|绑定)\s*", clause.text)
         if reverse and (reverse.group(1).startswith("目标") or primary_role_atom(reverse.group(1), context)):
             return clause._replace(role="owner-attestation" if primary_role_atom(reverse.group(1), context)
                                    else "invalid", diagnostic="conflicting-owner-attestation")
@@ -175,6 +177,10 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if status.role == "preview-status":
             result.append(status._replace(text=clause.text))
             continue
+        baseline = baseline_read_role(local, context)
+        if baseline in {"read-summary", "invalid"}:
+            result.append(clause._replace(role=baseline, diagnostic="conflicting-baseline" if baseline == "invalid" else ""))
+            continue
         if (context.identity["type"] == "Sound" and re.fullmatch(r"\s*(?:接下来)?核对追加位置和现有配置的保护条件\s*", local)):
             result.append(clause._replace(role="read-summary"))
             continue
@@ -185,7 +191,15 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
             result.append(clause._replace(role="authorization", start=clause.start + auth.start,
                                          end=clause.start + auth.end, value=auth.owner_prefix))
         else:
-            result.append(clause)
+            policy = re.fullmatch(r"\s*(?:当前|本次|此次|这次)(?:修改)?策略(?:为|是)\s*(.+?)\s*", local)
+            if policy:
+                # These ancillary mutation-notice contexts already require
+                # allow_changes for a policy grant. A standalone current-mode
+                # contradiction cannot evade it by omitting an edit verb.
+                result.append(clause._replace(role="authorization" if policy.group(1) == "allow_changes" else "invalid",
+                                              diagnostic="conflicting-current-policy"))
+            else:
+                result.append(clause)
     return tuple(result)
 
 
@@ -204,9 +218,11 @@ def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> Noti
 def matched_display_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """An opaque display token is lexical context, never native class evidence."""
     match = re.fullmatch(r"\s*(?:并匹配到|已从实时插件目录确认)\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*", clause.text)
+    reverse = re.fullmatch(r"\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*类型已从实时(?:插件)?目录确认\s*", clause.text)
+    match = match or reverse
     if match and context.identity["type"] == "Sound" and effect_kind_label(match.group(1)):
         return clause._replace(role="matched-display", value=" ".join(match.group(1).split()))
-    if re.match(r"\s*(?:并匹配到|已从实时插件目录确认)", clause.text):
+    if re.match(r"\s*(?:并匹配到|已从实时插件目录确认)", clause.text) or re.search(r"类型已从实时(?:插件)?目录确认", clause.text):
         return clause._replace(role="invalid", diagnostic="unclosed-matched-display")
     return clause
 
@@ -381,6 +397,58 @@ def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeC
     return clause._replace(role="prospective-operation", end=clause.start + match.end())
 
 
+def append_placement_claim(clause: NoticeClaim, action_pattern: str, *, after_existing: bool) -> NoticeClaim:
+    """Placement is an operation modifier, never an object-owner assertion."""
+    match = re.match(rf"\s*(?:将|即将)于(?:现有|原有)效果器(之前|之后)\s*(?={action_pattern})", clause.text)
+    if match is None:
+        ending = re.fullmatch(r"\s*作为(?:效果链(?:的)?)?(?:新)?(末项|首项|第一项)\s*", clause.text)
+        if ending:
+            return clause._replace(role="placement-modifier" if ending.group(1) == "末项" and after_existing else "invalid",
+                                   diagnostic="conflicting-append-placement" if ending.group(1) != "末项" or not after_existing else "")
+        return clause
+    if match.group(1) != "之后" or not after_existing:
+        return clause._replace(role="invalid", diagnostic="conflicting-append-placement")
+    return clause._replace(role="placement-intro", end=clause.start + match.end())
+
+
+def exclusion_claim(clause: NoticeClaim) -> NoticeClaim:
+    """A complete negative change-scope statement is preservation, not an edit.
+
+    The finite role nouns describe protected music/configuration scope. Extra
+    names, verbs or mixed affirmative tails remain outside this closed frame.
+    """
+    nouns = r"(?:音乐段|segment|容器|container|其他设置)"
+    match = re.fullmatch(rf"\s*(?:未|没有|不)包含{nouns}(?:(?:、|或|和|及){nouns})*(?:的)?(?:修改|变更|改动)\s*", clause.text)
+    return clause._replace(role="exclusion") if match else clause
+
+
+def effect_descriptor_value_claim(clause: NoticeClaim, *, name: str, notes: str) -> NoticeClaim:
+    """A local copular field/value belongs to the closed Effect descriptor.
+
+    Plain name, kind and notes assertions are validated separately from read,
+    status, authorization and exclusion roles. Unknown fields are not silently
+    added to the prepared create-only descriptor.
+    """
+    if re.match(r"\s*(?:不会|不|未|没有)(?:修改|改动|设置|改变|更新)", clause.text):
+        return clause  # Its complete predicate still goes through polarity checks.
+    if re.match(rf"\s*(?:{_FUTURE})?以", clause.text) and re.search(r"核验|验证|验收|检查", clause.text):
+        return clause  # A verification basis is not a copular descriptor field.
+    match = re.fullmatch(r"\s*([a-z_][a-z0-9_-]*|[\u4e00-\u9fff]{1,16})\s*(?:为|是|=)\s*(.+?)\s*", clause.text)
+    if match is None:
+        return clause
+    field, value = match.groups()
+    quotes = {'“': '”', '"': '"'}
+    if value[0] in quotes:
+        if len(value) < 2 or value[-1] != quotes[value[0]]:
+            return clause._replace(role="invalid", diagnostic="unclosed-descriptor-value")
+        value = value[1:-1]
+    kind_value = re.sub(r"^(?:唯一匹配的|已匹配的)\s*", "", value)
+    valid = ((field in {"名称", "名字", "名", "name"} and value == name)
+             or (field in {"类型", "type"} and effect_kind_label(kind_value))
+             or (field in {"备注", "notes"} and value == notes))
+    return clause._replace(role="descriptor-value" if valid else "invalid", diagnostic="" if valid else "unapproved-descriptor-field-or-value")
+
+
 def preview_status_claim(clause: NoticeClaim) -> NoticeClaim:
     """Preview-generation status is ancillary and retains any explicit owner."""
     preview = r"(?:可执行|具体|本次|这次|该|此)?(?:修改|变更|改动)?预览"
@@ -392,7 +460,8 @@ def preview_status_claim(clause: NoticeClaim) -> NoticeClaim:
 
 def execution_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
     """A complete operation-matched summary; it never establishes the effect."""
-    match = re.fullmatch(rf"\s*(?:{_FUTURE})执行(?:{_REFERENT})?(?:{action_pattern})\s*", clause.text)
+    read = r"(?:并(?:读取|回读)(?:实际)?结果(?:核验|验收))?"
+    match = re.fullmatch(rf"\s*(?:{_FUTURE})执行(?:{_REFERENT})?(?:{action_pattern}){read}\s*", clause.text)
     if match and prospective_intent(clause.text, operation_actions=action_pattern):
         return clause._replace(role="execution-summary")
     return clause

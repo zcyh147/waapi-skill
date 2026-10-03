@@ -42,6 +42,35 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Reviewed compositional notice repair — 2026-10-03:** the four exact valid
+  87f9dc8 notices reproduced **4 offline failures** before repair. Shared typed
+  roles now compose passive owner/display/baseline statements, attested append
+  placement, ancillary current-Preview authorization and sole-curve scope, and
+  local protected-object exclusions with the actual impending effect. They
+  cannot supply permission, native class identity or the primary effect alone.
+  Independent review caught two acceptance gaps: a coordinated subject/field
+  edit could inherit prior negation, and an adjacent unrequested descriptor
+  field could escape validation. Their controls reproduced **13 failures /
+  6 passes** before correction. A subsequent review caught negated adverbs
+  being treated as separate predicates (**5 failures / 3 passes**); the final
+  rule preserves one predicate's governing negation while validating a distinct
+  coordinated action separately. All failed iterations are retained, including
+  the files whose provisional names contain `green` despite their failures.
+  The independent 37-node corpus includes combined roles, clause/paragraph
+  permutations and paired substantive contradictions. Its initial audit used a
+  partially repaired snapshot and is not pre-repair RED evidence. Both final
+  review lanes are clear. Nine notice files passed **2355 tests / 4.36 seconds**,
+  retaining all 2229 previous controls. Root's combined notice, harness, Broker,
+  Skill-contract, documentation and interface-inventory gate passed
+  **2954 / skipped 9 native-Windows checks**, exit zero in **23.39 seconds**.
+  Log SHA-256: `201b82b9717be3d51ebec273d7a851ad34856687cb071f48bfba850b0cc91f12`;
+  JUnit SHA-256: `3dde19ac959c9858b435c3062aa07f945107213da0c324dc2a89490b0963b767`.
+  Packaged Skill, prompts, suite, business oracles and Program inputs remain
+  unchanged; the earlier Program result is component evidence only. A new
+  complete Non-live gate precedes further Fresh acceptance. The all-successful
+  business outcomes and original automatic failures in the 87f9dc8 root remain
+  separate and frozen without replay or regrading.
+
 - **Full business success with four notice false negatives — 2026-10-03:**
   frozen candidate `87f9dc8d09cbd93e9dac5ad41220bc5c338d6078` passed complete
   Non-live **15030 / skipped 119 / deselected 27**, exit zero in **871.39 seconds**.

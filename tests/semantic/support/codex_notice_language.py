@@ -20,7 +20,7 @@ _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
 _PROVIDER = r"(?:已)?按(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
 _GRANT = r"(?:已)?(?:取得|获得)"
-_AUTHORIZATION = r"(?:的)?(?:独立)?(?:策略)?授权(?:记录)?"
+_AUTHORIZATION = r"(?:的)?(?:独立)?(?:持久)?(?:策略)?授权(?:记录)?"
 
 
 class PlannedNoun(NamedTuple):
@@ -70,7 +70,8 @@ def authorization_claim(clause: str) -> AuthorizationClaim:
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
     record = r"(?:预览(?:之后|后)|本次)(?:已)?记录(?:了)?(?:独立)?(?:的)?\s*(?P<record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权(?:记录)?"
     inspection = r"(?:已)?确认(?:保存的)?授权记录包含独立于(?:修改|变更|改动)预览的\s*(?P<inspection_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权"
-    attributed_grant = rf"{_GRANT}\s*(?P<grant_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略{_AUTHORIZATION}"
+    preview = r"(?:(?:本次|当前|该|此)?(?:修改|变更|改动)?预览)?"
+    attributed_grant = rf"{preview}{_GRANT}\s*(?P<grant_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略{_AUTHORIZATION}"
     provider_record = rf"(?:当前)?\s*(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:策略)?(?:已)?(?:为(?:{_REFERENT})(?:具体)?{_CHANGE}(?:记录|保存|授予)(?:了)?(?:独立)?(?:执行|策略)?授权|授予(?:{_REFERENT}){_CHANGE}(?:的)?(?:独立)?(?:执行)?授权)"
     beginning = r"\s*(?:并(?:且)?)?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
     match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record}|{attributed_grant})(?=[，,。；;]|\s*$)", clause)
@@ -130,6 +131,11 @@ def attested_primary_target(clause: str, identity: Mapping[str, Any]) -> Primary
 
 def planned_change_noun(action: str, prefix: str, suffix: str) -> PlannedNoun | None:
     """Recognize a noun frame, preserving every preceding owner-bearing span."""
+    if action == "写入":
+        referent = re.search(rf"(?:{_REFERENT})$", prefix)
+        if referent and re.fullmatch(r"(?:范围)?(?:仅|只)(?:涉及|包含)(?:这(?:一)?|该|此)条曲线\s*", suffix):
+            return PlannedNoun("curve-range", prefix[:referent.start()])
+        return None
     if action in {"新增", "添加", "追加", "创建"}:
         verification = re.search(
             rf"(?:(?:{_FUTURE})执行(?:(?:{_REFERENT}){_CHANGE})?[，,]\s*)?(?:并)?(?:按返回的(?:核验|验证)结果)?(?:检查|核验)$", prefix)

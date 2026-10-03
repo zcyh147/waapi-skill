@@ -19,8 +19,8 @@ from tests.semantic.support.codex_attenuation_notice import (
 )
 from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
-    NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, ancillary_claims, baseline_read_claim, deictic_effect_claim,
-    effect_kind_label, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
+    NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
+    effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
     owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner, primary_role_atom, staged_operation_adoption,
 )
 
@@ -331,7 +331,8 @@ def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]
         return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
                 "action": "|".join(_PLUGIN_CREATION_WORDS), "kind": "plugin", "source_type": "sound", "source_id": source["id"],
                 "source_names": (source["name"], source["path"]), "notes": descriptor.get("notes", ""),
-                "protected_effect_count": protected_count, "descriptor": descriptor}
+                "protected_effect_count": protected_count, "descriptor": descriptor,
+                "append_after_existing": version != "2022.1" or int(slot[-1]) > max((int(field[-1]) for field in occupied), default=-1)}
     if operation == "object.setReference":
         source, target = state.get("object"), state.get("target")
         observed, expected = before.get("stinger"), before.get("target")
@@ -501,6 +502,7 @@ def _plugin_kind_claims_agree(text: str, name: str) -> bool:
         rf"{value}\s*的\s*([^，,。；;\n]+)(?=[，,。；;]|$)",
         rf"(?:{creation})(?!项|[:：])(?:一个|一项)?\s*([^，,。；;\n]+?)\s+{value}(?![a-z0-9_])",
         rf"效果链将多一个\s*([^，,。；;\n]+)[，,]\s*名称\s*{value}(?![a-z0-9_])",
+        rf"{value}[，,]\s*类型为\s*([^，,。；;\n]+)",
     )
     for pattern in patterns:
         for claim in re.finditer(pattern, text):
@@ -646,6 +648,29 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             return False
         operation_intro = (preview_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
+        placement = (append_placement_claim(local_claims[0], context["action"], after_existing=context["append_after_existing"])
+            if local_claims and context["kind"] == "plugin" else None)
+        if placement is not None and placement.role == "invalid":
+            return False
+        exclusions = tuple(exclusion_claim(local) for local in local_claims)
+        if context["kind"] == "plugin":
+            creations = tuple(re.finditer(context["action"], clause))
+            for local in local_claims:
+                if staged is None and (not creations or local.start <= creations[0].start()):
+                    continue  # The primary operation frame owns its own grammar.
+                if any(local.start <= creation.start() < local.end for creation in creations):
+                    continue
+                if any(claim.role in {"owner-attestation", "authorization", "preview-status", "read-summary"}
+                       and claim.start <= local.start and local.end <= claim.end for claim in ancillary):
+                    continue
+                descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"])
+                if descriptor_placement.role == "invalid":
+                    return False
+                if descriptor_placement.role == "placement-modifier":
+                    continue
+                descriptor_claim = effect_descriptor_value_claim(local, name=context["groups"][1][0].casefold(), notes=context["notes"].casefold())
+                if descriptor_claim.role == "invalid":
+                    return False
         execution_summary = (execution_operation_claim(local_claims[0], context["action"])
             if local_claims and context["kind"] == "plugin" else None)
         if staged is not None:
@@ -679,6 +704,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 continue  # The complete exact assignment was validated below.
             if any(claim.role in {"authorization", "preview-status", "read-summary"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
                 continue
+            if any(claim.role == "exclusion" and claim.start <= action.start() and action.end() <= claim.end for claim in exclusions):
+                continue
             if context["kind"] == "reference" and action.group() == "写入":
                 scope = re.fullmatch(r"\s*(?:预览已完成[:：])?唯一写入项是(.+)\s*", clause)
                 assignment = re.fullmatch(r"将(.+?)的(?:trigger|触发器)从\s*(.+?)\s*改为\s*(.+?)", scope.group(1)) if scope else None
@@ -708,6 +735,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if not affirmative:
                     return False
                 continue  # The already proven operation is the summary referent.
+            local_effect = next((local for local in local_claims if local.start <= action.start() < local.end), None)
+            # One descriptor may state its name/target in a following comma
+            # component. Preserve that existing projection; only exclusion
+            # polarity and protected-field checks use the local edit span.
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
             noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip())
             if noun_provider is not None and noun_provider.role in {"invalid-provider", "curve-range"}:
@@ -722,7 +753,16 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             expected = re.fullmatch(context["action"], action.group()) is not None or context["kind"] == "plugin" and action.group() == "加"
             if context["kind"] == "plugin" and expected and approved_value and historical_creation(clause[:action.start()]):
                 return False
-            negated = _notice_qualifier_is_negated(clause[:action.start()])
+            polarity_prefix = clause[local_effect.start if local_effect else 0:action.start()]
+            coordinators = tuple(re.finditer(r"并|且|同时|另外", polarity_prefix))
+            if coordinators:
+                before_coordinator = polarity_prefix[:coordinators[-1].start()]
+                # A preceding predicate marks a new coordinated action. With
+                # no earlier predicate, 同时/另外 remains an adverb governed
+                # by the same local negation (不会同时修改).
+                if re.search(_NOTICE_MUTATIONS, before_coordinator) or re.search(r"(?:未|不|没有)包含", before_coordinator):
+                    polarity_prefix = polarity_prefix[coordinators[-1].start():]
+            negated = _notice_qualifier_is_negated(polarity_prefix)
             if negated:
                 if expected and anchored and effect_anchor and (approved_value
                         or re.search(r"目标|名为|为|\bto\b", claim) is None):
@@ -750,6 +790,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 for start, end in inherited:
                     if start <= clause_start + action.start() < end:
                         owner_prefix = prefix[max(0, start - clause_start):]
+            if placement is not None and placement.role == "placement-intro" and placement.end == action.start():
+                owner_prefix = ""
             if action.group() == "写入":
                 # The create-only descriptor owns this note; a coordinated
                 # write may describe that same field, never arbitrary fields
@@ -770,7 +812,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 return False
             if noun or note_write:
                 continue
-            if any(term in clause for term in context["protected"]):
+            if any(term in (local_effect.text if local_effect else claim) for term in context["protected"]):
                 return False
             if not expected or not effect_anchor or not approved_value:
                 return False
