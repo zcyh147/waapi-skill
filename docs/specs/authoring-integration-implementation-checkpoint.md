@@ -42,6 +42,27 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen a77c96a C09 rerun — 2026-10-03:** complete Non-live passed
+  **15449 / skipped 119 / deselected 27**, exit zero in **863.53 seconds**.
+  The sole EXP25-C09 Fresh unit again achieved its business goal and all six
+  independent assertions with Gateway verification, while retaining one
+  notice-only FAIL. Independent assessment found no substantive omission.
+  One shared grammar gap causes two downstream rejections: a read-only
+  verification-purpose complement prevents the before-state record from
+  matching, losing the owner cursor before creation and exposing its temporal
+  modification noun to action scanning. The remaining notice roles are already
+  supported. The planned correction composes the bounded purpose with existing
+  baseline roles without granting proof credit or consuming adjacent actions.
+  Root and independent audits agree on **177 artifacts / 6767624 bytes** and
+  eleven metadata seals. Source protection, oracle closure, quarantine,
+  reconciliation and cleanup checks pass. One Preview/Execute/Verify sequence
+  completed; the Agent turn disables Apps and memories with zero observed MCP
+  calls. Agent time was **122.61 seconds**. The one-shot launcher exited 1,
+  was unloaded, and left no scoped process. Report:
+  `../research/integration-expansion-c09-a77c96a-sol-high-2026-10-03.json`.
+  The original FAIL remains frozen without replay or regrading. New C09 and
+  final full acceptance are still required after the reviewed correction.
+
 - **Reviewed target attestation and preflight bookkeeping — 2026-10-03:**
   the exact 595cc85 notice reproduced one failure. The independent 13-vector
   matrix, frozen before implementation, passed its complete primary control
