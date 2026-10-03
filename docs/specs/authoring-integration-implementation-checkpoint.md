@@ -1,9 +1,37 @@
-# Implementation checkpoint — resumed
+# Implementation checkpoint — paused
 
 Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #123/#124.
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
-on 2026-10-01. The implementation Goal is active; approved real preflight, model
-pilot, and acceptance may proceed after their prerequisite gates.
+on 2026-10-01. The latest Goal status and next permitted action are recorded below.
+
+## User-requested quota pause — 2026-10-03
+
+The user requested a pause after the running step completed. The complete
+Non-live gate for `0c2e75e0283b2c4dce1516149ee9bc0b944ed402` finished with
+**15466 passed, 119 skipped, 27 deselected**, exit zero in **854.17 seconds**.
+JUnit records 15585 tests, zero failures/errors and 119 skips. The managed
+candidate is unchanged and no test or campaign process remains.
+
+Pause the Goal after saving this checkpoint. Do not start more tests or
+implementation until the user explicitly resumes. The prepared
+`expansion-c09-0c2e75e-sol-high-r1-cli1592` LaunchAgent has **not** been loaded;
+its campaign root does not exist, and its preparation record carries a user
+pause hold. All sub-agents have completed their work.
+
+Completed component evidence includes both clear independent reviews,
+**2566** retained notice tests and the **3691 passed / 9 skipped** combined
+gate. Program inputs remain byte-identical to the completed eba698d gate;
+that earlier result is component evidence, not a new run. Native logs, hashes
+and pause state are recorded in
+`.waapi-skill-state/evidence/waapi-test-remediation/expansion-pause-0c2e75e-20261003/pause-checkpoint.json`.
+
+After explicit resume, recheck the frozen candidate, source full hashes/mtimes,
+CLI/config and scoped processes before the new EXP25-C09 attempt. Success must
+be followed by the appropriate identical successful-root verify-only audit,
+then final full 13-positive-plus-boundary same-candidate acceptance and its
+identical verify-only. Final reporting and issue closure, including #147,
+#122 and #108, remain incomplete. Earlier business success and notice-only
+FAIL roots retain their original evidence and verdicts without replay.
 
 ## Startup diagnosis after unlocking — 2026-10-01
 
