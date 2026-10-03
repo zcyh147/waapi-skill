@@ -1,0 +1,779 @@
+{
+  "contract": "waapi-skill.integration-expansion-evidence-audit/v1",
+  "candidate": "0e04c8c6578eb7d8cba8d6b60074a520ff9ecf1b",
+  "candidate_identity_limit": "Root verified the same full Git candidate before launch and after terminal cleanup; no tracked source changes occurred. Frozen campaign seals the Skill, suite, harness and runner bytes.",
+  "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592",
+  "status": "FROZEN_EARLY_STOP_BLOCKED; NOT_ACCEPTED",
+  "options": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "profile": "integration_expansion_v1",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "hard_agent_seconds": 600,
+    "slow_seconds": 420,
+    "readiness_seconds": 180.0,
+    "max_pre_action_retries": 0,
+    "host": "macOS",
+    "cli_version": "codex-cli 0.159.2"
+  },
+  "frozen_candidate_digests": {
+    "candidate": {
+      "excluded_names": [
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".DS_Store",
+        ".coverage"
+      ],
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill",
+      "tree_sha256": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422"
+    },
+    "harness": {
+      "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b",
+      "excluded_names": [
+        "__pycache__",
+        ".pytest_cache",
+        ".DS_Store",
+        ".coverage"
+      ],
+      "semantic_tree_sha256": "fd44409f6e247fd12fdc7d209c846c8509e8cc71567a65c96c2937a3da1484b5"
+    },
+    "suite": {
+      "dependency_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1",
+      "dependency_tree_sha256": "4065e57bfe7b896c222f104903ba067c8ba3d9f4dbf5f1013565f2b1216f3226",
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1/profile.json",
+      "sha256": "af1813d5d6b453f5541ccbb443eff724c23935df556e44c9ef16ee43e19103fe"
+    },
+    "runner": {
+      "campaign_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "campaign_sha256": "9bf2eb02ac91c6f7402a47ce9bb5b3d70aaa6e49c45132f128464de1277610cd",
+      "matrix_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/run_codex_skill_matrix.py",
+      "matrix_sha256": "c9241d911fc7db05f94f58ff6e792e42f28bb9227feb642a22da228ee1cad79d"
+    }
+  },
+  "result": {
+    "selected": 14,
+    "attempted": 7,
+    "matrix_agent_pass": 3,
+    "matrix_agent_fail": 3,
+    "campaign_agent_pass": 3,
+    "campaign_agent_fail": 2,
+    "campaign_blocked": 1,
+    "separate_boundary": 1,
+    "pending": 7,
+    "pending_units": [
+      "EXP25-C01",
+      "EXP25-C03",
+      "EXP25-C06",
+      "EXP25-C08",
+      "EXP25-C09",
+      "EXP25-M01",
+      "EXP25-M05"
+    ],
+    "stopped_early": true,
+    "stop_reason": "fail:EXP22-M01",
+    "independent_business_goals_completed": 4,
+    "independent_assertions_true": 29,
+    "attempted_positive_required_assertions": 40,
+    "goal_commands": {
+      "preview-from-draft": 5,
+      "execute": 4,
+      "verify": 4
+    },
+    "automatic_acceptance_complete": false,
+    "launcher_exit_code": 3,
+    "launcher_runs": 1,
+    "child_result": {
+      "completed_at": "2026-10-03T00:57:00Z",
+      "contract": "waapi-skill.codex-semantic-campaign-child/v1",
+      "group_id": "heavy-v3",
+      "returncode": 1
+    }
+  },
+  "units": [
+    {
+      "unit_id": "EXP22-M05",
+      "matrix_status": "BOUNDARY_PROVEN",
+      "campaign_status": "PASS",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-M05",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true
+    },
+    {
+      "unit_id": "EXP22-C01",
+      "matrix_status": "PASS",
+      "campaign_status": "PASS",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "passing_project_absent": true,
+      "agent_seconds": 207.7234044589568,
+      "slow": false,
+      "turns": 2,
+      "required_assertions": [
+        "distractor_unchanged",
+        "event_and_action_unchanged",
+        "exact_language_set",
+        "fixture_membership_unchanged",
+        "other_language_unchanged",
+        "requested_language_media_matches",
+        "requested_language_source_identity_preserved",
+        "sound_identity_and_configuration_unchanged",
+        "source_gain_unchanged"
+      ],
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "event_and_action_unchanged": true,
+        "exact_language_set": true,
+        "fixture_membership_unchanged": true,
+        "other_language_unchanged": true,
+        "requested_language_media_matches": true,
+        "requested_language_source_identity_preserved": true,
+        "sound_identity_and_configuration_unchanged": true,
+        "source_gain_unchanged": true
+      },
+      "formal_after_available": true,
+      "gateway_verification_state": "verified",
+      "terminal_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1827328,
+        "input_tokens": 1946005,
+        "output_tokens": 6314,
+        "reasoning_output_tokens": 707
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_commands": 18
+    },
+    {
+      "unit_id": "EXP22-C03",
+      "matrix_status": "PASS",
+      "campaign_status": "PASS",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C03",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "passing_project_absent": true,
+      "agent_seconds": 150.1092692920938,
+      "slow": false,
+      "turns": 2,
+      "required_assertions": [
+        "distractor_unchanged",
+        "exact_media_mapping",
+        "exact_target_set",
+        "fixture_membership_unchanged",
+        "media_destinations_preserved",
+        "sound_identities_and_configuration_preserved",
+        "source_identities_and_configuration_preserved"
+      ],
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "exact_media_mapping": true,
+        "exact_target_set": true,
+        "fixture_membership_unchanged": true,
+        "media_destinations_preserved": true,
+        "sound_identities_and_configuration_preserved": true,
+        "source_identities_and_configuration_preserved": true
+      },
+      "formal_after_available": true,
+      "gateway_verification_state": "verified",
+      "terminal_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 898048,
+        "input_tokens": 980271,
+        "output_tokens": 4518,
+        "reasoning_output_tokens": 98
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_commands": 12
+    },
+    {
+      "unit_id": "EXP22-C06",
+      "matrix_status": "PASS",
+      "campaign_status": "PASS",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP22-C06",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "passing_project_absent": true,
+      "agent_seconds": 129.8605819158256,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "control_identity_notes_and_parent_unchanged",
+        "media_unchanged",
+        "owner_configuration_unchanged",
+        "rtpc_identity_set_unchanged",
+        "sibling_curves_unchanged",
+        "target_curve_matches",
+        "target_identity_and_binding_unchanged"
+      ],
+      "independent_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "formal_after_available": true,
+      "gateway_verification_state": "verified",
+      "terminal_state": "verified",
+      "failed_gates": [],
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 424576,
+        "input_tokens": 472191,
+        "output_tokens": 2273,
+        "reasoning_output_tokens": 265
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_commands": 11
+    },
+    {
+      "unit_id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP22-C08",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 135.22889866586775,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "independent_assertions": {},
+      "formal_after_available": false,
+      "gateway_verification_state": null,
+      "terminal_state": "previewed",
+      "failed_gates": [
+        "broker_provenance",
+        "policy_checkpoint",
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 4.867246832931414,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "f50db72d6764de6e8170eae622059d99fb98e51726a1d9f06bc311783125f4f8",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 596096,
+        "input_tokens": 648220,
+        "output_tokens": 2046,
+        "reasoning_output_tokens": 318
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 0,
+        "verify": 0
+      },
+      "gateway_commands": 18,
+      "final_responses": [
+        "本次修改已按 allow_changes 策略取得独立授权，但核对曲线时工具输出被截断；按技能要求已停止，尚未执行修改，工程保持未改动。\n\n已读到的干声音量曲线为 Custom，两个点均为 Linear：\n\n| 距离 | 分贝 |\n|---:|---:|\n| 0.0 | 0.0 |\n| 100.0 | 4.71844785465692e-16 |\n\n声音当前引用指定衰减对象，音量为 −3 dB，输出为 Master Audio Bus，输出覆盖为 false。所需三点曲线尚未写入，其余六条曲线及 Horns 的完整核验尚未完成。"
+      ],
+      "diagnosis": "Safe incomplete business work: Preview reached policy authorization, then18 authenticated/successful Gateway commands ended without Execute/Verify. Agent explicitly stopped for perceived truncation; formal after=null and assertions={}. Reconciliation completed but cannot supply business PASS.",
+      "presentation_limit": "Archived Gateway JSON and receipts show no transport/error/truncated failure. Actual model-facing output completeness versus display truncation remains unresolved because original tool-output budget/rollout presentation is not retained. Full captured JSON alone does not prove visible completeness.",
+      "captured_metadata_sizes": [
+        {
+          "sequence": 12,
+          "stdout_utf8_bytes": 6973,
+          "payload_present": true
+        },
+        {
+          "sequence": 13,
+          "stdout_utf8_bytes": 6804,
+          "payload_present": true
+        },
+        {
+          "sequence": 14,
+          "stdout_utf8_bytes": 6825,
+          "payload_present": true
+        },
+        {
+          "sequence": 15,
+          "stdout_utf8_bytes": 6825,
+          "payload_present": true
+        },
+        {
+          "sequence": 16,
+          "stdout_utf8_bytes": 6807,
+          "payload_present": true
+        },
+        {
+          "sequence": 17,
+          "stdout_utf8_bytes": 6952,
+          "payload_present": true
+        },
+        {
+          "sequence": 18,
+          "stdout_utf8_bytes": 6778,
+          "payload_present": true
+        }
+      ]
+    },
+    {
+      "unit_id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "campaign_status": "FAIL",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP22-C09",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 107.35903362510726,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "formal_after_available": true,
+      "gateway_verification_state": "verified",
+      "terminal_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.2706161660607904,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "87c45d70b886f9f49f58f819a60538e8c23111e76ec14f5207e745134182b240",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 423424,
+        "input_tokens": 464331,
+        "output_tokens": 2012,
+        "reasoning_output_tokens": 189
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_commands": 10,
+      "final_responses": [
+        "已追加并通过核验：\n\n- 新增：Expansion_EXP22-C09_NewGain，类型 Wwise Gain。\n- GUID：`{71DDCF2E-E75F-46C8-BA9D-9660B9B8E534}`。\n- 绑定：Effect2（第三个 slot），位于原有两个效果器之后。\n- 备注：`Expansion C09 appended gain`；未另设插件参数或平台值。\n\n原有两个效果器的顺序、GUID、slot 绑定、类型、名称和备注保持；声音的音量、备注和父级保持。"
+      ],
+      "diagnosis": "Business goal completed; all six independent assertions true and Gateway verified. Exact prospective append/name/notes/owner notice occurs after Preview and before Execute. Automatic notice-only FAIL is a semantic false negative; original verdict remains frozen.",
+      "event_sha256": "b254e7a8596a181b457abdd13b169f3ae925400f31dcc70933449c46bca5cf00",
+      "notice_messages": [
+        "已加载 waapi-skill，已配置 WAAPI 端口 31170，Wwise 适配版本为 2022.1。\n\n当前修改策略为 allow_changes；可用策略为 read_only、ask_before_changes 和 allow_changes。我会先核对现有效果器及声音属性，再告知具体追加内容，并在取得独立策略授权后执行和核验。\n",
+        "已核对目标声音，并保存修改前状态。即将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”；不指定插件参数或平台值。执行后会对照修改前状态核验原有效果器的身份、slot 绑定、配置顺序，以及声音属性。\n\n本次具体修改已取得 allow_changes 策略的独立持久授权，现在执行。\n"
+      ]
+    },
+    {
+      "unit_id": "EXP22-M01",
+      "matrix_status": "FAIL",
+      "campaign_status": "BLOCKED",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01",
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_before_ns": 1790531309484673590,
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "quarantine_never_reuse": true,
+      "owned_root_exists": true,
+      "agent_seconds": 88.22215229202993,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "clip_media_matches_its_source",
+        "each_track_has_one_sequence_and_clip",
+        "exact_segment_track_source_topology",
+        "media_hashes_match_each_requested_track",
+        "only_track_has_requested_volume",
+        "parent_and_protected_sibling_unchanged"
+      ],
+      "independent_assertions": {},
+      "formal_after_available": false,
+      "gateway_verification_state": null,
+      "terminal_state": "unprepared",
+      "failed_gates": [
+        "broker_provenance",
+        "policy_checkpoint",
+        "visible_preview_notice"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.7615234169643372,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "15d4733fbfc2b88f8e1d57c65649c2913dec8bdd478ab6a793cbe1a612413b62",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "codex_sessions_complete": true,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 269312,
+        "input_tokens": 298777,
+        "output_tokens": 1560,
+        "reasoning_output_tokens": 303
+      },
+      "goal_commands": {
+        "preview-from-draft": 0,
+        "execute": 0,
+        "verify": 0
+      },
+      "gateway_commands": 6,
+      "final_responses": [
+        "尚未完成修改，工程未发生变更。准备的批量导入为 Imported → Quiet、Full，仅 Quiet Track 设为 -6 dB，但尚未执行，因此无法报告实际素材绑定或完成保护内容的核验。\n\n我误抄了校验命令中的授权标识，网关因此拒绝命令。[waapi-skill 的 SKILL.md](.agents/skills/waapi-skill/SKILL.md) 要求：“A structured error or shell failure stops the workflow; do not retry the Gateway command.” 本轮必须停止，不能重试或继续执行。"
+      ],
+      "diagnosis": "Agent copied a different Draft task-authority into draft-check and correctly stopped on Broker rejection before runner dispatch. Matrix FAIL is elevated to campaign BLOCKED because the rejected command lacks the archive-required authenticated pre-dispatch proof. Broker authenticated=true proves Broker caller authentication, not a valid Draft authority or complete canonical archive receipt. No Preview/Execute/Verify or formal after/assertions exist.",
+      "rejected_receipt": {
+        "sequence": 6,
+        "authenticated": true,
+        "accepted": false,
+        "succeeded": false,
+        "exit_code": 126,
+        "runner_exit_code": null,
+        "payload_sha256": "",
+        "runner_command_sha256": "",
+        "raw_argv_sha256": "515087aca519ec906f7d22309aeb9a2513ca3288b9063205f558784d0af67008",
+        "semantic_argv_sha256": "",
+        "rejection": "expansion policy rejected command: Draft identity, authority or revision is stale",
+        "payload_is_null": true
+      },
+      "wrong_authority_claim_confirmed_by_final_response": true,
+      "submitted_authority_sha256": "dc524352813f4b7055dfd4f0a991e27372017810989a4e9c713fcffe0894c485",
+      "submitted_authority_occurs_in_previous_gateway_payload": false,
+      "previous_returned_authority_sha256": [
+        "eb5bf9284b85de56d08f6e713f413ec7813a0551b8998b5b8605094cf78cb00d"
+      ],
+      "previous_returned_authority_count": 1
+    }
+  ],
+  "integrity": {
+    "artifact_count": 802,
+    "artifact_bytes": 27718773,
+    "manifest_sha256": "b96d516520bebd9dfde5c5b3f7fb788207619dbf55898d341e0256838a3e52e1",
+    "all_artifact_hash_size_executable_checks_passed": true,
+    "attempt_inventory_extras": [
+      "attempt-manifest.json",
+      "attempt-manifest.json.sha256"
+    ],
+    "sidecars": {
+      "campaign-config.json.sha256": {
+        "sha256": "873f60367f144efa895042d6d502a72b337833702c7d376fe02d5254b08f6669",
+        "matches": true
+      },
+      "expansion-accounting.json.sha256": {
+        "sha256": "74b8a70b9d1ef92bb1e0bc53e4b66948218d6be3f84d8f9902fd6f723729ac09",
+        "matches": true
+      },
+      "consolidated-summary.json.sha256": {
+        "sha256": "4dac22e37048d91e4c4ec7f0edbb0ee5a3b4f6b050b9497a0f37dae18d188db5",
+        "matches": true
+      },
+      "attempt-ledger.json.sha256": {
+        "sha256": "d9d5df9cf73d24a0b5427cad3c43c4be1874f329b8b579a05ba48faebdc559f7",
+        "matches": true
+      },
+      ".campaign-lock-owner.json.sha256": {
+        "sha256": "b0b59cb18f0d3a57c138825523d898baf820d8c9a094c3cbbdb398748e9d5fa6",
+        "matches": true
+      },
+      ".waapi-semantic-campaign-root.json.sha256": {
+        "sha256": "84f854a01f0b8aa611a4cbdc30a5b3b0f4a09501921c11c8348efc63d3410cfa",
+        "matches": true
+      },
+      "attempts/attempt-000001/attempt.json.sha256": {
+        "sha256": "e00ab6b2e6d9d7ae5e7a36af82fd4ec7fb8b9da54080818169bd9021c0a57974",
+        "matches": true
+      },
+      "attempts/attempt-000001/attempt-manifest.json.sha256": {
+        "sha256": "b96d516520bebd9dfde5c5b3f7fb788207619dbf55898d341e0256838a3e52e1",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/child-result.json.sha256": {
+        "sha256": "5e353884017a140f3f3c19a14ca94b2648b9014bc6bbbec938e374ddd59678ec",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/classification.json.sha256": {
+        "sha256": "a826e45b18d56e83ef2e87563b3d9818a115edbde638a10f4f8b363e061edd6f",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/child-request.json.sha256": {
+        "sha256": "dfa2226492d1c5e49d7ade7d20644768243e5d6ecd91033996d7651750fb8504",
+        "matches": true
+      }
+    },
+    "sidecar_count": 11,
+    "source_guard_count": 7,
+    "trusted_oracle_closed_count": 7,
+    "passing_projects_removed": 3,
+    "retained_cleanup_metadata": [
+      {
+        "unit_id": "EXP22-M05",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP22-C08",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP22-C09",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP22-M01",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      }
+    ],
+    "failure_reconciliation_children_reaped": 3,
+    "scoped_processes": [],
+    "wwise_processes": [],
+    "launchagent_absent": true,
+    "launcher": "Parent observed one launch, exit3, zero scoped/Wwise processes, successful bootout; independent current process and job-absence checks recorded here.",
+    "deleted_pass_process_detail_limit": "Three PASS project paths are absent; sealed lifecycle records establish removal. Their deleted detailed process metadata is not separately sealed. Four retained FAIL/boundary metadata records establish cleaned/exited/residual[].",
+    "launcher_stdout_sha256": "c5b2c07ffee06ab9e1d556316d718b4cc8750b72baa74ece4b4db82add224af0",
+    "metadata_seal_scope": "Eight campaign/business sidecars plus manifest and two root identity/lock sidecars: eleven total."
+  },
+  "usage": {
+    "agent_seconds": 818.5033402498811,
+    "turns": 8,
+    "slow_units": 0,
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 4438784,
+    "input_tokens": 4809795,
+    "output_tokens": 18723,
+    "reasoning_output_tokens": 1880,
+    "uncached_input_tokens": 371011,
+    "reasoning_included_in_output": true,
+    "usd": null
+  },
+  "development_gates": {
+    "nonlive": {
+      "candidate": "0e04c8c6578eb7d8cba8d6b60074a520ff9ecf1b",
+      "passed": 15156,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 864.05,
+      "exit_code": 0,
+      "source": "Completed candidate gate; terminal exit zero and owned pytest absence verified by root.",
+      "log_sha256": "d27c4ee102aae2562fe4d9c16a6764f40c541eab827a76d97a9c8f394e4f7dcc",
+      "junit_sha256": "e35d43db50a5913805a3f7609ae6a638961b02e5dc3cfdaa4e873f478d544910"
+    },
+    "program": {
+      "candidate": "eba698d9c9f461182b36c7c55ff9b8d2253d9d06",
+      "passed": 6345,
+      "skipped": 2,
+      "component_only": true,
+      "seconds": 303.27,
+      "exit_code": 0,
+      "scope": "Unchanged packaged Skill and Program inputs, not a new candidate run.",
+      "log_sha256": "3b0231dd1b3bf9ac0e2a023c3ac52ae78bae032a35f10455639d996bcaac6040"
+    },
+    "root_focused": {
+      "passed": 2954,
+      "skipped": 9,
+      "seconds": 23.39,
+      "exit_code": 0,
+      "log_sha256": "201b82b9717be3d51ebec273d7a851ad34856687cb071f48bfba850b0cc91f12",
+      "junit_sha256": "3dde19ac959c9858b435c3062aa07f945107213da0c324dc2a89490b0963b767"
+    }
+  },
+  "limitations": [
+    "C08/M01 have no formal after-state or assertion proof; successful read-only reconciliation is not business PASS.",
+    "No model-output completeness inferred from archived complete JSON.",
+    "Original matrix/campaign verdicts are preserved; no replay, verify-only, regrade or live invocation occurred.",
+    "Final13-Agent plus boundary acceptance and successful-root identical verify-only remain pending.",
+    "No Windows/playback/subscription/load-retest/general-model-ranking credit."
+  ],
+  "anomalies": [],
+  "status_attribution": {
+    "EXP22-C08": "Unexecuted/incomplete; perceived presentation truncation unresolved.",
+    "EXP22-C09": "Completed business and valid pre-Execute notice; automatic notice-only false negative.",
+    "EXP22-M01": "Agent supplied a wrong Draft authority and was safely rejected before dispatch. The archive has no admitted proof lane for this rejected draft-check after an accepted declaration; its fallback read validator expects a different rejection reason. The original campaign BLOCKED classification and systemic stop remain unchanged.",
+    "EXP22-C09_details": "The complete notice is rejected at two ancillary phrases: the current-change qualifier in 本次具体修改 and the before-state verification basis 对照修改前状态核验. No business outcome or authenticated policy failure occurred."
+  },
+  "diagnostics": {
+    "M01_archive_admission": {
+      "kind": "read_only_helper_exception_trace",
+      "function": "verify_expansion_task_archive",
+      "scope": "Original task evidence; PYTHONDONTWRITEBYTECODE=1; raised at receipt classification before returning a result.",
+      "writes": false,
+      "campaign_verify_only": false,
+      "transaction_dispatch": false,
+      "original_verdict_changed": false,
+      "finding": "Rejected draft-check fell through to rejected-read proof; expected rejection reason differed from its authenticated stale-authority receipt."
+    }
+  }
+}

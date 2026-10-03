@@ -42,6 +42,40 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen early stop and separate failure attribution — 2026-10-03:**
+  candidate `0e04c8c6578eb7d8cba8d6b60074a520ff9ecf1b` passed complete Non-live
+  **15156 / skipped 119 / deselected 27**, exit zero in **864.05 seconds**.
+  Root `expansion-acceptance-0e04c8c-sol-high-r1-cli1592` attempted the seven
+  2022 units before a fail-closed archive boundary stopped the batch. Canonical
+  results are **3 Agent PASS / 2 FAIL / 1 BLOCKED / 1 separate boundary**;
+  all seven 2025 units remain pending. Four business goals and **29 assertions**
+  are proven; the unexecuted C08/M01 goals receive no success credit.
+  - C08 stopped after the Agent reported output truncation. All captured curve
+    replies are complete, but the archive lacks model-facing tool-budget and
+    clipping telemetry; actual presentation versus mistaken interpretation is
+    unresolved. No Execute occurred.
+  - C09 executed and passed all six independent assertions. Its timely complete
+    notice was falsely rejected at a current-change qualifier and a before-state
+    verification-basis noun; this is not a business failure.
+  - M01 used the correct Draft identity/revision but a mistyped task authority
+    for `draft-check`. Broker authentication passed; policy correctly rejected
+    the command before dispatch. Existing archive rejection lanes do not admit
+    this proof after an accepted declaration, so classification became BLOCKED
+    and later cases did not start. The original matrix FAIL and campaign BLOCKED
+    remain distinct; any future archive repair must preserve actual rejection,
+    prove unchanged editable Draft and project state, and grant only ordinary
+    FAIL admission, never PASS or execution authority.
+  Independent audit and root rehash agree on **802 artifacts / 27718773 bytes**,
+  eleven metadata seals, seven unchanged full source hashes/mtimes and oracle
+  closures. Three PASS copies were removed; three failed copies plus the
+  boundary copy remain quarantined with clean process records. Three
+  reconciliation children exited. The one-shot launcher exited 3, was unloaded,
+  and left no scoped/Wwise processes. Agent time was **818.50 seconds / 8 turns**,
+  with zero slow cases. Exact usage and seals are in
+  `../research/integration-expansion-stopped-0e04c8c-sol-high-2026-10-03.json`.
+  This incomplete root remains frozen without resume, verify-only or regrading.
+  No new live attempt precedes the required evidence/notice repair review.
+
 - **Reviewed compositional notice repair — 2026-10-03:** the four exact valid
   87f9dc8 notices reproduced **4 offline failures** before repair. Shared typed
   roles now compose passive owner/display/baseline statements, attested append
