@@ -1,0 +1,1105 @@
+{
+  "contract": "waapi-skill.integration-expansion-evidence-audit/v1",
+  "candidate": "a7381ac3c7746b306350a11b53ffff98b7c1a161",
+  "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592",
+  "status": "FROZEN_COMPLETE_MIXED_FAIL; NOT_ACCEPTED",
+  "options": {
+    "auth_json": "/Users/xiye/.codex/auth.json",
+    "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592",
+    "case_ids": [
+      "EXP22-C01",
+      "EXP22-C09",
+      "EXP25-C06",
+      "EXP25-C08",
+      "EXP25-C09",
+      "EXP25-M05",
+      "EXP22-M05"
+    ],
+    "codex_binary": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+    "live_config": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/fixtures/local/expansion-portable-live-environment.json",
+    "lock_timeout_seconds": 10.0,
+    "max_pre_action_retries": 0,
+    "model": "gpt-6.1-sol",
+    "offline_only": false,
+    "pair_ids": [],
+    "profile": "integration_expansion_v1",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "skill_source": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill",
+    "suite_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1/profile.json",
+    "timeout_seconds": 600.0,
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "wwise_readiness_timeout_seconds": 180.0
+  },
+  "codex": {
+    "allow_login_shell": false,
+    "approval_policy": "never",
+    "apps": "disabled",
+    "fresh_process_thread_and_task_per_scenario": true,
+    "memory": "disabled",
+    "model": "gpt-6.1-sol",
+    "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+    "reasoning_effort": "high",
+    "runtime_files": [],
+    "service_tier": "default",
+    "sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704",
+    "timeout_seconds": 600.0,
+    "version": "codex-cli 0.159.2",
+    "windows_powershell_core_host": null,
+    "windows_shell_backend": null
+  },
+  "frozen_candidate_digests": {
+    "candidate": {
+      "excluded_names": [
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".DS_Store",
+        ".coverage"
+      ],
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill",
+      "tree_sha256": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422"
+    },
+    "harness": {
+      "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b",
+      "excluded_names": [
+        "__pycache__",
+        ".pytest_cache",
+        ".DS_Store",
+        ".coverage"
+      ],
+      "semantic_tree_sha256": "bb1242a76766996e78bd2831f022356abc8aef852d082b69ddd33e05167916f1"
+    },
+    "suite": {
+      "dependency_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1",
+      "dependency_tree_sha256": "4065e57bfe7b896c222f104903ba067c8ba3d9f4dbf5f1013565f2b1216f3226",
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/data/integration-expansion-v1/profile.json",
+      "sha256": "af1813d5d6b453f5541ccbb443eff724c23935df556e44c9ef16ee43e19103fe"
+    },
+    "runner": {
+      "campaign_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "campaign_sha256": "b889f4ac58cbdcfb3106bbb410cb19bfd9e8f786450a882f2111e512c1ef8633",
+      "matrix_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/semantic/run_codex_skill_matrix.py",
+      "matrix_sha256": "c9241d911fc7db05f94f58ff6e792e42f28bb9227feb642a22da228ee1cad79d"
+    }
+  },
+  "candidate_identity_limit": "Campaign seals pin frozen candidate bytes; audit never regenerated current source hashes.",
+  "result": {
+    "selected": 7,
+    "attempted": 7,
+    "agent_pass": 2,
+    "agent_fail": 4,
+    "separate_boundary": 1,
+    "pending": 0,
+    "blocked": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "independent_business_goals_completed": 5,
+    "independent_assertions_true": 32,
+    "positive_required_assertions": 39,
+    "goal_commands": {
+      "preview-from-draft": 5,
+      "execute": 5,
+      "verify": 5
+    },
+    "automatic_acceptance_complete": false,
+    "launcher_runs": 1,
+    "launcher_exit_code": 1,
+    "launcher_fact_authority": "Parent proved terminal once, empty scoped/Wwise processes and successful bootout; no live probe by this audit."
+  },
+  "units": [
+    {
+      "unit_id": "EXP22-M05",
+      "matrix_status": "BOUNDARY_PROVEN",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-M05",
+      "errors": [
+        "scenario:M05/2022.1: expected capability boundary CAPABILITY_UNAVAILABLE"
+      ],
+      "final_status": "BLOCKED",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-M05/evidence/quarantine.json",
+      "requested_status": "BLOCKED",
+      "sandbox_retained": true,
+      "scenario_id": "EXP22-M05",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_mtime_before_ns": 1790531309484673590,
+      "version": "2022.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "quarantine_never_reuse": true
+    },
+    {
+      "unit_id": "EXP22-C01",
+      "matrix_status": "PASS",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01",
+      "errors": [],
+      "final_status": "PASS",
+      "quarantine_path": null,
+      "requested_status": "PASS",
+      "sandbox_retained": false,
+      "scenario_id": "EXP22-C01",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_mtime_before_ns": 1790531309484673590,
+      "version": "2022.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "passing_project_absent": true,
+      "campaign_status": "PASS",
+      "agent_seconds": 205.28828095807694,
+      "slow": false,
+      "turns": 2,
+      "required_assertions": [
+        "distractor_unchanged",
+        "event_and_action_unchanged",
+        "exact_language_set",
+        "fixture_membership_unchanged",
+        "other_language_unchanged",
+        "requested_language_media_matches",
+        "requested_language_source_identity_preserved",
+        "sound_identity_and_configuration_unchanged",
+        "source_gain_unchanged"
+      ],
+      "independent_assertions": {
+        "distractor_unchanged": true,
+        "event_and_action_unchanged": true,
+        "exact_language_set": true,
+        "fixture_membership_unchanged": true,
+        "other_language_unchanged": true,
+        "requested_language_media_matches": true,
+        "requested_language_source_identity_preserved": true,
+        "sound_identity_and_configuration_unchanged": true,
+        "source_gain_unchanged": true
+      },
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "failed_gates": [],
+      "formal_after_available": true,
+      "reconciliation": null,
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_receipt_count": 19,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1485568,
+        "input_tokens": 1587020,
+        "output_tokens": 6687,
+        "reasoning_output_tokens": 573
+      }
+    },
+    {
+      "unit_id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C09",
+      "errors": [
+        "scenario:V3TaskRunnerError: expansion turn failed: visible_preview_notice"
+      ],
+      "final_status": "FAIL",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C09/evidence/quarantine.json",
+      "requested_status": "FAIL",
+      "sandbox_retained": true,
+      "scenario_id": "EXP22-C09",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309484673590,
+      "source_mtime_before_ns": 1790531309484673590,
+      "version": "2022.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "quarantine_never_reuse": true,
+      "campaign_status": "FAIL",
+      "agent_seconds": 119.2502326250542,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "formal_after_available": true,
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.3047125830780715,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "5fa505087d480251268754be53f4fbc29e9c8e90c7d23e0845a87a0a0829ac15",
+        "status": "completed",
+        "subprocesses_reaped": true,
+        "snapshot_hash_matches": true,
+        "snapshot_matches_attested_terminal_state": true
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_receipt_count": 10,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 407552,
+        "input_tokens": 448040,
+        "output_tokens": 2329,
+        "reasoning_output_tokens": 330
+      }
+    },
+    {
+      "unit_id": "EXP25-C06",
+      "matrix_status": "FAIL",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP25-C06",
+      "errors": [
+        "scenario:V3TaskRunnerError: expansion turn failed: policy_checkpoint, visible_preview_notice"
+      ],
+      "final_status": "FAIL",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP25-C06/evidence/quarantine.json",
+      "requested_status": "FAIL",
+      "sandbox_retained": true,
+      "scenario_id": "EXP25-C06",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309503233691,
+      "source_mtime_before_ns": 1790531309503233691,
+      "version": "2025.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "quarantine_never_reuse": true,
+      "campaign_status": "FAIL",
+      "agent_seconds": 35.751589291961864,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "control_identity_notes_and_parent_unchanged",
+        "media_unchanged",
+        "owner_configuration_unchanged",
+        "rtpc_identity_set_unchanged",
+        "sibling_curves_unchanged",
+        "target_curve_matches",
+        "target_identity_and_binding_unchanged"
+      ],
+      "independent_assertions": {},
+      "terminal_state": "unprepared",
+      "gateway_verification_state": null,
+      "failed_gates": [
+        "policy_checkpoint",
+        "visible_preview_notice"
+      ],
+      "formal_after_available": false,
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 1.2940003748517483,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "4bc97c2d10d57305893a0d06110fdc46439474c31d635616aa385a87aa112d25",
+        "status": "completed",
+        "subprocesses_reaped": true,
+        "snapshot_hash_matches": true,
+        "snapshot_matches_attested_terminal_state": true
+      },
+      "goal_commands": {},
+      "gateway_receipt_count": 1,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 67328,
+        "input_tokens": 79573,
+        "output_tokens": 554,
+        "reasoning_output_tokens": 243
+      }
+    },
+    {
+      "unit_id": "EXP25-C08",
+      "matrix_status": "PASS",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP25-C08",
+      "errors": [],
+      "final_status": "PASS",
+      "quarantine_path": null,
+      "requested_status": "PASS",
+      "sandbox_retained": false,
+      "scenario_id": "EXP25-C08",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309503233691,
+      "source_mtime_before_ns": 1790531309503233691,
+      "version": "2025.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "passing_project_absent": true,
+      "campaign_status": "PASS",
+      "agent_seconds": 210.48886866681278,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "independent_assertions": {
+        "attenuation_identity_unchanged": true,
+        "other_curves_unchanged": true,
+        "requested_curve_matches": true,
+        "source_attenuation_unchanged": true,
+        "users_and_references_unchanged": true
+      },
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "failed_gates": [],
+      "formal_after_available": true,
+      "reconciliation": null,
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_receipt_count": 22,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1176064,
+        "input_tokens": 1242433,
+        "output_tokens": 3207,
+        "reasoning_output_tokens": 440
+      }
+    },
+    {
+      "unit_id": "EXP25-C09",
+      "matrix_status": "FAIL",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-C09",
+      "errors": [
+        "scenario:V3TaskRunnerError: expansion turn failed: visible_preview_notice"
+      ],
+      "final_status": "FAIL",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-C09/evidence/quarantine.json",
+      "requested_status": "FAIL",
+      "sandbox_retained": true,
+      "scenario_id": "EXP25-C09",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309503233691,
+      "source_mtime_before_ns": 1790531309503233691,
+      "version": "2025.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "quarantine_never_reuse": true,
+      "campaign_status": "FAIL",
+      "agent_seconds": 143.43475037510507,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "independent_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "formal_after_available": true,
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.3383474159054458,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "10dd02b95d61f71bfc1dbed4799504c0aa9d33ccdc7ee7859ed07193f879b9cb",
+        "status": "completed",
+        "subprocesses_reaped": true,
+        "snapshot_hash_matches": true,
+        "snapshot_matches_attested_terminal_state": true
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_receipt_count": 10,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 402048,
+        "input_tokens": 440965,
+        "output_tokens": 1976,
+        "reasoning_output_tokens": 177
+      }
+    },
+    {
+      "unit_id": "EXP25-M05",
+      "matrix_status": "FAIL",
+      "source_evidence": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-M05",
+      "errors": [
+        "scenario:V3TaskRunnerError: expansion turn failed: visible_preview_notice"
+      ],
+      "final_status": "FAIL",
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-M05/evidence/quarantine.json",
+      "requested_status": "FAIL",
+      "sandbox_retained": true,
+      "scenario_id": "EXP25-M05",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1790531309503233691,
+      "source_mtime_before_ns": 1790531309503233691,
+      "version": "2025.1",
+      "source_unchanged": true,
+      "trusted_oracle_closed": true,
+      "quarantine_never_reuse": true,
+      "campaign_status": "FAIL",
+      "agent_seconds": 198.79555595805869,
+      "slow": false,
+      "turns": 1,
+      "required_assertions": [
+        "other_stingers_preserved",
+        "owner_unchanged",
+        "requested_trigger_matches",
+        "segment_reference_preserved",
+        "stinger_identity_and_other_configuration_preserved",
+        "target_and_segment_unchanged"
+      ],
+      "independent_assertions": {
+        "other_stingers_preserved": true,
+        "owner_unchanged": true,
+        "requested_trigger_matches": true,
+        "segment_reference_preserved": true,
+        "stinger_identity_and_other_configuration_preserved": true,
+        "target_and_segment_unchanged": true
+      },
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "failed_gates": [
+        "visible_preview_notice"
+      ],
+      "formal_after_available": true,
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.2874422080349177,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot_sha256": "84357909a9961d4b3d265a86d8f19932f7ea1f58260a6edcd974a13626d8c1fa",
+        "status": "completed",
+        "subprocesses_reaped": true,
+        "snapshot_hash_matches": true,
+        "snapshot_matches_attested_terminal_state": true
+      },
+      "goal_commands": {
+        "preview-from-draft": 1,
+        "execute": 1,
+        "verify": 1
+      },
+      "gateway_receipt_count": 23,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 1052032,
+        "input_tokens": 1112811,
+        "output_tokens": 3492,
+        "reasoning_output_tokens": 397
+      }
+    }
+  ],
+  "integrity": {
+    "artifact_count": 981,
+    "artifact_bytes": 34874055,
+    "manifest_sha256": "33d00f2b0081eedc7f7aeba43eca029a329df7c4fec791f39af3bf19d5507238",
+    "all_artifact_hash_size_executable_checks_passed": true,
+    "artifact_errors": [],
+    "metadata_sidecars": {
+      ".campaign-lock-owner.json.sha256": {
+        "sha256": "107784ce01c638fb10b8176196fa7cb1c5b413d4c3bda951c9e8cc542da59b54",
+        "matches": true
+      },
+      ".waapi-semantic-campaign-root.json.sha256": {
+        "sha256": "d961266e0c3a6201793a227a38dcf9ec57dea4e7abe715c7b9d94ee4fc0ba412",
+        "matches": true
+      },
+      "attempt-ledger.json.sha256": {
+        "sha256": "8c8f72a9355456c703e8e4cd60554d16bf63fa1cedf13f1079c01328c88db179",
+        "matches": true
+      },
+      "attempts/attempt-000001/attempt-manifest.json.sha256": {
+        "sha256": "33d00f2b0081eedc7f7aeba43eca029a329df7c4fec791f39af3bf19d5507238",
+        "matches": true
+      },
+      "attempts/attempt-000001/attempt.json.sha256": {
+        "sha256": "0f3217ba42e3820f3309cb51268c42acc995e4efce970f8399758746093d2aad",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/child-request.json.sha256": {
+        "sha256": "ee0c0b03da4954a069efce087d91ae91ff8c269c06a112f6eb21b601516a1532",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/child-result.json.sha256": {
+        "sha256": "ee2564e4194a0430399a74457e033a34bb38e68ccae3920af345f9c961d3cdc3",
+        "matches": true
+      },
+      "attempts/attempt-000001/runs/heavy-v3/classification.json.sha256": {
+        "sha256": "4d7f403bc3aaaa9545c75c13e86a93d713c99721771552be680c51ed5f51e5cd",
+        "matches": true
+      },
+      "campaign-config.json.sha256": {
+        "sha256": "90d226bd4fbdaf3d1216891780428e65e3e2c9a7dfbaa3ecc19419d6813fda27",
+        "matches": true
+      },
+      "consolidated-summary.json.sha256": {
+        "sha256": "2d79a0672ea9e48e3fdf10dd04b2af3869aa0295a47fad631451974e03256303",
+        "matches": true
+      },
+      "expansion-accounting.json.sha256": {
+        "sha256": "4049e528c5ae68a360d321192b7d94ac6cef84a7a2ff6a653e55e8515c64fe52",
+        "matches": true
+      }
+    },
+    "metadata_sidecar_count": 11,
+    "source_guard_count": 7,
+    "trusted_oracle_closed_count": 7,
+    "passing_projects_removed": 2,
+    "retained_cleanup_metadata": [
+      {
+        "unit_id": "EXP22-M05",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP22-C09",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP25-C06",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP25-C09",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      {
+        "unit_id": "EXP25-M05",
+        "cleanup_result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      }
+    ],
+    "failure_reconciliation_children_reaped": 4,
+    "deleted_pass_process_detail_limit": "Removed PASS directories no longer provide sandbox process metadata; sealed lifecycle proves removal. Retained FAIL/boundary metadata shows cleaned/exited/residual[].",
+    "audit_method": "Read-only sealed-file hashing/JSON projections; no campaign or archive verifier, tests, replay, or verdict rewrite.",
+    "manifest_inventory_extras": [
+      "attempt-manifest.json",
+      "attempt-manifest.json.sha256"
+    ],
+    "launcher_stdout_sha256": "c2f3b548adc75c8966543b984bd5096e6b36f65572f2b600dfb73c32936b109e",
+    "launcher_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "metadata_seal_scope": "Eight campaign/business sidecars plus manifest and two root identity/lock sidecars: eleven total.",
+    "root_independent_rehash": {
+      "artifact_count": 981,
+      "artifact_bytes": 34874055,
+      "manifest_sha256": "33d00f2b0081eedc7f7aeba43eca029a329df7c4fec791f39af3bf19d5507238",
+      "source_hash_and_mtime_matches": 7,
+      "scoped_processes_after_terminal": [],
+      "launch_agent_unloaded": true
+    }
+  },
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 4590592,
+    "input_tokens": 4910842,
+    "output_tokens": 18245,
+    "reasoning_output_tokens": 2160,
+    "uncached_input_tokens": 320250,
+    "agent_seconds": 913.0092778750695,
+    "turns": 7,
+    "slow_units": 0,
+    "reasoning_included_in_output": true,
+    "usd": null
+  },
+  "development_gates": {
+    "nonlive": {
+      "passed": 15359,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 870.97,
+      "exit_code": 0,
+      "nonlive.log": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-a7381ac-r1/nonlive.log",
+        "sha256": "d880f8115f8477bf510f4ffc34261cfe5c1c3794e317113d078715c36ae8c74e"
+      },
+      "nonlive.xml": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-a7381ac-r1/nonlive.xml",
+        "sha256": "48bd313709d987648d1c4fa6f77461adfa5430280ec51b134257235113a54eb4"
+      },
+      "junit_totals": {
+        "tests": 15478,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 119
+      }
+    },
+    "focused": {
+      "passed": 3584,
+      "skipped": 9,
+      "seconds": 46.29,
+      "exit_code": 0,
+      "exit_authority": "Parent observed completed gate exit0",
+      "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-current-role-apps-root-combined-r1/focused.log",
+      "log_sha256": "a8873565a278f94a00595f63eefa2db4da622194c6ff28285180f7ea59d38a3b",
+      "junit_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-current-role-apps-root-combined-r1/focused.xml",
+      "junit_sha256": "8bfa0875ae6b4177db4ea7d2960271188b28098df4c55711b93acf4203fdc536",
+      "junit_totals": {
+        "tests": 3593,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 9
+      }
+    }
+  },
+  "apps_isolation": {
+    "effective_apps": "disabled",
+    "effective_memory": "disabled",
+    "actual_turn_argv": [
+      {
+        "unit_id": "EXP22-C01",
+        "turn": "turn-01",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/evidence/codex-task/turns/turn-01/codex-facts.json",
+        "facts_sha256": "0c5d323491974453f463d53f177c536ebe17639ab6ce05d2bf59a0665ab25f6d",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. ask_before_changes: Preview now; Execute waits for later explicit user confirmation. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/evidence/codex-task/agent-workspace",
+          "声音 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01（{D02DB8F8-FF2C-4797-941B-B2695FBE3BF2}）已有日文 Japanese 和英文 English(US) 对白。请用 /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav 只更新日文版本，英文素材和语言关联保持不变。沿用现有声音对象，音量、输出总线以及事件 \\Events\\Default Work Unit\\Expansion_EXP22_C01_Play_Line_01（{9648A62D-60F4-492A-BA1A-03BCC6EAFB4B}）的播放目标都不变；不要修改备用对象 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01_Backup（{52E21CCE-9857-4AFF-B576-CC9FB3250A8E}）。先读取并核对当前状态，展示变更预览，等我确认后再执行；完成后说明两种语言实际关联的素材。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      },
+      {
+        "unit_id": "EXP22-C01",
+        "turn": "turn-02",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/evidence/codex-task/turns/turn-02/codex-facts.json",
+        "facts_sha256": "318173379b8e702ff7592bf7409ed2baf10ad7a475fc52f52d3b72140f64be90",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. ask_before_changes: Preview now; Execute waits for later explicit user confirmation. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/evidence/codex-task/agent-workspace",
+          "resume",
+          "01a0ffca-f50c-7da0-9e38-24642a644ee8",
+          "这一步预览没问题，按当前预览执行并核验结果。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      },
+      {
+        "unit_id": "EXP22-C09",
+        "turn": "turn-01",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C09/evidence/codex-task/turns/turn-01/codex-facts.json",
+        "facts_sha256": "6d240eb47201b4886ab19c9cd0a12a06ee354083e33fd3372ffe1d434fa397a4",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. allow_changes: announce edits; Execute only with distinct durable policy authorization. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C09/evidence/codex-task/agent-workspace",
+          "请在声音 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner（{44D379E7-A86B-48C5-AB01-461B345A2CED}）的现有效果器后追加一个名为 Expansion_EXP22-C09_NewGain 的 Wwise Gain 效果器，备注写“Expansion C09 appended gain”。现有两个效果器的顺序、GUID、slot 绑定、类型、名称和备注都要保持，声音本身的音量、备注和父级也不变。不要替换现有效果器，不另设插件参数或平台值。这是要实际完成的修改，请先核对现状、告知变更，并按允许修改策略取得独立授权后执行和核验；只报告新增效果器及身份、绑定和配置顺序保持结果，不评价听感或播放效果。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      },
+      {
+        "unit_id": "EXP25-C06",
+        "turn": "turn-01",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP25-C06/evidence/codex-task/turns/turn-01/codex-facts.json",
+        "facts_sha256": "9497f1c5dc7e34d9f70477ce60f5b69a0ef49a181c7b3274c0a90b28893d6252",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. allow_changes: announce edits; Execute only with distinct durable policy authorization. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP25-C06/evidence/codex-task/agent-workspace",
+          "声音 \\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed（{99E823EE-6253-46B6-BB84-910D7C7B5D73}）已有 \\Game Parameters\\Ambience\\Rain_Intensity（{CA0B90AA-8A1F-43AE-ACDD-387803814573}）控制音量的曲线（关系对象 {6647161B-2CEF-47F1-956E-93A7849660BE}）。只把这条曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性。保留这条控制关系的身份和备注，其他控制曲线、声音、素材、路由均不变。这是要实际完成的修改，请核对当前状态、告知变更并完成执行和核验；不能表达或核验的部分请明确说明。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      },
+      {
+        "unit_id": "EXP25-C08",
+        "turn": "turn-01",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP25-C08/evidence/codex-task/turns/turn-01/codex-facts.json",
+        "facts_sha256": "778ebfd15a7719710c20b882bfc41e4216c52176845112d2c06b194304759806",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. allow_changes: announce edits; Execute only with distinct durable policy authorization. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP25-C08/evidence/codex-task/agent-workspace",
+          "请把衰减对象 \\Attenuations\\Default Work Unit\\Expansion_EXP25-C08_Attenuation（{2D8361BB-F5EA-4736-9DBA-9D80BEC91BC9}）的干声音量曲线改为自定义线性曲线，距离与分贝三个点为 (0.0,0)、(50.0,-12)、(100.0,-48)。只改这一条曲线，其余六条曲线及对象身份、备注都保持不变；声音 \\Containers\\Default Work Unit\\Expansion_EXP25-C08_AttenuatedSound（{7667588B-E3FF-4383-942F-B2404E393F48}）的衰减引用、音量和路由保持不变，原衰减 \\Attenuations\\Ambience\\Horns（{D7B7A627-3D4A-4921-842E-0A38A2DB2492}）也不要修改。这是要实际完成的修改，请核对当前状态、告知变更并完成执行和核验；按已保存的允许修改策略取得本次独立授权。请报告实际曲线数据，不评价听感。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      },
+      {
+        "unit_id": "EXP25-C09",
+        "turn": "turn-01",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-C09/evidence/codex-task/turns/turn-01/codex-facts.json",
+        "facts_sha256": "a087600747270e0f805512783da3f5e151a0978073bcca2cbe075a31a9885863",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. allow_changes: announce edits; Execute only with distinct durable policy authorization. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-C09/evidence/codex-task/agent-workspace",
+          "请在声音 \\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner（{B49EFFE7-AC17-480D-AF6E-62C815769B0F}）的现有效果器后追加一个名为 Expansion_EXP25-C09_NewGain 的 Wwise Gain 效果器，备注写“Expansion C09 appended gain”。现有两个效果器的顺序、GUID、slot 绑定、类型、名称和备注都要保持，声音本身的音量、备注和父级也不变。不要替换现有效果器，不另设插件参数或平台值。这是要实际完成的修改，请先核对现状、告知变更，并按允许修改策略取得独立授权后执行和核验；只报告新增效果器及身份、绑定和配置顺序保持结果，不评价听感或播放效果。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      },
+      {
+        "unit_id": "EXP25-M05",
+        "turn": "turn-01",
+        "facts_path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-M05/evidence/codex-task/turns/turn-01/codex-facts.json",
+        "facts_sha256": "5f235f867d58e0452dccf302100b19791a1431da3759c672df4361c251395edb",
+        "actual_argv": [
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+          "exec",
+          "-c",
+          "developer_instructions=\"First read SKILL.md once, standalone; no pre-read reply/questions. copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; final=remaining; all facts. Rows obey returned max. Composer: one action/call. allowed_action_argv owns TYPE; not Real64/int16. unapplied ancestor deferred_fact; execute_after=all_pending_ancestor_facts_in_response_tree_preorder. branch constant/value. Top facts first; exhaust tree. More=>ancestor_next_item_source; none=>completion_candidate.copy_command incl task_authority. Metadata: obey composer.start.preconditions; absent=none; prompt/schema!=live; all dynamic tokens pre-draft; single existing=>--object GUID; --object-type only new/imported/plural. SoundBank=>role_route; exact bank=>soundbank.by_exact_name. path=>by_path_segments one arg/segment; name=>query>ID=>by_id; GUID=>by_id. Else path=>path; no exact-type-name; subset reread only. one query/hop; no merge. enum/const exact. typed_operation: copy gateway_argv_prefix incl --apply; selector kind/value separate. Import type=Sound SFX; Sound query=all-sounds. Events: parents first. New path=>parent; name=>declaration only. POSIX path: single-quote; keep backslashes; one arg/child. Files absolute; no traversal. timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. Draft same turn; Preview: announce edits before Execute. draft-check!=Preview. allow_changes: announce edits; Execute only with distinct durable policy authorization. next_command unless requires_later_user_message. Omit workdir/cwd. No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py; append disclosed argv verbatim. Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md'] then [cat '.agents/skills/waapi-skill/references/waapi-operate.md']. Exact turn; no early/late/extra reads.\"",
+          "--model",
+          "gpt-6.1-sol",
+          "-c",
+          "model_reasoning_effort=\"high\"",
+          "-c",
+          "service_tier=\"default\"",
+          "-c",
+          "approval_policy=\"never\"",
+          "-c",
+          "sandbox_workspace_write.network_access=true",
+          "--disable",
+          "memories",
+          "--disable",
+          "apps",
+          "--ignore-user-config",
+          "--json",
+          "--sandbox",
+          "workspace-write",
+          "--skip-git-repo-check",
+          "-C",
+          "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-retry6-a7381ac-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-M05/evidence/codex-task/agent-workspace",
+          "请将现有 Stinger {B8D45849-AF76-4770-BE7B-5A6553B1337B} 的触发器从 Bonus 改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}）。保持关联音乐段 {B54923CD-4369-451A-8E64-C142D368037E} 不变，不修改 Stinger 的其他设置、所属 Stealth 容器 {20FA9A69-7ECC-4B05-BD6B-2C9527CD88C2}及其他 Stinger，特别是 Stress 容器里的 {ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}。读取并核对实际对象后完成预览、授权、执行和回读验收，不需要播放测试。"
+        ],
+        "disabled": [
+          "memories",
+          "apps"
+        ],
+        "apps_disabled": true,
+        "memory_disabled": true,
+        "ignore_user_config": true
+      }
+    ],
+    "observed_mcp_events": [],
+    "observed_mcp_event_count": 0,
+    "limit": "Observed none in retained CLI events; no complete native tool-inventory/presentation telemetry is available or claimed."
+  },
+  "limitations": [
+    "Frozen formal2PASS4FAIL+oneboundary retained; no final acceptance or verify-only.",
+    "Five business goals/32 TRUE assertions; six positive units require39. EXP25-C06 stopped after operations, no Preview/Execute/after and zero assertions.",
+    "EXP25-C06 operations stdout25435 UTF8bytes validJSON exactly equals Broker stdout. Model-facing max_output_tokens/rendered/clipped output unavailable; causal attribution remains UNKNOWN, not Agent hallucination.",
+    "The other three formal FAILs completed business effects and fail visible_preview_notice only.",
+    "C08 Gateway result_schema_checked is separate from independent five-assertion proof.",
+    "Authenticated phase receipt counts are not independent complete continuation-copy telemetry.",
+    "No Windows evidence, new model-selection claim, pricing estimate, regrade or mixed-root verify-only."
+  ],
+  "output_visibility_diagnostic": {
+    "unit_id": "EXP25-C06",
+    "item_id": "item_2",
+    "aggregated_stdout_utf8_bytes": 25435,
+    "aggregated_stdout_sha256": "f28c3cb3727cf509cd6f52134d838783df9a4ee853b15efbc54dc8b2e68af68b",
+    "json_complete": true,
+    "exact_broker_stdout_match": true,
+    "accepted": true,
+    "exit_code": 0,
+    "shell_tool_kwargs_or_model_rendered_text_available": false,
+    "attribution": "UNKNOWN",
+    "decision": "No diagnostic infrastructure added without observed native format/presentation semantics."
+  },
+  "date": "2026-10-03",
+  "host": "macOS",
+  "status_attribution": {
+    "notice_false_negatives": {
+      "EXP22-C09": "The parser does not compose a target-role identity attribute, before-state configuration baseline noun, or policy relation connector. All six business assertions passed.",
+      "EXP25-C09": "An owned Effect-chain location is misread as an object owner, and a concrete-change Preview subject is not shared with the authorization grammar. All six business assertions passed.",
+      "EXP25-M05": "A parent-qualified Stinger assignment, a reference/settings baseline noun, and a single-reference execution noun are not composed. Independent ownership and old/new reference evidence agree; all six assertions passed."
+    },
+    "incomplete_goal": "EXP25-C06 stopped after the first operations call. No Preview, Execute or business assertion is present. The source of its perceived incomplete output is unknown because model-facing budgets/presentation were not retained.",
+    "evidence_limit": "Read-only diagnosis does not rewrite automatic verdicts. The fixed Apps override and absence of observed MCP calls do not establish a complete tool-inventory enumeration."
+  },
+  "next_scope": "Consolidate bounded grammatical noun spans before scanning remaining mutation claims; independently freeze equivalence/contradiction tests before implementation. Keep authorization, business oracles, exact owners/values, extra-edit/refusal/timing checks and unknown mutation failures strict. No speculative query fix or native telemetry extension is approved by this report. Then use a new candidate/root for four failed units plus the separate boundary, followed by required final full acceptance and identical successful-root verify-only."
+}

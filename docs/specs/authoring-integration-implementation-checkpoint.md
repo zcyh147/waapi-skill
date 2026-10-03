@@ -42,6 +42,39 @@ pilot, and acceptance may proceed after their prerequisite gates.
 
 ### Completed entry-repair gates and next compact-directory candidate
 
+- **Frozen a7381ac failed-six rerun — 2026-10-03:** complete Non-live passed
+  **15359 / skipped 119 / deselected 27**, exit zero in **870.97 seconds**.
+  Candidate `a7381ac3c7746b306350a11b53ffff98b7c1a161` then completed the six
+  failed Agent units plus the separate 2022 Stinger boundary: **2 Agent PASS /
+  4 FAIL / 1 boundary**, with no pending, blocked or early-stopped units. Five
+  business goals and **32 assertions** succeeded out of 39 required assertions.
+  All seven retained Agent commands and sealed options explicitly disable Apps
+  and memories; zero MCP calls were observed. This is real invocation and event
+  evidence, not a complete tool-inventory enumeration.
+  - EXP22-C01 and EXP25-C08 passed. EXP22-C09, EXP25-C09 and EXP25-M05 completed
+    their business effects but retained valid-notice false rejections. Static
+    review identifies typed noun composition and owned-position/parent relations
+    as the shared gap. The next repair classifies bounded owner attributes,
+    baseline nouns and change/Preview/execution subjects before scanning every
+    remaining modification claim; it must not exempt arbitrary clauses or
+    loosen exact identities, values, policy, timing or extra-edit checks.
+  - EXP25-C06 stopped after its first `operations` response, before Preview or
+    Execute. The archived 25435-byte JSON is complete and equals authenticated
+    Broker stdout, but actual model-facing output budgets and presentation are
+    unavailable. The cause remains unknown. No speculative business-code or
+    telemetry-infrastructure change is justified by this record.
+  Independent audit and root rehash agree on **981 artifacts / 34874055 bytes**,
+  eleven metadata seals, seven unchanged source full hashes/mtimes and closed
+  oracles. Two PASS copies were removed; four FAIL copies and the boundary copy
+  remain quarantined with clean process records. Four reconciliation children
+  were reaped. The one-shot launcher exited 1, was unloaded, and left no scoped
+  process. Agent time was **913.01 seconds / 7 turns**, with no slow units; five
+  Preview/Execute/Verify receipt sequences completed. The audit is recorded in
+  `../research/integration-expansion-retry6-a7381ac-sol-high-2026-10-03.json`.
+  This mixed root remains frozen without resume, verify-only or regrading.
+  Independently specified component contrasts must precede the next notice
+  implementation. Four failed-unit reruns and final full acceptance remain.
+
 - **Reviewed Apps isolation and contextual notice repair — 2026-10-03:** #156
   explicitly disables Apps in prompt audit and the shared initial, ephemeral
   and resume execution prefix; both effective-config builders seal
