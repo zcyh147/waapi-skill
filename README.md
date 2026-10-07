@@ -236,3 +236,13 @@ remains the real Wwise matrix alias.
 A quick result is development feedback only. Run complete Non-live and the
 required final acceptance on the reviewed, frozen combined candidate; results
 from an earlier candidate do not replace those gates.
+
+Developer and Fresh campaign launchers emit a compact `test-readiness` JSON
+record with status, reason, and phase duration before expensive test dispatch.
+Selected real lanes check versioned paths, project version, sealed fixture/media
+payloads when a fixture manifest exists, and conflicts scoped to the selected
+source/sandbox. Custom installed SampleProjects do not need a repository
+manifest. Program, Non-live, and notice-fast do not require live configuration;
+archive verify-only retains its existing evidence checks without current live
+readiness. A blocked result requires an explicit prerequisite repair and retry:
+readiness never installs, hydrates, edits configuration, or terminates Wwise.

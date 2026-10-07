@@ -5,9 +5,10 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 import time
 import xml.etree.ElementTree as ET
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path, PurePosixPath
 
 
@@ -16,7 +17,6 @@ class ReadinessBlocked(ValueError):
 
 
 def report_readiness(started: float, *, reason: str = 'selected prerequisites ready', blocked: bool = False) -> None:
-    import sys
     print(json.dumps({
         'phase': 'test-readiness', 'status': 'blocked' if blocked else 'ready',
         'duration_seconds': round(time.perf_counter() - started, 6),
@@ -92,7 +92,9 @@ def scoped_process_snapshot() -> str:
     return result.stdout
 
 
-def validate_live_readiness(environment: Mapping[str, str], *, process_snapshot=None) -> None:
+def validate_live_readiness(
+    environment: Mapping[str, str], *, process_snapshot: Callable[[], str] | None = None,
+) -> None:
     project = Path(environment['WWISE_SAMPLE_PROJECT_PATH']).expanduser().resolve(strict=True)
     sandbox = Path(environment['WWISE_SANDBOX_ROOT']).expanduser().resolve()
     source = project.parent
@@ -106,7 +108,7 @@ def validate_live_readiness(environment: Mapping[str, str], *, process_snapshot=
             if isinstance(rows, dict):
                 rows = [rows]
             lines = [(int(row["ProcessId"]), str(row.get("CommandLine") or "")) for row in rows]
-        except (ValueError, TypeError, AttributeError) as exc:
+        except (ValueError, TypeError, AttributeError, KeyError) as exc:
             raise ReadinessBlocked("cannot parse scoped Windows process observation") from exc
     else:
         try:
@@ -119,5 +121,5 @@ def validate_live_readiness(environment: Mapping[str, str], *, process_snapshot=
         if pid in {os.getpid(), os.getppid()}:
             continue
         lowered = line.casefold()
-        if ('wwise' in lowered or 'pytest' in lowered or 'test_driver.py' in lowered) and any(scope.casefold() in lowered for scope in scopes):
-            raise ReadinessBlocked('a scoped Wwise/test process is still using the selected source or sandbox; inspect and resolve it before retrying')
+        if any(marker in lowered for marker in ('wwiseconsole', 'wwise.exe', 'wwise.app', 'pytest', 'test_driver.py', 'run_codex_skill_campaign.py')) and any(scope.casefold() in lowered for scope in scopes):
+            raise ReadinessBlocked(f'scoped Wwise/test process pid={pid} is still using the selected source or sandbox; inspect and resolve it before retrying')

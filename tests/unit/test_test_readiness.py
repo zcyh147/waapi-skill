@@ -39,7 +39,8 @@ def test_live_launcher_blocks_missing_materialized_media_before_child(tmp_path, 
     assert 'TEST_READINESS_BLOCKED' in capsys.readouterr().err
 
 
-def test_live_launcher_ready_preserves_child_status_and_flags(tmp_path, capsys):
+@pytest.mark.parametrize("sealed", [False, True])
+def test_live_launcher_ready_preserves_child_status_and_flags(tmp_path, capsys, sealed):
     console = tmp_path / 'WwiseConsole'
     console.write_text('fake console')
     console.chmod(0o755)
@@ -47,12 +48,13 @@ def test_live_launcher_ready_preserves_child_status_and_flags(tmp_path, capsys):
     project.parent.mkdir()
     project.write_text('<WwiseDocument WwiseVersion="2025.1.7" />')
     (project.parent / 'sound.wav').write_bytes(b'RIFFready')
-    (project.parent / 'fixture-manifest.json').write_text(json.dumps({
-        'algorithm': 'sha256', 'file_count': 1, 'files': [{
-            'path': 'sound.wav', 'bytes': 9,
-            'sha256': 'e1a07d8ee9e2f9624783861cd6fadc46125b0a90fd1b2e8c52b19ef466a63f42',
-        }],
-    }))
+    if sealed:
+        (project.parent / 'fixture-manifest.json').write_text(json.dumps({
+            'algorithm': 'sha256', 'file_count': 1, 'files': [{
+                'path': 'sound.wav', 'bytes': 9,
+                'sha256': 'e1a07d8ee9e2f9624783861cd6fadc46125b0a90fd1b2e8c52b19ef466a63f42',
+            }],
+        }))
     calls = []
     def child(command, **options):
         calls.append((command, options))
