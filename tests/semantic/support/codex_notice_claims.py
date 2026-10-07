@@ -197,10 +197,14 @@ def _supplied_owner_operand(value: str, context: NoticeRoleContext) -> bool:
     """Recognize an owner frame independently of singleton validation.
 
     Denial cannot turn a compound or foreign identity into neutral prose. Only
-    the existing role/attribute nouns and lexical identity forms enter this
+    the existing role/attribute nouns and explicit GUID/path forms enter this
     boundary; unrelated read operands remain unknown/reset components.
     """
-    value = re.sub(r"(?:的)?(?:身份|配置)\s*$", "", value.strip()).strip()
+    if primary_role_atom(value, context) or primary_role_attribute(value, context):
+        return True  # A sealed name may itself contain conjunction characters.
+    if re.fullmatch(r".+?(?:的)?(?:身份|配置)\s*", value.strip()):
+        return True  # An explicit identity/configuration operand retains its owner.
+    value = value.strip()
     terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
     for operand in re.split(r"\s*(?:和|及|与|或|、)\s*", value):
         if primary_role_atom(operand, context):
@@ -209,7 +213,7 @@ def _supplied_owner_operand(value: str, context: NoticeRoleContext) -> bool:
             return True
         if terms and re.match(rf"(?:(?:该|此|(?:所)?指定)(?:的)?\s*)?(?:{terms})(?:对象)?(?=\s|$)", operand):
             return True
-        if re.fullmatch(r"[a-z_][a-z0-9_.-]*|\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}|\\.+", operand):
+        if re.fullmatch(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}|\\.+", operand):
             return True
     return False
 

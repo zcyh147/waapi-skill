@@ -93,3 +93,39 @@ review snapshot and preflight paths with SHA-256 hashes under
 business 6/6 PASS remain unchanged. No full Program, full Non-live, Fresh,
 live-Wwise, Windows, campaign verifier, replay, resume or regrade ran.
 Independent Standards/Spec re-review and coordinator-owned proof remain pending.
+
+
+The final self-audit added four polarity controls for exact sealed names
+containing conjunction characters (`和声` and `微风与流水`). On intermediate
+commit `9d7da9d`, the two denied controls failed and the two affirmative guards
+passed. The recognizer now checks the whole sealed atom/attribute first, then
+considers compound vocabulary; all four pass. The final retained selection
+passed **2873 tests, no failures or skips, in 4.99 seconds**: unchanged 2838
+plus 35 total review controls. Earlier 31-control and 2869-test evidence is
+preserved, and new RED/GREEN/final paths and hashes are recorded in JSON.
+The integration merge remained already up to date. This self-audit extends
+identity preservation only; it adds no language or runtime route.
+
+
+A reviewer then identified a speculative overreach in `9d7da9d`: the generic
+ASCII-token fallback incorrectly treated unrelated `audio-docs` and `schedule`
+reads as owner identities. That fallback is removed. A supplied nonaffirmative
+operand now needs an exact sealed atom, explicit target/typed-role frame,
+identity/configuration qualifier, or explicit GUID/path. Bare English tokens
+retain unknown/reset behavior.
+
+**Expectation erratum:** four controls newly authored in `9d7da9d` wrongly
+assumed bare `OtherSound` read operands must be invalid owners. Only those new
+vectors were replaced: `没有确认 OtherSound` and its reverse now use typed
+`声音 OtherSound`; `或许已核实 OtherSound` and its reverse now qualify
+`OtherSound身份`. The qualified replacement negatives remain False. This is
+an explicit correction to speculative new expectations, not a change to the
+frozen44 or earlier2838 contracts. Three English ancillary guards were added.
+The original 9d7 and whole-identity RED/GREEN artifacts are preserved.
+
+The English ancillary guards first produced **2 failures / 3 passes**. After
+the correction, all **38 scoped review controls passed**; the final retained
+selection passed **2876 tests, no failures or skips, in 5.09 seconds**.
+This is unchanged2838 plus38 controls. The JSON records the erratum,
+final source hashes, argv/log/JUnit/exit paths and hashes. No full or Fresh
+acceptance is claimed; both independent reviews remain required.
