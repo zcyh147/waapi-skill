@@ -288,6 +288,7 @@ def test_readiness_path_separation_rejects_overlap_and_traversal(source, sandbox
 
 @pytest.mark.parametrize('platform,command,blocked', [
     ('darwin', 'python /other/repo/ci/test_driver.py --mode live --version 2022.1', True),
+    ('darwin', 'python /other/repo/ci/test_driver.py 2022.1 live', True),
     ('darwin', 'pytest /other/repo/tests/destructive/test_real.py', True),
     ('darwin', '/other/WwiseConsole.sh waapi-server /other/source.wproj', True),
     ('darwin', 'python /other/run_codex_skill_campaign.py --profile integration', True),

@@ -137,7 +137,8 @@ def _proved_real_lane(command: str) -> bool:
     if any(marker in lowered for marker in ('wwiseconsole.sh', 'wwiseconsole.exe', 'wwise.exe')):
         return True
     if 'test_driver.py' in lowered:
-        return re.search(r'(?:--mode|-m)\s+(?:smoke|live|destructive|matrix|focused|all)(?:\s|$)', lowered) is not None
+        return (re.search(r'(?:--mode|-m)\s+(?:smoke|live|destructive|matrix|focused|all)(?:\s|$)', lowered) is not None
+                or re.search(r'''test_driver\.py["']?\s+(?:202[1-5]\.1|all)\s+(?:smoke|live|destructive|matrix|focused|all)(?:\s|$)''', lowered) is not None)
     if 'pytest' in lowered:
         return (re.search(r'tests[\\/](?:live|destructive)(?:[\\/\s]|$)', lowered) is not None
                 or re.search(r'''(?:^|\s)-m\s+["']?(?:live|destructive)\b''', lowered) is not None)
