@@ -1,0 +1,49 @@
+{
+  "contract": "Independent finite-head delta at expansion_preview_notice; no Agent acceptance credit",
+  "base": "a08502f03f08142c654341ed34b7c64ba96c5050",
+  "vectors": [
+    {
+      "id": "scope-order-next-current",
+      "notice": "已核对目标为指定声音，并记录修改前状态。下次本次将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false
+    },
+    {
+      "id": "scope-order-second-current",
+      "notice": "已核对目标为指定声音，并记录修改前状态。第二次当前将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false
+    },
+    {
+      "id": "scope-gap-next",
+      "notice": "已核对目标为指定声音，并记录修改前状态。下一次普通进展将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false
+    },
+    {
+      "id": "positive-current-explicit",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true
+    },
+    {
+      "id": "positive-current-omitted",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true
+    },
+    {
+      "id": "opaque-下次本次将向目标声音",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向 下次本次将向目标声音 追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "owner_name": "下次本次将向目标声音"
+    },
+    {
+      "id": "opaque-第二次当前将向目标声音",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向 第二次当前将向目标声音 追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "owner_name": "第二次当前将向目标声音"
+    },
+    {
+      "id": "opaque-下一次普通进展将向目标声音",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向 下一次普通进展将向目标声音 追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "owner_name": "下一次普通进展将向目标声音"
+    }
+  ]
+}
