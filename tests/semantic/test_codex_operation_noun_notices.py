@@ -118,3 +118,27 @@ def test_after_a_neutral_read_then_append_is_one_plan():
     case = copy.deepcopy(_DESIGN["fixture"])
     case["events"][1]["item"]["text"] = case["events"][1]["item"]["text"].replace("即将追加", "之后再向目标声音追加")
     assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("separator", ["，", ",", "。", "；", ";", "\n"])
+def test_unknown_local_clause_consumes_owner_before_a_later_omitted_owner_append(separator):
+    case = copy.deepcopy(_DESIGN["fixture"])
+    case["events"][1]["item"]["text"] = case["events"][1]["item"]["text"].replace("即将追加", "稍后再评估" + separator + "然后追加")
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("separator", ["，", ",", "。", "；", ";", "\n"])
+def test_unknown_local_clause_does_not_replace_an_explicit_valid_append_owner(separator):
+    case = copy.deepcopy(_DESIGN["fixture"])
+    case["events"][1]["item"]["text"] = case["events"][1]["item"]["text"].replace("即将追加", "稍后再评估" + separator + "即将向目标声音追加")
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("prefix,suffix", [
+    ("再一次向目标声音", ""),
+    ("再向目标声音", "一遍"),
+])
+def test_explicit_repeat_count_order_cannot_add_another_approved_append(prefix, suffix):
+    case = copy.deepcopy(_DESIGN["fixture"])
+    case["events"][1]["item"]["text"] += prefix + "追加" + suffix + " Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。"
+    assert not _grammatical_notice(case)

@@ -521,10 +521,11 @@ def additional_action_qualifier(prefix: str, suffix: str) -> bool:
     local = re.split(r"[，,。；;\n]", prefix)[-1].strip()
     future = rf"(?:{_FUTURE}|将|会)?"
     recipient = r"(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?"
-    additional = r"(?:第二次|第2次)"
+    count = r"一次"
+    additional = rf"(?:第二次|第2次|再{count})"
     ordinal = re.fullmatch(rf"(?:{future}{additional}{future}{recipient}|{future}{recipient}{additional})\s*", local)
     repeat = re.fullmatch(rf"(?:{future}再{future}{recipient}|{future}{recipient}再)\s*", local)
-    return ordinal is not None or repeat is not None and re.match(r"\s*一次(?=\s|效果器|插件|wwise\b)", suffix) is not None
+    return ordinal is not None or repeat is not None and re.match(rf"\s*{count}(?=\s|效果器|插件|wwise\b)", suffix) is not None
 
 
 def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:

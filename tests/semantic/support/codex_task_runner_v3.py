@@ -689,11 +689,13 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         clause_cursor = clause_start + len(clause)
         substantive_start = clause_start + len(clause) - len(clause.lstrip())
         adjacent_owner = any(clause_start <= start < clause_start + len(clause) for start, end in inherited)
-        anchored = anchored or adjacent_owner or any(prospective_role_owner(clause[:action.start()], role_context) for action in re.finditer(context["action"], clause))
+        explicit_anchor = anchored or any(prospective_role_owner(clause[:action.start()], role_context) for action in re.finditer(context["action"], clause))
+        anchored = explicit_anchor or adjacent_owner
         source_referent = source_referent or anchored
         if source_referent and (re.search(r"(?:在|向)(?:其|它|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause)
                 or re.match(r"\s*(?:其本次预览|预览将|拟创建)", clause)):
             anchored = True
+            explicit_anchor = True
         if context["kind"] == "plugin" and (anchored or source_referent):
             state = re.search(r"(?:预览(?:的)?新增项是|预览显示[:：].*?效果链将多一个)", clause)
             if state and re.search(value_pattern, clause) and context["notes"].casefold() in clause:
@@ -792,6 +794,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             if sole_assignment:
                 continue  # The complete exact assignment was validated below.
             absolute_action = clause_start + action.start()
+            action_adjacent_owner = any(start <= absolute_action < end for start, end in inherited)
+            action_clause = next((local for local in local_claims if local.start <= action.start() < local.end), None)
+            local_owner = prospective_role_owner(clause[action_clause.start:action.start()], role_context) if action_clause else False
+            action_anchored = explicit_anchor or local_owner or action_adjacent_owner
             if any(claim.role == "prospective-reference" and claim.start <= absolute_action and clause_start + action.end() <= claim.end for claim in reference_claims):
                 continue
             if any(claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
@@ -861,7 +867,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                     polarity_prefix = polarity_prefix[coordinators[-1].start():]
             negated = _notice_qualifier_is_negated(polarity_prefix)
             if negated:
-                if expected and anchored and effect_anchor and (approved_value
+                if expected and action_anchored and effect_anchor and (approved_value
                         or re.search(r"目标|名为|为|\bto\b", claim) is None):
                     return False
                 continue
@@ -905,20 +911,20 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if not note_write:
                     return False
                 owner_prefix = qualifier
-            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent if owner_prefix.strip() not in {"将", "即将", "会"} else adjacent_owner):
+            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent if owner_prefix.strip() not in {"将", "即将", "会"} else action_adjacent_owner):
                 return False
             if noun or note_write:
                 continue
             if (context["kind"] == "plugin" and concrete_plugin_plan and expected and approved_value
                     and additional_action_qualifier(polarity_prefix, suffix)):
                 return False  # One approved descriptor cannot certify a second append.
-            if context["kind"] == "plugin" and expected and approved_value and anchored and uncertain_action_qualifier(polarity_prefix):
+            if context["kind"] == "plugin" and expected and approved_value and action_anchored and uncertain_action_qualifier(polarity_prefix):
                 return False  # Later execution prose cannot make this plan definite.
             if any(term in (local_effect.text if local_effect else claim) for term in context["protected"]):
                 return False
             if not expected or not effect_anchor or not approved_value:
                 return False
-            if expected and anchored:
+            if expected and action_anchored:
                 affirmative = True
                 if context["kind"] == "plugin":
                     concrete_plugin_plan = True
