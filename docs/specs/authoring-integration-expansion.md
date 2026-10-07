@@ -24,6 +24,20 @@ in-place change to a frozen run is allowed. This is not a general model ranking
 or retrospective change to the original pilot. Final complete acceptance must
 use the successful focused candidate and identical model/settings.
 
+## Limited notice review amendment — 2026-10-08
+
+The user approved independent, outcome-blind Agent review only for unsupported
+natural-language notice interpretation in the existing test harness. This
+supersedes #147's former no-model-grader restriction; actual authorization,
+identity, prepared operation, phase order, values, preservation and evidence
+checks remain deterministic. Read the [canonical development contract](../../tests/semantic/NOTICE_ADJUDICATION.md)
+before implementing or validating this path: uncertainty is non-PASS, new
+frozen runs only, and verify-only validates sealed review evidence without
+model rejudgment. Approved #157/#158 tooling is scheduled first, then #159 C09
+and #160 remaining workflows (#160 depends on #159). #147 remains the repair
+owner and #122 retains the complete one-candidate 13-positive-plus-boundary
+acceptance. Earlier decisions and recorded results remain historical evidence.
+
 ## Problem Statement
 
 The existing six business integration workflows demonstrate several common tasks, but do not represent every public parameter, object family, or music-authoring behavior. The large Python test suite also cannot establish parameter coverage from test counts alone. We need more valuable real-workflow coverage without duplicating tests, relying on rigid grading, or incurring unnecessary model costs.

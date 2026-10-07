@@ -4,6 +4,23 @@ Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
 on 2026-10-01. The latest Goal status and next permitted action are recorded below.
 
+## Current authorization amendment — 2026-10-08
+
+The user approved limited independent, outcome-blind review of unsupported
+notice language and the four implementation packages #157–#160. This changes
+only #147's former no-model-grader constraint. Read the [canonical development contract](../../tests/semantic/NOTICE_ADJUDICATION.md)
+for mandatory deterministic checks, uncertainty/non-PASS, sealed reviewer
+provenance, new-runs-only scope and verify-only without model rejudgment.
+Schedule #157 readiness and #158 fast feedback first; neither has blockers.
+#159 owns the narrow C09 path, and #160 depends on #159 for remaining workflows.
+#147 remains the consolidated repair; #122 retains final one-candidate macOS
+13-positive-plus-EXP22-M05-boundary acceptance and identical successful-root
+audit. Use pointer-based delegation with explicit `fork_turns="none"` at every
+spawn, Sol Medium for bounded execution and High for difficult design/review.
+No test, campaign or acceptance result is added here; the historical evidence,
+counts and FAIL roots below remain unchanged. Broad document reorganization
+is deferred.
+
 ## Current evidence addendum — 2026-10-07 modal review repair
 
 Latest completed full macOS Non-live remains functional `67279db`: **16609

@@ -33,6 +33,7 @@ SUPPORTED_MODES = frozenset(
     {
         "program",
         "nonlive",
+        "notice-fast",
         "default",
         "all",
         "smoke",
@@ -45,6 +46,7 @@ SUPPORTED_MODES = frozenset(
 DEFAULT_VERSION_BY_MODE = {
     "program": "none",
     "nonlive": "none",
+    "notice-fast": "none",
     "default": "none",
     "all": "all",
     "matrix": "all",
@@ -153,6 +155,7 @@ Versions:
 
 Modes:
   program      Run the focused pure-program public-route and transaction contract gate
+  notice-fast  Run fixed notice/fake runner/archive development regressions
   nonlive      Run default non-live test suite
   all          Run non-live suite first, then strict real matrix
   smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle
@@ -234,6 +237,8 @@ def parse_request(arguments: Sequence[str]) -> TestRequest | None:
         )
     if version not in SUPPORTED_VERSION_ARGUMENTS:
         raise TestDriverError(f"Unsupported version: {version}")
+    if mode == "notice-fast" and version != "none":
+        raise TestDriverError("notice-fast mode is non-live and requires version 'none'")
     if mode == "program" and version != "none":
         raise TestDriverError("program mode is all-version and requires version 'none'")
     if mode == "all" and version != "all":
@@ -364,6 +369,8 @@ class TestDriver:
         self.windows = os.name == "nt" if windows is None else windows
 
     def run(self, request: TestRequest) -> int:
+        if request.mode == "notice-fast":
+            return self._run_notice_fast(request.pytest_args)
         if request.mode == "program":
             return self._run_program(request.pytest_args)
         if request.mode in {"nonlive", "default"}:
@@ -442,6 +449,24 @@ class TestDriver:
                 "not live and not destructive",
                 *pytest_args,
             ),
+            environment,
+        )
+
+    def _run_notice_fast(self, pytest_args: Sequence[str]) -> int:
+        environment = self._nonlive_environment()
+        for name in (
+            "WWISE_VERSION", "WWISE_CONSOLE", "WWISE_SAMPLE_PROJECT_PATH",
+            "WWISE_SANDBOX_ROOT", "WWISE_TEST_CONFIG", "WWISE_WAAPI_HOST",
+            "WWISE_WAAPI_PORT", "PYTEST_ADDOPTS", "PYTEST_PLUGINS",
+        ):
+            environment.pop(name, None)
+        self._print_context(
+            environment=environment, version="none", mode="notice-fast",
+            pytest_args=pytest_args,
+        )
+        return self._run_child(
+            (self.python_executable,
+             str(self.repo_root / "ci" / "run_notice_fast_tests.py"), *pytest_args),
             environment,
         )
 
