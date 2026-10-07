@@ -19,7 +19,7 @@ Fresh used root `expansion-c09-c9145f1-sol-high-r1-cli1592`, profile `integratio
 The exact sealed notice at event 23 / item 11 was:
 
 > 已核对目标声音，并记录修改前状态；已从当前 Wwise 插件目录确认 Wwise Gain。将追加 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不设置插件参数或平台值；核验将检查原有效果器身份、slot 绑定及顺序，以及声音自身配置是否保持。
-> 
+>
 > 当前尚未修改工程，已取得 allow_changes 策略对这次具体变更的独立授权，现在执行。
 
 The notice contains no explicit GUID comparison. The saved cause is `V3TaskRunnerError: expansion turn failed: visible_preview_notice`; this audit does not regrade or reinterpret that sealed gate. Preview event 22 / item 10, Execute event 25 / item 12 and Verify event 27 / item 13 each exited zero exactly once. Every other turn gate passed. The independent oracle proved unchanged owner, exactly one added binding, unchanged existing effects/bindings, matching new effect, unique effect identities and target ownership. Final prose at event 28 / item 14 said the summary lacked individual comparisons for the existing effects and sound configuration; that saved statement does not alter independent business 6/6 or the notice FAIL.
