@@ -410,6 +410,11 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
         owner = re.sub(r"(?:的)?效果链(?:末尾|尾部)?$|(?:上|下)$", "", owner).strip()
         if source_referent and owner in {"其", "它", "该对象", "此对象"}:
             continue
+        role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
+            "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
+            reference_change=context["kind"] == "reference", parent=context.get("parent"))
+        if primary_role_atom(owner, role_context):
+            continue
         qualifiers = role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")
         owner = re.sub(rf"^(?:{'|'.join(re.escape(term) for term in qualifiers)})(?:对象)?\s+", "", owner)
         if owner in {context["source_id"].casefold(), *(value.casefold() for value in context["source_names"] if value)}:
@@ -772,15 +777,16 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if adopted.role == "execution-summary":
                     execution_summary = adopted
                     adoption = True
-        if local_claims and context["kind"] == "plugin":
-            deictic = deictic_effect_claim(local_claims[0], context["action"], planned_effect)
-            if deictic.role == "invalid":
-                return False
-            if deictic.role == "execution-summary":
-                if (planned_effect.owner_id != context["source_id"] or planned_effect.name != context["groups"][1][0].casefold()
-                        or planned_effect.native_class_id != context["descriptor"]["class_id"]):
+        if context["kind"] == "plugin":
+            for local in local_claims:
+                deictic = deictic_effect_claim(local, context["action"], planned_effect)
+                if deictic.role == "invalid":
                     return False
-                execution_summary = deictic
+                if deictic.role == "execution-summary":
+                    if (planned_effect.owner_id != context["source_id"] or planned_effect.name != context["groups"][1][0].casefold()
+                            or planned_effect.native_class_id != context["descriptor"]["class_id"]):
+                        return False
+                    execution_summaries += (deictic,)
         prior_note_owner, pending_note_owner = pending_note_owner, None
         if context["kind"] == "plugin" and not actions and re.fullmatch(r"\s*(?:在|向|对)\s*.+?(?:上|下)?\s*", clause):
             new_target = context["groups"][1][0].casefold()

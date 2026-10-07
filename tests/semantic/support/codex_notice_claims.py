@@ -9,7 +9,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, change_noun_pattern, notice_count, preview_noun_pattern, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, change_noun_pattern, notice_count, operation_noun_pattern, preview_noun_pattern, prospective_intent, role_terms
 
 FINITE_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
 
@@ -50,7 +50,7 @@ class StagedNoticeEvidence(NamedTuple):
 def staged_operation_adoption(clause: NoticeClaim, action_pattern: str, referent: PlannedEffectReferent) -> NoticeClaim:
     """Specific prospective adoption never grants policy or proves the plan."""
     refusal = r"(?:我)?(?:不会|不|暂不|不能|不再)"
-    match = re.fullmatch(rf"\s*(?P<intent>{_FUTURE}|{refusal})执行(?:{_REFERENT})?(?:{action_pattern})(?:\s+(?P<value>.+?))?\s*", clause.text)
+    match = re.fullmatch(rf"\s*(?P<intent>{_FUTURE}|{refusal})执行{operation_noun_pattern(action_pattern)}(?:\s+(?P<value>.+?))?\s*", clause.text)
     if match is None:
         return clause
     value = " ".join((match.group("value") or "").split())
@@ -101,6 +101,8 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
         return True
     if re.fullmatch(r"(?:所)?指定\s*guid", value):
         return True  # A definite referent to the adapter's singleton sealed ID.
+    if not context.reference_change and value in {"目标", "目标对象", "该对象", "此对象", "指定对象", "所指定对象"}:
+        return True  # No source/destination ambiguity in this singleton role.
     terms = "|".join(re.escape(term) for term in role_terms(row["type"]))
     return re.fullmatch(rf"(?:目标|该|此|(?:所)?指定)(?:的)?\s*(?:{terms})(?:对象)?", value) is not None
 
@@ -193,6 +195,12 @@ def _coordinated_attestations(clause: NoticeClaim, context: NoticeRoleContext) -
 
 def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """A complete affirmative generic/exact role assertion, with no lookup."""
+    nonaffirmative = r"(?:尚未|还未|未|没有|不|不能|可能|也许|或许|不确定(?:是否)?)"
+    denied = re.fullmatch(rf"\s*{nonaffirmative}(?:已)?(?:核对|核实|确认)\s*(.+?)\s*", clause.text)
+    reverse_denied = re.fullmatch(rf"\s*(.+?)\s*{nonaffirmative}(?:已)?(?:核对|核实|确认)\s*", clause.text)
+    if any(match is not None and (primary_role_atom(match.group(1), context)
+           or primary_role_attribute(match.group(1), context)) for match in (denied, reverse_denied)):
+        return clause._replace(role="invalid", diagnostic="nonaffirmative-owner-attestation")
     coordinated = _coordinated_attestations(clause, context)
     if coordinated is not None:
         if any(claim.role == "invalid" for claim in coordinated):
@@ -213,8 +221,11 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
     match = re.fullmatch(r"\s*(?:已)?(?:核对|核实|确认)(.+?)\s*", clause.text)
     if match is None:
         reverse = re.fullmatch(r"\s*(.+?)\s*已(?:核对|核实|确认|匹配|绑定)\s*", clause.text)
-        if reverse and (reverse.group(1).startswith("目标") or primary_role_atom(reverse.group(1), context)):
-            return clause._replace(role="owner-attestation" if primary_role_atom(reverse.group(1), context)
+        declared_object = re.match(r"(?:该|此|(?:所)?指定)对象(?:的|身份|配置|和|及|与|\s|$)", reverse.group(1)) if reverse else None
+        if reverse and (reverse.group(1).startswith("目标") or declared_object or primary_role_atom(reverse.group(1), context)
+                        or primary_role_attribute(reverse.group(1), context)):
+            return clause._replace(role="owner-attestation" if (primary_role_atom(reverse.group(1), context)
+                                   or primary_role_attribute(reverse.group(1), context))
                                    else "invalid", diagnostic="conflicting-owner-attestation")
         return clause
     from tests.semantic.support.codex_notice_language import attested_primary_target
@@ -607,7 +618,7 @@ def preview_status_claim(clause: NoticeClaim, *, reference_change: bool = False,
 def execution_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
     """A complete operation-matched summary; it never establishes the effect."""
     read = r"(?:并(?:读取|回读)(?:实际)?结果(?:核验|验收))?"
-    match = re.fullmatch(rf"\s*(?:{_FUTURE})执行(?:{_REFERENT})?(?:{action_pattern}){read}\s*", clause.text)
+    match = re.fullmatch(rf"\s*(?:{_FUTURE})执行{operation_noun_pattern(action_pattern)}{read}\s*", clause.text)
     if match and prospective_intent(clause.text, operation_actions=action_pattern):
         return clause._replace(role="execution-summary")
     return clause
@@ -616,7 +627,7 @@ def execution_operation_claim(clause: NoticeClaim, action_pattern: str) -> Notic
 def deictic_effect_claim(clause: NoticeClaim, action_pattern: str, referent: PlannedEffectReferent | None) -> NoticeClaim:
     """A future summary may refer only to one earlier validated planned effect."""
     refusal = r"(?:我)?(?:不会|不|暂不|不能|不再)"
-    match = re.fullmatch(rf"\s*(?P<intent>{_FUTURE}|{refusal})\s*(?:{action_pattern})\s*上述\s*(?P<value>.+?)\s*", clause.text)
+    match = re.fullmatch(rf"\s*(?P<intent>{_FUTURE}|{refusal})(?:再)?\s*(?:{action_pattern})\s*上述\s*(?P<value>.+?)\s*", clause.text)
     if match is None:
         return clause
     if referent is None:

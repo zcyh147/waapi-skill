@@ -200,7 +200,7 @@ def _point_description(text: str, context: Mapping[str, Any]) -> bool:
     shape = next(key for key, value in _CURVE_SHAPES.items() if value == native)
     shape = rf"(?:{re.escape(shape)}|线性)" if shape == "linear" else re.escape(shape)
     unit = r"(?:\s*db)?" if context["kind"] == "volume-dry" else ""
-    description = re.fullmatch(rf"(?:(?P<count>[0-9零一二三四五六七八九十]+)(?:个)?)?\s*{shape}(?:点|points)[:：]?[、\s]*{unit}\s*", text)
+    description = re.fullmatch(rf"(?:(?P<count>[0-9零一二三四五六七八九十]+)(?:个)?)?\s*{shape}[ \t]*(?:点|points)[:：]?[、\s]*{unit}\s*", text)
     return description is not None and (description.group("count") is None or _point_count(description.group("count")) == len(context["points"]))
 
 
@@ -225,7 +225,8 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
     """Every affirmative transitive edit must name this owner and curve role."""
     row = context["identity"]
     owner = "|".join(re.escape(value.casefold()) for value in _owner_terms(row))
-    kind = "|".join(re.escape(value) for value in kind_aliases)
+    alias = "|".join(re.escape(value) for value in kind_aliases)
+    kind = rf"(?:{alias})(?:[ \t]+(?:{alias}))?"
     field = rf"(?:的|'s|\s)*(?:{kind})(?:\s*(?:曲线|curve))?(?:的|:|：|\s)*(?:来源|source|形状|shape|点|points)?"
     source = "|".join(re.escape(value) for value in source_aliases)
     role_context = NoticeRoleContext(row, tuple(kind_aliases), context.get("before_curve"))
@@ -342,7 +343,7 @@ def _closed_mutation_claims(text: str, context: Mapping[str, Any], kind_aliases:
                 affirmative = True
                 continue
             if action.group() in {"提交", "应用", "写入"}:
-                if action.group() in {"提交", "写入"} and affirmative and left.strip() in {"", "并", "并按顺序"} and _point_description(right.strip(" 、"), context):
+                if action.group() in {"提交", "写入"} and affirmative and left.strip() in {"", "并", "按顺序", "并按顺序"} and _point_description(right.strip(" 、"), context):
                     continue
                 if not _prospective_submission(left, right, text, context, owner, kind, source):
                     return False

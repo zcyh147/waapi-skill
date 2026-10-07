@@ -23,12 +23,18 @@ _GRANT = r"(?:已)?(?:取得|获得)"
 _AUTHORIZATION = r"(?:下的|的)?(?:独立)?(?:持久)?(?:策略)?授权(?:记录)?"
 
 
+def operation_noun_pattern(operation_actions: str) -> str:
+    """Adapter-approved heads, usable only inside a complete noun carrier."""
+    return rf"(?:{_REFERENT})?[ \t]*(?:{operation_actions})[ \t]*(?:方案|计划|操作)?"
+
+
 def change_noun_pattern(*, reference_change: bool = False, require_referent: bool = True,
                         operation_actions: str | None = None) -> str:
     """One bounded current-change noun shared by its surrounding predicates.
 
     A reference qualifier is legal only in a caller-attested reference context.
-    An omitted current referent is used only inside the explicit Preview noun.
+    Omitted current referents require an adapter head and a complete carrier,
+    or the explicit Preview noun. A noun alone never exempts action text.
     operation_actions comes only from the adapter's sealed operation family.
     Neither the noun nor a qualifier proves an effect or permission.
     """
@@ -38,7 +44,8 @@ def change_noun_pattern(*, reference_change: bool = False, require_referent: boo
     if operation_actions:
         head = rf"(?:{head}|{operation_actions})"
     executable = r"(?:可执行)?" if not require_referent else ""
-    return rf"{referent}{executable}(?:具体)?(?:独立)?(?:单字段|单一)?{qualifier}{head}"
+    abstract = rf"{referent}{executable}(?:具体)?(?:独立)?(?:单字段|单一)?{qualifier}{head}"
+    return rf"(?:{abstract}|{operation_noun_pattern(operation_actions)})" if operation_actions else abstract
 
 
 def preview_noun_pattern(*, reference_change: bool = False, operation_actions: str | None = None) -> str:
@@ -131,7 +138,8 @@ def authorization_claim(clause: str, *, reference_change: bool = False,
     denied_grant = re.fullmatch(r"(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*(.+)", body)
     if denied_grant and re.fullmatch(attributed_grant, denied_grant.group(1)):
         return AuthorizationClaim("invalid", 0, len(clause), "")
-    relevant = re.search(change, body) is not None and "授权" in body
+    grant_component = re.split(r"[，,]", body, maxsplit=1)[0]
+    relevant = re.search(change, grant_component) is not None and "授权" in grant_component
     recognized = re.match(rf"(?:(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*)?(?:{change}|(?:已)?(?:按|依据|取得|获得|为))|在|向|对|(?:当前)?\s*[a-z_]+\s*策略", body)
     if relevant and recognized:
         return AuthorizationClaim("invalid", 0, len(clause), "")
@@ -183,8 +191,9 @@ def planned_change_noun(action: str, prefix: str, suffix: str, *, reference_chan
             return None
     if re.fullmatch(_CHANGE, action) is None and (not operation_actions or re.fullmatch(operation_actions, action) is None):
         return None
-    execution = re.search(rf"(?:{_FUTURE})?(?:按(?:该)?授权)?(?:执行|应用){change_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)}$", prefix + action)
-    if execution and re.match(r"(?=[，,]|并|$)", suffix):
+    nominal_tail = re.match(r"[ \t]*(?:方案|计划|操作)?", suffix).group()
+    execution = re.search(rf"(?:{_FUTURE})?(?:按(?:该)?授权)?(?:执行|应用){change_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)}$", prefix + action + nominal_tail)
+    if execution and re.match(r"(?=[，,]|并|$)", suffix[len(nominal_tail):]):
         return PlannedNoun("execution", prefix[:execution.start()])
     frames = (
         ("execution", rf"(?:{_FUTURE})?(?:按(?:该)?授权)?(?:执行|应用)(?:{_REFERENT})(?:单字段|单一引用|单一)?$", r"(?=[，,]|并|$)"),
