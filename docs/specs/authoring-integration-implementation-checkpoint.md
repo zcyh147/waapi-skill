@@ -4,6 +4,24 @@ Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
 on 2026-10-01. The latest Goal status and next permitted action are recorded below.
 
+## Current evidence addendum — 2026-10-07 modal-prefix repair
+
+Latest completed full macOS Non-live remains functional `67279db`: **16609
+passed / 119 skipped / 27 deselected**, exit 0. Its new EXP25-C09 Fresh root
+remains a frozen notice-only **FAIL**, with Gateway `verified` and independent
+business **6/6**; see the [validation report](../research/integration-expansion-guid-validation-67279db-2026-10-07.md).
+The subsequent bounded prefix repair `f88f3a1` passed the focused developer
+selection **3807 tests**, including all **3766 retained controls**. It composes
+current-operation/modal/recipient components and binds new omitted-recipient
+action prefixes to the action's local owner window; existing complete Preview
+noun carriers retain their prior reference path. See the [repair report](../research/integration-expansion-modal-prefix-repair-2026-10-07.md).
+This is focused component evidence, with independent review, complete applicable
+gate and a new targeted Fresh proof pending. **#147 stays open; #122's final
+13-positive-plus-boundary acceptance remains pending.** The read-only
+[contract audit](/tmp/waapi-expansion-notice-contract-audit-20261007.md) contains
+proposal-only continuity alternatives; no continuity rule, N18 expectation or
+acceptance requirement changed. Historical tables below remain unchanged.
+
 ## Resume and task frontier — 2026-10-07
 
 The user explicitly resumed implementation under `implement-spec`; the new Goal
