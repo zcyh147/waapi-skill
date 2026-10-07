@@ -22,6 +22,12 @@ fallback. Review-repair candidate `6bc4a68` passed **3834 focused tests**: all
 every supplied prefix/claim-side owner before using inheritance as a fallback and
 recognizes the existing finite action head before rejecting unsupported modal
 composition. See the [review-repair report](../research/integration-expansion-modal-review-repair-2026-10-07.md).
+The subsequent finite scope-head delta `7ec4b67` passed **3842 focused
+tests** (all **3834 retained** plus **eight new controls**). Both immediate and
+interrupted-composition recognizers now use the same declared finite heads; next/second
+scope cannot disappear through reordered components or intervening text. The
+[delta report](../research/integration-expansion-modal-scope-head-delta-2026-10-08.md)
+adds evidence without revising the predecessor reports.
 This is focused component evidence, with independent rereview, complete applicable
 gate and a new targeted Fresh proof pending. **#147 stays open; #122's final
 13-positive-plus-boundary acceptance remains pending.** The read-only
