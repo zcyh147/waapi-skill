@@ -506,8 +506,8 @@ def uncertain_action_qualifier(prefix: str) -> bool:
     Like completion qualifiers, uncertainty may precede or follow the
     recipient. It concerns this action only, never another read sentence.
     """
-    local = re.split(r"[，,。；;\n]", prefix)[-1]
-    return re.search(r"(?:可能|也许|或许|不确定(?:是否)?)(?:会|将)?(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?$", local) is not None
+    local = re.split(r"[，,。；;\n]", prefix)[-1].strip()
+    return re.search(r"(?:可能|也许|或许|不确定(?:是否)?)(?:会|将)?\s*(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?$", local) is not None
 
 
 def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:

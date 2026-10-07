@@ -52,6 +52,23 @@ def test_local_append_certainty_cannot_be_supplied_by_later_generic_execution(re
     assert _grammatical_notice(case) is expected
 
 
+@pytest.mark.parametrize("recipient,qualifier_gap,action_gap", [
+    ("", " ", ""), ("", "\t", ""),
+    ("向目标声音", "", " "), ("向目标声音", "", "\t"),
+    ("向目标声音", " ", ""), ("向目标声音", "\t", ""),
+])
+@pytest.mark.parametrize("qualifier,expected", [
+    ("将", True), ("会", True), ("可能会", False),
+    ("也许会", False), ("或许将", False), ("不确定是否会", False),
+])
+def test_local_append_certainty_is_independent_of_qualifier_edge_whitespace(recipient, qualifier_gap, action_gap, qualifier, expected):
+    case = copy.deepcopy(_CASES[0])
+    post = case["events"][2]["item"]
+    prefix = qualifier + qualifier_gap + recipient + action_gap
+    post["text"] = post["text"].replace("。将追加", "。" + prefix + "追加")
+    assert _grammatical_notice(case) is expected
+
+
 @pytest.mark.parametrize("operands", [
     "目标声音身份、实时 Sound 类型",
     "目标声音身份、实时 ActorMixer 类型",

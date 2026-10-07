@@ -151,5 +151,67 @@
     "business oracle",
     "model grader",
     "frozen campaign verdict and evidence"
-  ]
+  ],
+  "review_delta": {
+    "reviewed_candidate": "d4ca72670613381a60b25154a3d5dce2fe4c8876",
+    "reviews": [
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/d4ca726-review-standards.md",
+        "sha256": "15cbbf154914a831f89dde73201f933dd1e334e4b400cf1f09613daf6a1593be"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/d4ca726-review-spec.md",
+        "sha256": "6543c1bf14f198f4a1d1228da7f31c9c88a7bbe9d6f33841950552819ad76069"
+      }
+    ],
+    "findings": {
+      "standards": 0,
+      "spec": 1,
+      "priority": "P2",
+      "description": "Whitespace between an uncertainty qualifier and its owned append bypassed the local certainty guard."
+    },
+    "repair": "Normalize only local qualifier-edge whitespace and permit whitespace before the already supported optional recipient. This changes no role grammar, descriptor/owner authority or independent vector expectation.",
+    "additional_controls": 36,
+    "independent_vector_sha256": "67ec04ea10f5aacad588dc28b1ace2fdbc6363d6339e8c3a27c408abf4339bb8",
+    "final_result": {
+      "passed": 2657,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 4.7,
+      "previous_notice_selection_passed": 2566,
+      "new_controls_total": 91
+    },
+    "artifacts": [
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/review-whitespace-red.log",
+        "sha256": "ef2b84173d37155665307cf4b1c197ce0fb363d0c22e1ab1fec138f738a07e76",
+        "exit_code": 1,
+        "result": "10 failed /81 passed in0.28s"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/review-whitespace-green.log",
+        "sha256": "ec750092e1df5b7bf51b942e7a6c4a6a8d6a482caf0c7eda57673c44eee59621",
+        "exit_code": 0,
+        "result": "91 passed in0.23s"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/review-retained-exact-selection.log",
+        "sha256": "1a0df70997bf6df48eb1a7797967e69713cc31713a45d8e5ff7f421caf565338",
+        "exit_code": 0,
+        "result": "2657 passed in4.70s"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/review-retained-exact-selection.xml",
+        "sha256": "0a3f5dfdad4b1c336d875a7f63103d3b2f15f2bd941aef93601d78b239c963da",
+        "exit_code": 0,
+        "result": "JUnit2657 tests /0failures /0errors /0skips"
+      }
+    ],
+    "full_program_run": false,
+    "full_nonlive_run": false,
+    "fresh_codex_run": false,
+    "live_wwise_run": false,
+    "windows_validation": false,
+    "frozen_campaign_replayed_or_regraded": false
+  }
 }
