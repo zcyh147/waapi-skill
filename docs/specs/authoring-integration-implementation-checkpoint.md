@@ -2217,3 +2217,11 @@ The current coordinator is GPT-6.1 Sol high. Prefer GPT-6 Luna max for normal
 implementation, fixture repairs, and evidence handling; use GPT-6.1 Sol medium
 for cross-module work and reviews. The user does not want routine permission
 questions. Do not reactivate completed Astra subagents for new implementation work.
+
+
+## Modal candidate validation checkpoint — 2026-10-08
+
+- Frozen `c9145f1` passed complete macOS Non-live: **16694 passed, 119 skipped, 27 deselected**, exit 0. Fixed Program inputs remain unchanged; no new Program run or count is claimed.
+- Its sole Fresh EXP25-C09 failed `visible_preview_notice`; Gateway verification and all six independent business assertions passed. All other turn gates passed. The root is frozen without retry, resume, replay, regrading or verify-only.
+- Both source full hashes/mtimes and all candidate input hashes remain unchanged. The failed sandbox is sealed and quarantined, the one-shot LaunchAgent is unloaded, and scoped residual processes are empty.
+- Notice-only failure repeated. Further execution stopped; the coordinator owns the read-only contract audit and next design decision. Final 13 acceptance remains unreleased, with no Windows or full-profile claim. Exact notice, logs, launch pins and artifact digests are in the [validation report](../research/integration-expansion-modal-validation-c9145f1-2026-10-08.md) and its companion JSON.
