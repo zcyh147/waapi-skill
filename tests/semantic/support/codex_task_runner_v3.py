@@ -1153,6 +1153,17 @@ def _rtpc_coherent_actions(text: str, context: Mapping[str, Any]) -> bool:
     return affirmative
 
 
+def _rtpc_endpoint_preservation_polarity(clause: NoticeClaim) -> NoticeClaim:
+    """A complete local preservation predicate carries its own polarity."""
+    predicate = re.search(r"保持(?:原样|不变|原值)?|\bunchanged\b|\bretain(?:ed)?\b", clause.text)
+    if predicate is None or clause.text[predicate.end():].strip():
+        return clause
+    qualifier = clause.text[:predicate.start()]
+    if _notice_qualifier_is_negated(qualifier) or uncertain_action_qualifier(qualifier):
+        return clause._replace(role="invalid", diagnostic="nonaffirmative-endpoint-preservation")
+    return clause._replace(role="retained-endpoints")
+
+
 def _rtpc_retained_endpoint_claim(text: str) -> NoticeClaim | None:
     """Preservation belongs to the endpoint clause or its coordinated list.
 
@@ -1162,13 +1173,31 @@ def _rtpc_retained_endpoint_claim(text: str) -> NoticeClaim | None:
     for clause in notice_clauses(text):
         if re.match(r"\s*端点\s*[（(]", clause.text) is None:
             continue
-        predicate = re.search(r"保持(?:原样|不变|原值)?|\bunchanged\b|\bretain(?:ed)?\b", clause.text)
-        if (predicate is None or _notice_qualifier_is_negated(clause.text[:predicate.start()])
-                or uncertain_action_qualifier(clause.text[:predicate.start()])
-                or clause.text[predicate.end():].strip()):
-            return None
-        return clause._replace(role="retained-endpoints")
+        claim = _rtpc_endpoint_preservation_polarity(clause)
+        return claim if claim.role == "retained-endpoints" else None
     return None
+
+
+def _rtpc_owned_endpoint_claims(text: str, context: Mapping[str, Any]) -> tuple[NoticeClaim, ...]:
+    """Bind endpoint claims locally to the certified current Volume relation.
+
+    Foreign subjects and scheduling prose never inherit this relation merely
+    because an earlier sentence named it. No preservation statement is required.
+    """
+    exact_relation = re.escape(context["ids"][2].casefold())
+    relation = r"(?:曲线|关系|curve|association|relationship)"
+    quantity_relation = rf"(?:(?:本次|当前|这次)\s*)?(?:volume|voice volume|音量|增益)\s*(?:rtpc\s*)?{relation}"
+    definite_relation = rf"(?:本次|当前|这次|该|此|这条|目标){relation}"
+    subject = rf"(?:(?:{quantity_relation}|{definite_relation}|{exact_relation})\s*(?:的)?\s*)?"
+    claims = []
+    for clause in notice_clauses(text):
+        noun = re.match(rf"\s*{subject}(?:两端(?:点)?|端点|首尾点|endpoints)\s*", clause.text)
+        if noun is None:
+            continue
+        # Polarity starts after the bound subject/noun, retaining original spans.
+        predicate = clause._replace(start=clause.start + noun.end(), text=clause.text[noun.end():])
+        claims.append(_rtpc_endpoint_preservation_polarity(predicate))
+    return tuple(claims)
 
 
 def _rtpc_preview_actions_accounted(text: str, context: Mapping[str, Any],
@@ -1263,6 +1292,9 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
         return notice_shape and (not ("linear" in part or "线性" in part)
                                  or _affirmative_linear_interpolation(part))
     old, new = context["old"], context["new"]
+    if (len(old) >= 2 and len(new) >= 2 and old[0] == new[0] and old[-1] == new[-1]
+            and any(claim.role == "invalid" for claim in _rtpc_owned_endpoint_claims(numeric, context))):
+        return False, False
     explicit_retained_endpoints = False
     for remainder in same_target_clauses:
         if re.search(r"两端(?:点)?\s*仍为", remainder):

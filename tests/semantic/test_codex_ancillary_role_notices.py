@@ -209,3 +209,35 @@ def test_rtpc_matching_incomplete_owner_fields_do_not_attest_a_complete_source(f
         {"type": "item.started", "item": {"type": "command_execution", "command": "execute"}},
     ]
     assert not _notice(events, case)
+
+
+@pytest.mark.parametrize("extra,expected", [
+    ("本次 Volume RTPC 曲线的两端点不会保持原样。", False),
+    ("本次 Volume RTPC 曲线的两端点可能保持原样。", False),
+    ("本次 Volume RTPC 曲线的两端点不确定是否保持原样。", False),
+    ("该曲线的两端点不会保持原样。", False),
+    ("本次关系的端点不会保持不变。", False),
+    ("本次 Volume RTPC 曲线的两端点保持原样。", True),
+    ("该曲线的两端点会保持原样。", True),
+    ("本次关系的端点保持不变。", True),
+    ("Pitch RTPC 曲线的两端点不会保持原样。", True),
+    ("本次 Pitch RTPC 曲线的两端点可能保持原样。", True),
+    ("另一条曲线的两端点不会保持原样。", True),
+    ("其他关系的端点可能保持原样。", True),
+    ("今天四点执行检查。", True),
+    ("明天的日程不会保持原样。", True),
+])
+def test_rtpc_later_endpoint_preservation_claims_keep_local_owned_polarity(extra, expected):
+    assert _single_message_notice("RTPC", _VECTORS[51]["messages"][0] + extra) is expected
+
+
+@pytest.mark.parametrize("extra,expected", [
+    ("", True),
+    ("本次 Volume RTPC 曲线的两端点保持原样。", True),
+    ("本次 Volume RTPC 曲线的两端点不会保持原样。", False),
+    ("本次 Volume RTPC 曲线的两端点可能保持原样。", False),
+    ("Pitch RTPC 曲线的两端点不会保持原样。", True),
+])
+def test_rtpc_complete_curve_requires_no_preservation_prose_but_rejects_owned_contradiction(extra, expected):
+    text = "将音量曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性。" + extra
+    assert _single_message_notice("RTPC", text) is expected
