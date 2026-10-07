@@ -18,11 +18,11 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 if __package__:
-    from .test_readiness import report_readiness
+    from .test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness
     from .resolve_live_test_config import LiveTestConfigError
     from .run_live_test_command import main as run_live_test_command
 else:  # Executed directly by ci/test.sh or ci/test.bat.
-    from test_readiness import report_readiness
+    from test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness
     from resolve_live_test_config import LiveTestConfigError
     from run_live_test_command import main as run_live_test_command
 
@@ -433,6 +433,14 @@ class TestDriver:
         print(flush=True)
 
     def _run_nonlive(self, pytest_args: Sequence[str]) -> int:
+        started = time.perf_counter()
+        try:
+            validate_nonlive_readiness(self.repo_root, tuple(pytest_args))
+        except (ReadinessBlocked, ValueError, OSError) as exc:
+            report_readiness(started, reason=str(exc), blocked=True)
+            print(f"TEST_READINESS_BLOCKED: {exc}", file=sys.stderr)
+            return 1
+        report_readiness(started, reason="selected Non-live prerequisites ready")
         environment = self._nonlive_environment()
         self._print_context(
             environment=environment,

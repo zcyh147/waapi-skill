@@ -241,8 +241,12 @@ Developer and Fresh campaign launchers emit a compact `test-readiness` JSON
 record with status, reason, and phase duration before expensive test dispatch.
 Selected real lanes check versioned paths, project version, sealed fixture/media
 payloads when a fixture manifest exists, and conflicts scoped to the selected
-source/sandbox. Custom installed SampleProjects do not need a repository
-manifest. Program, Non-live, and notice-fast do not require live configuration;
+source/sandbox. On macOS, real lanes also exclude other active real lanes
+across roots because Audiokinetic wrappers share the Wwise2019x64 bottle.
+Custom installed SampleProjects do not need a repository manifest. Complete
+Non-live checks the five static fixture payloads and scoped gate conflicts;
+focused fake selections remain independent of unrelated fixtures. Program,
+Non-live, and notice-fast do not require live configuration;
 archive verify-only retains its existing evidence checks without current live
 readiness. A blocked result requires an explicit prerequisite repair and retry:
 readiness never installs, hydrates, edits configuration, or terminates Wwise.
