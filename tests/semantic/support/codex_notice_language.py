@@ -74,6 +74,7 @@ _CURRENT_SCOPE = r"本次|此次|这次|当前"
 _INCOMPATIBLE_SCOPE = r"下次|下一次|第二次|第2次|已经|已|可能|也许|或许|不确定(?:是否)?|不会|不"
 _PROSPECTIVE_MODAL = r"即将|将|会"
 _ACTION_SCOPE_HEAD = rf"{_CURRENT_SCOPE}|{_INCOMPATIBLE_SCOPE}"
+_RECIPIENT_MARKER = r"向|在|把|对"
 
 
 def prospective_action_prefix(prefix: str) -> ProspectivePrefix | None:
@@ -89,13 +90,13 @@ def prospective_action_prefix(prefix: str) -> ProspectivePrefix | None:
         rf"\s*(?P<scope>{_CURRENT_SCOPE})?\s*"
         rf"(?P<qualifier>{_INCOMPATIBLE_SCOPE})?\s*"
         rf"(?P<modal>{_PROSPECTIVE_MODAL})?\s*"
-        r"(?:(?P<marker>向|在|把|对)\s*(?P<recipient>.+?))?\s*", prefix)
+        rf"(?:(?P<marker>{_RECIPIENT_MARKER})\s*(?P<recipient>.+?))?\s*", prefix)
     if match is None:
+        # Recognition selects the same modal-or-recipient alternatives as
+        # validation. An optional modal cannot be required to retain scope.
         started = re.match(
-            rf"\s*(?P<scope>{_ACTION_SCOPE_HEAD})\s*(?P<modal>{_PROSPECTIVE_MODAL})", prefix)
-        if started is None:
-            started = re.fullmatch(
-                rf"\s*(?P<scope>{_ACTION_SCOPE_HEAD}).*?(?P<modal>{_PROSPECTIVE_MODAL})\s*(?:向|在|把|对)\s*.+\s*", prefix)
+            rf"\s*(?P<scope>{_ACTION_SCOPE_HEAD}).*?"
+            rf"(?:(?P<modal>{_PROSPECTIVE_MODAL})|(?:{_RECIPIENT_MARKER}))", prefix)
         if started is not None:
             # This finite action head has already selected the scope/modal class.
             # Unconsumed text cannot fall through to the legacy last-marker
