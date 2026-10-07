@@ -19,7 +19,7 @@ from tests.semantic.support.codex_attenuation_notice import (
 )
 from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
-    NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
+    NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, additional_action_qualifier, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
     effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
     owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner, primary_role_atom, staged_operation_adoption, uncertain_action_qualifier,
 )
@@ -435,9 +435,10 @@ _NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|写入|改动|更新|�
                      r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
 
 
-def _notice_mutation_is_noun(action: str, prefix: str, suffix: str, *, reference_change: bool = False) -> bool:
+def _notice_mutation_is_noun(action: str, prefix: str, suffix: str, *, reference_change: bool = False,
+                             operation_actions: str | None = None) -> bool:
     """Only complete request/authorization and execute-summary noun roles."""
-    if planned_change_noun(action, prefix, suffix, reference_change=reference_change) is not None:
+    if planned_change_noun(action, prefix, suffix, reference_change=reference_change, operation_actions=operation_actions) is not None:
         return True
     if action not in {"修改", "变更", "改动"}:
         return False
@@ -608,7 +609,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
     role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
         "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
         protected_effect_count=context.get("protected_effect_count"), reference_change=context["kind"] == "reference",
-        parent=context.get("parent"))
+        parent=context.get("parent"), operation_actions=context["action"])
     inherited = owner_inheritance(text, role_context)
     if inherited is None:
         return False
@@ -660,6 +661,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
     if staged is None and (not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited or reference_effect) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]})):
         return False
     affirmative = staged is not None or reference_effect
+    concrete_plugin_plan = False
     adoption = False
     source_referent = False
     pending_note_owner = None
@@ -674,9 +676,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
         for claim in ancillary:
             if claim.role in {"authorization", "preview-status"} and not _bound_explicit_owners_agree(claim.value.strip().rstrip("，,").strip(), "", context):
                 return False
-        preview_status = preview_status_claim(local_claims[0], reference_change=context["kind"] == "reference") if local_claims else None
+        preview_status = preview_status_claim(local_claims[0], reference_change=context["kind"] == "reference", operation_actions=context["action"]) if local_claims else None
         authorization = authorization_claim(local_claims[0].text if preview_status is not None
-            and preview_status.role == "preview-status" else clause, reference_change=context["kind"] == "reference")
+            and preview_status.role == "preview-status" else clause, reference_change=context["kind"] == "reference", operation_actions=context["action"])
         if authorization.state == "invalid":
             return False
         if authorization.state == "ancillary":
@@ -712,7 +714,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             # composition. Broader owner proof is retained above; unknown
             # coordinated text is left for ordinary action validation.
             for local_claim in local_claims[1:]:
-                record = authorization_claim(local_claim.text, reference_change=context["kind"] == "reference")
+                record = authorization_claim(local_claim.text, reference_change=context["kind"] == "reference", operation_actions=context["action"])
                 if record.state == "invalid":
                     return False
                 if record.state == "ancillary":
@@ -792,7 +794,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             absolute_action = clause_start + action.start()
             if any(claim.role == "prospective-reference" and claim.start <= absolute_action and clause_start + action.end() <= claim.end for claim in reference_claims):
                 continue
-            if any(claim.role in {"authorization", "preview-status", "read-summary", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
+            if any(claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
                 continue
             if any(claim.role == "exclusion" and claim.start <= action.start() and action.end() <= claim.end for claim in exclusions):
                 continue
@@ -835,7 +837,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             # component. Preserve that existing projection; only exclusion
             # polarity and protected-field checks use the local edit span.
             claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
-            noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip(), reference_change=context["kind"] == "reference")
+            noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip(), reference_change=context["kind"] == "reference", operation_actions=context["action"])
             if noun_provider is not None and noun_provider.role in {"invalid-provider", "curve-range"}:
                 return False
             effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
@@ -867,7 +869,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             # change. They cannot certify the expected effect by themselves.
             prefix = clause[:action.start()]
             suffix = clause[action.end():].strip()
-            noun = (_notice_mutation_is_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference")
+            noun = (_notice_mutation_is_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference", operation_actions=context["action"])
                 or (context["kind"] == "plugin" and action.group() == "新增" and re.search(r"预览的$", prefix) and re.match(r"项是", suffix))
                 or (context["kind"] == "plugin" and _plugin_description_is_noun(action.group(), prefix, suffix))
                 or (action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", suffix)
@@ -876,7 +878,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 or re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix)
                 or (context["kind"] == "reference" and re.search(r"执行.*引用$", prefix) and action.group() == "更新"))
             note_write = False
-            noun_frame = planned_change_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference") if noun else None
+            noun_frame = planned_change_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference", operation_actions=context["action"]) if noun else None
             owner_prefix = noun_frame.owner_prefix if noun_frame else _noun_owner_prefix(prefix) if noun else prefix
             if (operation_intro is not None and operation_intro.role == "prospective-operation"
                     and operation_intro.end == action.start()):
@@ -907,6 +909,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 return False
             if noun or note_write:
                 continue
+            if (context["kind"] == "plugin" and concrete_plugin_plan and expected and approved_value
+                    and additional_action_qualifier(polarity_prefix, suffix)):
+                return False  # One approved descriptor cannot certify a second append.
             if context["kind"] == "plugin" and expected and approved_value and anchored and uncertain_action_qualifier(polarity_prefix):
                 return False  # Later execution prose cannot make this plan definite.
             if any(term in (local_effect.text if local_effect else claim) for term in context["protected"]):
@@ -916,6 +921,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             if expected and anchored:
                 affirmative = True
                 if context["kind"] == "plugin":
+                    concrete_plugin_plan = True
                     creation_position = action.start()
                     quoted_notes = re.findall(r'备注(?:为|是)?\s*[“"]([^”"]*)[”"]', clause)
                     if not context["notes"] or context["notes"].casefold() in quoted_notes:

@@ -23,22 +23,27 @@ _GRANT = r"(?:已)?(?:取得|获得)"
 _AUTHORIZATION = r"(?:下的|的)?(?:独立)?(?:持久)?(?:策略)?授权(?:记录)?"
 
 
-def change_noun_pattern(*, reference_change: bool = False, require_referent: bool = True) -> str:
+def change_noun_pattern(*, reference_change: bool = False, require_referent: bool = True,
+                        operation_actions: str | None = None) -> str:
     """One bounded current-change noun shared by its surrounding predicates.
 
     A reference qualifier is legal only in a caller-attested reference context.
     An omitted current referent is used only inside the explicit Preview noun.
+    operation_actions comes only from the adapter's sealed operation family.
     Neither the noun nor a qualifier proves an effect or permission.
     """
     referent = rf"(?:{_REFERENT})" + ("" if require_referent else "?")
     qualifier = r"(?:引用)?" if reference_change else ""
     head = r"(?:修改|变更|改动|更新)" if reference_change else _CHANGE
+    if operation_actions:
+        head = rf"(?:{head}|{operation_actions})"
     executable = r"(?:可执行)?" if not require_referent else ""
     return rf"{referent}{executable}(?:具体)?(?:独立)?(?:单字段|单一)?{qualifier}{head}"
 
 
-def preview_noun_pattern(*, reference_change: bool = False) -> str:
-    change = change_noun_pattern(reference_change=reference_change, require_referent=False)
+def preview_noun_pattern(*, reference_change: bool = False, operation_actions: str | None = None) -> str:
+    change = change_noun_pattern(reference_change=reference_change, require_referent=False,
+                                 operation_actions=operation_actions)
     return rf"(?:(?:{change})(?:的)?|(?:可执行|具体|本次|当前|这次|该|此))?预览"
 
 
@@ -74,14 +79,15 @@ def notice_count(value: str) -> int | None:
     return None
 
 
-def authorization_claim(clause: str, *, reference_change: bool = False) -> AuthorizationClaim:
+def authorization_claim(clause: str, *, reference_change: bool = False,
+                        operation_actions: str | None = None) -> AuthorizationClaim:
     """Classify active/passive ancillary claims, retaining their original span.
 
     A claim never grants authority or proves an expected effect. Its owner
     prefix must still agree with the caller's independently attested role.
     Unconsumed coordinated text remains available for action accounting.
     """
-    change = change_noun_pattern(reference_change=reference_change)
+    change = change_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)
     active = rf"(?:{_PROVIDER})?{_GRANT}{change}{_AUTHORIZATION}"
     policy_attribute = r"(?:当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略"
     passive = rf"{change}(?:{_PROVIDER})?{_GRANT}\s*(?:{policy_attribute})?{_AUTHORIZATION}"
@@ -89,13 +95,13 @@ def authorization_claim(clause: str, *, reference_change: bool = False) -> Autho
     beneficiary = rf"(?:已)?为{change}(?:{_GRANT}|提供){_AUTHORIZATION}"
     record = r"(?:预览(?:之后|后)|本次)(?:已)?记录(?:了)?(?:独立)?(?:的)?\s*(?P<record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权(?:记录)?"
     inspection = r"(?:已)?确认(?:保存的)?授权记录包含独立于(?:修改|变更|改动)预览的\s*(?P<inspection_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权"
-    preview = rf"(?:{preview_noun_pattern(reference_change=reference_change)})?"
+    preview = rf"(?:{preview_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)})?"
     attributed_grant = rf"{preview}{_GRANT}\s*(?:当前)?\s*(?P<grant_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略{_AUTHORIZATION}"
     provider_record = rf"(?:当前)?\s*(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:策略)?(?:已)?(?:为{change}(?:记录|保存|授予|提供)(?:了)?(?:独立)?(?:执行|策略)?授权|授予{change}(?:的)?(?:独立)?(?:执行)?授权)"
     gateway_record = rf"网关(?:已)?(?:按|依据)\s*(?P<gateway_policy>[a-z_]+)\s*策略{_AUTHORIZATION}"
     coordinator = r"(?:并(?:且)?|且|同时|另外)"
     beginning = rf"\s*(?:{coordinator})?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
-    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record}|{attributed_grant}|{gateway_record})(?=[，,。；;]|\s*$)", clause)
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record}|{attributed_grant}|{gateway_record})[ \t]*(?=[，,。；;]|\s*$)", clause)
     if match:
         if match.group('grant_policy') is not None and match.group('grant_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
@@ -129,6 +135,9 @@ def authorization_claim(clause: str, *, reference_change: bool = False) -> Autho
     recognized = re.match(rf"(?:(?:尚未|未|不|不能|可能|猜测|估计|不确定)\s*)?(?:{change}|(?:已)?(?:按|依据|取得|获得|为))|在|向|对|(?:当前)?\s*[a-z_]+\s*策略", body)
     if relevant and recognized:
         return AuthorizationClaim("invalid", 0, len(clause), "")
+    if (operation_actions and re.match(rf"(?:{_REFERENT})[^，,。；;\n]+?(?:取得|获得|提供)", body)
+            and "授权" in body):
+        return AuthorizationClaim("invalid", 0, len(clause), "")
     if re.match(r"网关(?:已|未|尚未|没有|可能|不确定)?(?:按|依据)", body) and "策略" in body and "授权" in body:
         return AuthorizationClaim("invalid", 0, len(clause), "")
     return AuthorizationClaim("unrelated", 0, 0, "")
@@ -157,7 +166,8 @@ def attested_primary_target(clause: str, identity: Mapping[str, Any]) -> Primary
     return PrimaryTarget("invalid", None)
 
 
-def planned_change_noun(action: str, prefix: str, suffix: str, *, reference_change: bool = False) -> PlannedNoun | None:
+def planned_change_noun(action: str, prefix: str, suffix: str, *, reference_change: bool = False,
+                        operation_actions: str | None = None) -> PlannedNoun | None:
     """Recognize a noun frame, preserving every preceding owner-bearing span."""
     if action == "写入":
         referent = re.search(rf"(?:{_REFERENT})$", prefix)
@@ -169,10 +179,11 @@ def planned_change_noun(action: str, prefix: str, suffix: str, *, reference_chan
             rf"(?:(?:{_FUTURE})执行(?:(?:{_REFERENT}){_CHANGE})?[，,]\s*)?(?:并)?(?:按返回的(?:核验|验证)结果)?(?:检查|核验)$", prefix)
         if verification and re.fullmatch(r"(?:效果器|项)(?:(?:及|和)原有[^。；;]*(?:身份|绑定|顺序|链路))?", suffix):
             return PlannedNoun("verification", prefix[:verification.start()])
+        if not operation_actions or re.fullmatch(operation_actions, action) is None:
+            return None
+    if re.fullmatch(_CHANGE, action) is None and (not operation_actions or re.fullmatch(operation_actions, action) is None):
         return None
-    if re.fullmatch(_CHANGE, action) is None:
-        return None
-    execution = re.search(rf"(?:{_FUTURE})?(?:按(?:该)?授权)?(?:执行|应用){change_noun_pattern(reference_change=reference_change)}$", prefix + action)
+    execution = re.search(rf"(?:{_FUTURE})?(?:按(?:该)?授权)?(?:执行|应用){change_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)}$", prefix + action)
     if execution and re.match(r"(?=[，,]|并|$)", suffix):
         return PlannedNoun("execution", prefix[:execution.start()])
     frames = (
@@ -205,7 +216,7 @@ def prospective_intent(text: str, *, require_affirmative: bool = True, owners: t
         for execution in re.finditer(r"执行|应用", clause):
             prefix, suffix = clause[:execution.start()], clause[execution.end():].strip()
             legacy_referent = rf"(?:(?:{_REFERENT})(?:预览|{_CHANGE})?)?"
-            current_change = change_noun_pattern(reference_change=reference_change)
+            current_change = change_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)
             if (not reference_change and re.match(
                     rf"{change_noun_pattern(reference_change=True)}(?=$|并|随后|[，,。；;])", suffix)
                     and "引用" in suffix):
@@ -213,7 +224,7 @@ def prospective_intent(text: str, *, require_affirmative: bool = True, owners: t
             operation = rf"|(?:{_REFERENT})?(?:{operation_actions})" if operation_actions else ""
             if re.match(rf"(?:{current_change}|{legacy_referent}{operation})(?=$|并|随后|[，,。；;])", suffix) is None:
                 continue
-            if re.fullmatch(r"\s*(?:项目)?(?:目前|当前|此刻|现在)?(?:尚未|还未|未)\s*", prefix):
+            if re.fullmatch(rf"\s*(?:{current_change})?(?:项目)?(?:目前|当前|此刻|现在)?(?:尚未|还未|未)\s*", prefix):
                 continue  # Pre-Execute status is not a prospective refusal.
             excluded_owner = re.fullmatch(r"\s*(?:不|不会)(?:在|向)\s*(.+?)\s*(?:上|下)?\s*", prefix)
             if excluded_owner and owners:

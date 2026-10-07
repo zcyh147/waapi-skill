@@ -9,7 +9,7 @@ import math
 import re
 from typing import Any, Mapping, NamedTuple
 
-from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, notice_count, preview_noun_pattern, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import _FUTURE, _REFERENT, change_noun_pattern, notice_count, preview_noun_pattern, prospective_intent, role_terms
 
 FINITE_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?"
 
@@ -21,6 +21,7 @@ class NoticeRoleContext(NamedTuple):
     protected_effect_count: int | None = None
     reference_change: bool = False
     parent: Mapping[str, Any] | None = None
+    operation_actions: str | None = None
 
 
 class NoticeClaim(NamedTuple):
@@ -120,7 +121,7 @@ def _without_verification_purpose(text: str) -> str:
 
 def _baseline_producer(text: str, context: NoticeRoleContext) -> bool:
     return re.fullmatch(
-        rf"\s*(?:{preview_noun_pattern(reference_change=context.reference_change)}|预检)已(?:记录|保存|建立){before_state_noun_pattern()}\s*",
+        rf"\s*(?:{preview_noun_pattern(reference_change=context.reference_change, operation_actions=context.operation_actions)}|预检)已(?:记录|保存|建立){before_state_noun_pattern()}\s*",
         _without_verification_purpose(text)) is not None
 
 
@@ -263,9 +264,14 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if owner.role in {"owner-attestation", "invalid"}:
             result.append(owner._replace(text=clause.text, end=clause.start + colon.start() if colon else clause.end))
             continue
-        status = preview_status_claim(clause._replace(text=local), reference_change=context.reference_change)
+        status = preview_status_claim(clause._replace(text=local), reference_change=context.reference_change,
+                                      operation_actions=context.operation_actions)
         if status.role == "preview-status":
             result.append(status._replace(text=clause.text))
+            continue
+        pending = pending_execution_claim(clause._replace(text=local), context)
+        if pending.role == "execution-status":
+            result.append(pending._replace(text=clause.text))
             continue
         if context.quantity_terms and re.fullmatch(r"\s*提交的(?:修改|变更|改动)范围(?:仅|只)(?:包含|涉及)(?:这一|该|此)条曲线\s*", local):
             result.append(clause._replace(role="curve-range"))
@@ -281,7 +287,7 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if (context.identity["type"] == "Sound" and re.fullmatch(r"\s*(?:接下来)?核对追加位置和现有配置的保护条件\s*", local)):
             result.append(clause._replace(role="read-summary"))
             continue
-        auth = authorization_claim(local, reference_change=context.reference_change)
+        auth = authorization_claim(local, reference_change=context.reference_change, operation_actions=context.operation_actions)
         if auth.state == "invalid":
             result.append(clause._replace(role="invalid", diagnostic="conflicting-authorization"))
         elif auth.state == "ancillary" and not local[auth.end:].strip():
@@ -425,51 +431,47 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
     Coordinated read-baseline or authorization summaries carry no owner or
     effect authority; all other intervening text resets this local relation.
     """
-    from tests.semantic.support.codex_notice_language import authorization_claim
-
     windows = []
-    for sentence in re.finditer(r"[^。；;\n]+", text):
-        clauses = ancillary_claims(sentence.group(), context)
-        if not clauses:
-            continue
-        first = clauses[0]
-        colon = re.search(r"[:：]", first.text)
-        assertion = owner_attestation(first._replace(text=first.text[:colon.start()]) if colon else first, context)
-        if assertion.role == "invalid":
+    pending_owner = False
+    # Both projections retain original offsets. Only complete, validated local
+    # components can bridge the owner to one next substantive clause.
+    for raw, claim in zip(notice_clauses(text), ancillary_claims(text, context)):
+        if claim.role == "invalid":
             return None
-        if assertion.role != "owner-attestation":
+        if claim.role == "owner-attestation":
+            if claim.end < raw.end:
+                windows.append((claim.end + 1, raw.end))
+                pending_owner = False
+            else:
+                pending_owner = True
             continue
-        if colon:
-            start = sentence.start() + first.start + colon.end()
-            windows.append((start, sentence.start() + notice_clauses(sentence.group())[0].end))
+        if not pending_owner:
             continue
-        compatible = True
-        for tail in clauses[1:]:
-            if tail.role == "invalid":
-                return None
-            if tail.role in {"authorization", "preview-status"} and not tail.value:
+        if claim.role in {"authorization", "preview-status", "execution-status", "read-summary"}:
+            if claim.value:
+                owner = re.fullmatch(r"\s*(?:在|向|对)\s*(.+?)\s*(?:上|下)\s*[，,]?\s*", claim.value)
+                if owner is None or not primary_role_atom(owner.group(1), context):
+                    return None
+            if not text[raw.start:claim.start].strip() and not text[claim.end:raw.end].strip():
                 continue
-            authorization = authorization_claim(tail.text, reference_change=context.reference_change)
-            baseline = baseline_read_role(tail.text, context)
-            if baseline == "invalid":
-                return None
-            display = matched_display_claim(tail, context)
-            if display.role == "invalid":
-                return None
-            if baseline != "read-summary" and display.role != "matched-display" and not (authorization.state == "ancillary" and not authorization.owner_prefix
-                                     and not tail.text[authorization.end:].strip()):
-                compatible = False
-        if compatible:
-            offset = sentence.end()
-            while following := re.match(r"[。；;\n]\s*([^，,。；;\n]+)", text[offset:]):
-                first_start, first_end = offset + following.start(1), offset + following.end(1)
-                status = re.fullmatch(r"(?:目前|当前)?(?:工程)?尚未(?:修改|执行)(?:工程)?", following.group(1))
-                if status or _baseline_producer(following.group(1), context):
-                    offset = first_end
-                    continue
-                windows.append((first_start, first_end))
-                break
+        display = matched_display_claim(raw, context)
+        if display.role == "invalid":
+            return None
+        if display.role == "matched-display":
+            continue
+        windows.append((raw.start, raw.end))
+        pending_owner = False
     return tuple(windows)
+
+
+def pending_execution_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
+    """A complete not-yet status cannot supply an edit or a future refusal."""
+    change = change_noun_pattern(reference_change=context.reference_change, operation_actions=context.operation_actions)
+    temporal = r"(?:目前|当前|此刻|现在)?"
+    project = r"(?:工程|项目)?"
+    pending = r"(?:尚未|还未|未)"
+    status = rf"(?:{change})?{temporal}{project}{pending}(?:修改|执行){project}"
+    return clause._replace(role="execution-status") if re.fullmatch(rf"\s*{status}\s*", clause.text) else clause
 
 
 def pending_curve_claim(clause: NoticeClaim, context: NoticeRoleContext, source_terms: tuple[str, ...]) -> NoticeClaim:
@@ -508,6 +510,21 @@ def uncertain_action_qualifier(prefix: str) -> bool:
     """
     local = re.split(r"[，,。；;\n]", prefix)[-1].strip()
     return re.search(r"(?:可能|也许|或许|不确定(?:是否)?)(?:会|将)?\s*(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?$", local) is not None
+
+
+def additional_action_qualifier(prefix: str, suffix: str) -> bool:
+    """A second ordinal or paired repeat/count governs its local predicate.
+
+    Discourse coordinators and a bare 再 can restate the same plan. Only an
+    explicit second occurrence, or 再…一次 around this action, adds a write.
+    """
+    local = re.split(r"[，,。；;\n]", prefix)[-1].strip()
+    future = rf"(?:{_FUTURE}|将|会)?"
+    recipient = r"(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?"
+    additional = r"(?:第二次|第2次)"
+    ordinal = re.fullmatch(rf"(?:{future}{additional}{future}{recipient}|{future}{recipient}{additional})\s*", local)
+    repeat = re.fullmatch(rf"(?:{future}再{future}{recipient}|{future}{recipient}再)\s*", local)
+    return ordinal is not None or repeat is not None and re.match(r"\s*一次(?=\s|效果器|插件|wwise\b)", suffix) is not None
 
 
 def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:
@@ -576,9 +593,10 @@ def effect_descriptor_value_claim(clause: NoticeClaim, *, name: str, notes: str)
     return clause._replace(role="descriptor-value" if valid else "invalid", diagnostic="" if valid else "unapproved-descriptor-field-or-value")
 
 
-def preview_status_claim(clause: NoticeClaim, *, reference_change: bool = False) -> NoticeClaim:
+def preview_status_claim(clause: NoticeClaim, *, reference_change: bool = False,
+                         operation_actions: str | None = None) -> NoticeClaim:
     """Preview-generation status is ancillary and retains any explicit owner."""
-    preview = preview_noun_pattern(reference_change=reference_change)
+    preview = preview_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)
     generated = r"(?:已)?生成"
     owner = r"(?P<owner>(?:在|向|对)\s*[^，,。；;\n]+?(?:上|下)\s*)?"
     match = re.fullmatch(rf"\s*(?:并)?{owner}(?:{preview}{generated}|{generated}{preview})\s*", clause.text)
