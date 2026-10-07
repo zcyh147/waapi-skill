@@ -1,0 +1,201 @@
+{
+  "status": "frozen-before-implementation-developer-contrasts",
+  "seam": "expansion_preview_notice",
+  "source_provenance": {
+    "report_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/research/integration-expansion-guid-validation-67279db-2026-10-07.json",
+    "report_sha256": "16e7aff9abe8e46497990bc881b7ab39addb8d30d7d1e7a1165497da3587d656",
+    "event_index": 23,
+    "item_id": "item_11",
+    "source_paths": {
+      "events": {
+        "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/events.jsonl",
+        "sha256": "8333da30858b04d3afabc33c78143e8db66a8e063a1db55b120c6a164ef6b1ee",
+        "bytes": 142799
+      },
+      "preview": {
+        "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/broker/state/transactions/tx1-c2vzbv24gppbxnzs5xqm/preview.json",
+        "sha256": "08668c12d3b7b9583ac0b4f8829806a08a5a07bbec6d566882b41adb23bd7703",
+        "bytes": 23546
+      },
+      "oracle": {
+        "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/expansion-oracle.json",
+        "sha256": "cda87de0323a965ac71dc6371f100b4a1cf589af19410c9e15a638c80e43880b",
+        "bytes": 17560
+      }
+    },
+    "notice_sha256": "c29a1e84a7d227aeb787891cfe1ce87e72ff9eb6a8420a2c8d88f8e28d358207",
+    "notice_bytes": 393,
+    "copied_fields": [
+      "notice",
+      "preview.artifact",
+      "oracle.before"
+    ],
+    "no_auth_read": true,
+    "no_original_writes": true
+  },
+  "scope": "bounded current-operation scope + existing modal; local owner authority only",
+  "vectors": [
+    {
+      "id": "exact-witness",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "attested-owner-window + current-scope + future"
+    },
+    {
+      "id": "bare-control",
+      "notice": "已核对目标为指定声音，并记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "supported owner-window and future"
+    },
+    {
+      "id": "current-scope-modal",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次会追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "modal component already accepts"
+    },
+    {
+      "id": "explicit-primary",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "recipient independently validates"
+    },
+    {
+      "id": "scope-no-owner",
+      "notice": "本次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "scope never supplies owner"
+    },
+    {
+      "id": "unknown-bridge",
+      "notice": "已核对目标为指定声音，并记录修改前状态。普通进展说明。本次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "unknown component spends inheritance"
+    },
+    {
+      "id": "foreign-recipient",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向 OtherSound 追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "foreign role"
+    },
+    {
+      "id": "scope-uncertain",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次可能将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "uncertain prospective action"
+    },
+    {
+      "id": "scope-negated",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次不会追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "denied action"
+    },
+    {
+      "id": "next-operation-explicit",
+      "notice": "已核对目标为指定声音，并记录修改前状态。下次将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "recipient cannot erase incompatible operation scope"
+    },
+    {
+      "id": "second-operation",
+      "notice": "已核对目标为指定声音，并记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。现在第二次向目标声音追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "explicit second occurrence"
+    },
+    {
+      "id": "residual-write",
+      "notice": "已核对目标为指定声音，并记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。随后修改 Pitch。",
+      "expected": false,
+      "reason": "unconsumed edit"
+    },
+    {
+      "id": "wrong-descriptor",
+      "notice": "已核对目标为指定声音，并记录修改前状态。将追加 Wwise Gain 效果器 `OtherGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "sealed descriptor"
+    },
+    {
+      "id": "scope-without-effect",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将。当前尚未修改项目。",
+      "expected": false,
+      "reason": "scope never supplies effect"
+    },
+    {
+      "id": "current-other",
+      "notice": "已核对目标为指定声音，并记录修改前状态。此次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "existing current-operation referent"
+    },
+    {
+      "id": "this-time",
+      "notice": "已核对目标为指定声音，并记录修改前状态。这次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "existing current-operation referent"
+    },
+    {
+      "id": "current",
+      "notice": "已核对目标为指定声音，并记录修改前状态。当前将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "existing current-operation referent"
+    },
+    {
+      "id": "imminent",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次即将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": true,
+      "reason": "current operation composes with existing imminent modal"
+    },
+    {
+      "id": "modal-missing-owner",
+      "notice": "本次会追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "modal cannot create owner authority"
+    },
+    {
+      "id": "modal-stale-owner",
+      "notice": "已核对目标为指定声音，并记录修改前状态。普通进展说明。本次会追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "unknown intervening component consumes inherited owner"
+    },
+    {
+      "id": "unknown-prefix",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次普通进展将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "unknown prefix text cannot be skipped"
+    },
+    {
+      "id": "completed",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次已经向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "completed event is not prospective"
+    },
+    {
+      "id": "next-omitted",
+      "notice": "已核对目标为指定声音，并记录修改前状态。下次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "next operation is outside current preview"
+    },
+    {
+      "id": "second-explicit",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次第二次将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "second occurrence cannot be erased by recipient"
+    },
+    {
+      "id": "compound-recipient",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次将向目标声音和 OtherSound追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "compound recipient is not unique primary"
+    },
+    {
+      "id": "uncertain-explicit",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次可能将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "recipient cannot supply definite intent"
+    },
+    {
+      "id": "negated-explicit",
+      "notice": "已核对目标为指定声音，并记录修改前状态。本次不会向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。",
+      "expected": false,
+      "reason": "recipient cannot cancel negative intent"
+    }
+  ]
+}

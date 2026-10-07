@@ -59,6 +59,51 @@ class PlannedNoun(NamedTuple):
     owner_prefix: str
 
 
+class ProspectivePrefix(NamedTuple):
+    """Complete local components, never identity or authorization evidence."""
+    state: str
+    scope: str
+    modal: str
+    recipient: str | None
+    scope_span: tuple[int, int]
+    modal_span: tuple[int, int]
+    recipient_span: tuple[int, int]
+
+
+def prospective_action_prefix(prefix: str) -> ProspectivePrefix | None:
+    """Compose reviewed scope/modal/recipient components without skipping text.
+
+    None leaves the caller's existing closed owner grammar in charge. Only a
+    complete omitted-recipient form can request action-local owner inheritance.
+    Supplied operands remain opaque: scope-looking object names are identities,
+    not grammatical qualifiers. Incompatible scope before the recipient stays
+    visible rather than disappearing when the last preposition is extracted.
+    """
+    match = re.fullmatch(
+        r"\s*(?P<scope>本次|此次|这次|当前)?\s*"
+        r"(?P<qualifier>下次|下一次|第二次|第2次|已经|已|可能|也许|或许|不确定(?:是否)?|不会|不)?\s*"
+        r"(?P<modal>即将|将|会)?\s*"
+        r"(?:(?P<marker>向|在|把|对)\s*(?P<recipient>.+?))?\s*", prefix)
+    if match is None:
+        started = re.match(r"\s*(?P<scope>本次|此次|这次|当前)\s*(?P<modal>即将|将|会)", prefix)
+        if started is None:
+            started = re.fullmatch(
+                r"\s*(?P<scope>本次|此次|这次|当前).*?(?P<modal>即将|将|会)\s*(?:向|在|把|对)\s*.+\s*", prefix)
+        if started is not None:
+            # This action head has already selected the current/modal class.
+            # Unconsumed text cannot fall through to the legacy last-marker
+            # projection, which would discard it before validating an owner.
+            return ProspectivePrefix("invalid", started.group("scope"), started.group("modal") or "",
+                                     None, started.span("scope"), started.span("modal"), (-1, -1))
+        return None
+    if not (match.group("modal") or match.group("marker")):
+        return None
+    return ProspectivePrefix(
+        "invalid" if match.group("qualifier") else "prospective",
+        match.group("scope") or "", match.group("modal") or "",
+        match.group("recipient"), match.span("scope"), match.span("modal"), match.span("recipient"))
+
+
 class PrimaryTarget(NamedTuple):
     state: str
     identity: Mapping[str, Any] | None

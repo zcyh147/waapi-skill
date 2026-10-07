@@ -17,7 +17,7 @@ from tests.semantic.support.codex_attenuation_notice import (
     ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
     prospective_preview_execution,
 )
-from tests.semantic.support.codex_notice_language import authorization_claim, negated_foreign_owner, notice_count, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import authorization_claim, negated_foreign_owner, notice_count, planned_change_noun, prospective_action_prefix, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
     NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, additional_action_qualifier, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
     effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
@@ -388,14 +388,21 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
     """Check owner-bearing grammar; omitted owners do not add an identity."""
     owners = []
     source_prefix = re.sub(r"\s*的\s*(?:trigger|触发器)\s*(?:引用)?\s*$", "", prefix)
+    prospective = prospective_action_prefix(source_prefix)
+    if prospective is not None:
+        if prospective.state == "invalid":
+            return False
+        if prospective.recipient is None:
+            return source_referent
+        owners.append(prospective.recipient.strip())
     prepositions = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", source_prefix))
-    if prepositions:
+    if prospective is None and prepositions:
         owner = source_prefix[prepositions[-1].end():].strip()
-        if not owner and source_referent and re.fullmatch(r"\s*(?:(?:其本次)?预览)?(?:即将|将|会)\s*", source_prefix):
+        # Complete legacy Preview noun carriers retain their existing referent
+        # path. They are not bare/scoped modal action prefixes and do not gain
+        # a new omitted-recipient exception through component classification.
+        if not owner and source_referent and re.fullmatch(r"\s*(?:其本次)?预览(?:即将|将|会)\s*", source_prefix):
             return True
-        owner = re.sub(r"[，,]\s*(?:仅|只)$", "", owner).strip()
-        if owner.endswith("上"):
-            owner = owner[:-1].strip()
         owners.append(owner)
     if context["kind"] == "plugin":
         following = re.search(r"(?:\b(?:on|to)\s+|到\s*)(.+?)\s*$", claim)
@@ -406,6 +413,9 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
         if possessive:
             owners.append(possessive.group(1))
     for owner in owners:
+        # Existing exact trailing operation modifier; all other residual text
+        # remains part of the identity and fails the closed role check.
+        owner = re.sub(r"[，,]\s*(?:仅|只)$", "", owner).strip()
         # Location is a relationship of the same owner, not another identity.
         owner = re.sub(r"(?:的)?效果链(?:末尾|尾部)?$|(?:上|下)$", "", owner).strip()
         if source_referent and owner in {"其", "它", "该对象", "此对象"}:
@@ -919,7 +929,10 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 if not note_write:
                     return False
                 owner_prefix = qualifier
-            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=source_referent if owner_prefix.strip() not in {"将", "即将", "会"} else action_adjacent_owner):
+            prospective_prefix = prospective_action_prefix(owner_prefix)
+            owner_authority = (action_adjacent_owner if prospective_prefix is not None
+                and prospective_prefix.recipient is None else source_referent)
+            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=owner_authority):
                 return False
             if noun or note_write:
                 continue
