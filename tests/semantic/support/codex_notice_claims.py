@@ -119,9 +119,10 @@ def _without_verification_purpose(text: str) -> str:
     """Remove only a complete trailing read-purpose component.
 
     The remaining complete clause must still validate as a baseline record.
-    Its temporal modifier conveys purpose, never phase or verification proof.
+    Its temporal and preservation modifiers convey purpose, never phase,
+    preservation or verification proof.
     """
-    return re.sub(r"(?:用于|供|以便)(?:执行后|后续|随后)?(?:比较|核验|验证|验收|检查)\s*$", "", text)
+    return re.sub(r"(?:用于|供|以便)(?:执行后|后续|随后)?(?:保持性)?(?:比较|核验|验证|验收|检查)\s*$", "", text)
 
 
 def _baseline_producer(text: str, context: NoticeRoleContext) -> bool:
@@ -581,12 +582,13 @@ def additional_action_qualifier(prefix: str, suffix: str) -> bool:
     explicit second occurrence, or 再…一次 around this action, adds a write.
     """
     local = re.split(r"[，,。；;\n]", prefix)[-1].strip()
+    coordinator = r"(?:(?:并(?:且)?|且|同时|另外)\s*)?"
     future = rf"(?:{_FUTURE}|将|会)?"
     recipient = r"(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?"
     count = r"一次"
     additional = rf"(?:第二次|第2次|再{count})"
-    ordinal = re.fullmatch(rf"(?:{future}{additional}{future}{recipient}|{future}{recipient}{additional})\s*", local)
-    repeat = re.fullmatch(rf"(?:{future}再{future}{recipient}|{future}{recipient}再)\s*", local)
+    ordinal = re.fullmatch(rf"{coordinator}(?:{future}{additional}{future}{recipient}|{future}{recipient}{additional})\s*", local)
+    repeat = re.fullmatch(rf"{coordinator}(?:{future}再{future}{recipient}|{future}{recipient}再)\s*", local)
     return ordinal is not None or repeat is not None and re.match(rf"\s*{count}(?=\s|效果器|插件|wwise\b)", suffix) is not None
 
 
