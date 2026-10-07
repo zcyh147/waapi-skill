@@ -387,23 +387,26 @@ def _bound_owner_anchor(text: str, context: Mapping[str, Any]) -> bool:
 def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any], *, source_referent: bool = False) -> bool:
     """Check owner-bearing grammar; omitted owners do not add an identity."""
     owners = []
+    omitted_owner = False
     source_prefix = re.sub(r"\s*的\s*(?:trigger|触发器)\s*(?:引用)?\s*$", "", prefix)
     prospective = prospective_action_prefix(source_prefix)
     if prospective is not None:
         if prospective.state == "invalid":
             return False
         if prospective.recipient is None:
-            return source_referent
-        owners.append(prospective.recipient.strip())
+            omitted_owner = True
+        else:
+            owners.append(prospective.recipient.strip())
     prepositions = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", source_prefix))
     if prospective is None and prepositions:
         owner = source_prefix[prepositions[-1].end():].strip()
         # Complete legacy Preview noun carriers retain their existing referent
         # path. They are not bare/scoped modal action prefixes and do not gain
         # a new omitted-recipient exception through component classification.
-        if not owner and source_referent and re.fullmatch(r"\s*(?:其本次)?预览(?:即将|将|会)\s*", source_prefix):
-            return True
-        owners.append(owner)
+        if not owner and re.fullmatch(r"\s*(?:其本次)?预览(?:即将|将|会)\s*", source_prefix):
+            omitted_owner = True
+        else:
+            owners.append(owner)
     if context["kind"] == "plugin":
         following = re.search(r"(?:\b(?:on|to)\s+|到\s*)(.+?)\s*$", claim)
         if following:
@@ -412,6 +415,10 @@ def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, 
         possessive = re.search(r"^(?:改动|更新|修改|改为|设为|指向|update|change|retarget)\s*(.+?)\s*的\s*(?:trigger|触发器)", claim)
         if possessive:
             owners.append(possessive.group(1))
+    # Inheritance is only the fallback for a genuinely omitted owner. Every
+    # supplied prefix and claim-side operand still reaches the same checks.
+    if omitted_owner and not owners:
+        return source_referent
     for owner in owners:
         # Existing exact trailing operation modifier; all other residual text
         # remains part of the identity and fails the closed role check.

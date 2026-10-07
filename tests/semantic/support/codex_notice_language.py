@@ -70,6 +70,11 @@ class ProspectivePrefix(NamedTuple):
     recipient_span: tuple[int, int]
 
 
+_CURRENT_SCOPE = r"本次|此次|这次|当前"
+_INCOMPATIBLE_SCOPE = r"下次|下一次|第二次|第2次|已经|已|可能|也许|或许|不确定(?:是否)?|不会|不"
+_PROSPECTIVE_MODAL = r"即将|将|会"
+
+
 def prospective_action_prefix(prefix: str) -> ProspectivePrefix | None:
     """Compose reviewed scope/modal/recipient components without skipping text.
 
@@ -80,17 +85,18 @@ def prospective_action_prefix(prefix: str) -> ProspectivePrefix | None:
     visible rather than disappearing when the last preposition is extracted.
     """
     match = re.fullmatch(
-        r"\s*(?P<scope>本次|此次|这次|当前)?\s*"
-        r"(?P<qualifier>下次|下一次|第二次|第2次|已经|已|可能|也许|或许|不确定(?:是否)?|不会|不)?\s*"
-        r"(?P<modal>即将|将|会)?\s*"
+        rf"\s*(?P<scope>{_CURRENT_SCOPE})?\s*"
+        rf"(?P<qualifier>{_INCOMPATIBLE_SCOPE})?\s*"
+        rf"(?P<modal>{_PROSPECTIVE_MODAL})?\s*"
         r"(?:(?P<marker>向|在|把|对)\s*(?P<recipient>.+?))?\s*", prefix)
     if match is None:
-        started = re.match(r"\s*(?P<scope>本次|此次|这次|当前)\s*(?P<modal>即将|将|会)", prefix)
+        started = re.match(
+            rf"\s*(?P<scope>{_CURRENT_SCOPE}|{_INCOMPATIBLE_SCOPE})\s*(?P<modal>{_PROSPECTIVE_MODAL})", prefix)
         if started is None:
             started = re.fullmatch(
-                r"\s*(?P<scope>本次|此次|这次|当前).*?(?P<modal>即将|将|会)\s*(?:向|在|把|对)\s*.+\s*", prefix)
+                rf"\s*(?P<scope>{_CURRENT_SCOPE}).*?(?P<modal>{_PROSPECTIVE_MODAL})\s*(?:向|在|把|对)\s*.+\s*", prefix)
         if started is not None:
-            # This action head has already selected the current/modal class.
+            # This finite action head has already selected the scope/modal class.
             # Unconsumed text cannot fall through to the legacy last-marker
             # projection, which would discard it before validating an owner.
             return ProspectivePrefix("invalid", started.group("scope"), started.group("modal") or "",
