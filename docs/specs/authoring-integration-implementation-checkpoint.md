@@ -28,6 +28,12 @@ interrupted-composition recognizers now use the same declared finite heads; next
 scope cannot disappear through reordered components or intervening text. The
 [delta report](../research/integration-expansion-modal-scope-head-delta-2026-10-08.md)
 adds evidence without revising the predecessor reports.
+The optional-component successor `e85fc31` passed **3851 focused tests**
+(all **3842 retained** plus **nine new controls**). Recognition now uses the same
+modal-or-recipient alternatives as validation, so a malformed declared scope
+cannot disappear when its optional modal is absent. The
+[additive report](../research/integration-expansion-modal-optional-component-delta-2026-10-08.md)
+keeps all predecessor evidence unchanged.
 This is focused component evidence, with independent rereview, complete applicable
 gate and a new targeted Fresh proof pending. **#147 stays open; #122's final
 13-positive-plus-boundary acceptance remains pending.** The read-only
