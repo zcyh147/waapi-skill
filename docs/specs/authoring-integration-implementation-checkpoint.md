@@ -1,8 +1,57 @@
-# Implementation checkpoint — paused
+# Implementation checkpoint — resumed
 
 Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #123/#124.
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
 on 2026-10-01. The latest Goal status and next permitted action are recorded below.
+
+## Resume and task frontier — 2026-10-07
+
+The user explicitly resumed implementation under `implement-spec`; the new Goal
+is active. Continue on `codex/waapi-expansion-integration`. This resume supersedes
+the pause instruction below; the completed runs and original pause record remain
+unchanged. This is a documentation/task-graph audit, with no new test, Wwise or
+Fresh result. The main checkout and historical campaign host contain unrelated
+tracked edits; use isolated clean worktrees. The Fresh owner is preparing a clean
+pinned execution worktree and has not launched a campaign at this audit.
+
+The functional candidate remains `0c2e75e0283b2c4dce1516149ee9bc0b944ed402`.
+Completed Non-live is **15466 passed / 119 skipped / 27 deselected**, exit zero,
+**854.17 seconds**; its original log/JUnit digests and preparation state remain in
+`expansion-pause-0c2e75e-20261003/pause-checkpoint.json` under the ignored evidence
+tree. The new EXP25-C09 attempt is pending under the Fresh owner. Recheck candidate,
+source hashes/mtimes, CLI/config and scoped processes before execution; retain
+source guards, quarantine and cleanup afterward.
+
+Repairs own scoped implementation, retained regressions, independent two-axis
+review, applicable development gates and focused real/Fresh proof. **#122 owns the
+final full macOS acceptance run: 13 positive Agent units plus the separate
+EXP22-M05 capability boundary, followed by identical successful-root verify-only
+and final reporting.** No obligation is removed; final-full clauses in repair
+bodies are assigned to #122. A component closure grants no final or Windows
+acceptance. Do not split #147 again or retrospectively split completed tickets.
+All issues below remain open at this audit; closure decisions belong to the
+coordinator. #156's missing native #108 parent and #122 blocked-by links are
+repaired as task-graph housekeeping; native dependencies remain canonical.
+
+| Ticket / owner | Existing scoped evidence | Remaining action / proposed closure |
+| --- | --- | --- |
+| #137 — SFX identity/placement | Reviewed f16ab1c focused/Program gates; b4fd348 real 2022/2025 proofs each pass seven assertions; both C03 units PASS in [4d2c121 report](../research/integration-expansion-failed-rerun-4d2c121-2026-10-02.json). #141/#145 successors already completed. | Coordinator may close scoped repair now; final C03 regression belongs #122. |
+| #138 — attenuation choices | Reviewed five-version disclosure/compiler and bounded invalid-choice contracts; both C08 units PASS in [6b906cb report](../research/integration-expansion-focused-rerun-6b906cb-sol-high-2026-10-03.json), following complete Non-live. | Coordinator may close scoped repair now; preserve schema-only Gateway verification and no Fresh getter-consumption claim. Final C08 regression belongs #122. |
+| #139 — policy instructions | Actual allow-mode instruction RED, 25 construction/wiring tests, 410 harness PASS / 9 skips and two reviews; C09/2022 PASS in [e49354a report](../research/integration-expansion-retry4-e49354a-sol-high-2026-10-03.json), C09/2025 PASS in [db82de6 report](../research/integration-expansion-failed-rerun-db82de6-2026-10-02.json). | Coordinator may close scoped repair now; later Agent refusals do not prove the construction conflict returned. Final policy/workflow regression belongs #122. |
+| #140 — original contextual notices | Three witness/negative regressions and reviewed gates; C06/2022 PASS in [86b475e](../research/integration-expansion-failed-rerun-86b475e-2026-10-02.json), C09/2025 PASS in db82de6, M05/2025 PASS in e49354a. | Coordinator may close original scoped repair now; later consolidated language repairs/current proof stay in #147, final acceptance in #122. |
+| #142 — attenuation notice proof | Original two witnesses/contrasts, clear reviews and 1328 PASS / 9 skips combined gate; both C08 units PASS in 6b906cb, C08/2025 also PASS after Apps isolation in [a7381ac report](../research/integration-expansion-retry6-a7381ac-sol-high-2026-10-03.json). | Coordinator may close scoped repair now; independent outcomes do not upgrade `result_schema_checked`. Later shared language stays #147, final C08 regression #122. |
+| #143 — original coherent notices | Four witness/negative regressions, clear reviews, complete Non-live; C09/2022, C06/2025 and M05/2025 PASS in e49354a, C09/2025 PASS in db82de6. | Coordinator may close original scoped repair now; #147 retains later consolidated gaps, #122 final acceptance. |
+| #147 — consolidated notice repair | Current candidate: 2566 notice controls; combined 3691 PASS / 9 skips; clear reviews; complete Non-live above. Latest [a77c96a C09 report](../research/integration-expansion-c09-a77c96a-sol-high-2026-10-03.json) remains notice-only FAIL with six business assertions passing. | Keep open through new EXP25-C09 PASS and appropriate identical successful-root verify-only; then coordinator may close scoped repair before #122's full gate. |
+| #156 — Apps isolation | a7381ac shared invocation/config repair; 714 focused PASS / 9 skips and clear reviews; actual argv/seals with Apps and memories disabled, zero observed MCP events; C01/2022 and C08/2025 PASS in a7381ac, C06/2025 PASS in e49354a; complete successor Non-live. | Coordinator must disposition supported telemetry: pinned 0.159.2 prompt audit exposes no complete inventory. Obtain bounded absence proof if supported; otherwise explicitly accept/report that enumeration is unavailable. Flags and no observed calls alone are not absence proof. Full gate belongs #122. |
+| #122 — acceptance / coordinator | Earlier full and failed-only roots are truthful component/history evidence; they are not final same-candidate acceptance. | After scoped repair disposition and successful focused proof, freeze all options and complete full 13-positive-plus-boundary selection, identical verify-only, final independent review/report and closure audit. #108 remains open through that acceptance. |
+
+Linked mixed roots retain their original overall FAIL/partial verdicts. Their
+individual scoped PASS records support component closure only; do not replay,
+verify-only or regrade those roots. Preserve all frozen witnesses, negatives,
+source guards, failed copies and evidence limitations. All seven initial cases
+and M03/M04/M06 dispositions remain in #122's final reporting; conditional scope
+and the 2022 Stinger boundary remain separate. The next campaign owner updates
+this top section with new evidence, without rewriting the historical record.
 
 ## User-requested quota pause — 2026-10-03
 
