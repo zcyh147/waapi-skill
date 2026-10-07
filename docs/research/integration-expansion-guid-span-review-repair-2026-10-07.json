@@ -1,0 +1,342 @@
+{
+  "contract": "waapi-skill.expansion-guid-span-review-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "fixed_review_candidate": "19aed837a921ed180501ba25d88d5de3da208007",
+  "integration_tip": "875b6e727a7f73a0695b66dc8594e04e3f9dd0db",
+  "functional_successor": "f66d942e2545ec38b37a2b31b8780ea11699f0df",
+  "integration_merge": "Already up to date.",
+  "public_seam": "expansion_preview_notice",
+  "findings_closed": [
+    {
+      "priority": "P2",
+      "finding": "Owner-colon attestation early return omitted comparison tail",
+      "repair": "Classify owner prefix and original tail independently with the same component spans used for owner inheritance."
+    },
+    {
+      "priority": "P2",
+      "finding": "Coordinated valid GUID suffix omitted comparison prefix",
+      "repair": "Separate coordinated components before classification; each prefix must pass its own complete consumer or remain unclassified/invalid. The comparison classifier accepts only one whole frame."
+    }
+  ],
+  "non_authorities": [
+    "GUID equality does not establish owner identity, native class, mutation effect, policy authorization, live identity resolution or verification.",
+    "Valid comparison only preserves an independently established primary owner; unknown components consume/reset continuity.",
+    "Legacy multiattribute identity assertion remains with existing consumer, with no new neutral credit.",
+    "RTPC association identity remains separately attested and nonprimary."
+  ],
+  "source_review_evidence": [
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/cross-family-probes.json",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/cross-family-probes.json",
+      "sha256": "987af9a056ca7ea9d3128aa6e57f7e26f50e67e87c89ed0ef0f19dbc63b17ff4",
+      "bytes": 3899
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/cross_family_probe.py",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/cross_family_probe.py",
+      "sha256": "1b4a7a564a80d1d0189bfad77282767f2bfd5cdeff4b527b5fbf5878a13f4d73",
+      "bytes": 1546
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/parent-comparison-tail-probes.json",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/parent-comparison-tail-probes.json",
+      "sha256": "8f6c2d3a965dd908e2975aff6f0e4ca7d18d6c25964a41bce10907dfc6c9b241",
+      "bytes": 3192
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/probe.py",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/probe.py",
+      "sha256": "3dcd464af10097d99dcb202931684ff990171ac81fa174d34d50af584d2ad3e8",
+      "bytes": 2162
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/probes.json",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/probes.json",
+      "sha256": "4cc4b2ff2d12bdbac87ac5d5ecc708990af3dc8595cac9c29f0da427779fd9f4",
+      "bytes": 31404
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/span-probes.json",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/span-probes.json",
+      "sha256": "c8a496e158af5285e64b543bf7e2ee99b31e3a2c4395407be74dae6a50053bdc",
+      "bytes": 17133
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/spec.md",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/spec.md",
+      "sha256": "245444278f0d8218111a42089d27bcb1812c7d96f4560aec5c6c101c96f570af",
+      "bytes": 2575
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/standards-probe-results.json",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/standards-probe-results.json",
+      "sha256": "802251d2e190d14f02b814b9d945293485bdc67d8f16c5c2c482b3ce868ae430",
+      "bytes": 775
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/standards-probe.py",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/standards-probe.py",
+      "sha256": "9bff2bcdee286e679409f22a87fd8bd7c8aed0f749157a77cd3808906f47400b",
+      "bytes": 1459
+    },
+    {
+      "source_path": "/tmp/waapi-expansion-guid-review/standards.md",
+      "archived_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/fixed-candidate-review/standards.md",
+      "sha256": "09b06009a5b4acbad25e38642b3f102f57e591a7b96eb8f631bcad92a1053a5b",
+      "bytes": 2294
+    }
+  ],
+  "frozen_vectors": [
+    {
+      "path": "tests/fixtures/semantic/expansion-guid-span-review-20261007.json",
+      "sha256": "82d9f71bf6110b1d17fb44a8089aa5593cfcd53d8156fc9b9e8e0c56bcb488fa",
+      "cases": 75
+    },
+    {
+      "path": "tests/fixtures/semantic/expansion-guid-span-review-coordinated-20261007.json",
+      "sha256": "daf025c3c372be6597a0a789f525af8f4a2af055ec43808f37396ac7b43afda1",
+      "cases": 36
+    },
+    {
+      "path": "tests/fixtures/semantic/expansion-guid-span-review-corrected-20261007.json",
+      "sha256": "62da6aabfe27da72d849dbbd1b249921d920a4e810dcbcc46fd6d1d741664454",
+      "cases": 76
+    },
+    {
+      "path": "tests/fixtures/semantic/expansion-guid-span-review-final-20261007.json",
+      "sha256": "cd97fadcef28f49c58992fddeeea8f8ae68b5ae28f9181e0ca5af65e80c03ddc",
+      "cases": 76
+    }
+  ],
+  "expectation_errata": [
+    {
+      "vector": "effect-legacy-attributes",
+      "from": true,
+      "to": false,
+      "authorized_reason": "Implicit prospective recipient cannot inherit across legacy aggregate assertion; legacy consumer remains unchanged.",
+      "initial_record_preserved": true,
+      "successor_frozen_before_implementation": true
+    },
+    {
+      "vector": "effect-comparison-without-authorization",
+      "from": false,
+      "to": true,
+      "authorized_reason": "Authorization prose is optional. Removing only its sentence does not damage actual authoritative phase/artifact authorization evidence. No new mandatory-prose criterion.",
+      "initial_record_preserved": true,
+      "successor_frozen_before_final_tests": true
+    }
+  ],
+  "validation": {
+    "lane": "Focused offline developer pytest via ci/test.sh --mode nonlive; not full Non-live",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "runs": {
+      "red": {
+        "summary": "32 failed, 44 passed in 0.33s",
+        "direct_exit": 1,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "32",
+          "skipped": "0",
+          "tests": "76",
+          "time": "0.329",
+          "timestamp": "2026-10-07T22:17:27.280431+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "files": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/red.log",
+            "sha256": "df062175b4f3ad03aab92dfe38a81f3f1aefea737b46b5139dc2ef4d1f7453cf"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/red.xml",
+            "sha256": "5a6f7aca8b1ef4576941cb50c2e4825d3a1fd327531965593726074409200916"
+          }
+        ]
+      },
+      "red-complete": {
+        "summary": "58 failed, 55 passed in 0.42s",
+        "direct_exit": 1,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "58",
+          "skipped": "0",
+          "tests": "113",
+          "time": "0.420",
+          "timestamp": "2026-10-07T22:18:47.467187+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "files": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/red-complete.log",
+            "sha256": "6c4d75c40f7ce017c97cf030c2ab4921042e09afd266f2a5f5f394c2acd696f5"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/red-complete.xml",
+            "sha256": "811f35e40b821a5e1ae6e66d3db9eba4327d618b1f0ad5e8f67989c010fec22f"
+          }
+        ]
+      },
+      "green-slice": {
+        "summary": "1 failed, 161 passed in 0.46s",
+        "direct_exit": 1,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "1",
+          "skipped": "0",
+          "tests": "162",
+          "time": "0.457",
+          "timestamp": "2026-10-07T22:19:40.230504+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "files": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/green-slice.log",
+            "sha256": "8fc9fa28fc24972e8321d81e16d7bc815c876ff214760b60be1618cbb274d175"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/green-slice.xml",
+            "sha256": "3fb5fb57d41dbc44b3bb7587d143d7f11ae0b897f0d59163506a67ef82850f51"
+          }
+        ]
+      },
+      "focused-final": {
+        "summary": "3312 passed in 6.47s",
+        "direct_exit": 0,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "3312",
+          "time": "6.457",
+          "timestamp": "2026-10-07T22:20:47.968357+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "files": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/focused-final.log",
+            "sha256": "8de7069ea171f840a0e6113eae192675e0c3b7a3d238484bb0244dfb45ab35d3"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/focused-final.xml",
+            "sha256": "378b3778605428f70c7cd5e8e6bccc4df5683345ab0ea8b835d09379e55f34cd"
+          }
+        ]
+      }
+    },
+    "final": {
+      "tests": 3312,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "direct_exit": 0,
+      "elapsed_pytest_seconds": 6.47,
+      "prior_retained": 3199,
+      "new_controls": 113,
+      "selected_files": [
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py",
+        "tests/semantic/test_codex_guid_span_review.py"
+      ],
+      "argv": [
+        "ci/test.sh",
+        "--mode",
+        "nonlive",
+        "--",
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py",
+        "tests/semantic/test_codex_guid_span_review.py",
+        "-q",
+        "-ra",
+        "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-span-review-20261007/focused-final.xml"
+      ]
+    }
+  },
+  "immutability": {
+    "tracked_prior_semantic_fixture_count": 60,
+    "changed_prior_semantic_fixtures": [],
+    "previous_report_seals": {
+      "docs/research/integration-expansion-guid-comparison-repair-2026-10-07.md": {
+        "sha256": "6477c10c98d36e967c2932309642588adc01f488da67f6f28f2305a4415c216e",
+        "byte_identical_to_fixed_candidate": true
+      },
+      "docs/research/integration-expansion-guid-comparison-repair-2026-10-07.json": {
+        "sha256": "b8d5cf55cb1d3477020701f1dad3f17be1d444f0fcafcd575607a967a3979c99",
+        "byte_identical_to_fixed_candidate": true
+      }
+    },
+    "independent37_sha256": "527c8243221ac332cff36e31920064fa99690645722d160cc734cd32455eb3bd",
+    "contexts_sha256": "a28eb7501ced6afadf78024a6dbe19d08906d46c589c6e303ffe77dfe9976883",
+    "448_byte_witness_sha256": "0779259641f8c361fb675007bd2520d60e12b3c509fddd1da6a320f4fe0d6b9a"
+  },
+  "tested_source_hashes": [
+    {
+      "path": "tests/semantic/support/codex_notice_claims.py",
+      "sha256": "f8bf900b2f1413cbc2e0889c1af445dc6efb7fde19941df6b786d2258cccec56"
+    },
+    {
+      "path": "tests/semantic/test_codex_guid_span_review.py",
+      "sha256": "7c5e11e815df97345b3b40e50e2a62facf03da1978d99986d6c2e80eb763a5b0"
+    }
+  ],
+  "scope_limits": [
+    "No Skill, suite, business oracle, runtime, prompt, configuration, source-project or acceptance-criteria changes.",
+    "No original campaign replay, resume, verify-only, regrade or verdict promotion. Historical FAILs remain FAIL.",
+    "No Program, full Non-live, Wwise, Fresh campaign or model grader ran. No Windows evidence claimed.",
+    "Independent successor review, integration/full gates, new scoped EXP25-C09 and final13 acceptance remain coordinator-owned.",
+    "Unrelated 原状态 grammar gap is unchanged and outside this repair.",
+    "Finite reviewed grammar and copied-fixture developer checks do not prove arbitrary natural-language acceptance."
+  ]
+}
