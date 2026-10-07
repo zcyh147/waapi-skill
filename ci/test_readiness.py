@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -134,6 +135,14 @@ def _command_mentions_scope(command: str, scope: str) -> bool:
 
 def _proved_real_lane(command: str) -> bool:
     lowered = command.casefold()
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    if argv and Path(argv[0]).name in {'bash', 'sh', 'zsh', 'fish'} and any(
+        option in {'-c', '-lc', '-ic'} for option in argv[1:3]
+    ):
+        return False  # Script source text is not proof of a running real child.
     if any(marker in lowered for marker in ('wwiseconsole.sh', 'wwiseconsole.exe', 'wwise.exe')):
         return True
     if 'test_driver.py' in lowered:
