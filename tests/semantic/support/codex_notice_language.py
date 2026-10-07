@@ -208,6 +208,19 @@ def planned_change_noun(action: str, prefix: str, suffix: str, *, reference_chan
     return None
 
 
+def negated_foreign_owner(prefix: str, owners: tuple[str, ...]) -> bool:
+    """Only one complete named foreign recipient establishes preservation.
+
+    Qualified GUIDs, aliases, omitted and compound recipients remain owned or
+    ambiguous; missing affirmative-owner proof cannot exempt a contradiction.
+    """
+    excluded = re.fullmatch(r"\s*(?:不|不会)(?:在|向)\s*(.+?)\s*(?:上|下)?\s*", prefix)
+    if excluded is None or not owners:
+        return False
+    owner = excluded.group(1).strip()
+    return owner not in owners and re.fullmatch(r"[a-z_][a-z0-9_.-]*", owner) is not None
+
+
 def prospective_intent(text: str, *, require_affirmative: bool = True, owners: tuple[str, ...] = (), operation_actions: str | None = None,
                        reference_change: bool = False) -> bool:
     """Owned execution polarity; this cannot promote a noun or prove an edit."""
@@ -226,14 +239,8 @@ def prospective_intent(text: str, *, require_affirmative: bool = True, owners: t
                 continue
             if re.fullmatch(rf"\s*(?:{current_change})?(?:项目)?(?:目前|当前|此刻|现在)?(?:尚未|还未|未)\s*", prefix):
                 continue  # Pre-Execute status is not a prospective refusal.
-            excluded_owner = re.fullmatch(r"\s*(?:不|不会)(?:在|向)\s*(.+?)\s*(?:上|下)?\s*", prefix)
-            if excluded_owner and owners:
-                owner = excluded_owner.group(1).strip()
-                # Only a complete, single named foreign identifier proves
-                # preservation. Qualified GUIDs, aliases and compound owners
-                # remain owned or ambiguous and cannot exempt a refusal.
-                if owner not in owners and re.fullmatch(r"[a-z_][a-z0-9_.-]*", owner):
-                    continue
+            if negated_foreign_owner(prefix, owners):
+                continue
             if re.search(_NEGATION, prefix):
                 return False
             if re.fullmatch(rf"\s*(?:{_FUTURE})(?:按授权|按预览)?\s*", prefix):

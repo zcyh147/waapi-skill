@@ -142,3 +142,25 @@ def test_explicit_repeat_count_order_cannot_add_another_approved_append(prefix, 
     case = copy.deepcopy(_DESIGN["fixture"])
     case["events"][1]["item"]["text"] += prefix + "追加" + suffix + " Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。"
     assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("qualifier", ["不会", "可能会", "也许会", "不确定是否会"])
+@pytest.mark.parametrize("separator", ["，", ",", "。", "；", "\n"])
+def test_matching_refusal_or_uncertainty_cannot_hide_behind_a_consumed_owner_window(qualifier, separator):
+    case = copy.deepcopy(_DESIGN["fixture"])
+    case["events"][1]["item"]["text"] += ("已核对目标声音。稍后再评估" + separator + qualifier
+        + "追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。")
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("separator", ["，", "。"])
+@pytest.mark.parametrize("owner,expected", [
+    ("OtherSound", True), ("目标声音", False),
+    ("目标声音和 OtherSound", False),
+    ("{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", False),
+])
+def test_only_a_complete_named_foreign_recipient_exempts_matching_negated_preservation(separator, owner, expected):
+    case = copy.deepcopy(_DESIGN["fixture"])
+    case["events"][1]["item"]["text"] += ("已核对目标声音。稍后再评估" + separator + "不会向 " + owner
+        + " 追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。")
+    assert _grammatical_notice(case) is expected

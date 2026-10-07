@@ -17,7 +17,7 @@ from tests.semantic.support.codex_attenuation_notice import (
     ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
     prospective_preview_execution,
 )
-from tests.semantic.support.codex_notice_language import authorization_claim, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import authorization_claim, negated_foreign_owner, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
     NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, additional_action_qualifier, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
     effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
@@ -867,7 +867,9 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                     polarity_prefix = polarity_prefix[coordinators[-1].start():]
             negated = _notice_qualifier_is_negated(polarity_prefix)
             if negated:
-                if expected and action_anchored and effect_anchor and (approved_value
+                foreign_preservation = negated_foreign_owner(re.sub(r"^\s*另外", "", polarity_prefix), owner_terms)
+                contradiction_scope = action_anchored or context["kind"] == "plugin" and approved_value
+                if expected and contradiction_scope and not foreign_preservation and effect_anchor and (approved_value
                         or re.search(r"目标|名为|为|\bto\b", claim) is None):
                     return False
                 continue
@@ -918,7 +920,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             if (context["kind"] == "plugin" and concrete_plugin_plan and expected and approved_value
                     and additional_action_qualifier(polarity_prefix, suffix)):
                 return False  # One approved descriptor cannot certify a second append.
-            if context["kind"] == "plugin" and expected and approved_value and action_anchored and uncertain_action_qualifier(polarity_prefix):
+            if context["kind"] == "plugin" and expected and approved_value and uncertain_action_qualifier(polarity_prefix):
                 return False  # Later execution prose cannot make this plan definite.
             if any(term in (local_effect.text if local_effect else claim) for term in context["protected"]):
                 return False
