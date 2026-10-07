@@ -305,6 +305,70 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
     return clause
 
 
+def _primary_guid_operand(value: str, context: NoticeRoleContext) -> bool:
+    """Validate one operand, keeping reference source/destination distinct."""
+    guid = r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}"
+    value = value.strip()
+    supplied = re.fullmatch(r"你提供的\s*(.*?)", value)
+    if supplied:
+        value = supplied.group(1)
+        if not value:
+            return not context.reference_change
+    resolved = re.fullmatch(r"解析出的\s*(.+)", value)
+    if resolved:
+        value = resolved.group(1)
+    generic = re.fullmatch(rf"guid(?:\s+({guid}))?", value)
+    if generic:
+        explicit_id = generic.group(1)
+        # An exact source ID removes the two-role ambiguity; an unqualified
+        # resolved/supplied GUID does not select either reference role.
+        return (explicit_id == str(context.identity["id"]).casefold() if explicit_id
+                else not context.reference_change)
+    operand = re.fullmatch(rf"(.+?)\s*(?:的)?\s*guid(?:\s+({guid}))?", value)
+    if operand is None:
+        return False
+    owner = operand.group(1).strip().removesuffix("的").strip()
+    explicit_id = operand.group(2)
+    if explicit_id and explicit_id != str(context.identity["id"]).casefold():
+        return False
+    if primary_role_atom(owner, context):
+        return True
+    # Definite typed source + exact ID is still a singleton, including the
+    # supplied `指定目标 Stinger {id}` rendering. No foreign type is inferred.
+    typed = re.fullmatch(rf"(?:(?:所)?指定)?(?:目标|该|此)?(?:的)?\s*(.+?)\s+({guid})", owner)
+    return typed is not None and primary_role_atom(typed.group(1) + " " + typed.group(2), context)
+
+
+def primary_identity_comparison(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
+    """Whole finite operand/relation frames preserve only prior owner continuity.
+
+    A recognized GUID comparison with uncertainty, denial, foreign/compound
+    operands or residual text is invalid even beside a correct explicit edit.
+    Neither a neutral comparison nor its operands attest a new primary owner.
+    """
+    if (re.search(r"(?<![a-z0-9_])guid(?![a-z0-9_])", clause.text) is None
+            or re.search(r"一致|相同|相符|相等|等同|不同|不等", clause.text) is None):
+        return clause
+    # Existing multi-attribute identity assertions belong to the adapter's
+    # identity grammar. They are not GUID-versus-GUID comparison operands and
+    # gain neither a neutral span nor owner credit from this classifier.
+    attributes = re.fullmatch(r"\s*(.*?)guid\s*、\s*名称\s*、\s*类型\s*(?:和|及|、)\s*路径(?:已|均)?与(.+?)一致\s*", clause.text)
+    if attributes:
+        owner = attributes.group(1).strip().removesuffix("的").strip()
+        intended = attributes.group(2).strip()
+        if (not owner or primary_role_atom(owner, context)) and (intended == "请求" or primary_role_atom(intended, context)):
+            return clause
+    local = clause
+    coordination = re.search(r"、(?=(?:并(?:且)?|且)\s*guid)", clause.text)
+    if coordination:
+        # Keep the preceding read assertion visible to its existing consumer.
+        local = clause._replace(start=clause.start + coordination.end(), text=clause.text[coordination.end():])
+    frame = re.fullmatch(r"\s*(?:并(?:且)?|且|同时|另外)?\s*(.+?)\s*与\s*(.+?)\s*一致\s*", local.text)
+    if frame is not None and all(_primary_guid_operand(value, context) for value in frame.groups()):
+        return local._replace(role="primary-identity-comparison")
+    return clause._replace(role="invalid", diagnostic="unclosed-primary-identity-comparison")
+
+
 def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim, ...]:
     """Classify every local ancillary role, retaining source and owner spans.
 
@@ -320,6 +384,10 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         owner = owner_attestation(clause._replace(text=local[:colon.start()] if colon else local), context)
         if owner.role in {"owner-attestation", "invalid"}:
             result.append(owner._replace(text=clause.text, end=clause.start + colon.start() if colon else clause.end))
+            continue
+        comparison = primary_identity_comparison(clause._replace(text=local), context)
+        if comparison.role in {"primary-identity-comparison", "invalid"}:
+            result.append(comparison._replace(text=text[comparison.start:comparison.end]))
             continue
         status = preview_status_claim(clause._replace(text=local), reference_change=context.reference_change,
                                       operation_actions=context.operation_actions)
@@ -515,7 +583,7 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
             continue
         if not pending_owner:
             continue
-        if claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "matched-display"}:
+        if claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "matched-display", "primary-identity-comparison"}:
             if claim.value and claim.role in {"authorization", "preview-status"}:
                 owner = re.fullmatch(r"\s*(?:在|向|对)\s*(.+?)\s*(?:上|下)\s*[，,]?\s*", claim.value)
                 if owner is None or not primary_role_atom(owner.group(1), context):

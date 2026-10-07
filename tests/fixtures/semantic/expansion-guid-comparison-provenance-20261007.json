@@ -1,0 +1,14 @@
+{
+  "original_copy_provenance": "provenance.json",
+  "additional_sources": [
+    {
+      "path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/fixtures/semantic/expansion-contextual-notices-4d2c121.json",
+      "sha256": "c3bd47449fe9c6c61cd34d87ed81b5dfcd28225e2d64d4427777e1d17b580189"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/fixtures/semantic/expansion-target-plan-independent-fixture-20261007.json",
+      "sha256": "79c14d62eb9084737deb18dd8ed47f64cc8fc223590340b092ed48669deec6ca"
+    }
+  ],
+  "writes": "Only this /tmp directory; original campaign never opened by this agent."
+}

@@ -1200,10 +1200,31 @@ def _rtpc_owned_endpoint_claims(text: str, context: Mapping[str, Any]) -> tuple[
     return tuple(claims)
 
 
+def _rtpc_ancillary_claims(text: str, context: Mapping[str, Any]) -> tuple[NoticeClaim, ...]:
+    """Retain the adapter's attested association role separately from Sound.
+
+    Only its complete affirmative GUID comparison is nonwriting bookkeeping.
+    It never supplies a primary owner, curve values or association certification.
+    The existing context already proves one Volume association independently.
+    """
+    claims = []
+    guid = r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}"
+    role = rf"(?:目标|该|这条)(?:关系|关联)\s*guid(?:\s+({guid}))?"
+    supplied = rf"(?:用户|你)提供的(?:\s*guid(?:\s+({guid}))?)?"
+    for claim in ancillary_claims(text, NoticeRoleContext(context["owner"])):
+        if claim.role == "invalid" and claim.diagnostic == "unclosed-primary-identity-comparison":
+            local = re.sub(r"^\s*预览已(?:核对|确认)[:：]\s*", "", claim.text)
+            frame = re.fullmatch(rf"\s*{role}\s*与\s*{supplied}\s*一致\s*", local)
+            if frame and all(value is None or value == context["ids"][2].casefold() for value in frame.groups()):
+                claim = claim._replace(role="association-identity-comparison", diagnostic="")
+        claims.append(claim)
+    return tuple(claims)
+
+
 def _rtpc_preview_actions_accounted(text: str, context: Mapping[str, Any],
                                    concrete_actions: Sequence[NoticeClaim] = ()) -> bool:
     """Keep each affirmative edit outside validated action/noun spans visible."""
-    ancillary = ancillary_claims(text, NoticeRoleContext(context["owner"]))
+    ancillary = _rtpc_ancillary_claims(text, context)
     if any(claim.role == "invalid" for claim in ancillary):
         return False
     neutral_roles = {"owner-attestation", "authorization", "preview-status", "execution-status",
@@ -1231,6 +1252,8 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     """Recognize a full curve or accurate point delta in the attested context."""
     # The immutable Preview noun is not a negated edit qualifier.
     text = re.sub(r"`([^`\n]+)`", r"\1", text).replace("不可变预览", "预览")
+    if any(claim.role == "invalid" for claim in _rtpc_ancillary_claims(text, context)):
+        return False, False
     numeric = text.replace("\u2212", "-")
     if _rtpc_volume_point_claims(numeric) is None:
         return False, False

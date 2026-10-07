@@ -1,0 +1,314 @@
+{
+  "contract": "waapi-skill.expansion-guid-comparison-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "base": "875b6e727a7f73a0695b66dc8594e04e3f9dd0db",
+  "branch": "codex/expansion-guid-comparison",
+  "public_seam": "expansion_preview_notice",
+  "integration_merge": {
+    "tip": "875b6e727a7f73a0695b66dc8594e04e3f9dd0db",
+    "result": "Already up to date."
+  },
+  "scope": [
+    "Bounded primary GUID operand/equality components in shared notice roles",
+    "Comparison preserves only a separately established primary owner; never seeds it or supplies an effect, authorization, identity lookup or verification proof",
+    "Recognized contradiction, uncertainty, malformed, foreign, compound or unconsumed comparison rejects",
+    "Reference contexts distinguish MusicStinger primary source from Trigger destination",
+    "RTPC propagates invalid ancillary claims before alternative midpoint proofs; existing independently attested association comparison remains separate nonprimary role"
+  ],
+  "source_evidence": {
+    "diagnosis_path": "/tmp/waapi-expansion-d8-notice-diagnosis/DIAGNOSIS.md",
+    "diagnosis_sha256": "e26d7187e58d475ca563ce25d22863a0f18ab74277c1422ee013df16eca37cd6",
+    "diagnostic_manifest_sha256": "95c13ab05c7ae0df28b13c07b2f9af3af19eb0747767e2d0e4b6f7cbb54d826b",
+    "diagnostic_manifest_19_hashes_verified": true,
+    "matrix_path": "/tmp/waapi-expansion-guid-comparison-contrasts/matrix.json",
+    "matrix_sha256": "527c8243221ac332cff36e31920064fa99690645722d160cc734cd32455eb3bd",
+    "contexts_sha256": "a28eb7501ced6afadf78024a6dbe19d08906d46c589c6e303ffe77dfe9976883",
+    "baseline_observations_sha256": "2c2147c3321a921943be8370f8a16714cba618fb595a0a8e3dbbbdad01b7ae19",
+    "independent_baseline": {
+      "total": 37,
+      "matches": 17,
+      "false_rejections": 4,
+      "false_acceptances": 16
+    },
+    "original_copy_provenance": {
+      "report_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/research/integration-expansion-purpose-validation-d8ef3bd-2026-10-07.json",
+      "report_sha256": "c010f1aca6a8a8f8e6710f9b5458dd8073560e79f251d9dddd632f8b3fe5a536",
+      "event_index": 23,
+      "item_id": "item_11",
+      "source_paths": {
+        "events": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-d8ef3bd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/events.jsonl",
+          "sha256": "134262df1215b81a5a28ec286e5bd174e0fc9105d243c2b39cf47cde158242bb",
+          "bytes": 143009
+        },
+        "preview": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-d8ef3bd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/broker/state/transactions/tx1-0n2082xpzrsmv830nays/preview.json",
+          "sha256": "01adb7a9ea796cb1cc7e132caae42c85fcbce0929c87c7edddb472193f506413",
+          "bytes": 23546
+        },
+        "oracle": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-d8ef3bd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/expansion-oracle.json",
+          "sha256": "149fe013d6f54f96719c44797c37b41969d9d65b10a8517c984e514a615cca34",
+          "bytes": 17560
+        }
+      },
+      "notice_sha256": "0779259641f8c361fb675007bd2520d60e12b3c509fddd1da6a320f4fe0d6b9a",
+      "notice_bytes": 448,
+      "copied_fields": [
+        "notice",
+        "preview.artifact",
+        "oracle.before"
+      ],
+      "prohibited_campaign_actions_performed": false
+    },
+    "matrix_copy_provenance": {
+      "original_copy_provenance": "provenance.json",
+      "additional_sources": [
+        {
+          "path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/fixtures/semantic/expansion-contextual-notices-4d2c121.json",
+          "sha256": "c3bd47449fe9c6c61cd34d87ed81b5dfcd28225e2d64d4427777e1d17b580189"
+        },
+        {
+          "path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/fixtures/semantic/expansion-target-plan-independent-fixture-20261007.json",
+          "sha256": "79c14d62eb9084737deb18dd8ed47f64cc8fc223590340b092ed48669deec6ca"
+        }
+      ],
+      "writes": "Only this /tmp directory; original campaign never opened by this agent."
+    },
+    "copied_fixture_bytes_unchanged": true,
+    "notice_bytes": 448,
+    "notice_sha256": "0779259641f8c361fb675007bd2520d60e12b3c509fddd1da6a320f4fe0d6b9a"
+  },
+  "validation": {
+    "lane": "Focused offline developer pytest via ci/test.sh --mode nonlive; not full Non-live gate",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "runs": {
+      "red-witness": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/red-witness.log",
+        "log_sha256": "a96d8a23b25f7142b199f11b944d4972ce84eeeeb3e8fca440cfd331043f3eac",
+        "summary": "1 failed in 0.46s",
+        "direct_exit": 1
+      },
+      "green-witness": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/green-witness.log",
+        "log_sha256": "4ac7f341d2c9d43e928c4d907915e694719ba7ec267d5ee2104745bfcfd8e51d",
+        "summary": "1 passed in 0.13s",
+        "direct_exit": 0
+      },
+      "red-matrix": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/red-matrix.log",
+        "log_sha256": "28d16875a72ea9dcb2a5b764a18f7b0dad83fcf22097c4dbedad22b55a01ff1b",
+        "summary": "18 failed, 20 passed in 0.25s",
+        "direct_exit": 1
+      },
+      "green-matrix": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/green-matrix.log",
+        "log_sha256": "088b33011e545586629e56387907689144744ffff603298e3d232bd23de8739f",
+        "summary": "38 passed in 0.22s",
+        "direct_exit": 0
+      },
+      "focused-notice-gate": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/focused-notice-gate.log",
+        "log_sha256": "49cff081db70eceafec4f6e6a6313847aa01a069197df61ede5d5d486913cd30",
+        "summary": "78 failed, 3047 passed in 8.44s",
+        "direct_exit": 1
+      },
+      "focused-coordinator-regression": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/focused-coordinator-regression.log",
+        "log_sha256": "2e6b04182041660560d8c1ca2fa53032b3abf870e5a9895858dc227da812b6bd",
+        "summary": "73 failed, 3052 passed in 7.95s",
+        "direct_exit": 1
+      },
+      "focused-owner-frame-regression": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/focused-owner-frame-regression.log",
+        "log_sha256": "56273f4fe68e3e50ed4380aa21d87705fa9c4c6933e02c3249c9ad3c469aae67",
+        "summary": "73 failed, 3052 passed in 8.01s",
+        "direct_exit": 1
+      },
+      "green-roles": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/green-roles.log",
+        "log_sha256": "556b1713ed50e978ae3da8ea2ef2a35de363e73323940bbc73356dec6013fae9",
+        "summary": "2043 passed in 3.64s",
+        "direct_exit": 0
+      },
+      "focused-final": {
+        "log_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/focused-final.log",
+        "log_sha256": "a21e4c19c8566af2642ae27900e3ed0a44bc3832f292f13fe8a65b86f82700e5",
+        "summary": "3199 passed in 6.19s",
+        "direct_exit": 0
+      }
+    },
+    "final": {
+      "tests": 3199,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "elapsed_pytest_seconds": 6.19,
+      "direct_exit": 0,
+      "prior_retained": 3093,
+      "new_comparison_controls": 49,
+      "additional_task_runner_controls": 57,
+      "selected_files": [
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py"
+      ],
+      "argv": [
+        "ci/test.sh",
+        "--mode",
+        "nonlive",
+        "--",
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py",
+        "-q",
+        "-ra",
+        "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/focused-final.xml"
+      ],
+      "junit_path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-comparison-20261007/focused-final.xml",
+      "junit_sha256": "a98ba0a908da146862d229fc5faaf82fb84ab23b3b8239beb9cb2037a16882d3"
+    }
+  },
+  "regression_repairs": [
+    {
+      "observed": "78 failed / 3047 passed",
+      "cause": "Initial classifier conflated legacy multi-attribute/coordinated assertions with GUID operands and RTPC association comparison with Sound.",
+      "resolution": "Bound the comparator class; preserve prior identity grammar and preceding original spans."
+    },
+    {
+      "observed": "73 failed / 3052 passed on two intermediate focused runs",
+      "resolution": "Complete existing multi-attribute frames receive no neutral span or owner credit from new parser. Adapter validates association operand and explicit IDs against the existing sealed Volume association; eleven controls reject uncertain, foreign, compound, malformed, wrong-ID and residual-write forms."
+    }
+  ],
+  "preservation": {
+    "previous_semantic_fixture_count": 57,
+    "all_previous_semantic_fixtures_byte_identical": true,
+    "previous_fixture_hashes": {
+      "tests/fixtures/semantic/expansion-ancillary-role-independent-20261007.json": "6fe9d9f3e5bbc5377b68f29cbfe8e500061dc8e3d329ae36add4926ec506234f",
+      "tests/fixtures/semantic/expansion-ancillary-role-independent-fixture-20261007.json": "776e7b08a737efec00f08024281bdc67f090e31a88aeb69a81ed34313c45bbbe",
+      "tests/fixtures/semantic/expansion-ancillary-roles-1cbc2d0.json": "4f1c0475e555a27de359b7cef2fa3fb8823c1aa3341bdc0d115f23d615b5e188",
+      "tests/fixtures/semantic/expansion-attenuation-notice-c39b728-2022.json": "c1981c4c5255ec4bedb21fe708c437f6fb1a875ff8403dad21fa9481103a5071",
+      "tests/fixtures/semantic/expansion-attenuation-notice-c39b728-2025.json": "60f449435c91ef39dcda18bb6ebf70038ec09b5fe5a164102692aaa1114d8ad9",
+      "tests/fixtures/semantic/expansion-attested-frame-notices-492c30a.json": "a456d5b005062a3ad6cc4537cbd0066d7855431d2dff06ace9bdcd8b828ae7f6",
+      "tests/fixtures/semantic/expansion-authority-target-notices-5278a15.json": "bf79c405470b14857fdb44634dc1e1f9c74df2f946b737d105a502d42de3d302",
+      "tests/fixtures/semantic/expansion-authorization-clause-cases-7652745.json": "7cbad0e1a5bf38a88b97cc20142571b840965a4c121e86705db6de45b8140bce",
+      "tests/fixtures/semantic/expansion-auxiliary-claims-534fdde.json": "d71532b7343038a56e87a9c887395492cd05f0f1ff4f859ca31a24acb0519ee6",
+      "tests/fixtures/semantic/expansion-baseline-purpose-a77c96a.json": "c50ccd4910953dbe82f0838a79f457a15b3629aa28f98b3cabab088eb455bfdb",
+      "tests/fixtures/semantic/expansion-composed-authority-notices-d6430a0.json": "1f2913121e33703d4d8c5f0edd26c9772a817ab9a4e377e9fa0c82c3f429a8a7",
+      "tests/fixtures/semantic/expansion-composed-notices-87f9dc8.json": "85312947d24b046eb9b4169bc7b66e77fb0483b47d30583818962ba2fe60318b",
+      "tests/fixtures/semantic/expansion-context-notice-cf94158.json": "96033e4713d7088b6d522c12710b485b18562dbf65173180782afec590011df7",
+      "tests/fixtures/semantic/expansion-contextual-notices-4d2c121.json": "c3bd47449fe9c6c61cd34d87ed81b5dfcd28225e2d64d4427777e1d17b580189",
+      "tests/fixtures/semantic/expansion-contextual-notices-86b475e.json": "1c1318f138d4cc58a3592c945931186aeb32cb8acb7ab30020f82569cbb859b6",
+      "tests/fixtures/semantic/expansion-contextual-notices-977e71e.json": "9ee0261b2e39fc3f7c258d9ceafb7f5851d6342bd53d509d2fd207a153487af4",
+      "tests/fixtures/semantic/expansion-contextual-notices-c39b728.json": "0087c9b17d74aac043e4b69b521ae746c226139452d8fce3a1ce97fb93843c7a",
+      "tests/fixtures/semantic/expansion-contextual-notices-fa51197.json": "0635f588f5b9cd9854504383327838d6616f2d95612ba6a714c08cb9ab6aa6a5",
+      "tests/fixtures/semantic/expansion-coordinated-attestation-0c2e75e.json": "e8113c7baab72b94fea53dd33dcf3d2e0a11b698deb56bbf5b3a160c43089366",
+      "tests/fixtures/semantic/expansion-coordinated-attestation-independent-20261007.json": "67ec04ea10f5aacad588dc28b1ace2fdbc6363d6339e8c3a27c408abf4339bb8",
+      "tests/fixtures/semantic/expansion-current-project-guard.json": "2e38ef74c5bad338111cfd3890a5ba2f23ad3c9b823facabf5a5c637b29875fc",
+      "tests/fixtures/semantic/expansion-current-role-notices-db2299c.json": "78f40bbcfdefcb3130e6de54ba109d76b5ddff9820babcb29c0a8788a78dcf53",
+      "tests/fixtures/semantic/expansion-effect-coordination-withheld-r1.json": "50a8062445b3b47c1377258c915a19acee419c2b95c034def276c61cdb6d64f9",
+      "tests/fixtures/semantic/expansion-expected-state-notices-db82de6.json": "e6db0f2aa8899f96dbd421222a5e9f237be2b4861857d50540987c6688baac26",
+      "tests/fixtures/semantic/expansion-independent-composition-87f9dc8-r2.json": "31b034f6880b42e75d4489289f8a81380ac862566d6a8415b25cbc9a6c635281",
+      "tests/fixtures/semantic/expansion-independent-composition-87f9dc8.json": "ae82fc5ec0f0de908c79009f2f22636dec09a9146cfc01458207e7a4a9047cf0",
+      "tests/fixtures/semantic/expansion-independent-stage-notices-eba698d.json": "c5b2fc33aeb2d417f0388203bf6b96fba63a50ee2479b76e978df0de79462981",
+      "tests/fixtures/semantic/expansion-interleaved-reads-0997d20.json": "15762f0a1920a7c78c0dd34838c2a068e41402448cc5376fe16dde60393fdc19",
+      "tests/fixtures/semantic/expansion-midpoint-notice-919043f.json": "8b436a9adb139eaf5845154ff4ddec75f753c3965f2bacbc0d8038460adc02f5",
+      "tests/fixtures/semantic/expansion-nominal-preview-6b906cb.json": "0913e93436db4d28091a4b21be6e4c7bc6dae2f73a8fddc0f4b03847d1cefdec",
+      "tests/fixtures/semantic/expansion-notice-language-paraphrases-1faaa5d.json": "50723bb69e29a69cb99bfd54a7ceea96db20675a6ab90e932019bf30651cafb2",
+      "tests/fixtures/semantic/expansion-notice-role-context-withheld-r1.json": "4c0130a00fd35886d22a6000116f838536b0fcea1717cbde0f11106f675d3ddf",
+      "tests/fixtures/semantic/expansion-notice-role-context-withheld-r2.json": "a662ce5196fe069b8ea8d80e0426a7f3f7cae72c6a640142eeb11ef7d8601d77",
+      "tests/fixtures/semantic/expansion-noun-span-notices-a7381ac.json": "d6936e44f7b44824805ffef84fd684594eb445c1892de841ec992770113f183c",
+      "tests/fixtures/semantic/expansion-operation-noun-700914d.json": "4ee90522f7cef2e5ac79ac039a2ac448082525b65aef19c3f9ced2313f65b286",
+      "tests/fixtures/semantic/expansion-operation-noun-independent-20261007.json": "c8c668d22c038813fa0996d8ca30fcab2e30553ef0f165d77238c6dfc274da8a",
+      "tests/fixtures/semantic/expansion-passive-authority-notices-7652745.json": "6d447310da34fa9edca036a625d3d3c591df3b81cfb94890ff0d4261efbdaff8",
+      "tests/fixtures/semantic/expansion-planned-effect-entity-notices-55df097.json": "4ed7bc7939ec6457d167171f1ab254f597839d933dead90ba5b29ab3d75f56a0",
+      "tests/fixtures/semantic/expansion-point-notice-86e23cd.json": "67f276d7605660148ad272a9ecb0654f6a398a6f3c5b275e01a8a5d8b55b1b99",
+      "tests/fixtures/semantic/expansion-preview-baseline-placement-e49354a.json": "0e9d97cd7881cffd04b8612197d1a79abf840985c21021880e6189f4f27bf8ad",
+      "tests/fixtures/semantic/expansion-preview-midpoint-719e3e0.json": "14f1e83ff8cae816e0dbf96a53e2e7aa162a101174b346696c1feeefc0ecd346",
+      "tests/fixtures/semantic/expansion-preview-notice-0997d20.json": "6c15e75a09ec1af73509fd55f12560968ccf25e17a9ef55965edce8f092216f8",
+      "tests/fixtures/semantic/expansion-preview-notice-122eb09.json": "d91b4b0f63cbd0f98b742a5e3c807fd01a2fee82a666f1d12c2a495ae5cdffe2",
+      "tests/fixtures/semantic/expansion-preview-read-interlude-a1979db.json": "712bfa4113cbc23f85b7f08ffc3a668b6649127d841cc2131da28021230f0b08",
+      "tests/fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json": "e415de78d9ec034e562dfbb0efc0937e774f6affb9b687f33707f050fc997481",
+      "tests/fixtures/semantic/expansion-purpose-fixture-0b6af50-20261007.json": "1ddfe39754f4ee50fae43817c39641b064dde7f1d4e0a6f27e7fea7df0e33ee1",
+      "tests/fixtures/semantic/expansion-purpose-independent-20261007.json": "19a734704545f162b0450d50be691a8914e233a00cf3f89987ac4347fafe5b44",
+      "tests/fixtures/semantic/expansion-rejected-declaration-719e3e0.json": "0bb1447674e0ab97223439f3944c8859b2daa284707de5e67f7bfc48412253a1",
+      "tests/fixtures/semantic/expansion-rejected-draft-check-0e04c8c.json": "9579398aed256881d56f274f4ddd33db7206c8a2ff7c61bc74f93a127f576ddf",
+      "tests/fixtures/semantic/expansion-role-notices-1faaa5d.json": "c37923a3c44410fdb932d3fb01c495ed555f3b9a9ae8a007d3ed68d7d368bbd9",
+      "tests/fixtures/semantic/expansion-staged-notices-eba698d.json": "a8da472e71355cf3d5e8626e5bf3783457f4db07ca0ee06a6a6e9a683e11eec5",
+      "tests/fixtures/semantic/expansion-target-plan-e93a575.json": "27c19db62d48e2ef7f294aaab3694f787da48c6ce4e2c0434b86c1a1e216026d",
+      "tests/fixtures/semantic/expansion-target-plan-independent-20261007.json": "a4a087d4cbf58f7302a434baf350ef15fad44883db9d08e2a74105abacd0e67b",
+      "tests/fixtures/semantic/expansion-target-plan-independent-fixture-20261007.json": "79c14d62eb9084737deb18dd8ed47f64cc8fc223590340b092ed48669deec6ca",
+      "tests/fixtures/semantic/expansion-target-preflight-595cc85.json": "a24d1fb38ace6741331e3ee92612c0ed504c449110d9b824731eef0744f44a81",
+      "tests/fixtures/semantic/expansion-temporal-notices-a1979db.json": "61178317935878490222cc3a363a6079e76f50992e23c409b99618ed28d2dc24",
+      "tests/fixtures/semantic/expansion-verification-basis-notice-0e04c8c.json": "a595e36a9d83de04cf968ea1d8971a8a608499c058eaeafe391528313d4119a9"
+    },
+    "candidate_file_sha256": {
+      "tests/semantic/support/codex_notice_claims.py": "8e836def016d9d0261086ffac54486b711e4bbc5e31cf0b2932f229fdf1527b9",
+      "tests/semantic/support/codex_task_runner_v3.py": "7bd0d5093150b402eba2e50934dcc931d63942ae52b2c58e61384c1c2f882c30",
+      "tests/semantic/test_codex_guid_comparison_notices.py": "0db79e50dce13bbb65addb176879d3314f1a1f4bbd3ad04041991aeda71ef75f",
+      "tests/fixtures/semantic/expansion-guid-comparison-independent-20261007.json": "527c8243221ac332cff36e31920064fa99690645722d160cc734cd32455eb3bd",
+      "tests/fixtures/semantic/expansion-guid-comparison-contexts-20261007.json": "a28eb7501ced6afadf78024a6dbe19d08906d46c589c6e303ffe77dfe9976883",
+      "tests/fixtures/semantic/expansion-guid-comparison-provenance-20261007.json": "0dcf5e454cb0bb8c36683ba2f9ff7c322c475338db2e9e2aa8327e673c783120"
+    },
+    "unchanged_trees": [
+      "skills/waapi-skill",
+      "ci",
+      "tests/_org"
+    ],
+    "original_state_wording_unchanged": true
+  },
+  "limits": [
+    "Historical FAILs remain FAIL; copied predicates grant no Agent, Wwise or business-effect PASS credit.",
+    "No Program/full Non-live, Fresh/Wwise, campaign replay/resume/verify-only, source-project/config writes, or model grader.",
+    "No Skill, suite, oracle, runtime, acceptance or forced-prompt-wording change.",
+    "Finite grammar does not guarantee arbitrary natural-language acceptance.",
+    "Independent reviews, full Non-live, new EXP25-C09 proof and final13 acceptance remain coordinator-owned."
+  ]
+}
