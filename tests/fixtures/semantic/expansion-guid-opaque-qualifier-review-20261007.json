@@ -1,0 +1,761 @@
+{
+  "source_sha256": "b21e2a2baa1f4496d0e07f5c02dc5cd994fbec69fcf049af2e514019ae72eec3",
+  "cases": [
+    {
+      "id": "observations-000-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-001-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-002-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-003-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-004-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-005-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-006-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-007-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-008-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音 的 GUID {{2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-009-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与目标声音 的 GUID {{2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-010-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {{2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-011-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {{2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-012-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音 的 GUID {} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-013-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与目标声音 的 GUID {}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-014-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-015-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-016-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-017-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与目标声音 的 GUID {not-a-guid}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-018-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-019-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {not-a-guid}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-020-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid}} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-021-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与目标声音 的 GUID {not-a-guid}}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-022-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-023-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {not-a-guid}}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-024-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-025-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-026-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-027-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-028-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-029-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-030-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-031-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-032-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音 的 GUID {{504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-033-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与目标声音 的 GUID {{504F14BB-C97E-467F-9354-04811517B4D3}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-034-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {{504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-035-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {{504F14BB-C97E-467F-9354-04811517B4D3}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-036-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音 的 GUID {} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-037-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与目标声音 的 GUID {}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-038-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-039-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-040-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-041-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与目标声音 的 GUID {not-a-guid}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-042-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-043-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {not-a-guid}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-044-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid}} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-045-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与目标声音 的 GUID {not-a-guid}}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-046-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-047-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，与OtherObject 的 GUID {not-a-guid}}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-048-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-049-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-050-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-051-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-052-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-053-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-054-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-055-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-056-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {{E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-057-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与目标衰减对象 的 GUID {{E68369C4-8381-45B1-92B3-4D43924A0030}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-058-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {{E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-059-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与OtherObject 的 GUID {{E68369C4-8381-45B1-92B3-4D43924A0030}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-060-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-061-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与目标衰减对象 的 GUID {}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-062-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-063-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与OtherObject 的 GUID {}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-064-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-065-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与目标衰减对象 的 GUID {not-a-guid}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-066-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-067-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与OtherObject 的 GUID {not-a-guid}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-068-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid}} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-069-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与目标衰减对象 的 GUID {not-a-guid}}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-070-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid}} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-071-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，与OtherObject 的 GUID {not-a-guid}}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-072-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-073-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-074-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-075-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-076-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-077-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-078-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-079-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-080-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {{B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-081-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与目标 Stinger 的 GUID {{B8D45849-AF76-4770-BE7B-5A6553B1337B}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-082-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {{B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-083-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与OtherObject 的 GUID {{B8D45849-AF76-4770-BE7B-5A6553B1337B}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-084-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-085-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与目标 Stinger 的 GUID {}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-086-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-087-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与OtherObject 的 GUID {}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-088-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-089-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与目标 Stinger 的 GUID {not-a-guid}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-090-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-091-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与OtherObject 的 GUID {not-a-guid}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-092-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid}} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-093-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与目标 Stinger 的 GUID {not-a-guid}}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-094-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid}} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "observations-095-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，与OtherObject 的 GUID {not-a-guid}}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-000-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-001-effect",
+      "family": "effect",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid}} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-002-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-003-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-004-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid}} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-005-rtpc",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-006-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid}} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-007-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {not-a-guid}} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-008-attenuation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid}} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-009-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid}} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-010-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {not-a-guid}} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    },
+    {
+      "id": "colon_coordinated-011-stinger",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid}} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen Spec review judgment: opaque malformed qualifier must not suppress incomplete or foreign comparison intent."
+    }
+  ]
+}
