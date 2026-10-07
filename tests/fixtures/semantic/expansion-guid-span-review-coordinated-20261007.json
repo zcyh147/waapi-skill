@@ -1,0 +1,259 @@
+{
+  "contract": "waapi-skill.expansion-guid-span-review-regressions/v1",
+  "candidate": "19aed837a921ed180501ba25d88d5de3da208007",
+  "expectations_frozen_before_implementation": true,
+  "cases": [
+    {
+      "id": "effect-guid-suffix-valid",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-denied",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的不一致、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-uncertain",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的可能一致、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-foreign-left",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的一致、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-foreign-right",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与 OtherObject 的 GUID 一致、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-extra-edit",
+      "family": "effect",
+      "notice": "已核对目标声音，并修改 Pitch 为12、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-residual",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致以及 OtherObject、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-missing",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID 与一致、且 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-valid",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-denied",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 不一致、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-uncertain",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 可能一致、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-foreign-left",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的 GUID 一致、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-foreign-right",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与 OtherObject 的 GUID 一致、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-extra-edit",
+      "family": "rtpc",
+      "notice": "已核对目标声音，并修改 Pitch 为12、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-residual",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致以及 OtherObject、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "rtpc-guid-suffix-missing",
+      "family": "rtpc",
+      "notice": "已核对目标声音，GUID 与一致、且 GUID 与你提供的一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-valid",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-denied",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 不一致、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-uncertain",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 可能一致、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-foreign-left",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID 与你提供的 GUID 一致、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-foreign-right",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与 OtherObject 的 GUID 一致、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-extra-edit",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，并修改 Pitch 为12、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-residual",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致以及 OtherObject、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "attenuation-guid-suffix-missing",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，GUID 与一致、且 GUID 与你提供的一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-valid",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-denied",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 不一致、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-uncertain",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 可能一致、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-foreign-left",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID 与你提供的目标 Stinger GUID 一致、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-foreign-right",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与 OtherObject 的 GUID 一致、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-extra-edit",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，并修改 Pitch 为12、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-residual",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致以及 OtherObject、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "stinger-guid-suffix-missing",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，GUID 与一致、且 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A later correct explicit prospective owner and valid GUID suffix cannot excuse an invalid preceding comparison or edit."
+    },
+    {
+      "id": "effect-guid-suffix-read-prefix",
+      "family": "effect",
+      "notice": "已核对目标声音、且 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Every coordinated component remains visible; valid reads preserve ownership, unknown text resets it."
+    },
+    {
+      "id": "effect-guid-suffix-comparison-prefix",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致、且 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Every coordinated component remains visible; valid reads preserve ownership, unknown text resets it."
+    },
+    {
+      "id": "effect-guid-suffix-unknown-prefix",
+      "family": "effect",
+      "notice": "已核对目标声音，顺便核对天气、且 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every coordinated component remains visible; valid reads preserve ownership, unknown text resets it."
+    },
+    {
+      "id": "effect-guid-suffix-unknown-middle",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致、顺便核对天气、且 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every coordinated component remains visible; valid reads preserve ownership, unknown text resets it."
+    }
+  ]
+}

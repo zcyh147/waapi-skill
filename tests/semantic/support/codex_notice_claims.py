@@ -358,15 +358,40 @@ def primary_identity_comparison(clause: NoticeClaim, context: NoticeRoleContext)
         intended = attributes.group(2).strip()
         if (not owner or primary_role_atom(owner, context)) and (intended == "请求" or primary_role_atom(intended, context)):
             return clause
-    local = clause
-    coordination = re.search(r"、(?=(?:并(?:且)?|且)\s*guid)", clause.text)
-    if coordination:
-        # Keep the preceding read assertion visible to its existing consumer.
-        local = clause._replace(start=clause.start + coordination.end(), text=clause.text[coordination.end():])
-    frame = re.fullmatch(r"\s*(?:并(?:且)?|且|同时|另外)?\s*(.+?)\s*与\s*(.+?)\s*一致\s*", local.text)
+    frame = re.fullmatch(r"\s*(?:并(?:且)?|且|同时|另外)?\s*(.+?)\s*与\s*(.+?)\s*一致\s*", clause.text)
     if frame is not None and all(_primary_guid_operand(value, context) for value in frame.groups()):
-        return local._replace(role="primary-identity-comparison")
+        return clause._replace(role="primary-identity-comparison")
     return clause._replace(role="invalid", diagnostic="unclosed-primary-identity-comparison")
+
+
+def _ancillary_components(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim, ...]:
+    """Keep every coordinated prefix and owner-colon tail in local accounting.
+
+    These boundaries split components, never validate or discard their text.
+    Ordinary identity attribute lists retain their existing complete consumer.
+    Ownership and mutation accounting use the same original component spans.
+    """
+    components = []
+    for clause in notice_clauses(text):
+        boundaries = [0]
+        boundaries.extend(match.end() for match in re.finditer(
+            r"、(?=(?:并(?:且)?|且)\s*[^、]*?(?<![a-z0-9_])guid(?![a-z0-9_]))", clause.text))
+        boundaries.append(len(clause.text) + 1)
+        for start, next_start in zip(boundaries, boundaries[1:]):
+            end = next_start - 1
+            component = clause._replace(start=clause.start + start, end=clause.start + end,
+                                        text=clause.text[start:end])
+            colon = re.search(r"[:：]", component.text)
+            if colon is not None:
+                prefix = component._replace(end=component.start + colon.start(),
+                                            text=component.text[:colon.start()])
+                if owner_attestation(prefix, context).role in {"owner-attestation", "invalid"}:
+                    components.append(prefix)
+                    components.append(component._replace(start=component.start + colon.end(),
+                                                         text=component.text[colon.end():]))
+                    continue
+            components.append(component)
+    return tuple(components)
 
 
 def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim, ...]:
@@ -378,12 +403,11 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
     from tests.semantic.support.codex_notice_language import authorization_claim
 
     result = []
-    for clause in notice_clauses(text):
+    for clause in _ancillary_components(text, context):
         local = re.sub(r"^(\s*)且", r"\1并", clause.text)
-        colon = re.search(r"[:：]", local)
-        owner = owner_attestation(clause._replace(text=local[:colon.start()] if colon else local), context)
+        owner = owner_attestation(clause._replace(text=local), context)
         if owner.role in {"owner-attestation", "invalid"}:
-            result.append(owner._replace(text=clause.text, end=clause.start + colon.start() if colon else clause.end))
+            result.append(owner._replace(text=clause.text))
             continue
         comparison = primary_identity_comparison(clause._replace(text=local), context)
         if comparison.role in {"primary-identity-comparison", "invalid"}:
@@ -571,7 +595,7 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
     pending_owner = False
     # Both projections retain original offsets. Only complete, validated local
     # components can bridge the owner to one next substantive clause.
-    for raw, claim in zip(notice_clauses(text), ancillary_claims(text, context)):
+    for raw, claim in zip(_ancillary_components(text, context), ancillary_claims(text, context)):
         if claim.role == "invalid":
             return None
         if claim.role == "owner-attestation":

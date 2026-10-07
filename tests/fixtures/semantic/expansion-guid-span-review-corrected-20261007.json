@@ -1,0 +1,546 @@
+{
+  "contract": "waapi-skill.expansion-guid-span-review-regressions/v1",
+  "candidate": "19aed837a921ed180501ba25d88d5de3da208007",
+  "expectations_frozen_before_implementation": true,
+  "cases": [
+    {
+      "id": "effect-colon-valid",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-denied",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的不一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-uncertain",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的可能一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-foreign-left",
+      "family": "effect",
+      "notice": "已核对目标声音：OtherObject 的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-foreign-right",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与 OtherObject 的 GUID 一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-extra-edit",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的一致并修改 Pitch 为12，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-residual",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的一致以及 OtherObject，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-missing",
+      "family": "effect",
+      "notice": "已核对目标声音：GUID 与一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-valid",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-denied",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的不一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-uncertain",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的可能一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-foreign-left",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-foreign-right",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与 OtherObject 的 GUID 一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-extra-edit",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致并修改 Pitch 为12、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-residual",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致以及 OtherObject、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-coordinated-missing",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID 与一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-valid",
+      "family": "rtpc",
+      "notice": "已核对目标声音：目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-denied",
+      "family": "rtpc",
+      "notice": "已核对目标声音：目标声音的 GUID 与你提供的 GUID 不一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-uncertain",
+      "family": "rtpc",
+      "notice": "已核对目标声音：目标声音的 GUID 与你提供的 GUID 可能一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-foreign-left",
+      "family": "rtpc",
+      "notice": "已核对目标声音：OtherObject 的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-foreign-right",
+      "family": "rtpc",
+      "notice": "已核对目标声音：目标声音的 GUID 与 OtherObject 的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-extra-edit",
+      "family": "rtpc",
+      "notice": "已核对目标声音：目标声音的 GUID 与你提供的 GUID 一致并修改 Pitch 为12。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-residual",
+      "family": "rtpc",
+      "notice": "已核对目标声音：目标声音的 GUID 与你提供的 GUID 一致以及 OtherObject。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-colon-missing",
+      "family": "rtpc",
+      "notice": "已核对目标声音：GUID 与一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-valid",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-denied",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 不一致、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-uncertain",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 可能一致、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-foreign-left",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的 GUID 一致、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-foreign-right",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与 OtherObject 的 GUID 一致、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-extra-edit",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致并修改 Pitch 为12、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-residual",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致以及 OtherObject、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "rtpc-coordinated-missing",
+      "family": "rtpc",
+      "notice": "已核对目标声音，GUID 与一致、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-valid",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-denied",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：目标衰减对象的 GUID 与你提供的 GUID 不一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-uncertain",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：目标衰减对象的 GUID 与你提供的 GUID 可能一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-foreign-left",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-foreign-right",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：目标衰减对象的 GUID 与 OtherObject 的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-extra-edit",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：目标衰减对象的 GUID 与你提供的 GUID 一致并修改 Pitch 为12。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-residual",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：目标衰减对象的 GUID 与你提供的 GUID 一致以及 OtherObject。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-colon-missing",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：GUID 与一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-valid",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-denied",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 不一致、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-uncertain",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 可能一致、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-foreign-left",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID 与你提供的 GUID 一致、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-foreign-right",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与 OtherObject 的 GUID 一致、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-extra-edit",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致并修改 Pitch 为12、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-residual",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致以及 OtherObject、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "attenuation-coordinated-missing",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，GUID 与一致、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-valid",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-denied",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 不一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-uncertain",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 可能一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-foreign-left",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-foreign-right",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID 与 OtherObject 的 GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-extra-edit",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致并修改 Pitch 为12。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-residual",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致以及 OtherObject。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-colon-missing",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：GUID 与一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-valid",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-denied",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 不一致、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-uncertain",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 可能一致、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-foreign-left",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID 与你提供的目标 Stinger GUID 一致、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-foreign-right",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与 OtherObject 的 GUID 一致、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-extra-edit",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致并修改 Pitch 为12、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-residual",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致以及 OtherObject、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "stinger-coordinated-missing",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，GUID 与一致、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Every owner-colon tail and coordinated prefix is independently accounted; valid equality grants no new authority."
+    },
+    {
+      "id": "effect-colon-valid",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-coordinated-valid",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-coordinated-read",
+      "family": "effect",
+      "notice": "已核对目标声音、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-colon-unknown-reset",
+      "family": "effect",
+      "notice": "已核对目标声音：顺便核对天气、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-coordinated-unknown-reset",
+      "family": "effect",
+      "notice": "已核对目标声音，顺便核对天气、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-coordinated-unknown-middle-reset",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致、顺便核对天气、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-comparison-without-owner",
+      "family": "effect",
+      "notice": "解析出的 GUID 与你提供的一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-comparison-without-effect",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的一致，并已记录修改前状态。执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-comparison-without-authorization",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-denied-owner",
+      "family": "effect",
+      "notice": "未核对目标声音：解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Only an independently established owner survives fully classified neutral components; unknown text resets continuity; comparison proves no effect or authorization."
+    },
+    {
+      "id": "effect-legacy-attributes",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing aggregate identity assertion remains with its legacy consumer and grants no neutral-span/owner credit; implicit recipient after this unclassified component is rejected."
+    },
+    {
+      "id": "effect-legacy-attributes-explicit-recipient",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Existing aggregate identity assertion remains visible to its legacy consumer; later explicit correct recipient independently supplies the prospective owner."
+    }
+  ],
+  "expectation_erratum": {
+    "source_sha256": "82d9f71bf6110b1d17fb44a8089aa5593cfcd53d8156fc9b9e8e0c56bcb488fa",
+    "vector": "effect-legacy-attributes",
+    "before": true,
+    "after": false,
+    "reason": "Coordinator confirmed that legacy aggregate assertions cannot gain neutral ownership continuity; prior independent37 and3199 expectations unchanged."
+  }
+}
