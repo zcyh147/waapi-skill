@@ -99,11 +99,14 @@ def primary_role_atom(value: str, context: NoticeRoleContext) -> bool:
             return False
     if value and value in {str(row[key]).casefold() for key in ("id", "name", "path")}:
         return True
+    terms = "|".join(re.escape(term) for term in role_terms(row["type"]))
+    typed_id = re.fullmatch(rf"(?:{terms})\s+(\{{[0-9a-f]{{8}}(?:-[0-9a-f]{{4}}){{3}}-[0-9a-f]{{12}}\}})", value)
+    if typed_id:
+        return typed_id.group(1) == str(row["id"]).casefold()
     if re.fullmatch(r"(?:所)?指定\s*guid", value):
         return True  # A definite referent to the adapter's singleton sealed ID.
     if not context.reference_change and value in {"目标", "目标对象", "该对象", "此对象", "指定对象", "所指定对象"}:
         return True  # No source/destination ambiguity in this singleton role.
-    terms = "|".join(re.escape(term) for term in role_terms(row["type"]))
     return re.fullmatch(rf"(?:目标|该|此|(?:所)?指定)(?:的)?\s*(?:{terms})(?:对象)?", value) is not None
 
 
@@ -128,11 +131,17 @@ def _baseline_producer(text: str, context: NoticeRoleContext) -> bool:
 
 
 def baseline_read_role(text: str, context: NoticeRoleContext | None = None) -> str:
-    """A complete coordinated read-state summary, with no owner/edit payload."""
+    """A complete read-state record, without accomplished-read/effect credit."""
     original_text = text
     text = _without_verification_purpose(text)
     record = r"(?:记录|保存|建立)"
-    if re.fullmatch(rf"\s*并(?:为当前配置)?{record}(?:了)?{before_state_noun_pattern()}\s*", text):
+    forward = re.fullmatch(rf"\s*(?:并(?:且)?|且|同时|另外)?(?:已|将)?(?:为当前配置)?{record}(?:了)?{before_state_noun_pattern()}"
+        r"(?:[:：]\s*当前已有(?P<count>[0-9零一二两三四五六七八九十]+)(?:个)?效果器)?\s*", text)
+    if forward:
+        count = forward.group("count")
+        if count is not None and (context is None or context.identity["type"] != "Sound"
+                or context.protected_effect_count is None or notice_count(count) != context.protected_effect_count):
+            return "invalid"
         return "read-summary"
     if re.fullmatch(rf"\s*{before_state_noun_pattern()}已{record}\s*", text):
         return "read-summary"
@@ -247,8 +256,8 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
     if match is None:
         reverse = re.fullmatch(r"\s*(.+?)\s*已(?:核对|核实|确认|匹配|绑定)\s*", clause.text)
         declared_object = re.match(r"(?:该|此|(?:所)?指定)对象(?:的|身份|配置|和|及|与|\s|$)", reverse.group(1)) if reverse else None
-        if reverse and (reverse.group(1).startswith("目标") or declared_object or primary_role_atom(reverse.group(1), context)
-                        or primary_role_attribute(reverse.group(1), context)):
+        if reverse and (reverse.group(1).startswith("目标") or declared_object
+                        or _supplied_owner_operand(reverse.group(1), context)):
             return clause._replace(role="owner-attestation" if (primary_role_atom(reverse.group(1), context)
                                    or primary_role_attribute(reverse.group(1), context))
                                    else "invalid", diagnostic="conflicting-owner-attestation")
@@ -316,6 +325,10 @@ def ancillary_claims(text: str, context: NoticeRoleContext) -> tuple[NoticeClaim
         if baseline in {"read-summary", "invalid"}:
             result.append(clause._replace(role=baseline, diagnostic="conflicting-baseline" if baseline == "invalid" else ""))
             continue
+        display = matched_display_claim(clause._replace(text=local), context)
+        if display.role in {"matched-display", "invalid"}:
+            result.append(display._replace(text=clause.text))
+            continue
         verification = verification_basis_claim(clause._replace(text=local))
         if verification.role == "verification-basis":
             result.append(verification._replace(text=clause.text))
@@ -372,12 +385,19 @@ def matched_display_claim(clause: NoticeClaim, context: NoticeRoleContext) -> No
         if any(claim.role == "invalid" for claim in coordinated):
             return clause._replace(role="invalid", diagnostic="conflicting-coordinated-attestation")
         return next((claim for claim in coordinated if claim.role == "matched-display"), clause)
-    match = re.fullmatch(r"\s*(?:并匹配到|已从实时插件目录确认)\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*", clause.text)
-    reverse = re.fullmatch(r"\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*类型已从实时(?:插件)?目录确认\s*", clause.text)
-    match = match or reverse
+    label = r"([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})"
+    read = r"(?:确认|核对|核实)"
+    coordinator = r"(?:并(?:且)?|且|同时|另外)?"
+    match = re.fullmatch(rf"\s*(?:并匹配到|已从实时插件目录确认)\s*{label}\s*", clause.text)
+    reverse = re.fullmatch(rf"\s*{label}\s*类型已从实时(?:插件)?目录确认\s*", clause.text)
+    forward_read = re.fullmatch(rf"\s*{coordinator}(?:已)?{read}\s*{label}\s*类型\s*", clause.text)
+    reverse_read = re.fullmatch(rf"\s*{label}\s*类型已{read}\s*", clause.text)
+    match = match or reverse or forward_read or reverse_read
     if match and context.identity["type"] == "Sound" and effect_kind_label(match.group(1)):
         return clause._replace(role="matched-display", value=" ".join(match.group(1).split()))
-    if re.match(r"\s*(?:并匹配到|已从实时插件目录确认)", clause.text) or re.search(r"类型已从实时(?:插件)?目录确认", clause.text):
+    type_read = (re.match(rf"\s*{coordinator}(?:已|尚未|未|没有|不|不能|可能|也许|或许|不确定(?:是否)?)?{read}\s*.+类型", clause.text)
+                 or re.search(rf"类型(?:已|尚未|未|没有|不|不能|可能|也许|或许|不确定(?:是否)?){read}", clause.text))
+    if re.match(r"\s*(?:并匹配到|已从实时插件目录确认)", clause.text) or re.search(r"类型已从实时(?:插件)?目录确认", clause.text) or type_read:
         return clause._replace(role="invalid", diagnostic="unclosed-matched-display")
     return clause
 
@@ -483,18 +503,13 @@ def owner_inheritance(text: str, context: NoticeRoleContext) -> tuple[tuple[int,
             continue
         if not pending_owner:
             continue
-        if claim.role in {"authorization", "preview-status", "execution-status", "read-summary"}:
-            if claim.value:
+        if claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "matched-display"}:
+            if claim.value and claim.role in {"authorization", "preview-status"}:
                 owner = re.fullmatch(r"\s*(?:在|向|对)\s*(.+?)\s*(?:上|下)\s*[，,]?\s*", claim.value)
                 if owner is None or not primary_role_atom(owner.group(1), context):
                     return None
             if not text[raw.start:claim.start].strip() and not text[claim.end:raw.end].strip():
                 continue
-        display = matched_display_claim(raw, context)
-        if display.role == "invalid":
-            return None
-        if display.role == "matched-display":
-            continue
         windows.append((raw.start, raw.end))
         pending_owner = False
     return tuple(windows)

@@ -15,7 +15,7 @@ def role_terms(live_type: str) -> tuple[str, ...]:
 
 
 _CHANGE = r"(?:修改|变更|改动)"
-_REFERENT = r"(?:该|此|本次|此次|这次|(?:这|此)(?:一)?(?:项|份|个))(?:已授权)?|这个已授权的"
+_REFERENT = r"(?:该|此|本次|此次|这次|当前|(?:这|此)(?:一)?(?:项|份|个))(?:已授权)?|这个已授权的"
 _NEGATION = r"不|未|非|\bnot\b|\bnever\b|\bwithout\b|n't"
 _FUTURE = r"(?:接下来|下面|现在|即将|随后|然后|立即)(?:我)?(?:将|会)?|我(?:现在|即将|随后|将|会)"
 _PROVIDER = r"(?:已)?(?:按|依据)(?:保存的|已保存的|当前)?\s*(?:allow_changes|\*\*allow_changes\*\*)\s*策略\s*"
@@ -104,11 +104,12 @@ def authorization_claim(clause: str, *, reference_change: bool = False,
     inspection = r"(?:已)?确认(?:保存的)?授权记录包含独立于(?:修改|变更|改动)预览的\s*(?P<inspection_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略授权"
     preview = rf"(?:{preview_noun_pattern(reference_change=reference_change, operation_actions=operation_actions)})?"
     attributed_grant = rf"{preview}{_GRANT}\s*(?:当前)?\s*(?P<grant_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略{_AUTHORIZATION}"
-    provider_record = rf"(?:当前)?\s*(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:策略)?(?:已)?(?:为{change}(?:记录|保存|授予|提供)(?:了)?(?:独立)?(?:执行|策略)?授权|授予{change}(?:的)?(?:独立)?(?:执行)?授权)"
+    provider_record = rf"(?:当前)?\s*(?P<provider_record_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*(?:策略)?(?:已)?(?:为{change}(?:记录|保存|授予|提供|签发)(?:了)?(?:独立)?(?:执行|策略)?授权|授予{change}(?:的)?(?:独立)?(?:执行)?授权)"
+    provider_passive = rf"{change}(?:已)?由\s*(?P<provider_passive_policy>(?:\*\*)?[a-z_]+(?:\*\*)?)\s*策略(?:记录|保存|授予|提供|签发)(?:了)?(?:独立)?(?:执行|策略)?授权"
     gateway_record = rf"网关(?:已)?(?:按|依据)\s*(?P<gateway_policy>[a-z_]+)\s*策略{_AUTHORIZATION}"
     coordinator = r"(?:并(?:且)?|且|同时|另外)"
     beginning = rf"\s*(?:{coordinator})?\s*(?P<owner>(?:在|向|对)[^，,。；;\n]+?(?:上|下)\s*[，,]?\s*)?"
-    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record}|{attributed_grant}|{gateway_record})[ \t]*(?=[，,。；;]|\s*$)", clause)
+    match = re.match(rf"{beginning}(?:{active}|{passive}|{beneficiary}|{bare_grant}|{record}|{inspection}|{provider_record}|{provider_passive}|{attributed_grant}|{gateway_record})[ \t]*(?=[，,。；;]|\s*$)", clause)
     if match:
         if match.group('grant_policy') is not None and match.group('grant_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
@@ -117,6 +118,8 @@ def authorization_claim(clause: str, *, reference_change: bool = False,
         if match.group('inspection_policy') is not None and match.group('inspection_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
         if match.group('provider_record_policy') is not None and match.group('provider_record_policy') not in {'allow_changes', '**allow_changes**'}:
+            return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
+        if match.group('provider_passive_policy') is not None and match.group('provider_passive_policy') not in {'allow_changes', '**allow_changes**'}:
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")
         if match.group('gateway_policy') is not None and match.group('gateway_policy') != 'allow_changes':
             return AuthorizationClaim("invalid", match.start(), match.end(), match.group("owner") or "")

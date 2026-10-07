@@ -1,0 +1,4284 @@
+{
+  "contract": "waapi-skill.independent-ancillary-role-contrast-design/v1",
+  "status": "frozen-before-implementation",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "scope": "147A bounded shared ancillary producer/consumer roles only",
+  "functional_candidate": "1cbc2d039227811190dba1828692e879fd58d8cd",
+  "docs_tip": "f01485c",
+  "expectation_authority": "Independent native before/prepared artifact/prospective delta/receipt timing; not existing parser result",
+  "fixture_ref": "fixture.json",
+  "source_manifest": {
+    "c09-events.jsonl": {
+      "original_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-1cbc2d0-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/events.jsonl",
+      "source_copy": "sources/c09-events.jsonl",
+      "sha256": "38d91a420e9d7fd4e0f39c9b001509637e7e2709948f328938fe2082372184db",
+      "bytes": 142815
+    },
+    "c09-oracle.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-1cbc2d0-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/expansion-oracle.json",
+      "source_copy": "sources/c09-oracle.json",
+      "sha256": "868bd9c101ba54e0eef0430c9903eedee8c7d7f18450ac77ffab9b64cfc4cab3",
+      "bytes": 17561
+    },
+    "c09-preview.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-1cbc2d0-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/broker/state/transactions/tx1-536n90qf3qtvqkm6ag8x/preview.json",
+      "source_copy": "sources/c09-preview.json",
+      "sha256": "e9021072e0ea401b04f493cda92a9dde026d708b8dc2987dd4583ebf638ac98b",
+      "bytes": 23546
+    },
+    "c09-journal.jsonl": {
+      "original_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-1cbc2d0-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/broker/state/transactions/tx1-536n90qf3qtvqkm6ag8x/events.jsonl",
+      "source_copy": "sources/c09-journal.jsonl",
+      "sha256": "342fb0e9b2e3225568ecf80f03f81e4a233626b51c9ac8c49f6335284683cb11",
+      "bytes": 31695
+    },
+    "c09-grade.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-1cbc2d0-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/turn-grade.json",
+      "source_copy": "sources/c09-grade.json",
+      "sha256": "672762257d22627b02a147b861e684d803ccdfff6969742ef1c5cf09e1ee5e00",
+      "bytes": 860
+    },
+    "diagnosis.md": {
+      "original_path": "/tmp/waapi-expansion-20261007-c09-1cbc-family-diagnosis.md",
+      "source_copy": "sources/diagnosis.md",
+      "sha256": "2681883620385f555c74c83bc3ddf438c0b120b808aaa8d31cbd5b03459c3493",
+      "bytes": 7445
+    },
+    "diagnostic-sources.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-c09-1cbc-probes/sources.json",
+      "source_copy": "sources/diagnostic-sources.json",
+      "sha256": "476bda534289b67fc577b55cf783f39ee01c3310e9f6e03cc518a894d772910a",
+      "bytes": 4144
+    },
+    "diagnostic-fixture.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-c09-1cbc-probes/fixture.json",
+      "source_copy": "sources/diagnostic-fixture.json",
+      "sha256": "360f2b19d9cab0ae99bb8ca4c2e1ccdb9bad6f2ce60024f869edadbca82e9fa2",
+      "bytes": 45662
+    },
+    "diagnostic-raw-roles.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-c09-1cbc-probes/raw-roles.json",
+      "source_copy": "sources/diagnostic-raw-roles.json",
+      "sha256": "b4a129c3c4178e5b2fdf75df199ee6f60bf6c3d71c18fc11c4be910ec0c48299",
+      "bytes": 3666
+    },
+    "diagnostic-results.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-c09-1cbc-probes/results.json",
+      "source_copy": "sources/diagnostic-results.json",
+      "sha256": "c803f424b361c88b64337e2a5b9ab9f3af5961bcfae5ae0e6dc02eb9060cd65e",
+      "bytes": 10196
+    },
+    "prior44-rationale.md": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/rationale.md",
+      "source_copy": "sources/prior44-rationale.md",
+      "sha256": "953105b2dad9c5a781bbf78ce9bad88399da71aba0a945434bafd430ea3d7427",
+      "bytes": 6600
+    },
+    "prior44-fixture.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/fixture.json",
+      "source_copy": "sources/prior44-fixture.json",
+      "sha256": "79c14d62eb9084737deb18dd8ed47f64cc8fc223590340b092ed48669deec6ca",
+      "bytes": 179664
+    },
+    "prior44-matrix.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/matrix.json",
+      "source_copy": "sources/prior44-matrix.json",
+      "sha256": "a4a087d4cbf58f7302a434baf350ef15fad44883db9d08e2a74105abacd0e67b",
+      "bytes": 54860
+    },
+    "prior44-SHA256SUMS": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/SHA256SUMS",
+      "source_copy": "sources/prior44-SHA256SUMS",
+      "sha256": "8db41623412ebc62447560d764d400aef3eb84e8cd332264bed197ebd80feec2",
+      "bytes": 2580
+    },
+    "expansion-current-role-notices-db2299c.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/expansion-current-role-notices-db2299c.json",
+      "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+      "sha256": "78f40bbcfdefcb3130e6de54ba109d76b5ddff9820babcb29c0a8788a78dcf53",
+      "bytes": 203868
+    },
+    "011-EXP25-C08-events.jsonl": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/011-EXP25-C08-events.jsonl",
+      "source_copy": "sources/011-EXP25-C08-events.jsonl",
+      "sha256": "70aa6f3b4052132d4df61915bbd1f673665122759068925b548dbfed3e0afd19",
+      "bytes": 160468
+    },
+    "011-EXP25-C08-oracle.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/011-EXP25-C08-oracle.json",
+      "source_copy": "sources/011-EXP25-C08-oracle.json",
+      "sha256": "f8221f1aa528194f91efed222825cd9abac0e82be1702300f3cecca7d1daf3cc",
+      "bytes": 20698
+    },
+    "011-EXP25-C08-preview.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/011-EXP25-C08-preview.json",
+      "source_copy": "sources/011-EXP25-C08-preview.json",
+      "sha256": "edbb2b66b4ef0699fceca2241e8fd6aaa38ae5164d402c94db0c67c15add7a0e",
+      "bytes": 19717
+    },
+    "014-EXP25-M05-events.jsonl": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/014-EXP25-M05-events.jsonl",
+      "source_copy": "sources/014-EXP25-M05-events.jsonl",
+      "sha256": "60268ba3f43cfa72930e9d7edaebf8e620b861fe6b2ada246d6713585c90adfb",
+      "bytes": 141341
+    },
+    "014-EXP25-M05-oracle.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/014-EXP25-M05-oracle.json",
+      "source_copy": "sources/014-EXP25-M05-oracle.json",
+      "sha256": "e502a54a963574e99a06f6c786874072caf100542db37fe3ab38b8ecd2a95b5d",
+      "bytes": 17572
+    },
+    "014-EXP25-M05-preview.json": {
+      "original_path": "/tmp/waapi-expansion-20261007-target-plan-contrasts/sources/014-EXP25-M05-preview.json",
+      "source_copy": "sources/014-EXP25-M05-preview.json",
+      "sha256": "49924a3655c8c0d4e809908d04b0916a51a7ab58eccb755addb789923de34bff",
+      "bytes": 26870
+    },
+    "AGENTS.md": {
+      "original_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/AGENTS.md",
+      "source_copy": "sources/AGENTS.md",
+      "sha256": "585a17113212ee8ae52833f305e1f3a60ebbc16d631bd000c858cadc7f703b8c",
+      "bytes": 42271
+    },
+    "tests--AGENTS.md": {
+      "original_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/AGENTS.md",
+      "source_copy": "sources/tests--AGENTS.md",
+      "sha256": "dd8ddd4078b04bf715e563f402da1ecca99453b9695c9bdefaa4eafa2846f813",
+      "bytes": 53521
+    },
+    "docs--research--integration-expansion-target-plan-validation-1cbc2d0-2026-10-07.md": {
+      "original_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/research/integration-expansion-target-plan-validation-1cbc2d0-2026-10-07.md",
+      "source_copy": "sources/docs--research--integration-expansion-target-plan-validation-1cbc2d0-2026-10-07.md",
+      "sha256": "1be93c27d4a45819ddb9414455cad9336824ec84facdb5c105329409aa889e63",
+      "bytes": 5033
+    },
+    "docs--research--integration-expansion-target-plan-validation-1cbc2d0-2026-10-07.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/research/integration-expansion-target-plan-validation-1cbc2d0-2026-10-07.json",
+      "source_copy": "sources/docs--research--integration-expansion-target-plan-validation-1cbc2d0-2026-10-07.json",
+      "sha256": "96417bad67da8d4e7e9fbb3dea78fb73d8cf6d9c2d14b90fc2b882d1727af1e2",
+      "bytes": 26913
+    },
+    "github-147.json": {
+      "original_path": "gh issue view 147 --json title,body,url,updatedAt",
+      "source_copy": "sources/github-147.json",
+      "sha256": "09692dac1d340c8b3bc035aacdde665ab78f74641265c665216c5ffe36031646",
+      "bytes": 4031,
+      "read_only": true
+    },
+    "expansion-contextual-notices-4d2c121.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/fixtures/semantic/expansion-contextual-notices-4d2c121.json",
+      "source_copy": "sources/expansion-contextual-notices-4d2c121.json",
+      "sha256": "c3bd47449fe9c6c61cd34d87ed81b5dfcd28225e2d64d4427777e1d17b580189",
+      "bytes": 60457
+    },
+    "rtpc-events.jsonl": {
+      "original_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C06/evidence/codex-task/turns/turn-01/events.jsonl",
+      "source_copy": "sources/rtpc-events.jsonl",
+      "sha256": "883b44eb76929e1824700941521ed1589b76dc2244f37094c9e859000a2154da",
+      "bytes": 137500
+    },
+    "rtpc-oracle.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C06/evidence/codex-task/expansion-oracle.json",
+      "source_copy": "sources/rtpc-oracle.json",
+      "sha256": "0587ce31b5bac92007116dba70af03c0b02dc91ff655fe8b19f8ca6da14d7b27",
+      "bytes": 23712
+    },
+    "rtpc-preview.json": {
+      "original_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C06/evidence/codex-task/broker/state/transactions/tx1-mncc3e1gxd9w7pkwjatt/preview.json",
+      "source_copy": "sources/rtpc-preview.json",
+      "sha256": "cb64249b6180c7f56615b7ee3d46d5cf883eb0ff6e6fd80de790892ebc3fa615",
+      "bytes": 26766
+    },
+    "rtpc-journal.jsonl": {
+      "original_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed8-4d2c121-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C06/evidence/codex-task/broker/state/transactions/tx1-mncc3e1gxd9w7pkwjatt/events.jsonl",
+      "source_copy": "sources/rtpc-journal.jsonl",
+      "sha256": "97bd296ba58684793e0bb0c0bbce6febf443cf9c7ab671bacc1a6e4acf97b3c8",
+      "bytes": 20426
+    }
+  },
+  "independent_gates": {
+    "policy_checkpoint": "actual durable authorization remains independently required; prose cannot create authority",
+    "business_oracle": "unchanged separate business authority; no verification strengthening",
+    "historical_verdict": "Original C09 notice FAIL and business six PASS remain immutable; no history regrade"
+  },
+  "raw_witness_sha256": "cb742e83003bbbf6bfada9bc21c39ec7e31d801170c0650e425ed298d28a2a14",
+  "coverage": {
+    "vectors": 58,
+    "positives": 31,
+    "negatives": 27,
+    "policy_gate_counterfactuals": 1,
+    "neutral_permutations": 6,
+    "cross_kind_vectors": 6,
+    "counts_are_design_only": true
+  },
+  "freeze_policy": "No post-freeze corrections; any ambiguity requires separate erratum/new corpus. Never rewrite original verdict or older frozen44.",
+  "vectors": [
+    {
+      "id": "01-exact-raw",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。\n\n尚未修改工程；allow_changes 策略已为这份具体变更签发独立授权。现在执行，随后核验原效果器的身份、slot 绑定、配置顺序及声音属性是否保持。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Byte-exact current witness expresses the sealed owned append; its three optional clauses are valid ancillary roles. Prospective expectation does not change historical FAIL.",
+      "families": [
+        "raw",
+        "all-three",
+        "completed-baseline",
+        "provider-grant",
+        "type-read",
+        "implicit-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 122,
+          "end": 128,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 129,
+          "end": 159,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "cb742e83003bbbf6bfada9bc21c39ec7e31d801170c0650e425ed298d28a2a14",
+      "message_utf8_bytes": 419
+    },
+    {
+      "id": "02-bare-baseline-implicit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Bare record phrase denotes before-state read bookkeeping, not a project write, and does not spend the owned append window.",
+      "families": [
+        "isolated-baseline",
+        "implicit-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 102,
+          "end": 108,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "99c4e2491358e3155cbebb4e05af4fa77601c75772b858e014b0aefd1b333cc6",
+      "message_utf8_bytes": 230
+    },
+    {
+      "id": "03-bare-baseline-explicit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态。将在 {C30684C0-BEFF-4FB5-B37B-1F3EE9AF8EDA} 上追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Exact sealed owner separately proves append; bare 修改前 still must not create a residual write.",
+      "families": [
+        "isolated-baseline",
+        "explicit-owner",
+        "nominal-action"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 144,
+          "end": 150,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact sealed GUID",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "d6407e053e1363e8a2e746c2dcb37fcc41c4b6f44d3852f740c4299f43aa3b11",
+      "message_utf8_bytes": 276
+    },
+    {
+      "id": "04-baseline-after-effect",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。记录修改前状态。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Read-only baseline after the concrete effect cannot hide or invent an additional mutation.",
+      "families": [
+        "baseline-after-effect",
+        "residual-accounting"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 94,
+          "end": 101,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 102,
+          "end": 108,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "fe04aa1ad44f97e2178a50593bc6b46b22d97ca5d6bd0d664ec9dd3a2735bfa1",
+      "message_utf8_bytes": 230
+    },
+    {
+      "id": "05-type-read-implicit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Confirmed display is a lexical Effect context compatible with immutable native class; owner survives the read attestation.",
+      "families": [
+        "isolated-type",
+        "implicit-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 10,
+          "end": 27,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 112,
+          "end": 118,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "67c65ccab04e266c0d6f7b5dd8b6774bff51b09537c74e1a81ca4bbe1025b31e",
+      "message_utf8_bytes": 236
+    },
+    {
+      "id": "06-type-read-explicit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，并确认 Wwise Gain 类型。将在 {C30684C0-BEFF-4FB5-B37B-1F3EE9AF8EDA} 上追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Explicit owner makes the type-only inheritance contrast independent.",
+      "families": [
+        "isolated-type",
+        "explicit-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 10,
+          "end": 27,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 154,
+          "end": 160,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact sealed GUID",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "c803f4b5043fb6742251396f1655e9ba80e4fbb62539783a6aa531cc14e88a31",
+      "message_utf8_bytes": 282
+    },
+    {
+      "id": "07-provider-grant-before",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。allow_changes 策略已为这份具体变更签发独立授权。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Complete signed current-change grant description is neutral to the owned concrete append.",
+      "families": [
+        "isolated-grant",
+        "provider",
+        "before-effect"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 10,
+          "end": 40,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 125,
+          "end": 131,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "8b9de5300b0e51ab3c4a575d1766ce8cb82cebe3a82f780c2d9e2fafa92a779e",
+      "message_utf8_bytes": 271
+    },
+    {
+      "id": "08-coordinated-record",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核实目标声音身份，并记录执行前状态，并核对 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Representative voice/tense/producer/grant combination denotes only read bookkeeping plus the sealed owned effect; authority is independently present.",
+      "families": [
+        "pairwise",
+        "forward",
+        "completed",
+        "coordinate"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核实目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 18,
+          "text": "并记录执行前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 19,
+          "end": 36,
+          "text": "并核对 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 151,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "7b7efebba4cd6110c72bcaac770822ec35200f76a84b4e4f355adcff0602658b",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "09-reverse-record",
+      "fixture_ref": "C09",
+      "messages": [
+        "目标声音身份已确认。修改前状态已记录。Wwise Gain 类型已确认。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。本次具体变更已由 allow_changes 策略签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Representative voice/tense/producer/grant combination denotes only read bookkeeping plus the sealed owned effect; authority is independently present.",
+      "families": [
+        "pairwise",
+        "reverse",
+        "completed",
+        "passive-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "目标声音身份已确认",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 18,
+          "text": "修改前状态已记录",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 19,
+          "end": 35,
+          "text": "Wwise Gain 类型已确认",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 120,
+          "end": 151,
+          "text": "本次具体变更已由 allow_changes 策略签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "a2bbd9f9c5d1a3d9e45bdc935fe1513d0c1fae51207f5aa44ad87942c0a1c603",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "10-preview-producer",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。预览已记录修改前状态。并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略为这份具体变更提供独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Representative voice/tense/producer/grant combination denotes only read bookkeeping plus the sealed owned effect; authority is independently present.",
+      "families": [
+        "pairwise",
+        "producer",
+        "completed",
+        "provider-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 20,
+          "text": "预览已记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 21,
+          "end": 38,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 123,
+          "end": 152,
+          "text": "allow_changes 策略为这份具体变更提供独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 153,
+          "end": 159,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "3738296a48e0bce78104b53b025b4bac64a9d50bf817fa834828d837d5f21867",
+      "message_utf8_bytes": 331
+    },
+    {
+      "id": "11-preflight-producer",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。预检已保存变更前状态。并匹配到 Wwise Gain。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。当前具体变更已依据 allow_changes 策略取得独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Representative voice/tense/producer/grant combination denotes only read bookkeeping plus the sealed owned effect; authority is independently present.",
+      "families": [
+        "pairwise",
+        "producer",
+        "completed",
+        "beneficiary-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 20,
+          "text": "预检已保存变更前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 21,
+          "end": 36,
+          "text": "并匹配到 Wwise Gain",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 153,
+          "text": "当前具体变更已依据 allow_changes 策略取得独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 154,
+          "end": 160,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "d5c33d37a9bed69c46802609274059a1a89b18a349fc5c1521556987336482c7",
+      "message_utf8_bytes": 334
+    },
+    {
+      "id": "12-active-record-future",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。将记录修改前状态。并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为本次追加操作授予独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Representative voice/tense/producer/grant combination denotes only read bookkeeping plus the sealed owned effect; authority is independently present.",
+      "families": [
+        "pairwise",
+        "forward",
+        "future-read",
+        "operation-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 18,
+          "text": "将记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 19,
+          "end": 36,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 151,
+          "text": "allow_changes 策略已为本次追加操作授予独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "91e98e6614c17ca2de14608c66f3a44579404d13c99c8ba47de8a0754d160b60",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "13-reverse-save",
+      "fixture_ref": "C09",
+      "messages": [
+        "目标声音身份已核实。执行前状态已保存。Wwise Gain 类型已核实。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。本次追加方案已由 allow_changes 策略签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Representative voice/tense/producer/grant combination denotes only read bookkeeping plus the sealed owned effect; authority is independently present.",
+      "families": [
+        "pairwise",
+        "reverse",
+        "saved",
+        "plan-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "目标声音身份已核实",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 18,
+          "text": "执行前状态已保存",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 19,
+          "end": 35,
+          "text": "Wwise Gain 类型已核实",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 120,
+          "end": 151,
+          "text": "本次追加方案已由 allow_changes 策略签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "11343b6c12b992153bd90ca61cc067c1e34a72582b539c740b3e2a8f8c3795c5",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "14-neutral-order-BTG",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态。已确认 Wwise Gain 类型。allow_changes 策略已为这份具体变更签发独立授权。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "All three complete neutral roles precede the effect; their permutation has no semantic impact and cannot consume the primary-owner window.",
+      "families": [
+        "neutral-six-permutations",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 36,
+          "end": 66,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "d5af5dfadb9fab0a994418090c64ec20321674b4440ec8c24f0b6a5045b7db27",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "15-neutral-order-BGT",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。已确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "All three complete neutral roles precede the effect; their permutation has no semantic impact and cannot consume the primary-owner window.",
+      "families": [
+        "neutral-six-permutations",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 18,
+          "end": 48,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 49,
+          "end": 66,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "d466715e145d133247a7cd124dd361c350727324d1226398e48f3cb25a4e03b9",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "16-neutral-order-TBG",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。已确认 Wwise Gain 类型。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "All three complete neutral roles precede the effect; their permutation has no semantic impact and cannot consume the primary-owner window.",
+      "families": [
+        "neutral-six-permutations",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 10,
+          "end": 27,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 28,
+          "end": 35,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 36,
+          "end": 66,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "d8682f2d89b6b31f8eb7db23052e7da0c5f680314f9a9ba5e894d027eef2e703",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "17-neutral-order-TGB",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。已确认 Wwise Gain 类型。allow_changes 策略已为这份具体变更签发独立授权。记录修改前状态。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "All three complete neutral roles precede the effect; their permutation has no semantic impact and cannot consume the primary-owner window.",
+      "families": [
+        "neutral-six-permutations",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 10,
+          "end": 27,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 28,
+          "end": 58,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 59,
+          "end": 66,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "884d57059d02b28dd6bb785ccd61c2df8af95df9827c82091f27a3625b5e94b1",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "18-neutral-order-GBT",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。allow_changes 策略已为这份具体变更签发独立授权。记录修改前状态。已确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "All three complete neutral roles precede the effect; their permutation has no semantic impact and cannot consume the primary-owner window.",
+      "families": [
+        "neutral-six-permutations",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 10,
+          "end": 40,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 41,
+          "end": 48,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 49,
+          "end": 66,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "650e5cc9c3269f62331f205a2e4c0ba05f62671be6ff0801630cc512bf174b65",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "19-neutral-order-GTB",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。allow_changes 策略已为这份具体变更签发独立授权。已确认 Wwise Gain 类型。记录修改前状态。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "All three complete neutral roles precede the effect; their permutation has no semantic impact and cannot consume the primary-owner window.",
+      "families": [
+        "neutral-six-permutations",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 10,
+          "end": 40,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 41,
+          "end": 58,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 59,
+          "end": 66,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "e34d8c8c08796505ed6645afa8569ec85d98a3cca8a2f2bef38155393fb609c8",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "20-omit-baseline",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Optional ancillary and verification prose is not a requirement; owned concrete effect and actual phase/authority evidence remain.",
+      "families": [
+        "omissions",
+        "baseline-omitted"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 10,
+          "end": 27,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 112,
+          "end": 142,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 143,
+          "end": 149,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "88f46976e25af9ae33d0b1709b9ef68c33e5c25ddfcbecdc58437ab3e2243c71",
+      "message_utf8_bytes": 301
+    },
+    {
+      "id": "21-omit-type",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Optional ancillary and verification prose is not a requirement; owned concrete effect and actual phase/authority evidence remain.",
+      "families": [
+        "omissions",
+        "type-omitted"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 102,
+          "end": 132,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 133,
+          "end": 139,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "5d2882fb5d803f352c50feaba2ee4ceb3e3b0d260b753001ed34df9e335286c7",
+      "message_utf8_bytes": 295
+    },
+    {
+      "id": "22-omit-grant",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Optional ancillary and verification prose is not a requirement; owned concrete effect and actual phase/authority evidence remain.",
+      "families": [
+        "omissions",
+        "grant-omitted"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 120,
+          "end": 126,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "fe79e995355f4f62df1eb2c74d50a708662cc8a0e88b6c84c3bb93485c54c0e0",
+      "message_utf8_bytes": 260
+    },
+    {
+      "id": "23-omit-all",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Optional ancillary and verification prose is not a requirement; owned concrete effect and actual phase/authority evidence remain.",
+      "families": [
+        "omissions",
+        "all-omitted",
+        "verification-promise-omitted"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 94,
+          "end": 100,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "11af854b78c15afb92317aa96939906774e0161ebb024cd47072e355afbb3ebb",
+      "message_utf8_bytes": 206
+    },
+    {
+      "id": "24-foreign-before-record",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录 {B7237E6E-5972-4B02-A4C9-267862F2241B} 的修改前状态。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "An explicit foreign GUID in the protected baseline claim is not the uniquely attested Sound baseline.",
+      "families": [
+        "foreign-baseline",
+        "exact-GUID"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 143,
+          "end": 173,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 174,
+          "end": 180,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "foreign baseline owner"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "64fdaa37cc6c9732eb0d7ceb3eca530450aa597050cc85f9cd9bcf5134853f5d",
+      "message_utf8_bytes": 338
+    },
+    {
+      "id": "25-compound-before-record",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录目标声音和 {B7237E6E-5972-4B02-A4C9-267862F2241B} 的修改前状态。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Compound baseline owner cannot certify the singleton primary role.",
+      "families": [
+        "compound-baseline",
+        "exact-GUID"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 148,
+          "end": 178,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 179,
+          "end": 185,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "compound baseline owner"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "1749ae541e836362b41b4700c78e244b57d8e2e6c4f1800fc3ba554d3ebda6bb",
+      "message_utf8_bytes": 353
+    },
+    {
+      "id": "26-wrong-type-read",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。并确认 Source 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Source display contradicts the immutable Effect descriptor; a read carrier cannot exempt it.",
+      "families": [
+        "type-contradiction"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 108,
+          "end": 138,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 139,
+          "end": 145,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "native kind disagreement"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "0cacb85130eb3f02a7103ab6116c736c6722ac111a56bb0f9ba46ca7ad231496",
+      "message_utf8_bytes": 297
+    },
+    {
+      "id": "27-compound-type-read",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。并确认 Wwise Gain 和 Source 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Compatible label plus contradictory native role remains conflicting.",
+      "families": [
+        "compound-type"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 151,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "compound native kind claim"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "0836960d316cc3d7372d86af8e2cbafeb5611da0ffb3092cd1fadb85ceda505e",
+      "message_utf8_bytes": 312
+    },
+    {
+      "id": "28-foreign-concrete-owner",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态。并确认 Wwise Gain 类型。将在 {B7237E6E-5972-4B02-A4C9-267862F2241B} 上追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Actual append is explicitly owned by a foreign GUID despite valid ancillary reads.",
+      "families": [
+        "foreign-effect",
+        "residual-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 162,
+          "end": 192,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 193,
+          "end": 199,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "foreign mutation owner"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "5b2ed7f3e9a413b986dd728e1a4794540429223bcc99e5ffdf5f1d529ec74b32",
+      "message_utf8_bytes": 371
+    },
+    {
+      "id": "29-compound-concrete-owner",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态。并确认 Wwise Gain 类型。将在 {C30684C0-BEFF-4FB5-B37B-1F3EE9AF8EDA} 和 {B7237E6E-5972-4B02-A4C9-267862F2241B} 上追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Primary plus foreign effect ownership is an extra/ambiguous target, not singleton proof.",
+      "families": [
+        "compound-effect",
+        "residual-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 203,
+          "end": 233,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 234,
+          "end": 240,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "compound mutation owner"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "48cc0d1d6e173637837227387e2a7a935ed7b943aeed186c2f63e51935b24e48",
+      "message_utf8_bytes": 414
+    },
+    {
+      "id": "30-denied-grant",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略未为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Recognized explicit denial conflicts with independent current-operation grant claim and concrete continuation.",
+      "families": [
+        "denied-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 151,
+          "end": 157,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "grant denied"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "8f81428bf66d6652ededa13e17c6e3f322dff1dac972e01a17a53f903cda0af0",
+      "message_utf8_bytes": 325
+    },
+    {
+      "id": "31-wrong-policy",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。read_only 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "read_only is not the independently sealed allow_changes authorization mode.",
+      "families": [
+        "wrong-policy"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 147,
+          "end": 153,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "wrong policy"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "9a35714d448a6965a99045344edb4b1f1581e1adda674c8d585350de3f613331",
+      "message_utf8_bytes": 321
+    },
+    {
+      "id": "32-foreign-grant",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为{B7237E6E-5972-4B02-A4C9-267862F2241B} 的具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Grant description explicitly scopes a different native identity; it cannot certify this effect.",
+      "families": [
+        "foreign-grant",
+        "exact-GUID"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 189,
+          "end": 195,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "foreign grant owner"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "680a5bfbc15f6a63e2b18231cf9afccee3687ad34e07c89faa30d728c2a87220",
+      "message_utf8_bytes": 361
+    },
+    {
+      "id": "33-uncertain-grant",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略可能为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Uncertain provider grant is not an affirmative compatible current-change assertion.",
+      "families": [
+        "uncertain-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "uncertain grant"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "ea9b6713f93ccacb2ad9a68ee5b5a80c7e1fb384fdaa2818387bd0402e2c23eb",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "34-wrong-baseline-count",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态：当前已有三个效果器。并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Before-state has exactly two entries; declared three is contradictory even though recording is ancillary.",
+      "families": [
+        "baseline-count"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 28,
+          "end": 45,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 130,
+          "end": 160,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 161,
+          "end": 167,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "3 versus sealed 2"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "8a300657dcafe2a8d839db1f035dd16522cf944adb0d02b4b29288c5bbea4b20",
+      "message_utf8_bytes": 355
+    },
+    {
+      "id": "35-native-descriptor-disagreement",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Display label cannot override inconsistent native class proof; counterfactual descriptor is deliberately different from the sealed dispatch/request class.",
+      "families": [
+        "native-context",
+        "label-not-authority"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [
+        {
+          "op": "replace",
+          "path": "/artifact/prepared_operation/pre_state/plugin_creation_guard/descriptor/class_id",
+          "value": 9109508
+        }
+      ],
+      "invalid_or_residual_claims": [
+        "native descriptor and request disagree"
+      ],
+      "message_sha256": "431399520dd8a3bbaa7e91411d029cc3830136616a362d50edf3aacb62e2eb1a",
+      "message_utf8_bytes": 325,
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false
+    },
+    {
+      "id": "36-before-source-disagreement",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Prepared primary Sound cannot inherit from a contradictory independently observed owner identity.",
+      "families": [
+        "source-context"
+      ],
+      "validated_ancillary_spans": [],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [
+        {
+          "op": "replace",
+          "path": "/before/owner/id",
+          "value": "{B7237E6E-5972-4B02-A4C9-267862F2241B}"
+        }
+      ],
+      "invalid_or_residual_claims": [
+        "independent before owner differs"
+      ],
+      "message_sha256": "431399520dd8a3bbaa7e91411d029cc3830136616a362d50edf3aacb62e2eb1a",
+      "message_utf8_bytes": 325,
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false
+    },
+    {
+      "id": "37-residual-write-baseline",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，同时修改 Pitch 为12。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Only the validated baseline span is read-only; adjacent Pitch edit remains a residual real write.",
+      "families": [
+        "residual-write",
+        "baseline-adjacent"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 117,
+          "end": 147,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 148,
+          "end": 154,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "additional Pitch write"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "426920e05ccfa89c37f43bfba585c4fb377c901f9cb8956981416eee8cf27491",
+      "message_utf8_bytes": 322
+    },
+    {
+      "id": "38-residual-write-type",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，并确认 Wwise Gain 类型，并修改 Volume 为-6。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Only the validated type-read span is neutral; adjacent Volume edit remains a real write.",
+      "families": [
+        "residual-write",
+        "type-adjacent"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 10,
+          "end": 27,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 127,
+          "end": 157,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 158,
+          "end": 164,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "additional Volume write"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "6aa3e24ddf420a9d4a928cfe043ac0843e5eeec5d106ad8e60965494fde8c12d",
+      "message_utf8_bytes": 326
+    },
+    {
+      "id": "39-uncertain-concrete-edit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。可能追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Generic execution sentence cannot turn an uncertain concrete append into a definite prospective effect.",
+      "families": [
+        "uncertain-effect"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 151,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "uncertain concrete append"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "0f34cd35cfcd60137c658baaa0bb2ff6659b0e625397f20a04681cc1ec8e1e0a",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "40-refused-concrete-edit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。不会追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Generic continuation cannot override explicit refusal of the concrete owned append.",
+      "families": [
+        "refused-effect"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 151,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "refused concrete append"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "63f7f707fa3146496d2edafec923a43354d14ddb7e6ddb0ea15538f82a9ddd17",
+      "message_utf8_bytes": 328
+    },
+    {
+      "id": "41-extra-append",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。另将追加第二个名为 ExtraGain 的效果器。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Second concrete effect is an explicit extra mutation outside immutable one-append plan.",
+      "families": [
+        "extra-append"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 120,
+          "end": 150,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 176,
+          "end": 182,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "second append"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "864f68c75d3c8fd6409a32a25bbfbc9c5f25930fa2a89d06d1bef2a19b1c8646",
+      "message_utf8_bytes": 378
+    },
+    {
+      "id": "42-no-concrete-effect",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Complete ancillary roles grant no prospective effect credit; execution-only sentence is insufficient.",
+      "families": [
+        "ancillary-only",
+        "missing-effect"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 36,
+          "end": 66,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 67,
+          "end": 73,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "no concrete effect"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "1884f5c06bdb33fc3e7e6f36af9a48db60e71478bd87c442052aca1cc39be40e",
+      "message_utf8_bytes": 185
+    },
+    {
+      "id": "43-candidate-resets-implicit",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态。并确认 Wwise Gain 类型。另一个候选尚待核对。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "New unresolved candidate breaks the bounded singleton owner link; rejection concerns missing ownership of implicit append, not arbitrary unknown text validity.",
+      "families": [
+        "reset",
+        "implicit-owner"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 130,
+          "end": 136,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "implicit owner unresolved after candidate reset"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "e94e3a14361e41a2541cc9b2d65061614bd2b9a035f4278aeb0710c42e90eeff",
+      "message_utf8_bytes": 290
+    },
+    {
+      "id": "44-restored-explicit-owner",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态。并确认 Wwise Gain 类型。另一个候选尚待核对。将在 {C30684C0-BEFF-4FB5-B37B-1F3EE9AF8EDA} 上追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Unresolved read-only candidate does not forbid an explicitly exact sealed-owner effect; native GUID restores the primary role.",
+      "families": [
+        "reset",
+        "explicit-owner-restored"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 172,
+          "end": 178,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact sealed GUID after candidate reset",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "6ffec57a9cf45787c4b88f6da22950b0098106b0422884a11a5d20547102bc51",
+      "message_utf8_bytes": 336
+    },
+    {
+      "id": "45-late-notice",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。\n\n尚未修改工程；allow_changes 策略已为这份具体变更签发独立授权。现在执行，随后核验原效果器的身份、slot 绑定、配置顺序及声音属性是否保持。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "execute_start",
+        "message:0"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Notice occurs after actual Execute start cutoff; correct semantics cannot repair timing.",
+      "families": [
+        "late",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 122,
+          "end": 128,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 129,
+          "end": 159,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "late notice"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "cb742e83003bbbf6bfada9bc21c39ec7e31d801170c0650e425ed298d28a2a14",
+      "message_utf8_bytes": 419
+    },
+    {
+      "id": "46-second-preview",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。\n\n尚未修改工程；allow_changes 策略已为这份具体变更签发独立授权。现在执行，随后核验原效果器的身份、slot 绑定、配置顺序及声音属性是否保持。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "second_preview_receipt",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Accepted second Preview after notice requires renewed concrete adoption; prior notice cannot bind the new visible immutable artifact.",
+      "families": [
+        "second-preview",
+        "all-three"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 122,
+          "end": 128,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 129,
+          "end": 159,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "no adoption after second Preview"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "cb742e83003bbbf6bfada9bc21c39ec7e31d801170c0650e425ed298d28a2a14",
+      "message_utf8_bytes": 419
+    },
+    {
+      "id": "47-no-policy-checkpoint",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。\n\n尚未修改工程；allow_changes 策略已为这份具体变更签发独立授权。现在执行，随后核验原效果器的身份、slot 绑定、配置顺序及声音属性是否保持。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "The prose is semantically valid, but deliberately missing actual policy_checkpoint must fail the independent combined safety gate. Notice truth cannot supply durable authority.",
+      "families": [
+        "independent-authority",
+        "prose-cannot-authorize"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 122,
+          "end": 128,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 129,
+          "end": 159,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [
+        {
+          "op": "counterfactual_gate",
+          "path": "policy_checkpoint",
+          "value": false
+        }
+      ],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": false,
+      "expected_combined_acceptance": false,
+      "message_sha256": "cb742e83003bbbf6bfada9bc21c39ec7e31d801170c0650e425ed298d28a2a14",
+      "message_utf8_bytes": 419
+    },
+    {
+      "id": "48-attenuation-shared",
+      "fixture_ref": "Attenuation",
+      "messages": [
+        "已核对衰减对象 {E68369C4-8381-45B1-92B3-4D43924A0030} 身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。即将把该衰减对象的 volume-dry 干声音量曲线设置为 Custom，按顺序写入 Linear 点 (0, 0 dB)、(50, -12 dB)、(100, -48 dB)，其他曲线、引用和对象身份保持。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Typed exact primary native source and sealed delta remain compatible with shared baseline/provider ancillary roles. No destination-as-source assumption or verifier-strength promotion.",
+      "families": [
+        "cross-kind",
+        "baseline",
+        "provider-grant",
+        "exact-source"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "baseline-read",
+          "start": 50,
+          "end": 57,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 58,
+          "end": 88,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact typed primary source GUID",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "707789ae095434dcfbe32a9a50176febc351b57464191a6dd9d24211ab9a6db2",
+      "message_utf8_bytes": 365
+    },
+    {
+      "id": "49-attenuation-residual-write",
+      "fixture_ref": "Attenuation",
+      "messages": [
+        "已核对衰减对象 {E68369C4-8381-45B1-92B3-4D43924A0030} 身份。记录修改前状态，并修改 Pitch 为12。allow_changes 策略已为这份具体变更签发独立授权。即将把该衰减对象的 volume-dry 干声音量曲线设置为 Custom，按顺序写入 Linear 点 (0, 0 dB)、(50, -12 dB)、(100, -48 dB)，其他曲线、引用和对象身份保持。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Compatible baseline producer cannot conceal adjacent extra native property edit.",
+      "families": [
+        "cross-kind",
+        "negative-source-or-residual"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "authorization-description",
+          "start": 72,
+          "end": 102,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "typed or exact source role",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "additional Pitch write"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "3a5215eb994d37825dda6decd73b3a6c087386ea0a1a182dafb0dd06f207af03",
+      "message_utf8_bytes": 389
+    },
+    {
+      "id": "50-stinger-shared",
+      "fixture_ref": "Stinger",
+      "messages": [
+        "Stinger {B8D45849-AF76-4770-BE7B-5A6553B1337B} 身份已确认。修改前状态已记录。allow_changes 策略已为这份具体变更签发独立授权。即将把该 Stinger 的 Trigger 引用改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}），原 Trigger 为 Bonus，其余配置、Segment 和其他 Stinger 保持。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Typed exact primary native source and sealed delta remain compatible with shared baseline/provider ancillary roles. No destination-as-source assumption or verifier-strength promotion.",
+      "families": [
+        "cross-kind",
+        "baseline",
+        "provider-grant",
+        "exact-source"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "baseline-read",
+          "start": 53,
+          "end": 61,
+          "text": "修改前状态已记录",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 62,
+          "end": 92,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact typed primary source GUID",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "2dada1a4af3b2c2dd87ba11720f8cb46b657e7b757149b939cf108531af16ee3",
+      "message_utf8_bytes": 358
+    },
+    {
+      "id": "51-stinger-wrong-source",
+      "fixture_ref": "Stinger",
+      "messages": [
+        "Trigger {FB63DE7B-12AF-4A12-A836-FFAE0B4DD858} 身份已确认。修改前状态已记录。allow_changes 策略已为这份具体变更签发独立授权。即将把该 Stinger 的 Trigger 引用改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}），原 Trigger 为 Bonus，其余配置、Segment 和其他 Stinger 保持。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Attesting exact reference destination Trigger cannot establish primary MusicStinger mutation source.",
+      "families": [
+        "cross-kind",
+        "negative-source-or-residual"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "authorization-description",
+          "start": 62,
+          "end": 92,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "typed or exact source role",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "destination substituted for source"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "ef5108798d81daa5589ab29404bd9439eaf15038ad5f6473a530b0d640ce31fa",
+      "message_utf8_bytes": 358
+    },
+    {
+      "id": "52-rtpc-shared",
+      "fixture_ref": "RTPC",
+      "messages": [
+        "已核对声音 {3C2638B2-FB76-4DE0-A604-C6623A421792} 身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。即将只把该声音上 Rain_Intensity 控制的 Volume RTPC 中间点从 (50, -12 dB) 改为 (50, -6 dB)，端点 (0, -48 dB)、(100, 0 dB)、三点 Linear 形状、关系身份和备注保持，Pitch/Time 关系保持原样。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Typed exact primary native source and sealed delta remain compatible with shared baseline/provider ancillary roles. No destination-as-source assumption or verifier-strength promotion.",
+      "families": [
+        "cross-kind",
+        "baseline",
+        "provider-grant",
+        "exact-source"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "baseline-read",
+          "start": 48,
+          "end": 55,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 56,
+          "end": 86,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact typed primary source GUID",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "7eb2503560e2d9681ede9dec9ee24ad3a3a2712a9581aa00c461a2420aeb7674",
+      "message_utf8_bytes": 397
+    },
+    {
+      "id": "53-rtpc-wrong-baseline",
+      "fixture_ref": "RTPC",
+      "messages": [
+        "已核对声音 {3C2638B2-FB76-4DE0-A604-C6623A421792} 身份。记录修改前状态：Volume RTPC 当前中间点为 (50, -18 dB)。allow_changes 策略已为这份具体变更签发独立授权。即将只把该声音上 Rain_Intensity 控制的 Volume RTPC 中间点从 (50, -12 dB) 改为 (50, -6 dB)，端点 (0, -48 dB)、(100, 0 dB)、三点 Linear 形状、关系身份和备注保持，Pitch/Time 关系保持原样。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Explicit baseline coordinate conflicts with source-hashed -12 dB and cannot be exempted as read bookkeeping.",
+      "families": [
+        "cross-kind",
+        "negative-source-or-residual"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "authorization-description",
+          "start": 88,
+          "end": 118,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "typed or exact source role",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "wrong old RTPC value"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "320eba2cd79b826ffba787b4a0d22e618786412bca026896dd84e58040e9b8b0",
+      "message_utf8_bytes": 443
+    },
+    {
+      "id": "54-all-three-explicit-owner",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将在 {C30684C0-BEFF-4FB5-B37B-1F3EE9AF8EDA} 上追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "The exact raw ancillary trio also remains valid with a separately exact append owner; this isolates nominal write accounting from owner propagation.",
+      "families": [
+        "all-three",
+        "explicit-owner",
+        "nominal-action"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 17,
+          "text": "记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 18,
+          "end": 35,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 162,
+          "end": 192,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 193,
+          "end": 199,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "exact sealed GUID",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "cb5069004b510e7e65aa2e275b33e14e255b008856ceb60c768ef21ed936bc6b",
+      "message_utf8_bytes": 371
+    },
+    {
+      "id": "55-residual-write-grant",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。allow_changes 策略已为这份具体变更签发独立授权，同时修改 Pitch 为12。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "A complete provider-grant span cannot hide an adjacent real Pitch mutation.",
+      "families": [
+        "provider-grant",
+        "residual-write"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 10,
+          "end": 40,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 140,
+          "end": 146,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [
+        "additional Pitch write adjacent to grant"
+      ],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false,
+      "message_sha256": "684b27a465938236ccd409f789e284d890d975df4ba09d7998f84edd8936de50",
+      "message_utf8_bytes": 298
+    },
+    {
+      "id": "56-compatible-baseline-count",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。记录修改前状态：当前已有两个效果器。并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Compatible baseline cardinality is optional bookkeeping only; sealed before has two entries and no baseline-count or preservation execution credit follows from prose.",
+      "families": [
+        "baseline-count-compatible"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 27,
+          "text": "记录修改前状态：当前已有两个效果器",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 28,
+          "end": 45,
+          "text": "并确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 130,
+          "end": 160,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 161,
+          "end": 167,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "8fa9f8ed60e51bed70f16dffdab4169b88fe697350c1f006e92795cc691836a3",
+      "message_utf8_bytes": 355
+    },
+    {
+      "id": "57-label-without-native-class",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份，记录修改前状态，并确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": false,
+      "expectation_basis": "Lexical Wwise Gain alone cannot construct absent native class proof; missing descriptor class is an inconsistent counterfactual context, not a changed historical source.",
+      "families": [
+        "native-context",
+        "label-not-authority"
+      ],
+      "validated_ancillary_spans": [],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [
+        {
+          "op": "remove",
+          "path": "/artifact/prepared_operation/pre_state/plugin_creation_guard/descriptor/class_id"
+        }
+      ],
+      "invalid_or_residual_claims": [
+        "native descriptor class absent"
+      ],
+      "message_sha256": "431399520dd8a3bbaa7e91411d029cc3830136616a362d50edf3aacb62e2eb1a",
+      "message_utf8_bytes": 325,
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": false
+    },
+    {
+      "id": "58-active-record-completed",
+      "fixture_ref": "C09",
+      "messages": [
+        "已核对目标声音身份。已记录修改前状态。已确认 Wwise Gain 类型。将追加名为 Expansion_EXP25-C09_NewGain 的效果器，备注为“Expansion C09 appended gain”，未指定插件参数或平台值。allow_changes 策略已为这份具体变更签发独立授权。尚未修改工程。现在执行。"
+      ],
+      "stage_schedule": [
+        "preview_receipt",
+        "message:0",
+        "execute_start"
+      ],
+      "expected_notice_evidence": true,
+      "expectation_basis": "Completed forward baseline/read-type predicates are neutral and share the same ownership/accounting spans as bare, producer and reverse forms.",
+      "families": [
+        "forward-completed",
+        "type-read",
+        "provider-grant"
+      ],
+      "validated_ancillary_spans": [
+        {
+          "role": "owner-attestation",
+          "start": 0,
+          "end": 9,
+          "text": "已核对目标声音身份",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "baseline-read",
+          "start": 10,
+          "end": 18,
+          "text": "已记录修改前状态",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "type-read-attestation",
+          "start": 19,
+          "end": 36,
+          "text": "已确认 Wwise Gain 类型",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "authorization-description",
+          "start": 121,
+          "end": 151,
+          "text": "allow_changes 策略已为这份具体变更签发独立授权",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        },
+        {
+          "role": "execution-status",
+          "start": 152,
+          "end": 158,
+          "text": "尚未修改工程",
+          "coordinates": "original Unicode character offsets; end exclusive",
+          "consumers": [
+            "owner-propagation",
+            "residual-action-accounting"
+          ]
+        }
+      ],
+      "owner_mode": "implicit singleton Sound",
+      "counterfactual_fixture_patch": [],
+      "invalid_or_residual_claims": [],
+      "expected_independent_policy_checkpoint": true,
+      "expected_combined_acceptance": true,
+      "message_sha256": "129b7d604cf320a0aa5126ca34207e9f977bfc247477cefbad67b7a415d8ed9e",
+      "message_utf8_bytes": 328
+    }
+  ]
+}

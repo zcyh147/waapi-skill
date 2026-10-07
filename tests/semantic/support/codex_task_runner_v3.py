@@ -754,7 +754,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                     continue  # The primary operation frame owns its own grammar.
                 if any(local.start <= creation.start() < local.end for creation in creations):
                     continue
-                if any(claim.role in {"owner-attestation", "authorization", "preview-status", "read-summary"}
+                if any(claim.role in {"owner-attestation", "authorization", "preview-status", "read-summary", "matched-display"}
                        and claim.start <= local.start and local.end <= claim.end for claim in ancillary):
                     continue
                 descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"), context=role_context)
@@ -806,7 +806,7 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
             action_anchored = explicit_anchor or local_owner or action_adjacent_owner
             if any(claim.role == "prospective-reference" and claim.start <= absolute_action and clause_start + action.end() <= claim.end for claim in reference_claims):
                 continue
-            if any(claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
+            if any(claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "matched-display", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
                 continue
             if any(claim.role == "exclusion" and claim.start <= action.start() and action.end() <= claim.end for claim in exclusions):
                 continue
@@ -1377,7 +1377,7 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
             # two compatible claims, not four authored curve points. Require
             # the closed middle-y role and this exact sequence; never dedup.
             direct_middle_claim = re.search(
-                rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*[（(]\s*{number}\s*[,，]\s*{number}\s*[)）])?\s*$",
+                rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*[（(]\s*{number}\s*[,，]\s*{number}(?:\s*db)?\s*[)）])?\s*$",
                 clause[:action.start()]) is not None
             coherent_middle = re.fullmatch(
                 rf".*?(?:当前|现有)(?:中点|中间点)(?:是|为)\s*[（(]\s*{number}\s*[,，]\s*{number}(?:\s*db)?\s*[)）]\s*[,，]\s*(?:将|会)",
@@ -1390,8 +1390,16 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
                 following[first_pair.end():]) is not None)
             if middle_edit and direct_middle_claim and separate_result and stated == context["delta"] + new:
                 stated = new
+            retained_middle = (middle_edit and direct_middle_claim and pairs(clause[:action.start()]) == [old[1]]
+                and stated == [new[1], new[0], new[2]]
+                and re.search(r"[,，]\s*端点\s*[（(]", following) is not None
+                and re.search(r"保持|unchanged|retain", following) is not None
+                and (not shape_clauses or notice_shape)
+                and _affirmative_linear_interpolation(following))
             if stated == context["new"] and requested_shape(following):
                 full = effect = True
+            elif retained_middle:
+                effect = True  # The exact midpoint delta plus ordered unchanged endpoints.
             elif (stated == context["delta"] and stated and context["same_domain"]
                   and (rest_already_matches or explicit_retained_endpoints or (middle_edit and coherent_final and coherent_middle) or (middle_edit and direct_middle_claim and complete_current_curve) or
                        (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
