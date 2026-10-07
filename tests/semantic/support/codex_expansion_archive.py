@@ -579,6 +579,27 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
     return records
 
 
+def replay_c09_notice(root: Path, result: Any, command_records: Any, *, other_gates: Mapping[str, bool],
+                      expected_runtime: Mapping[str, str], **kwargs: Any) -> bool:
+    """Validate preserved independent evidence, never rejudge a model's meaning."""
+    from tests.semantic.support.codex_c09_notice_adjudication import decide_c09_notice, verify_c09_review_receipt
+    decision = decide_c09_notice(result, command_records, **kwargs)
+    try:
+        recorded = _json(root, "notice-decision.json")
+        _require(canonical_digest(recorded) == canonical_digest(decision), "notice decision binding changed")
+        receipt_path = root / "notice-review" / "receipt.json"
+        hard_passed = bool(other_gates) and all(value is True for value in other_gates.values())
+        if decision["outcome"] != "review_required" or not hard_passed:
+            _require(not receipt_path.exists(), "review receipt cannot override deterministic hard gates")
+            return hard_passed and decision["outcome"] == "accepted"
+        receipt = _json(root, "notice-review/receipt.json")
+        return verify_c09_review_receipt(receipt, decision=decision, expected_runtime=expected_runtime)
+    except ExpansionArchiveError:
+        raise
+    except Exception as exc:
+        raise ExpansionArchiveError(f"invalid or missing notice review receipt: {exc}") from exc
+
+
 def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
            budget: Mapping[str, Any], records: list[Mapping[str, Any]], oracle: Mapping[str, Any]) -> list[dict]:
     turns = budget.get("turns")
@@ -641,6 +662,18 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 and list(resolved.gateway_arguments) == record["gateway_arguments"]
                 and command.exit_code == record["exit_code"],
                 "Broker receipt order differs from raw Codex Gateway commands")
+        c09_notice = None
+        if index == 1 and "notice_adjudication" in plan:
+            artifact = (_transaction(root, oracle["transaction_id"])[0]["artifact"]
+                        if oracle.get("transaction_id") else {})
+            c09_notice = replay_c09_notice(root / directory, SimpleNamespace(stdout=events_raw.decode("utf-8")),
+                commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
+                preview_artifact=artifact, before_snapshot=oracle.get("preview_before") or plan["before"],
+                transaction_id=oracle.get("transaction_id") or "", user_prompt=plan["prompts"][0],
+                other_gates={key: value for key, value in grade["common_gates"].items() if key != "visible_preview_notice"},
+                expected_runtime=plan["notice_adjudication"]["runtime"])
+            _require(grade["common_gates"]["visible_preview_notice"] is c09_notice,
+                     "recorded adjudicated notice grade differs from sealed evidence")
         rejected_read = any(record.get("accepted") is False for record in records)
         if result["passed"] or rejected_read:
             classified = classify_task_commands(commands, workspace=root / "agent-workspace",
@@ -655,10 +688,10 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 and (index != 1 or bool(references) and references[0] == "SKILL.md")
                 and len(commands) - len(recoverable_preprocess_attempt_indexes(commands))
                     == count - prefix + len(classified.allowed_read_commands), "raw commands violate Skill-only/no-bypass gates")
-            _require(not result["passed"] or index != 1 or expansion_preview_notice(SimpleNamespace(stdout=events_raw.decode("utf-8")),
+            _require(not result["passed"] or index != 1 or (c09_notice if c09_notice is not None else expansion_preview_notice(SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
                 preview_artifact=_transaction(root, oracle["transaction_id"])[0]["artifact"],
-                before_snapshot=oracle.get("preview_before") or plan["before"]),
+                before_snapshot=oracle.get("preview_before") or plan["before"])),
                      "visible post-Preview notice is missing")
             if rejected_read:
                 false_gates = {"broker_provenance", "policy_checkpoint", "visible_preview_notice"}
@@ -714,6 +747,12 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(plan.get("inputs_sha256") == inputs_sha256, "immutable campaign inputs mismatch")
     _require(plan.get("contract") == "waapi-skill.integration-expansion-task-plan/v1"
         and plan.get("unit_id") == unit_id and plan.get("version") == version, "task plan identity mismatch")
+    if "notice_adjudication" in plan:
+        from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration
+        review = plan["notice_adjudication"]
+        _require(unit_id.endswith("-C09") and isinstance(review, dict)
+            and set(review) == {"configuration", "runtime"} and review["configuration"] == reviewer_configuration()
+            and isinstance(review["runtime"], dict), "adjudication is outside the pinned C09 contract")
     module, case_id = _case(plan)
     _require(unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"}
         and (case_id, version) != ("M05", "2022.1"), "unit is not an Agent case")

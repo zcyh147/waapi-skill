@@ -7,8 +7,8 @@ integration-expansion notice adjudication path. The user approved limited
 independent Agent review of natural-language notices the deterministic parser
 cannot decide. The [#147 amendment](https://github.com/zcyh147/waapi-skill/issues/147)
 supersedes only its former no-model-grader restriction. This document records
-the approved development contract; it does not claim an implemented mechanism,
-a completed test, or acceptance.
+the approved development contract. The implementation checkpoint below records
+its current developer proof and pending acceptance separately.
 
 The normal Skill/product interaction, business prompts, independent business
 oracles and Gateway runtime remain unchanged. Reuse the existing formal Fresh
@@ -121,3 +121,64 @@ outside the tracked tree at
 `waapi-eight-hour-cost-audit-20261008.md` (and JSON/metadata), and
 `waapi-framework-ticket-retro-20261008.md`. Broad AGENTS/checkpoint
 reorganization remains deferred; this amendment preserves all historical counts.
+
+
+## C09 implementation checkpoint — #159
+
+New expansion C09 task plans pin `waapi-skill.c09-notice-adjudication/v1`, the
+reviewer settings and runtime identity hashes. Legacy plans retain the original
+boolean notice parser and replay. The copied c914 notice in
+`tests/fixtures/semantic/c09-notice-adjudication-v1.json` is a prospective
+contract fixture: its legacy judgment remains FAIL, and its new decision is
+review-required until an independent valid judgment exists.
+
+`codex_c09_notice_adjudication.py` keeps the new C09 decision, isolated review
+and receipt validation together. Existing role attestation and timeline
+extraction establish the immutable request and notice phase. Deterministic
+acceptance is preserved; structural failures and a small set of exact affirmative
+material claims reject. Other unsupported wording enters review-required. The
+reviewer cannot run unless every other task gate passes. The existing Broker,
+transaction policy and independent business oracle retain their authority.
+
+The reviewer uses the existing Codex command builder, disposable environment,
+prompt audit and process-group infrastructure, in an empty temporary workspace
+with no injected Skill, Broker overlay or project capability. The fixed settings
+are `gpt-6.1-sol`, medium reasoning and default service tier. Its total deadline
+is 120 seconds; input is at most 128 KiB, each subprocess output is at most
+512 KiB, and the final judgment is at most 16 KiB. CLI capability probes and one
+prompt audit precede exactly one ephemeral review turn. There are no retries.
+The reviewer receives the original user prompt, all visible messages before the
+first Execute, original event positions, before-state, immutable prepared
+operation and attested roles. Raw post-Execute events, after-state, business
+verdicts and execution receipts are excluded. Transaction, Preview and the
+pre-execution timeline hashes bind this input. Reviewer seconds and token usage
+are recorded independently of executing-Agent seconds; no monetary cost is
+inferred from tokens.
+
+The supported disabled-feature flags are attested from the selected CLI's
+`features list` and `exec --help`. These flags and the prompt audit do not prove
+a complete absent-tool inventory: CLI 0.159.2 does not expose that inventory.
+Any observed tool use or incomplete session fails the judgment. Read-only
+sandboxing, supplied capability removal and event auditing are the implemented
+controls, not a claim of complete security isolation against a hostile CLI.
+No credentials are included in reviewer input; model authentication remains
+inside the disposable Codex environment.
+
+The existing archive verifier validates the exact receipt, its invocation,
+configuration, runtime hashes, grounded text references and source bindings.
+It makes no reviewer or Wwise call and writes no grades. This introduces the
+preserved independent model judgment as a new evidence authority. Replay proves
+that judgment was preserved and bound; it does not deterministically recompute
+its semantic truth. The campaign seal and trusted root remain prerequisites.
+Receipt checks do not defend against an owner rewriting the entire trusted root.
+Missing or substituted standalone judgment JSON cannot override a deterministic
+failure or replace the recorded isolated invocation.
+
+`test_codex_c09_notice_adjudication.py` exercises the decision, fake subprocess
+review, existing task gate and complete real-TransactionStore archive paths,
+including uncertainty, malformed/truncated output, timeouts, tools, hard
+failures and tampering. It is included in the fixed `notice-fast` selection.
+These are developer tests, not Fresh or Wwise acceptance. Independent review,
+combined-candidate development gates, targeted Fresh fallback proof and identical
+successful-root verify-only remain pending at this paused checkpoint. #160 and
+broader adapter activation remain outside this implementation.

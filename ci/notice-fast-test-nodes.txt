@@ -23,6 +23,7 @@ tests/semantic/test_codex_target_plan_family_notices.py
 tests/semantic/test_codex_target_preflight_notices.py
 tests/semantic/test_codex_verification_basis_notices.py
 tests/semantic/test_codex_expansion_task_runner.py
+tests/semantic/test_codex_c09_notice_adjudication.py
 tests/semantic/test_codex_expansion_archive.py
 tests/semantic/test_codex_campaign_runner.py
 tests/semantic/test_codex_expansion_cli_wiring.py

@@ -2365,9 +2365,12 @@ def run_process(
     cwd: Path,
     env: Mapping[str, str],
     timeout: float,
+    max_output_bytes: int | None = None,
 ) -> ProcessResult:
     """Run a process in its own group so timeouts also stop internal agents."""
 
+    if max_output_bytes is not None and (type(max_output_bytes) is not int or max_output_bytes <= 0):
+        raise ValueError("max_output_bytes must be a positive integer")
     started = time.monotonic()
     process_group_options = subprocess_process_group_options()
     process = subprocess.Popen(
@@ -2377,11 +2380,13 @@ def run_process(
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="strict",
+        text=max_output_bytes is None,
+        encoding="utf-8" if max_output_bytes is None else None,
+        errors="strict" if max_output_bytes is None else None,
         **process_group_options,
     )
+    if max_output_bytes is not None:
+        return _bounded_process_output(process, started=started, timeout=timeout, maximum=max_output_bytes)
     try:
         stdout, stderr = process.communicate(timeout=timeout)
         return ProcessResult(
@@ -2419,6 +2424,53 @@ def run_process(
             except BaseException:
                 pass
         raise
+
+
+def _bounded_process_output(process: Any, *, started: float, timeout: float, maximum: int) -> ProcessResult:
+    """Drain both pipes while sharing one byte ceiling; reap the same process group."""
+    import threading
+    buffers = [bytearray(), bytearray()]
+    lock = threading.Lock()
+    exceeded = threading.Event()
+
+    def drain(stream: Any, buffer: bytearray) -> None:
+        try:
+            while chunk := stream.read(4096):
+                with lock:
+                    available = maximum - sum(len(value) for value in buffers)
+                    buffer.extend(chunk[:available])
+                    if len(chunk) > available:
+                        exceeded.set()
+        finally:
+            stream.close()
+
+    readers = [threading.Thread(target=drain, args=(stream, buffer), daemon=True)
+        for stream, buffer in zip((process.stdout, process.stderr), buffers)]
+    for reader in readers:
+        reader.start()
+    expired = False
+    try:
+        while process.poll() is None:
+            expired = time.monotonic() - started >= timeout
+            if expired or exceeded.is_set():
+                break
+            exceeded.wait(min(0.02, max(0.0, timeout - (time.monotonic() - started))))
+    finally:
+        if process.poll() is None:
+            try:
+                terminate_process_group(process)
+                process.wait(timeout=2)
+            except BaseException:
+                kill_process_group(process)
+                process.wait(timeout=WINDOWS_HARD_REAP_SECONDS)
+        for reader in readers:
+            reader.join(timeout=2)
+        if any(reader.is_alive() for reader in readers):
+            kill_process_group(process)
+            raise CodexHarnessError("bounded subprocess pipes did not close after reaping")
+    return ProcessResult(exit_status=124 if expired else 125 if exceeded.is_set() else int(process.returncode),
+        stdout=buffers[0].decode("utf-8", "ignore"), stderr=buffers[1].decode("utf-8", "ignore"),
+        duration_seconds=round(time.monotonic() - started, 6), timed_out=expired)
 
 
 def terminate_and_reap_process(

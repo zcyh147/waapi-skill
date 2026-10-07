@@ -1722,6 +1722,10 @@ def run_expansion_codex_task(
         "model": options.model, "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
     }
+    if unit.unit_id.endswith("-C09"):
+        from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_runtime_identity
+        plan["notice_adjudication"] = {"configuration": reviewer_configuration(),
+            "runtime": reviewer_runtime_identity(options)}
     _write_json(root / "expansion-plan.json", {**plan, "sha256": canonical_digest(plan)})
     allowed_subcommands = (
         "status", "operations", "operation-schema", "request-schema", "query-schema", "query-object", "metadata",
@@ -1823,6 +1827,16 @@ def run_expansion_codex_task(
                         "final_response_present": bool(result.final_response.strip()),
                         "cumulative_agent_budget": budget.elapsed_seconds <= budget.hard_seconds,
                     }
+                    if index == 1 and "notice_adjudication" in plan:
+                        from tests.semantic.support.codex_c09_notice_adjudication import grade_c09_notice
+                        notice = grade_c09_notice(result, command_rows, version=unit.version,
+                            execute_expected=prepared.policy == "allow_changes",
+                            preview_artifact=(TransactionStore(broker.state_directory).load_preview(
+                                policy.transaction_id).artifact if policy.transaction_id else {}),
+                            before_snapshot=prepared.before, transaction_id=policy.transaction_id or "",
+                            user_prompt=prompt, other_gates={key: value for key, value in gates.items()
+                                if key != "visible_preview_notice"}, root=output_dir, options=options)
+                        gates["visible_preview_notice"] = notice["passed"]
                     grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
                                         reconciliation, gates, tuple(key for key, passed in gates.items() if not passed))
                     _archive_turn(output_dir, prompt=prompt, result=result, grade=grade)
