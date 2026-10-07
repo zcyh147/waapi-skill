@@ -134,3 +134,78 @@ def test_rtpc_middle_delta_and_retained_endpoints_keep_exact_quantity_order_and_
     elif damage == "later-shape-contradiction":
         text += "本次 Volume RTPC 曲线不保持 Linear 形状。"
     assert _single_message_notice("RTPC", text) is (damage == "none")
+
+
+@pytest.mark.parametrize("endpoints,expected", [
+    ("端点 (0, -48 dB)、(100, 0 dB)、", True),
+    ("端点 (0, -48 dB)、(100, 0 dB) 保持原样，", True),
+    ("端点 (0, -48 dB)、(100, 0 dB) 不会保持原样，", False),
+    ("端点 (0, -48 dB)、(100, 0 dB) 可能保持原样，", False),
+    ("端点 (0, -48 dB)、(100, 0 dB)，", False),
+])
+def test_rtpc_endpoint_preservation_owns_its_predicate_and_polarity(endpoints, expected):
+    text = _VECTORS[51]["messages"][0].replace("端点 (0, -48 dB)、(100, 0 dB)、", endpoints)
+    assert _single_message_notice("RTPC", text) is expected
+
+
+@pytest.mark.parametrize("replacement,extra,expected", [
+    ("三点 Linear", "", True),
+    ("四点 Linear", "", False),
+    ("3 点 Linear", "", True),
+    ("4 点 Linear", "", False),
+    ("三点 Linear", "本次 Volume RTPC 曲线共四点。", False),
+    ("三点 Linear", "本次 Volume RTPC 曲线共三点。", True),
+    ("三点 Linear", "今天四点执行检查。", True),
+    ("三点 Linear", "今天四点开始，五点结束。", True),
+])
+def test_rtpc_curve_cardinality_is_local_and_cannot_be_contradicted(replacement, extra, expected):
+    text = _VECTORS[51]["messages"][0].replace("三点 Linear", replacement) + extra
+    assert _single_message_notice("RTPC", text) is expected
+
+
+@pytest.mark.parametrize("extra,expected", [
+    ("同时移除 Pitch RTPC 关系。", False),
+    ("同时清空 Pitch RTPC 关系。", False),
+    ("同时新增 Pitch RTPC 关系。", False),
+    ("同时移除该声音。", False),
+    ("同时移除该声音上的 Volume RTPC 关系。", False),
+    ("不会移除 Pitch RTPC 关系。", True),
+    ("不会清空 Pitch RTPC 关系。", True),
+    ("新增关系计数为零。移除关系计数为零。", True),
+    ("移除关系计数为零。同时移除 Pitch RTPC 关系。", False),
+    ("记录修改前状态。", True),
+])
+def test_rtpc_validated_curve_carrier_preserves_residual_action_accounting(extra, expected):
+    assert _single_message_notice("RTPC", _VECTORS[51]["messages"][0] + extra) is expected
+
+
+@pytest.mark.parametrize("frame", ["已确认 {operand} 身份", "{operand} 身份已确认", "已确认 {operand}", "{operand} 已确认"])
+@pytest.mark.parametrize("owner_type,owner_id,expected", [
+    ("Stinger", "{B8D45849-AF76-4770-BE7B-5A6553B1337B}", True),
+    ("Stinger", "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}", False),
+    ("Trigger", "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}", False),
+    ("Trigger", "{B8D45849-AF76-4770-BE7B-5A6553B1337B}", False),
+])
+def test_typed_identity_forward_and_reverse_share_sealed_source_validation(frame, owner_type, owner_id, expected):
+    text = _VECTORS[49]["messages"][0]
+    _, separator, effect = text.partition("。")
+    assert separator
+    text = frame.format(operand=owner_type + " " + owner_id) + "。" + effect
+    assert _single_message_notice("Stinger", text) is expected
+
+
+@pytest.mark.parametrize("field", ["name", "type", "path"])
+@pytest.mark.parametrize("damage", ["missing", None, "", 42])
+def test_rtpc_matching_incomplete_owner_fields_do_not_attest_a_complete_source(field, damage):
+    case = json.loads(_FIXTURE.read_text())["RTPC"]
+    for row in (case["before"]["owner"], case["artifact"]["prepared_operation"]["pre_state"]["object"]):
+        if damage == "missing":
+            del row[field]
+        else:
+            row[field] = damage
+    events = [
+        {"type": "item.completed", "item": {"type": "command_execution", "command": "preview-from-draft"}},
+        {"type": "item.completed", "item": {"type": "agent_message", "text": _VECTORS[51]["messages"][0]}},
+        {"type": "item.started", "item": {"type": "command_execution", "command": "execute"}},
+    ]
+    assert not _notice(events, case)

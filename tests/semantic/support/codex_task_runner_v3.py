@@ -17,7 +17,7 @@ from tests.semantic.support.codex_attenuation_notice import (
     ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
     prospective_preview_execution,
 )
-from tests.semantic.support.codex_notice_language import authorization_claim, negated_foreign_owner, planned_change_noun, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_language import authorization_claim, negated_foreign_owner, notice_count, planned_change_noun, prospective_intent, role_terms
 from tests.semantic.support.codex_notice_claims import (
     NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, additional_action_qualifier, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
     effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
@@ -988,6 +988,8 @@ def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any])
     old_owner, controls, rtpcs = before.get("owner"), before.get("controls"), before.get("rtpcs")
     snapshot = state.get("rtpc_snapshot", {})
     if (not isinstance(old_owner, Mapping) or old_owner.get("id") != owner
+            or any(not isinstance(old_owner.get(key), str) or not old_owner[key]
+                   for key in ("name", "type", "path"))
             or not isinstance(controls, list) or not isinstance(rtpcs, Mapping)
             or not isinstance(snapshot, Mapping) or snapshot.get("object_id") != owner):
         return None
@@ -1033,7 +1035,7 @@ def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any])
                      if isinstance(row.get("@PropertyName"), str) and row["@PropertyName"] != "Volume"}
     foreign_names.update(row[key] for row in controls if isinstance(row, Mapping) and row.get("id") != control
                          for key in ("name", "path") if isinstance(row.get(key), str) and row[key])
-    return {"ids": (owner, control, association), "old": old, "new": new, "delta": delta,
+    return {"ids": (owner, control, association), "owner": old_owner, "old": old, "new": new, "delta": delta,
             "foreign_names": tuple(sorted(foreign_names)),
             "control_names": tuple(matched[0][key] for key in ("name", "path")
                                    if isinstance(matched[0].get(key), str) and matched[0][key]),
@@ -1151,6 +1153,51 @@ def _rtpc_coherent_actions(text: str, context: Mapping[str, Any]) -> bool:
     return affirmative
 
 
+def _rtpc_retained_endpoint_claim(text: str) -> NoticeClaim | None:
+    """Preservation belongs to the endpoint clause or its coordinated list.
+
+    Coordinate commas do not split a claim. A later separate shape assertion
+    cannot supply a missing or denied endpoint predicate.
+    """
+    for clause in notice_clauses(text):
+        if re.match(r"\s*端点\s*[（(]", clause.text) is None:
+            continue
+        predicate = re.search(r"保持(?:原样|不变|原值)?|\bunchanged\b|\bretain(?:ed)?\b", clause.text)
+        if (predicate is None or _notice_qualifier_is_negated(clause.text[:predicate.start()])
+                or uncertain_action_qualifier(clause.text[:predicate.start()])
+                or clause.text[predicate.end():].strip()):
+            return None
+        return clause._replace(role="retained-endpoints")
+    return None
+
+
+def _rtpc_preview_actions_accounted(text: str, context: Mapping[str, Any],
+                                   concrete_actions: Sequence[NoticeClaim] = ()) -> bool:
+    """Keep each affirmative edit outside validated action/noun spans visible."""
+    ancillary = ancillary_claims(text, NoticeRoleContext(context["owner"]))
+    if any(claim.role == "invalid" for claim in ancillary):
+        return False
+    neutral_roles = {"owner-attestation", "authorization", "preview-status", "execution-status",
+                     "read-summary", "matched-display", "verification-basis"}
+    for clause in notice_clauses(text):
+        if re.fullmatch(r"(?:新增|移除)关系计数为(?:零|0)", clause.text.strip()):
+            continue
+        for mutation in re.finditer(_NOTICE_MUTATIONS, clause.text):
+            start, end = clause.start + mutation.start(), clause.start + mutation.end()
+            if any(claim.start <= start and end <= claim.end for claim in concrete_actions):
+                continue  # Only the proven verb span; never its entire sentence.
+            if any(claim.role in neutral_roles and claim.start <= start and end <= claim.end for claim in ancillary):
+                continue
+            prefix, suffix = clause.text[:mutation.start()], clause.text[mutation.end():]
+            qualifier = re.split(r"[，,、]", prefix)[-1]
+            if _notice_qualifier_is_negated(qualifier) or _notice_mutation_is_noun(mutation.group(), prefix, suffix):
+                continue
+            if (re.search(r"(?:中点|中间点|midpoint|middle point)\s*$", qualifier) is None
+                    or mutation.group() not in {"改为", "改成", "设为", "set", "change"}):
+                return False
+    return True
+
+
 def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool, earlier_shape: bool = False) -> tuple[bool, bool]:
     """Recognize a full curve or accurate point delta in the attested context."""
     # The immutable Preview noun is not a negated edit qualifier.
@@ -1199,6 +1246,19 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
         and any(term in retention for term in ("符合目标", "match the target")))
     shape_clauses = "\n".join(clause for clause in same_target_clauses if "linear" in clause or "线性" in clause)
     notice_shape = _affirmative_linear_interpolation(shape_clauses) if shape_clauses else earlier_shape
+    # Cardinalities describe the whole curve only inside a local shape/count
+    # frame. A time of day elsewhere in the notice is not a curve claim.
+    cardinal = r"[0-9零一二两三四五六七八九十]+"
+    for clause in notice_clauses(numeric):
+        if any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", clause.text)
+               for name in context["foreign_names"]):
+            continue
+        for count in re.finditer(rf"(?P<count>{cardinal})\s*(?:点|points)\s*(?=linear|线性)", clause.text):
+            if notice_count(count.group("count")) != len(context["new"]):
+                return False, False
+        for count in re.finditer(rf"(?:曲线|curve)\s*(?:共|有|包含|has|contains)\s*(?P<count>{cardinal})\s*(?:点|points)", clause.text):
+            if notice_count(count.group("count")) != len(context["new"]):
+                return False, False
     def requested_shape(part: str) -> bool:
         return notice_shape and (not ("linear" in part or "线性" in part)
                                  or _affirmative_linear_interpolation(part))
@@ -1227,20 +1287,13 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
     # Preview inheritance covers only the sealed midpoint edit. Every other
     # affirmative mutation remains a contradiction, even without an owner label.
     sibling_names = [name for name in context["foreign_names"] if "\\" not in name]
-    preview_actions_accounted = True
-    for action_clause in re.split(r"[。；;\n]", text):
-        # A complete zero-count status is a noun observation, not an action.
-        # It cannot hide a second clause or an instruction following the count.
-        if re.fullmatch(r"(?:新增|移除)关系计数为(?:零|0)", action_clause.strip()):
-            continue
-        for mutation in re.finditer(_NOTICE_MUTATIONS, action_clause):
-            qualifier = re.split(r"[，,、]", action_clause[:mutation.start()])[-1]
-            if _notice_qualifier_is_negated(qualifier):
-                continue
-            if (re.search(r"(?:中点|中间点|midpoint|middle point)\s*$", qualifier) is None
-                    or mutation.group() not in {"改为", "改成", "设为", "set", "change"}):
-                preview_actions_accounted = False
+    preview_actions_accounted = _rtpc_preview_actions_accounted(numeric, context)
+    concrete_actions = []
+    retained_middle_seen = False
+    clause_cursor = 0
     for clause_index, clause in enumerate(clauses):
+        clause_start = numeric.find(clause, clause_cursor)
+        clause_cursor = clause_start + len(clause)
         point_reference = "该点" in clause
         if point_reference and middle_edit:
             prefix = "\n".join(clauses[:clause_index]) + clause.split("该点", 1)[0]
@@ -1392,14 +1445,16 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
                 stated = new
             retained_middle = (middle_edit and direct_middle_claim and pairs(clause[:action.start()]) == [old[1]]
                 and stated == [new[1], new[0], new[2]]
-                and re.search(r"[,，]\s*端点\s*[（(]", following) is not None
-                and re.search(r"保持|unchanged|retain", following) is not None
+                and _rtpc_retained_endpoint_claim(following) is not None
                 and (not shape_clauses or notice_shape)
                 and _affirmative_linear_interpolation(following))
             if stated == context["new"] and requested_shape(following):
                 full = effect = True
             elif retained_middle:
                 effect = True  # The exact midpoint delta plus ordered unchanged endpoints.
+                retained_middle_seen = True
+                concrete_actions.append(NoticeClaim("curve-edit", clause_start + action.start(),
+                    clause_start + action.end(), action.group()))
             elif (stated == context["delta"] and stated and context["same_domain"]
                   and (rest_already_matches or explicit_retained_endpoints or (middle_edit and coherent_final and coherent_middle) or (middle_edit and direct_middle_claim and complete_current_curve) or
                        (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
@@ -1412,6 +1467,8 @@ def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points
                 effect = True
             elif stated:
                 return False, False
+    if retained_middle_seen and not _rtpc_preview_actions_accounted(numeric, context, concrete_actions):
+        return False, False
     return effect or coherent_final, full or coherent_final
 
 

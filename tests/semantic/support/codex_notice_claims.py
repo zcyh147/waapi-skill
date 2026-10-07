@@ -224,7 +224,16 @@ def _supplied_owner_operand(value: str, context: NoticeRoleContext) -> bool:
             return True
         if re.fullmatch(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}|\\.+", operand):
             return True
+        if re.fullmatch(r"(?:[a-z][a-z0-9_-]*|[\u4e00-\u9fff]+)\s+\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", operand):
+            return True  # A typed canonical identity supplies a role even when it is foreign.
     return False
+
+
+def _owner_operand_role(value: str, context: NoticeRoleContext) -> str:
+    """Both assertion orders validate an independently supplied role/GUID."""
+    if primary_role_atom(value, context) or primary_role_attribute(value, context):
+        return "owner-attestation"
+    return "invalid" if _supplied_owner_operand(value, context) else "unclassified"
 
 
 def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
@@ -258,9 +267,8 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
         declared_object = re.match(r"(?:该|此|(?:所)?指定)对象(?:的|身份|配置|和|及|与|\s|$)", reverse.group(1)) if reverse else None
         if reverse and (reverse.group(1).startswith("目标") or declared_object
                         or _supplied_owner_operand(reverse.group(1), context)):
-            return clause._replace(role="owner-attestation" if (primary_role_atom(reverse.group(1), context)
-                                   or primary_role_attribute(reverse.group(1), context))
-                                   else "invalid", diagnostic="conflicting-owner-attestation")
+            return clause._replace(role=_owner_operand_role(reverse.group(1), context),
+                                   diagnostic="conflicting-owner-attestation")
         return clause
     from tests.semantic.support.codex_notice_language import attested_primary_target
 
@@ -272,7 +280,8 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
             return clause._replace(role="invalid", diagnostic="conflicting-protected-baseline")
         if baseline_role == "read-summary":
             value = value[:coordinated.start()].strip()
-    if primary_role_atom(re.sub(r"^目标(?:是|为)\s*", "", value), context) or primary_role_attribute(value, context):
+    operand_role = _owner_operand_role(re.sub(r"^目标(?:是|为)\s*", "", value), context)
+    if operand_role == "owner-attestation":
         return clause._replace(role="owner-attestation")
     legacy = attested_primary_target(clause.text[:match.start(1)] + value, context.identity)
     if legacy.state == "attested":
@@ -289,6 +298,8 @@ def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> Notice
     # Other established identity constructions remain with the exact legacy
     # adapter. A narrow role assertion cannot silently introduce a new owner.
     if re.match(r"目标(?!是)", value):
+        return clause._replace(role="invalid", diagnostic="conflicting-owner-attestation")
+    if operand_role == "invalid":
         return clause._replace(role="invalid", diagnostic="conflicting-owner-attestation")
     return clause
 
