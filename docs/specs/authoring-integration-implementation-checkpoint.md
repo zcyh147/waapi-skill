@@ -4,7 +4,7 @@ Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
 on 2026-10-01. The latest Goal status and next permitted action are recorded below.
 
-## Current evidence addendum — 2026-10-07 modal-prefix repair
+## Current evidence addendum — 2026-10-07 modal review repair
 
 Latest completed full macOS Non-live remains functional `67279db`: **16609
 passed / 119 skipped / 27 deselected**, exit 0. Its new EXP25-C09 Fresh root
@@ -15,7 +15,14 @@ selection **3807 tests**, including all **3766 retained controls**. It composes
 current-operation/modal/recipient components and binds new omitted-recipient
 action prefixes to the action's local owner window; existing complete Preview
 noun carriers retain their prior reference path. See the [repair report](../research/integration-expansion-modal-prefix-repair-2026-10-07.md).
-This is focused component evidence, with independent review, complete applicable
+Independent Spec review of `85fc942` found that omitted-prefix inheritance skipped
+supplied claim-side owners and malformed finite scope could disappear on legacy
+fallback. Review-repair candidate `6bc4a68` passed **3834 focused tests**: all
+**3807 retained tests** plus **27 frozen public notice-seam controls**. It validates
+every supplied prefix/claim-side owner before using inheritance as a fallback and
+recognizes the existing finite action head before rejecting unsupported modal
+composition. See the [review-repair report](../research/integration-expansion-modal-review-repair-2026-10-07.md).
+This is focused component evidence, with independent rereview, complete applicable
 gate and a new targeted Fresh proof pending. **#147 stays open; #122's final
 13-positive-plus-boundary acceptance remains pending.** The read-only
 [contract audit](/tmp/waapi-expansion-notice-contract-audit-20261007.md) contains
