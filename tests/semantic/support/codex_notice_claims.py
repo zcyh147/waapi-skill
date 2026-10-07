@@ -347,8 +347,11 @@ def primary_identity_comparison(clause: NoticeClaim, context: NoticeRoleContext)
     Neither a neutral comparison nor its operands attest a new primary owner.
     """
     if (re.search(r"(?<![a-z0-9_])guid(?![a-z0-9_])", clause.text) is None
-            or re.search(r"一致|相同|相符|相等|等同|不同|不等", clause.text) is None):
+            or (re.search(r"一致|相同|相符|相等|等同|不同|不等", clause.text) is None
+                and re.search(r"(?<![a-z0-9_])guid(?![a-z0-9_])\s*与", clause.text) is None)):
         return clause
+    # GUID-versus-operand intent exists before the relation is complete. Such
+    # incomplete frames must reach validation instead of becoming bookkeeping.
     # Existing multi-attribute identity assertions belong to the adapter's
     # identity grammar. They are not GUID-versus-GUID comparison operands and
     # gain neither a neutral span nor owner credit from this classifier.

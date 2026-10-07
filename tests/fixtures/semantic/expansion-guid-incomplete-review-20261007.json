@@ -1,0 +1,299 @@
+{
+  "source": "spec-final-boundary-probes.json",
+  "source_sha256": "e2e6944d3b3da853729d627c4cff2f54791a9333574d8ee707dfa5fc501bc638",
+  "family_mapping": {
+    "effect": "effect",
+    "rtpc": "rtpc",
+    "attenuation": "attenuation",
+    "stinger": "stinger"
+  },
+  "cases": [
+    {
+      "id": "effect-valid-comparison",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-missing-second-operand",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-colon-missing-second-operand",
+      "family": "effect",
+      "notice": "已核对目标声音：解析出的 GUID 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-missing-relation",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-foreign-unclosed",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-colon-foreign-unclosed",
+      "family": "effect",
+      "notice": "已核对目标声音：OtherObject 的 GUID 与你提供的，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-coordinated-missing-prefix",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-coordinated-foreign-prefix",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-unrelated-guid-read",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID 已记录，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-legacy-identity-aggregate",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-valid-comparison",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-missing-second-operand",
+      "family": "rtpc",
+      "notice": "已核对目标声音，解析出的 GUID 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-colon-missing-second-operand",
+      "family": "rtpc",
+      "notice": "已核对目标声音：解析出的 GUID 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-missing-relation",
+      "family": "rtpc",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-foreign-unclosed",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-colon-foreign-unclosed",
+      "family": "rtpc",
+      "notice": "已核对目标声音：OtherObject 的 GUID 与你提供的。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-coordinated-missing-prefix",
+      "family": "rtpc",
+      "notice": "已核对目标声音，解析出的 GUID 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-coordinated-foreign-prefix",
+      "family": "rtpc",
+      "notice": "已核对目标声音，OtherObject 的 GUID 与你提供的、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-unrelated-guid-read",
+      "family": "rtpc",
+      "notice": "已核对目标声音，GUID 已记录。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "rtpc-legacy-identity-aggregate",
+      "family": "rtpc",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-valid-comparison",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-missing-second-operand",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，解析出的 GUID 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-colon-missing-second-operand",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：解析出的 GUID 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-missing-relation",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，解析出的 GUID 与你提供的。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-foreign-unclosed",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID 与你提供的。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-colon-foreign-unclosed",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID 与你提供的。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-coordinated-missing-prefix",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，解析出的 GUID 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-coordinated-foreign-prefix",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID 与你提供的、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-unrelated-guid-read",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，GUID 已记录。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "attenuation-legacy-identity-aggregate",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，GUID、名称、类型和路径与请求一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-valid-comparison",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-missing-second-operand",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，解析出的 GUID 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-colon-missing-second-operand",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：解析出的 GUID 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-missing-relation",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，解析出的 GUID 与你提供的。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-foreign-unclosed",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID 与你提供的。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-colon-foreign-unclosed",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID 与你提供的。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-coordinated-missing-prefix",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，解析出的 GUID 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-coordinated-foreign-prefix",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID 与你提供的、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-unrelated-guid-read",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，GUID 已记录。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "stinger-legacy-identity-aggregate",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，GUID、名称、类型和路径与请求一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    },
+    {
+      "id": "effect-implicit-legacy-identity-aggregate",
+      "family": "effect",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Frozen #147 review judgment: incomplete intended comparison is invalid; matching controls preserve existing consumer behavior."
+    }
+  ]
+}
