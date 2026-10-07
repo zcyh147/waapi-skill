@@ -346,12 +346,16 @@ def primary_identity_comparison(clause: NoticeClaim, context: NoticeRoleContext)
     operands or residual text is invalid even beside a correct explicit edit.
     Neither a neutral comparison nor its operands attest a new primary owner.
     """
+    operands = clause.text.split("与")
+    comparison_intent = len(operands) > 1 and any(re.search(
+        r"(?<![a-z0-9_])guid(?![a-z0-9_])(?:\s+\{[^{}]*\}?)?\s*$", operand)
+        for operand in operands)
     if (re.search(r"(?<![a-z0-9_])guid(?![a-z0-9_])", clause.text) is None
             or (re.search(r"一致|相同|相符|相等|等同|不同|不等", clause.text) is None
-                and re.search(r"(?<![a-z0-9_])guid(?![a-z0-9_])\s*与", clause.text) is None)):
+                and not comparison_intent)):
         return clause
-    # GUID-versus-operand intent exists before the relation is complete. Such
-    # incomplete frames must reach validation instead of becoming bookkeeping.
+    # Either operand can carry GUID plus its optional brace qualifier. This
+    # recognizes intent only; malformed/incomplete frames still fail below.
     # Existing multi-attribute identity assertions belong to the adapter's
     # identity grammar. They are not GUID-versus-GUID comparison operands and
     # gain neither a neutral span nor owner credit from this classifier.
