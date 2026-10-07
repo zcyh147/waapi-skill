@@ -1,0 +1,155 @@
+{
+  "contract": "waapi-skill.notice-repair-evidence/v1",
+  "date": "2026-10-07",
+  "issue": 147,
+  "integration_base": "279363910641264e640d34b837f352844817ed7d",
+  "branch": "codex/expansion-notice-attestation",
+  "scope": "Deterministic coordinated read-role attestation and local primary-append certainty at the existing public expansion_preview_notice seam.",
+  "frozen_source": {
+    "candidate": "0c2e75e",
+    "campaign_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-0c2e75e-sol-high-r2-clean-cli1592",
+    "original_status": "FAIL",
+    "failed_gate": "visible_preview_notice",
+    "notice_event_index": 23,
+    "business_assertions": {
+      "passed": 6,
+      "required": 6
+    },
+    "gateway_verification_state": "verified",
+    "replayed": false,
+    "regraded": false,
+    "verify_only": false
+  },
+  "diagnosis": "The unsplit owner identity and real-time Effect type noun list was misclassified as one conflicting owner attribute before concrete append validation. No required substantive pre-Execute fact was found omitted.",
+  "repair": [
+    "Closed affirmative attestation predicate decomposes typed noun-list operands with original spans; each exact/definite owner or Effect-kind display operand is checked independently. Unknown, negated, foreign, ambiguous or conflicting operands fail closed.",
+    "Native owner/class/descriptor authority remains immutable prepared state and independently sealed before-state; lexical display tokens never perform class mapping or live lookup.",
+    "Only the expected owned creation action is checked for local uncertainty; a later generic execute claim cannot turn a possible append into a definite plan.",
+    "Full coordinated predicates keep their pre-existing parser; verification noun lists are not globally split."
+  ],
+  "fixtures": [
+    {
+      "path": "tests/fixtures/semantic/expansion-coordinated-attestation-0c2e75e.json",
+      "sha256": "e8113c7baab72b94fea53dd33dcf3d2e0a11b698deb56bbf5b3a160c43089366"
+    },
+    {
+      "path": "tests/fixtures/semantic/expansion-coordinated-attestation-independent-20261007.json",
+      "sha256": "67ec04ea10f5aacad588dc28b1ace2fdbc6363d6339e8c3a27c408abf4339bb8"
+    }
+  ],
+  "independent_design": {
+    "json_source": "/tmp/waapi-expansion-20261007-notice-contrasts/notice-contrasts.json",
+    "json_sha256": "67ec04ea10f5aacad588dc28b1ace2fdbc6363d6339e8c3a27c408abf4339bb8",
+    "rationale_source": "/tmp/waapi-expansion-20261007-notice-contrasts/rationale.md",
+    "rationale_sha256": "a3b1cbeabf8b621ae702f7060cad9df0f4949dc746f2c910773bce23c6b5d6b2",
+    "positive_vectors": 6,
+    "negative_vectors": 18,
+    "expectations_modified": false
+  },
+  "validation": {
+    "lane": "Focused developer pytest via ci/test.sh --mode nonlive with explicit test paths; not the full Non-live gate.",
+    "developer_interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "final_result": {
+      "passed": 2621,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 4.5,
+      "previous_notice_selection_passed": 2566,
+      "new_controls": 55
+    },
+    "full_program_run": false,
+    "full_nonlive_run": false,
+    "fresh_codex_run": false,
+    "live_wwise_run": false,
+    "windows_validation": false,
+    "historical_pass_credit_changed": false,
+    "artifacts": [
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/red-exact.log",
+        "sha256": "7a9bbcf3a29e4a3a8694715e11b4940d72fb46254e44363d352e515aeeeb6fbe",
+        "exit_code": 4,
+        "result": "environment BLOCKED; no test collection"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/red-exact-attested.log",
+        "sha256": "32e315a2edd8472f5dd9c21ebcff14f907a5078bb2e04858818ed84b29458333",
+        "exit_code": 1,
+        "result": "1 failed in 0.53s"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/red-independent.log",
+        "sha256": "4a1b97bd2d1298d911d01a15268cbdba1170c267439b4509447f53b337b2869b",
+        "exit_code": 1,
+        "result": "5 failed / 20 passed in 0.17s"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/green-independent-r1.log",
+        "sha256": "d64467069a266da972a4b74bc02f62b734c7e3b4b740d6327c808412478cfbbb",
+        "exit_code": 1,
+        "result": "1 failed / 24 passed in 0.17s; uncertainty exposed"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/red-local-certainty.log",
+        "sha256": "332f1c3a6219ef4c702217da5c3bf73eec884162b7b417f64ac91413417ef811",
+        "exit_code": 1,
+        "result": "9 failed / 32 passed in 0.22s; includes exploratory unsupported qualifier control"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/red-local-certainty-r2.log",
+        "sha256": "658b185fd15ea1fed2eb87e37ccd8cc21da37eb7220d88a0fdbe18de2f29684a",
+        "exit_code": 1,
+        "result": "8 failed / 33 passed; supported definite qualifier controls"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/green-independent-r2.log",
+        "sha256": "2cadde7bd974d253b738e6a3c856fc17c15d1b3618dc3e9609d4a3926a889156",
+        "exit_code": 0,
+        "result": "41 passed in 0.19s"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/focused-retained-r1.log",
+        "sha256": "e0fbf6bd413754c468b6da08cd908173175546fc7b13066ba84cb790d09d9688",
+        "exit_code": 1,
+        "result": "1 failed / 2556 passed in 4.60s; full-predicate parser applicability regression"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/focused-retained-r2.log",
+        "sha256": "566e6ed2c1b87ed1fdf4a70879a9f760ae12be78982a9c5b292a02a8ac60149b",
+        "exit_code": 0,
+        "result": "2557 passed in 4.31s; narrower than historical19-module selection"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/focused-retained-final.log",
+        "sha256": "5320c9081cdd3608c6b6d38b9e15fbd2bc5e8508ccfb11d07ec06adfe405281b",
+        "exit_code": 0,
+        "result": "2571 passed in 4.33s; narrower selection with14 additional controls"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/retained-exact-selection.log",
+        "sha256": "72d28f15e25ddbc5eca656b58b4e7453e5d2e0950d66c01aa8c5fe465975644c",
+        "exit_code": 0,
+        "result": "2621 passed in 4.50s; exact prior19-module selection plus55 new controls"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-attestation-repair-0c2e75e-20261007/retained-exact-selection.xml",
+        "sha256": "c74cd6f1fea94e1bb0d0c7615a04dc5f1358c38420a2f3896ddacef5188cc3ef",
+        "exit_code": 0,
+        "result": "JUnit2621 tests /0failures /0errors /0skips"
+      }
+    ]
+  },
+  "out_of_scope_observations": [
+    "Exploratory inherited recipient-free 现在将追加 positive is rejected by the existing owner-prefix grammar; it was replaced with supported 会追加 in local certainty controls before the repair. The exploratory failure remains preserved, is not a frozen independent vector, and grants no acceptance credit.",
+    "Post-Execute final Agent uncertainty about compact preservation disclosures is outside the failed pre-Execute notice gate.",
+    "Older repeated-name descriptor prose remains outside this repair."
+  ],
+  "unchanged": [
+    "packaged Skill tree",
+    "Gateway/runtime",
+    "prompt",
+    "suite",
+    "business oracle",
+    "model grader",
+    "frozen campaign verdict and evidence"
+  ]
+}

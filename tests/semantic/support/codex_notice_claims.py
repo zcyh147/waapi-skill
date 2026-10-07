@@ -158,8 +158,45 @@ def primary_role_attribute(value: str, context: NoticeRoleContext) -> bool:
     return attribute is not None and primary_role_atom(attribute.group(1), context)
 
 
+def _coordinated_attestations(clause: NoticeClaim, context: NoticeRoleContext) -> tuple[NoticeClaim, ...] | None:
+    """One affirmative read predicate governs only independently closed roles.
+
+    Keep each enumerated operand's original span. A display token remains
+    lexical Effect context, never an owner or a label-to-native-class lookup.
+    Unknown, negated and compound-owner operands invalidate the entire frame.
+    Other noun lists, including later verification objects, are untouched.
+    """
+    frame = re.fullmatch(r"\s*(?:已)?(?:核对|核实|确认)(?P<values>.+?)\s*", clause.text)
+    if context.identity["type"] != "Sound" or frame is None or "、" not in frame.group("values"):
+        return None
+    values = frame.group("values").split("、")
+    if not any(re.fullmatch(r".+(?:身份|配置|类型)\s*", value) for value in values):
+        return None  # Full coordinated predicates retain their existing parser.
+    claims = []
+    start = frame.start("values")
+    for value in values:
+        operand = NoticeClaim("unclassified", clause.start + start, clause.start + start + len(value), value)
+        if primary_role_atom(value, context) or primary_role_attribute(value, context):
+            claims.append(operand._replace(role="owner-attestation"))
+        else:
+            display = re.fullmatch(r"\s*实时\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*类型\s*", value)
+            if display and effect_kind_label(display.group(1)):
+                claims.append(operand._replace(role="matched-display", value=" ".join(display.group(1).split())))
+            else:
+                claims.append(operand._replace(role="invalid", diagnostic="unclosed-coordinated-attestation"))
+        start += len(value) + 1
+    if len({claim.value for claim in claims if claim.role == "matched-display"}) > 1:
+        return (clause._replace(role="invalid", diagnostic="conflicting-coordinated-display"),)
+    return tuple(claims)
+
+
 def owner_attestation(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """A complete affirmative generic/exact role assertion, with no lookup."""
+    coordinated = _coordinated_attestations(clause, context)
+    if coordinated is not None:
+        if any(claim.role == "invalid" for claim in coordinated):
+            return clause._replace(role="invalid", diagnostic="conflicting-coordinated-attestation")
+        return clause._replace(role="owner-attestation") if any(claim.role == "owner-attestation" for claim in coordinated) else clause
     terms = "|".join(re.escape(term) for term in role_terms(context.identity["type"]))
     established = re.fullmatch(rf"\s*(?:目标已核对为请求中的\s*(?:{terms})|这个(?:{terms})已按\s*guid\s*核实)\s*", clause.text)
     if established:
@@ -288,6 +325,11 @@ def baseline_read_claim(clause: NoticeClaim, context: NoticeRoleContext) -> Noti
 
 def matched_display_claim(clause: NoticeClaim, context: NoticeRoleContext) -> NoticeClaim:
     """An opaque display token is lexical context, never native class evidence."""
+    coordinated = _coordinated_attestations(clause, context)
+    if coordinated is not None:
+        if any(claim.role == "invalid" for claim in coordinated):
+            return clause._replace(role="invalid", diagnostic="conflicting-coordinated-attestation")
+        return next((claim for claim in coordinated if claim.role == "matched-display"), clause)
     match = re.fullmatch(r"\s*(?:并匹配到|已从实时插件目录确认)\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*", clause.text)
     reverse = re.fullmatch(r"\s*([a-z][a-z0-9_-]*(?:[ \t]+[a-z][a-z0-9_-]*){0,5})\s*类型已从实时(?:插件)?目录确认\s*", clause.text)
     match = match or reverse
@@ -456,6 +498,16 @@ def historical_creation(prefix: str) -> bool:
     # elsewhere in the clause does not turn that completed event into intent;
     # affirmative Preview confirmation followed by 将 retains its future role.
     return re.search(r"(?:已经|已)(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?$", local) is not None
+
+
+def uncertain_action_qualifier(prefix: str) -> bool:
+    """Local possibility cannot declare a definite prospective operation.
+
+    Like completion qualifiers, uncertainty may precede or follow the
+    recipient. It concerns this action only, never another read sentence.
+    """
+    local = re.split(r"[，,。；;\n]", prefix)[-1]
+    return re.search(r"(?:可能|也许|或许|不确定(?:是否)?)(?:会|将)?(?:(?:向|在|对)\s*.+?(?:上|下)?\s*)?$", local) is not None
 
 
 def preview_operation_claim(clause: NoticeClaim, action_pattern: str) -> NoticeClaim:

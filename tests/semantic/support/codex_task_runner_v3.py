@@ -21,7 +21,7 @@ from tests.semantic.support.codex_notice_language import authorization_claim, pl
 from tests.semantic.support.codex_notice_claims import (
     NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
     effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
-    owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner, primary_role_atom, staged_operation_adoption,
+    owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner, primary_role_atom, staged_operation_adoption, uncertain_action_qualifier,
 )
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
@@ -907,6 +907,8 @@ def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: Plan
                 return False
             if noun or note_write:
                 continue
+            if context["kind"] == "plugin" and expected and approved_value and anchored and uncertain_action_qualifier(polarity_prefix):
+                return False  # Later execution prose cannot make this plan definite.
             if any(term in (local_effect.text if local_effect else claim) for term in context["protected"]):
                 return False
             if not expected or not effect_anchor or not approved_value:
