@@ -1,0 +1,266 @@
+{
+  "contract": "waapi-skill.reviewed-validation-report/v1",
+  "date": "2026-10-07",
+  "candidate": "700914d86b10dc1c586762fb3a617a0fd4e9ab2a",
+  "status": "NONLIVE_FAILED_FRESH_NOT_LAUNCHED",
+  "branch": "codex/expansion-reviewed-validation",
+  "host": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills",
+  "result": {
+    "exit_code": 1,
+    "passed": 15531,
+    "failed": 20,
+    "errors": 6,
+    "skipped": 119,
+    "deselected": 27,
+    "seconds": 886.28
+  },
+  "command": "WAAPI_TEST_PYTHON=/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python ci/test.sh --mode nonlive -- -q -ra --junitxml=/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-700914d-r1/nonlive.xml",
+  "evidence_directory": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-700914d-r1",
+  "evidence_sha256": {
+    "nonlive.log": "0582a4c5fa2d419c5efb8f6b6c417ff0078d62e28a4c6b5ba70ff41a743861c0",
+    "nonlive.xml": "5a4e7bc6e0608270b9c7008fdf8ebdf1fe6d76f103c0cab2e84f906a2781fa34",
+    "exit-code.txt": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "terminal-audit.json": "25f01381c57660084c196f4483dcf74d3b8e5718b39d4e42f8dcd6f9d1b2efaa"
+  },
+  "failure_groups": [
+    {
+      "failed": 10,
+      "errors": 6,
+      "reason": "Public integration component-02 invalid, caused by 2022.1 manifest full tree hash drift."
+    },
+    {
+      "failed": 1,
+      "errors": 0,
+      "reason": "V2 preflight: 2022.1 manifest full tree hash drift."
+    },
+    {
+      "failed": 3,
+      "errors": 0,
+      "reason": "Music fixture donor differs from pinned WAV hash; the injected-failure test stops before injection."
+    },
+    {
+      "failed": 3,
+      "errors": 0,
+      "reason": "Campaign parser SystemExit 2: missing tests/fixtures/local/live-environment.json."
+    },
+    {
+      "failed": 3,
+      "errors": 0,
+      "reason": "Org fixture manifest expected 12404 bytes, got 130-byte Git LFS pointer."
+    }
+  ],
+  "failure_cases": [
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_matrix_loader_accepts_public_and_legacy_case_aliases",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_public_and_legacy_case_spellings_seal_the_same_public_selection",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_child_argv_uses_public_profile_and_public_unit_ids",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_effective_config_fingerprints_both_components_and_replay_detects_drift",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_loader_composes_twelve_public_units_in_version_major_order",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_public_units_retain_component_runtime_and_closed_legacy_ids",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_weather_prompt_distinguishes_the_boolean_instance_limit_from_its_value",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT22-WEATHER-INT22-WEATHER]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT22-INTERACTIVE-WEATHER-BUILD-INT22-WEATHER]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT25-RIFLE-INT25-RIFLE]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT25-V2-RIFLE-SAFE-REIMPORT-INT25-RIFLE]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_filters_keep_public_version_major_order",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_public_integration_units_delegate_first_use_intro",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_component_source_digests_are_namespaced_and_include_baselines",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_component_bytes_participate_in_the_unified_definition_digest",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_rejects_unknown_and_duplicate_aliases",
+      "kind": "failure",
+      "message": "AssertionError: Regex pattern did not match.\n Regex: 'unknown integration'\n Input: 'integration component-02 is invalid'"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows_v2::test_real_execution_preflight_loads_sealed_committed_baselines",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows_v2.IntegrationWorkflowV2Error: 2022.1 manifest full tree hash drifted"
+    },
+    {
+      "case": "tests.semantic.test_codex_music_switch_reference_goal::test_missing_legacy_music_is_seeded_before_actual_hash_preservation",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_expansion_case_helpers.CaseBoundaryError: fixture donor differs from its pinned WAV hash"
+    },
+    {
+      "case": "tests.semantic.test_codex_music_switch_reference_goal::test_media_preparation_preserves_existing_input_without_overwrite",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_expansion_case_helpers.CaseBoundaryError: fixture donor differs from its pinned WAV hash"
+    },
+    {
+      "case": "tests.semantic.test_codex_music_switch_reference_goal::test_partial_fixture_copy_evidence_survives_later_failure",
+      "kind": "failure",
+      "message": "AssertionError: Regex pattern did not match.\n Regex: 'injected'\n Input: 'fixture donor differs from its pinned WAV hash'"
+    },
+    {
+      "case": "tests.semantic.test_codex_typed_input_profile_cli_wiring::test_campaign_uses_same_profile_and_disables_same_root_retry",
+      "kind": "failure",
+      "message": "SystemExit: 2"
+    },
+    {
+      "case": "tests.semantic.test_run_codex_skill_campaign::test_typed_input_profile_uses_a_bounded_long_form_turn_budget",
+      "kind": "failure",
+      "message": "SystemExit: 2"
+    },
+    {
+      "case": "tests.semantic.test_run_codex_skill_campaign::test_campaign_readiness_timeout_is_explicit_positive_and_finite",
+      "kind": "failure",
+      "message": "SystemExit: 2"
+    },
+    {
+      "case": "tests.unit.test_2025_1_fixture_inventory::test_2025_1_org_fixture_metadata_and_hash_manifest",
+      "kind": "failure",
+      "message": "AssertionError: assert 12404 == 130\n +  where 130 = len(b'version https://git-lfs.github.com/spec/v1\\noid sha256:b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97\\nsize 12404\\n')"
+    },
+    {
+      "case": "tests.unit.test_2025_1_fixture_inventory::test_2025_1_fixture_manifest_hashes_match_committed_files",
+      "kind": "failure",
+      "message": "AssertionError: assert 12404 == 130\n +  where 130 = len(b'version https://git-lfs.github.com/spec/v1\\noid sha256:b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97\\nsize 12404\\n')"
+    },
+    {
+      "case": "tests.unit.test_org_fixture_source::test_org_fixture_manifest_hashes_match_committed_files",
+      "kind": "failure",
+      "message": "AssertionError: assert 12404 == 130\n +  where 130 = len(b'version https://git-lfs.github.com/spec/v1\\noid sha256:b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97\\nsize 12404\\n')"
+    }
+  ],
+  "terminal_bounds": {
+    "tracked_clean": true,
+    "source_guards": {
+      "2022.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+          "file_count": 84,
+          "bytes_hashed": 3788783
+        },
+        "mtime_ns": 1790531309484673590,
+        "matches_prior": true
+      },
+      "2025.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "mtime_ns": 1790531309503233691,
+        "matches_prior": true
+      }
+    },
+    "scoped_processes": [],
+    "inputs": {
+      "skills/waapi-skill": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+      "tests/semantic": "50c4f620f36aaccacfd70df1b735f085e075bac9f38bb0a8e45b6f86cfec09c8",
+      "tests/destructive/support": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+    },
+    "fresh_launched": false,
+    "fresh_root_absent": true,
+    "retry_or_regrade": false
+  },
+  "focused_component": {
+    "passed": 2657,
+    "seconds": 4.7,
+    "old_controls": 2566,
+    "new_controls": 91,
+    "authority": "integration-expansion-coordinated-attestation-repair-2026-10-07.json review_delta; not rerun here"
+  },
+  "program_component": "No new Program run. Existing Program component attribution remains unchanged; this semantic-only patch and validation report add no Program credit.",
+  "prior_frozen_fresh": {
+    "candidate": "0c2e75e0283b2c4dce1516149ee9bc0b944ed402",
+    "root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-0c2e75e-sol-high-r2-clean-cli1592",
+    "status": "FROZEN_SINGLE_NOTICE_FAIL; NOT_ACCEPTED",
+    "failed_gate": "visible_preview_notice",
+    "business_assertions_passed": 6,
+    "business_assertions_required": 6,
+    "gateway_verified": true,
+    "usage": {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 402432,
+      "input_tokens": 441330,
+      "output_tokens": 2053,
+      "reasoning_output_tokens": 304,
+      "uncached_input_tokens": 38898,
+      "agent_seconds": 96.78919045906514,
+      "reasoning_included_in_output": true,
+      "usd": null
+    },
+    "resume_verify_regrade": false
+  },
+  "priority_capability": {
+    "supported": false,
+    "parser": "tests/semantic/run_codex_skill_campaign.py:15740",
+    "loader": "tests/semantic/support/codex_expansion_profile.py:78",
+    "reason": "No priority/order CLI option; expansion loader builds version-major CASE_IDS order before filtering. case-id argv order cannot put C09 first. Changing selection on resume changes immutable options and cannot grow a targeted root into full acceptance."
+  },
+  "coordination": {
+    "new_subagents": "Every spawn_agent must explicitly set fork_turns=\"none\"; supply only necessary objective, constraints, acceptance, path pointers and essential unrecorded decisions; propagate recursively.",
+    "goal_metadata": "No goal metadata edit performed or claimed.",
+    "board": "137/138/139/140/142/143 closed with existing component proof;156 closed with explicit unsupported tool-inventory telemetry boundary;147/122/108 remain open, per coordinator."
+  },
+  "limits": [
+    "No fixture hydration, config edit, retry or code diagnosis performed.",
+    "No Fresh/verify-only/full acceptance launched at 700914d.",
+    "Existing FAIL roots remain frozen without replay or regrading.",
+    "No native Windows evidence, model usage or USD added by the non-live run."
+  ]
+}
