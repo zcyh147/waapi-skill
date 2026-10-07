@@ -1,6 +1,6 @@
 # Finite target and operation-noun repair — 2026-10-07
 
-The focused retained selection passed **2838 tests, no failures or skips, in
+The pre-review focused retained selection passed **2838 tests, no failures or skips, in
 4.94 seconds**. It preserves all 2770 prior assertions and adds 68 meaningful
 public-seam controls. Independent review and coordinator-owned gates remain
 pending. This is component evidence, not new Agent acceptance or issue closure.
@@ -57,3 +57,39 @@ actual durable policy authority, phase receipts, independent business oracles
 and verifier strength remain separate evidence. The packaged Skill, runtime,
 prompts, suite and historical campaigns are unchanged. Independent Standards/Spec
 reviews and subsequent coordinator-owned proof remain required.
+
+
+## Independent review delta
+
+The consolidated Standards/Spec P2 is repaired at the existing public notice
+seam. The added 31 controls first produced **18 failures / 13 passes** on
+`1a58b53`, then **31 passes** after the classifier change. The retained focused
+selection passed **2869 tests, no failures or skips, in 5.21 seconds** through
+the same supplied developer interpreter and `ci/test.sh --mode nonlive`.
+All prior 2770 + 68 assertions remain unchanged; the frozen 44-vector matrix,
+independent fixture and exact e93a575 fixture retain their original bytes.
+
+A complete existing denied/uncertain attestation now recognizes the supplied
+owner frame independently of singleton validity. Existing role nouns,
+identity/configuration attributes and finite lexical identities retain
+compound/foreign operands as contradictions instead of neutral fallthrough.
+The original clause span remains available. Positive target attributes and
+typed Stinger source attributes still pass alongside the separately validated
+reference destination. Unrelated reads such as `未核对文档` and
+`未确认下一步时间` retain unknown/reset behavior beside a correct explicit owner.
+No predicate, bare `另外` syntax or source/destination identity shortcut was added.
+
+Baseline attribution is limited: the Standards bare `向目标` witness returned
+False on `99adb52` and True on `1a58b53`. Its typed `向目标声音` variant already
+passed on the base; that bypass is preexisting, not a newly introduced defect.
+The exact raw C09 notice with an appended reverse denied compound or forward
+uncertain compound now rejects. These contrasts use independent review probes
+and copied program fixtures; no historical root was replayed or regraded.
+
+The integration-tip merge was already up to date before the final focused run.
+The JSON `review_delta` records actual RED/GREEN argv, logs, JUnit, exit-code,
+review snapshot and preflight paths with SHA-256 hashes under
+`expansion-target-plan-review-20261007`. The historical frozen notice FAIL and
+business 6/6 PASS remain unchanged. No full Program, full Non-live, Fresh,
+live-Wwise, Windows, campaign verifier, replay, resume or regrade ran.
+Independent Standards/Spec re-review and coordinator-owned proof remain pending.

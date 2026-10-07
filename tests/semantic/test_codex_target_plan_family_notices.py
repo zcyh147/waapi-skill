@@ -111,3 +111,68 @@ def test_ordered_point_summary_cannot_supply_or_broaden_the_curve_assignment(dam
         text += "同时修改备注为 changed。"
     case["events"][1]["item"]["text"] = text
     assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("attestation,notice", [
+    ("目标和 OtherSound 尚未核实", "bare-owner"),
+    ("目标和 OtherSound 尚未核实", "typed-owner"),
+    ("目标对象和 OtherSound身份尚未核对", "exact"),
+    ("可能已核对目标声音和 OtherSound 身份", "exact"),
+    ("目标对象和 OtherSound身份已核对", "exact"),
+])
+def test_review_compound_target_attestation_cannot_disappear_beside_correct_append(attestation, notice):
+    case = json.loads(_EXACT.read_text())
+    if notice == "exact":
+        case["events"][1]["item"]["text"] += attestation + "。"
+    else:
+        owner = "目标" if notice == "bare-owner" else "目标声音"
+        case["events"][1]["item"]["text"] = (attestation + "。即将向" + owner
+            + "追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。")
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("attestation", [
+    "未核对目标和 OtherSound", "目标和 OtherSound 未核对",
+    "还未核实该对象和 OtherSound 的配置", "该对象和 OtherSound 的配置还未核实",
+    "没有确认 OtherSound", "OtherSound 没有确认",
+    "不能核实 OtherSound身份", "OtherSound身份不能核实",
+    "可能已核对目标声音和 OtherSound 身份", "目标声音和 OtherSound 身份可能已核对",
+    "也许已确认该对象和 OtherSound 配置", "该对象和 OtherSound 配置也许已确认",
+    "或许已核实 OtherSound", "OtherSound 或许已核实",
+    "不确定是否已核对 OtherSound身份", "OtherSound身份不确定是否已核对",
+])
+def test_finite_nonaffirmative_supplied_owner_frames_fail_closed(attestation):
+    case = json.loads(_EXACT.read_text())
+    case["events"][1]["item"]["text"] += attestation + "。"
+    assert not _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("attestation", [
+    "已核对目标", "目标已核实", "已确认目标声音身份", "目标声音身份已确认",
+    "已核实该对象的配置", "该对象的配置已核实",
+])
+def test_affirmative_same_family_target_attributes_preserve_correct_append(attestation):
+    case = json.loads(_EXACT.read_text())
+    case["events"][1]["item"]["text"] += attestation + "。"
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("attestation", [
+    "已核对该 Stinger 身份", "该 Stinger 配置已核实",
+])
+def test_affirmative_typed_source_attributes_preserve_separate_reference_destination(attestation):
+    case = copy.deepcopy(_CONTEXT["cross_kind_fixtures"]["014-EXP25-M05"])
+    preview = next(i for i, event in enumerate(case["events"])
+        if event["item"].get("command") == "preview-from-draft")
+    post = next(event["item"] for event in case["events"][preview + 1:]
+        if event["item"]["type"] == "agent_message")
+    post["text"] += attestation + "。"
+    assert _grammatical_notice(case)
+
+
+@pytest.mark.parametrize("ancillary", ["未确认下一步时间", "未核对文档"])
+def test_unrelated_nonaffirmative_reads_preserve_correct_explicit_owner(ancillary):
+    case = json.loads(_EXACT.read_text())
+    case["events"][1]["item"]["text"] = (ancillary + "。即将向目标声音追加 Wwise Gain 效果器 "
+        "Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。")
+    assert _grammatical_notice(case)
