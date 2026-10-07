@@ -177,7 +177,8 @@ def test_live_command_main_runs_exact_argv_without_a_shell(
     console = tmp_path / "WwiseConsole"
     console.write_text("console\n", encoding="utf-8")
     console.chmod(0o755)
-    project = tmp_path / "SampleProject.wproj"
+    project = tmp_path / "source" / "SampleProject.wproj"
+    project.parent.mkdir()
     project.write_text("<Project />\n", encoding="utf-8")
     sandbox = tmp_path / "sandbox"
     interpreter = str(tmp_path / "venv" / "python")
@@ -571,7 +572,8 @@ def test_ci_test_all_runs_nonlive_before_matrix(tmp_path: Path) -> None:
     if os.name != "nt":
         console_path.chmod(0o755)
 
-    project_path = tmp_path / "SampleProject.wproj"
+    project_path = tmp_path / "source" / "SampleProject.wproj"
+    project_path.parent.mkdir()
     project_path.write_text("<Project />\n")
 
     env = os.environ.copy()
@@ -608,7 +610,8 @@ def test_ci_test_all_stops_when_nonlive_fails(tmp_path: Path) -> None:
     if os.name != "nt":
         console_path.chmod(0o755)
 
-    project_path = tmp_path / "SampleProject.wproj"
+    project_path = tmp_path / "source" / "SampleProject.wproj"
+    project_path.parent.mkdir()
     project_path.write_text("<Project />\n")
 
     env = os.environ.copy()
@@ -645,7 +648,7 @@ def test_ci_test_sh_reads_versioned_live_environment_config(tmp_path: Path) -> N
     console_path.chmod(0o755)
     project_path = tmp_path / "configured" / "SampleProject.wproj"
     project_path.write_text("<Project />\n", encoding="utf-8")
-    sandbox_root = tmp_path / "configured" / "sandbox"
+    sandbox_root = tmp_path / "sandbox"
     config_path = tmp_path / "live-environment.json"
     config_path.write_text(
         json.dumps(
@@ -703,7 +706,7 @@ def test_ci_test_sh_env_overrides_versioned_live_environment_config(tmp_path: Pa
     configured_console.chmod(0o755)
     configured_project = configured_root / "SampleProject.wproj"
     configured_project.write_text("<Project />\n", encoding="utf-8")
-    configured_sandbox = configured_root / "sandbox"
+    configured_sandbox = tmp_path / "configured-sandbox"
 
     override_root = tmp_path / "override"
     override_console = override_root / "WwiseConsole.sh"
@@ -712,7 +715,7 @@ def test_ci_test_sh_env_overrides_versioned_live_environment_config(tmp_path: Pa
     override_console.chmod(0o755)
     override_project = override_root / "SampleProject.wproj"
     override_project.write_text("<Project />\n", encoding="utf-8")
-    override_sandbox = override_root / "sandbox"
+    override_sandbox = tmp_path / "override-sandbox"
 
     config_path = tmp_path / "live-environment.json"
     config_path.write_text(

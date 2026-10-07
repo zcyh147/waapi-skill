@@ -661,7 +661,7 @@ def test_ci_test_bat_reads_versioned_live_environment_config(tmp_path: Path) -> 
     console_path.write_text("console\n", encoding="utf-8")
     project_path = configured_root / "SampleProject.wproj"
     project_path.write_text("<Project />\n", encoding="utf-8")
-    sandbox_root = configured_root / "sandbox"
+    sandbox_root = tmp_path / "configured-sandbox"
     config_path = tmp_path / "配置 !percent% & equals= environment.json"
     config_path.write_text(
         json.dumps(

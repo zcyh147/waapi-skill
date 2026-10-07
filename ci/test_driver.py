@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 import tomllib
 from importlib import metadata
 from collections.abc import Mapping, Sequence
@@ -17,9 +18,11 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 if __package__:
+    from .test_readiness import report_readiness
     from .resolve_live_test_config import LiveTestConfigError
     from .run_live_test_command import main as run_live_test_command
 else:  # Executed directly by ci/test.sh or ci/test.bat.
+    from test_readiness import report_readiness
     from resolve_live_test_config import LiveTestConfigError
     from run_live_test_command import main as run_live_test_command
 
@@ -548,9 +551,11 @@ def main(
     if request is None:
         print(usage(windows=windows), end="")
         return 0
+    started = time.perf_counter()
     try:
         validate_test_environment(repo_root=repo_root)
     except TestEnvironmentError as exc:
+        report_readiness(started, reason=str(exc), blocked=True)
         print(f"TEST_ENVIRONMENT_BLOCKED: {exc}", file=sys.stderr)
         print(
             "Select a complete interpreter with WAAPI_TEST_PYTHON or provision "
@@ -558,6 +563,7 @@ def main(
             file=sys.stderr,
         )
         return 4
+    report_readiness(started, reason="locked developer interpreter ready")
     try:
         return TestDriver(
             repo_root=repo_root,

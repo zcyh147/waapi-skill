@@ -7,6 +7,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Callable
@@ -14,8 +15,10 @@ from typing import Any, Callable
 from wwise_waapi.versions import WWISE_VERSION_CONTRACTS
 
 if __package__:
+    from .test_readiness import ReadinessBlocked, report_readiness, validate_live_readiness
     from .resolve_live_test_config import LiveTestConfigError, load_version_config
 else:  # Executed directly by ci/test.bat.
+    from test_readiness import ReadinessBlocked, report_readiness, validate_live_readiness
     from resolve_live_test_config import LiveTestConfigError, load_version_config
 
 
@@ -358,7 +361,9 @@ def main(
     command_runner: Callable[..., subprocess.CompletedProcess[Any]] | None = None,
     python_executable: str | None = None,
     environment: Mapping[str, str] | None = None,
+    process_snapshot: Callable[[], str] | None = None,
 ) -> int:
+    started = time.perf_counter()
     args = _build_parser().parse_args(argv)
     command = list(args.command)
     if command and command[0] == "--":
@@ -384,14 +389,18 @@ def main(
             default_sandbox=args.default_sandbox,
         )
     except (LiveTestConfigError, OSError) as exc:
+        report_readiness(started, reason=str(exc), blocked=True)
         print(f"live-test config error: {exc}", file=sys.stderr)
         return 2
     try:
         validate_live_test_environment(environment, mode=args.mode)
-    except (LiveTestConfigError, OSError) as exc:
-        print(f"live-test prerequisite error: {exc}", file=sys.stderr)
+        validate_live_readiness(environment, process_snapshot=process_snapshot)
+    except (LiveTestConfigError, ReadinessBlocked, OSError) as exc:
+        report_readiness(started, reason=str(exc), blocked=True)
+        print(f"TEST_READINESS_BLOCKED: live-test prerequisite error: {exc}", file=sys.stderr)
         return 1
 
+    report_readiness(started)
     _print_context(environment, version=args.version, mode=args.mode)
     runner = subprocess.run if command_runner is None else command_runner
     options: dict[str, Any] = {

@@ -35,8 +35,11 @@ _C1 = next(session for session in _SCREENING if session.case.id == "C1")
 def test_typed_input_profile_uses_a_bounded_long_form_turn_budget(
     tmp_path: Path,
 ) -> None:
+    local_config = tmp_path / "live-config.json"
+    local_config.write_text("{}")
     options = campaign.parse_args(
         [
+            "--live-config", str(local_config),
             "--campaign-root",
             str(tmp_path / "typed-input"),
             "--profile",
@@ -52,8 +55,11 @@ def test_typed_input_profile_uses_a_bounded_long_form_turn_budget(
 def test_campaign_readiness_timeout_is_explicit_positive_and_finite(
     tmp_path: Path,
 ) -> None:
+    local_config = tmp_path / "live-config.json"
+    local_config.write_text("{}")
     explicit = campaign.parse_args(
         [
+            "--live-config", str(local_config),
             "--campaign-root",
             str(tmp_path / "campaign"),
             "--wwise-readiness-timeout",
@@ -796,3 +802,42 @@ def test_resume_with_unsealed_attempt_exits_blocked(
 
     assert campaign.main([]) == campaign.EXIT_BLOCKED
     assert len(child_calls) == 1
+
+
+def test_campaign_blocks_missing_selected_live_fixture_before_child(monkeypatch, tmp_path):
+    import json
+    live = next(session for session in _SCREENING if session.case.id == 'Q2' and session.version == '2022.1')
+    options = _options(tmp_path, pair_ids=(live.pair_id,))
+    options.live_config.write_text(json.dumps({'versions': {'2022.1': {
+        'wwise_console': str(tmp_path / 'missing-console'),
+        'sample_project': str(tmp_path / 'source' / 'missing.wproj'),
+    }}}))
+    calls = _install_synthetic_execution(monkeypatch, options=options)
+    monkeypatch.setattr(campaign, 'assert_effective_inputs_frozen', lambda *args, **kwargs: None)
+    with pytest.raises(CampaignEvidenceError, match='readiness'):
+        campaign.run_campaign(options)
+    assert calls == []
+    assert not options.campaign_root.exists()
+
+
+def test_campaign_ready_selected_live_fixture_dispatches_existing_child(monkeypatch, tmp_path):
+    import json
+    from ci import test_readiness
+    live = next(session for session in _SCREENING if session.case.id == 'Q2' and session.version == '2022.1')
+    options = _options(tmp_path, pair_ids=(live.pair_id,))
+    project = tmp_path / 'source' / 'SampleProject.wproj'
+    project.parent.mkdir()
+    project.write_text('<WwiseDocument WwiseVersion="2022.1.19" />')
+    console = tmp_path / 'WwiseConsole'
+    console.write_text('fake console')
+    console.chmod(0o755)
+    options.live_config.write_text(json.dumps({'versions': {'2022.1': {
+        'wwise_console': str(console), 'sample_project': str(project),
+    }}}))
+    calls = _install_synthetic_execution(monkeypatch, options=options)
+    monkeypatch.setattr(test_readiness, 'scoped_process_snapshot', lambda: '')
+    monkeypatch.setattr(campaign, 'assert_effective_inputs_frozen', lambda *args, **kwargs: None)
+    assert campaign.run_campaign(options) == campaign.EXIT_PASS
+    assert len(calls) == 1
+    assert '--version' in calls[0]
+    assert '2022.1' in calls[0]

@@ -832,6 +832,36 @@ def require_skill_local_campaign_interpreter(
     return expected_lexical
 
 
+def require_campaign_readiness(options: CampaignOptions, *, versions: Sequence[str]) -> None:
+    """Observe selected live inputs before starting any matrix/Codex/Wwise child."""
+    if options.verify_only:
+        return  # Archive validation does not gain current live prerequisites.
+    from ci.test_readiness import report_readiness, validate_live_readiness
+    from ci.run_live_test_command import validate_live_test_environment
+    from tests.destructive.support.live_environment import require_live_environment
+    started = time.perf_counter()
+    try:
+        if versions:
+            matrix.require_live_runner_dependencies()
+        for version in dict.fromkeys(versions):
+            environment = {
+                "WWISE_LIVE": "1", "WWISE_DESTRUCTIVE": "1", "WWISE_VERSION": version,
+                "WWISE_TEST_CONFIG": str(options.live_config),
+                "WWISE_SANDBOX_ROOT": str(options.campaign_root),
+            }
+            contract = require_live_environment(environment)
+            environment.update({
+                "WWISE_CONSOLE": str(contract.console_path),
+                "WWISE_SAMPLE_PROJECT_PATH": str(contract.sample_project_source),
+            })
+            validate_live_test_environment(environment, mode="live")
+            validate_live_readiness(environment)
+    except (ValueError, RuntimeError, OSError) as exc:
+        report_readiness(started, reason=str(exc), blocked=True)
+        raise CampaignEvidenceError(f"campaign readiness blocked: {exc}") from exc
+    report_readiness(started, reason="selected campaign prerequisites ready")
+
+
 def run_campaign(options: CampaignOptions) -> int:
     if options.profile in EXECUTABLE_V3_PROFILE_IDS:
         return run_heavy_v3_campaign(options)
@@ -868,6 +898,10 @@ def run_campaign(options: CampaignOptions) -> int:
     except (CampaignEvidenceError, OSError, subprocess.SubprocessError) as exc:
         raise CampaignConfigError(f"cannot fingerprint campaign inputs: {exc}") from exc
     sealed_windows_host = _sealed_windows_powershell_core_host(effective)
+    require_campaign_readiness(options, versions=tuple(
+        session.version for session in sessions
+        if session.case.id not in matrix.OFFLINE_CASE_IDS
+    ))
 
     root = prepare_campaign_root(options)
     with CampaignLock(root, timeout_seconds=options.lock_timeout_seconds):
@@ -1131,6 +1165,11 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         protocol_manifest_revision=_sealed_protocol_manifest_revision(effective),
         campaign_inputs_sha256=hashlib.sha256(canonical_json_bytes(effective)).hexdigest(),
     )
+
+    require_campaign_readiness(options, versions=(
+        () if options.profile in OFFLINE_BUSINESS_AGENT_PROFILE_IDS
+        else tuple(unit.version for unit in units)
+    ))
 
     root = prepare_campaign_root(options)
     with CampaignLock(root, timeout_seconds=options.lock_timeout_seconds):
