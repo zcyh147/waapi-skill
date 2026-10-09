@@ -3100,6 +3100,8 @@ def _build_exec_prefix(
                 "-c",
                 "allow_login_shell=false",
                 "-c",
+                "features.unified_exec=false",
+                "-c",
                 f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"',
             )
         )

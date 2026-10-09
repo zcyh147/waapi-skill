@@ -2513,6 +2513,7 @@ def test_native_windows_exec_and_task_commands_pin_unelevated_sandbox(
     for command in commands:
         assert command.count('windows.sandbox="unelevated"') == 1
         assert command.count("allow_login_shell=false") == 1
+        assert command.count("features.unified_exec=false") == 1
         assert 'approval_policy="never"' in command
         assert "--ignore-user-config" in command
         assert command[command.index("--sandbox") + 1] == "workspace-write"
@@ -2548,6 +2549,7 @@ def test_non_windows_exec_and_task_commands_do_not_set_windows_sandbox(
     for command in commands:
         assert not any(value.startswith("windows.sandbox=") for value in command)
         assert "allow_login_shell=false" not in command
+        assert "features.unified_exec=false" not in command
 
 
 def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolation_flags(
