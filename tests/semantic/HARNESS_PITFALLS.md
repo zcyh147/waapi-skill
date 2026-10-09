@@ -1331,6 +1331,34 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   source equality as the Skill-read credit gate; accepting mojibake or merely
   setting `$OutputEncoding` does not repair this transport boundary.
 
+### A new child console can undo the parent UTF-8 preflight
+
+- Evidence: native Windows expansion root `iwin-expansion-1ff5427-sol-high-r1`
+  stopped before C01 execution. Its Skill and operate outputs contained 39 and
+  13 replacement characters; each output exactly matched the original text
+  encoded as CP936 and then decoded as UTF-8. The source files were intact.
+- Reproduction: the same PowerShell read inherited CP65001 successfully, while
+  `CREATE_NEW_CONSOLE` selected CP936 and reproduced the exact 39 replacements.
+  Parent code-page attestation therefore does not establish child encoding.
+- Repair: formal Windows read schedules prepend the fixed
+  `WINDOWS_UTF8_READ_PREFIX` in `codex_harness.py` to each complete file read.
+  The parser admits that exact assignment only before one literal
+  `Get-Content -Raw -Encoding UTF8` call through the attested PowerShell host.
+  Complete-content checks remain mandatory; arbitrary assignments, chaining,
+  redirection and prefixed Gateway continuations remain rejected. The bounded
+  developer-instruction ceiling is 2304 bytes to hold the fixed read prologues.
+- Regression: `test_native_windows_skill_read_survives_child_cp936` forces
+  CP936 inside a fresh child, proves the unprefixed read corrupts Unicode, and
+  proves the scheduled command returns the exact text. It runs even when the
+  system-wide UTF-8 option is enabled. Native focused checks passed 84 tests;
+  macOS harness, expansion runner and archive checks passed 2644, skipped 10.
+- Attribution limit: an interim non-PTY C1 experiment passed one offline Fresh
+  unit, but the user enabled system UTF-8 during investigation. It does not
+  isolate the backend's effect or validate the final repair. The final repair
+  retains the original CLI backend settings and relies on the forced-CP936
+  child regression. The two earlier offline campaign admission attempts never
+  started an Agent; all diagnostic roots remain separate from business credit.
+
 ### Optional discovery and Composer setup may still complete out of recipe order
 
 - Evidence: #60 macOS r23 metadata completed its selected optional lane, but

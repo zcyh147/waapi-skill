@@ -2513,7 +2513,6 @@ def test_native_windows_exec_and_task_commands_pin_unelevated_sandbox(
     for command in commands:
         assert command.count('windows.sandbox="unelevated"') == 1
         assert command.count("allow_login_shell=false") == 1
-        assert command.count("features.unified_exec=false") == 1
         assert 'approval_policy="never"' in command
         assert "--ignore-user-config" in command
         assert command[command.index("--sandbox") + 1] == "workspace-write"
@@ -2549,7 +2548,6 @@ def test_non_windows_exec_and_task_commands_do_not_set_windows_sandbox(
     for command in commands:
         assert not any(value.startswith("windows.sandbox=") for value in command)
         assert "allow_login_shell=false" not in command
-        assert "features.unified_exec=false" not in command
 
 
 def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolation_flags(
@@ -2720,7 +2718,7 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
     ) in instructions
     assert "No next_command: only" in instructions
     assert "append disclosed argv verbatim" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None:
@@ -2749,7 +2747,7 @@ def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None
     assert "Reads: 1" in instructions
     assert "2 none" in instructions
     assert "Exact turn; no early/late/extra reads" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> None:
@@ -2780,7 +2778,8 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
         r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
     ) in instructions
     assert "Exact turn; no early/late/extra reads" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert instructions.count(codex_harness_module.WINDOWS_UTF8_READ_PREFIX) == 2
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> None:
@@ -2807,10 +2806,10 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     )
 
     assert "Reads: 1" in instructions
-    assert "2 [Get-Content" in instructions
+    assert "2 [" + codex_harness_module.WINDOWS_UTF8_READ_PREFIX + "Get-Content" in instructions
     assert "3 none" in instructions
     assert "not Real64/int16" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 @pytest.mark.parametrize("runner,source", [
@@ -2828,7 +2827,7 @@ def test_expansion_allow_instruction_follows_durable_authorization_without_extra
     assert "requires_later_user_message" in instructions
     assert "never reconstruct" in instructions
     assert "Exact turn; no early/late/extra reads" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 @pytest.mark.parametrize("policy,required,forbidden", [
@@ -2847,7 +2846,7 @@ def test_expansion_instructions_keep_other_policy_boundaries(policy, required, f
     )
     assert required in instructions
     assert forbidden not in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 @pytest.mark.parametrize("policy", ["allow", "", "ALLOW_CHANGES"])
@@ -7736,3 +7735,71 @@ def test_workspace_snapshot_detects_content_change_after_mtime_restore(tmp_path:
 
     assert target.stat().st_mtime_ns == metadata.st_mtime_ns
     assert workspace_changes(before, after) == ((), ("existing.txt",))
+
+
+def test_windows_utf8_read_prefix_preserves_exact_read_proof(tmp_path, monkeypatch):
+    monkeypatch.setattr(codex_harness_module, "split_native_command_line", portable_windows_outer_split)
+    skill = tmp_path / "agent-workspace/.agents/skills/waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# Skill\nWwise 适配版本、声音\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    body = r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    command = windows_powershell_recording(codex_harness_module.WINDOWS_UTF8_READ_PREFIX + body)
+    for output, accepted in ((content, True), (content.encode("gbk").decode("utf-8", errors="replace"), False)):
+        record = completed_windows_record(command, output)
+        facts = classify_commands((record,), skill_source=skill)
+        assert facts.skill_read is accepted
+        assert facts.allowed_read_commands == ((command,) if accepted else ())
+
+
+@pytest.mark.parametrize("script", (
+    "[Console]::OutputEncoding=[Text.Encoding]::Unicode; Get-Content -Raw -Encoding UTF8 'SKILL.md'",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; python run.py gateway.py execute tx",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'SKILL.md'; whoami",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 $(whoami)",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'SKILL.md' > stolen.txt",
+))
+def test_windows_utf8_read_prefix_cannot_authorize_other_scripts(script):
+    argv, operators, error = parse_command_argv(
+        windows_powershell_recording(script), platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+    assert argv == () and operators and error
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows console encoding")
+def test_native_windows_skill_read_survives_child_cp936(tmp_path):
+    from tests.semantic.test_codex_gateway_broker import native_pwsh_73_or_skip
+    pwsh = native_pwsh_73_or_skip()
+    skill = tmp_path / ".agents/skills/waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# Skill\nWwise 适配版本、声音\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    body = r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    fixed = codex_harness_module.WINDOWS_UTF8_READ_PREFIX + body
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        TASK_LOCAL_RUNNER_WINDOWS, task_skill_source=str(skill),
+        expected_skill_reads=(("SKILL.md",),),
+    )
+    assert fixed in instructions
+    outputs = []
+    for command in (body, fixed):
+        result = subprocess.run(
+            [pwsh, "-NoProfile", "-Command",
+             "[Console]::OutputEncoding=[Text.Encoding]::GetEncoding(936); " + command],
+            cwd=tmp_path, capture_output=True, timeout=15, check=False,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+        assert result.returncode == 0, result.stderr
+        outputs.append(result.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n").rstrip())
+    assert outputs[0] == content.rstrip().encode("gbk").decode("utf-8", errors="replace")
+    assert outputs[0] != content.rstrip()
+    assert outputs[1] == content.rstrip()
+
+
+def test_semantic_developer_instructions_remain_bounded(tmp_path):
+    with pytest.raises(ValueError, match="at most"):
+        CodexHarnessConfig(
+            workspace=tmp_path, skill_source=tmp_path / "skill", codex_binary=tmp_path / "codex",
+            developer_instructions="x" * (codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES + 1),
+        )

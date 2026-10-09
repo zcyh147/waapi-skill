@@ -46,7 +46,9 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+SEMANTIC_DEVELOPER_MAX_BYTES = 2304
 WINDOWS_UTF8_CODE_PAGE = 65001
+WINDOWS_UTF8_READ_PREFIX = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone; no pre-read reply/questions. "
     "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
@@ -171,7 +173,7 @@ def semantic_task_developer_instructions(
             if is_windows:
                 relative_windows = relative.replace("/", "\\")
                 commands.append(
-                    "Get-Content -Raw -Encoding UTF8 "
+                    WINDOWS_UTF8_READ_PREFIX + "Get-Content -Raw -Encoding UTF8 "
                     f"'.agents\\skills\\waapi-skill\\{relative_windows}'"
                 )
             else:
@@ -212,9 +214,9 @@ def semantic_task_developer_instructions(
         + "; ".join(turn_rows)
         + ". Exact turn; no early/late/extra reads."
     )
-    if len(instructions.encode("utf-8")) > 2048:
+    if len(instructions.encode("utf-8")) > SEMANTIC_DEVELOPER_MAX_BYTES:
         raise CodexHarnessError(
-            "semantic task developer instructions exceed the 2048-byte limit"
+            f"semantic task developer instructions exceed the {SEMANTIC_DEVELOPER_MAX_BYTES}-byte limit"
         )
     return instructions
 
@@ -1836,11 +1838,11 @@ class CodexHarnessConfig:
         if self.developer_instructions and (
             self.developer_instructions != self.developer_instructions.strip()
             or "\x00" in self.developer_instructions
-            or len(self.developer_instructions.encode("utf-8")) > 2048
+            or len(self.developer_instructions.encode("utf-8")) > SEMANTIC_DEVELOPER_MAX_BYTES
         ):
             raise ValueError(
                 "CodexHarnessConfig.developer_instructions must be trimmed, NUL-free, "
-                "and at most 2048 UTF-8 bytes"
+                f"and at most {SEMANTIC_DEVELOPER_MAX_BYTES} UTF-8 bytes"
             )
         commands = tuple(expectation.command for expectation in self.expected_gateway_errors)
         if len(commands) != len(set(commands)):
@@ -3099,8 +3101,6 @@ def _build_exec_prefix(
             (
                 "-c",
                 "allow_login_shell=false",
-                "-c",
-                "features.unified_exec=false",
                 "-c",
                 f'windows.sandbox="{WINDOWS_SEMANTIC_SANDBOX_MODE}"',
             )
@@ -4514,6 +4514,16 @@ def _parse_windows_powershell_core_command_wrapper(
     if executable != expected_executable:
         return (), True, "PowerShell Core wrapper executable is not the attested host"
     script = outer_argv[3]
+    if script.startswith(WINDOWS_UTF8_READ_PREFIX):
+        # Only this fixed encoding assignment followed by one closed UTF-8
+        # file read is admitted. It never applies to Gateway continuations.
+        try:
+            argv = _split_literal_powershell_argv(script[len(WINDOWS_UTF8_READ_PREFIX):])
+        except ValueError as exc:
+            return (), True, str(exc)
+        if len(argv) != 5 or argv[:4] != ("Get-Content", "-Raw", "-Encoding", "UTF8"):
+            return (), True, "UTF-8 prefix requires one exact Skill file read"
+        return argv, False, ""
     if script.startswith("powershell.exe "):
         try:
             return decode_windows_powershell_argv(script), False, ""
