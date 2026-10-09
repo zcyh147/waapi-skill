@@ -2287,6 +2287,8 @@ class BoundedProcessResult(ProcessResult):
     stderr_base64: str | None = None
     output_decoding_error: str | None = None
     process_exit_status: int | None = None
+    stdin_sha256: str | None = None
+    stdin_bytes_count: int | None = None
 
     def __post_init__(self) -> None:
         # Text-only fake subprocess adapters have an unambiguous UTF-8 stream.
@@ -2399,27 +2401,44 @@ def run_process(
     env: Mapping[str, str],
     timeout: float,
     max_output_bytes: int | None = None,
+    input_bytes: bytes | None = None,
 ) -> ProcessResult:
     """Run a process in its own group so timeouts also stop internal agents."""
 
     if max_output_bytes is not None and (type(max_output_bytes) is not int or max_output_bytes <= 0):
         raise ValueError("max_output_bytes must be a positive integer")
+    if input_bytes is not None and (
+        not isinstance(input_bytes, bytes) or len(input_bytes) > 131072 or max_output_bytes is None
+    ):
+        raise ValueError("input_bytes requires bounded output and at most 131072 bytes")
     started = time.monotonic()
     process_group_options = subprocess_process_group_options()
-    process = subprocess.Popen(
-        [str(part) for part in command],
-        cwd=str(cwd),
-        env=dict(env),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=max_output_bytes is None,
-        encoding="utf-8" if max_output_bytes is None else None,
-        errors="strict" if max_output_bytes is None else None,
-        **process_group_options,
-    )
+    # A private, seekable input avoids blocking pipe writes before output draining.
+    # The child inherits the handle; closing our copy never truncates its input.
+    with ExitStack() as stack:
+        input_handle = subprocess.DEVNULL
+        if input_bytes is not None:
+            input_handle = stack.enter_context(tempfile.TemporaryFile())
+            input_handle.write(input_bytes)
+            input_handle.seek(0)
+        process = subprocess.Popen(
+            [str(part) for part in command],
+            cwd=str(cwd),
+            env=dict(env),
+            stdin=input_handle,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=max_output_bytes is None,
+            encoding="utf-8" if max_output_bytes is None else None,
+            errors="strict" if max_output_bytes is None else None,
+            **process_group_options,
+        )
     if max_output_bytes is not None:
-        return _bounded_process_output(process, started=started, timeout=timeout, maximum=max_output_bytes)
+        result = _bounded_process_output(process, started=started, timeout=timeout, maximum=max_output_bytes)
+        if input_bytes is not None:
+            result = replace(result, stdin_sha256=hashlib.sha256(input_bytes).hexdigest(),
+                stdin_bytes_count=len(input_bytes))
+        return result
     try:
         stdout, stderr = process.communicate(timeout=timeout)
         return ProcessResult(

@@ -145,12 +145,14 @@ def test_new_attenuation_runner_receipt_replays_without_model(tmp_path, monkeypa
             return BoundedProcessResult(0, '--output-schema --ephemeral --ignore-user-config --ignore-rules --sandbox', '', .01)
         if 'prompt-input' in command:
             return BoundedProcessResult(0, json.dumps([{'role': 'developer', 'content': review.reviewer_rubric(CONTRACT)}]), '', .01)
-        payload = json.loads(command[-1])
+        assert command[-1] == '-'
+        payload = json.loads(kwargs['input_bytes'].decode('utf-8'))
         assert payload['attested_roles']['gateway_verification'] == 'result_schema'
         output = [{'type': 'thread.started', 'thread_id': 'independent'}, {'type': 'turn.started'},
             {'type': 'item.completed', 'item': {'type': 'agent_message', 'text': json.dumps(grounded_judgment(payload))}},
             {'type': 'turn.completed', 'usage': {'input_tokens': 10, 'output_tokens': 10}}]
-        return BoundedProcessResult(0, '\n'.join(json.dumps(row) for row in output), '', .01)
+        from tests.semantic.test_codex_c09_notice_adjudication import reviewer_stdin_evidence
+        return BoundedProcessResult(0, '\n'.join(json.dumps(row) for row in output), '', .01, **reviewer_stdin_evidence(kwargs))
     monkeypatch.setattr(review, 'run_process', process)
     kwargs = dict(case_id='C08', version='2025.1', execute_expected=True, preview_artifact=artifact,
         before_snapshot=plan['before'], preview_parameters=plan['preview_parameters'], transaction_id='tx1-00000000000000000001',
@@ -575,7 +577,8 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         if command[1:] == ['features', 'list']: return BoundedProcessResult(0, '\n'.join(review.DISABLED_FEATURES), '', .01)
         if command[1:] == ['exec', '--help']: return BoundedProcessResult(0, '--output-schema --ephemeral --ignore-user-config --ignore-rules --sandbox', '', .01)
         if 'prompt-input' in command: return BoundedProcessResult(0, json.dumps([{'role': 'developer', 'content': review.reviewer_rubric(CONTRACT)}]), '', .01)
-        payload = json.loads(command[-1])
+        assert command[-1] == '-'
+        payload = json.loads(kwargs['input_bytes'].decode('utf-8'))
         assert payload['contract'] == CONTRACT
         assert ('notice_obligations' in payload) is (not CONTRACT.endswith('/v1'))
         assert payload['user_prompt'] == prompts[0]
@@ -591,7 +594,8 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         output = [{'type': 'thread.started', 'thread_id': 'independent'}, {'type': 'turn.started'},
             {'type': 'item.completed', 'item': {'type': 'agent_message', 'text': json.dumps(judgment)}},
             {'type': 'turn.completed', 'usage': {'input_tokens': 10, 'output_tokens': 10}}]
-        return BoundedProcessResult(0, '\n'.join(json.dumps(row) for row in output), '', .01)
+        from tests.semantic.test_codex_c09_notice_adjudication import reviewer_stdin_evidence
+        return BoundedProcessResult(0, '\n'.join(json.dumps(row) for row in output), '', .01, **reviewer_stdin_evidence(kwargs))
     monkeypatch.setattr(review, 'run_process', process)
     directory = root / 'turns/turn-01'
     events = turn_events[0]

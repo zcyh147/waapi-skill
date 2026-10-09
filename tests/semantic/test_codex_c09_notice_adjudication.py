@@ -75,6 +75,12 @@ def fake_reviewer_options(root):
         windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST if os.name == 'nt' else None)
 
 
+def reviewer_stdin_evidence(kwargs):
+    import hashlib
+    raw = kwargs['input_bytes']
+    return {'stdin_sha256': hashlib.sha256(raw).hexdigest(), 'stdin_bytes_count': len(raw)}
+
+
 def test_independent_reviewer_receipt_replays_without_model_and_rejects_tampering(tmp_path, monkeypatch):
     from tests.semantic.support import codex_c09_notice_adjudication as review
     from tests.semantic.support.codex_harness import BoundedProcessResult as ProcessResult
@@ -100,7 +106,7 @@ def test_independent_reviewer_receipt_replays_without_model_and_rejects_tamperin
             {'type': 'item.completed', 'item': {'type': 'agent_message', 'text': json.dumps(grounded_judgment(decision['input']))}},
             {'type': 'turn.completed', 'usage': {'input_tokens': 100, 'output_tokens': 50}},
         ]
-        return ProcessResult(0, '\n'.join(json.dumps(e) for e in events), '', 0.5)
+        return ProcessResult(0, '\n'.join(json.dumps(e) for e in events), '', 0.5, **reviewer_stdin_evidence(kwargs))
     monkeypatch.setattr(review, 'run_process', process)
     receipt = review.review_c09_notice(decision, root=tmp_path / 'review', options=options)
     assert receipt['outcome'] == 'accepted'
@@ -283,7 +289,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None, actu
             raw = stdout.encode('utf-8').replace(b'accepted', b'ac\xffcepted')
             return run_process([sys.executable, '-c',
                 'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))', raw.hex()], **kwargs)
-        return ProcessResult(0, stdout, '', .01)
+        return ProcessResult(0, stdout, '', .01, **reviewer_stdin_evidence(kwargs))
     monkeypatch.setattr(review, 'run_process', process)
     graded = review.grade_c09_notice(SimpleNamespace(stdout=(directory / 'events.jsonl').read_text()), commands,
         version='2025.1', execute_expected=True, preview_artifact=artifact, before_snapshot=before,
@@ -308,12 +314,12 @@ def test_full_C09_archive_replays_sealed_review_without_subprocess_or_grade_writ
     assert before == {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
 
 
-def test_v2_actual_CLI_owned_system_catalog_reaches_review_and_replays_after_cleanup(tmp_path, monkeypatch):
+def test_v3_actual_CLI_owned_system_catalog_reaches_review_and_replays_after_cleanup(tmp_path, monkeypatch):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
     from tests.semantic.support import codex_c09_notice_adjudication as review
     root = sealed_c09_archive(tmp_path, monkeypatch, actual_audit=True)
     binding = json.loads((root / 'turns/turn-01/notice-review/invocation-binding.json').read_text())
-    assert binding['contract'] == 'waapi-skill.c09-review-invocation/v2'
+    assert binding['contract'] == 'waapi-skill.c09-review-invocation/v3'
     assert not Path(binding['context']['audit_codex_home']).exists()
     before = {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
     monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('rejudgment')))
@@ -373,7 +379,8 @@ def test_exact_frozen_audit_copy_only_classifies_independently_owned_system_root
 
 
 @pytest.mark.parametrize('actual_audit', [False, True])
-def test_v1_archive_keeps_original_catalog_audit_semantics(tmp_path, monkeypatch, actual_audit):
+@pytest.mark.parametrize('legacy_version', ['v1', 'v2'])
+def test_legacy_archive_keeps_original_catalog_audit_semantics(tmp_path, monkeypatch, actual_audit, legacy_version):
     from tests.semantic.support import codex_c09_notice_adjudication as review
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
     from tests.semantic.support.codex_expansion_policy import canonical_digest
@@ -381,12 +388,18 @@ def test_v1_archive_keeps_original_catalog_audit_semantics(tmp_path, monkeypatch
     directory = root / 'turns/turn-01/notice-review'
     path = directory / 'invocation-binding.json'
     binding = json.loads(path.read_text())
-    binding['contract'] = 'waapi-skill.c09-review-invocation/v1'
-    binding['context'].pop('audit_codex_home')
+    binding['contract'] = 'waapi-skill.c09-review-invocation/' + legacy_version
+    binding.pop('input_transport')
+    if legacy_version == 'v1':
+        binding['context'].pop('audit_codex_home')
     binding['sha256'] = canonical_digest({k: v for k, v in binding.items() if k != 'sha256'})
     path.write_text(json.dumps(binding))
     path = directory / 'receipt.json'
     receipt = json.loads(path.read_text())
+    prompt = json.dumps(receipt['input'], ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    receipt['audit_command'], receipt['invocation'] = review._review_invocations(binding, prompt=prompt)
+    receipt['execution'].pop('stdin_sha256')
+    receipt['execution'].pop('stdin_bytes_count')
     receipt['invocation_binding_sha256'] = binding['sha256']
     receipt['sha256'] = canonical_digest({k: v for k, v in receipt.items() if k != 'sha256'})
     path.write_text(json.dumps(receipt))
@@ -398,7 +411,7 @@ def test_v1_archive_keeps_original_catalog_audit_semantics(tmp_path, monkeypatch
     before = {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
     monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('rejudgment')))
     kwargs = dict(expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
-    if actual_audit:
+    if actual_audit and legacy_version == 'v1':
         with pytest.raises(ExpansionArchiveError, match='isolated execution'):
             verify_expansion_task_archive(root, **kwargs)
     else:
@@ -737,3 +750,56 @@ def test_gateway_legacy_identity_preserves_review_and_archive_binding(tmp_path, 
         expected_version='2025.1', expected_inputs_sha256='a' * 64)
     assert replay['business_pass'] is True
     assert before == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('raw', [b'x' * 131072, ('Long JSON: "声音雪地"\r\n' * 2500).encode('utf-8')],
+    ids=['maximum-ascii', 'chinese-quotes-crlf'])
+def test_bounded_reviewer_stdin_exceeds_windows_argv_limit_without_quote_or_encoding_loss(tmp_path, raw):
+    import base64
+    import hashlib
+    import sys
+    from tests.semantic.support.codex_harness import run_process
+    assert len(raw.decode('utf-8').encode('utf-16-le')) // 2 > 32767
+    result = run_process([sys.executable, '-c',
+        'import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())'],
+        cwd=tmp_path, env=os.environ, timeout=10, max_output_bytes=262144, input_bytes=raw)
+    assert result.exit_status == 0 and not result.timed_out
+    assert base64.b64decode(result.stdout_base64) == raw
+    assert result.stderr == ''
+    assert result.stdin_sha256 == hashlib.sha256(raw).hexdigest()
+    assert result.stdin_bytes_count == len(raw)
+
+
+@pytest.mark.parametrize('raw,maximum', [(b'x' * 131073, 4096), ('text', 4096), (b'x', None)],
+    ids=['over-limit', 'not-bytes', 'unbounded-output'])
+def test_reviewer_stdin_rejects_unbounded_or_nonbyte_input_before_launch(tmp_path, monkeypatch, raw, maximum):
+    from tests.semantic.support import codex_harness as harness
+    monkeypatch.setattr(harness.subprocess, 'Popen', lambda *a, **k: pytest.fail('launched invalid input'))
+    with pytest.raises(ValueError, match='input_bytes'):
+        harness.run_process(['unused'], cwd=tmp_path, env={}, timeout=1,
+            max_output_bytes=maximum, input_bytes=raw)
+
+
+@pytest.mark.parametrize('damage', ['stdin_hash', 'stdin_count', 'missing_stdin', 'transport', 'argv'])
+def test_v3_reviewer_receipt_rejects_input_transport_tampering(tmp_path, monkeypatch, damage):
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    root = sealed_c09_archive(tmp_path, monkeypatch)
+    directory = root / 'turns/turn-01'
+    receipt = json.loads((directory / 'notice-review/receipt.json').read_text())
+    binding = json.loads((directory / 'notice-review/invocation-binding.json').read_text())
+    decision = json.loads((directory / 'notice-decision.json').read_text())
+    prompt = json.dumps(receipt['input'], ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    assert receipt['audit_command'][-1] == '' and receipt['invocation'][-1] == '-'
+    assert prompt not in receipt['audit_command'] and prompt not in receipt['invocation']
+    if damage == 'stdin_hash': receipt['execution']['stdin_sha256'] = '0' * 64
+    elif damage == 'stdin_count': receipt['execution']['stdin_bytes_count'] += 1
+    elif damage == 'missing_stdin': receipt['execution'].pop('stdin_sha256')
+    elif damage == 'argv': receipt['invocation'][-1] = prompt
+    elif damage == 'transport':
+        binding['input_transport']['execution'] = 'argv'
+        binding['sha256'] = canonical_digest({k: v for k, v in binding.items() if k != 'sha256'})
+        receipt['invocation_binding_sha256'] = binding['sha256']
+    receipt['sha256'] = canonical_digest({k: v for k, v in receipt.items() if k != 'sha256'})
+    with pytest.raises(ValueError, match='stdin|transport|canonical invocation'):
+        review.verify_c09_review_receipt(receipt, decision=decision, expected_binding=binding)

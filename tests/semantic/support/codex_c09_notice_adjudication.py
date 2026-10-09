@@ -341,6 +341,22 @@ def _capabilities(rows: Any) -> None:
         raise ValueError('reviewer CLI lacks required attested flags/features')
 
 
+def _review_input_transport(prompt: str) -> dict[str, Any]:
+    raw = prompt.encode('utf-8')
+    if len(raw) > INPUT_MAX_BYTES:
+        raise ValueError('complete reviewer input exceeds bound')
+    return {'audit': 'context-only', 'execution': 'stdin-utf8',
+        'sha256': hashlib.sha256(raw).hexdigest(), 'bytes_count': len(raw)}
+
+
+def _validate_review_stdin(execution: Mapping[str, Any], prompt: str) -> None:
+    expected = _review_input_transport(prompt)
+    if (execution.get('stdin_sha256') != expected['sha256']
+            or type(execution.get('stdin_bytes_count')) is not int
+            or execution['stdin_bytes_count'] != expected['bytes_count']):
+        raise ValueError('review execution stdin differs from sealed input')
+
+
 def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[list[str], list[str]]:
     """Render exact argv from fixed settings and separately sealed host locators."""
     context = binding.get('context', {})
@@ -348,15 +364,15 @@ def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[lis
     rubric = reviewer_rubric(contract)
     version = binding.get('contract')
     keys = {'binary', 'workspace', 'schema', 'platform_name', 'disabled_user_skill_paths'}
-    if version == 'waapi-skill.c09-review-invocation/v2':
+    if version in {'waapi-skill.c09-review-invocation/v2', 'waapi-skill.c09-review-invocation/v3'}:
         keys.add('audit_codex_home')
-    if (version not in {'waapi-skill.c09-review-invocation/v1', 'waapi-skill.c09-review-invocation/v2'}
+    if (version not in {'waapi-skill.c09-review-invocation/v1', 'waapi-skill.c09-review-invocation/v2', 'waapi-skill.c09-review-invocation/v3'}
             or binding.get('configuration') != reviewer_configuration(contract)
             or binding.get('schema_utf8') != json.dumps(JUDGMENT_SCHEMA)
             or not isinstance(context, dict) or set(context) != keys
             or context['platform_name'] != os.name):
         raise ValueError('review invocation binding configuration/schema/host mismatch')
-    for key in ('binary', 'workspace', 'schema', *(['audit_codex_home'] if version.endswith('/v2') else [])):
+    for key in ('binary', 'workspace', 'schema', *(['audit_codex_home'] if version.endswith(('/v2', '/v3')) else [])):
         value = context[key]
         if (not isinstance(value, str) or not value or '\x00' in value or not Path(value).is_absolute()
                 or (key == 'audit_codex_home' and '..' in Path(value).parts)):
@@ -377,8 +393,13 @@ def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[lis
         service_tier=binding['configuration']['service_tier'],
         timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
         network_access=False, developer_instructions=rubric)
-    audit = build_prompt_audit_command(config, prompt=prompt)
-    execution = build_exec_command(config, prompt=prompt, writable_dir=workspace)
+    via_stdin = version == 'waapi-skill.c09-review-invocation/v3'
+    if via_stdin and binding.get('input_transport') != _review_input_transport(prompt):
+        raise ValueError('review invocation input transport mismatch')
+    # debug prompt-input treats '-' literally; it audits isolation without task
+    # content. Only exec supports stdin, with exact bytes attested by run_process.
+    audit = build_prompt_audit_command(config, prompt='' if via_stdin else prompt)
+    execution = build_exec_command(config, prompt='-' if via_stdin else prompt, writable_dir=workspace)
     if paths:
         rows = ','.join('{path=' + json.dumps(value) + ',enabled=false}' for value in paths)
         override = ['-c', 'skills.config=[' + rows + ']']
@@ -448,7 +469,8 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
                 network_access=False, developer_instructions=rubric,
                 windows_powershell_core_host=options.windows_powershell_core_host)
-            binding = {'contract': 'waapi-skill.c09-review-invocation/v2',
+            binding = {'contract': 'waapi-skill.c09-review-invocation/v3',
+                'input_transport': _review_input_transport(prompt),
                 'configuration': configuration, 'runtime': receipt['runtime'],
                 'decision_sha256': canonical_digest(decision), 'schema_utf8': schema.read_text(encoding='utf-8'),
                 'context': {'binary': str(options.codex_binary), 'workspace': str(workspace),
@@ -493,10 +515,12 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                     raise ValueError('reviewer environment is not isolated')
                 receipt['invocation'] = command
                 completed = run_process(command, cwd=workspace, env=env,
-                    timeout=TIMEOUT_SECONDS - (time.monotonic() - started), max_output_bytes=OUTPUT_MAX_BYTES)
+                    timeout=TIMEOUT_SECONDS - (time.monotonic() - started), max_output_bytes=OUTPUT_MAX_BYTES,
+                    input_bytes=prompt.encode('utf-8'))
                 receipt.update(stdout=completed.stdout, stderr=completed.stderr,
                     execution=asdict(completed), isolation={'passed': isolation.passed, 'broker_environment_keys': []})
                 _validate_bounded_output(asdict(completed))
+                _validate_review_stdin(asdict(completed), prompt)
                 judgment, usage = _judgment(completed.stdout, review_input)
                 receipt.update(judgment=judgment, outcome=judgment['outcome'], usage=usage)
     except Exception as exc:
@@ -536,7 +560,7 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
         raise ValueError('review receipt prompt audit exceeds bound')
     _capabilities(receipt.get('capabilities'))
     if (not isinstance(expected_binding, Mapping)
-            or expected_binding.get('contract') not in {'waapi-skill.c09-review-invocation/v1', 'waapi-skill.c09-review-invocation/v2'}
+            or expected_binding.get('contract') not in {'waapi-skill.c09-review-invocation/v1', 'waapi-skill.c09-review-invocation/v2', 'waapi-skill.c09-review-invocation/v3'}
             or expected_binding.get('sha256') != canonical_digest({key: value for key, value in expected_binding.items() if key != 'sha256'})
             or expected_binding['sha256'] != receipt.get('invocation_binding_sha256')
             or expected_binding.get('decision_sha256') != canonical_digest(decision)
@@ -552,6 +576,8 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
     audit = _review_prompt_audit(_decode(receipt['audit_stdout']), expected_binding, rubric=rubric, archived=True)
     execution = receipt.get('execution', {})
     _validate_bounded_output(execution)
+    if expected_binding['contract'] == 'waapi-skill.c09-review-invocation/v3':
+        _validate_review_stdin(execution, prompt)
     if (audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact
             or receipt.get('isolation') != {'passed': True, 'broker_environment_keys': []}
             or execution.get('exit_status') != 0 or execution.get('timed_out') is not False

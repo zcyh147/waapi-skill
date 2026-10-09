@@ -602,6 +602,37 @@ incident below for its technical cause.
   ACK timer begins. Dependency installation time is therefore never classified
   as subscription latency.
 
+### A notice-review FAIL concealed a Windows process-launch failure
+
+- Evidence: native Windows `iwin-expansion-a898d8d8-c01-r1` passed its exact
+  Skill/reference read gates, then stopped at Preview with
+  `visible_preview_notice=false`. Its independent review receipt contained
+  `judgment=null` and `FileNotFoundError: [WinError 206]`: no reviewer started.
+  This was infrastructure failure, not an unfavorable language judgment.
+- Cause: the complete bounded review packet was still placed in both CLI
+  argument lists. A valid 128 KiB packet can exceed Windows' 32,767 UTF-16-unit
+  command-line limit before Codex runs.
+- Prevention: invocation v3 audits the isolated context with an empty user
+  prompt and sends the complete canonical UTF-8 packet through `codex exec -`
+  stdin. `debug prompt-input -` treats the dash literally on CLI 0.162.0; it is
+  not a stdin transport. The existing bounded process runner uses a private
+  input handle, caps input at 131072 bytes, and records its SHA-256 and length.
+  The prelaunch binding and replay require those exact input facts as well as
+  canonical argv, raw output, runtime identity, isolated context and grounded
+  judgment. Input is never shortened, repaired or summarized to fit argv.
+- Keep v1/v2 archive invocation semantics unchanged. Freeze failed roots;
+  diagnostic review of a copied packet grants no historical or business PASS.
+  Only fresh execution establishes the repaired candidate's business result.
+- When a notice gate fails, inspect `notice-review/receipt.json` before choosing
+  to continue the batch. A missing judgment with a launch/decoding/output error
+  is a reviewer infrastructure failure. Ordinary unsupported wording may
+  continue through the batch; repeated inability to run its required reviewer
+  must stop affected cases instead of spending one Fresh turn per recurrence.
+- Regression must include a native Windows child reading more than 32767
+  UTF-16 units, exact Chinese/quote/CRLF bytes, the maximum input boundary,
+  tampered input bindings, and unchanged legacy replay. A fake reviewer alone
+  cannot prove operating-system process creation or CLI stdin behavior.
+
 ### A clean Windows pytest worktree selected the Store Python alias
 
 - Symptom: direct-SSH `ci\test.bat` stops before pytest with Python exit `9009`,
