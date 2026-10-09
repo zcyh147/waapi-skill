@@ -1,0 +1,19 @@
+{
+  "source_candidate": "e1f3e9b13a16260c56a3697aaee514c667a244e8",
+  "scope": "Only the pre-execution C01 input and its two Backup public reads. No judgments, grade or after-state. Placeholder events reconstruct other original positions; reconstructed timeline has its own digest, not the full source timeline digest.",
+  "source_events_sha256": "254d2bfa722c8596936bd0c7e16120e4857dde0322f89bd64453ef3ffe1bee84",
+  "source_broker_records_sha256": "53d547d938daf59a12b52e1b9608f3a0eca6ac12e85daf21963f460832bc45e3",
+  "original_broker_file_sha256": "1cd8c9e4d7c68c3857435608a19dd8b3563440c67ebad806865d75e2c38ea68c",
+  "files": {
+    "c01-input.json": "d17f57add8b37302ba2a9897dfd5e056be099abf67c655751efe0ff013542ba6",
+    "backup-reads.json": "ccb305f37c02a21184c7b6ac49e00d6178b8b8c18d292c90738d4e3a1175bc20"
+  },
+  "original_event_positions": [
+    26,
+    29
+  ],
+  "original_broker_sequences": [
+    10,
+    11
+  ]
+}

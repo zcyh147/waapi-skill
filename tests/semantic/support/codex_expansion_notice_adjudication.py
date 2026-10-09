@@ -15,8 +15,9 @@ from tests.semantic.support.codex_harness import normalized_gateway_command_argv
 
 LEGACY_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v1'
 BUSINESS_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v2'
-CONTRACT = 'waapi-skill.expansion-notice-adjudication/v3'
-CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, CONTRACT})
+INTENT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v3'
+CONTRACT = 'waapi-skill.expansion-notice-adjudication/v4'
+CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, INTENT_CONTRACT, CONTRACT})
 CASES = frozenset({'C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'})
 
 
@@ -289,11 +290,82 @@ def _verification_context(artifact):
     }
 
 
+# Only business read results cross this boundary, never endpoint/session,
+# continuation authority, raw dispatch, stdout or stderr envelopes.
+_PUBLIC_READ_RESULT_KEYS = {
+    'query-object': ('query_bound', 'count', 'objects', 'limit_reached', 'complete', 'truncated', 'response_integrity'),
+    'metadata': ('operation', 'metadata_authority', 'agent_result', 'response_integrity'),
+    'query-schema': ('query_layer', 'query_contract', 'versions'),
+    'operation-schema': ('operation', 'version', 'supported_versions', 'input_mode'),
+    'request-schema': ('api', 'version', 'supported_versions', 'input_mode'),
+    'operations': ('versions',),
+    'status': ('detected_version', 'is_command_line'),
+}
+
+
+def _public_read_evidence(events, command_records, *, version, broker_records, read_admission):
+    from dataclasses import asdict, is_dataclass
+    from tests.semantic.support.codex_expansion_policy import BoundedExpansionReads
+    from tests.semantic.support.codex_c09_notice_adjudication import _decode
+    records = [{**asdict(row), 'succeeded': row.succeeded} if is_dataclass(row) else row
+        for row in broker_records]
+    execute_sequence = next((row['sequence'] for row in records
+        if tuple(row.get('gateway_arguments', ()))[:1] == ('execute',)), None)
+    if execute_sequence is not None:
+        records = [row for row in records if row['sequence'] < execute_sequence]
+    commands = {row.command: row for row in command_records}
+    gate = (BoundedExpansionReads(read_admission.scope, public_parser=read_admission.public_parser)
+        if read_admission is not None else None)
+    reads, used = [], set()
+    for position, event in enumerate(events):
+        item = event.get('item', {})
+        if event.get('type') != 'item.completed' or item.get('type') != 'command_execution':
+            continue
+        command = commands.get(item.get('command'))
+        if command is None:
+            continue
+        normalized = normalized_gateway_command_argv(command.argv, expected_wwise_version=version)
+        if len(normalized) < 4 or normalized[3] not in _PUBLIC_READ_RESULT_KEYS:
+            continue
+        matches = [(index, row) for index, row in enumerate(records) if index not in used
+            and tuple(normalized_gateway_command_argv(row['model_argv'], expected_wwise_version=version))[1:] == normalized[1:]
+            and normalized[0] in {row['model_argv'][0], row['normalized_model_argv'][0]}]
+        if not matches or gate is None:
+            raise ValueError('public read lacks admitted Broker evidence')
+        index, record = matches[0]
+        used.add(index)
+        argv, payload = tuple(record['gateway_arguments']), record['payload']
+        if (record.get('authenticated') is not True or record.get('accepted') is not True
+                or record.get('succeeded') is not True or record.get('payload_error')
+                or record.get('exit_code') != record.get('runner_exit_code')
+                or record.get('exit_code') != item.get('exit_code')
+                or not isinstance(payload, Mapping)
+                or record.get('payload_sha256') != canonical_digest(payload)
+                or _decode(item.get('aggregated_output', '')) != payload
+                or payload.get('command') != normalized[3]
+                or argv != normalized[3:]):
+            raise ValueError('public read differs from authenticated Broker receipt')
+        gate.admit(argv)
+        complete = gate.observe(payload)
+        if not complete:
+            continue  # Failed/clarification/ceiling receipts grant no acquired facts.
+        reads.append({'event_position': position, 'broker_sequence': record['sequence'],
+            'gateway_arguments': list(argv), 'payload_sha256': record['payload_sha256'],
+            'broker_record_sha256': canonical_digest(record),
+            'scope_complete': (not (payload.get('complete') is False or payload.get('truncated') is True
+                or isinstance(payload.get('response_integrity'), Mapping) and (
+                    payload['response_integrity'].get('complete') is False
+                    or payload['response_integrity'].get('truncated') is True)) if argv[0] == 'query-object' else None),
+            'result': {key: payload[key] for key in _PUBLIC_READ_RESULT_KEYS[argv[0]] if key in payload}})
+    return {'read_scope_sha256': gate.scope.digest if gate is not None else None, 'reads': reads}
+
+
 def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case_id: str,
         version: str, execute_expected: bool, preview_artifact: Mapping[str, Any],
         before_snapshot: Mapping[str, Any], preview_parameters: Mapping[str, Any],
         user_prompt: str = '', transaction_id: str = '',
-        adjudication_contract: str = CONTRACT) -> dict[str, Any]:
+        adjudication_contract: str = CONTRACT, broker_records: Sequence[Any] = (),
+        read_admission: Any = None) -> dict[str, Any]:
     from tests.semantic.support.codex_c09_notice_adjudication import INPUT_MAX_BYTES
     if (adjudication_contract not in CONTRACTS or case_id not in CASES or version not in {'2022.1', '2025.1'}
             or (case_id, version) == ('M05', '2022.1')
@@ -354,7 +426,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     }
     if adjudication_contract != LEGACY_CONTRACT:
         obligations = _notice_obligations(case_id, roles)
-        if adjudication_contract == CONTRACT:
+        if adjudication_contract in {INTENT_CONTRACT, CONTRACT}:
             # Protected invariants and transaction strength remain attested
             # facts, not an exhaustive inventory of required spoken promises.
             obligations.pop('preserve')
@@ -363,6 +435,18 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
                 'only_declared_changes': True, 'adopt_user_preservation_scope': True}
             review_input['verification_context'] = _verification_context(preview_artifact)
         review_input['notice_obligations'] = obligations
+    if adjudication_contract == CONTRACT:
+        try:
+            review_input['pre_execution_public_reads'] = _public_read_evidence(events_before_execute, command_records,
+                version=version, broker_records=broker_records, read_admission=read_admission)
+        except (KeyError, TypeError, ValueError):
+            return {'outcome': 'material_reject', 'reason': 'unbound-pre-execution-public-read-evidence'}
+        from wwise_waapi.execution_contracts import FIXED_COMMANDS_BY_URI
+        review_input['verification_context']['public_object_read_support'] = {
+            'uri': 'ak.wwise.core.object.get',
+            'fixed_commands': list(FIXED_COMMANDS_BY_URI['ak.wwise.core.object.get']),
+            'scope': 'bounded-public-query-schema-selectors-relationships-and-projections',
+            'authority': 'packaged-interface-only-not-acquisition-or-live-availability'}
     if len(json.dumps(review_input, ensure_ascii=False).encode('utf-8')) > INPUT_MAX_BYTES:
         return {'outcome': 'material_reject', 'reason': 'complete-review-input-exceeds-bound'}
     return {'outcome': 'review_required', 'reason': (

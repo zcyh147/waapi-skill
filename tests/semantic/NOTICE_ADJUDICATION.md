@@ -379,3 +379,47 @@ The fixed `notice-fast` gate then passed 3678, with that same single skip;
 both commands exited 0 through `ci/test.sh` with the pinned developer Python.
 These counts are developer evidence only. No full Non-live, Wwise, Codex turn,
 formal semantic acceptance or native-Windows execution occurred in this repair.
+
+## Pre-execution read evidence checkpoint — consolidated #147
+
+New expansion plans use `waapi-skill.expansion-notice-adjudication/v4`.
+The outcome-blind e1f3e9b audit identified one confirmed producer omission:
+C01's Agent had already read Backup's children through the authenticated
+public query and received count 0 / objects [], while the reviewer saw only
+Agent text and selected oracle facts. The copied pre-execution witness retains
+that read at event 29 / Broker sequence 11 and its preceding scalar read at
+event 26 / sequence 10. Source file hashes and original positions are recorded;
+the test's placeholder timeline is explicitly a reconstruction with its own
+hash, never the source timeline. No judgment or after-state was copied.
+
+V4 projects existing admitted successful public query rows and metadata
+results, plus small schema/status identifiers, through the existing Broker
+and input-builder seam. Exact request scope, returned field absence/null/empty
+values, completeness markers, event position, Broker sequence, payload and
+record digests remain bound to the pre-Execute timeline. Replaying the existing
+read admission checks adds no Wwise call. Partial results cannot establish
+complete absence; failed reads grant no factual proof. Endpoint/session,
+continuation authority and raw transcript envelopes do not cross into review.
+The complete input retains its 128 KiB ceiling and fails closed rather than
+silently dropping acquired facts.
+
+Packaged ordinary object-query support is disclosed separately from actual
+acquisition and live availability. V3 already distinguishes natural future
+verification plans from acquired or guaranteed proof; v4 adds evidence rather
+than phrase exceptions. Exact contiguous quote/event grounding, authorization,
+immutable Preview, business oracle and archive gates remain unchanged.
+V1/v2/v3 keep their exact input shape, rubric hashes and replay; old FAIL roots
+remain frozen. Product Skill, prompts, oracles and reviewer settings are unchanged.
+
+The lightweight retrospective measured about 69.59 minutes across one Non-live
+and three Fresh matrices, excluding unmeasured coordination/development. Its
+repair package is limited to evidence completeness and exact failed-read
+receipt admission. Focused tests and `notice-fast` precede one combined parent
+Non-live promotion gate; no new model/Wwise execution or historical regrade
+is implied by this checkpoint.
+
+The merged a0d0414 developer base plus this v4 repair passed the four focused
+reviewer/producer/archive/Broker files: 391 passed, one native-Windows UNC case
+skipped. The fixed `notice-fast` gate passed 3715 with that same skip; both
+exited 0 through `ci/test.sh` and the pinned developer Python. These are fake
+developer proofs only; the combined Non-live and real/Fresh gates remain separate.

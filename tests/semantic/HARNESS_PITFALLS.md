@@ -3466,3 +3466,16 @@ through `WAAPI_TEST_PYTHON` and `ci/test.sh --mode nonlive`: the focused
 passed 38 tests; `test_sandbox_fixture.py` / `test_headless_lifecycle.py`
 passed 89 tests. No live process, Agent campaign, full Program or broad Non-live
 gate was run by the implementer; promotion owns the combined candidate gates.
+
+## An admitted read and an acquired fact need separate evidence (#147)
+
+- A reviewer packet may omit facts the Agent actually acquired. Preserve the
+  existing successful pre-Execute public read with its exact request scope,
+  returned fields/completeness, original event/receipt positions and sealed
+  digests. Missing oracle fields cannot prove either absence or an unavailable
+  public capability; future verification intent is not completed proof.
+- An authentic `query-object` exit-2 failure may carry `call.error_code` and
+  null count/objects/agent_result. Exact Broker receipt admission grants no read
+  proof. Timeout/cleanup_pending stops further dispatch and sealing; an already
+  verified transaction retains its verification. Preserve the old FAIL root
+  without retry or after-state rescue.

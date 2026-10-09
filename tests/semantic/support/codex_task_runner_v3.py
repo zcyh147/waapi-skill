@@ -1837,7 +1837,8 @@ def run_expansion_codex_task(
                             preview_artifact=(TransactionStore(broker.state_directory).load_preview(
                                 policy.transaction_id).artifact if policy.transaction_id else {}),
                             before_snapshot=prepared.before, transaction_id=policy.transaction_id or "",
-                            user_prompt=prompt, other_gates={key: value for key, value in gates.items()
+                            user_prompt=prompt, broker_records=broker.evidence().records, read_admission=policy.reads,
+                            other_gates={key: value for key, value in gates.items()
                                 if key != "visible_preview_notice"}, root=output_dir, options=options)
                         gates["visible_preview_notice"] = notice["passed"]
                     grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
