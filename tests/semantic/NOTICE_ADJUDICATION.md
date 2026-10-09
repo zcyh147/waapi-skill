@@ -1,5 +1,26 @@
 # Limited notice adjudication and development gates
 
+## Current prospective checkpoint — v6, #147
+
+New plans use `waapi-skill.expansion-notice-adjudication/v6`. V6 keeps v5's
+input/evidence semantics and High/default reviewer settings, clarifying only
+ordinary future verification intent: saying preservation will be checked after
+execution does not assert prior discovery/acquisition, guaranteed proof or a
+stronger transaction verifier. Missing exact pre-Execute follow-up discovery
+alone is not an unsupported-follow-up finding. Actual public reads still obey
+discovery requirements. Explicit unsupported methods, false capability,
+completed/guaranteed proof, verifier overclaims, uncertain edit scope, false
+baselines and all timing/authorization/provenance/non-PASS gates retain their
+boundaries. Terminal proof cannot come from future intent or after-state rescue.
+
+V1–v5 retain exact rubric/configuration digests, settings and sealed replay;
+v5 remains High. The schema, 120-second bound, isolation and input/output
+ceilings remain fixed. Compact C09 contrasts and fake runner/archive checks
+prove input transport, invocation binding and read-only replay/tamper rejection;
+they do not prove language accuracy or semantic acceptance. Historical roots
+remain frozen without rejudgment. Combined development gates and new Fresh
+failed-only C09 acceptance are separate coordinator-owned work.
+
 ## Approved amendment — 2026-10-08
 
 Read this contract when implementing, reviewing, running or replaying the

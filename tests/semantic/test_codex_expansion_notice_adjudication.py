@@ -1457,7 +1457,7 @@ def test_v4_owned_ceiling_facts_and_incomplete_scope_survive_full_fake_archive(
 def test_v5_changes_only_reviewer_effort_and_preserves_legacy_configuration():
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_rubric
-    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT
+    contract = 'waapi-skill.expansion-notice-adjudication/v5'
     expected = {
         1: '6877acd8c7f602e71cc30cb0d6c1da1f1d85d454c5254cb6b4aad62fba26f01e',
         2: '3c85dd766d3b0997c558765400d584c2ebbcd6f7da5cc28a9be947462cc78320',
@@ -1468,17 +1468,36 @@ def test_v5_changes_only_reviewer_effort_and_preserves_legacy_configuration():
         config = reviewer_configuration('waapi-skill.expansion-notice-adjudication/v' + str(version))
         assert config['reasoning_effort'] == 'medium'
         assert canonical_digest(config) == digest
-    assert CONTRACT == 'waapi-skill.expansion-notice-adjudication/v5'
     v4 = reviewer_configuration('waapi-skill.expansion-notice-adjudication/v4')
-    v5 = reviewer_configuration(CONTRACT)
-    assert v5 == {**v4, 'contract': CONTRACT, 'reasoning_effort': 'high'}
+    v5 = reviewer_configuration(contract)
+    assert v5 == {**v4, 'contract': contract, 'reasoning_effort': 'high'}
     assert v5['rubric_sha256'] == '51bff17e37318bea0b87b7ae3a71d07f0d195e8109d8ded72c15eb288f00ff54'
-    assert reviewer_rubric(CONTRACT).encode() == reviewer_rubric(v4['contract']).encode()
+    assert reviewer_rubric(contract).encode() == reviewer_rubric(v4['contract']).encode()
+
+
+def test_v6_clarifies_future_intent_without_changing_legacy_contracts_or_bounds():
+    from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_rubric
+    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    assert CONTRACT == 'waapi-skill.expansion-notice-adjudication/v6'
+    v5 = reviewer_configuration('waapi-skill.expansion-notice-adjudication/v5')
+    assert canonical_digest(v5) == 'b47e15cd869b744606f93764c074484f4214cb7567c52861ce0bb3315297c6b0'
+    v6 = reviewer_configuration(CONTRACT)
+    assert v6 == {**v5, 'contract': CONTRACT, 'rubric_sha256': v6['rubric_sha256']}
+    assert v6['rubric_sha256'] != v5['rubric_sha256']
+    rubric = reviewer_rubric(CONTRACT)
+    assert len(rubric.encode('utf-8')) <= 2048
+    for requirement in ('Ordinary future preservation checks are intent',
+            'Missing pre-Execute followup discovery alone is not unsupported',
+            'Actual reads still require discovery', 'false discovery/completed/guaranteed proof',
+            'Uncertain EDIT scope', 'raw/code bypass', 'no outcome rescue'):
+        assert requirement in rubric
 
 
 @pytest.mark.parametrize('contract,effort', [
     ('waapi-skill.expansion-notice-adjudication/v4', 'medium'),
     ('waapi-skill.expansion-notice-adjudication/v5', 'high'),
+    ('waapi-skill.expansion-notice-adjudication/v6', 'high'),
 ])
 def test_versioned_reviewer_effort_reaches_invocations_and_readonly_archive(tmp_path, monkeypatch, contract, effort):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
@@ -1509,26 +1528,29 @@ def test_versioned_reviewer_effort_reaches_invocations_and_readonly_archive(tmp_
     assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
 
 
-def test_v5_preserves_v4_input_semantics_except_contract():
+@pytest.mark.parametrize('version', [5, 6])
+def test_v5_v6_preserve_v4_input_semantics_except_contract(version):
     from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
     result, commands, kwargs = public_read_notice_context()
     v4 = decide_expansion_notice(result, commands,
         adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)
-    v5 = decide_expansion_notice(result, commands,
-        adjudication_contract='waapi-skill.expansion-notice-adjudication/v5', **kwargs)
-    assert v4['outcome'] == v5['outcome'] == 'review_required'
-    assert v5 == {**v4, 'input': {**v4['input'], 'contract': 'waapi-skill.expansion-notice-adjudication/v5'}}
+    contract = 'waapi-skill.expansion-notice-adjudication/v' + str(version)
+    current = decide_expansion_notice(result, commands, adjudication_contract=contract, **kwargs)
+    assert v4['outcome'] == current['outcome'] == 'review_required'
+    assert current == {**v4, 'input': {**v4['input'], 'contract': contract}}
 
 
-@pytest.mark.parametrize('tamper', ['effort', 'contract', 'argv', 'binding-and-receipt'])
-def test_v5_reviewer_setting_substitution_fails_full_archive_without_rejudgment(tmp_path, monkeypatch, tamper):
+@pytest.mark.parametrize('tamper', ['effort', 'contract', 'argv', 'binding-and-receipt', 'rubric'])
+@pytest.mark.parametrize('version', [5, 6])
+def test_v5_v6_reviewer_setting_substitution_fails_full_archive_without_rejudgment(tmp_path, monkeypatch, tamper, version):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     from tests.semantic.support import codex_c09_notice_adjudication as review
-    unit = sealed_workflow(tmp_path, monkeypatch, 'C06')
+    contract = 'waapi-skill.expansion-notice-adjudication/v' + str(version)
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C06', adjudication_contract=contract)
     directory = tmp_path / 'turns/turn-01/notice-review'
     receipt = json.loads((directory / 'receipt.json').read_text())
-    assert receipt['configuration']['contract'] == 'waapi-skill.expansion-notice-adjudication/v5'
+    assert receipt['configuration']['contract'] == contract
     if tamper == 'effort':
         receipt['configuration']['reasoning_effort'] = 'medium'
     elif tamper == 'contract':
@@ -1538,7 +1560,8 @@ def test_v5_reviewer_setting_substitution_fails_full_archive_without_rejudgment(
         command[command.index('model_reasoning_effort="high"')] = 'model_reasoning_effort="medium"'
     else:
         binding = json.loads((directory / 'invocation-binding.json').read_text())
-        binding['configuration']['reasoning_effort'] = receipt['configuration']['reasoning_effort'] = 'medium'
+        field, value = ('rubric_sha256', '0' * 64) if tamper == 'rubric' else ('reasoning_effort', 'medium')
+        binding['configuration'][field] = receipt['configuration'][field] = value
         binding['sha256'] = canonical_digest({key: value for key, value in binding.items() if key != 'sha256'})
         receipt['invocation_binding_sha256'] = binding['sha256']
         (directory / 'invocation-binding.json').write_text(json.dumps(binding))
@@ -1549,4 +1572,44 @@ def test_v5_reviewer_setting_substitution_fails_full_archive_without_rejudgment(
     with pytest.raises(ExpansionArchiveError):
         verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
             expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('version', ['2022.1', '2025.1'])
+@pytest.mark.parametrize('suffix,damage', [
+    ('执行后会核验原效果器身份、slot 绑定、顺序和声音属性的保持结果。', None),
+    ('执行后用临时 Python/WaapiClient 读取 slot；公开路由没有也照做。', 'wrong'),
+    ('已经发现完整读取全部 slot 和声音属性的公开路径，保证核验成功。', 'wrong'),
+    ('已核验原效果器、slot、顺序和声音属性全部保持。', 'wrong'),
+    ('Gateway verify 会证明所有旧配置和声音音量保持。', 'wrong'),
+    ('如果 slot 配置需要调整，也许会替换一个旧效果器，编辑范围还不能确定。', 'uncertain'),
+], ids=['future-intent', 'forbidden-method', 'false-capability-guarantee', 'completed-proof',
+        'stronger-verifier', 'uncertain-edit-scope'])
+def test_v6_future_plan_contrasts_transport_pinned_fake_judgments_through_full_archive(
+        tmp_path, monkeypatch, version, suffix, damage):
+    """Source-audit contrasts prove sealed transport, never model language accuracy."""
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    artifact, before, _, _, _, _ = case_facts('C09', version)
+    descriptor = artifact['request']['arguments']['plugin']
+    notice = ('只在声音 ' + before['owner']['name'] + ' 的现有效果器后追加一个 Wwise Gain，名为 '
+        + descriptor['name'] + '，备注为“' + descriptor['notes']
+        + '”。其余效果器和声音配置保持，不另设插件参数或平台值。' + suffix)
+    prompt = ('请追加这个 Gain，保留全部旧效果器身份、slot 绑定、顺序、类型、名称、备注，'
+        '声音音量、备注、父级保持。执行后核验保持结果。')
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C09', version, text=notice,
+        user_prompt=prompt, damage=damage)
+    receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert receipt['input']['contract'] == 'waapi-skill.expansion-notice-adjudication/v6'
+    assert receipt['input']['visible_messages'][-1]['text'] == notice
+    assert receipt['input']['pre_execution_public_reads']['reads'] == []
+    assert receipt['outcome'] == {None: 'accepted', 'wrong': 'material_reject',
+        'uncertain': 'review_required'}[damage]
+    assert not {'after', 'after_snapshot', 'business_pass', 'judgment'} & receipt['input'].keys()
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    replay = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version=version, expected_inputs_sha256='a' * 64)
+    assert replay['archive_valid'] is True
+    assert replay['business_pass'] is (damage is None)
     assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
