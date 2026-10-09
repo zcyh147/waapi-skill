@@ -56,7 +56,8 @@ def _type_candidates(payload, meanings, role):
 
 def _field_candidates(payload, meanings, platform):
     from wwise_waapi.business_declarations import _normalize_restrictions
-    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_LIMIT
+    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_LIMIT, _validate_queries
+    normalized_meanings = {value.casefold() for value in _validate_queries(meanings)}
     groups = payload['meaning_results']
     if (not isinstance(groups, list) or [row['meaning'] for row in groups] != meanings
             or type(payload['meaning_count']) is not int or payload['meaning_count'] != len(meanings)
@@ -87,9 +88,11 @@ def _field_candidates(payload, meanings, platform):
             if canonical_digest(restrictions) != canonical_digest(row['restrictions']):
                 raise ValueError('field restrictions differ from normalized public contract')
             matched = row.get('matched_meanings')
-            if matched is not None and (not isinstance(matched, list) or group['meaning'] not in matched
-                    or not set(matched) <= set(meanings) or len(set(matched)) != len(matched)):
-                raise ValueError('field candidate meaning differs')
+            if matched is not None:
+                normalized_matches = {value.casefold() for value in _validate_queries(matched)}
+                if (' '.join(group['meaning'].split()).casefold() not in normalized_matches
+                        or not normalized_matches <= normalized_meanings):
+                    raise ValueError('field candidate meaning differs')
             if row['handle'] in indexed and canonical_digest(indexed[row['handle']]) != canonical_digest(row):
                 raise ValueError('field candidate identity differs between meanings')
             indexed[row['handle']] = row
@@ -104,7 +107,8 @@ def _field_candidates(payload, meanings, platform):
         raise ValueError('field discovery projections differ')
     return [{**{key: row[key] for key in ('label', 'field_kind', 'value_type', 'platform', 'restrictions')},
         'candidate_sha256': canonical_digest(row['handle']),
-        'matched_meanings': [group['meaning'] for group in groups if any(candidate['handle'] == row['handle']
+        'matched_meanings': list(row['matched_meanings']) if 'matched_meanings' in row else [
+            group['meaning'] for group in groups if any(candidate['handle'] == row['handle']
             for candidate in group['candidates'])]} for row in rows], meaning_results
 
 
@@ -158,6 +162,30 @@ def draft_discovery_evidence(events, command_records, *, version, broker_records
         last_sequence = record['sequence']
         payload = _authenticated_event_receipt(event, record, normalized, exact=True)
         public_parser(argv)
+        if argv[0] in DISCOVERY_COMMANDS and (payload.get('ok') is False or payload.get('status') == 'needs_clarification'):
+            failed_draft = payload.get('draft')
+            if (type(record['exit_code']) is not int or record['exit_code'] != 2
+                    or tuple(record.get('allowed_exit_codes', ())) != (0, 2)
+                    or argv[1] != draft_id or _option(argv, '--task-authority') != authority
+                    or int(_option(argv, '--expected-revision')) != revision
+                    or not (isinstance(payload.get('error_code'), str) and payload['error_code']
+                        or payload.get('status') == 'needs_clarification')
+                    or payload.get('executed') is True
+                    or payload.get('detected_version', version) != version
+                    or any(key in payload for key in ('type_candidates', 'field_candidates', 'meaning_results'))
+                    or failed_draft is not None and (not isinstance(failed_draft, Mapping)
+                        or failed_draft.get('draft_id') != draft_id or type(failed_draft.get('revision')) is not int
+                        or failed_draft['revision'] != revision
+                        or canonical_digest(failed_draft.get('binding')) != canonical_digest(binding))):
+                raise ValueError('failed discovery differs from the admitted unchanged Draft')
+            # Broker acceptance/success attests its existing durable unchanged-
+            # revision check; the following authenticated lineage must still
+            # consume this exact revision. The failed output grants no candidates.
+            result['revision_lineage'].append({'command': argv[0], 'event_position': position,
+                'broker_sequence': record['sequence'], 'payload_sha256': record['payload_sha256'],
+                'broker_record_sha256': canonical_digest(record), 'expected_revision': revision,
+                'result_revision': revision, 'status': 'failed-no-acquisition'})
+            continue
         if payload.get('ok') is not True or type(record['exit_code']) is not int or record['exit_code'] != 0:
             raise ValueError('Draft receipt is unsuccessful')
         if argv[0] == 'preview-from-draft':

@@ -28,6 +28,126 @@ def generated_discoveries():
             'selection_rule': 'copy_exactly_one_candidate.handle_per_requested_meaning'})]
 
 
+def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path, monkeypatch):
+    from tests.unit.test_object_metadata_business_gateway import (
+        waapi_gateway, _offline, _env, _info, _project, OBJECT_ID, FakeClient)
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    producer = tmp_path / 'producer'
+    producer.mkdir()
+    code, started = _offline(producer, 'draft-start', 'object.setProperty')
+    assert code == 0
+    draft, authority = started['draft']['draft_id'], started['task_authority']
+    client = FakeClient({'ak.wwise.core.getInfo': [_info()],
+        'ak.wwise.core.getProjectInfo': [_project(producer)], 'ak.wwise.core.object.get': [{'return': [{
+            'id': OBJECT_ID, 'name': 'Alarm', 'type': 'Sound', 'path': r'\Actor-Mixer Hierarchy\Default Work Unit\Alarm'}]}]})
+    common = ['--state-dir', str(producer / 'state')]
+    code, bound = waapi_gateway.execute_gateway([*common, 'draft-bind-object', draft,
+        '--task-authority', authority, '--expected-revision', '1', '--object-id', OBJECT_ID],
+        env=_env(producer), client_factory=lambda _: client)
+    assert code == 0, bound
+    metadata = {'name': 'VolumeGain', 'type': 'Real32', 'display': {'name': 'Volume gain'},
+        'restriction': {'type': 'range', 'min': -96.0, 'max': 24.0}}
+    client = FakeClient({'ak.wwise.core.getInfo': [_info()], 'ak.wwise.core.getProjectInfo': [_project(producer)],
+        'ak.wwise.core.object.getPropertyAndReferenceNames': [{'return': ['VolumeGain']}] * 2,
+        'ak.wwise.core.object.getPropertyInfo': [metadata] * 2})
+    code, discovered = waapi_gateway.execute_gateway([*common, 'draft-discover-fields', draft,
+        '--task-authority', authority, '--expected-revision', '2', '--object-handle', bound['bound_object']['handle'],
+        '--meaning', 'Volume  gain'], env=_env(producer), client_factory=lambda _: client)
+    assert code == 0, discovered
+    assert discovered['meaning_results'][0]['meaning'] == 'Volume  gain'
+    assert discovered['field_candidates'][0]['matched_meanings'] == ['Volume gain']
+    discoveries = generated_discoveries()
+    discoveries[1][0][-1] = 'Volume  gain'
+    # Reuse exact real producer semantic rows in the existing generated archive;
+    # its synthetic class scope is plumbing evidence, not a real plug-in read.
+    discoveries[1] = (discoveries[1][0], {key: discovered[key] for key in ('field_candidates', 'candidate_count', 'meaning_count',
+        'meaning_results', 'rejected_candidate_count', 'selection_required', 'selection_rule')})
+    root = tmp_path / 'archive'
+    root.mkdir()
+    unit = sealed_workflow(root, monkeypatch, 'C09', adjudication_contract=V8, draft_discoveries=discoveries)
+    receipt = json.loads((root / 'turns/turn-01/notice-review/receipt.json').read_text())
+    fact = receipt['input']['pre_execution_draft_discoveries']['discoveries'][-1]
+    assert fact['meanings'] == ['Volume  gain']
+    assert fact['candidates'][0]['matched_meanings'] == ['Volume gain']
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    assert verify_expansion_task_archive(root, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)['archive_valid'] is True
+
+
+def refined_discoveries(command):
+    rows = generated_discoveries()
+    index = 0 if command == 'draft-discover-types' else 1
+    argv = rows[index][0][:]
+    argv[argv.index('--meaning') + 1] = 'Unmatched initial phrase'
+    rows.insert(index, (argv, {'ok': False, 'error_code': 'CAPABILITY_UNAVAILABLE'}))
+    return rows
+
+
+@pytest.mark.parametrize('command', ['draft-discover-types', 'draft-discover-fields'])
+def test_admitted_failed_discovery_then_refinement_acquires_only_successful_rows(tmp_path, monkeypatch, command):
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C09', adjudication_contract=V8,
+        draft_discoveries=refined_discoveries(command))
+    receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
+    evidence = receipt['input']['pre_execution_draft_discoveries']
+    assert len(evidence['discoveries']) == 2
+    assert 'Unmatched initial phrase' not in json.dumps(evidence)
+    failed, = [row for row in evidence['revision_lineage'] if row.get('status') == 'failed-no-acquisition']
+    assert failed['expected_revision'] == failed['result_revision'] == (1 if command.endswith('types') else 2)
+    assert evidence['preview_expected_revision'] == 3
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(p): p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+    replay = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert replay['archive_valid'] is True and replay['business_pass'] is True
+    assert files == {str(p): p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
+
+
+@pytest.mark.parametrize('command', ['draft-discover-types', 'draft-discover-fields'])
+@pytest.mark.parametrize('damage', ['bad-revision', 'retry-revision', 'unauthenticated', 'unaccepted',
+    'wrong-authority', 'event-output', 'wrong-exit', 'missing-admission', 'candidate-rows'])
+def test_failed_discovery_refinement_retains_binding_and_no_acquisition_boundary(tmp_path, monkeypatch, command, damage):
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
+    from tests.semantic.support.codex_expansion_archive import _scope
+    from wwise_waapi.transactions import TransactionStore
+    sealed_workflow(tmp_path, monkeypatch, 'C09', adjudication_contract=V8, draft_discoveries=refined_discoveries(command))
+    plan = json.loads((tmp_path / 'expansion-plan.json').read_text())
+    records = json.loads((tmp_path / 'expansion-broker.json').read_text())['records']
+    events = [json.loads(line) for line in (tmp_path / 'turns/turn-01/events.jsonl').read_text().splitlines()]
+    tx = 'tx1-00000000000000000001'
+    kwargs = dict(case_id='C09', version='2025.1', execute_expected=True,
+        preview_artifact=TransactionStore(tmp_path / 'broker/state').load_preview(tx).artifact,
+        before_snapshot=plan['before'], preview_parameters=plan['preview_parameters'], transaction_id=tx,
+        user_prompt=plan['prompts'][0], broker_records=records, read_admission=_scope(plan))
+    positions = [i for i, event in enumerate(events) if event.get('type') == 'item.completed'
+        and event.get('item', {}).get('type') == 'command_execution' and 'gateway.py' in event['item'].get('command', '')]
+    context = events, list(completed_command_records(events)), kwargs, {'receipts': [{'event_position': i} for i in positions]}
+    index = 1 if command.endswith('types') else 2
+    record = records[index]
+    if damage == 'bad-revision':
+        record['payload']['draft'] = {**records[0]['payload']['draft'], 'revision': index + 1}
+    elif damage == 'retry-revision':
+        records[index + 1]['gateway_arguments'][5] = str(index + 1)
+        reseal(context, index + 1)
+    elif damage == 'unauthenticated': record['authenticated'] = False
+    elif damage == 'unaccepted': record['accepted'] = False
+    elif damage == 'wrong-authority': record['gateway_arguments'][3] = 'other-authority'
+    elif damage == 'event-output': events[positions[index]]['item']['aggregated_output'] = '{}'
+    elif damage == 'wrong-exit':
+        record.update(exit_code=0, runner_exit_code=0)
+        events[positions[index]]['item']['exit_code'] = 0
+    elif damage == 'missing-admission': record['allowed_exit_codes'] = [0]
+    else: record['payload']['type_candidates'] = []
+    if damage != 'event-output': reseal(context, index)
+    decision = decide(context)
+    assert decision['outcome'] == 'material_reject'
+    assert 'input' not in decision
+
+
 @pytest.mark.parametrize('version', ['2022.1', '2025.1'])
 def test_type_and_field_facts_survive_fake_runner_and_readonly_archive(tmp_path, monkeypatch, version):
     from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow

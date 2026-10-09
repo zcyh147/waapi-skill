@@ -493,9 +493,12 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     _write(root / 'expansion-oracle.json', oracle)
     original = json.loads((root / 'expansion-broker.json').read_text())['records']
     args = [list(argv) for argv, _ in public_reads] + [['draft-start', plan['request_schema_uri'] or plan['operation']]]
-    args += [[argv[0], 'draft', '--task-authority', 'auth', '--expected-revision', str(index), *argv[1:]]
-        for index, (argv, _) in enumerate(draft_discoveries, 1)]
-    args += [['preview-from-draft', 'draft', '--task-authority', 'auth', '--expected-revision', str(1 + len(draft_discoveries))]]
+    draft_revision = 1
+    for argv, payload in draft_discoveries:
+        args.append([argv[0], 'draft', '--task-authority', 'auth', '--expected-revision', str(draft_revision), *argv[1:]])
+        if payload.get('ok') is not False and payload.get('status') != 'needs_clarification':
+            draft_revision += 1
+    args += [['preview-from-draft', 'draft', '--task-authority', 'auth', '--expected-revision', str(draft_revision)]]
     preview_index = len(args)
     if ask: args.append(['confirm', tx, '--confirmation-token', token])
     args += [['execute', tx], ['verify', tx]]
@@ -515,9 +518,11 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
             payload = deepcopy(draft_discoveries[index - len(public_reads) - 2][1])
         template['payload'] = payload
         payload['command'] = argv[0]
-        if draft_discoveries and argv[0] in {'draft-start', 'draft-discover-types', 'draft-discover-fields'}:
+        preparation_failed = (argv[0] in {'draft-discover-types', 'draft-discover-fields'}
+            and (payload.get('ok') is False or payload.get('status') == 'needs_clarification'))
+        if draft_discoveries and argv[0] in {'draft-start', 'draft-discover-types', 'draft-discover-fields'} and not preparation_failed:
             payload.update(ok=True, offline=argv[0] == 'draft-start', detected_version=version,
-                draft={'draft_id': 'draft', 'revision': index - len(public_reads),
+                draft={'draft_id': 'draft', 'revision': 1 if argv[0] == 'draft-start' else int(argv[5]) + 1,
                     'binding': {'operation': artifact['request']['operation'], 'version': version},
                     'response_integrity': {'complete': True, 'truncated': False}})
         if argv[0] not in {'draft-start', 'query-object', 'metadata', 'query-schema'}: payload.update(transaction_id=tx, artifact_hash=artifact_hash)
@@ -540,9 +545,11 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
             gateway_arguments=argv, raw_argv_sha256=canonical_digest(model), argv_sha256=canonical_digest(model),
             semantic_argv_sha256=canonical_digest(semantic), payload_sha256=canonical_digest(payload), stdout=json.dumps(payload),
             runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]))
+        if preparation_failed:
+            template.update(exit_code=2, runner_exit_code=2, allowed_exit_codes=[0, 2])
         records.append(template)
         command = {'id': 'cmd-' + str(index), 'type': 'command_execution', 'command': shlex.join(model),
-            'status': 'completed', 'exit_code': 0, 'aggregated_output': template['stdout']}
+            'status': 'completed', 'exit_code': template['exit_code'], 'aggregated_output': template['stdout']}
         events = turn_events[1 if ask and index > preview_index else 0]
         events.extend([{'type': 'item.started', 'item': {**command, 'status': 'in_progress'}}, {'type': 'item.completed', 'item': command}])
         if argv[0] == 'preview-from-draft':
