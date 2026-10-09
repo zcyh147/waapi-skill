@@ -1,0 +1,2045 @@
+{
+  "contract": "waapi-skill.expansion-notice-adjudication/v1",
+  "case_id": "M01",
+  "version": "2025.1",
+  "transaction_id": "tx1-hn648m82jmz2gr7jec1e",
+  "preview_sha256": "9d53e6dd417ac9c4c2811f110986c037b6c3f91b561fe82ec4a8c38125df02b5",
+  "pre_execution_timeline_sha256": "93742e37ba1ee1bb6fd23f9bd201d77df324f957e209c3fb11b294dbea5ac70a",
+  "preview_event_position": 20,
+  "execute_event_position": 22,
+  "user_prompt": "请通过一次批量导入，在 \\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music（{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}）下建立音乐段 Imported，其中建立 Quiet 和 Full 两条 Music Track，分别导入 /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav 和 /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav。只把 Quiet 的 Track 音量设为 -6 dB；Full 保持默认音量，不修改片段或源音量。已有 Keep（{D205BFF2-A7E6-433B-BA12-EEF5D47EC19F}）与父级其他内容保持不变，不设置播放列表、Transition 或 Stinger。这是要实际完成的修改，请核对状态、告知变更并完成执行和核验；说明两条Track各自实际使用的素材。",
+  "visible_messages": [
+    {
+      "event_position": 8,
+      "text": "已加载 waapi-skill，WAAPI 端口配置为 30700，Wwise 适配版本为 2025.1。\n\n当前修改策略为 allow_changes；支持 read_only、ask_before_changes 和 allow_changes 三种模式。我会核对目标状态，准备一次批量导入，告知具体变更后执行并核验。\n"
+    },
+    {
+      "event_position": 21,
+      "text": "导入预览已完成：将在 Expansion_EXP25-M01_Music 下新建 Imported 音乐段及 Quiet、Full 两条 Music Track，分别导入 Quiet.wav、Full.wav。只设置 Quiet 的 Track 音量为 -6 dB，Full 使用默认音量；不修改片段或源音量，也不设置播放列表、Transition 或 Stinger。现在执行这一次批量导入，随后核验素材、音量及已有内容是否保持不变。\n"
+    }
+  ],
+  "before_snapshot": {
+    "parent": {
+      "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+      "name": "Expansion_EXP25-M01_Music",
+      "type": "MusicPlaylistContainer",
+      "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+      "parent": {
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+        "name": "Default Work Unit"
+      },
+      "notes": ""
+    },
+    "protected": {
+      "id": "{D205BFF2-A7E6-433B-BA12-EEF5D47EC19F}",
+      "name": "Keep",
+      "type": "MusicSegment",
+      "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Keep",
+      "parent": {
+        "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "name": "Expansion_EXP25-M01_Music"
+      },
+      "notes": ""
+    },
+    "children": [
+      {
+        "id": "{D205BFF2-A7E6-433B-BA12-EEF5D47EC19F}",
+        "name": "Keep",
+        "type": "MusicSegment",
+        "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Keep",
+        "parent": {
+          "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "name": "Expansion_EXP25-M01_Music"
+        }
+      }
+    ],
+    "segment": null,
+    "tracks": {}
+  },
+  "immutable_request": {
+    "arguments": {
+      "imports": [
+        {
+          "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+          "object_type": "MusicSegment"
+        },
+        {
+          "audio_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+          "import_language": "SFX",
+          "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+          "object_type": "MusicTrack",
+          "properties": [
+            {
+              "name": "Volume",
+              "value": -6.0
+            }
+          ]
+        },
+        {
+          "audio_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+          "import_language": "SFX",
+          "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+          "object_type": "MusicTrack"
+        }
+      ]
+    },
+    "contract": "waapi-skill.operation-request/v1",
+    "operation": "audio.import",
+    "version": "2025.1"
+  },
+  "prepared_operation": {
+    "cleanup": {
+      "automatic": false,
+      "automatic_retry": false,
+      "created_guid_source": "execution_result.result.objects",
+      "irreversible": false,
+      "kind": "discard-case-owned-project-copy"
+    },
+    "contract": "waapi-skill.prepared-operation/v1",
+    "dispatch": {
+      "args": {
+        "autoAddToSourceControl": false,
+        "autoCheckOutToSourceControl": false,
+        "importOperation": "createNew",
+        "imports": [
+          {
+            "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+            "objectType": "MusicSegment"
+          },
+          {
+            "@Volume": -6.0,
+            "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+            "objectType": "MusicTrack"
+          },
+          {
+            "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+            "importLanguage": "SFX",
+            "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet\\<AudioFileSource>Quiet"
+          },
+          {
+            "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+            "objectType": "MusicTrack"
+          },
+          {
+            "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+            "importLanguage": "SFX",
+            "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full\\<AudioFileSource>Full"
+          }
+        ]
+      },
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "parent",
+          "notes",
+          "activeSource",
+          "originalFilePath",
+          "sound:originalWavFilePath",
+          "audioSource:language",
+          "@Sequences",
+          "@Volume"
+        ]
+      },
+      "uri": "ak.wwise.core.audio.import"
+    },
+    "operation": "audio.import",
+    "pre_state": {
+      "closed_import_plan": {
+        "contract": "waapi-skill.audio-import-plan/v1",
+        "dispatch_args": {
+          "autoAddToSourceControl": false,
+          "autoCheckOutToSourceControl": false,
+          "importOperation": "createNew",
+          "imports": [
+            {
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+              "objectType": "MusicSegment"
+            },
+            {
+              "@Volume": -6.0,
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+              "objectType": "MusicTrack"
+            },
+            {
+              "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+              "importLanguage": "SFX",
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet\\<AudioFileSource>Quiet"
+            },
+            {
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+              "objectType": "MusicTrack"
+            },
+            {
+              "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+              "importLanguage": "SFX",
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full\\<AudioFileSource>Full"
+            }
+          ]
+        },
+        "file_proofs": [
+          {
+            "device": 16777229,
+            "index": 1,
+            "inode": 313494080,
+            "mtime_ns": 1791525871049781973,
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+            "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+            "size": 12404
+          },
+          {
+            "device": 16777229,
+            "index": 2,
+            "inode": 313494081,
+            "mtime_ns": 1791525871049976848,
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+            "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+            "size": 1644
+          }
+        ],
+        "operation_policy": {
+          "absent_target_postcondition": "new_unique_guid_at_exact_path",
+          "automatic_retry": false,
+          "cleanup_policy": "delete_created_guids_then_discard_owned_project_copy_for_media",
+          "collision_policy": "exact_target_must_be_absent",
+          "disposable_project_required": false,
+          "existing_target_postcondition": "not_applicable",
+          "import_operation": "createNew",
+          "in_place_restore_supported": false,
+          "one_global_operation_per_call": true,
+          "owned_project_copy_required_for_clean_test": true,
+          "partial_success_is_failure": true,
+          "pre_execution_drift_check_required": true,
+          "pre_state_required": true,
+          "verify_every_derived_target": true
+        },
+        "oracle": {
+          "derived_from": "closed_request_and_hashed_source_files",
+          "dialogue_event_side_effects_present": false,
+          "event_side_effects_present": false,
+          "language_requires_live_project_validation": false,
+          "media_hash_readback_required": true,
+          "no_retry_after_dispatch": true,
+          "result_contract": "required_log_files_objects",
+          "switch_assignment_side_effects_present": false,
+          "targets": [
+            {
+              "canonical_parent_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+              "canonical_target_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+              "index": 0,
+              "media_expected": false,
+              "pre_state_required": true,
+              "requested_object_type": "MusicSegment"
+            },
+            {
+              "canonical_parent_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+              "canonical_target_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet",
+              "expected_audio_file_source_result_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet\\Quiet",
+              "index": 1,
+              "media_expected": true,
+              "pre_state_required": true,
+              "requested_language": "SFX",
+              "requested_object_type": "MusicTrack",
+              "requested_properties": [
+                {
+                  "name": "Volume",
+                  "value": -6.0
+                }
+              ],
+              "source_file": {
+                "device": 16777229,
+                "inode": 313494080,
+                "kind": "regular_file",
+                "mtime_ns": 1791525871049781973,
+                "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+                "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+                "size": 12404
+              }
+            },
+            {
+              "canonical_parent_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+              "canonical_target_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full",
+              "expected_audio_file_source_result_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full\\Full",
+              "index": 2,
+              "media_expected": true,
+              "pre_state_required": true,
+              "requested_language": "SFX",
+              "requested_object_type": "MusicTrack",
+              "source_file": {
+                "device": 16777229,
+                "inode": 313494081,
+                "kind": "regular_file",
+                "mtime_ns": 1791525871049976848,
+                "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+                "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+                "size": 1644
+              }
+            }
+          ]
+        },
+        "version": "2025.1"
+      },
+      "import_guard": {
+        "existing_sfx_source_snapshots": [],
+        "file_proofs": [
+          {
+            "field": "file_proofs[0]",
+            "proof": {
+              "device": 16777229,
+              "index": 1,
+              "inode": 313494080,
+              "mtime_ns": 1791525871049781973,
+              "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+              "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+              "size": 12404
+            }
+          },
+          {
+            "field": "file_proofs[1]",
+            "proof": {
+              "device": 16777229,
+              "index": 2,
+              "inode": 313494081,
+              "mtime_ns": 1791525871049976848,
+              "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+              "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+              "size": 1644
+            }
+          }
+        ],
+        "language_inventory": null,
+        "localized_source_snapshots": [],
+        "originals_context": {
+          "authority": "waapi_getProjectInfo",
+          "originals_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/sandbox-root/sample-project-da156526e9684fdcabe493d47349aae5/Originals",
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/sandbox-root/sample-project-da156526e9684fdcabe493d47349aae5/SampleProject.wproj"
+          },
+          "project_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/sandbox-root/sample-project-da156526e9684fdcabe493d47349aae5",
+          "source_proof_sha256": null,
+          "version": "2025.1"
+        },
+        "path_snapshots": [
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "parent",
+              "notes",
+              "activeSource",
+              "originalFilePath",
+              "sound:originalWavFilePath",
+              "audioSource:language"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+            "rows": []
+          },
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "parent",
+              "notes"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+            "rows": []
+          },
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "parent",
+              "notes",
+              "activeSource",
+              "originalFilePath",
+              "sound:originalWavFilePath",
+              "audioSource:language",
+              "@Sequences",
+              "@Volume"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet",
+            "rows": []
+          },
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "parent",
+              "notes"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+            "rows": []
+          },
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "parent",
+              "notes",
+              "activeSource",
+              "originalFilePath",
+              "sound:originalWavFilePath",
+              "audioSource:language",
+              "@Sequences"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full",
+            "rows": []
+          },
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "notes",
+              "originalFilePath",
+              "audioSource:language"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet\\Quiet",
+            "rows": []
+          },
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "notes",
+              "originalFilePath",
+              "audioSource:language"
+            ],
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full\\Full",
+            "rows": []
+          }
+        ],
+        "source_operation": "audio.import"
+      },
+      "targets[0].anchor": {
+        "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "name": "Expansion_EXP25-M01_Music",
+        "notes": "",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+        "type": "MusicPlaylistContainer"
+      },
+      "targets[1].anchor": {
+        "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "name": "Expansion_EXP25-M01_Music",
+        "notes": "",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+        "type": "MusicPlaylistContainer"
+      },
+      "targets[2].anchor": {
+        "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "name": "Expansion_EXP25-M01_Music",
+        "notes": "",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+        "type": "MusicPlaylistContainer"
+      }
+    },
+    "preflight_reads": [
+      {
+        "args": {},
+        "options": {},
+        "result": {
+          "return": [
+            {
+              "classId": 12451843,
+              "name": "Wwise 3D Audio Bed Mixer",
+              "type": "Effect"
+            },
+            {
+              "classId": 8257539,
+              "name": "Wwise Guitar Distortion",
+              "type": "Effect"
+            },
+            {
+              "classId": 1572880,
+              "name": "ObjectSettingAssoc",
+              "type": "WObject"
+            },
+            {
+              "classId": 8912899,
+              "name": "Wwise Pitch Shifter",
+              "type": "Effect"
+            },
+            {
+              "classId": 13107202,
+              "name": "Wwise Audio Input",
+              "type": "Source"
+            },
+            {
+              "classId": 3932176,
+              "name": "MusicClip",
+              "type": "WObject"
+            },
+            {
+              "classId": 7077891,
+              "name": "Wwise Compressor",
+              "type": "Effect"
+            },
+            {
+              "classId": 8192003,
+              "name": "Wwise Flanger",
+              "type": "Effect"
+            },
+            {
+              "classId": 7143427,
+              "name": "Wwise Expander",
+              "type": "Effect"
+            },
+            {
+              "classId": 6946819,
+              "name": "Wwise Delay",
+              "type": "Effect"
+            },
+            {
+              "classId": 9109507,
+              "name": "Wwise Gain",
+              "type": "Effect"
+            },
+            {
+              "classId": 9043971,
+              "name": "Wwise Harmonizer",
+              "type": "Effect"
+            },
+            {
+              "classId": 11730951,
+              "name": "Controller Speaker",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 7536643,
+              "name": "Wwise Matrix Reverb",
+              "type": "Effect"
+            },
+            {
+              "classId": 65537,
+              "name": "PCM",
+              "type": "Conversion"
+            },
+            {
+              "classId": 12648451,
+              "name": "Ak Sidechain Send",
+              "type": "Effect"
+            },
+            {
+              "classId": 8454147,
+              "name": "Wwise Meter",
+              "type": "Effect"
+            },
+            {
+              "classId": 262145,
+              "name": "Vorbis",
+              "type": "Conversion"
+            },
+            {
+              "classId": 8650755,
+              "name": "Wwise Recorder",
+              "type": "Effect"
+            },
+            {
+              "classId": 12845059,
+              "name": "Wwise Multiband Meter",
+              "type": "Effect"
+            },
+            {
+              "classId": 6881283,
+              "name": "Wwise Parametric EQ",
+              "type": "Effect"
+            },
+            {
+              "classId": 4063248,
+              "name": "MusicClipMidi",
+              "type": "WObject"
+            },
+            {
+              "classId": 11403271,
+              "name": "System",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 7208963,
+              "name": "Wwise Peak Limiter",
+              "type": "Effect"
+            },
+            {
+              "classId": 12976131,
+              "name": "Wwise Recorder (ADM)",
+              "type": "Effect"
+            },
+            {
+              "classId": 2490384,
+              "name": "MusicStinger",
+              "type": "WObject"
+            },
+            {
+              "classId": 11927559,
+              "name": "Remote System",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 7733251,
+              "name": "Wwise RoomVerb",
+              "type": "Effect"
+            },
+            {
+              "classId": 5373968,
+              "name": "Marker",
+              "type": "WObject"
+            },
+            {
+              "classId": 131073,
+              "name": "ADPCM",
+              "type": "Conversion"
+            },
+            {
+              "classId": 8519683,
+              "name": "Wwise Time Stretch",
+              "type": "Effect"
+            },
+            {
+              "classId": 12713987,
+              "name": "Ak Sidechain Receive",
+              "type": "Effect"
+            },
+            {
+              "classId": 5439504,
+              "name": "MultiSwitchEntry",
+              "type": "WObject"
+            },
+            {
+              "classId": 8585219,
+              "name": "Wwise Tremolo",
+              "type": "Effect"
+            },
+            {
+              "classId": 12779522,
+              "name": "Ak Sidechain Source",
+              "type": "Source"
+            },
+            {
+              "classId": 6619138,
+              "name": "Wwise Silence",
+              "type": "Source"
+            },
+            {
+              "classId": 6553602,
+              "name": "Wwise Sine",
+              "type": "Source"
+            },
+            {
+              "classId": 8847363,
+              "name": "Wwise Stereo Delay",
+              "type": "Effect"
+            },
+            {
+              "classId": 262160,
+              "name": "Event",
+              "type": "WObject"
+            },
+            {
+              "classId": 1310721,
+              "name": "WEM Opus",
+              "type": "Conversion"
+            },
+            {
+              "classId": 9699330,
+              "name": "Wwise Synth One",
+              "type": "Source"
+            },
+            {
+              "classId": 327696,
+              "name": "Action",
+              "type": "WObject"
+            },
+            {
+              "classId": 5570560,
+              "name": "MetadataSlot",
+              "type": "Inner"
+            },
+            {
+              "classId": 58982409,
+              "name": "Wwise System Output Settings",
+              "type": "Metadata"
+            },
+            {
+              "classId": 6684674,
+              "name": "Wwise Tone Generator",
+              "type": "Source"
+            },
+            {
+              "classId": 11468807,
+              "name": "DVR Bypass",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11534343,
+              "name": "Communication",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11599879,
+              "name": "Controller Headphones",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 2359312,
+              "name": "MusicPlaylistItem",
+              "type": "WObject"
+            },
+            {
+              "classId": 11796487,
+              "name": "Auxiliary",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 2424848,
+              "name": "MusicTransition",
+              "type": "WObject"
+            },
+            {
+              "classId": 11862023,
+              "name": "No Output",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 5636096,
+              "name": "PlaylistSlot",
+              "type": "Inner"
+            },
+            {
+              "classId": 5767168,
+              "name": "EntryPathSlot",
+              "type": "Inner"
+            },
+            {
+              "classId": 2752528,
+              "name": "Panner",
+              "type": "WObject"
+            },
+            {
+              "classId": 4980752,
+              "name": "ActionException",
+              "type": "WObject"
+            },
+            {
+              "classId": 786448,
+              "name": "Position",
+              "type": "WObject"
+            },
+            {
+              "classId": 720912,
+              "name": "Path2D",
+              "type": "WObject"
+            },
+            {
+              "classId": 917520,
+              "name": "Curve",
+              "type": "WObject"
+            },
+            {
+              "classId": 2555920,
+              "name": "MusicFade",
+              "type": "WObject"
+            },
+            {
+              "classId": 3866640,
+              "name": "MusicCue",
+              "type": "WObject"
+            },
+            {
+              "classId": 16,
+              "name": "AudioFileSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 5242896,
+              "name": "MidiFileSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 5046288,
+              "name": "MusicEventCue",
+              "type": "WObject"
+            },
+            {
+              "classId": 5701632,
+              "name": "ArgumentsSlot",
+              "type": "Inner"
+            },
+            {
+              "classId": 3014672,
+              "name": "DialogueEvent",
+              "type": "WObject"
+            },
+            {
+              "classId": 1179664,
+              "name": "SoundBank",
+              "type": "WObject"
+            },
+            {
+              "classId": 1245200,
+              "name": "SwitchGroup",
+              "type": "WObject"
+            },
+            {
+              "classId": 1310736,
+              "name": "Switch",
+              "type": "WObject"
+            },
+            {
+              "classId": 458768,
+              "name": "StateGroup",
+              "type": "WObject"
+            },
+            {
+              "classId": 393232,
+              "name": "State",
+              "type": "WObject"
+            },
+            {
+              "classId": 5177360,
+              "name": "CustomState",
+              "type": "WObject"
+            },
+            {
+              "classId": 5570576,
+              "name": "StateGroupInfo",
+              "type": "WObject"
+            },
+            {
+              "classId": 1507344,
+              "name": "GameParameter",
+              "type": "WObject"
+            },
+            {
+              "classId": 4128784,
+              "name": "MidiParameter",
+              "type": "WObject"
+            },
+            {
+              "classId": 2621456,
+              "name": "Trigger",
+              "type": "WObject"
+            },
+            {
+              "classId": 1048592,
+              "name": "SourcePlugin",
+              "type": "WObject"
+            },
+            {
+              "classId": 1114128,
+              "name": "Effect",
+              "type": "WObject"
+            },
+            {
+              "classId": 5308432,
+              "name": "Metadata",
+              "type": "WObject"
+            },
+            {
+              "classId": 2686992,
+              "name": "Attenuation",
+              "type": "WObject"
+            },
+            {
+              "classId": 3604496,
+              "name": "Conversion",
+              "type": "WObject"
+            },
+            {
+              "classId": 4259856,
+              "name": "ModulatorEnvelope",
+              "type": "WObject"
+            },
+            {
+              "classId": 4194320,
+              "name": "ModulatorLfo",
+              "type": "WObject"
+            },
+            {
+              "classId": 5111824,
+              "name": "ModulatorTime",
+              "type": "WObject"
+            },
+            {
+              "classId": 4653072,
+              "name": "AudioDevice",
+              "type": "WObject"
+            },
+            {
+              "classId": 4718608,
+              "name": "AcousticTexture",
+              "type": "WObject"
+            },
+            {
+              "classId": 3473424,
+              "name": "MixingSession",
+              "type": "WObject"
+            },
+            {
+              "classId": 1703952,
+              "name": "SoundcasterSession",
+              "type": "WObject"
+            },
+            {
+              "classId": 4325392,
+              "name": "ControlSurfaceSession",
+              "type": "WObject"
+            },
+            {
+              "classId": 4390928,
+              "name": "ControlSurfaceBinding",
+              "type": "WObject"
+            },
+            {
+              "classId": 4456464,
+              "name": "ControlSurfaceBindingGroup",
+              "type": "WObject"
+            },
+            {
+              "classId": 5701648,
+              "name": "MediaPoolQuery",
+              "type": "WObject"
+            },
+            {
+              "classId": 5767184,
+              "name": "MediaPoolFilter",
+              "type": "WObject"
+            },
+            {
+              "classId": 2097168,
+              "name": "Query",
+              "type": "WObject"
+            },
+            {
+              "classId": 2162704,
+              "name": "SearchCriteria",
+              "type": "WObject"
+            },
+            {
+              "classId": 983056,
+              "name": "Modifier",
+              "type": "WObject"
+            },
+            {
+              "classId": 1376272,
+              "name": "Bus",
+              "type": "WObject"
+            },
+            {
+              "classId": 3997712,
+              "name": "AuxBus",
+              "type": "WObject"
+            },
+            {
+              "classId": 65552,
+              "name": "Sound",
+              "type": "WObject"
+            },
+            {
+              "classId": 524304,
+              "name": "PropertyContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 589840,
+              "name": "RandomSequenceContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 655376,
+              "name": "SwitchContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 1900560,
+              "name": "BlendContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 1966096,
+              "name": "BlendTrack",
+              "type": "WObject"
+            },
+            {
+              "classId": 2228240,
+              "name": "MusicPlaylistContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 5832704,
+              "name": "MusicArgumentsSlot",
+              "type": "Inner"
+            },
+            {
+              "classId": 2293776,
+              "name": "MusicSwitchContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 1769488,
+              "name": "MusicSegment",
+              "type": "WObject"
+            },
+            {
+              "classId": 1835024,
+              "name": "MusicTrack",
+              "type": "WObject"
+            },
+            {
+              "classId": 3801104,
+              "name": "MusicTrackSequence",
+              "type": "WObject"
+            },
+            {
+              "classId": 3342352,
+              "name": "UserProjectSettings",
+              "type": "WObject"
+            },
+            {
+              "classId": 65011712,
+              "name": "BatchRenameSettings",
+              "type": "Inner"
+            },
+            {
+              "classId": 196624,
+              "name": "Project",
+              "type": "WObject"
+            },
+            {
+              "classId": 4522000,
+              "name": "Platform",
+              "type": "WObject"
+            },
+            {
+              "classId": 4915216,
+              "name": "Language",
+              "type": "WObject"
+            },
+            {
+              "classId": 3538960,
+              "name": "PluginDataSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 1441808,
+              "name": "RTPC",
+              "type": "WObject"
+            },
+            {
+              "classId": 3670032,
+              "name": "ExternalSourceFile",
+              "type": "WObject"
+            },
+            {
+              "classId": 3735568,
+              "name": "ExternalSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 1638416,
+              "name": "WorkUnit",
+              "type": "WObject"
+            },
+            {
+              "classId": 131088,
+              "name": "Folder",
+              "type": "WObject"
+            },
+            {
+              "classId": 5505040,
+              "name": "EffectSlot",
+              "type": "WObject"
+            },
+            {
+              "classId": 5636112,
+              "name": "SidechainMix",
+              "type": "WObject"
+            },
+            {
+              "classId": 5898240,
+              "name": "MediaPoolDatabasePath",
+              "type": "Inner"
+            },
+            {
+              "classId": 5832720,
+              "name": "MediaPoolDatabase",
+              "type": "WObject"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.getTypes"
+      },
+      {
+        "args": {
+          "classId": 1835024,
+          "property": "Volume"
+        },
+        "options": {},
+        "result": {
+          "audioEngineId": 0,
+          "default": 0.0,
+          "dependencies": [],
+          "display": {
+            "group": "Voice",
+            "index": 1520,
+            "name": "Voice Volume"
+          },
+          "name": "Volume",
+          "restriction": {
+            "max": 200.0,
+            "min": -200.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Additive",
+            "unlink": true
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "Decibels",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false,
+              "percentage": false
+            },
+            "value": {
+              "decimals": 1,
+              "fine": 0.1,
+              "infinity": 0,
+              "max": 12.0,
+              "min": -96.0,
+              "step": 1.0
+            }
+          }
+        },
+        "uri": "ak.wwise.core.object.getPropertyInfo"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+              "name": "Expansion_EXP25-M01_Music",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+              "type": "MusicPlaylistContainer"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes",
+            "activeSource",
+            "originalFilePath",
+            "sound:originalWavFilePath",
+            "audioSource:language"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+              "name": "Expansion_EXP25-M01_Music",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+              "type": "MusicPlaylistContainer"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes",
+            "activeSource",
+            "originalFilePath",
+            "sound:originalWavFilePath",
+            "audioSource:language",
+            "@Sequences",
+            "@Volume"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+              "name": "Expansion_EXP25-M01_Music",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+              "type": "MusicPlaylistContainer"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes",
+            "activeSource",
+            "originalFilePath",
+            "sound:originalWavFilePath",
+            "audioSource:language",
+            "@Sequences"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet\\Quiet"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "notes",
+            "originalFilePath",
+            "audioSource:language"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full\\Full"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "notes",
+            "originalFilePath",
+            "audioSource:language"
+          ]
+        },
+        "result": {
+          "return": []
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {},
+        "options": {},
+        "result": {
+          "currentLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+          "currentPlatformId": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+          "defaultConversion": {
+            "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+            "name": "PCM"
+          },
+          "defaultImportWorkUnit": {
+            "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Containers\\Default Work Unit.wwu",
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit",
+            "path": "\\Containers\\Default Work Unit"
+          },
+          "defaultWorkUnits": {
+            "Attenuations": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Attenuations\\Default Work Unit.wwu",
+              "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+              "name": "Default Work Unit",
+              "path": "\\Attenuations\\Default Work Unit"
+            },
+            "Busses": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Busses\\Default Work Unit.wwu",
+              "id": "{A74EEB4A-0805-4AFA-969C-53DCB862B550}",
+              "name": "Default Work Unit",
+              "path": "\\Busses\\Default Work Unit"
+            },
+            "Containers": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Containers\\Default Work Unit.wwu",
+              "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+              "name": "Default Work Unit",
+              "path": "\\Containers\\Default Work Unit"
+            },
+            "ControlSurfaceSessions": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Control Surface Sessions\\Default Work Unit.wwu",
+              "id": "{04DA98D7-6856-454A-8FDB-1049468EC4FC}",
+              "name": "Default Work Unit",
+              "path": "\\Control Surface Sessions\\Default Work Unit"
+            },
+            "Conversions": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Conversion Settings\\Default Work Unit.wwu",
+              "id": "{F187BB3C-C15C-4708-8E6B-2C0F95B6BE78}",
+              "name": "Default Work Unit",
+              "path": "\\Conversion Settings\\Default Work Unit"
+            },
+            "Devices": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Devices\\Default Work Unit.wwu",
+              "id": "{B231292D-F96D-4EDC-AE14-D62DE1E07EDD}",
+              "name": "Default Work Unit",
+              "path": "\\Devices\\Default Work Unit"
+            },
+            "DynamicDialogue": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Dynamic Dialogue\\Default Work Unit.wwu",
+              "id": "{6CA389AB-7446-4658-BFBD-6F2627EA8DA8}",
+              "name": "Default Work Unit",
+              "path": "\\Dynamic Dialogue\\Default Work Unit"
+            },
+            "Effects": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Effects\\Default Work Unit.wwu",
+              "id": "{2D54A839-DA81-4D75-A684-ABCB4AC6B14E}",
+              "name": "Default Work Unit",
+              "path": "\\Effects\\Default Work Unit"
+            },
+            "Events": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Events\\Default Work Unit.wwu",
+              "id": "{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}",
+              "name": "Default Work Unit",
+              "path": "\\Events\\Default Work Unit"
+            },
+            "GameParameters": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Game Parameters\\Default Work Unit.wwu",
+              "id": "{6D1262CA-2375-4279-B5E2-FF5C0B0120EA}",
+              "name": "Default Work Unit",
+              "path": "\\Game Parameters\\Default Work Unit"
+            },
+            "Metadatas": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Metadata\\Default Work Unit.wwu",
+              "id": "{2C7B8E5D-3DF1-41AF-A767-BAFAE19ABCD3}",
+              "name": "Default Work Unit",
+              "path": "\\Metadata\\Default Work Unit"
+            },
+            "MixingSessions": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Mixing Sessions\\Default Work Unit.wwu",
+              "id": "{293DB498-BD51-495B-8F0B-CD3298968340}",
+              "name": "Default Work Unit",
+              "path": "\\Mixing Sessions\\Default Work Unit"
+            },
+            "Modulators": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Modulators\\Default Work Unit.wwu",
+              "id": "{F29892F6-1D97-4F5F-8E0A-A82D4CD3D195}",
+              "name": "Default Work Unit",
+              "path": "\\Modulators\\Default Work Unit"
+            },
+            "Presets": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Presets\\Default Work Unit.wwu",
+              "id": "{93E0E21F-9614-43AE-8C9E-5E3C2C5A5A11}",
+              "name": "Default Work Unit",
+              "path": "\\Presets\\Default Work Unit"
+            },
+            "Queries": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Queries\\Default Work Unit.wwu",
+              "id": "{83B30CD8-11CE-415D-B21A-0940F0708AC1}",
+              "name": "Default Work Unit",
+              "path": "\\Queries\\Default Work Unit"
+            },
+            "SidechainMixes": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Sidechain Mixes\\Default Work Unit.wwu",
+              "id": "{0C74FBC2-2F34-439B-A950-F08F0BA455D0}",
+              "name": "Default Work Unit",
+              "path": "\\Sidechain Mixes\\Default Work Unit"
+            },
+            "SoundBanks": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\SoundBanks\\Default Work Unit.wwu",
+              "id": "{12FC0937-5066-4C74-B671-F462C59D7912}",
+              "name": "Default Work Unit",
+              "path": "\\SoundBanks\\Default Work Unit"
+            },
+            "SoundcasterSessions": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Soundcaster Sessions\\Default Work Unit.wwu",
+              "id": "{8C516E3C-23AA-4358-ACBF-2C79E9DF888C}",
+              "name": "Default Work Unit",
+              "path": "\\Soundcaster Sessions\\Default Work Unit"
+            },
+            "States": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\States\\Default Work Unit.wwu",
+              "id": "{893902C5-0AC7-4779-8308-53B50FF94BD6}",
+              "name": "Default Work Unit",
+              "path": "\\States\\Default Work Unit"
+            },
+            "Switches": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Switches\\Default Work Unit.wwu",
+              "id": "{943EAFED-3A2C-4325-9F3C-E4CD8AEE33DC}",
+              "name": "Default Work Unit",
+              "path": "\\Switches\\Default Work Unit"
+            },
+            "Triggers": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Triggers\\Default Work Unit.wwu",
+              "id": "{AF6AA034-ACF7-4B97-ADFE-07532193996D}",
+              "name": "Default Work Unit",
+              "path": "\\Triggers\\Default Work Unit"
+            },
+            "VirtualAcoustics": {
+              "filePath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Virtual Acoustics\\Default Work Unit.wwu",
+              "id": "{0E4EBC41-B974-4788-B7B6-8657E0865E85}",
+              "name": "Default Work Unit",
+              "path": "\\Virtual Acoustics\\Default Work Unit"
+            }
+          },
+          "directories": {
+            "cache": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\io\\cache\\",
+            "commands": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Add-ons\\Commands",
+            "originals": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Originals\\",
+            "properties": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\Add-ons\\Properties",
+            "root": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\",
+            "soundBankOutputRoot": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\io\\soundbanks\\"
+          },
+          "displayTitle": "SampleProject* - No license key - WwiseConsole 2025.1.7 ",
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "isDirty": true,
+          "languages": [
+            {
+              "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+              "name": "English(US)",
+              "shortId": 684519430
+            }
+          ],
+          "name": "SampleProject",
+          "path": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\sandbox-root\\sample-project-da156526e9684fdcabe493d47349aae5\\SampleProject.wproj",
+          "platforms": [
+            {
+              "baseDisplayName": "Mac®",
+              "baseName": "Mac",
+              "copiedMediaPath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\io\\soundbanks\\Mac\\Media",
+              "id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+              "name": "Mac",
+              "soundBankPath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\io\\soundbanks\\Mac\\"
+            },
+            {
+              "baseDisplayName": "Windows®",
+              "baseName": "Windows",
+              "copiedMediaPath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\io\\soundbanks\\Windows\\Media",
+              "id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}",
+              "name": "Windows",
+              "soundBankPath": "Y:\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-initial25-8550bdd-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP25-M01\\owned\\io\\soundbanks\\Windows\\"
+            }
+          ],
+          "referenceLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}"
+        },
+        "uri": "ak.wwise.core.getProjectInfo"
+      }
+    ],
+    "raw_dispatch_allowed": false,
+    "request": {
+      "arguments": {
+        "imports": [
+          {
+            "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+            "object_type": "MusicSegment"
+          },
+          {
+            "audio_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+            "import_language": "SFX",
+            "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+            "object_type": "MusicTrack",
+            "properties": [
+              {
+                "name": "Volume",
+                "value": -6.0
+              }
+            ]
+          },
+          {
+            "audio_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+            "import_language": "SFX",
+            "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+            "object_type": "MusicTrack"
+          }
+        ]
+      },
+      "contract": "waapi-skill.operation-request/v1",
+      "operation": "audio.import",
+      "version": "2025.1"
+    },
+    "resolved_roles": {
+      "targets[0].anchor": {
+        "identity": {
+          "id": null,
+          "name": null,
+          "parent": null,
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "type": null,
+          "waql": null
+        },
+        "object": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "resolution": "live-path",
+        "row": {
+          "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "name": "Expansion_EXP25-M01_Music",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "type": "MusicPlaylistContainer"
+        }
+      },
+      "targets[1].anchor": {
+        "identity": {
+          "id": null,
+          "name": null,
+          "parent": null,
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "type": null,
+          "waql": null
+        },
+        "object": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "resolution": "live-path",
+        "row": {
+          "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "name": "Expansion_EXP25-M01_Music",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "type": "MusicPlaylistContainer"
+        }
+      },
+      "targets[2].anchor": {
+        "identity": {
+          "id": null,
+          "name": null,
+          "parent": null,
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "type": null,
+          "waql": null
+        },
+        "object": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+        "resolution": "live-path",
+        "row": {
+          "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "name": "Expansion_EXP25-M01_Music",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "type": "MusicPlaylistContainer"
+        }
+      }
+    },
+    "semantic_preview": {
+      "envelope": {
+        "args": {
+          "autoAddToSourceControl": false,
+          "autoCheckOutToSourceControl": false,
+          "importOperation": "createNew",
+          "imports": [
+            {
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+              "objectType": "MusicSegment"
+            },
+            {
+              "@Volume": -6.0,
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+              "objectType": "MusicTrack"
+            },
+            {
+              "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+              "importLanguage": "SFX",
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet\\<AudioFileSource>Quiet"
+            },
+            {
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+              "objectType": "MusicTrack"
+            },
+            {
+              "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+              "importLanguage": "SFX",
+              "objectPath": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full\\<AudioFileSource>Full"
+            }
+          ]
+        },
+        "metadata": {
+          "caller_expected_rows_accepted": false,
+          "closed_import_plan": "waapi-skill.audio-import-plan/v1",
+          "import_operation": "createNew",
+          "model_authored_code": false,
+          "native_row_count": 5,
+          "native_row_mapping": [
+            {
+              "logical_index": 0,
+              "native_rows": [
+                {
+                  "kind": "single",
+                  "native_index": 0,
+                  "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported"
+                }
+              ]
+            },
+            {
+              "logical_index": 1,
+              "native_rows": [
+                {
+                  "kind": "music_track_structure",
+                  "native_index": 1,
+                  "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet"
+                },
+                {
+                  "canonical_result_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet\\Quiet",
+                  "kind": "audio_file_source_media",
+                  "native_index": 2,
+                  "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet\\<AudioFileSource>Quiet"
+                }
+              ]
+            },
+            {
+              "logical_index": 2,
+              "native_rows": [
+                {
+                  "kind": "music_track_structure",
+                  "native_index": 3,
+                  "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full"
+                },
+                {
+                  "canonical_result_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full\\Full",
+                  "kind": "audio_file_source_media",
+                  "native_index": 4,
+                  "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full\\<AudioFileSource>Full"
+                }
+              ]
+            }
+          ],
+          "preflight_consumed_fields": [],
+          "request_validation_strength": "partial_reflected_schema",
+          "schema_validation": {
+            "required_families": [],
+            "required_fields": [
+              "imports"
+            ],
+            "section": "request",
+            "unresolved_refs": [
+              "#/properties/default/properties/audioFile",
+              "#/properties/default/properties/importLanguage",
+              "#/properties/default/properties/objectPath",
+              "#/properties/default/properties/objectType",
+              "common_definitions.json#/definitions/propertyValue",
+              "waapi_definitions.json#/definitions/importOperationType",
+              "waapi_definitions.json#/definitions/objectReturnOptions"
+            ],
+            "uri": "ak.wwise.core.audio.import",
+            "validated_nodes": 24,
+            "version": "2025.1"
+          },
+          "source_control_policy": {
+            "auto_add_to_source_control": false,
+            "auto_check_out_to_source_control": false,
+            "auto_check_out_to_source_control_dispatched": true,
+            "auto_check_out_to_source_control_supported": true
+          },
+          "target_count": 3
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes",
+            "activeSource",
+            "originalFilePath",
+            "sound:originalWavFilePath",
+            "audioSource:language",
+            "@Sequences",
+            "@Volume"
+          ]
+        },
+        "uri": "ak.wwise.core.audio.import"
+      },
+      "evidence_plan": [],
+      "raw_dispatch_allowed": false,
+      "readback_plan": [],
+      "requires_destructive_gate": true,
+      "source_note_family": "import",
+      "version": "2025.1"
+    },
+    "verification_plan": {
+      "allowed_result_paths": [
+        "\\containers\\default work unit\\expansion_exp25-m01_music\\imported",
+        "\\containers\\default work unit\\expansion_exp25-m01_music\\imported\\full",
+        "\\containers\\default work unit\\expansion_exp25-m01_music\\imported\\full\\full",
+        "\\containers\\default work unit\\expansion_exp25-m01_music\\imported\\quiet",
+        "\\containers\\default work unit\\expansion_exp25-m01_music\\imported\\quiet\\quiet"
+      ],
+      "error_log_is_failure": true,
+      "import_operation": "createNew",
+      "kind": "closed-audio-import",
+      "native_directive_boundaries": [],
+      "originals_context": {
+        "authority": "waapi_getProjectInfo",
+        "originals_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/sandbox-root/sample-project-da156526e9684fdcabe493d47349aae5/Originals",
+        "project": {
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "name": "SampleProject",
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/sandbox-root/sample-project-da156526e9684fdcabe493d47349aae5/SampleProject.wproj"
+        },
+        "project_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/sandbox-root/sample-project-da156526e9684fdcabe493d47349aae5",
+        "source_proof_sha256": null,
+        "version": "2025.1"
+      },
+      "result_contract": "required_log_files_objects",
+      "source_operation": "audio.import",
+      "targets": [
+        {
+          "anchor_id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "canonical_parent_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+          "canonical_target_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+          "index": 0,
+          "media_expected": false,
+          "metadata_class_id": 1769488,
+          "metadata_object_type": "MusicSegment",
+          "missing_ancestor_paths": [],
+          "pre_state_required": true,
+          "pre_state_rows": [],
+          "requested_notes_destination": "target_object",
+          "requested_object_type": "MusicSegment"
+        },
+        {
+          "anchor_id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "canonical_parent_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+          "canonical_target_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet",
+          "expected_audio_file_source_result_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet\\Quiet",
+          "explicit_audio_file_source_pre_state_rows": [],
+          "index": 1,
+          "media_expected": true,
+          "metadata_class_id": 1835024,
+          "metadata_object_type": "MusicTrack",
+          "missing_ancestor_paths": [
+            "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported"
+          ],
+          "pre_state_required": true,
+          "pre_state_rows": [],
+          "requested_language": "SFX",
+          "requested_notes_destination": "target_object",
+          "requested_object_type": "MusicTrack",
+          "requested_properties": [
+            {
+              "name": "Volume",
+              "value": -6.0
+            }
+          ],
+          "source_file": {
+            "device": 16777229,
+            "inode": 313494080,
+            "kind": "regular_file",
+            "mtime_ns": 1791525871049781973,
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+            "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+            "size": 12404
+          },
+          "validated_properties": [
+            {
+              "metadata_type": "Real64",
+              "name": "Volume",
+              "source": "request",
+              "value": -6.0
+            }
+          ]
+        },
+        {
+          "anchor_id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+          "canonical_parent_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+          "canonical_target_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full",
+          "expected_audio_file_source_result_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full\\Full",
+          "explicit_audio_file_source_pre_state_rows": [],
+          "index": 2,
+          "media_expected": true,
+          "metadata_class_id": 1835024,
+          "metadata_object_type": "MusicTrack",
+          "missing_ancestor_paths": [
+            "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported"
+          ],
+          "pre_state_required": true,
+          "pre_state_rows": [],
+          "requested_language": "SFX",
+          "requested_notes_destination": "target_object",
+          "requested_object_type": "MusicTrack",
+          "source_file": {
+            "device": 16777229,
+            "inode": 313494081,
+            "kind": "regular_file",
+            "mtime_ns": 1791525871049976848,
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+            "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+            "size": 1644
+          }
+        }
+      ],
+      "uri": "ak.wwise.core.audio.import",
+      "version": "2025.1"
+    },
+    "version": "2025.1",
+    "warnings": []
+  },
+  "attested_roles": {
+    "quantity": 3,
+    "mappings": [
+      {
+        "source_file": null,
+        "destination": {
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported",
+          "type": "MusicSegment"
+        },
+        "language": "SFX",
+        "field_owner": "MusicSegment",
+        "properties": [],
+        "before_source": null
+      },
+      {
+        "source_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Quiet.wav",
+        "destination": {
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Quiet",
+          "type": "MusicTrack"
+        },
+        "language": "SFX",
+        "field_owner": "MusicTrack",
+        "properties": [
+          {
+            "name": "Volume",
+            "value": -6.0
+          }
+        ],
+        "before_source": null
+      },
+      {
+        "source_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/owned/assets/music/Full.wav",
+        "destination": {
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\Imported\\Full",
+          "type": "MusicTrack"
+        },
+        "language": "SFX",
+        "field_owner": "MusicTrack",
+        "properties": [],
+        "before_source": null
+      }
+    ],
+    "target": {
+      "id": "{3FF07FE6-1D0E-49B0-9CF5-2530AA460CE9}",
+      "name": "Expansion_EXP25-M01_Music",
+      "type": "MusicPlaylistContainer",
+      "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music",
+      "parent": {
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+        "name": "Default Work Unit"
+      },
+      "notes": ""
+    },
+    "topology": "one MusicSegment with Quiet/Full MusicTrack; one AudioFileSource, sequence and clip per Track",
+    "units": {
+      "Volume": "decibels"
+    },
+    "preserve": [
+      "parent and Keep",
+      "Full default Volume",
+      "Clip and Source zero gain",
+      "no playlist/Transition/Stinger"
+    ]
+  }
+}

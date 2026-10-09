@@ -587,9 +587,9 @@ def replay_c09_notice(root: Path, result: Any, command_records: Any, *, other_ga
     if adjudication_contract is None:
         decision = decide_c09_notice(result, command_records, **kwargs)
     else:
-        from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice, CONTRACT
-        _require(adjudication_contract == CONTRACT, "unknown adjudication contract")
-        decision = decide_expansion_notice(result, command_records, **kwargs)
+        from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice, CONTRACTS
+        _require(adjudication_contract in CONTRACTS, "unknown adjudication contract")
+        decision = decide_expansion_notice(result, command_records, adjudication_contract=adjudication_contract, **kwargs)
     try:
         recorded = _json(root, "notice-decision.json")
         _require(canonical_digest(recorded) == canonical_digest(decision), "notice decision binding changed")
@@ -764,13 +764,13 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         and plan.get("unit_id") == unit_id and plan.get("version") == version, "task plan identity mismatch")
     if "notice_adjudication" in plan:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, CONTRACT as legacy_notice_contract
-        from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as notice_contract, CASES
+        from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACTS as notice_contracts, CASES
         review = plan["notice_adjudication"]
         _require(isinstance(review, dict) and set(review) == {"configuration", "runtime"}
             and isinstance(review["configuration"], dict), "invalid adjudication binding")
         review_contract = review["configuration"].get("contract")
         _require((review_contract == legacy_notice_contract and unit_id.endswith("-C09")
-                or review_contract == notice_contract and unit_id.rsplit("-", 1)[-1] in CASES)
+                or review_contract in notice_contracts and unit_id.rsplit("-", 1)[-1] in CASES)
             and review["configuration"] == reviewer_configuration(review_contract)
             and isinstance(review["runtime"], dict), "adjudication is outside the pinned workflow contract")
     module, case_id = _case(plan)

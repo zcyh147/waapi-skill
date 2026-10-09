@@ -53,6 +53,23 @@ def test_import_review_receives_exact_typed_roles(case_id):
         assert roles['mappings'][1]['properties'] == [{'name': 'Volume', 'value': -6}]
 
 
+def test_reimport_notice_requires_business_mappings_without_unchanged_native_defaults():
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    case = import_case('C03')
+    result, commands = timeline('将按上述完整路径分别重新导入现有 Left、Right；声音与来源身份和 Originals 位置、音量及路由保持，等你确认。', ask=True)
+    decision = decide_expansion_notice(result, commands, case_id='C03', version='2025.1', execute_expected=False,
+        preview_artifact=case['artifact'], before_snapshot=case['before'], preview_parameters=case['parameters'])
+    assert decision['input']['contract'] == 'waapi-skill.expansion-notice-adjudication/v2'
+    obligations = decision['input']['notice_obligations']
+    assert obligations['action'] == 'reimport-existing-media'
+    assert [row['source_file'] for row in obligations['mappings']] == ['/replacement/left/Hit.wav', '/replacement/right/Hit.wav']
+    assert [row['destination']['name'] for row in obligations['mappings']] == ['Left', 'Right']
+    assert not any('language' in row or 'field_owner' in row for row in obligations['mappings'])
+    # Complete truth remains available to reject affirmative false claims.
+    assert decision['input']['attested_roles']['mappings'][0]['language'] == 'SFX'
+    assert decision['input']['attested_roles']['mappings'][0]['field_owner'] == 'Sound SFX'
+
+
 def test_rtpc_review_input_retains_existing_association_and_ordered_delta():
     from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
     case = historical_case('C06')
@@ -263,7 +280,132 @@ def case_facts(case_id, version='2025.1'):
     return artifact, before, after, parameters, oracle, notice
 
 
-def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None, text=None, transaction_id=None):
+@pytest.mark.parametrize('case_id', ['C01', 'C06', 'C08', 'C09', 'M01', 'M05'])
+def test_notice_obligations_keep_changed_business_meaning_and_contextual_facts_distinct(case_id):
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    artifact, before, _, parameters, _, notice = case_facts(case_id)
+    result, commands = timeline(notice, ask=case_id == 'C01')
+    decision = decide_expansion_notice(result, commands, case_id=case_id, version='2025.1',
+        execute_expected=case_id != 'C01', preview_artifact=artifact, before_snapshot=before,
+        preview_parameters=parameters, user_prompt='Explicit original business request.')
+    obligations = decision['input']['notice_obligations']
+    assert obligations['preserve'] == decision['input']['attested_roles']['preserve']
+    assert 'before_snapshot' not in obligations and 'topology' not in obligations
+    if case_id == 'C01':
+        assert obligations['selected_language'] == 'Japanese'
+        assert obligations['import_kind'] == 'Sound Voice'
+        assert obligations['mappings'][0]['destination']['type'] == 'Sound'
+        assert obligations['preserve_existing_sound_and_source_identity'] is True
+        assert 'English(US) media and association' in obligations['preserve']
+    elif case_id == 'C06':
+        assert obligations['action'] == 'update-existing-RTPC'
+        assert obligations['property'] == 'Volume'
+        assert obligations['points'] == [{'x': 0, 'y': -48, 'shape': 'Linear'},
+            {'x': 50, 'y': -6, 'shape': 'Linear'}, {'x': 100, 'y': 0, 'shape': 'Linear'}]
+        assert obligations['control_input']['name'] == 'Rain_Intensity'
+        assert obligations['axis_meaning'] == {'x': 'GameParameter value', 'y': 'decibels'}
+        assert 'old' not in obligations and 'delta' not in obligations
+    elif case_id == 'C08':
+        assert obligations['curve_kind'] == 'volume-dry'
+        assert obligations['curve_source'] == 'custom'
+        assert obligations['points'][1] == {'x': 50, 'y': -12, 'shape': 'Linear'}
+        assert obligations['gateway_verification'] == 'result_schema'
+        assert obligations['axis_meaning']['x'] == 'distance in the sealed project domain'
+        assert 'before_curve' not in obligations
+    elif case_id == 'C09':
+        assert obligations['effect_count'] == 1
+        assert obligations['effect'] == artifact['prepared_operation']['verification_plan']['descriptor']
+        assert 'protected_effect_count' not in obligations
+    elif case_id == 'M01':
+        assert obligations['segment_count'] == 1 and obligations['track_count'] == 2 and obligations['media_count'] == 2
+        assert obligations['segment']['type'] == 'MusicSegment'
+        assert [row['destination']['type'] for row in obligations['mappings']] == ['MusicTrack', 'MusicTrack']
+        assert [row['source_file'] for row in obligations['mappings']] == ['/replacement/Quiet.wav', '/replacement/Full.wav']
+        assert obligations['mappings'][0]['properties'] == [{'name': 'Volume', 'value': -6}]
+        assert obligations['volume_owner'] == 'MusicTrack' and obligations['volume_unit'] == 'decibels'
+        assert 'quantity' not in obligations and 'AudioFileSource' not in json.dumps(obligations)
+    else:
+        assert obligations['action'] == 'update-existing-reference'
+        assert obligations['field'] == 'Trigger'
+        assert obligations['destination']['type'] == 'Trigger'
+        assert obligations['preserved_segment']['type'] == 'MusicSegment'
+        assert 'before_reference' not in obligations and 'siblings' not in obligations
+
+
+def test_prospective_rubric_uses_business_obligations_and_preserves_legacy_text():
+    import hashlib
+    from tests.semantic.support.codex_c09_notice_adjudication import reviewer_rubric, reviewer_configuration
+    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT, LEGACY_CONTRACT
+    old = reviewer_rubric(LEGACY_CONTRACT)
+    new = reviewer_rubric(CONTRACT)
+    assert 'use the attested_roles as obligations' in old
+    # Independently captured from the source-only 8550bdd/v1 rubric.
+    assert hashlib.sha256(old.encode()).hexdigest() == 'd304d0d46e3fd3c4cc85e002745227dba6c77eb1c1b9fb03a672f91fe5600172'
+    assert 'use notice_obligations for required business meaning' in new
+    assert 'use the attested_roles as obligations' not in new
+    assert 'Sealed facts cannot supply missing visible intent' in new
+    assert 'Japanese' in new and 'unchanged SFX' in new
+    assert 'AudioFileSource/sequence/clip' in new and 'result-schema-only' in new
+    assert reviewer_configuration(CONTRACT)['rubric_sha256'] != reviewer_configuration(LEGACY_CONTRACT)['rubric_sha256']
+
+
+@pytest.mark.parametrize('case_id', ['C03', 'C06', 'M01'])
+def test_exact_pre_execution_witness_produces_business_obligations_without_regrading_history(case_id):
+    """Actual sealed producer facts, no outcomes; synthetic route timeline only."""
+    import hashlib
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice, LEGACY_CONTRACT
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    directory = Path(__file__).parents[1] / 'fixtures/semantic/notice-obligations-8550bdd'
+    provenance = json.loads((directory / 'provenance.json').read_text())
+    entry = next(row for row in provenance['rows'] if row['case'] == case_id)
+    raw = (directory / entry['copied_input']).read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == entry['copied_input_sha256']
+    witness = json.loads(raw)
+    assert not {'after_snapshot', 'outcome', 'judgment', 'business_pass'} & witness.keys()
+    roles, version = witness['attested_roles'], witness['version']
+    parameters = {'version': version}
+    if case_id == 'C03':
+        parameters.update(mappings={row['destination']['path']: row['source_file'] for row in roles['mappings']},
+            target_ids={row['destination']['path']: row['destination']['id'] for row in roles['mappings']})
+    elif case_id == 'C06':
+        plan = witness['prepared_operation']['verification_plan']
+        parameters.update(owner_id=plan['object_id'], control_id=plan['control_input_id'],
+            target_id=plan['existing_rtpc_id'], expected_notes=roles['association']['notes'])
+    else:
+        parameters.update(parent_path=roles['target']['path'], segment_name='Imported',
+            media={row['destination']['path'].rsplit('\\', 1)[-1]: row['source_file']
+                for row in roles['mappings'] if row['source_file'] is not None})
+    # Preserve the exact visible message text/positions, without copying the
+    # source's command outcomes or any post-execution campaign state.
+    positions = [row['event_position'] for row in witness['visible_messages']]
+    end = witness['execute_event_position'] or max(positions) + 1
+    events = [{'type': 'fixture.placeholder'} for _ in range(end + (case_id != 'C03'))]
+    for row in witness['visible_messages']:
+        events[row['event_position']] = {'type': 'item.completed', 'item': {'type': 'agent_message', 'text': row['text']}}
+    events[witness['preview_event_position']] = {'type': 'item.completed',
+        'item': {'type': 'command_execution', 'command': 'preview'}}
+    if case_id != 'C03':
+        events[end] = {'type': 'item.started', 'item': {'type': 'command_execution', 'command': 'execute'}}
+    _, commands = timeline('', version=version, ask=case_id == 'C03')
+    result = SimpleNamespace(stdout='\n'.join(json.dumps(row, ensure_ascii=False) for row in events))
+    kwargs = dict(case_id=case_id, version=version, execute_expected=case_id != 'C03',
+        preview_artifact={'transaction_id': witness['transaction_id'], 'request': witness['immutable_request'],
+            'prepared_operation': witness['prepared_operation']}, before_snapshot=witness['before_snapshot'],
+        preview_parameters=parameters, user_prompt=witness['user_prompt'], transaction_id=witness['transaction_id'])
+    legacy = decide_expansion_notice(result, commands, adjudication_contract=LEGACY_CONTRACT, **kwargs)
+    current = decide_expansion_notice(result, commands, **kwargs)
+    assert legacy['outcome'] == current['outcome'] == 'review_required'
+    assert canonical_digest(current['input']['attested_roles']) == canonical_digest(roles)
+    assert current['input']['visible_messages'] == witness['visible_messages']
+    assert current['input']['user_prompt'] == witness['user_prompt']
+    assert current['input']['notice_obligations']['action'] == {
+        'C03': 'reimport-existing-media', 'C06': 'update-existing-RTPC', 'M01': 'import-new-music-media'}[case_id]
+    assert 'notice_obligations' not in legacy['input']
+    assert (directory / entry['copied_input']).read_bytes() == raw
+
+
+def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None, text=None, transaction_id=None,
+        adjudication_contract=None, user_prompt=None):
     """Complete real-TransactionStore fixture through runner grade and archive."""
     import hashlib
     import importlib
@@ -276,6 +418,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     from tests.semantic.support.codex_harness import completed_command_records, BoundedProcessResult
     from tests.semantic.support import codex_c09_notice_adjudication as review
     from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice, CONTRACT
+    CONTRACT = adjudication_contract or CONTRACT
     from tests.semantic.test_codex_c09_notice_adjudication import grounded_judgment
     from wwise_waapi.transactions import TransactionStore, confirmation_token_for
     _sealed_c08(root)
@@ -301,7 +444,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     binary.write_bytes(b'fake independent CLI')
     auth.write_text('{}')
     options = SimpleNamespace(codex_binary=binary, auth_json=auth, windows_powershell_core_host=None)
-    prompts = ['Perform this requested workflow.'] + (['Confirm this exact Preview.'] if ask else [])
+    prompts = [user_prompt or 'Perform this requested workflow.'] + (['Confirm this exact Preview.'] if ask else [])
     unit = 'EXP' + version[2:4] + '-' + case_id
     plan.update(unit_id=unit, version=version, operation=artifact['request']['operation'],
         request_schema_uri='ak.wwise.core.object.setAttenuationCurve' if case_id == 'C08' else None,
@@ -389,6 +532,9 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         if command[1:] == ['exec', '--help']: return BoundedProcessResult(0, '--output-schema --ephemeral --ignore-user-config --ignore-rules --sandbox', '', .01)
         if 'prompt-input' in command: return BoundedProcessResult(0, json.dumps([{'role': 'developer', 'content': review.reviewer_rubric(CONTRACT)}]), '', .01)
         payload = json.loads(command[-1])
+        assert payload['contract'] == CONTRACT
+        assert ('notice_obligations' in payload) is CONTRACT.endswith('/v2')
+        assert payload['user_prompt'] == prompts[0]
         judgment = grounded_judgment(payload)
         if damage == 'uncertain':
             judgment['outcome'] = 'review_required'
@@ -408,7 +554,8 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     graded = grade_expansion_notice(SimpleNamespace(stdout=(directory / 'events.jsonl').read_text()),
         completed_command_records(events, platform_name='posix'), case_id=case_id, version=version,
         execute_expected=not ask, preview_artifact=artifact, before_snapshot=before, preview_parameters=parameters,
-        transaction_id=tx, user_prompt=prompts[0], other_gates={'policy_checkpoint': True}, root=directory, options=options)
+        transaction_id=tx, user_prompt=prompts[0], adjudication_contract=CONTRACT,
+        other_gates={'policy_checkpoint': True}, root=directory, options=options)
     if text is None:
         assert graded['decision']['outcome'] == ('material_reject' if damage == 'unattested_role' else 'review_required'), graded['decision']
     assert graded['passed'] is (damage is None), graded
@@ -443,6 +590,22 @@ def test_each_workflow_full_archive_replays_sealed_review_without_model(tmp_path
     assert archived['business_pass'] is True
     assert archived['turn_count'] == (2 if case_id in {'C01', 'C03'} else 1)
     assert before == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('contract', ['waapi-skill.expansion-notice-adjudication/v1', 'waapi-skill.expansion-notice-adjudication/v2'])
+def test_full_archive_replays_exact_sealed_contract_without_upgrading_legacy_input(tmp_path, monkeypatch, contract):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C03', adjudication_contract=contract)
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    assert decision['input']['contract'] == contract
+    assert ('notice_obligations' in decision['input']) is contract.endswith('/v2')
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    replayed = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert replayed['archive_valid'] is True and replayed['business_pass'] is True
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
 
 
 _CONTRASTS = json.loads((Path(__file__).parents[1] /
@@ -493,6 +656,62 @@ def test_independent_heldout_business_meanings_survive_runner_and_archive(tmp_pa
         expected_version='2025.1', expected_inputs_sha256='a' * 64)
     assert replayed['business_pass'] is (not wrong)
     assert replayed['original_status'] == ('FAIL' if wrong else 'PASS')
+
+
+_OBLIGATION_CONTRASTS = json.loads((Path(__file__).parents[1] /
+    'fixtures/semantic/expansion-notice-obligation-contrasts-v2.json').read_text())['contrasts']
+
+
+@pytest.mark.parametrize('contrast', _OBLIGATION_CONTRASTS, ids=lambda row: row['id'])
+def test_prospective_contrast_input_and_pinned_receipt_status_survive_complete_archive(tmp_path, monkeypatch, contrast):
+    """Transport/binding proof only: the fake reviewer does not grade language."""
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    notice = instantiate_contrast(contrast)
+    prompt = instantiate_contrast({**contrast, 'notice': contrast['user_prompt']})
+    damage = {'sufficient': None, 'contradicted': 'wrong', 'unresolved': 'uncertain'}[contrast['expected_meaning']]
+    unit = sealed_workflow(tmp_path, monkeypatch, contrast['case'], damage=damage, text=notice, user_prompt=prompt)
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert decision['outcome'] == 'review_required'  # even complete attested facts cannot rescue empty intent
+    assert receipt['input'] == decision['input']
+    assert receipt['input']['user_prompt'] == prompt
+    assert any(row['text'] == notice for row in receipt['input']['visible_messages'])
+    obligations = receipt['input']['notice_obligations']
+    assert obligations['action'] == {'C01': 'reimport-existing-media', 'C03': 'reimport-existing-media',
+        'C06': 'update-existing-RTPC', 'C08': 'update-selected-attenuation-curve', 'M01': 'import-new-music-media'}[contrast['case']]
+    if contrast['case'] == 'C01': assert obligations['selected_language'] == 'Japanese'
+    if contrast['case'] == 'C08': assert obligations['gateway_verification'] == 'result_schema'
+    if contrast['case'] == 'M01': assert obligations['media_count'] == 2 and obligations['track_count'] == 2
+    assert not {'after_snapshot', 'after', 'business_pass', 'judgment'} & receipt['input'].keys()
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    archived = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert archived['archive_valid'] is True
+    assert archived['business_pass'] is (damage is None)
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('tamper', ['selected-language', 'native-default-obligation', 'contract-downgrade'])
+def test_resealed_receipt_cannot_change_required_meaning_or_downgrade_new_contract(tmp_path, monkeypatch, tamper):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C01')
+    path = tmp_path / 'turns/turn-01/notice-review/receipt.json'
+    receipt = json.loads(path.read_text())
+    if tamper == 'selected-language': receipt['input']['notice_obligations']['selected_language'] = 'English(US)'
+    elif tamper == 'native-default-obligation': receipt['input']['notice_obligations']['required_native_topology'] = 'two sources'
+    else:
+        receipt['input']['contract'] = 'waapi-skill.expansion-notice-adjudication/v1'
+        receipt['input'].pop('notice_obligations')
+    receipt['sha256'] = canonical_digest({key: value for key, value in receipt.items() if key != 'sha256'})
+    path.write_text(json.dumps(receipt))
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    with pytest.raises(ExpansionArchiveError, match='binding'):
+        verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+            expected_version='2025.1', expected_inputs_sha256='a' * 64)
 
 
 @pytest.mark.parametrize('case_id', ['C01', 'C03', 'C06', 'C08', 'M01', 'M05'])

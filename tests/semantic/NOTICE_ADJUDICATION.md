@@ -300,3 +300,42 @@ beside supported C06/C09/M05 notices, and an unattested C08 preserved source.
 Complete review decisions and deterministic role rejection replay through the
 same full runner/archive seam. No new wording blacklist or language grammar
 was added, and the frozen legacy fixtures and oracles remain unchanged.
+
+## Business notice obligations checkpoint — reopened #147
+
+New plans use `waapi-skill.expansion-notice-adjudication/v2`. After the unchanged
+complete operation/role attestation, a deterministic per-case
+`notice_obligations` projection defines required business meaning. Complete
+`attested_roles` remains available to check all affirmative claims. V1 retains
+its exact input shape, rubric hash and archive replay; original C09/v1 and
+plans without adjudication keep their historical semantics. No historical
+judgment is upgraded or rewritten.
+
+C01 retains selected Japanese/Voice and English(US) preservation. C03 requires
+both exact existing-target media mappings and identity/Originals preservation;
+unchanged SFX and Sound SFX defaults need not be repeated. C06/C08 retain
+ownership, new points and shape. Axis labels may resolve through unambiguous
+visible prompt/context; old points, delta arithmetic and unchanged domain are
+contextual facts. M01 requires one new Segment, two media-bearing Tracks,
+exact file associations, Quiet Track Volume -6 dB, Full default Volume and
+preserved clip/source gain and music scope. Native AudioFileSource/sequence/
+clip enumeration is optional. C08 keeps the weaker Gateway result-schema
+boundary, including any required disclosure; it cannot claim Gateway persisted
+curve readback or listening proof.
+
+The post-Preview notice must visibly communicate or adopt the specific plan.
+Sealed operations cannot supply absent intent. Preservation shorthand is
+sufficient only when it unambiguously adopts the full explicit scope. Wrong
+mappings, languages, fields, values, quantities, protected edits, false optional
+claims and weaker-verifier overclaims remain non-PASS. No parser, business
+prompt, oracle, authorization or product runtime change accompanies this repair.
+
+The [source-only audit](../../docs/research/integration-expansion-notice-obligation-audit-8550bdd.md)
+grounds prospective contrasts. Three copied C03/C06/M01 pre-execution-only
+inputs preserve exact source hashes, complete attested facts and visible text;
+their tests regenerate roles/projection without historical regrading. Fake
+reviewer contrast tests prove producer-to-input transport, receipt binding and
+read-only full-archive replay, including original v1 and new v2 contracts,
+non-PASS receipts and obligation/contract substitution rejection. They do not
+establish language accuracy or grant semantic PASS credit. Held-out independent
+review, promotion gates and new frozen Fresh acceptance remain separate work.

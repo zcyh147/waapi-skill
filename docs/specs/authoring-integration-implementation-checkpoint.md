@@ -2242,3 +2242,30 @@ questions. Do not reactivate completed Astra subagents for new implementation wo
 - Its sole Fresh EXP25-C09 failed `visible_preview_notice`; Gateway verification and all six independent business assertions passed. All other turn gates passed. The root is frozen without retry, resume, replay, regrading or verify-only.
 - Both source full hashes/mtimes and all candidate input hashes remain unchanged. The failed sandbox is sealed and quarantined, the one-shot LaunchAgent is unloaded, and scoped residual processes are empty.
 - Notice-only failure repeated. Further execution stopped; the coordinator owns the read-only contract audit and next design decision. Final 13 acceptance remains unreleased, with no Windows or full-profile claim. Exact notice, logs, launch pins and artifact digests are in the [validation report](../research/integration-expansion-modal-validation-c9145f1-2026-10-08.md) and its companion JSON.
+
+## Notice business-obligation repair checkpoint — 2026-10-09
+
+Reopened #147 adds a prospective expansion notice v2 contract with a deterministic
+business `notice_obligations` projection alongside unchanged complete
+`attested_roles`. The [source-only audit](../research/integration-expansion-notice-obligation-audit-8550bdd.md)
+and [canonical notice contract](../../tests/semantic/NOTICE_ADJUDICATION.md#business-notice-obligations-checkpoint--reopened-147)
+describe the boundary: C01 selected Japanese remains required; C03 unchanged SFX
+defaults, context-established curve axes and M01 native source/sequence/clip
+enumeration need not be repeated. Exact targets, actions, mappings, values,
+field owners, quantities, meaningful preservation and C08 weaker-verifier
+limits remain required. Visible intent cannot be supplied by sealed facts.
+
+Original expansion v1 input/rubric/archive semantics remain pinned. Three exact
+pre-execution-only C03/C06/M01 witnesses are preserved with source hashes; no
+historical grades or campaign state were imported or rewritten. Thirty
+source-audit contrast examples exercise input transport and pinned receipt
+status through the real TransactionStore and full archive verifier using fake
+reviewer processes. These prove evidence binding, not language accuracy.
+
+Focused producer/shared-review/archive validation completed with **327 passed,
+1 skipped**; the fixed `notice-fast` gate completed with **3651 passed,
+1 skipped**, both exit 0. The skipped case requires native Windows UNC ownership
+semantics. No real Wwise or Codex call, full Non-live gate, historical regrade,
+Fresh semantic PASS or final acceptance is claimed. Independent held-out review,
+integration promotion gates, failed-only Fresh proof and #122 final acceptance
+remain separate work owned by the coordinator.

@@ -13,7 +13,9 @@ from typing import Any, Mapping, Sequence
 from tests.semantic.support.codex_expansion_policy import canonical_digest
 from tests.semantic.support.codex_harness import normalized_gateway_command_argv, parse_jsonl_events
 
-CONTRACT = 'waapi-skill.expansion-notice-adjudication/v1'
+LEGACY_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v1'
+CONTRACT = 'waapi-skill.expansion-notice-adjudication/v2'
+CONTRACTS = frozenset({LEGACY_CONTRACT, CONTRACT})
 CASES = frozenset({'C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'})
 
 
@@ -207,12 +209,59 @@ def _roles(case_id, artifact, before, version, parameters):
     return None
 
 
+def _notice_identity(row):
+    return {key: row[key] for key in ('id', 'name', 'type', 'path') if key in row}
+
+
+def _notice_obligations(case_id, roles):
+    """Required business meaning, derived only after full operation attestation.
+
+    Facts omitted here remain in attested_roles to check affirmative claims.
+    This projection supplies expected meaning, never evidence that it was said.
+    """
+    obligations = {'preserve': roles['preserve']}
+    if case_id in {'C01', 'C03'}:
+        obligations.update(action='reimport-existing-media', media_count=len(roles['mappings']),
+            mappings=[{'source_file': row['source_file'], 'destination': _notice_identity(row['destination'])}
+                for row in roles['mappings']], preserve_existing_sound_and_source_identity=True)
+        if case_id == 'C01':
+            obligations['selected_language'] = roles['mappings'][0]['language']
+            obligations['import_kind'] = roles['mappings'][0]['field_owner']
+    elif case_id == 'M01':
+        segment, *tracks = roles['mappings']
+        obligations.update(action='import-new-music-media', parent=_notice_identity(roles['target']),
+            segment=_notice_identity(segment['destination']), segment_count=1, track_count=len(tracks),
+            media_count=len(tracks), volume_owner='MusicTrack', volume_unit=roles['units']['Volume'],
+            mappings=[{'source_file': row['source_file'], 'destination': _notice_identity(row['destination']),
+                'properties': row['properties']} for row in tracks])
+    elif case_id == 'C06':
+        association = roles['association']
+        obligations.update(action='update-existing-RTPC', target=_notice_identity(roles['target']),
+            control_input=_notice_identity(roles['control_input']), association_id=association['ids'][2],
+            property='Volume', points=[{'x': x, 'y': y, 'shape': 'Linear'} for x, y in association['new']],
+            axis_meaning=roles['units'])
+    elif case_id == 'C08':
+        curve = roles['curve']
+        obligations.update(action='update-selected-attenuation-curve', target=_notice_identity(roles['target']),
+            curve_kind=curve['kind'], curve_source=curve['source'], points=curve['points'],
+            axis_meaning=roles['units'], gateway_verification=roles['gateway_verification'])
+    elif case_id == 'C09':
+        obligations.update(action='append-effect', target=_notice_identity(roles['target']),
+            effect=roles['append']['descriptor'], effect_count=1)
+    elif case_id == 'M05':
+        obligations.update(action='update-existing-reference', source=_notice_identity(roles['source']),
+            destination=_notice_identity(roles['destination']), field=roles['field'],
+            preserved_segment=_notice_identity(roles['preserved_segment']))
+    return obligations
+
+
 def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case_id: str,
         version: str, execute_expected: bool, preview_artifact: Mapping[str, Any],
         before_snapshot: Mapping[str, Any], preview_parameters: Mapping[str, Any],
-        user_prompt: str = '', transaction_id: str = '') -> dict[str, Any]:
+        user_prompt: str = '', transaction_id: str = '',
+        adjudication_contract: str = CONTRACT) -> dict[str, Any]:
     from tests.semantic.support.codex_c09_notice_adjudication import INPUT_MAX_BYTES
-    if (case_id not in CASES or version not in {'2022.1', '2025.1'}
+    if (adjudication_contract not in CONTRACTS or case_id not in CASES or version not in {'2022.1', '2025.1'}
             or (case_id, version) == ('M05', '2022.1')
             or execute_expected != (case_id not in {'C01', 'C03'})
             or preview_parameters.get('version') != version):
@@ -260,7 +309,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     # in the complete visible notice. The prospective contract therefore needs
     # one complete independent judgment after its deterministic hard checks.
     review_input = {
-        'contract': CONTRACT, 'case_id': case_id, 'version': version,
+        'contract': adjudication_contract, 'case_id': case_id, 'version': version,
         'transaction_id': transaction_id or preview_artifact.get('transaction_id'),
         'preview_sha256': canonical_digest(preview_artifact),
         'pre_execution_timeline_sha256': canonical_digest(events_before_execute),
@@ -269,6 +318,8 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
         'before_snapshot': before_snapshot, 'immutable_request': preview_artifact['request'],
         'prepared_operation': preview_artifact['prepared_operation'], 'attested_roles': roles,
     }
+    if adjudication_contract == CONTRACT:
+        review_input['notice_obligations'] = _notice_obligations(case_id, roles)
     if len(json.dumps(review_input, ensure_ascii=False).encode('utf-8')) > INPUT_MAX_BYTES:
         return {'outcome': 'material_reject', 'reason': 'complete-review-input-exceeds-bound'}
     return {'outcome': 'review_required', 'reason': (
