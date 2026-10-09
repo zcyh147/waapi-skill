@@ -253,7 +253,7 @@ fields; absent differs from null/empty. Only scope_complete reads prove scoped a
 reads cannot prove wider absence. Missing facts are unresolved, not proof of unavailable capability.
 Separate verifier, potential packaged support, discovery/acquisition and future intent.
 Ordinary future preservation checks are intent, not discovered/acquired reads or guaranteed/stronger proof.
-Missing pre-Execute followup discovery alone is not unsupported. Actual reads still require discovery.
+Missing pre-Execute followup discovery alone is not unsupported. Reads follow applicable discovery rules.
 Unsupported/unavailable methods, false discovery/completed/guaranteed proof or stronger-verifier/
 persisted/listening claims, raw/code bypass and execute/reverify/retry plans remain non-PASS.
 Disclosure follows operation/Skill/user timing/requests; no unconditional pre-Execute schema-only warning.

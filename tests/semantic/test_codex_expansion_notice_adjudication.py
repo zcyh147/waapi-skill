@@ -1489,9 +1489,11 @@ def test_v6_clarifies_future_intent_without_changing_legacy_contracts_or_bounds(
     assert len(rubric.encode('utf-8')) <= 2048
     for requirement in ('Ordinary future preservation checks are intent',
             'Missing pre-Execute followup discovery alone is not unsupported',
-            'Actual reads still require discovery', 'false discovery/completed/guaranteed proof',
+            'Reads follow applicable discovery rules', 'false discovery/completed/guaranteed proof',
             'Uncertain EDIT scope', 'raw/code bypass', 'no outcome rescue'):
         assert requirement in rubric
+    # Exact-ID/path fast reads may proceed without preliminary discovery.
+    assert 'Actual reads still require discovery' not in rubric
 
 
 @pytest.mark.parametrize('contract,effort', [
