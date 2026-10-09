@@ -253,14 +253,20 @@ def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[lis
     context = binding.get('context', {})
     contract = binding.get('configuration', {}).get('contract')
     rubric = reviewer_rubric(contract)
-    if (binding.get('configuration') != reviewer_configuration(contract)
+    version = binding.get('contract')
+    keys = {'binary', 'workspace', 'schema', 'platform_name', 'disabled_user_skill_paths'}
+    if version == 'waapi-skill.c09-review-invocation/v2':
+        keys.add('audit_codex_home')
+    if (version not in {'waapi-skill.c09-review-invocation/v1', 'waapi-skill.c09-review-invocation/v2'}
+            or binding.get('configuration') != reviewer_configuration(contract)
             or binding.get('schema_utf8') != json.dumps(JUDGMENT_SCHEMA)
-            or not isinstance(context, dict) or set(context) != {'binary', 'workspace', 'schema', 'platform_name', 'disabled_user_skill_paths'}
+            or not isinstance(context, dict) or set(context) != keys
             or context['platform_name'] != os.name):
         raise ValueError('review invocation binding configuration/schema/host mismatch')
-    for key in ('binary', 'workspace', 'schema'):
+    for key in ('binary', 'workspace', 'schema', *(['audit_codex_home'] if version.endswith('/v2') else [])):
         value = context[key]
-        if not isinstance(value, str) or not value or '\x00' in value or not Path(value).is_absolute():
+        if (not isinstance(value, str) or not value or '\x00' in value or not Path(value).is_absolute()
+                or (key == 'audit_codex_home' and '..' in Path(value).parts)):
             raise ValueError('review invocation binding has invalid host locator')
     workspace = Path(context['workspace'])
     if context['schema'] != str(workspace / 'judgment-schema.json'):
@@ -287,6 +293,15 @@ def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[lis
             command[position:position] = override
     execution[-1:-1] = ['--ignore-rules', '--output-schema', context['schema']]
     return _disable(audit), _disable(execution)
+
+
+def _review_prompt_audit(payload: Any, binding: Mapping[str, Any], *, rubric: str, archived: bool = False):
+    # Only the pre-launch invocation binding owns this locator. Never select it
+    # from the prompt inventory or receipt. V1 keeps its historical audit rule.
+    home = binding['context'].get('audit_codex_home')
+    return audit_prompt_input_payload(payload, expected_developer_instructions=rubric,
+        system_skill_root=Path(home) / 'skills' / '.system' if home is not None else None,
+        system_skill_root_is_archived=archived)
 
 
 def _validate_bounded_output(result: Mapping[str, Any]) -> None:
@@ -338,22 +353,23 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
                 network_access=False, developer_instructions=rubric,
                 windows_powershell_core_host=options.windows_powershell_core_host)
-            binding = {'contract': 'waapi-skill.c09-review-invocation/v1',
+            binding = {'contract': 'waapi-skill.c09-review-invocation/v2',
                 'configuration': configuration, 'runtime': receipt['runtime'],
                 'decision_sha256': canonical_digest(decision), 'schema_utf8': schema.read_text(encoding='utf-8'),
                 'context': {'binary': str(options.codex_binary), 'workspace': str(workspace),
                     'schema': str(schema), 'platform_name': os.name,
                     'disabled_user_skill_paths': [str(path) for path in config.disabled_user_skill_paths]}}
-            binding['sha256'] = canonical_digest(binding)
-            (root / 'invocation-binding.json').write_text(json.dumps(binding, ensure_ascii=False, indent=2), encoding='utf-8')
-            receipt['invocation_binding_sha256'] = binding['sha256']
-            audit_command, command = _review_invocations(binding, prompt=prompt)
             with isolated_codex_environment(options.auth_json) as env:
                 env = codex_process_environment(options.codex_binary, env,
                     powershell_core_host=options.windows_powershell_core_host)
                 isolation = inspect_isolated_environment(env, auth_json=options.auth_json)
                 if not isolation.passed or isolation.broker_environment_keys:
                     raise ValueError('reviewer environment is not isolated')
+                binding['context']['audit_codex_home'] = str(Path(env['CODEX_HOME']).resolve(strict=True))
+                binding['sha256'] = canonical_digest(binding)
+                (root / 'invocation-binding.json').write_text(json.dumps(binding, ensure_ascii=False, indent=2), encoding='utf-8')
+                receipt['invocation_binding_sha256'] = binding['sha256']
+                audit_command, command = _review_invocations(binding, prompt=prompt)
                 capabilities = []
                 for args in (['features', 'list'], ['exec', '--help']):
                     probe_command = [str(options.codex_binary), *args]
@@ -370,7 +386,7 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 receipt['audit_stdout'] = audited.stdout
                 receipt['audit_execution'] = asdict(audited)
                 _validate_bounded_output(asdict(audited))
-                audit = audit_prompt_input_payload(_decode(audited.stdout), expected_developer_instructions=rubric)
+                audit = _review_prompt_audit(_decode(audited.stdout), binding, rubric=rubric)
                 if audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact:
                     raise ValueError('reviewer prompt contains executor memory or skills')
             # A distinct disposable HOME/CODEX_HOME prevents even audit state reuse.
@@ -425,7 +441,7 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
         raise ValueError('review receipt prompt audit exceeds bound')
     _capabilities(receipt.get('capabilities'))
     if (not isinstance(expected_binding, Mapping)
-            or expected_binding.get('contract') != 'waapi-skill.c09-review-invocation/v1'
+            or expected_binding.get('contract') not in {'waapi-skill.c09-review-invocation/v1', 'waapi-skill.c09-review-invocation/v2'}
             or expected_binding.get('sha256') != canonical_digest({key: value for key, value in expected_binding.items() if key != 'sha256'})
             or expected_binding['sha256'] != receipt.get('invocation_binding_sha256')
             or expected_binding.get('decision_sha256') != canonical_digest(decision)
@@ -438,7 +454,7 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
     _validate_bounded_output(receipt.get('audit_execution') or {})
     if receipt['audit_execution'].get('stdout') != receipt['audit_stdout']:
         raise ValueError('review receipt prompt audit raw/text mismatch')
-    audit = audit_prompt_input_payload(_decode(receipt['audit_stdout']), expected_developer_instructions=rubric)
+    audit = _review_prompt_audit(_decode(receipt['audit_stdout']), expected_binding, rubric=rubric, archived=True)
     execution = receipt.get('execution', {})
     _validate_bounded_output(execution)
     if (audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact

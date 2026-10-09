@@ -169,6 +169,18 @@ controls, not a claim of complete security isolation against a hostile CLI.
 No credentials are included in reviewer input; model authentication remains
 inside the disposable Codex environment.
 
+The CLI may disclose its bundled system Skill catalog under its own disposable
+`CODEX_HOME/skills/.system`; this differs from injecting a user or WAAPI Skill.
+New invocation bindings use `waapi-skill.c09-review-invocation/v2` and seal the
+audit process's canonical `CODEX_HOME` before any subprocess launch. Both live
+audit and replay classify bundled entries only below that independently bound
+root, using the existing ownership-aware inventory audit. A prompt's advertised
+root cannot authorize itself. User/WAAPI Skills, memory and changed developer
+instructions still reject before the review turn. Replay compares traversal-free
+archived absolute identities without resolving or looking up the deleted
+temporary root. V1 bindings retain their historical audit semantics; original
+FAIL roots remain frozen.
+
 Before subprocess launch, a separate harness-owned invocation binding records
 fixed configuration/runtime, the decision digest, sealed temporary host locators
 and exact schema text. Its digest is stored separately in the task turn record.

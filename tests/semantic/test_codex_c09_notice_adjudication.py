@@ -1,5 +1,6 @@
 """Prospective C09 v1 notice review; historical fixture grades stay unchanged."""
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -125,7 +126,7 @@ def test_archive_notice_gate_requires_receipt_only_for_review_required_and_check
     assert replay_c09_notice(tmp_path, result, commands, other_gates={'authorization': False}, expected_runtime={}, **kwargs) is False
 
 
-def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None):
+def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None, actual_audit=False):
     """Adapt the existing complete fake archive fixture, with a separate C09 oracle."""
     import shlex
     import shutil
@@ -226,6 +227,31 @@ def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None):
         if command[1:] == ['exec', '--help']:
             return ProcessResult(0, '--output-schema --ephemeral --ignore-user-config --ignore-rules --sandbox', '', .01)
         if 'prompt-input' in command:
+            if actual_audit:
+                fixture_audit = json.loads((FIXTURE.parent / 'reviewer-prompt-audit-cli-0.159.2-v2.json').read_text())
+                payload = json.loads(fixture_audit['audit_stdout'])
+                owned_home = str(Path(kwargs['env']['CODEX_HOME']).resolve())
+                for message in payload:
+                    for content in message['content']:
+                        if content.get('type') == 'input_text':
+                            content['text'] = content['text'].replace(
+                                '/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/codex-waapi-state-ceie7a06', owned_home)
+                payload[0]['content'][0]['text'] = review.RUBRIC
+                payload[-1]['content'][0]['text'] = command[-1]
+                if damage == 'audit_wrong_root':
+                    for message in payload:
+                        for content in message['content']:
+                            if content.get('type') == 'input_text':
+                                content['text'] = content['text'].replace(owned_home, '/unowned/.codex')
+                elif damage in {'audit_user_skill', 'audit_waapi_skill'}:
+                    name = 'waapi-skill' if damage == 'audit_waapi_skill' else 'personal'
+                    payload.append({'role': 'developer', 'content':
+                        f'- {name}: unowned (file: /unowned/.agents/skills/{name}/SKILL.md)'})
+                elif damage == 'audit_memory':
+                    payload.append({'role': 'developer', 'content': '<memory_summary>executor memory</memory_summary>'})
+                elif damage == 'audit_developer':
+                    payload[0]['content'][0]['text'] += ' altered rubric'
+                return ProcessResult(0, json.dumps(payload), '', .01)
             return ProcessResult(0, json.dumps([{'role': 'developer', 'content': review.RUBRIC}]), '', .01)
         judgment = grounded_judgment(decision['input'])
         if damage == 'uncertain':
@@ -274,7 +300,129 @@ def test_full_C09_archive_replays_sealed_review_without_subprocess_or_grade_writ
     assert before == {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
 
 
+def test_v2_actual_CLI_owned_system_catalog_reaches_review_and_replays_after_cleanup(tmp_path, monkeypatch):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    root = sealed_c09_archive(tmp_path, monkeypatch, actual_audit=True)
+    binding = json.loads((root / 'turns/turn-01/notice-review/invocation-binding.json').read_text())
+    assert binding['contract'] == 'waapi-skill.c09-review-invocation/v2'
+    assert not Path(binding['context']['audit_codex_home']).exists()
+    before = {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('rejudgment')))
+    # Replay cannot recover ownership by looking up a deleted temporary root.
+    original_resolve = Path.resolve
+    def resolve(path, *args, **kwargs):
+        if 'codex-waapi-state-' in str(path):
+            raise AssertionError('deleted audit-root resolution')
+        return original_resolve(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'resolve', resolve)
+    original_stat = Path.stat
+    def stat(path, *args, **kwargs):
+        if 'codex-waapi-state-' in str(path):
+            raise AssertionError('deleted audit-root lookup')
+        return original_stat(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'stat', stat)
+    assert verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1',
+        expected_inputs_sha256='a' * 64)['business_pass'] is True
+    assert before == {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
+
+
 import pytest
+
+
+@pytest.mark.parametrize('damage', ['audit_wrong_root', 'audit_user_skill', 'audit_waapi_skill',
+    'audit_memory', 'audit_developer'])
+def test_v2_actual_CLI_catalog_does_not_admit_executor_skills_memory_or_rubric_changes(tmp_path, monkeypatch, damage):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    root = sealed_c09_archive(tmp_path, monkeypatch, damage=damage, actual_audit=True)
+    receipt = json.loads((root / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert receipt['invocation'] is None
+    assert receipt['outcome'] == 'review_required'
+    with pytest.raises(ExpansionArchiveError):
+        verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1',
+            expected_inputs_sha256='a' * 64)
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='exact frozen prompt inventory owns macOS host locators')
+def test_exact_frozen_audit_copy_only_classifies_independently_owned_system_root():
+    import hashlib
+    from tests.semantic.support.codex_harness import audit_prompt_input_payload
+    fixture = json.loads((FIXTURE.parent / 'reviewer-prompt-audit-cli-0.159.2-v2.json').read_text())
+    raw = fixture['audit_stdout']
+    assert hashlib.sha256(raw.encode()).hexdigest() == fixture['source_audit_sha256']
+    payload = json.loads(raw)
+    # Literal expected host identity from the observed isolated launch, not a
+    # locator selected by the prompt inventory under test.
+    owned = Path('/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/codex-waapi-state-ceie7a06/skills/.system')
+    old = audit_prompt_input_payload(payload, expected_developer_instructions=fixture['expected_developer_instructions'])
+    prospective = audit_prompt_input_payload(payload, system_skill_root=owned, system_skill_root_is_archived=True,
+        expected_developer_instructions=fixture['expected_developer_instructions'])
+    assert len(old.unexpected_skills) == 4
+    assert len(prospective.system_skills) == 4
+    assert prospective.unexpected_skills == ()
+    assert prospective.developer_instructions_exact is True
+    assert prospective.has_memory is False and prospective.has_target_skill is False
+
+
+@pytest.mark.parametrize('actual_audit', [False, True])
+def test_v1_archive_keeps_original_catalog_audit_semantics(tmp_path, monkeypatch, actual_audit):
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    root = sealed_c09_archive(tmp_path, monkeypatch, actual_audit=actual_audit)
+    directory = root / 'turns/turn-01/notice-review'
+    path = directory / 'invocation-binding.json'
+    binding = json.loads(path.read_text())
+    binding['contract'] = 'waapi-skill.c09-review-invocation/v1'
+    binding['context'].pop('audit_codex_home')
+    binding['sha256'] = canonical_digest({k: v for k, v in binding.items() if k != 'sha256'})
+    path.write_text(json.dumps(binding))
+    path = directory / 'receipt.json'
+    receipt = json.loads(path.read_text())
+    receipt['invocation_binding_sha256'] = binding['sha256']
+    receipt['sha256'] = canonical_digest({k: v for k, v in receipt.items() if k != 'sha256'})
+    path.write_text(json.dumps(receipt))
+    for name in ('expansion-agent-budget.json', 'expansion-task-result.json'):
+        path = root / name
+        record = json.loads(path.read_text())
+        record['turns'][0]['notice_invocation_binding_sha256'] = binding['sha256']
+        path.write_text(json.dumps(record))
+    before = {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('rejudgment')))
+    kwargs = dict(expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    if actual_audit:
+        with pytest.raises(ExpansionArchiveError, match='isolated execution'):
+            verify_expansion_task_archive(root, **kwargs)
+    else:
+        assert verify_expansion_task_archive(root, **kwargs)['business_pass'] is True
+    assert before == {str(path): path.read_bytes() for path in root.rglob('*') if path.is_file()}
+
+
+def test_archived_owned_system_paths_are_lexical_and_reject_escape_or_sibling_roots(tmp_path, monkeypatch):
+    from tests.semantic.support.codex_harness import is_codex_system_skill
+    root = tmp_path / 'reviewer space 日本 $`' / 'skills' / '.system'
+    monkeypatch.setattr(Path, 'resolve', lambda *a, **k: (_ for _ in ()).throw(AssertionError('archive lookup')))
+    def classified(locator):
+        return is_codex_system_skill(str(locator), system_skill_root=root, system_skill_root_is_archived=True)
+    assert classified(root / 'builtin' / 'SKILL.md') is True
+    assert classified(root / 'builtin' / '..' / 'outside' / 'SKILL.md') is False
+    assert classified(root.parent / '.system-other' / 'builtin' / 'SKILL.md') is False
+    assert classified(root / 'SKILL.md') is False
+    assert classified('builtin/SKILL.md') is False
+    assert classified(str(root / 'builtin' / 'SKILL.md').upper()) is (os.name == 'nt')
+    mixed = str(root / 'builtin' / 'SKILL.md')
+    mixed = mixed.replace('\\', '/') if os.name == 'nt' else mixed.replace('/', '\\')
+    assert classified(mixed) is (os.name == 'nt')
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='native Windows UNC ownership semantics')
+def test_archived_owned_system_paths_preserve_native_UNC_case_semantics():
+    from tests.semantic.support.codex_harness import is_codex_system_skill
+    root = Path(r'\\server\share\reviewer space\skills\.system')
+    assert is_codex_system_skill(r'\\SERVER\SHARE\reviewer space\skills\.system\builtin\SKILL.md',
+        system_skill_root=root, system_skill_root_is_archived=True) is True
+    assert is_codex_system_skill(r'\\server\other\reviewer space\skills\.system\builtin\SKILL.md',
+        system_skill_root=root, system_skill_root_is_archived=True) is False
 
 
 @pytest.mark.parametrize('damage', ['uncertain', 'conflicting', 'ungrounded', 'missing_obligation',
@@ -394,11 +542,11 @@ def test_complete_C09_archive_rejects_changed_effective_reviewer_settings(tmp_pa
         verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
 
 
-@pytest.mark.parametrize('change', ['schema_content', 'configuration', 'decision', 'runtime', 'workspace', 'missing'])
+@pytest.mark.parametrize('change', ['schema_content', 'configuration', 'decision', 'runtime', 'workspace', 'audit_codex_home', 'missing'])
 def test_complete_C09_archive_rejects_rewritten_binding_and_receipt(tmp_path, monkeypatch, change):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
     from tests.semantic.support.codex_expansion_policy import canonical_digest
-    root = sealed_c09_archive(tmp_path, monkeypatch)
+    root = sealed_c09_archive(tmp_path, monkeypatch, actual_audit=change == 'audit_codex_home')
     directory = root / 'turns/turn-01/notice-review'
     path = directory / 'invocation-binding.json'
     binding = json.loads(path.read_text())
@@ -410,6 +558,7 @@ def test_complete_C09_archive_rejects_rewritten_binding_and_receipt(tmp_path, mo
         elif change == 'configuration': binding['configuration']['model'] = 'different-model'
         elif change == 'decision': binding['decision_sha256'] = 'e' * 64
         elif change == 'runtime': binding['runtime']['codex_sha256'] = 'e' * 64
+        elif change == 'audit_codex_home': binding['context']['audit_codex_home'] = '/unowned/.codex'
         elif change == 'workspace':
             binding['context']['workspace'] += '-other'
             binding['context']['schema'] = str(Path(binding['context']['workspace']) / 'judgment-schema.json')

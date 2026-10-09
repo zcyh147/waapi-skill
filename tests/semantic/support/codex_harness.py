@@ -3140,6 +3140,7 @@ def audit_prompt_input_payload(
     *,
     target_skill_source: Path | None = None,
     system_skill_root: Path | None = None,
+    system_skill_root_is_archived: bool = False,
     expected_developer_instructions: str = "",
 ) -> CodexPromptAudit:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -3156,6 +3157,7 @@ def audit_prompt_input_payload(
         if is_codex_system_skill(
             resolved_locator,
             system_skill_root=system_skill_root,
+            system_skill_root_is_archived=system_skill_root_is_archived,
         ):
             system_skills.append((name, locator))
             continue
@@ -3348,11 +3350,24 @@ def local_locator_contains_parts(
     )
 
 
-def is_codex_system_skill(locator: str, *, system_skill_root: Path | None = None) -> bool:
+def is_codex_system_skill(locator: str, *, system_skill_root: Path | None = None,
+                          system_skill_root_is_archived: bool = False) -> bool:
     if not locator:
         return False
-    candidate = Path(locator).expanduser()
+    candidate = Path(locator) if system_skill_root_is_archived else Path(locator).expanduser()
     if system_skill_root is not None:
+        if system_skill_root_is_archived:
+            # Sealed disposable roots no longer exist. Compare their absolute,
+            # traversal-free host identities without consulting the filesystem.
+            root = Path(system_skill_root)
+            if (not root.is_absolute() or not candidate.is_absolute()
+                    or '..' in root.parts or '..' in candidate.parts):
+                return False
+            try:
+                relative = candidate.relative_to(root)
+            except ValueError:
+                return False
+            return len(relative.parts) >= 2 and relative.name.lower() == 'skill.md'
         root = system_skill_root.expanduser().resolve(strict=False)
         try:
             relative = candidate.resolve(strict=False).relative_to(root)
