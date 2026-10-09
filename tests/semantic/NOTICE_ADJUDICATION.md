@@ -1,5 +1,10 @@
 # Limited notice adjudication and development gates
 
+For current acceptance reporting, failure triage and rerun scope, use
+[business acceptance](TEST_ACCEPTANCE.md). The versioned reviewer contracts
+below still define machine judgments and immutable replay; they do not turn a
+nonmaterial wording discrepancy into a business failure in the companion report.
+
 ## Delivery acceptance amendment — 2026-10-09
 
 The user approved business-first closure after the current framework repair and

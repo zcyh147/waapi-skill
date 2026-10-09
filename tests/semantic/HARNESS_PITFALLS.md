@@ -5,6 +5,10 @@ accepted Gateway command, differs by host, or repeats a failure family below.
 `tests/AGENTS.md` owns the rules. This file records signals, causes, and
 prevention checks that are expensive to rediscover.
 
+Before deciding whether a failure blocks business acceptance or needs a rerun,
+apply [business acceptance](TEST_ACCEPTANCE.md); then consult the matching
+incident below for its technical cause.
+
 ## Classify the failing layer first
 
 | Evidence signal | Classification | Next action |

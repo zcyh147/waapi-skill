@@ -4,6 +4,10 @@ This repository implements `waapi-skill`: a local, version-aware WAAPI interface
 for Wwise Authoring. Read this file before changing the Skill or running tests.
 `tests/AGENTS.md` adds more specific rules for files below `tests/`.
 
+For Fresh test planning, failure triage or rerun decisions, read
+[business acceptance](tests/semantic/TEST_ACCEPTANCE.md) before interpreting
+historical campaign requirements.
+
 ## Design intent
 
 - The Skill is the interface layer. It replaces an always-on MCP server with a

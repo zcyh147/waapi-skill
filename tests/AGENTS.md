@@ -2,6 +2,10 @@
 
 Use `ci/test.sh` to run project test modes with consistent environment setup. See `tests/TEST_INVENTORY.md` for the human test inventory.
 
+For Fresh batch planning, failure classification, grader repairs and rerun scope,
+follow [business acceptance](semantic/TEST_ACCEPTANCE.md). It owns current
+coordination policy; dated campaign records retain their original verdicts.
+
 Repository development tests run through Poetry behind `ci/test.sh`. Do not
 install or run those developer dependencies from `skills/waapi-skill/.venv`.
 That Skill-local environment is reserved for the packaged Skill runtime and
@@ -513,9 +517,10 @@ failure queue: let the current full root finish, then run only the queued units
 in fresh targeted roots and replay each passing root with identical
 `--resume --verify-only`. Combine those roots only as explicitly labelled
 same-candidate cumulative evidence; never call them a single-root PASS. Run a
-new full root only after the candidate, suite, harness, immutable options, or an
-explicit single-root acceptance criterion makes the earlier completed units
-insufficient. A failed root always stays frozen without verify-only replay.
+new full root only when the changed execution/oracle behavior or an explicit
+single-root acceptance criterion makes earlier evidence insufficient; use the
+[proportional rerun rules](semantic/TEST_ACCEPTANCE.md#3-prove-the-affected-chain-and-rerun-proportionally)
+to determine scope. A failed root always stays frozen without verify-only replay.
 
 ### Multi-Draft Broker flow identity
 

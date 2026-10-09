@@ -1,5 +1,9 @@
 # Fresh Codex semantic validation
 
+Before planning a batch, triaging a failure or choosing reruns, read
+[business acceptance and bounded test work](TEST_ACCEPTANCE.md). It separates
+business outcomes from raw grader verdicts and includes the Windows impact plan.
+
 The formal agent-behavior gate is the resumable fresh Codex campaign in
 `tests/semantic/run_codex_skill_campaign.py`. It delegates execution to the
 existing matrix runner in `tests/semantic/run_codex_skill_matrix.py`, tests the
