@@ -226,3 +226,120 @@ def test_fixture_timeout_preserves_bounded_failure_receipt_without_retry(monkeyp
     assert len(launches) == len(receipts) == 1
     assert receipts[0]["argv"] == ["execute", "tx1-owned"] and receipts[0]["processes_reaped"] is True
     assert len(receipts[0]["error"]["message"].encode()) <= 2048
+
+
+def test_macos_expansion_versions_use_distinct_empty_homes_and_owned_cleanup(monkeypatch, tmp_path):
+    """The real expansion/lifecycle path owns the wrapper's effective bottle."""
+    from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle
+    from tests.semantic.test_codex_scenario_lifecycle_v3 import _install_fakes
+
+    source, _ = _install_fakes(monkeypatch, tmp_path)
+    monkeypatch.setattr(runtime.sys, "platform", "darwin")
+    monkeypatch.setattr(lifecycle, "require_live_environment", lambda env:
+        SimpleNamespace(version=env["WWISE_VERSION"], sample_project_source=source))
+    launches, cleanups = [], []
+
+    def launch(sandbox, env, *, wine_prefix_path, case_owned_root):
+        home = Path(env["HOME"])
+        assert home.is_dir() and not any(home.iterdir())
+        assert not wine_prefix_path.exists()
+        assert wine_prefix_path == home / "Library/Application Support/Wwise2019/Bottles/Wwise2019x64"
+        assert case_owned_root == home.parent
+        wine_prefix_path.mkdir(parents=True)
+        sandbox.metadata.wine_prefix_path = str(wine_prefix_path)
+        launches.append((home, wine_prefix_path))
+        return SimpleNamespace(host="127.0.0.1", port=49152,
+            command=("WwiseConsole", str(sandbox.sandbox_project)),
+            launch_cwd=sandbox.sandbox_root.resolve(), prefix=wine_prefix_path)
+
+    def shutdown(process, sandbox, *, suppress_errors):
+        assert suppress_errors is False
+        assert str(process.prefix) == sandbox.metadata.wine_prefix_path
+        cleanups.append(process.prefix)
+
+    class Direct:
+        calls = []
+        fully_closed = True
+        def __init__(self, **kwargs):
+            pass
+        def close(self):
+            return True
+
+    prepared = make_policy().prepared
+    monkeypatch.setattr(lifecycle, "launch_sandboxed_wwise", launch)
+    monkeypatch.setattr(lifecycle, "shutdown_sandboxed_wwise", shutdown)
+    monkeypatch.setattr(runtime, "make_project_prelaunch_hook", lambda request: lambda *args: None)
+    monkeypatch.setattr(runtime, "OwnedDirectWaapiCall", Direct)
+    monkeypatch.setattr(runtime, "fixture_gateway", lambda **kwargs: lambda argv: {"ok": True})
+    monkeypatch.setattr(runtime, "expansion_oracle_reader", lambda **kwargs:
+        lambda view, ids: [{"id": identifier, "path": "\\Containers\\Default Work Unit\\Music"} for identifier in ids])
+    monkeypatch.setattr(runtime.importlib, "import_module", lambda name: SimpleNamespace(prepare_m01=lambda ctx: prepared))
+    monkeypatch.setattr(runtime, "run_expansion_codex_task", lambda **kwargs:
+        {"passed": True, "status": "PASS", "thread_id": "fake-task"})
+    options = SimpleNamespace(model="gpt-6-luna", reasoning_effort="high", service_tier="default",
+        live_environment={}, skill_source=tmp_path, campaign_inputs_sha256="a" * 64)
+
+    for version in ("2022.1", "2025.1"):
+        root = tmp_path / version
+        unit = SimpleNamespace(case_id="M01", version=version, unit_id=f"EXP-{version}", policy="allow_changes")
+        outcome = runtime.run_expansion_unit(unit, scenario_root=root, options=options)
+        assert outcome.status == "PASS", outcome
+        start = json.loads((root / "evidence/start.json").read_text())
+        assert start["isolated_launch_environment"] == {"HOME": str(launches[-1][0])}
+        assert start["owned_wine_prefix"] == str(cleanups[-1])
+        assert not (root / "owned").exists()
+    assert launches[0][0] != launches[1][0]
+    assert cleanups == [prefix for _, prefix in launches]
+    assert all(tmp_path in prefix.parents for prefix in cleanups)
+
+
+@pytest.mark.parametrize("platform", ("win32", "linux"))
+def test_non_macos_expansion_preserves_lifecycle_launch_inputs(monkeypatch, tmp_path, platform):
+    observed = {}
+    class StopAfterConstruction(Exception):
+        pass
+    def construct(**kwargs):
+        observed.update(kwargs)
+        raise StopAfterConstruction
+    monkeypatch.setattr(runtime.sys, "platform", platform)
+    monkeypatch.setattr(runtime, "ScenarioLifecycle", construct)
+    unit = SimpleNamespace(case_id="M01", version="2025.1", unit_id="EXP25-M01")
+    live_environment = {"HOME": str(tmp_path / "existing-home")}
+    options = SimpleNamespace(model="gpt-6-luna", reasoning_effort="high", service_tier="default",
+        live_environment=live_environment)
+    with pytest.raises(StopAfterConstruction):
+        runtime.run_expansion_unit(unit, scenario_root=tmp_path / "case", options=options)
+    assert observed["live_environment"] == live_environment
+    assert observed["launch_environment_overrides"] is None
+    assert observed["owned_wine_prefix"] is None
+
+
+@pytest.mark.parametrize("contamination", ("settings", "bottle"))
+def test_macos_expansion_rejects_nonempty_home_before_launch(monkeypatch, tmp_path, contamination):
+    from tests.semantic.support import codex_scenario_lifecycle_v3 as lifecycle
+    from tests.semantic.test_codex_scenario_lifecycle_v3 import _install_fakes
+
+    _install_fakes(monkeypatch, tmp_path)
+    monkeypatch.setattr(runtime.sys, "platform", "darwin")
+    original_prepare = lifecycle.prepare_sample_project_sandbox
+    def prepare(env, **kwargs):
+        sandbox = original_prepare(env, **kwargs)
+        home = Path(env["HOME"])
+        if contamination == "settings":
+            (home / "settings.ini").write_text("unexpected", encoding="utf-8")
+        else:
+            (home / "Library/Application Support/Wwise2019/Bottles/Wwise2019x64").mkdir(parents=True)
+        return sandbox
+    monkeypatch.setattr(lifecycle, "prepare_sample_project_sandbox", prepare)
+    monkeypatch.setattr(lifecycle, "launch_sandboxed_wwise", lambda *args, **kwargs: pytest.fail("must not launch"))
+    root = tmp_path / "case"
+    options = SimpleNamespace(model="gpt-6-luna", reasoning_effort="high", service_tier="default",
+        live_environment={}, campaign_inputs_sha256="a" * 64)
+    unit = SimpleNamespace(case_id="M01", version="2022.1", unit_id="EXP22-M01")
+    outcome = runtime.run_expansion_unit(unit, scenario_root=root, options=options)
+    assert outcome.status == "BLOCKED"
+    failure = json.loads((root / "evidence/start-failure.json").read_text())
+    assert failure["stage"] == "prelaunch" and failure["wwise_stop_status"] == "not-started"
+    assert failure["never_reuse"] is True
+    assert "empty real case-owned Wwise HOME" in failure["primary_error"]
+    assert failure["source_hash_before"] == failure["source_hash_after"]
