@@ -191,8 +191,15 @@ def _roles(case_id, artifact, before, version, parameters):
         if not approve_c08_preview(artifact, **parameters):
             return None
         curve = attenuation_notice_context(artifact, before, version)
-        return None if curve is None else {
+        source_state = before.get('source')
+        source = source_state.get('object') if isinstance(source_state, Mapping) else None
+        if (curve is None or not _identity(source, 'Attenuation')
+                or any(not source[key] for key in ('name', 'path'))
+                or source['id'].casefold() == before['attenuation']['id'].casefold()):
+            return None
+        return {
             'target': before['attenuation'], 'curve': curve,
+            'preserved_source': source,
             'units': {'x': 'distance in the sealed project domain', 'y': 'decibels'},
             'preserve': ['other curves', 'source Attenuation', 'users and references'],
             'gateway_verification': 'result_schema',
@@ -205,7 +212,6 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
         before_snapshot: Mapping[str, Any], preview_parameters: Mapping[str, Any],
         user_prompt: str = '', transaction_id: str = '') -> dict[str, Any]:
     from tests.semantic.support.codex_c09_notice_adjudication import INPUT_MAX_BYTES
-    from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
     if (case_id not in CASES or version not in {'2022.1', '2025.1'}
             or (case_id, version) == ('M05', '2022.1')
             or execute_expected != (case_id not in {'C01', 'C03'})
@@ -220,7 +226,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     if case_id == 'C09':
         from tests.semantic.support.codex_c09_notice_adjudication import decide_c09_notice
         legacy = decide_c09_notice(result, command_records, version=version, execute_expected=execute_expected,
-            preview_artifact=preview_artifact, before_snapshot=before_snapshot)
+            preview_artifact=preview_artifact, before_snapshot=before_snapshot, complete_meaning_required=True)
         if legacy['outcome'] == 'material_reject':
             return legacy
     routes = {}
@@ -249,12 +255,10 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     if (preview is None or execute_expected != (execute is not None)
             or not any(row['event_position'] > preview and row['text'].strip() for row in visible)):
         return {'outcome': 'material_reject', 'reason': 'missing-ordered-visible-notice'}
-    # The historical import notice gate is token-based, not an exact role/value
-    # decision. Its legacy acceptance cannot attest mappings or preservation in
-    # this new contract; those complete notices receive independent review.
-    if case_id not in {'C01', 'C03', 'M01'} and expansion_preview_notice(result, command_records, version=version, execute_expected=execute_expected,
-            preview_artifact=preview_artifact, before_snapshot=before_snapshot):
-        return {'outcome': 'accepted', 'reason': 'legacy-deterministic-acceptance'}
+    # Historical parsers establish only selected edit frames. Even a positive
+    # cannot prove the meaning of every supplied baseline/verifier/scope claim
+    # in the complete visible notice. The prospective contract therefore needs
+    # one complete independent judgment after its deterministic hard checks.
     review_input = {
         'contract': CONTRACT, 'case_id': case_id, 'version': version,
         'transaction_id': transaction_id or preview_artifact.get('transaction_id'),
@@ -269,7 +273,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
         return {'outcome': 'material_reject', 'reason': 'complete-review-input-exceeds-bound'}
     return {'outcome': 'review_required', 'reason': (
         'legacy-lexical-match-insufficient-for-complete-import-mappings-and-scope'
-        if case_id in {'C01', 'C03', 'M01'} else 'unsupported-visible-notice'), 'input': review_input}
+        if case_id in {'C01', 'C03', 'M01'} else 'legacy-partial-parser-insufficient-for-complete-notice-meaning'), 'input': review_input}
 
 
 def grade_expansion_notice(result, command_records, *, other_gates, root, options, **kwargs):

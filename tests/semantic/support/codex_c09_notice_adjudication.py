@@ -22,11 +22,12 @@ INPUT_MAX_BYTES = 128 * 1024
 
 def decide_c09_notice(result: Any, command_records: Sequence[Any], *, version: str,
                       execute_expected: bool, preview_artifact: Mapping[str, Any],
-                      before_snapshot: Mapping[str, Any], user_prompt: str = '', transaction_id: str = '') -> dict[str, Any]:
+                      before_snapshot: Mapping[str, Any], user_prompt: str = '', transaction_id: str = '',
+                      complete_meaning_required: bool = False) -> dict[str, Any]:
     from tests.semantic.support.codex_task_runner_v3 import _bound_context_notice, expansion_preview_notice
     kwargs = dict(version=version, execute_expected=execute_expected,
         preview_artifact=preview_artifact, before_snapshot=before_snapshot)
-    if expansion_preview_notice(result, command_records, **kwargs):
+    if not complete_meaning_required and expansion_preview_notice(result, command_records, **kwargs):
         return {'outcome': 'accepted', 'reason': 'legacy-deterministic-acceptance'}
     context = _bound_context_notice(preview_artifact, before_snapshot)
     if (preview_artifact.get('request', {}).get('operation') != 'object.createPlugin'

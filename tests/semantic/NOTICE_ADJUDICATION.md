@@ -226,14 +226,27 @@ assuming a unit conversion. M05 display labels may derive from associations;
 its oracle preserves identity and real settings rather than literal display
 name/path.
 
+The preserved C08 source must independently prove a canonical GUID, Attenuation
+type, name and path distinct from the edited copy. Equality of malformed
+before/after source objects is not identity evidence; a missing, malformed or
+aliased source is rejected before review, even if the existing business
+equality oracle would agree.
+
 The historical import notice parser only matches lexical groups. A match
 cannot decide complete media mappings, property owners, extra writes or scope.
 New C01/C03/M01 notices therefore generally require independent review after
 typed attestation, with reason
 `legacy-lexical-match-insufficient-for-complete-import-mappings-and-scope`.
-Other supported contextual notices keep deterministic acceptance, and the
-existing C09 exact material-rejection checks remain authoritative. Unsupported
-wording is never automatic PASS. Narrative order may differ when the exact
+The contextual legacy parsers likewise prove only selected edit frames; a
+positive does not establish every supplied baseline, scope or verifier claim
+in the complete notice. New C06/C08/C09/M05 notices also require complete
+independent review, with reason
+`legacy-partial-parser-insufficient-for-complete-notice-meaning`. Structural
+hard checks and the existing C09 exact material-rejection checks remain
+authoritative. The original C09/v1 default keeps its historical positive
+shortcut; only the prospective contract opts out of that shortcut. Supported
+or unsupported wording is never automatic PASS under the new contract.
+Narrative order may differ when the exact
 mapping and curve point/shape meaning is clear; preservation need not use a
 verbatim or exhaustive bookkeeping list. Missing or ambiguous edit meaning
 remains non-PASS. The frozen independent contrasts have a separate source
@@ -263,3 +276,10 @@ failure, unsupported-language judgment, reviewer infrastructure and provenance;
 execution/authorization and business outcomes retain their independent gates.
 Combined independent review, frozen-candidate broad development gates and
 final #147/#122 acceptance remain separate pending promotion work.
+
+The #160 review repairs specifically reproduce the previously admitted C08
+verifier/audibility overclaim beside a supported notice, false baseline claims
+beside supported C06/C09/M05 notices, and an unattested C08 preserved source.
+Complete review decisions and deterministic role rejection replay through the
+same full runner/archive seam. No new wording blacklist or language grammar
+was added, and the frozen legacy fixtures and oracles remain unchanged.

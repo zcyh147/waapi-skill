@@ -410,7 +410,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         execute_expected=not ask, preview_artifact=artifact, before_snapshot=before, preview_parameters=parameters,
         transaction_id=tx, user_prompt=prompts[0], other_gates={'policy_checkpoint': True}, root=directory, options=options)
     if text is None:
-        assert graded['decision']['outcome'] == 'review_required', graded['decision']
+        assert graded['decision']['outcome'] == ('material_reject' if damage == 'unattested_role' else 'review_required'), graded['decision']
     assert graded['passed'] is (damage is None), graded
     turns = []
     for index in range(1, len(turn_events) + 1):
@@ -590,3 +590,104 @@ def test_new_music_reviewer_infrastructure_failures_preserve_valid_failed_archiv
     monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
     assert verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
         expected_version='2025.1', expected_inputs_sha256='a' * 64)['business_pass'] is False
+
+
+def test_supported_attenuation_notice_with_false_verifier_claim_requires_review_and_replays_fail(tmp_path, monkeypatch):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    fixture = json.loads((Path(__file__).parents[1] /
+        'fixtures/semantic/expansion-attenuation-notice-c39b728-2025.json').read_text())
+    supported = '\n'.join(row['item']['text'] for row in fixture['events'] if row['item']['type'] == 'agent_message')
+    # Independent contrast #160: result_schema_checked does not attest actual
+    # curve effect or audibility, even alongside a supported prospective plan.
+    overclaim = 'Gateway 已核验，所以本次衰减曲线的实际业务效果已有 Gateway 完整证明，且听感正确。'
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C08', damage='wrong', text=supported + '\n' + overclaim)
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    assert decision['outcome'] == 'review_required'
+    assert (tmp_path / 'turns/turn-01/notice-review/receipt.json').is_file()
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    archived = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert archived['archive_valid'] is True and archived['business_pass'] is False
+    assert archived['gateway_verification_state'] == 'result_schema_checked'
+
+
+@pytest.mark.parametrize('defect', ['empty', 'wrong_type', 'malformed_guid', 'aliased_guid'])
+def test_attenuation_preserved_source_must_be_attested_before_review_and_failed_archive_replays(tmp_path, monkeypatch, defect):
+    from copy import deepcopy
+    import sys
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    original = case_facts
+    def malformed(case_id, version='2025.1'):
+        artifact, before, after, parameters, oracle, notice = original(case_id, version)
+        source = deepcopy(before['source']['object'])
+        if defect == 'empty': source = {}
+        elif defect == 'wrong_type': source['type'] = 'Sound'
+        elif defect == 'malformed_guid': source['id'] = '{not-a-canonical-guid}'
+        else: source['id'] = before['attenuation']['id'].lower()
+        before['source']['object'] = source
+        after['source']['object'] = deepcopy(source)
+        return artifact, before, after, parameters, oracle, notice
+    monkeypatch.setattr(sys.modules[__name__], 'case_facts', malformed)
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C08', damage='unattested_role')
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    assert decision['outcome'] == 'material_reject'
+    assert decision['reason'] == 'unattested-workflow-operation-or-roles'
+    assert not (tmp_path / 'turns/turn-01/notice-review').exists()
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    archived = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert archived['archive_valid'] is True and archived['business_pass'] is False
+
+
+def supported_context_notice(case_id):
+    if case_id == 'C06':
+        case = historical_case(case_id)
+    else:
+        cases = json.loads((Path(__file__).parents[1] /
+            'fixtures/semantic/expansion-current-role-notices-db2299c.json').read_text())['cases']
+        case = next(row for row in cases if row['case'].endswith('EXP25-' + case_id))
+    messages = [row['item']['text'] for row in case['events'] if row['item']['type'] == 'agent_message']
+    return '\n'.join(messages) if case_id == 'C06' else messages[-1]
+
+
+@pytest.mark.parametrize('case_id', ['C06', 'C09', 'M05'])
+@pytest.mark.parametrize('false_baseline', [False, True], ids=['supported', 'false-baseline'])
+def test_new_contract_reviews_complete_legacy_positive_context_and_replays_its_judgment(tmp_path, monkeypatch, case_id, false_baseline):
+    from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    artifact, before, _, _, _, _ = case_facts(case_id)
+    notice = supported_context_notice(case_id)
+    result, commands = timeline(notice)
+    # These supported contextual frames retain their original parser result;
+    # the new contract cannot extend that result to all other visible claims.
+    assert expansion_preview_notice(result, commands, version='2025.1', execute_expected=True,
+        preview_artifact=artifact, before_snapshot=before) is True
+    if false_baseline:
+        notice += ('当前 Stinger 数量为 99。' if case_id == 'M05' else '当前声音音量为 -99 dB。')
+    unit = sealed_workflow(tmp_path, monkeypatch, case_id,
+        damage='wrong' if false_baseline else None, text=notice)
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    assert decision['outcome'] == 'review_required'
+    assert decision['reason'] == 'legacy-partial-parser-insufficient-for-complete-notice-meaning'
+    assert (tmp_path / 'turns/turn-01/notice-review/receipt.json').is_file()
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    archived = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert archived['business_pass'] is (not false_baseline)
+
+
+def test_new_c09_retains_deterministic_material_rejection_before_complete_review(tmp_path, monkeypatch):
+    from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    artifact, before, _, parameters, _, _ = case_facts('C09')
+    name = artifact['request']['arguments']['plugin']['name']
+    result, commands = timeline('将追加 ' + name + '，备注为“Wrong note”，现在执行。')
+    monkeypatch.setattr(review, 'review_c09_notice', lambda *a, **k: (_ for _ in ()).throw(AssertionError('material rescue')))
+    graded = grade_expansion_notice(result, commands, case_id='C09', version='2025.1', execute_expected=True,
+        preview_artifact=artifact, before_snapshot=before, preview_parameters=parameters,
+        other_gates={'policy_checkpoint': True}, root=tmp_path, options=None)
+    assert graded['decision'] == {'outcome': 'material_reject', 'reason': 'explicit-descriptor-contradiction'}
+    assert graded['passed'] is False and graded['receipt'] is None
