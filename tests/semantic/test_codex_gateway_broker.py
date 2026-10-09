@@ -2462,7 +2462,7 @@ with os.fdopen(descriptor, "wb") as stream:
     stream.write(encoded_ack)
     stream.flush()
     os.fsync(stream.fileno())
-if mode == "" and os.name == "nt":
+if os.name == "nt" and (mode == "" or mode.startswith("topic-stream")):
     # Keep the fake writer and both venv redirector layers alive while the
     # broker takes its native process snapshot.  The real wait-topic gateway
     # naturally remains alive after publishing its ACK.
@@ -3902,10 +3902,15 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
                 "last_event_hash": FAKE_LAST_EVENT_HASH,
             },
         }
-        assert shown["next_command"] == expected_fake_confirmation_next_command(
+        expected_next = expected_fake_confirmation_next_command(
             invocation_runner,
             "tx-dynamic-123",
         )
+        if os.name == "nt":
+            expected_next["model_command"] = encode_windows_model_argv(
+                ["python", TASK_LOCAL_RUNNER_WINDOWS, "gateway.py", *expected_next["gateway_argv"]]
+            )
+        assert shown["next_command"] == expected_next
         assert results[3].stderr == ""
         assert preview["request"] == request
         assert preview["broker_token_visible"] is False

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from tests.semantic.support.codex_expansion_policy import canonical_digest
+from tests.semantic.support.codex_archive_paths import parse_archive_absolute_path
 from tests.semantic.support.codex_harness import normalized_gateway_command_argv, parse_jsonl_events
 
 LEGACY_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v1'
@@ -59,13 +60,15 @@ def _import_roles(case_id, artifact, before, parameters):
     from tests.semantic.support.codex_expansion_music_case import approve_m01_preview
     parameters = dict(parameters)
     if case_id == 'C01':
-        parameters['replacement'] = Path(parameters['replacement'])
+        parameters['replacement'] = parse_archive_absolute_path(parameters['replacement']).pure_path
         approved = approve_c01_preview(artifact, **parameters)
     elif case_id == 'C03':
-        parameters['mappings'] = {key: Path(value) for key, value in parameters['mappings'].items()}
+        parameters['mappings'] = {key: parse_archive_absolute_path(value).pure_path
+            for key, value in parameters['mappings'].items()}
         approved = approve_c03_preview(artifact, **parameters)
     else:
-        parameters['media'] = {key: Path(value) for key, value in parameters['media'].items()}
+        parameters['media'] = {key: parse_archive_absolute_path(value).pure_path
+            for key, value in parameters['media'].items()}
         approved = approve_m01_preview(artifact, **parameters)
     request, prepared = artifact['request'], artifact['prepared_operation']
     plan = prepared['verification_plan']

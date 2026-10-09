@@ -82,7 +82,7 @@ def prepare_music_switch_reference_media(ctx, owned_wwu: Path, source_project: P
             raise CaseBoundaryError("music media path contains unsupported or escaping segments")
         target = _confined_media_path(owned, Path("Originals/SFX", *parts))
         folded = str(target).casefold()
-        if folded in destinations and destinations[folded] != target:
+        if folded in destinations and str(destinations[folded]) != str(target):
             raise CaseBoundaryError("music media paths alias the same destination")
         destinations[folded] = target
         ids.add(identifier)

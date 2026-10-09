@@ -21,7 +21,9 @@ from types import SimpleNamespace
 from pathlib import Path
 from typing import Any, Mapping
 
-from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
+from tests.semantic.support.codex_archive_paths import (
+    parse_archive_absolute_path, parse_archive_relative_path,
+)
 from tests.semantic.support.codex_expansion_policy import (
     BoundedExpansionReads, ExpansionReadScope, canonical_digest, classify_expansion_outcome,
     is_public_query_timeout_failure,
@@ -878,10 +880,11 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         parameters = dict(plan["preview_parameters"])
         for key in ("replacement",):
             if key in parameters:
-                parameters[key] = Path(parameters[key])
+                parameters[key] = parse_archive_absolute_path(parameters[key]).pure_path
         for key in ("mappings", "media"):
             if key in parameters:
-                parameters[key] = {name: Path(path) for name, path in parameters[key].items()}
+                parameters[key] = {name: parse_archive_absolute_path(path).pure_path
+                    for name, path in parameters[key].items()}
         preview_approval = getattr(module, "approve_" + case_id.lower() + "_preview")(
             preview["artifact"], **parameters)
         _require(type(preview_approval) is bool, "adapter Preview approval is not an exact boolean")

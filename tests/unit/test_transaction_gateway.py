@@ -2276,7 +2276,11 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
     assert list(payload).index("next_command") > list(payload).index("events")
     assert "session_context" not in payload
     assert list(payload)[-1] == "next_command"
-    assert waapi_gateway.gateway_json_document_size(payload) < 5_500
+    # The exact continuation is checked above. Its encoded Windows shell form
+    # grows with the host's absolute paths; measure the business summary apart.
+    assert waapi_gateway.gateway_json_document_size(
+        {key: value for key, value in payload.items() if key != "next_command"}
+    ) < 5_500
     assert payload["summary_only"] is True
     assert "artifact" not in payload
     assert payload["preview_summary"]["contract"] == artifact["contract"]

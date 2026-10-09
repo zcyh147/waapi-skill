@@ -410,6 +410,7 @@ class TestDriver:
                 "WWISE_LIVE": "0",
                 "WWISE_DESTRUCTIVE": "0",
                 "WWISE_STRICT_REAL": "0",
+                "PYTHONUTF8": "1",
             }
         )
         return environment

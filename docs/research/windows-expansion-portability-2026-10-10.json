@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-10",
+  "base_commit": "9589659ede2fa025c7eabdba0154e2e6155b923a",
+  "scope": "Native-Windows portability repair; no packaged Skill changes or Fresh acceptance credit",
+  "repair_patch_sha256": "546488e56e2a14eaaa33b49f301f90b4ef81fb952d93e99269afd79a41a84261",
+  "original_nonlive": {
+    "passed": 16309,
+    "failed": 750,
+    "errors": 49,
+    "skipped": 266,
+    "deselected": 27,
+    "exit_code": 1
+  },
+  "native_recovery": {
+    "passed": 3525,
+    "failed": 30,
+    "skipped": 15,
+    "warnings": 5,
+    "seconds": 741.44,
+    "exit_code": 1,
+    "files": [
+      "tests/semantic/test_codex_ancillary_role_notices.py",
+      "tests/semantic/test_codex_baseline_purpose_components_review.py",
+      "tests/semantic/test_codex_c09_notice_adjudication.py",
+      "tests/semantic/test_codex_coordinated_attestation_notices.py",
+      "tests/semantic/test_codex_expansion_archive.py",
+      "tests/semantic/test_codex_expansion_music_case.py",
+      "tests/semantic/test_codex_expansion_notice_adjudication.py",
+      "tests/semantic/test_codex_first_use.py",
+      "tests/semantic/test_codex_gateway_broker.py",
+      "tests/semantic/test_codex_guid_comparison_notices.py",
+      "tests/semantic/test_codex_guid_incomplete_operands_review.py",
+      "tests/semantic/test_codex_guid_incomplete_review.py",
+      "tests/semantic/test_codex_guid_opaque_qualifier_review.py",
+      "tests/semantic/test_codex_guid_span_review.py",
+      "tests/semantic/test_codex_harness.py",
+      "tests/semantic/test_codex_import_declaration_mvp.py",
+      "tests/semantic/test_codex_independent_composed_notices.py",
+      "tests/semantic/test_codex_modal_prefix_notices.py",
+      "tests/semantic/test_codex_modal_review_notices.py",
+      "tests/semantic/test_codex_music_switch_reference_goal.py",
+      "tests/semantic/test_codex_notice_authorization_facts.py",
+      "tests/semantic/test_codex_notice_discovery_facts.py",
+      "tests/semantic/test_codex_notice_noun_components_review.py",
+      "tests/semantic/test_codex_operation_noun_notices.py",
+      "tests/semantic/test_codex_preview_components_review.py",
+      "tests/semantic/test_codex_purpose_composition_notices.py",
+      "tests/semantic/test_codex_rejected_draft_check_archive.py",
+      "tests/semantic/test_codex_target_plan_family_notices.py",
+      "tests/semantic/test_codex_target_preflight_components_review.py",
+      "tests/semantic/test_run_codex_skill_campaign_heavy_v3.py",
+      "tests/unit/test_audio_import_business_gateway.py",
+      "tests/unit/test_media_build_business_adapter.py",
+      "tests/unit/test_transaction_gateway.py",
+      "tests/unit/test_workflow_source_guard.py"
+    ]
+  },
+  "native_targeted_retry": {
+    "passed": 122,
+    "failed": 1,
+    "seconds": 28.46,
+    "exit_code": 1,
+    "warnings_as_errors": "pytest.PytestUnhandledThreadExceptionWarning"
+  },
+  "remaining_failure": {
+    "node": "tests/semantic/test_codex_gateway_broker.py::test_native_windows_powershell_shim_preserves_public_typed_container_facts",
+    "classification": "obsolete test protocol, nonblocking for the expansion Fresh assessment",
+    "reason": "The test searches for draft-apply, but current soundbank.setInclusions uses bound business declarations. It fails at max(empty) before PowerShell, Broker or Gateway dispatch.",
+    "action": "Retain raw FAIL; defer migration of this older transport fixture. Do not claim all-green Non-live."
+  },
+  "logs": [
+    {
+      "path": "C:/w/waapi-win-recovery34-r4.log",
+      "sha256": "f79e2d01627075f3182b9d1e1f141f31f80666fe82e9221717bdba74cee2c639"
+    },
+    {
+      "path": "C:/w/waapi-win-retry-r5.log",
+      "sha256": "59ddb6ba43cfd08250c6858a0f09366d629ce31e4aa53996d6505cb595e4435f"
+    },
+    {
+      "path": "/tmp/waapi-winfix-mac-r4.log",
+      "sha256": "40bee49a169d18a208da43755dd2966178259c0d03cfdd22d2d77dd42bd14824"
+    },
+    {
+      "path": "/tmp/waapi-winfix-mac-boundaries.log",
+      "sha256": "986814e6a042e5edd80f307fd6a4cd5bad4ffa1169a6bcb0478976f52eb9f2d7"
+    },
+    {
+      "path": "/tmp/waapi-winfix-mac-r5-small.log",
+      "sha256": "d855bb79ee0becab566cbee9e9d6f271a068137edc11160e662387f7584664b7"
+    },
+    {
+      "path": "/tmp/waapi-winfix-mac-heavy.log",
+      "sha256": "74845d063790a9d2150191d171fed78693e4984907bd3b22a2807d9cc159a5b3"
+    },
+    {
+      "path": "/tmp/waapi-winfix-mac-r5-archive.log",
+      "sha256": "f0250ada32d9f77c737d5c047c329b8837e50394b06216fd30bdb05e8c2c31db"
+    }
+  ]
+}

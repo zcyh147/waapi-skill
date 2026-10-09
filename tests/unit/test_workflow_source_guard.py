@@ -209,3 +209,28 @@ def test_source_hash_bound_stops_fixture_before_launch(tmp_path, workflow, monke
     assert "launch" not in events
     assert "release" in events
     assert records == []
+
+
+@pytest.mark.parametrize("after_read", (False, True))
+def test_full_source_hash_rejects_changed_open_file_identity(
+    tmp_path, workflow, monkeypatch, after_read,
+):
+    root = tmp_path / "source"
+    _source(root)
+    original_fstat = os.fstat
+    calls = 0
+
+    def switched_identity(descriptor):
+        nonlocal calls
+        calls += 1
+        info = original_fstat(descriptor)
+        fields = {name: getattr(info, name) for name in (
+            "st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns", "st_ctime_ns",
+        )}
+        if calls == (2 if after_read else 1):
+            fields["st_ino"] += 1
+        return SimpleNamespace(**fields)
+
+    monkeypatch.setattr(os, "fstat", switched_identity)
+    with pytest.raises(workflow.SandboxFixtureError, match="changed.*hashing"):
+        workflow._hash_mutation_bearing_project_files(root)

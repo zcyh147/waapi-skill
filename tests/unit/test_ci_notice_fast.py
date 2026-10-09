@@ -22,7 +22,7 @@ def test_notice_fast_launcher_forces_offline_and_preserves_child_failure():
     assert main(
         ['--mode', 'notice-fast', '--', '-q', '-ra'],
         environment={'WWISE_LIVE': '1', 'WWISE_DESTRUCTIVE': '1',
-                     'WWISE_STRICT_REAL': '1', 'PYTEST_ADDOPTS': 'tests/live'},
+                     'WWISE_STRICT_REAL': '1', 'PYTEST_ADDOPTS': 'tests/live', 'PYTHONUTF8': '0'},
         python_executable=sys.executable, command_runner=child,
     ) == 7
     command, options = calls[0]
@@ -32,6 +32,7 @@ def test_notice_fast_launcher_forces_offline_and_preserves_child_failure():
             ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_STRICT_REAL')} == {
                 'WWISE_LIVE': '0', 'WWISE_DESTRUCTIVE': '0', 'WWISE_STRICT_REAL': '0'}
     assert 'PYTEST_ADDOPTS' not in options['env']
+    assert options['env']['PYTHONUTF8'] == '1'
 
 
 def test_notice_fast_collection_is_explicit_and_missing_selection_cannot_pass(tmp_path):

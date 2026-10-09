@@ -5,3 +5,7 @@
 # Immutable Wwise fixtures are hash-bound raw payloads. Never translate their
 # line endings during checkout, regardless of the host core.autocrlf setting.
 tests/_org/** -text
+
+# Sealed semantic witnesses and definitions are hashed as committed bytes.
+tests/fixtures/semantic/** -text
+tests/semantic/data/** -text

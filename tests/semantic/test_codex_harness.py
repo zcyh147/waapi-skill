@@ -822,7 +822,7 @@ def test_snapshot_interlude_requires_positional_broker_receipt_correlation(damag
     original = json.loads(text)
     old_runner = original["records"][0]["payload"]["next_command"]["full_argv"][1]
     skill = Path(__file__).parents[2] / "skills/waapi-skill"
-    runner = str(skill / "scripts/run.py")
+    runner = (skill / "scripts/run.py").as_posix()
     rows = json.loads(text.replace(old_runner, runner).replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
     commands = [completed_record(row["command"], row["payload"]) for row in rows]
     accepted = []
@@ -884,7 +884,7 @@ def test_preview_interlude_requires_positional_gateway_receipts_before_copy_admi
     original = json.loads(path.read_text())
     old_runner = original["records"][0]["payload"]["next_command"]["full_argv"][1]
     skill = Path(__file__).parents[2] / "skills/waapi-skill"
-    runner = str(skill / "scripts/run.py")
+    runner = (skill / "scripts/run.py").as_posix()
     rows = json.loads(path.read_text().replace(old_runner, runner)
         .replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
     commands = [completed_record(row["command"], row["payload"]) for row in rows]
@@ -989,7 +989,7 @@ def test_expansion_copy_interleaving_requires_real_positional_argv_reconciliatio
     original = json.loads(text)
     original_runner = completed_record(original["records"][3]["command"]).argv[1]
     skill = Path(__file__).parents[2] / "skills/waapi-skill"
-    runner = str(skill / "scripts/run.py")
+    runner = (skill / "scripts/run.py").as_posix()
     rows = json.loads(text.replace(original_runner, runner).replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
     commands = [completed_record(row["command"], row["payload"]) for row in rows]
     accepted = []
@@ -4007,6 +4007,8 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
     )
 
     def successful_run(command: Sequence[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert _kwargs["encoding"] == ("oem" if os.name == "nt" else "utf-8")
+        assert _kwargs["errors"] == "replace"
         observed.append(tuple(command))
         return subprocess.CompletedProcess(command, 0, "SUCCESS", "")
 

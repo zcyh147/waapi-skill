@@ -4,6 +4,8 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
+
 from tests.semantic.support.codex_task_runner_v3 import expansion_preview_notice
 
 FIXTURE = Path(__file__).parents[1] / 'fixtures/semantic/c09-notice-adjudication-v1.json'
@@ -61,14 +63,25 @@ def grounded_judgment(review_input, verdict='accepted'):
         for key in ('target', 'effect', 'values', 'scope_and_preservation', 'prospective_meaning', 'optional_baseline_claims')]}
 
 
+def fake_reviewer_options(root):
+    """Use a valid host runtime layout; only model execution is replaced."""
+    from tests.semantic.test_codex_harness import (
+        executable_file, windows_standalone_binary, _WINDOWS_POWERSHELL_CORE_HOST)
+    binary = (windows_standalone_binary(root / 'fake-standalone') if os.name == 'nt'
+        else executable_file(root / 'fake-codex'))
+    auth = root / 'fake-auth'
+    auth.write_text('{}', encoding='utf-8')
+    return SimpleNamespace(codex_binary=binary, auth_json=auth,
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST if os.name == 'nt' else None)
+
+
 def test_independent_reviewer_receipt_replays_without_model_and_rejects_tampering(tmp_path, monkeypatch):
     from tests.semantic.support import codex_c09_notice_adjudication as review
     from tests.semantic.support.codex_harness import BoundedProcessResult as ProcessResult
     result, commands, fixture = witness()
     decision = review.decide_c09_notice(result, commands, version='2025.1', execute_expected=True,
         preview_artifact=fixture['preview_artifact'], before_snapshot=fixture['before_snapshot'])
-    binary = tmp_path / 'codex'
-    binary.write_bytes(b'fake CLI identity')
+    options = fake_reviewer_options(tmp_path)
     calls = []
     def process(command, **kwargs):
         calls.append(command)
@@ -89,8 +102,6 @@ def test_independent_reviewer_receipt_replays_without_model_and_rejects_tamperin
         ]
         return ProcessResult(0, '\n'.join(json.dumps(e) for e in events), '', 0.5)
     monkeypatch.setattr(review, 'run_process', process)
-    options = SimpleNamespace(codex_binary=binary, auth_json=tmp_path / 'auth', windows_powershell_core_host=None)
-    options.auth_json.write_text('{}')
     receipt = review.review_c09_notice(decision, root=tmp_path / 'review', options=options)
     assert receipt['outcome'] == 'accepted'
     assert receipt['usage'] == {'input_tokens': 100, 'output_tokens': 50}
@@ -156,10 +167,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None, actu
     assert all(assertions.values())
     plan = json.loads((root / 'expansion-plan.json').read_text())
     plan.pop('sha256')
-    binary, auth = root / 'fake-codex', root / 'fake-auth'
-    binary.write_bytes(b'fake independent CLI')
-    auth.write_text('{}')
-    options = SimpleNamespace(codex_binary=binary, auth_json=auth, windows_powershell_core_host=None)
+    options = fake_reviewer_options(root)
     runtime = review.reviewer_runtime_identity(options)
     plan.update(unit_id='EXP25-C09', operation='object.createPlugin', request_schema_uri=None,
         before=before, required_assertions=sorted(C09_ASSERTIONS), oracle_parameters=oracle_parameters,
@@ -191,7 +199,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None, actu
         argv = record['gateway_arguments']
         argv[:] = [tx if value == 'tx1-00000000000000000001' else value for value in argv]
         if argv[0] == 'draft-start': argv[1] = 'object.createPlugin'
-        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        model = ['python', str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]
         semantic = ['runner-owned-version', '2025.1', *argv]
         if '--expected-revision' in argv: semantic[-1] = 1
         payload = record['payload']
@@ -201,7 +209,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None, actu
         record.update(model_argv=model, normalized_model_argv=model, raw_argv_sha256=canonical_digest(model),
             argv_sha256=canonical_digest(model), semantic_argv_sha256=canonical_digest(semantic),
             payload_sha256=canonical_digest(payload), stdout=json.dumps(payload),
-            runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]))
+            runner_command_sha256=canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]))
         for event in events:
             item = event.get('item', {})
             if item.get('id') == 'cmd-' + str(record['sequence']):
@@ -209,7 +217,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None, actu
     for event in events:
         if event.get('item', {}).get('id') == 'preview-notice': event['item']['text'] = fixture['notice']
     _write(root / 'expansion-broker.json', broker)
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     commands = completed_command_records(events, platform_name='posix')
     facts['command_facts']['command_records'] = [asdict(row) for row in commands]

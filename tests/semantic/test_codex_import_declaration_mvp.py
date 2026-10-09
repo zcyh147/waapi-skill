@@ -201,10 +201,15 @@ def test_business_asset_compiles_without_model_authored_wwise_mechanics(
         "audio_file_source_media",
     ]
     assert compiled.next_command["copy_instruction"]["source_field"] == (
-        "shell_command"
+        "model_command" if os.name == "nt" else "shell_command"
     )
     assert compiled.next_command["full_argv"][-1] == "mvp-preview"
-    assert compiled.next_command["shell_command"].endswith("mvp-preview")
+    if os.name == "nt":
+        assert decode_windows_model_argv(compiled.next_command["model_command"]) == tuple(
+            compiled.next_command["full_argv"]
+        )
+    else:
+        assert shlex.split(compiled.next_command["shell_command"]) == compiled.next_command["full_argv"]
     assert set(compiled.model_authored_fields) == {
         "parent",
         "name",

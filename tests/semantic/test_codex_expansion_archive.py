@@ -1,6 +1,7 @@
 """Read-only expansion replay rejects missing or inconsistent sealed evidence."""
 
 import json
+import os
 import importlib.util
 import hashlib
 import shlex
@@ -19,6 +20,8 @@ from tests.semantic.support.codex_expansion_policy import canonical_digest
 from tests.semantic.support.codex_expansion_policy import ExpansionReadScope
 from tests.semantic.support.codex_expansion_attenuation_case import C08_ASSERTIONS, verify_c08
 from tests.semantic.support.codex_harness import completed_command_records
+from tests.semantic.support.codex_gateway_contracts import TASK_LOCAL_RUNNER_POSIX, TASK_LOCAL_RUNNER_WINDOWS
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 from tests.semantic.test_codex_transaction_seal import _artifact
 from wwise_waapi.transactions import TransactionStore
 from wwise_waapi.operation_drafts import OperationDraftStore, _record_digest
@@ -200,7 +203,7 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
             payload["state"] = "executed_unverified"
         if argv[0] == "verify":
             payload["state"] = "result_schema_checked"
-        model_argv = ["python", plan["skill_source"] + "/scripts/run.py", "gateway.py", *argv]
+        model_argv = ["python", str(Path(plan["skill_source"]) / "scripts" / "run.py"), "gateway.py", *argv]
         semantic = ["runner-owned-version", "2025.1", *argv]
         if "--expected-revision" in argv:
             semantic[-1] = 1
@@ -209,7 +212,7 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
             "model_argv": model_argv, "normalized_model_argv": model_argv, "gateway_arguments": argv,
             "raw_argv_sha256": canonical_digest(model_argv), "argv_sha256": canonical_digest(model_argv),
             "semantic_argv_sha256": canonical_digest(semantic), "payload_sha256": canonical_digest(payload),
-            "runner_command_sha256": canonical_digest([plan["trusted_python"], plan["skill_source"] + "/scripts/run.py", "gateway.py", *argv]),
+            "runner_command_sha256": canonical_digest([plan["trusted_python"], str(Path(plan["skill_source"]) / "scripts" / "run.py"), "gateway.py", *argv]),
             "authenticated": True, "accepted": True, "succeeded": True, "payload": payload, "stdout": stdout,
             "exit_code": 0, "runner_exit_code": 0, "allowed_exit_codes": [0], "payload_error": "",
             "started_at_unix": index, "finished_at_unix": index + .1, "duration_seconds": .1})
@@ -257,10 +260,10 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
         "isolation_audit": {"passed": True}, "skill_tree_unchanged": True,
         "skill_tree_sha256_before": INPUTS, "skill_tree_sha256_after": INPUTS,
         "command_facts": {"command_records": [asdict(row) for row in completed_command_records(events, platform_name="posix")]}})
-    (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
-    (directory / "prompt.txt").write_text(plan["prompts"][0] + "\n")
-    (directory / "final.txt").write_text(final_response + "\n")
-    (directory / "stderr.txt").write_text("")
+    write_utf8_text_bytes(directory / "events.jsonl", "".join(json.dumps(event) + "\n" for event in events))
+    write_utf8_text_bytes(directory / "prompt.txt", plan["prompts"][0] + "\n")
+    write_utf8_text_bytes(directory / "final.txt", final_response + "\n")
+    write_utf8_text_bytes(directory / "stderr.txt", "")
 
 
 def test_complete_archive_replays_real_store_without_writing_or_upgrading_failure(tmp_path):
@@ -431,14 +434,14 @@ def test_failed_accepted_receipt_can_replay_without_json(tmp_path, command):
         argv = (["query-object", "--exact-id", next(iter(plan["read_scope"]["object_ids"]))]
                 if command == "query-object" else ["draft-check", "draft", "--task-authority", "auth", "--expected-revision", "1"])
         record["gateway_arguments"] = argv
-        record["model_argv"] = ["python", plan["skill_source"] + "/scripts/run.py", "gateway.py", *argv]
+        record["model_argv"] = ["python", str(Path(plan["skill_source"]) / "scripts" / "run.py"), "gateway.py", *argv]
         record["normalized_model_argv"] = record["model_argv"]
         record["raw_argv_sha256"] = record["argv_sha256"] = canonical_digest(record["model_argv"])
         semantic = ["runner-owned-version", "2025.1", *argv]
         if command == "draft-check":
             semantic[-1] = 1
         record["semantic_argv_sha256"] = canonical_digest(semantic)
-        record["runner_command_sha256"] = canonical_digest([plan["trusted_python"], plan["skill_source"] + "/scripts/run.py", "gateway.py", *argv])
+        record["runner_command_sha256"] = canonical_digest([plan["trusted_python"], str(Path(plan["skill_source"]) / "scripts" / "run.py"), "gateway.py", *argv])
     record.update(succeeded=False, payload=None, payload_sha256="", stdout="", exit_code=125,
                   runner_exit_code=None, payload_error="runner timeout; no complete JSON receipt")
     broker["records"] = [broker["records"][0], record]
@@ -460,7 +463,7 @@ def test_failed_execute_reservation_is_not_proof_of_gateway_dispatch(tmp_path, d
     directory = next(tmp_path.glob("broker/state/transactions/*"))
     events = [json.loads(line) for line in (directory / "events.jsonl").read_text().splitlines()]
     events = events[:3 if dispatch_started else 2]
-    (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
+    write_utf8_text_bytes(directory / "events.jsonl", "".join(json.dumps(event) + "\n" for event in events))
     state = json.loads((directory / "state.json").read_text())
     state.update(state=events[-1]["to_state"], event_sequence=len(events),
                  last_event_hash=events[-1]["event_hash"], updated_at=events[-1]["timestamp"])
@@ -543,12 +546,12 @@ def test_archive_preserves_blocked_infrastructure_only_from_raw_pre_action_event
     directory = root / "turns" / "turn-01"
     _write(directory / "codex-facts.json", {"timed_out": False})
     events = [{"type": "turn.failed", "error": {"message": "authentication failed"}}]
-    (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
-    (directory / "stderr.txt").write_text("")
+    write_utf8_text_bytes(directory / "events.jsonl", "".join(json.dumps(event) + "\n" for event in events))
+    write_utf8_text_bytes(directory / "stderr.txt", "")
     replay = _verify(root)
     assert replay["original_status"] == "BLOCKED" and replay["business_pass"] is False
     events.append({"type": "item.completed", "item": {"type": "agent_message", "text": "Working"}})
-    (directory / "events.jsonl").write_text("".join(json.dumps(event) + "\n" for event in events))
+    write_utf8_text_bytes(directory / "events.jsonl", "".join(json.dumps(event) + "\n" for event in events))
     with pytest.raises(ExpansionArchiveError, match="pre-action"):
         _verify(root)
 
@@ -560,7 +563,8 @@ def _realistic_command_paths(root):
     events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
     for record in broker['records']:
         old = shlex.join(record['model_argv'])
-        raw = ['python', '.agents/skills/waapi-skill/scripts/run.py', 'gateway.py', *record['gateway_arguments']]
+        raw = ['python', TASK_LOCAL_RUNNER_WINDOWS if os.name == 'nt' else TASK_LOCAL_RUNNER_POSIX,
+               'gateway.py', *record['gateway_arguments']]
         record['model_argv'] = [str(root / 'broker/bin/python'), *raw[1:]]
         record['normalized_model_argv'] = ['python', str(root / 'agent-workspace/.agents/skills/waapi-skill/scripts/run.py'), 'gateway.py', *record['gateway_arguments']]
         record['raw_argv_sha256'] = canonical_digest(record['model_argv'])
@@ -570,7 +574,7 @@ def _realistic_command_paths(root):
             if item.get('command') == old:
                 item['command'] = shlex.join(raw)
     _write(root / 'expansion-broker.json', broker)
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)
@@ -602,12 +606,12 @@ def _sealed_read_rejection(root):
     events = events[:-2]
     for index, argv in enumerate(argv_rows, 1):
         record = deepcopy(originals[index - 1])
-        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        model = ['python', str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]
         payload = {'ok': True, 'command': 'query-object', 'objects': [{'id': identifier}], 'count': 1, 'query_bound': {'mode': 'exact-object'}}
         record.update(sequence=index, model_argv=model, normalized_model_argv=model, gateway_arguments=argv,
             raw_argv_sha256=canonical_digest(model), argv_sha256=canonical_digest(model),
             semantic_argv_sha256=canonical_digest(['runner-owned-version', '2025.1', *argv]),
-            runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]),
+            runner_command_sha256=canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]),
             payload=payload, payload_sha256=canonical_digest(payload), stdout=json.dumps(payload))
         if index == 2:
             rejection = 'expansion policy rejected command: project query requires a bounded public source'
@@ -622,7 +626,7 @@ def _sealed_read_rejection(root):
     events += final_events
     broker.update(records=records, passed=False, complete=False, expected_step_names=['expansion.step.0001'], consumed_step_names=['expansion.step.0001'])
     _write(root / 'expansion-broker.json', broker)
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)
@@ -756,7 +760,7 @@ def test_predispatch_read_rejection_requires_closed_negative_proof(tmp_path, dam
         events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
         item = {'id': 'bypass', 'type': 'command_execution', 'command': "python -c 'print(1)'", 'status': 'completed', 'exit_code': 0, 'aggregated_output': '1'}
         events[-2:-2] = [{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}}, {'type': 'item.completed', 'item': item}]
-        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
         facts = json.loads((directory / 'codex-facts.json').read_text())
         facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
         _write(directory / 'codex-facts.json', facts)
@@ -797,7 +801,7 @@ def test_canonical_command_binding_keeps_exact_arguments_and_multiplicity(tmp_pa
                 else:
                     argv += ['--nonclosed-option', 'value']
                 event['item']['command'] = shlex.join(argv)
-        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
         facts = json.loads((directory / 'codex-facts.json').read_text())
         facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
         _write(directory / 'codex-facts.json', facts)
@@ -815,7 +819,7 @@ def _swap_raw_command_blocks(root, first_id, second_id):
     assert [events[index]['type'] for index in second] == ['item.started', 'item.completed']
     for left, right in zip(first, second):
         events[left], events[right] = events[right], events[left]
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)
@@ -843,7 +847,7 @@ def test_completed_rejected_read_turn_cannot_omit_terminal_receipt(tmp_path):
     directory = tmp_path / 'turns/turn-01'
     events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
     events = [event for event in events if event.get('item', {}).get('id') != 'cmd-2']
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)
@@ -888,12 +892,12 @@ def _sealed_invalid_draft_bind(root, operation="audio.import"):
     last['stderr'] = 'Gateway broker rejected command: ' + last['rejection'] + '\n'
     for row in broker['records']:
         argv = row['gateway_arguments']
-        row['model_argv'] = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        row['model_argv'] = ['python', str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]
         row['normalized_model_argv'] = row['model_argv']
         row['raw_argv_sha256'] = row['argv_sha256'] = canonical_digest(row['model_argv'])
         if row['accepted']:
             row['semantic_argv_sha256'] = canonical_digest(['runner-owned-version', '2025.1', *argv])
-            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv])
+            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv])
     _write(root / 'expansion-broker.json', broker)
     directory = root / 'turns/turn-01'
     events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
@@ -903,7 +907,7 @@ def _sealed_invalid_draft_bind(root, operation="audio.import"):
             row = broker['records'][int(item['id'][-1]) - 1]
             item['command'] = shlex.join(row['model_argv'])
             item['aggregated_output'] = row['stdout']
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     result = json.loads((root / 'expansion-task-result.json').read_text())
     oracle = json.loads((root / 'expansion-oracle.json').read_text())
     oracle.update(artifact_hash=None, authorization=None, permit=None,
@@ -997,7 +1001,7 @@ def _sealed_bound_draft_read_rejection(root, *, declaration=False):
     events = events[:-2]
     for row in broker['records']:
         argv = row['gateway_arguments']
-        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        model = ['python', str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]
         row.update(model_argv=model, normalized_model_argv=model,
             raw_argv_sha256=canonical_digest(model), argv_sha256=canonical_digest(model))
         if row['accepted']:
@@ -1005,13 +1009,13 @@ def _sealed_bound_draft_read_rejection(root, *, declaration=False):
             if '--expected-revision' in argv:
                 semantic[2 + argv.index('--expected-revision') + 1] = 1
             row['semantic_argv_sha256'] = canonical_digest(semantic)
-            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv])
+            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv])
         item = {'id': 'cmd-' + str(row['sequence']), 'type': 'command_execution', 'command': shlex.join(model),
             'status': 'completed', 'exit_code': row['exit_code'], 'aggregated_output': row['stdout']}
         events.extend([{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}},
                        {'type': 'item.completed', 'item': item}])
     _write(root / 'expansion-broker.json', broker)
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in [*events, *final]))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in [*events, *final]))
     oracle = json.loads((root / 'expansion-oracle.json').read_text())
     oracle['before'] = oracle['reconciliation']['snapshot'] = plan['before']
     oracle['reconciliation']['snapshot_sha256'] = canonical_digest(plan['before'])
@@ -1051,13 +1055,13 @@ def _refresh_bound_rejection_receipts(root, broker):
                 semantic[2 + argv.index('--expected-revision') + 1] = int(argv[argv.index('--expected-revision') + 1])
             row['semantic_argv_sha256'] = canonical_digest(semantic)
             plan = json.loads((root / 'expansion-plan.json').read_text())
-            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv])
+            row['runner_command_sha256'] = canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv])
         item = {'id': 'cmd-' + str(row['sequence']), 'type': 'command_execution', 'command': shlex.join(model),
             'status': 'completed', 'exit_code': row['exit_code'], 'aggregated_output': row['stdout']}
         events.extend([{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}},
                        {'type': 'item.completed', 'item': item}])
     _write(root / 'expansion-broker.json', broker)
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in [*events, *final]))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in [*events, *final]))
     _realistic_command_paths(root)
 
 
@@ -1161,7 +1165,7 @@ def test_invalid_draft_bind_requires_exact_pristine_negative_proof(tmp_path, dam
                 if event.get('item', {}).get('id') == 'cmd-' + str(row['sequence']):
                     event['item']['command'] = shlex.join(row['model_argv'])
         _write(broker_path, broker)
-        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
         _realistic_command_paths(tmp_path)
     elif damage in {'extra_draft', 'composition', 'audit', 'schema'}:
         path = next((tmp_path / 'broker/state/operation-drafts-v1/records').glob('*.json'))
@@ -1185,7 +1189,7 @@ def test_invalid_draft_bind_requires_exact_pristine_negative_proof(tmp_path, dam
         directory = tmp_path / 'turns/turn-01'
         events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
         events = [event for event in events if event.get('item', {}).get('id') != 'cmd-2']
-        (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+        write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
         facts = json.loads((directory / 'codex-facts.json').read_text())
         facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
         _write(directory / 'codex-facts.json', facts)
@@ -1242,7 +1246,7 @@ def test_rejected_bind_rejects_self_consistent_wrong_gateway_schema_digest(tmp_p
     for event in events:
         if event.get('item', {}).get('id') == 'cmd-1':
             event['item']['aggregated_output'] = first['stdout']
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)
@@ -1345,12 +1349,12 @@ def _sealed_post_verification_query_timeout(root, *, continuation=False, fabrica
         extra.append((['operations'], {'ok': True, 'status': 'ok', 'command': 'operations'}, 0))
     for argv, payload, exit_code in extra:
         sequence = len(broker['records']) + 1
-        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        model = ['python', str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]
         record = deepcopy(broker['records'][-1])
         record.update(sequence=sequence, step_name=f'expansion.step.{sequence:04d}', model_argv=model,
             normalized_model_argv=model, gateway_arguments=argv, raw_argv_sha256=canonical_digest(model),
             argv_sha256=canonical_digest(model), semantic_argv_sha256=canonical_digest(['runner-owned-version', '2025.1', *argv]),
-            runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]),
+            runner_command_sha256=canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]),
             payload=payload, payload_sha256=canonical_digest(payload), stdout=json.dumps(payload),
             exit_code=exit_code, runner_exit_code=exit_code, allowed_exit_codes=[0, 2] if exit_code == 2 else [0])
         broker['records'].append(record)
@@ -1365,7 +1369,7 @@ def _sealed_post_verification_query_timeout(root, *, continuation=False, fabrica
         expected_step_names=names, consumed_step_names=names)
     _write(root / 'expansion-broker.json', broker)
     events.extend(final)
-    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    write_utf8_text_bytes(directory / 'events.jsonl', ''.join(json.dumps(event) + '\n' for event in events))
     facts = json.loads((directory / 'codex-facts.json').read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
     _write(directory / 'codex-facts.json', facts)

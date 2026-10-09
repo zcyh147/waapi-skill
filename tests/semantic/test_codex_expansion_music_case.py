@@ -1,5 +1,5 @@
 from copy import deepcopy
-from pathlib import Path
+from pathlib import PurePosixPath
 
 import pytest
 
@@ -25,7 +25,7 @@ def artifact(version="2025.1"):
 def approve(value, version="2025.1"):
     return approve_m01_preview(value, version=version,
         parent_path=r"\Containers\Default Work Unit\Owned", segment_name="Imported",
-        media={"Quiet": Path("/assets/Quiet.wav"), "Full": Path("/assets/Full.wav")})
+        media={"Quiet": PurePosixPath("/assets/Quiet.wav"), "Full": PurePosixPath("/assets/Full.wav")})
 
 
 @pytest.mark.parametrize("version", ("2022.1", "2025.1"))

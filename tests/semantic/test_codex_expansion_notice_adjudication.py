@@ -3,6 +3,7 @@ import json
 import pytest
 from pathlib import Path
 from types import SimpleNamespace
+from tests.semantic.support.codex_filesystem_security import write_utf8_text_bytes
 
 
 def timeline(text, *, version='2025.1', ask=False):
@@ -135,10 +136,8 @@ def test_new_attenuation_runner_receipt_replays_without_model(tmp_path, monkeypa
             row['item']['text'] = '我将让 FixtureAttenuation 的干声音量随距离作直线衰落，距离0为0dB，距离100为-48dB；只换这一条自定义曲线。'
     result = SimpleNamespace(stdout='\n'.join(json.dumps(row) for row in events))
     commands = completed_command_records(events, platform_name='posix')
-    binary, auth = tmp_path / 'fake-codex', tmp_path / 'fake-auth'
-    binary.write_bytes(b'fake CLI')
-    auth.write_text('{}')
-    options = SimpleNamespace(codex_binary=binary, auth_json=auth, windows_powershell_core_host=None)
+    from tests.semantic.test_codex_c09_notice_adjudication import fake_reviewer_options
+    options = fake_reviewer_options(tmp_path)
     def process(command, **kwargs):
         if command[1:] == ['features', 'list']:
             return BoundedProcessResult(0, '\n'.join(review.DISABLED_FEATURES), '', .01)
@@ -166,7 +165,7 @@ def test_new_attenuation_runner_receipt_replays_without_model(tmp_path, monkeypa
     from dataclasses import asdict
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
-    (directory / 'events.jsonl').write_text(result.stdout)
+    write_utf8_text_bytes(directory / 'events.jsonl', result.stdout)
     facts_path = directory / 'codex-facts.json'
     facts = json.loads(facts_path.read_text())
     facts['command_facts']['command_records'] = [asdict(row) for row in commands]
@@ -443,10 +442,8 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         artifact[guard]['fingerprint'] = canonical_digest({k: v for k, v in artifact[guard].items() if k not in {'contract', 'fingerprint'}})
     ask = case_id in {'C01', 'C03'}
     state = 'result_schema_checked' if case_id == 'C08' else 'verified'
-    binary, auth = root / 'fake-codex', root / 'fake-auth'
-    binary.write_bytes(b'fake independent CLI')
-    auth.write_text('{}')
-    options = SimpleNamespace(codex_binary=binary, auth_json=auth, windows_powershell_core_host=None)
+    from tests.semantic.test_codex_c09_notice_adjudication import fake_reviewer_options
+    options = fake_reviewer_options(root)
     prompts = [user_prompt or 'Perform this requested workflow.'] + (['Confirm this exact Preview.'] if ask else [])
     unit = 'EXP' + version[2:4] + '-' + case_id
     plan.update(unit_id=unit, version=version, operation=artifact['request']['operation'],
@@ -510,7 +507,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
             {'type': 'thread.started', 'thread_id': 'thread'}, {'type': 'turn.started'}])
     for index, argv in enumerate(args, 1):
         template = deepcopy(original[0 if argv[0] == 'draft-start' else 1 if argv[0] == 'preview-from-draft' else 2 if argv[0] in {'execute', 'confirm'} else 3])
-        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        model = ['python', str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]
         semantic = ['runner-owned-version', version, *argv]
         if '--expected-revision' in argv: semantic[semantic.index('--expected-revision') + 1] = int(argv[argv.index('--expected-revision') + 1])
         payload = deepcopy(public_reads[index - 1][1]) if index <= len(public_reads) else template['payload']
@@ -544,7 +541,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         template.update(sequence=index, step_name=f'expansion.step.{index:04d}', model_argv=model, normalized_model_argv=model,
             gateway_arguments=argv, raw_argv_sha256=canonical_digest(model), argv_sha256=canonical_digest(model),
             semantic_argv_sha256=canonical_digest(semantic), payload_sha256=canonical_digest(payload), stdout=json.dumps(payload),
-            runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]))
+            runner_command_sha256=canonical_digest([plan['trusted_python'], str(Path(plan['skill_source']) / 'scripts' / 'run.py'), 'gateway.py', *argv]))
         if preparation_failed:
             template.update(exit_code=2, runner_exit_code=2, allowed_exit_codes=[0, 2])
         records.append(template)
@@ -563,10 +560,10 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         facts = json.loads((root / 'turns/turn-01/codex-facts.json').read_text())
         facts['command_facts']['command_records'] = [asdict(row) for row in commands]
         _write(directory / 'codex-facts.json', facts)
-        (directory / 'events.jsonl').write_text('\n'.join(json.dumps(row) for row in events))
-        (directory / 'prompt.txt').write_text(prompts[index - 1] + '\n')
-        (directory / 'final.txt').write_text('Done.\n')
-        (directory / 'stderr.txt').write_text('')
+        write_utf8_text_bytes(directory / 'events.jsonl', '\n'.join(json.dumps(row) for row in events))
+        write_utf8_text_bytes(directory / 'prompt.txt', prompts[index - 1] + '\n')
+        write_utf8_text_bytes(directory / 'final.txt', 'Done.\n')
+        write_utf8_text_bytes(directory / 'stderr.txt', '')
         grade = json.loads((root / 'turns/turn-01/turn-grade.json').read_text())
         grade.update(index=index, prompt_sha256=hashlib.sha256(prompts[index - 1].encode()).hexdigest(), broker_prefix_count=preview_index if ask and index == 1 else len(records))
         _write(directory / 'turn-grade.json', grade)

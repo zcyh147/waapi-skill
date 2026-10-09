@@ -2620,6 +2620,11 @@ def taskkill_process_tree(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            # taskkill emits localized console diagnostics, not UTF-8 Agent
+            # evidence. Its return code and the observed process exit remain
+            # authoritative even if a diagnostic contains undecodable bytes.
+            encoding="oem" if os.name == "nt" else "utf-8",
+            errors="replace",
             timeout=15.0,
             check=False,
         )

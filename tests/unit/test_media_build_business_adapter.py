@@ -6,6 +6,7 @@ import struct
 from pathlib import Path
 
 import pytest
+from tests.support.platform_filesystem import create_symlink_or_skip
 from wwise_waapi.execution_contracts import ExecutionContractRegistry
 from wwise_waapi.media_build_business import (
     MediaBuildBusinessError,
@@ -456,6 +457,17 @@ def test_media_pool_business_plan_rejects_hostile_or_native_values(
         validate_media_pool_business_plan(plan)
 
 
+def test_media_pool_audio_similarity_rejects_symlinks(tmp_path: Path) -> None:
+    audio_file = tmp_path / "reference.wav"
+    audio_file.write_bytes(b"fixture audio")
+    link = tmp_path / "link.wav"
+    create_symlink_or_skip(link, audio_file)
+    with pytest.raises(MediaBuildBusinessError, match="non-symlink"):
+        validate_media_pool_business_plan(
+            {"max_results": 10, "audio_similarity_files": [str(link)]}
+        )
+
+
 def test_media_pool_audio_similarity_requires_an_exact_regular_file(
     tmp_path: Path,
 ) -> None:
@@ -487,12 +499,6 @@ def test_media_pool_audio_similarity_requires_an_exact_regular_file(
     )
     assert prepared["args"]["filters"][0]["value"] == str(audio_file)
 
-    link = tmp_path / "link.wav"
-    link.symlink_to(audio_file)
-    with pytest.raises(MediaBuildBusinessError, match="non-symlink"):
-        validate_media_pool_business_plan(
-            {"max_results": 10, "audio_similarity_files": [str(link)]}
-        )
     with pytest.raises(MediaBuildBusinessError, match="existing audio file"):
         validate_media_pool_business_plan(
             {

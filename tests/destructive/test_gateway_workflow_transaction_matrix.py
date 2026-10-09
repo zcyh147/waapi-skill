@@ -3621,7 +3621,9 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
                 if entries_seen > SOURCE_HASH_MAX_ENTRIES:
                     raise SandboxFixtureError("source hash tree-entry bound exceeded")
                 path = Path(entry.path)
-                info = entry.stat(follow_symlinks=False)
+                # Windows DirEntry.stat may omit the device/file identity.
+                # Use the same path API as the subsequent race checks.
+                info = path.lstat()
                 if path_is_link_or_reparse(path, metadata=info):
                     raise SandboxFixtureError("source hash rejects links and reparse points")
                 if stat.S_ISDIR(info.st_mode):
@@ -3636,9 +3638,12 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
                 else:
                     raise SandboxFixtureError("source hash requires regular files and directories")
 
-    def snapshot(info):
+    def snapshot(info, *, handle_comparison=False):
+        # Windows fstat and lstat can expose different ctime semantics. Keep
+        # ctime for path-to-path checks, and all other fields for handle checks.
+        ctime = None if os.name == "nt" and handle_comparison else info.st_ctime_ns
         return (info.st_dev, info.st_ino, info.st_mode, info.st_size,
-                info.st_mtime_ns, info.st_ctime_ns)
+                info.st_mtime_ns, ctime)
 
     digest = hashlib.sha256()
     bytes_hashed = 0
@@ -3650,7 +3655,7 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
             raise SandboxFixtureError("source file changed during hash preflight")
         descriptor = os.open(path, binary_file_open_flags(os.O_RDONLY, getattr(os, "O_NOFOLLOW", 0)))
         try:
-            if snapshot(os.fstat(descriptor)) != snapshot(info):
+            if snapshot(os.fstat(descriptor), handle_comparison=True) != snapshot(info, handle_comparison=True):
                 raise SandboxFixtureError("source file changed before hashing")
             file_bytes = 0
             while chunk := os.read(descriptor, SOURCE_HASH_CHUNK_BYTES):
@@ -3661,7 +3666,7 @@ def _hash_mutation_bearing_project_files(root: Path) -> tuple[str, int, int]:
                 digest.update(chunk)
             final = path.lstat()
             if (file_bytes != info.st_size
-                    or snapshot(os.fstat(descriptor)) != snapshot(info)
+                    or snapshot(os.fstat(descriptor), handle_comparison=True) != snapshot(info, handle_comparison=True)
                     or path_is_link_or_reparse(path, metadata=final)
                     or snapshot(final) != snapshot(info)):
                 raise SandboxFixtureError("source file changed during hashing")
