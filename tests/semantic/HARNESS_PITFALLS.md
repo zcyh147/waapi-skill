@@ -3427,3 +3427,42 @@ Complete every item before spending a Fresh turn:
    `Limited`, standalone Codex, and attested PowerShell Core before task start.
 6. Freeze every FAIL or BLOCKED root without replay. Replay only an all-PASS
    root with identical `--resume --verify-only` options.
+
+## macOS expansion cases need the wrapper's private HOME bottle (#161)
+
+The official 2022.1 and 2025.1 macOS wrappers select
+`$HOME/Library/Application Support/Wwise2019/Bottles/Wwise2019x64`, overriding
+an ordinary sandbox Wine prefix. Sequential expansion cases therefore pass a
+fresh `owned/wwise-user-home` and that exact owned prefix to the existing
+`ScenarioLifecycle`. Prelaunch requires an empty real HOME and a nonexistent
+prefix. Nothing copies the user's bottle, preferences or license files.
+The lifecycle retains its existing source proofs, scoped shutdown, archive and
+quarantine rules. Native Windows, the packaged Skill, readiness checks and the
+2022 CoreAudio startup mitigation are unchanged. Shared-helper adoption or
+host-wide signalling is not part of this repair.
+
+At frozen `8550bdd6c1f7b0a7f2514b7b50b9e8c2ca265e08`, the parent-owned
+existing-lifecycle probe started 2022.1.19.8584 in 9.028 seconds followed by
+2025.1.7.9143 in 8.514 seconds, each within a 15-second readiness bound and
+under a distinct initially empty HOME. Both passed owned-prefix cleanup,
+removed passing sandboxes, preserved source full hashes and mtimes, and left
+no scoped residual process. The measured real-account Wwise user-state tree
+was unchanged; this does not attest every settings or licensing location.
+The preserved proof manifest is
+`.waapi-skill-state/evidence/waapi-test-remediation/private-home-proof-8550bdd-20261009/proof-manifest.json`
+in the original development checkout. This is infrastructure proof only,
+with no expansion Agent PASS credit. Historical failures remain frozen; the
+later exact-candidate semantic campaign is a separate acceptance requirement.
+
+Focused fake regressions exercise the actual expansion-to-lifecycle path for
+2022.1 then 2025.1, distinct empty HOMEs, matching launch/evidence/cleanup
+prefixes, contaminated HOME rejection before launch, and unchanged non-macOS
+inputs. Existing lifecycle and sandbox tests retain the fresh-path, symlink,
+failed-start and unproven-shutdown boundaries.
+
+Developer checks for this bounded repair used the pinned Poetry interpreter
+through `WAAPI_TEST_PYTHON` and `ci/test.sh --mode nonlive`: the focused
+`test_codex_expansion_runtime.py` / `test_codex_scenario_lifecycle_v3.py` pair
+passed 38 tests; `test_sandbox_fixture.py` / `test_headless_lifecycle.py`
+passed 89 tests. No live process, Agent campaign, full Program or broad Non-live
+gate was run by the implementer; promotion owns the combined candidate gates.

@@ -96,13 +96,29 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
     if unit.case_id not in _ADAPTERS or unit.version not in {"2022.1", "2025.1"}:
         raise ValueError("expansion unit is outside its closed adapter registry")
     root = Path(scenario_root).resolve(strict=False)
+    private_home = root / "owned" / "wwise-user-home" if sys.platform == "darwin" else None
+    # Both expansion versions' official wrappers select this HOME-relative bottle.
+    owned_prefix = (private_home / "Library/Application Support/Wwise2019/Bottles/Wwise2019x64"
+                    if private_home is not None else None)
+    project_prelaunch = make_project_prelaunch_hook(ProjectPrelaunchRequest(
+        scenario_id=unit.unit_id, languages=("SFX", "English(US)", "Japanese") if unit.case_id == "C01" else ("SFX",),
+        platforms=("Windows",),
+    ))
+
+    def prelaunch(sandbox, asset_root, io_root):
+        if private_home is not None:
+            if private_home.is_symlink() or not private_home.is_dir() or any(private_home.iterdir()):
+                raise CaseBoundaryError("expansion requires an empty real case-owned Wwise HOME")
+            if os.path.lexists(owned_prefix):
+                raise CaseBoundaryError("expansion requires a fresh case-owned wrapper Wine prefix")
+        project_prelaunch(sandbox, asset_root, io_root)
+
     lifecycle = ScenarioLifecycle(
         scenario_id=unit.unit_id, version=unit.version, scenario_root=root,
         live_environment=options.live_environment,
-        prelaunch_hook=make_project_prelaunch_hook(ProjectPrelaunchRequest(
-            scenario_id=unit.unit_id, languages=("SFX", "English(US)", "Japanese") if unit.case_id == "C01" else ("SFX",),
-            platforms=("Windows",),
-        )),
+        prelaunch_hook=prelaunch,
+        launch_environment_overrides={"HOME": str(private_home)} if private_home is not None else None,
+        owned_wine_prefix=owned_prefix,
     )
     runtime = None
     direct = None
