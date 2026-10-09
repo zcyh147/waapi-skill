@@ -38,6 +38,33 @@ and #160 remaining workflows (#160 depends on #159). #147 remains the repair
 owner and #122 retains the complete one-candidate 13-positive-plus-boundary
 acceptance. Earlier decisions and recorded results remain historical evidence.
 
+## Completion amendment — 2026-10-09
+
+The user explicitly changed the remaining acceptance procedure: finish the
+notice-framework repair and run one fresh **EXP25-C09** on Wwise 2025.1. A passing
+targeted run and its identical successful-root audit complete the remaining
+acceptance; another complete 13-unit matrix is no longer required. This replaces
+the final-full-pass requirement below for this delivery only.
+
+Actual Wwise outcomes, authorization, exact targets/values and preservation are
+the acceptance priorities. Minor wording and nonessential explanatory ambiguity
+must be reported separately from incorrect business work. Materially misleading
+claims, falsely reporting completion, abusive responses, unauthorized changes
+and actual outcome failures remain unacceptable. This amendment does not rewrite
+historical grades or use business success to manufacture missing evidence.
+
+The frozen `8079061` full run retains its original **12 PASS / 1 notice-only FAIL
+/ 1 separate boundary** classification. All 13 positive units reached verified
+and passed their independent business assertions. Final reporting must distinguish
+that business evidence from the new repair candidate's targeted validation; it
+must not claim a final-candidate full-matrix PASS.
+
+Complete startup/preparation/oracle/cleanup phase telemetry is deferred. Existing
+Agent/reviewer measurements and limits remain in force. The incomplete timing
+work is preserved on `expansion-phase-timing` at `7308f2a`; it is excluded from
+this delivery and receives no completion credit. The earlier timing requirement
+is correspondingly deferred, rather than silently described as implemented.
+
 ## Problem Statement
 
 The existing six business integration workflows demonstrate several common tasks, but do not represent every public parameter, object family, or music-authoring behavior. The large Python test suite also cannot establish parameter coverage from test counts alone. We need more valuable real-workflow coverage without duplicating tests, relying on rigid grading, or incurring unnecessary model costs.

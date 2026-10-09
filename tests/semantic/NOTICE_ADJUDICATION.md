@@ -1,5 +1,17 @@
 # Limited notice adjudication and development gates
 
+## Delivery acceptance amendment — 2026-10-09
+
+The user approved business-first closure after the current framework repair and
+one fresh EXP25-C09 PASS plus its identical successful-root audit. Another full
+13-unit rerun is waived for this delivery. Minor auxiliary wording is distinct
+from wrong Wwise outcomes; material misrepresentation and deterministic safety,
+authorization, target/value, preservation and evidence gates remain relevant.
+See the [spec amendment](../../docs/specs/authoring-integration-expansion.md#completion-amendment--2026-10-09).
+Frozen grades, uncertainties and quarantines remain unchanged. This is a delivery
+acceptance decision, not a retrospective reviewer judgment or a claim of full
+acceptance on the new candidate. Detailed phase timing is deferred.
+
 ## Current prospective checkpoint — v8, #147
 
 New plans use `waapi-skill.expansion-notice-adjudication/v8`, adding only closed
@@ -20,6 +32,13 @@ they prove plumbing, not language accuracy. Focused validation passed 406 / skip
 one native-Windows-only case; `notice-fast` passed 3860 / skipped the same case,
 both exit 0. Combined promotion and new Fresh acceptance remain coordinator-owned.
 No Wwise/model run or historical replay/regrade occurred here.
+
+The subsequent independent review corrections preserve the producer's normalized
+field-meaning equivalence and valid authenticated failed-discovery/refinement
+histories. Failed discovery contributes no acquired facts; exact authentication,
+unchanged revision and later Preview binding remain mandatory. The affected
+focused selection passed **360 tests**, exit 0; both independent findings were
+closed. This is developer proof, not Fresh acceptance.
 
 ## Earlier prospective checkpoint — v7, #147
 

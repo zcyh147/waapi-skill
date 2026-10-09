@@ -1,5 +1,21 @@
 # Implementation checkpoint — resumed
 
+## Latest completion scope — 2026-10-09
+
+The user now authorizes closure after the current notice-framework repair and
+one fresh EXP25-C09 PASS with identical successful-root audit; a further full
+matrix is not required. Read the [completion amendment](authoring-integration-expansion.md#completion-amendment--2026-10-09)
+before interpreting older outstanding-work lists below. Detailed phase telemetry
+is deferred and preserved separately; it is not delivered or counted as done.
+
+Frozen `8079061` completed all 13 positive business outcomes and the separate
+EXP22-M05 boundary. Its original overall result remains 12 PASS / 1 notice-only
+FAIL / 1 boundary. The failed C09 unit passed all six business assertions and
+every turn gate except notice review. The repair supplies authenticated Draft
+discovery facts to that reviewer; both independent review findings are closed,
+with 360 affected focused tests passing. The new candidate still requires its
+combined development gate and targeted Fresh proof before issue closure.
+
 Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #123/#124.
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
 on 2026-10-01. The latest Goal status and next permitted action are recorded below.
