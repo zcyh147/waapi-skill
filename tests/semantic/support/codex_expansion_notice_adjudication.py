@@ -14,8 +14,9 @@ from tests.semantic.support.codex_expansion_policy import canonical_digest
 from tests.semantic.support.codex_harness import normalized_gateway_command_argv, parse_jsonl_events
 
 LEGACY_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v1'
-CONTRACT = 'waapi-skill.expansion-notice-adjudication/v2'
-CONTRACTS = frozenset({LEGACY_CONTRACT, CONTRACT})
+BUSINESS_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v2'
+CONTRACT = 'waapi-skill.expansion-notice-adjudication/v3'
+CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, CONTRACT})
 CASES = frozenset({'C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'})
 
 
@@ -255,6 +256,39 @@ def _notice_obligations(case_id, roles):
     return obligations
 
 
+def _verification_context(artifact):
+    """Packaged interface evidence, never live availability or completed proof.
+
+    This operation-to-reader relation is established by the fixed Gateway
+    metadata disclosure, not inferred from native URI spelling or case IDs.
+    Terminal disclosure timing comes from waapi-operate.md's Terminal states.
+    """
+    from wwise_waapi.execution_contracts import FIXED_COMMANDS_BY_URI
+    public_readers = {
+        'ak.wwise.core.object.setAttenuationCurve': 'ak.wwise.core.object.getAttenuationCurve',
+    }
+    request = artifact['request']
+    operation = request['operation']
+    if operation == 'waapi.call':
+        operation = request['arguments']['api']
+    reader = public_readers.get(operation)
+    return {
+        'public_readback_routes': ([{'uri': reader, 'fixed_commands': list(FIXED_COMMANDS_BY_URI[reader])}]
+            if reader is not None else []),
+        'support_evidence': 'packaged-public-interface-only',
+        'route_inventory_scope': 'positive-support-evidence-only-not-exhaustive',
+        'live_availability_or_completed_read': 'not_attested',
+        'disclosure_timing': {
+            'authority': 'operation-contract-Skill-guidance-and-explicit-user-request',
+            'pre_execution': 'only-at-required-source-timing',
+            'terminal': 'report-actual-verification-strength-and-boundaries',
+        },
+        'sources': ['skills/waapi-skill/references/waapi-operate.md#terminal-states',
+            'skills/waapi-skill/wwise_waapi/execution_contracts.py#FIXED_COMMANDS_BY_URI',
+            'skills/waapi-skill/scripts/gateway.py#fixed-command-disclosure'],
+    }
+
+
 def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case_id: str,
         version: str, execute_expected: bool, preview_artifact: Mapping[str, Any],
         before_snapshot: Mapping[str, Any], preview_parameters: Mapping[str, Any],
@@ -318,8 +352,17 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
         'before_snapshot': before_snapshot, 'immutable_request': preview_artifact['request'],
         'prepared_operation': preview_artifact['prepared_operation'], 'attested_roles': roles,
     }
-    if adjudication_contract == CONTRACT:
-        review_input['notice_obligations'] = _notice_obligations(case_id, roles)
+    if adjudication_contract != LEGACY_CONTRACT:
+        obligations = _notice_obligations(case_id, roles)
+        if adjudication_contract == CONTRACT:
+            # Protected invariants and transaction strength remain attested
+            # facts, not an exhaustive inventory of required spoken promises.
+            obligations.pop('preserve')
+            obligations.pop('gateway_verification', None)
+            obligations['preservation_intent'] = {
+                'only_declared_changes': True, 'adopt_user_preservation_scope': True}
+            review_input['verification_context'] = _verification_context(preview_artifact)
+        review_input['notice_obligations'] = obligations
     if len(json.dumps(review_input, ensure_ascii=False).encode('utf-8')) > INPUT_MAX_BYTES:
         return {'outcome': 'material_reject', 'reason': 'complete-review-input-exceeds-bound'}
     return {'outcome': 'review_required', 'reason': (

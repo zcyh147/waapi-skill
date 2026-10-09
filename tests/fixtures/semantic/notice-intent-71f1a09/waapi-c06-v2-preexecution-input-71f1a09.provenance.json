@@ -1,0 +1,6 @@
+{
+  "source": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-failed7-71f1a09-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C06/evidence/codex-task/turns/turn-01/notice-decision.json",
+  "source_sha256": "25126b1a6a192e029f0a0edc1adfa4a353acd2a5b1c4772cee9a51f4de58b8b8",
+  "copied_input_sha256": "2ba1ebc8bb431849737738e79c2bd2312d2fcd054c8cfc8e7ce311dec6cf356c",
+  "scope": "pre-execution input only; no judgments or after-state"
+}

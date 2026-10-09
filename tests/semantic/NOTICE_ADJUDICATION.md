@@ -339,3 +339,43 @@ read-only full-archive replay, including original v1 and new v2 contracts,
 non-PASS receipts and obligation/contract substitution rejection. They do not
 establish language accuracy or grant semantic PASS credit. Held-out independent
 review, promotion gates and new frozen Fresh acceptance remain separate work.
+
+## Intent and verification attribution checkpoint — consolidated #147
+
+New plans use `waapi-skill.expansion-notice-adjudication/v3`. The
+[source-only rationale](../../docs/research/integration-expansion-notice-intent-audit-71f1a09.md)
+and two exact C06/C08 pre-execution inputs establish the prospective repair
+scope; they provide no historical regrade or formal outcome. V1 and v2 retain
+their exact input shape, rubric hashes and sealed archive replay.
+
+V3 separates required visible preservation intent from protected background
+invariants. An unambiguous exclusive requested-edit plan adopts the user's full
+preservation scope without enumerating every oracle guard. Future verification
+uncertainty does not revoke that intent; explicit protected edits and uncertain
+edit scope remain non-PASS. Complete attested facts remain available for false
+claim checks. Every target, action, mapping, field, value, count and curve
+requirement, and every authorization/execution/oracle/provenance gate, remains.
+
+V3 also separates transaction strength from a planned requested public read.
+The operation-bound verification context records packaged reader support and
+source-controlled disclosure timing, without claiming live availability,
+discovery or a completed read. Operation, Skill and explicit user requirements
+control warning timing; there is no unconditional pre-Execute schema-only
+phrase requirement. Terminal strength/boundary reporting, false persisted or
+stronger-verifier attribution, listening claims, unsupported proof, raw/code
+bypasses and retries retain their limits. The transaction stays closed.
+
+The existing isolated reviewer, schema, bounds and formal Fresh harness are
+reused, including the 2048-byte effective instruction ceiling. Copied-witness
+projection and real producer-to-archive tests preserve complete source facts;
+independent positive/negative contrasts prove fake-judgment transport and
+non-PASS propagation only. They grant no language accuracy or semantic PASS
+credit. Product Skill, business prompts and oracles are unchanged. Full Non-live
+and new frozen Fresh acceptance remain promotion work.
+
+This isolated macOS developer checkpoint passed the four focused reviewer/
+producer/archive/CLI files: 429 passed, 1 native-Windows UNC case skipped.
+The fixed `notice-fast` gate then passed 3678, with that same single skip;
+both commands exited 0 through `ci/test.sh` with the pinned developer Python.
+These counts are developer evidence only. No full Non-live, Wwise, Codex turn,
+formal semantic acceptance or native-Windows execution occurred in this repair.

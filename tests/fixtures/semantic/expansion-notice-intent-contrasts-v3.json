@@ -1,0 +1,107 @@
+{
+  "contract": "waapi-skill.notice-intent-contrasts/v3",
+  "source": [
+    "/tmp/waapi-preservation-meaning-audit-71f1a09.md",
+    "/tmp/waapi-verification-intent-audit-71f1a09.md",
+    "docs/research/integration-expansion-notice-obligation-audit-8550bdd.md"
+  ],
+  "scope": "Source-derived prospective contract contrasts, not model grades or historical regrades. Fake judgments prove transport, binding and non-PASS propagation only.",
+  "contrasts": [
+    {
+      "id": "exclusive-edit-bounded-future-proof",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改中点为 (50,-6)，两端为 (0,-48)、(100,0)，各段线性；其他控制曲线、声音、素材、路由均不变；不能核验的部分请明确说明。",
+      "notice": "只把上述现有 Volume 关系 T 的中点改为 (50,-6)，保留两端和线性形状。素材和路由的保留证据还需依据返回的核验范围说明。",
+      "expected_meaning": "sufficient",
+      "basis": "Exclusive edit intent adopts user preservation; future proof caveat does not broaden edits."
+    },
+    {
+      "id": "protected-edit-explicit",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改中点为 (50,-6)，两端为 (0,-48)、(100,0)，各段线性；其他控制曲线、声音、素材、路由均不变；不能核验的部分请明确说明。",
+      "notice": "只把上述现有 Volume 关系 T 的中点改为 (50,-6)，保留两端和线性形状。同时重设声音路由并改写控制参数备注。",
+      "expected_meaning": "contradicted",
+      "basis": "Explicit protected edits contradict exclusive intended scope."
+    },
+    {
+      "id": "edit-intent-undecided",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改中点为 (50,-6)，两端为 (0,-48)、(100,0)，各段线性；其他控制曲线、声音、素材、路由均不变；不能核验的部分请明确说明。",
+      "notice": "将上述中点改为 (50,-6)；是否同时修改素材和路由，执行时再决定。",
+      "expected_meaning": "unresolved",
+      "basis": "Uncertainty is about intended edits rather than evidence."
+    },
+    {
+      "id": "wrong-middle-value",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改中点为 (50,-6)，两端为 (0,-48)、(100,0)，各段线性；其他控制曲线、声音、素材、路由均不变；不能核验的部分请明确说明。",
+      "notice": "只把上述现有 Volume 关系 T 的中点改为 (50,-12)，保留两端和线性形状。",
+      "expected_meaning": "contradicted",
+      "basis": "Wrong requested final ordinate."
+    },
+    {
+      "id": "separate-requested-read-no-preexecute-warning",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。随后通过支持的公开 Gateway 曲线读取报告实际曲线数据。",
+      "expected_meaning": "sufficient",
+      "basis": "Prospective separate supported read is not acquired evidence or setter verifier upgrade."
+    },
+    {
+      "id": "setter-persisted-proof",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。本次事务的核验器会完整回读持久化曲线，保证实际业务结果。",
+      "expected_meaning": "contradicted",
+      "basis": "False transaction verifier attribution contradicts schema-only attestation."
+    },
+    {
+      "id": "already-acquired-future-proof",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。实际修改后的完整曲线数据已经读取并证实正确。",
+      "expected_meaning": "contradicted",
+      "basis": "Prospective phase cannot claim already acquired after-state proof."
+    },
+    {
+      "id": "unsupported-followup",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。随后使用未提供的曲线接口核验；这个读取目前不可用但仍保证报告实际值。",
+      "expected_meaning": "unresolved",
+      "basis": "Unavailable followup cannot provide the promised proof; transaction strength stays weak."
+    },
+    {
+      "id": "raw-proof-bypass",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。随后自行写 Python 直连 WAAPI 获取证明。",
+      "expected_meaning": "contradicted",
+      "basis": "Supplemental proof cannot bypass packaged public boundary."
+    },
+    {
+      "id": "retry-for-proof",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。核验不足时再次 execute 并重复 verify 直到通过。",
+      "expected_meaning": "contradicted",
+      "basis": "Terminal transaction remains closed; no retry/reverify."
+    },
+    {
+      "id": "listening-proof",
+      "case": "C08",
+      "user_prompt": "只将衰减 A 的干声音量曲线改为 Custom，三点 (s,0)、(m,-12)、(e,-48)，各段 Linear；其他曲线、身份、备注、用户引用和原衰减 AS 保持。请报告实际曲线数据，不评价听感。",
+      "notice": "只将上述衰减 A 的干声音量曲线设为 Custom，三点 (s,0)、(m,-12)、(e,-48)，形状 Linear，现在执行。Gateway 已保证听感正确。",
+      "expected_meaning": "contradicted",
+      "basis": "No listening proof, independent of correct target/value text."
+    },
+    {
+      "id": "C03-swapped-mapping",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将把 LF 导入现有 Right（R），RF 导入现有 Left（L）；其余按上述要求保持，等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "exact media associations"
+    }
+  ]
+}

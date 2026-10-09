@@ -1,0 +1,1095 @@
+{
+  "contract": "waapi-skill.expansion-notice-adjudication/v2",
+  "case_id": "C06",
+  "version": "2022.1",
+  "transaction_id": "tx1-fvmmeesg0991d24bmea3",
+  "preview_sha256": "ec4c1fe6d6b51dd5f0db6cf841d18c13efd50b0b2b2f80c182b904ebfa9e817c",
+  "pre_execution_timeline_sha256": "7362fc98267937b8f8550fc7d25a632063d234759391c611f196d5b304e04e97",
+  "preview_event_position": 24,
+  "execute_event_position": 26,
+  "user_prompt": "声音 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed（{2FD14D80-3562-4BC1-8F8F-7BE11948A729}）已有 \\Game Parameters\\Ambience\\Rain_Intensity（{CA0B90AA-8A1F-43AE-ACDD-387803814573}）控制音量的曲线（关系对象 {463D3DD8-24F1-4AFC-BE44-9934B18E3572}）。只把这条曲线改为 (0,-48)、(50,-6)、(100,0)，各段线性。保留这条控制关系的身份和备注，其他控制曲线、声音、素材、路由均不变。这是要实际完成的修改，请核对当前状态、告知变更并完成执行和核验；不能表达或核验的部分请明确说明。",
+  "visible_messages": [
+    {
+      "event_position": 8,
+      "text": "已加载 waapi-skill，配置的 WAAPI 端口为 31552，Wwise 适配版本为 2022.1。\n\n当前修改策略是 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会核对已有曲线与接口支持范围，告知具体变更后执行并核验。\n"
+    },
+    {
+      "event_position": 25,
+      "text": "已核对现状：指定的音量关系备注为 “Preserve volume association”，当前曲线是 (0,-48)、(50,-12)、(100,0)，各段线性；声音还存在一条音高控制曲线。\n\n即将把音量曲线中点改为 (50,-6)，保留两端点和线性形状。此次更新只声明这条音量曲线；执行后将核验关系身份、备注及其他控制曲线的保留情况。素材和路由是否保持不变，还需依据返回的核验范围说明。\n"
+    }
+  ],
+  "before_snapshot": {
+    "owner": {
+      "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+      "type": "Sound",
+      "name": "Expansion_EXP22-C06_Bed",
+      "notes": "",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+      "parent": {
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+        "name": "Default Work Unit"
+      },
+      "@OutputBus": {
+        "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "name": "Master Audio Bus"
+      },
+      "@Volume": -3.0
+    },
+    "rtpcs": {
+      "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}": {
+        "id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+        "type": "RTPC",
+        "name": "",
+        "notes": "Preserve volume association",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+        "@PropertyName": "Volume",
+        "@ControlInput": {
+          "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+          "name": "Rain_Intensity"
+        },
+        "@Curve": {
+          "id": "{23821932-1852-4C08-97AB-6E6C5D648B39}",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": -48.0
+            },
+            {
+              "shape": "Linear",
+              "x": 50.0,
+              "y": -12.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 0.0
+            }
+          ],
+          "@Flags": 3
+        }
+      },
+      "{18208B43-1F05-4A48-A894-E5B33F8680D7}": {
+        "id": "{18208B43-1F05-4A48-A894-E5B33F8680D7}",
+        "type": "RTPC",
+        "name": "",
+        "notes": "Preserve pitch association",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+        "@PropertyName": "Pitch",
+        "@ControlInput": {
+          "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+          "name": "Time"
+        },
+        "@Curve": {
+          "id": "{308C189B-68E2-4097-A5B4-2B4824ED7036}",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": -100.0
+            },
+            {
+              "shape": "Linear",
+              "x": 240.0,
+              "y": 100.0
+            }
+          ],
+          "@Flags": 65537
+        }
+      }
+    },
+    "media": {
+      "source": {
+        "id": "{573A4B51-1051-4D8E-A2B7-1FAD75ED6B7B}",
+        "name": "C06_bed",
+        "type": "AudioFileSource",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\C06_bed",
+        "source_language": {
+          "id": "{85A66963-A627-476E-91C1-2770B39D245A}",
+          "name": "SFX"
+        },
+        "original_file_path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-failed7-71f1a09-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C06\\owned\\sandbox-root\\sample-project-6f07f8fd114b4476b22e8bae89ecf1e5\\Originals\\SFX\\C06_bed.wav",
+        "parent": {
+          "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+          "name": "Expansion_EXP22-C06_Bed"
+        }
+      },
+      "file": {
+        "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-failed7-71f1a09-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C06/owned/sandbox-root/sample-project-6f07f8fd114b4476b22e8bae89ecf1e5/Originals/SFX/C06_bed.wav",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+      }
+    },
+    "controls": [
+      {
+        "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+        "name": "Rain_Intensity",
+        "type": "GameParameter",
+        "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+        "notes": "",
+        "parent": {
+          "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+          "name": "Ambience"
+        }
+      },
+      {
+        "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+        "name": "Time",
+        "type": "GameParameter",
+        "path": "\\Game Parameters\\Ambience\\Time",
+        "notes": "",
+        "parent": {
+          "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+          "name": "Ambience"
+        }
+      }
+    ]
+  },
+  "immutable_request": {
+    "arguments": {
+      "control_input": {
+        "kind": "id",
+        "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+      },
+      "mode": "add_or_replace",
+      "object": {
+        "kind": "id",
+        "value": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}"
+      },
+      "points": [
+        {
+          "shape": "Linear",
+          "x": 0,
+          "y": -48
+        },
+        {
+          "shape": "Linear",
+          "x": 50,
+          "y": -6
+        },
+        {
+          "shape": "Linear",
+          "x": 100,
+          "y": 0
+        }
+      ],
+      "property": "Volume"
+    },
+    "contract": "waapi-skill.operation-request/v1",
+    "operation": "object.setRTPC",
+    "version": "2022.1"
+  },
+  "prepared_operation": {
+    "cleanup": {
+      "action": "update",
+      "automatic": false,
+      "automatic_retry": false,
+      "kind": "restore-rtpc-snapshot-or-discard-owned-sandbox",
+      "snapshot": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "notes",
+          "@PropertyName",
+          "@ControlInput",
+          "@Curve"
+        ],
+        "object_id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+        "readback_compatibility": [],
+        "rows": [
+          {
+            "@ControlInput": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{23821932-1852-4C08-97AB-6E6C5D648B39}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -48.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            },
+            "@PropertyName": "Volume",
+            "id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+            "name": "",
+            "notes": "Preserve volume association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+            "type": "RTPC"
+          },
+          {
+            "@ControlInput": {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time"
+            },
+            "@Curve": {
+              "@Flags": 65537,
+              "id": "{308C189B-68E2-4097-A5B4-2B4824ED7036}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -100.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 240.0,
+                  "y": 100.0
+                }
+              ]
+            },
+            "@PropertyName": "Pitch",
+            "id": "{18208B43-1F05-4A48-A894-E5B33F8680D7}",
+            "name": "",
+            "notes": "Preserve pitch association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+            "type": "RTPC"
+          }
+        ]
+      }
+    },
+    "contract": "waapi-skill.prepared-operation/v1",
+    "dispatch": {
+      "args": {
+        "autoAddToSourceControl": false,
+        "listMode": "append",
+        "objects": [
+          {
+            "@Curve": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0,
+                  "y": -48
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50,
+                  "y": -6
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100,
+                  "y": 0
+                }
+              ],
+              "type": "Curve"
+            },
+            "object": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}"
+          }
+        ],
+        "onNameConflict": "fail"
+      },
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "@RTPC",
+          "@Curve"
+        ]
+      },
+      "uri": "ak.wwise.core.object.set"
+    },
+    "operation": "object.setRTPC",
+    "pre_state": {
+      "control_input": {
+        "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+        "name": "Rain_Intensity",
+        "notes": "",
+        "parent": {
+          "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+          "name": "Ambience"
+        },
+        "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+        "type": "GameParameter"
+      },
+      "object": {
+        "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+        "name": "Expansion_EXP22-C06_Bed",
+        "notes": "",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+        "type": "Sound"
+      },
+      "rtpc_snapshot": {
+        "fields": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "notes",
+          "@PropertyName",
+          "@ControlInput",
+          "@Curve"
+        ],
+        "object_id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+        "readback_compatibility": [],
+        "rows": [
+          {
+            "@ControlInput": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{23821932-1852-4C08-97AB-6E6C5D648B39}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -48.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            },
+            "@PropertyName": "Volume",
+            "id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+            "name": "",
+            "notes": "Preserve volume association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+            "type": "RTPC"
+          },
+          {
+            "@ControlInput": {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time"
+            },
+            "@Curve": {
+              "@Flags": 65537,
+              "id": "{308C189B-68E2-4097-A5B4-2B4824ED7036}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -100.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 240.0,
+                  "y": 100.0
+                }
+              ]
+            },
+            "@PropertyName": "Pitch",
+            "id": "{18208B43-1F05-4A48-A894-E5B33F8680D7}",
+            "name": "",
+            "notes": "Preserve pitch association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+            "type": "RTPC"
+          }
+        ]
+      }
+    },
+    "preflight_reads": [
+      {
+        "args": {
+          "from": {
+            "id": [
+              "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+              "name": "Expansion_EXP22-C06_Bed",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+              "type": "Sound"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "id": [
+              "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity",
+              "notes": "",
+              "parent": {
+                "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+                "name": "Ambience"
+              },
+              "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+              "type": "GameParameter"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "object": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+          "property": "Volume"
+        },
+        "options": {},
+        "result": {
+          "audioEngineId": 0,
+          "default": 0.0,
+          "dependencies": [],
+          "display": {
+            "group": "Audio/General Settings/Voice",
+            "index": 1340,
+            "name": "Voice Volume"
+          },
+          "name": "Volume",
+          "restriction": {
+            "max": 200.0,
+            "min": -200.0,
+            "type": "range"
+          },
+          "supports": {
+            "randomizer": true,
+            "rtpc": "Additive",
+            "unlink": true
+          },
+          "type": "Real64",
+          "ui": {
+            "autoUpdate": false,
+            "dataMeaning": "Decibels",
+            "displayAs": {
+              "bitfield": false,
+              "lrMix": false,
+              "musicNote": false
+            },
+            "value": {
+              "decimals": 1,
+              "fine": 0.1,
+              "infinity": 0.0,
+              "max": 12.0,
+              "min": -96.0,
+              "step": 1.0
+            }
+          }
+        },
+        "uri": "ak.wwise.core.object.getPropertyInfo"
+      },
+      {
+        "args": {
+          "from": {
+            "id": [
+              "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "@RTPC"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "@RTPC": [
+                {
+                  "id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}"
+                },
+                {
+                  "id": "{18208B43-1F05-4A48-A894-E5B33F8680D7}"
+                }
+              ],
+              "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "id": [
+              "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+              "{18208B43-1F05-4A48-A894-E5B33F8680D7}"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "notes",
+            "@PropertyName",
+            "@ControlInput",
+            "@Curve"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "@ControlInput": {
+                "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                "name": "Rain_Intensity"
+              },
+              "@Curve": {
+                "@Flags": 3,
+                "id": "{23821932-1852-4C08-97AB-6E6C5D648B39}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": -48.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 0.0
+                  }
+                ]
+              },
+              "@PropertyName": "Volume",
+              "id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+              "name": "",
+              "notes": "Preserve volume association",
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+              "type": "RTPC"
+            },
+            {
+              "@ControlInput": {
+                "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                "name": "Time"
+              },
+              "@Curve": {
+                "@Flags": 65537,
+                "id": "{308C189B-68E2-4097-A5B4-2B4824ED7036}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": -100.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 240.0,
+                    "y": 100.0
+                  }
+                ]
+              },
+              "@PropertyName": "Pitch",
+              "id": "{18208B43-1F05-4A48-A894-E5B33F8680D7}",
+              "name": "",
+              "notes": "Preserve pitch association",
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+              "type": "RTPC"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      }
+    ],
+    "raw_dispatch_allowed": false,
+    "request": {
+      "arguments": {
+        "control_input": {
+          "kind": "id",
+          "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+        },
+        "mode": "add_or_replace",
+        "object": {
+          "kind": "id",
+          "value": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}"
+        },
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0,
+            "y": -48
+          },
+          {
+            "shape": "Linear",
+            "x": 50,
+            "y": -6
+          },
+          {
+            "shape": "Linear",
+            "x": 100,
+            "y": 0
+          }
+        ],
+        "property": "Volume"
+      },
+      "contract": "waapi-skill.operation-request/v1",
+      "operation": "object.setRTPC",
+      "version": "2022.1"
+    },
+    "resolved_roles": {
+      "control_input": {
+        "identity": {
+          "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+          "name": null,
+          "parent": null,
+          "path": null,
+          "type": null,
+          "waql": null
+        },
+        "object": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+        "resolution": "live-id",
+        "row": {
+          "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+          "name": "Rain_Intensity",
+          "notes": "",
+          "parent": {
+            "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+            "name": "Ambience"
+          },
+          "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+          "type": "GameParameter"
+        }
+      },
+      "object": {
+        "identity": {
+          "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+          "name": null,
+          "parent": null,
+          "path": null,
+          "type": null,
+          "waql": null
+        },
+        "object": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+        "resolution": "live-id",
+        "row": {
+          "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+          "name": "Expansion_EXP22-C06_Bed",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+          "type": "Sound"
+        }
+      }
+    },
+    "semantic_preview": {
+      "envelope": {
+        "args": {
+          "autoAddToSourceControl": false,
+          "listMode": "append",
+          "objects": [
+            {
+              "@Curve": {
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0,
+                    "y": -48
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50,
+                    "y": -6
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100,
+                    "y": 0
+                  }
+                ],
+                "type": "Curve"
+              },
+              "object": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}"
+            }
+          ],
+          "onNameConflict": "fail"
+        },
+        "metadata": {
+          "action": "update",
+          "closed_rtpc_operation": true,
+          "mode": "add_or_replace",
+          "model_authored_code": false,
+          "property_info": {
+            "audioEngineId": 0,
+            "default": 0.0,
+            "dependencies": [],
+            "display": {
+              "group": "Audio/General Settings/Voice",
+              "index": 1340,
+              "name": "Voice Volume"
+            },
+            "name": "Volume",
+            "restriction": {
+              "max": 200.0,
+              "min": -200.0,
+              "type": "range"
+            },
+            "supports": {
+              "randomizer": true,
+              "rtpc": "Additive",
+              "unlink": true
+            },
+            "type": "Real64",
+            "ui": {
+              "autoUpdate": false,
+              "dataMeaning": "Decibels",
+              "displayAs": {
+                "bitfield": false,
+                "lrMix": false,
+                "musicNote": false
+              },
+              "value": {
+                "decimals": 1,
+                "fine": 0.1,
+                "infinity": 0.0,
+                "max": 12.0,
+                "min": -96.0,
+                "step": 1.0
+              }
+            }
+          },
+          "raw_replace_all_allowed": false,
+          "request_validation_strength": "partial_reflected_schema",
+          "rtpc_support": "Additive",
+          "schema_validation": {
+            "required_families": [],
+            "required_fields": [
+              "objects"
+            ],
+            "section": "request",
+            "unresolved_refs": [
+              "#/definitions/curveObjectDefinition",
+              "#/definitions/objectArg",
+              "#/definitions/objectReturnOptions",
+              "#/localDefinitions/object",
+              "#/localDefinitions/objectArray"
+            ],
+            "uri": "ak.wwise.core.object.set",
+            "validated_nodes": 16,
+            "version": "2022.1"
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "@RTPC",
+            "@Curve"
+          ]
+        },
+        "uri": "ak.wwise.core.object.set"
+      },
+      "evidence_plan": [],
+      "raw_dispatch_allowed": false,
+      "readback_plan": [],
+      "requires_destructive_gate": true,
+      "source_note_family": "object-mutation",
+      "version": "2022.1"
+    },
+    "verification_plan": {
+      "action": "update",
+      "before_rows": [
+        {
+          "@ControlInput": {
+            "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "name": "Rain_Intensity"
+          },
+          "@Curve": {
+            "@Flags": 3,
+            "id": "{23821932-1852-4C08-97AB-6E6C5D648B39}",
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0.0,
+                "y": -48.0
+              },
+              {
+                "shape": "Linear",
+                "x": 50.0,
+                "y": -12.0
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 0.0
+              }
+            ]
+          },
+          "@PropertyName": "Volume",
+          "id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+          "name": "",
+          "notes": "Preserve volume association",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+          "type": "RTPC"
+        },
+        {
+          "@ControlInput": {
+            "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+            "name": "Time"
+          },
+          "@Curve": {
+            "@Flags": 65537,
+            "id": "{308C189B-68E2-4097-A5B4-2B4824ED7036}",
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0.0,
+                "y": -100.0
+              },
+              {
+                "shape": "Linear",
+                "x": 240.0,
+                "y": 100.0
+              }
+            ]
+          },
+          "@PropertyName": "Pitch",
+          "id": "{18208B43-1F05-4A48-A894-E5B33F8680D7}",
+          "name": "",
+          "notes": "Preserve pitch association",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+          "type": "RTPC"
+        }
+      ],
+      "control_input_id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+      "existing_rtpc_id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+      "expected_notes": null,
+      "kind": "object-rtpc-state",
+      "notes_supplied": false,
+      "object_id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+      "points": [
+        {
+          "shape": "Linear",
+          "x": 0,
+          "y": -48
+        },
+        {
+          "shape": "Linear",
+          "x": 50,
+          "y": -6
+        },
+        {
+          "shape": "Linear",
+          "x": 100,
+          "y": 0
+        }
+      ],
+      "property": "Volume",
+      "version": "2022.1"
+    },
+    "version": "2022.1",
+    "warnings": []
+  },
+  "attested_roles": {
+    "target": {
+      "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+      "type": "Sound",
+      "name": "Expansion_EXP22-C06_Bed",
+      "notes": "",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+      "parent": {
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+        "name": "Default Work Unit"
+      },
+      "@OutputBus": {
+        "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "name": "Master Audio Bus"
+      },
+      "@Volume": -3.0
+    },
+    "control_input": {
+      "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+      "name": "Rain_Intensity",
+      "type": "GameParameter",
+      "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+      "notes": "",
+      "parent": {
+        "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+        "name": "Ambience"
+      }
+    },
+    "association": {
+      "ids": [
+        "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+        "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+        "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}"
+      ],
+      "owner": {
+        "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+        "type": "Sound",
+        "name": "Expansion_EXP22-C06_Bed",
+        "notes": "",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "@OutputBus": {
+          "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+          "name": "Master Audio Bus"
+        },
+        "@Volume": -3.0
+      },
+      "old": [
+        [
+          0.0,
+          -48.0
+        ],
+        [
+          50.0,
+          -12.0
+        ],
+        [
+          100.0,
+          0.0
+        ]
+      ],
+      "new": [
+        [
+          0,
+          -48
+        ],
+        [
+          50,
+          -6
+        ],
+        [
+          100,
+          0
+        ]
+      ],
+      "delta": [
+        [
+          50,
+          -6
+        ]
+      ],
+      "foreign_names": [
+        "Pitch",
+        "Time",
+        "\\Game Parameters\\Ambience\\Time"
+      ],
+      "control_names": [
+        "Rain_Intensity",
+        "\\Game Parameters\\Ambience\\Rain_Intensity"
+      ],
+      "same_domain": true,
+      "notes": "Preserve volume association"
+    },
+    "units": {
+      "x": "GameParameter value",
+      "y": "decibels"
+    },
+    "preserve": [
+      "RTPC identity",
+      "other RTPC curves",
+      "notes",
+      "Sound state and media",
+      "control identity, notes and parent"
+    ]
+  },
+  "notice_obligations": {
+    "preserve": [
+      "RTPC identity",
+      "other RTPC curves",
+      "notes",
+      "Sound state and media",
+      "control identity, notes and parent"
+    ],
+    "action": "update-existing-RTPC",
+    "target": {
+      "id": "{2FD14D80-3562-4BC1-8F8F-7BE11948A729}",
+      "name": "Expansion_EXP22-C06_Bed",
+      "type": "Sound",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed"
+    },
+    "control_input": {
+      "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+      "name": "Rain_Intensity",
+      "type": "GameParameter",
+      "path": "\\Game Parameters\\Ambience\\Rain_Intensity"
+    },
+    "association_id": "{463D3DD8-24F1-4AFC-BE44-9934B18E3572}",
+    "property": "Volume",
+    "points": [
+      {
+        "x": 0,
+        "y": -48,
+        "shape": "Linear"
+      },
+      {
+        "x": 50,
+        "y": -6,
+        "shape": "Linear"
+      },
+      {
+        "x": 100,
+        "y": 0,
+        "shape": "Linear"
+      }
+    ],
+    "axis_meaning": {
+      "x": "GameParameter value",
+      "y": "decibels"
+    }
+  }
+}

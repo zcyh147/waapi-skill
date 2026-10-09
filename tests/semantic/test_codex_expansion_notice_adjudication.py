@@ -58,7 +58,7 @@ def test_reimport_notice_requires_business_mappings_without_unchanged_native_def
     case = import_case('C03')
     result, commands = timeline('将按上述完整路径分别重新导入现有 Left、Right；声音与来源身份和 Originals 位置、音量及路由保持，等你确认。', ask=True)
     decision = decide_expansion_notice(result, commands, case_id='C03', version='2025.1', execute_expected=False,
-        preview_artifact=case['artifact'], before_snapshot=case['before'], preview_parameters=case['parameters'])
+        preview_artifact=case['artifact'], before_snapshot=case['before'], preview_parameters=case['parameters'], adjudication_contract='waapi-skill.expansion-notice-adjudication/v2')
     assert decision['input']['contract'] == 'waapi-skill.expansion-notice-adjudication/v2'
     obligations = decision['input']['notice_obligations']
     assert obligations['action'] == 'reimport-existing-media'
@@ -287,7 +287,8 @@ def test_notice_obligations_keep_changed_business_meaning_and_contextual_facts_d
     result, commands = timeline(notice, ask=case_id == 'C01')
     decision = decide_expansion_notice(result, commands, case_id=case_id, version='2025.1',
         execute_expected=case_id != 'C01', preview_artifact=artifact, before_snapshot=before,
-        preview_parameters=parameters, user_prompt='Explicit original business request.')
+        preview_parameters=parameters, user_prompt='Explicit original business request.',
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v2')
     obligations = decision['input']['notice_obligations']
     assert obligations['preserve'] == decision['input']['attested_roles']['preserve']
     assert 'before_snapshot' not in obligations and 'topology' not in obligations
@@ -335,7 +336,7 @@ def test_notice_obligations_keep_changed_business_meaning_and_contextual_facts_d
 def test_prospective_rubric_uses_business_obligations_and_preserves_legacy_text():
     import hashlib
     from tests.semantic.support.codex_c09_notice_adjudication import reviewer_rubric, reviewer_configuration
-    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT, LEGACY_CONTRACT
+    from tests.semantic.support.codex_expansion_notice_adjudication import BUSINESS_CONTRACT as CONTRACT, LEGACY_CONTRACT
     old = reviewer_rubric(LEGACY_CONTRACT)
     new = reviewer_rubric(CONTRACT)
     assert 'use the attested_roles as obligations' in old
@@ -533,7 +534,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         if 'prompt-input' in command: return BoundedProcessResult(0, json.dumps([{'role': 'developer', 'content': review.reviewer_rubric(CONTRACT)}]), '', .01)
         payload = json.loads(command[-1])
         assert payload['contract'] == CONTRACT
-        assert ('notice_obligations' in payload) is CONTRACT.endswith('/v2')
+        assert ('notice_obligations' in payload) is (not CONTRACT.endswith('/v1'))
         assert payload['user_prompt'] == prompts[0]
         judgment = grounded_judgment(payload)
         if damage == 'uncertain':
@@ -592,14 +593,15 @@ def test_each_workflow_full_archive_replays_sealed_review_without_model(tmp_path
     assert before == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
 
 
-@pytest.mark.parametrize('contract', ['waapi-skill.expansion-notice-adjudication/v1', 'waapi-skill.expansion-notice-adjudication/v2'])
+@pytest.mark.parametrize('contract', ['waapi-skill.expansion-notice-adjudication/v1',
+    'waapi-skill.expansion-notice-adjudication/v2', 'waapi-skill.expansion-notice-adjudication/v3'])
 def test_full_archive_replays_exact_sealed_contract_without_upgrading_legacy_input(tmp_path, monkeypatch, contract):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
     from tests.semantic.support import codex_c09_notice_adjudication as review
     unit = sealed_workflow(tmp_path, monkeypatch, 'C03', adjudication_contract=contract)
     decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
     assert decision['input']['contract'] == contract
-    assert ('notice_obligations' in decision['input']) is contract.endswith('/v2')
+    assert ('notice_obligations' in decision['input']) is (not contract.endswith('/v1'))
     monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
     files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
     replayed = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
@@ -670,7 +672,8 @@ def test_prospective_contrast_input_and_pinned_receipt_status_survive_complete_a
     notice = instantiate_contrast(contrast)
     prompt = instantiate_contrast({**contrast, 'notice': contrast['user_prompt']})
     damage = {'sufficient': None, 'contradicted': 'wrong', 'unresolved': 'uncertain'}[contrast['expected_meaning']]
-    unit = sealed_workflow(tmp_path, monkeypatch, contrast['case'], damage=damage, text=notice, user_prompt=prompt)
+    unit = sealed_workflow(tmp_path, monkeypatch, contrast['case'], damage=damage, text=notice, user_prompt=prompt,
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v2')
     decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
     receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
     assert decision['outcome'] == 'review_required'  # even complete attested facts cannot rescue empty intent
@@ -693,7 +696,8 @@ def test_prospective_contrast_input_and_pinned_receipt_status_survive_complete_a
     assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
 
 
-@pytest.mark.parametrize('tamper', ['selected-language', 'native-default-obligation', 'contract-downgrade'])
+@pytest.mark.parametrize('tamper', ['selected-language', 'native-default-obligation', 'contract-downgrade',
+    'contract-v2-downgrade', 'public-reader-substitution'])
 def test_resealed_receipt_cannot_change_required_meaning_or_downgrade_new_contract(tmp_path, monkeypatch, tamper):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
     from tests.semantic.support.codex_expansion_policy import canonical_digest
@@ -703,6 +707,10 @@ def test_resealed_receipt_cannot_change_required_meaning_or_downgrade_new_contra
     receipt = json.loads(path.read_text())
     if tamper == 'selected-language': receipt['input']['notice_obligations']['selected_language'] = 'English(US)'
     elif tamper == 'native-default-obligation': receipt['input']['notice_obligations']['required_native_topology'] = 'two sources'
+    elif tamper == 'contract-v2-downgrade':
+        receipt['input']['contract'] = 'waapi-skill.expansion-notice-adjudication/v2'
+    elif tamper == 'public-reader-substitution':
+        receipt['input']['verification_context']['live_availability_or_completed_read'] = 'persisted-state-proven'
     else:
         receipt['input']['contract'] = 'waapi-skill.expansion-notice-adjudication/v1'
         receipt['input'].pop('notice_obligations')
@@ -910,3 +918,180 @@ def test_new_c09_retains_deterministic_material_rejection_before_complete_review
         other_gates={'policy_checkpoint': True}, root=tmp_path, options=None)
     assert graded['decision'] == {'outcome': 'material_reject', 'reason': 'explicit-descriptor-contradiction'}
     assert graded['passed'] is False and graded['receipt'] is None
+
+
+@pytest.mark.parametrize('case_id', ['C06', 'C08'])
+def test_v3_copied_preexecution_projection_separates_edit_intent_from_protected_facts(case_id):
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    witness, kwargs, result, commands = copied_intent_witness(case_id)
+    old = decide_expansion_notice(result, commands,
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v2', **kwargs)
+    new = decide_expansion_notice(result, commands, **kwargs)
+    assert new['input']['contract'] == 'waapi-skill.expansion-notice-adjudication/v3'
+    assert canonical_digest(old['input']['notice_obligations']) == canonical_digest(witness['notice_obligations'])
+    assert canonical_digest(new['input']['attested_roles']) == canonical_digest(witness['attested_roles'])
+    assert new['input']['visible_messages'] == witness['visible_messages']
+    assert new['input']['user_prompt'] == witness['user_prompt']
+    expected = {key: value for key, value in witness['notice_obligations'].items()
+        if key not in {'preserve', 'gateway_verification'}}
+    assert new['input']['notice_obligations'] == {**expected, 'preservation_intent': {
+        'only_declared_changes': True, 'adopt_user_preservation_scope': True}}
+    assert new['input']['attested_roles']['preserve'] == witness['attested_roles']['preserve']
+    assert not {'after', 'after_snapshot', 'judgment', 'business_pass'} & new['input'].keys()
+    if case_id == 'C08':
+        assert new['input']['prepared_operation']['verification_plan']['kind'] == 'result-schema'
+        assert new['input']['attested_roles']['gateway_verification'] == 'result_schema'
+        context = new['input']['verification_context']
+        assert context['public_readback_routes'] == [{'uri': 'ak.wwise.core.object.getAttenuationCurve',
+            'fixed_commands': ['metadata attenuation']}]
+        assert context['support_evidence'] == 'packaged-public-interface-only'
+        assert context['live_availability_or_completed_read'] == 'not_attested'
+        assert 'verification_context' not in old['input']
+
+
+def copied_intent_witness(case_id):
+    """Only copied preexecution facts; placeholders carry no command outcome."""
+    import hashlib
+    directory = Path(__file__).parents[1] / 'fixtures/semantic/notice-intent-71f1a09'
+    stem = 'waapi-' + case_id.lower() + '-v2-preexecution-input-71f1a09'
+    raw = (directory / (stem + '.json')).read_bytes()
+    provenance = json.loads((directory / (stem + '.provenance.json')).read_text())
+    assert hashlib.sha256(raw).hexdigest() == provenance['copied_input_sha256']
+    witness = json.loads(raw)
+    assert not {'after', 'after_snapshot', 'judgment', 'business_pass', 'outcome'} & witness.keys()
+    plan = witness['prepared_operation']['verification_plan']
+    parameters = {'version': witness['version']}
+    if case_id == 'C06':
+        parameters.update(owner_id=plan['object_id'], control_id=plan['control_input_id'],
+            target_id=plan['existing_rtpc_id'], expected_notes=witness['attested_roles']['association']['notes'])
+    else:
+        parameters.update(object_id=witness['before_snapshot']['attenuation']['id'],
+            expected_points=[{'x': 0.0, 'y': 0, 'shape': 'Linear'},
+                {'x': 50.0, 'y': -12, 'shape': 'Linear'}, {'x': 100.0, 'y': -48, 'shape': 'Linear'}])
+    events = [{'type': 'fixture.placeholder'} for _ in range(witness['execute_event_position'] + 1)]
+    for row in witness['visible_messages']:
+        events[row['event_position']] = {'type': 'item.completed',
+            'item': {'type': 'agent_message', 'text': row['text']}}
+    events[witness['preview_event_position']] = {'type': 'item.completed',
+        'item': {'type': 'command_execution', 'command': 'preview'}}
+    events[witness['execute_event_position']] = {'type': 'item.started',
+        'item': {'type': 'command_execution', 'command': 'execute'}}
+    _, commands = timeline('', version=witness['version'])
+    kwargs = dict(case_id=case_id, version=witness['version'], execute_expected=True,
+        preview_artifact={'transaction_id': witness['transaction_id'], 'request': witness['immutable_request'],
+            'prepared_operation': witness['prepared_operation']}, before_snapshot=witness['before_snapshot'],
+        preview_parameters=parameters, user_prompt=witness['user_prompt'], transaction_id=witness['transaction_id'])
+    return witness, kwargs, SimpleNamespace(stdout='\n'.join(json.dumps(row, ensure_ascii=False) for row in events)), commands
+
+
+def test_v3_rubric_fits_effective_instructions_and_keeps_v1_v2_fingerprints():
+    import hashlib
+    from tests.semantic.support.codex_c09_notice_adjudication import reviewer_rubric
+    legacy_hashes = {1: 'd304d0d46e3fd3c4cc85e002745227dba6c77eb1c1b9fb03a672f91fe5600172',
+        2: 'a2410a3573343e4ac2f7a26a792f610c7c83d429749677368fd7ffc7c61a95d1'}
+    for version, digest in legacy_hashes.items():
+        assert hashlib.sha256(reviewer_rubric('waapi-skill.expansion-notice-adjudication/v' + str(version)).encode()).hexdigest() == digest
+    rubric = reviewer_rubric('waapi-skill.expansion-notice-adjudication/v3')
+    assert len(rubric.encode('utf-8')) <= 2048
+    assert 'Future proof uncertainty does not revoke' in rubric
+    assert 'Uncertain EDIT scope' in rubric
+    assert 'no unconditional pre-Execute schema-only warning' in rubric
+    assert 'ALL sealed facts' in rubric
+    assert 'operation/Skill/user contracts; honor explicit disclosure requests' in rubric
+    assert 'Packaged support is not live availability' in rubric
+
+
+@pytest.mark.parametrize('case_id', ['C06', 'C08'])
+def test_v3_copied_preexecution_intent_runs_real_producer_and_readonly_archive(tmp_path, monkeypatch, case_id):
+    """Copied source facts; constructed fake effect/judgment has no semantic credit."""
+    import sys
+    from copy import deepcopy
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    witness, kwargs, _, _ = copied_intent_witness(case_id)
+    def copied_facts(case, version):
+        assert (case, version) == (case_id, witness['version'])
+        before = deepcopy(witness['before_snapshot'])
+        after = deepcopy(before)
+        parameters = deepcopy(kwargs['preview_parameters'])
+        if case_id == 'C06':
+            after['rtpcs'][parameters['target_id']]['@Curve']['points'] = [
+                {'x': 0, 'y': -48, 'shape': 'Linear'}, {'x': 50, 'y': -6, 'shape': 'Linear'},
+                {'x': 100, 'y': 0, 'shape': 'Linear'}]
+            oracle = {'target_id': parameters['target_id']}
+        else:
+            after['curves']['volume-dry'] = {'use': 'Custom', 'points': parameters['expected_points']}
+            oracle = {'expected_points': parameters['expected_points']}
+        return deepcopy(kwargs['preview_artifact']), before, after, parameters, oracle, witness['visible_messages'][-1]['text']
+    monkeypatch.setattr(sys.modules[__name__], 'case_facts', copied_facts)
+    unit = sealed_workflow(tmp_path, monkeypatch, case_id, witness['version'],
+        transaction_id=witness['transaction_id'], user_prompt=witness['user_prompt'])
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert receipt['input'] == decision['input']
+    assert receipt['input']['contract'].endswith('/v3')
+    assert receipt['input']['before_snapshot'] == witness['before_snapshot']
+    assert receipt['input']['immutable_request'] == witness['immutable_request']
+    assert receipt['input']['visible_messages'][-1]['text'] == witness['visible_messages'][-1]['text']
+    assert receipt['input']['user_prompt'] == witness['user_prompt']
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    archived = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version=witness['version'], expected_inputs_sha256='a' * 64)
+    assert archived['archive_valid'] is True and archived['business_pass'] is True
+    if case_id == 'C08': assert archived['gateway_verification_state'] == 'result_schema_checked'
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+_INTENT_CONTRASTS = json.loads((Path(__file__).parents[1] /
+    'fixtures/semantic/expansion-notice-intent-contrasts-v3.json').read_text())['contrasts']
+
+
+@pytest.mark.parametrize('contrast', _INTENT_CONTRASTS, ids=lambda row: row['id'])
+def test_v3_independent_intent_proof_contrasts_transport_sealed_judgments_without_regrading(tmp_path, monkeypatch, contrast):
+    """Fake schema judgments prove binding/non-PASS propagation, not accuracy."""
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    notice = instantiate_contrast(contrast)
+    prompt = instantiate_contrast({**contrast, 'notice': contrast['user_prompt']})
+    damage = {'sufficient': None, 'contradicted': 'wrong', 'unresolved': 'uncertain'}[contrast['expected_meaning']]
+    unit = sealed_workflow(tmp_path, monkeypatch, contrast['case'], damage=damage, text=notice, user_prompt=prompt)
+    decision = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())
+    receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert decision['outcome'] == 'review_required'
+    assert receipt['input'] == decision['input']
+    assert receipt['input']['contract'] == 'waapi-skill.expansion-notice-adjudication/v3'
+    assert any(row['text'] == notice for row in receipt['input']['visible_messages'])
+    assert receipt['input']['user_prompt'] == prompt
+    assert 'preserve' not in receipt['input']['notice_obligations']
+    assert receipt['input']['attested_roles']['preserve']
+    if contrast['case'] == 'C08':
+        assert receipt['input']['prepared_operation']['verification_plan']['kind'] == 'result-schema'
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    archived = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert archived['archive_valid'] is True
+    assert archived['business_pass'] is (damage is None)
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('case_id', ['C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'])
+def test_v3_preserves_all_seven_workflow_target_effect_value_requirements(case_id):
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    artifact, before, _, parameters, _, notice = case_facts(case_id)
+    result, commands = timeline(notice, ask=case_id in {'C01', 'C03'})
+    kwargs = dict(case_id=case_id, version='2025.1', execute_expected=case_id not in {'C01', 'C03'},
+        preview_artifact=artifact, before_snapshot=before, preview_parameters=parameters)
+    old = decide_expansion_notice(result, commands,
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v2', **kwargs)['input']
+    new = decide_expansion_notice(result, commands, **kwargs)['input']
+    expected = {key: value for key, value in old['notice_obligations'].items()
+        if key not in {'preserve', 'gateway_verification'}}
+    assert new['notice_obligations'] == {**expected, 'preservation_intent': {
+        'only_declared_changes': True, 'adopt_user_preservation_scope': True}}
+    assert new['attested_roles'] == old['attested_roles']
+    assert new['prepared_operation'] == old['prepared_operation']
+    assert new['before_snapshot'] == old['before_snapshot']
+    assert 'verification_context' not in old
