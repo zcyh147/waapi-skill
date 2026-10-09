@@ -343,3 +343,60 @@ def test_macos_expansion_rejects_nonempty_home_before_launch(monkeypatch, tmp_pa
     assert failure["never_reuse"] is True
     assert "empty real case-owned Wwise HOME" in failure["primary_error"]
     assert failure["source_hash_before"] == failure["source_hash_after"]
+
+
+def test_successful_fixture_receipt_records_measured_and_effective_wait_bounds(monkeypatch, tmp_path):
+    clock = iter([10.0, 12.5])
+    monkeypatch.setattr(runtime.time, "monotonic", lambda: next(clock))
+    monkeypatch.setattr(runtime, "run_owned_gateway", lambda *args, **kwargs:
+        SimpleNamespace(returncode=0, stdout='{"ok": true}'))
+    owned = SimpleNamespace(host="127.0.0.1", port=41234, owned_root=tmp_path, runner_environment={})
+    receipts = []
+    gateway = runtime.fixture_gateway(skill_source=tmp_path, runtime=owned, version="2025.1", receipts=receipts)
+    gateway(["status"])
+    assert receipts[0]["timing"] == {"elapsed_seconds": 2.5, "subprocess_seconds": 45, "gateway_seconds": 30}
+
+
+def test_preparation_deadline_caps_gateway_and_cleanup_still_runs(monkeypatch, tmp_path):
+    from tests.semantic.support.codex_expansion_timing import ExpansionPhaseTiming, ExpansionPhaseTimeout
+    now = [100.0]
+    timing = ExpansionPhaseTiming(clock=lambda: now[0])
+    calls = []
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        now[0] += 2
+        return SimpleNamespace(returncode=0, stdout='{"ok": true}')
+    monkeypatch.setattr(runtime, "run_owned_gateway", run)
+    owned = SimpleNamespace(host="127.0.0.1", port=41234, owned_root=tmp_path, runner_environment={})
+    with timing.measure("preparation", "postlaunch"):
+        now[0] = 699.0
+        gateway = runtime.fixture_gateway(skill_source=tmp_path, runtime=owned, version="2025.1", receipts=[], phase_timing=timing)
+        gateway(["status"])
+        with pytest.raises(ExpansionPhaseTimeout):
+            gateway(["status"])
+    assert len(calls) == 1
+    assert calls[0][1]["timeout_seconds"] == 1.0
+    assert calls[0][0][calls[0][0].index("--timeout") + 1] == "1.0"
+    with timing.measure("cleanup", "total", recovery=True):
+        now[0] += 181
+        with timing.measure("cleanup", "source-proof", recovery=True):
+            now[0] += 1
+    evidence = timing.evidence()
+    assert evidence["phases"]["preparation"]["elapsed_seconds"] == 601.0
+    assert evidence["phases"]["cleanup"]["elapsed_seconds"] == 182.0
+    assert evidence["phases"]["cleanup"]["exhausted"] is True
+
+
+def test_invalid_fixture_receipt_retains_elapsed_evidence(monkeypatch, tmp_path):
+    now = iter([100.0, 103.0])
+    monkeypatch.setattr(runtime.time, "monotonic", lambda: next(now))
+    monkeypatch.setattr(runtime, "run_owned_gateway", lambda *args, **kwargs:
+        SimpleNamespace(returncode=0, stdout='not JSON'))
+    receipts = []
+    gateway = runtime.fixture_gateway(skill_source=tmp_path,
+        runtime=SimpleNamespace(host="127.0.0.1", port=41234, owned_root=tmp_path, runner_environment={}),
+        version="2025.1", receipts=receipts)
+    with pytest.raises(runtime.CaseBoundaryError, match="JSON"):
+        gateway(["status"])
+    assert receipts[0]["timing"]["elapsed_seconds"] == 3.0
+    assert receipts[0]["error"]["type"] == "CaseBoundaryError"

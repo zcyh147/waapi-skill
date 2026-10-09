@@ -138,7 +138,7 @@ def prepare_c08(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
                        "curves": _curves(ctx, _SOURCE_ID)},
         }
 
-    before = snapshot()
+    before = ctx.observe_before(snapshot)
     if before["source"] != {"object": source, "curves": source_curves}:
         raise CaseBoundaryError("C08 fixture setup changed the original attenuation")
     old_points = before["curves"]["volume-dry"]["points"]

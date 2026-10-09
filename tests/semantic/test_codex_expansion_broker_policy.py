@@ -620,3 +620,27 @@ def test_schema_checked_read_followup_never_admits_writes_reverification_or_publ
         assert receipt.payload is None and receipt.runner_exit_code is None
     assert store.load(tx) == terminal and store.read_events(tx) == events
     assert policy.complete and not policy.reads.receipts
+
+
+def test_independent_callback_measures_cpu_work_and_agent_overlap():
+    from tests.semantic.support.codex_expansion_timing import ExpansionPhaseTiming
+    from dataclasses import replace
+    now = [10.0]
+    timing = ExpansionPhaseTiming(clock=lambda: now[0])
+    policy = make_policy()
+    policy.phase_timing = timing
+    def snapshot():
+        now[0] += 3
+        return {"measured": True}
+    policy.prepared = replace(policy.prepared, snapshot=snapshot)
+    assert policy.observe_oracle("preview-before", policy.prepared.snapshot) == {"measured": True}
+    row = timing.evidence()["intervals"][0]
+    assert (row["phase"], row["scope"], row["attribution"], row["elapsed_seconds"]) == (
+        "oracle", "preview-before", "agent", 3.0)
+    def failed_snapshot():
+        now[0] += 2
+        raise OSError("proof unavailable")
+    with pytest.raises(OSError):
+        policy.observe_oracle("verification-snapshot", failed_snapshot)
+    assert timing.evidence()["phases"]["oracle"] == {
+        "elapsed_seconds": 5.0, "measured": True, "exhausted": False, "errors": 1}

@@ -4768,3 +4768,32 @@ def test_early_custom_media_start_failure_archives_real_account_proof(
     assert json.loads((root / "outcome.json").read_text(encoding="utf-8"))[
         "status"
     ] == "BLOCKED"
+
+
+def test_opt_in_direct_rpc_wait_is_capped_and_exhaustion_never_dispatches(monkeypatch):
+    from tests.semantic.support.codex_expansion_timing import ExpansionPhaseTiming, ExpansionPhaseTimeout
+    now = [100.0]
+    timing = ExpansionPhaseTiming(clock=lambda: now[0])
+    dispatched = []
+    class Client:
+        def __init__(self, **kwargs):
+            self._client_thread = SimpleNamespace(daemon=True)
+        def call(self, uri, args, *, options):
+            dispatched.append(uri)
+            now[0] += 1
+            return {"return": []}
+        def disconnect(self):
+            pass
+    monkeypatch.setitem(sys.modules, "waapi", SimpleNamespace(WaapiClient=Client, WaapiRequestFailed=RuntimeError))
+    direct = runner.OwnedDirectWaapiCall(host="127.0.0.1", port=49152, phase_timing=timing)
+    try:
+        with timing.measure("preparation", "postlaunch"):
+            now[0] = 699.0
+            direct("ak.wwise.core.object.get", {"from": {"id": ["{11111111-1111-1111-1111-111111111111}"]}}, {})
+            with pytest.raises(ExpansionPhaseTimeout):
+                direct("ak.wwise.core.object.get", {"from": {"id": ["{11111111-1111-1111-1111-111111111111}"]}}, {})
+        assert dispatched == ["ak.wwise.core.object.get"]
+        assert direct.calls[0]["timing"]["effective_wait_seconds"] == 1.0
+        assert direct.calls[0]["timing"]["elapsed_seconds"] == 1.0
+    finally:
+        assert direct.close() is True
