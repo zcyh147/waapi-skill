@@ -303,6 +303,29 @@ _PUBLIC_READ_RESULT_KEYS = {
 }
 
 
+def _validate_partial_public_query(payload, argv, gate):
+    """Keep observed rows, never upgrade the business-proof ceiling outcome."""
+    from tests.semantic.support.codex_expansion_policy import _GUID
+    rows, bound = payload.get('objects'), payload.get('query_bound')
+    exact = '--relationship' not in argv and ('--exact-id' in argv or '--path-segment' in argv)
+    if (argv[0] != 'query-object' or not gate.scope.owned_project_reads
+            or payload.get('ok') is not True or payload.get('status') != 'ok'
+            or not isinstance(rows, list) or not isinstance(bound, Mapping)
+            or not (payload.get('limit_reached') is True or not exact
+                and bound.get('mode') in {'take', 'gateway-appended-take'}
+                and type(bound.get('value')) is int and len(rows) == bound['value'])):
+        raise ValueError('false read observation is not a recognized successful ceiling result')
+    # observe() has checked byte/row/count/bound limits before its ceiling
+    # return. Identity checks ordinarily occur after that return, so enforce
+    # those same checks here without admitting this receipt as business proof.
+    ids = [row.get('id') if isinstance(row, Mapping) else None for row in rows]
+    if any(not isinstance(key, str) or not _GUID.fullmatch(key) for key in ids) or len(ids) != len(set(ids)):
+        raise ValueError('partial query identities are malformed or duplicate')
+    source_id = argv[argv.index('--exact-id') + 1] if '--exact-id' in argv else None
+    if exact and (len(rows) > 1 or source_id is not None and any(key.upper() != source_id.upper() for key in ids)):
+        raise ValueError('partial exact query returned another identity')
+
+
 def _public_read_evidence(events, command_records, *, version, broker_records, read_admission):
     from dataclasses import asdict, is_dataclass
     from tests.semantic.support.codex_expansion_policy import BoundedExpansionReads
@@ -348,11 +371,13 @@ def _public_read_evidence(events, command_records, *, version, broker_records, r
         gate.admit(argv)
         complete = gate.observe(payload)
         if not complete:
-            continue  # Failed/clarification/ceiling receipts grant no acquired facts.
+            if payload.get('ok') is False or payload.get('status') == 'needs_clarification':
+                continue  # Recognized failed/clarification receipts grant no acquired facts.
+            _validate_partial_public_query(payload, argv, gate)
         reads.append({'event_position': position, 'broker_sequence': record['sequence'],
             'gateway_arguments': list(argv), 'payload_sha256': record['payload_sha256'],
             'broker_record_sha256': canonical_digest(record),
-            'scope_complete': (not (payload.get('complete') is False or payload.get('truncated') is True
+            'scope_complete': (complete and not (payload.get('complete') is False or payload.get('truncated') is True
                 or isinstance(payload.get('response_integrity'), Mapping) and (
                     payload['response_integrity'].get('complete') is False
                     or payload['response_integrity'].get('truncated') is True)) if argv[0] == 'query-object' else None),

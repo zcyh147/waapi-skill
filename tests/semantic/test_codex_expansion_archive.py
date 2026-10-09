@@ -1323,3 +1323,69 @@ def test_rejected_declaration_requires_exact_bound_draft_and_terminal_no_dispatc
     _write(tmp_path / 'expansion-broker.json', broker)
     with pytest.raises(ExpansionArchiveError):
         _verify(tmp_path)
+
+
+def _sealed_post_verification_query_timeout(root, *, continuation=False, fabricated_pass=False):
+    """Exact authenticated read failure after a separately verified transaction."""
+    from tests.semantic.test_codex_expansion_broker_reads import query_timeout_receipt
+    _sealed_c08(root)
+    plan = json.loads((root / 'expansion-plan.json').read_text())
+    broker = json.loads((root / 'expansion-broker.json').read_text())
+    directory = root / 'turns/turn-01'
+    events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
+    final = events[-2:]
+    events = events[:-2]
+    extra = [(['query-object', '--exact-id', plan['read_scope']['object_ids'][0]], query_timeout_receipt(), 2)]
+    if continuation:
+        extra.append((['operations'], {'ok': True, 'status': 'ok', 'command': 'operations'}, 0))
+    for argv, payload, exit_code in extra:
+        sequence = len(broker['records']) + 1
+        model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
+        record = deepcopy(broker['records'][-1])
+        record.update(sequence=sequence, step_name=f'expansion.step.{sequence:04d}', model_argv=model,
+            normalized_model_argv=model, gateway_arguments=argv, raw_argv_sha256=canonical_digest(model),
+            argv_sha256=canonical_digest(model), semantic_argv_sha256=canonical_digest(['runner-owned-version', '2025.1', *argv]),
+            runner_command_sha256=canonical_digest([plan['trusted_python'], plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]),
+            payload=payload, payload_sha256=canonical_digest(payload), stdout=json.dumps(payload),
+            exit_code=exit_code, runner_exit_code=exit_code, allowed_exit_codes=[0, 2] if exit_code == 2 else [0])
+        broker['records'].append(record)
+        item = {'id': f'cmd-{sequence}', 'type': 'command_execution', 'command': shlex.join(model),
+            'status': 'completed', 'exit_code': exit_code, 'aggregated_output': record['stdout']}
+        events.extend([{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}},
+            {'type': 'item.completed', 'item': item}])
+    names = [record['step_name'] for record in broker['records']]
+    broker.update(passed=fabricated_pass, complete=fabricated_pass, terminal_state='complete' if fabricated_pass else 'indeterminate',
+        expected_step_names=names, consumed_step_names=names)
+    _write(root / 'expansion-broker.json', broker)
+    events.extend(final)
+    (directory / 'events.jsonl').write_text(''.join(json.dumps(event) + '\n' for event in events))
+    facts = json.loads((directory / 'codex-facts.json').read_text())
+    facts['command_facts']['command_records'] = [asdict(row) for row in completed_command_records(events, platform_name='posix')]
+    _write(directory / 'codex-facts.json', facts)
+    grade = json.loads((directory / 'turn-grade.json').read_text())
+    grade['broker_prefix_count'] = len(broker['records'])
+    grade['common_gates']['broker_provenance'] = fabricated_pass
+    grade.update(passed=fabricated_pass, errors=[] if fabricated_pass else ['broker_provenance'])
+    _write(directory / 'turn-grade.json', grade)
+    budget = json.loads((root / 'expansion-agent-budget.json').read_text())
+    budget['turns'][0]['gates'] = grade['common_gates']
+    _write(root / 'expansion-agent-budget.json', budget)
+    result = json.loads((root / 'expansion-task-result.json').read_text())
+    result.update(passed=fabricated_pass, turns=budget['turns'])
+    _write(root / 'expansion-task-result.json', result)
+
+
+def test_authenticated_post_verification_read_timeout_replays_fail_without_changing_verified_state(tmp_path):
+    _sealed_post_verification_query_timeout(tmp_path)
+    files = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+    replay = _verify(tmp_path)
+    assert replay['archive_valid'] is True and replay['original_status'] == 'FAIL'
+    assert replay['business_pass'] is False and replay['gateway_verification_state'] == 'result_schema_checked'
+    assert files == {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('contradiction', ['continuation', 'fabricated_pass'])
+def test_exact_read_timeout_cannot_replay_later_dispatch_or_pass(tmp_path, contradiction):
+    _sealed_post_verification_query_timeout(tmp_path, **{contradiction: True})
+    with pytest.raises(ExpansionArchiveError, match='terminal|timeout'):
+        _verify(tmp_path)

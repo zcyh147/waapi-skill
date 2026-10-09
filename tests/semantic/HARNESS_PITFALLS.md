@@ -3472,10 +3472,12 @@ gate was run by the implementer; promotion owns the combined candidate gates.
 - A reviewer packet may omit facts the Agent actually acquired. Preserve the
   existing successful pre-Execute public read with its exact request scope,
   returned fields/completeness, original event/receipt positions and sealed
-  digests. Missing oracle fields cannot prove either absence or an unavailable
+  digests. Valid owned-project ceiling rows remain observed facts with
+  incomplete scope; they cannot prove absence of further rows. Missing oracle fields cannot prove either absence or an unavailable
   public capability; future verification intent is not completed proof.
 - An authentic `query-object` exit-2 failure may carry `call.error_code` and
   null count/objects/agent_result. Exact Broker receipt admission grants no read
   proof. Timeout/cleanup_pending stops further dispatch and sealing; an already
-  verified transaction retains its verification. Preserve the old FAIL root
+  verified transaction retains its verification. Archive replay enforces the
+  same terminal stop and rejects a fabricated PASS. Preserve the old FAIL root
   without retry or after-state rescue.

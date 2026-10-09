@@ -1373,3 +1373,81 @@ def test_v4_resealed_read_projection_cannot_replace_original_archive_authority(t
     with pytest.raises(ExpansionArchiveError):
         verify_expansion_task_archive(tmp_path, expected_unit_id=unit, expected_version='2025.1',
             expected_inputs_sha256='a' * 64)
+
+
+def owned_ceiling_notice_context(*, malformed=False):
+    from dataclasses import asdict
+    from tests.semantic.support.codex_expansion_archive import _scope
+    from tests.semantic.support.codex_expansion_policy import canonical_digest, ExpansionReadScope
+    result, commands, kwargs = public_read_notice_context()
+    record = kwargs['broker_records'][0]
+    source_id = record['gateway_arguments'][2]
+    argv = ('query-object', '--exact-id', source_id, '--relationship', 'children', '--max-results', '1')
+    row = {'id': '{88888888-8888-8888-8888-888888888888}', 'name': 'ObservedSource',
+        'type': 'AudioFileSource', 'path': r'\Fixture\ObservedSource', 'volume_offset_db': -3.0}
+    if malformed: row['id'] = 'not-a-guid'
+    record['payload'].update(count=1, objects=[row], agent_result=[row], query_bound={'mode': 'take', 'value': 1})
+    record['gateway_arguments'] = argv
+    commands[0].argv = (*commands[0].argv[:3], *argv)
+    record['model_argv'] = record['normalized_model_argv'] = commands[0].argv
+    record['payload_sha256'] = canonical_digest(record['payload'])
+    events = [json.loads(line) for line in result.stdout.splitlines()]
+    events[0]['item']['aggregated_output'] = json.dumps(record['payload'])
+    result.stdout = '\n'.join(json.dumps(row) for row in events)
+    scope = ExpansionReadScope(frozenset({source_id}), frozenset({'audio.import'}), owned_project_reads=True)
+    kwargs['read_admission'] = _scope({'read_scope': {key: sorted(value) if isinstance(value, frozenset) else value
+        for key, value in asdict(scope).items()}, 'read_scope_sha256': scope.digest,
+        'skill_source': str(Path(__file__).parents[2] / 'skills/waapi-skill'), 'version': '2025.1'})
+    return result, commands, kwargs
+
+
+def test_v4_owned_ceiling_retains_observed_values_without_complete_scope_proof():
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    result, commands, kwargs = owned_ceiling_notice_context()
+    admission = kwargs['read_admission']
+    record = kwargs['broker_records'][0]
+    admission.admit(record['gateway_arguments'])
+    assert admission.observe(record['payload']) is False  # Business proof policy remains unchanged.
+    decision = decide_expansion_notice(result, commands, **kwargs)
+    read = decision['input']['pre_execution_public_reads']['reads'][0]
+    assert read['result']['objects'][0]['volume_offset_db'] == -3.0
+    assert read['result']['count'] == 1
+    assert read['scope_complete'] is False
+    assert read['payload_sha256'] == record['payload_sha256']
+
+
+def test_v4_owned_ceiling_cannot_hide_malformed_returned_identity():
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    result, commands, kwargs = owned_ceiling_notice_context(malformed=True)
+    assert decide_expansion_notice(result, commands, **kwargs) == {
+        'outcome': 'material_reject', 'reason': 'unbound-pre-execution-public-read-evidence'}
+
+
+@pytest.mark.parametrize('complete_absence_claim', [False, True])
+def test_v4_owned_ceiling_facts_and_incomplete_scope_survive_full_fake_archive(
+        tmp_path, monkeypatch, complete_absence_claim):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    identifier = import_case('C01')['before']['distractor']['id']
+    row = {'id': '{88888888-8888-8888-8888-888888888888}', 'name': 'ObservedSource',
+        'type': 'AudioFileSource', 'path': r'\Fixture\ObservedSource', 'notes': 'Observed source notes'}
+    reads = [(('query-object', '--exact-id', identifier, '--relationship', 'children',
+               '--include', 'notes', '--max-results', '1'),
+        {'ok': True, 'status': 'ok', 'command': 'query-object', 'count': 1, 'objects': [row], 'agent_result': [row],
+         'query_bound': {'mode': 'take', 'value': 1}})]
+    notice = case_facts('C01')[-1] + (' Backup has no other children; this guarantees full preservation.'
+        if complete_absence_claim else ' The bounded read returned ObservedSource with Observed source notes.')
+    # Fixed fake judgments test propagation, not independent language accuracy.
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C01', public_reads=reads, text=notice,
+        damage='wrong' if complete_absence_claim else None)
+    input = json.loads((tmp_path / 'turns/turn-01/notice-decision.json').read_text())['input']
+    projected = input['pre_execution_public_reads']['reads'][0]
+    assert projected['result']['objects'] == [row]
+    assert projected['scope_complete'] is False
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    replay = verify_expansion_task_archive(tmp_path, expected_unit_id=unit, expected_version='2025.1',
+        expected_inputs_sha256='a' * 64)
+    assert replay['archive_valid'] is True
+    assert replay['business_pass'] is (not complete_absence_claim)
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}

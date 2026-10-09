@@ -24,6 +24,7 @@ from typing import Any, Mapping
 from tests.semantic.support.codex_archive_paths import parse_archive_relative_path
 from tests.semantic.support.codex_expansion_policy import (
     BoundedExpansionReads, ExpansionReadScope, canonical_digest, classify_expansion_outcome,
+    is_public_query_timeout_failure,
 )
 from tests.semantic.support.codex_expansion_broker_policy import (
     _BUSINESS_EDITS, _DECLARATIONS, _DRAFT_READS, _READ_COMMANDS,
@@ -564,6 +565,12 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             gate.admit(argv)
             if record.get("succeeded") is True:
                 gate.observe(payload)
+                if is_public_query_timeout_failure(payload):
+                    _require(record.get("exit_code") == record.get("runner_exit_code") == 2
+                        and record.get("allowed_exit_codes") == [0, 2]
+                        and payload.get("detected_version") == plan["version"],
+                        "query timeout terminal receipt has inconsistent exit/version")
+                    failed_accepted = True  # Read infrastructure stop; transaction state stays unchanged.
         if command == "execute" and record.get("succeeded") is True and record.get("allowed_exit_codes") == [0, 2]:
             _validate_branching_execute_payload(payload, exit_code=record.get("runner_exit_code"))
             if payload.get("status") == "indeterminate":
@@ -737,8 +744,9 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
         and result.get("agent_seconds") == budget["elapsed_seconds"]
         and budget.get("slow") is (elapsed >= 420) and result.get("slow") is budget["slow"]
         and result.get("turns") == turns, "cumulative Agent budget mismatch")
-    if any(record.get("accepted") is False for record in records):
-        _require(prefix == len(records), "completed rejected-read turn omitted a Broker receipt")
+    if any(record.get("accepted") is False or is_public_query_timeout_failure(record.get("payload") or {})
+            for record in records):
+        _require(prefix == len(records), "completed terminal/rejected-read turn omitted a Broker receipt")
     if result["passed"]:
         _require(elapsed <= 600 and len(turns) == len(plan["prompts"]) and prefix == len(records),
                  "passing task exhausted budget or omitted a turn")
@@ -791,6 +799,10 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     budget = _json(root, "expansion-agent-budget.json")
     oracle = _json(root, "expansion-oracle.json")
     records = _receipts(root, plan, broker)
+    if any(is_public_query_timeout_failure(record.get("payload") or {}) for record in records):
+        _require(result["passed"] is False and broker.get("passed") is False
+            and broker.get("complete") is False and broker.get("terminal_state") == "indeterminate",
+            "query timeout is terminal infrastructure and cannot seal a PASS")
     turns = _turns(root, plan, result, budget, records, oracle)
     mutations = [row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["execute"]]
     _require(len(mutations) <= 1, "more than one execution was admitted")

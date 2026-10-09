@@ -397,8 +397,9 @@ results, plus small schema/status identifiers, through the existing Broker
 and input-builder seam. Exact request scope, returned field absence/null/empty
 values, completeness markers, event position, Broker sequence, payload and
 record digests remain bound to the pre-Execute timeline. Replaying the existing
-read admission checks adds no Wwise call. Partial results cannot establish
-complete absence; failed reads grant no factual proof. Endpoint/session,
+read admission checks adds no Wwise call. Validated ceiling-limited rows remain visible with `scope_complete=false`;
+partial results cannot establish complete absence, and failed reads grant no
+factual proof. The existing business-proof read policy is unchanged. Endpoint/session,
 continuation authority and raw transcript envelopes do not cross into review.
 The complete input retains its 128 KiB ceiling and fails closed rather than
 silently dropping acquired facts.
@@ -423,3 +424,16 @@ reviewer/producer/archive/Broker files: 391 passed, one native-Windows UNC case
 skipped. The fixed `notice-fast` gate passed 3715 with that same skip; both
 exited 0 through `ci/test.sh` and the pinned developer Python. These are fake
 developer proofs only; the combined Non-live and real/Fresh gates remain separate.
+
+The incremental review correction retains owned-project ceiling rows after
+checking their identities; malformed rows and unknown false-observation causes
+still fail closed. The exact public query timeout helper also drives archive
+terminal enforcement: later dispatch and fabricated PASS are rejected while
+an already verified transaction keeps its state. Owned-ceiling producer/archive
+contrasts and full fake timeout archives reproduce these two gaps without
+model execution, source-oracle changes or historical replay.
+
+After these review corrections, the same focused selection passed 398 with
+one native-Windows UNC skip; fixed `notice-fast` passed 3722 with the same skip.
+Both exited 0 using the pinned developer interpreter. No Non-live, Wwise or
+model execution/replay was run in this correction.
