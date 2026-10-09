@@ -1340,18 +1340,32 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
 - Reproduction: the same PowerShell read inherited CP65001 successfully, while
   `CREATE_NEW_CONSOLE` selected CP936 and reproduced the exact 39 replacements.
   Parent code-page attestation therefore does not establish child encoding.
-- Repair: formal Windows read schedules prepend the fixed
-  `WINDOWS_UTF8_READ_PREFIX` in `codex_harness.py` to each complete file read.
-  The parser admits that exact assignment only before one literal
-  `Get-Content -Raw -Encoding UTF8` call through the attested PowerShell host.
-  Complete-content checks remain mandatory; arbitrary assignments, chaining,
-  redirection and prefixed Gateway continuations remain rejected. The bounded
-  developer-instruction ceiling is 2304 bytes to hold the fixed read prologues.
-- Regression: `test_native_windows_skill_read_survives_child_cp936` forces
-  CP936 inside a fresh child, proves the unprefixed read corrupts Unicode, and
-  proves the scheduled command returns the exact text. It runs even when the
-  system-wide UTF-8 option is enabled. Native focused checks passed 84 tests;
-  macOS harness, expansion runner and archive checks passed 2644, skipped 10.
+- Initial repair `5126bcc1` tried to set `[Console]::OutputEncoding` in the
+  reading process. The real Codex shell uses ConstrainedLanguage, which rejects
+  that non-core property assignment. Source text was complete after the user's
+  system UTF-8 change, but an error prefix correctly prevented read credit.
+  The initial focused `-k utf8` selection also omitted a native test whose name
+  lacked `utf8`; neither its 84 passes nor FullLanguage probes established CLM
+  compatibility. Preserve the failed root and this attribution.
+- Repair: formal Windows read schedules use the fixed
+  `WINDOWS_UTF8_READ_PREFIX` and `WINDOWS_READ_LANGUAGE_GUARD` in
+  `codex_harness.py`. The exact System32 `chcp.com` command must succeed before
+  a fresh instance of the same attested PowerShell reads the file. This avoids
+  the parent's cached .NET output encoding. The child preserves CLM and tightens
+  FullLanguage to CLM; it never lowers the language restriction. The parser
+  admits only this literal wrapper followed by one complete UTF-8 file read.
+  Changed code pages, executable roots, language guards, command chaining,
+  redirection and wrapped Gateway continuations remain rejected. The bounded
+  developer-instruction ceiling is 3072 bytes for these fixed read wrappers.
+- Regression: `test_native_windows_utf8_skill_read_survives_child_cp936` forces
+  CP936 and covers FullLanguage/CLM parents crossed with initially ordinary/CLM
+  children. It proves the unwrapped read corrupts Unicode and the generated
+  read returns exact text with empty stderr. The four native parameterizations
+  passed explicitly, then were included in the corrected focused selection:
+  94 passed (`C:/w/waapi-clm-native-final.log`). macOS harness, expansion runner
+  and archive checks passed 2650, skipped 13. This is program proof, not a new
+  real-Wwise acceptance claim. Check the first fresh C01 separately before
+  continuing the remaining unique units on the same frozen candidate.
 - Attribution limit: an interim non-PTY C1 experiment passed one offline Fresh
   unit, but the user enabled system UTF-8 during investigation. It does not
   isolate the backend's effect or validate the final repair. The final repair

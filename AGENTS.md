@@ -428,9 +428,9 @@ blocks before the Fresh turn. Skill reads use complete UTF-8 text from the
 exact trusted file. `Get-Content -Raw -Encoding UTF8 <path>` and the equivalent
 `Get-Content -Raw <path>` UTF-8 default receive credit only through the sealed,
 profile-free PowerShell Core wrapper and complete-content comparison; legacy
-or unattested shells do not. Formal task read schedules also own a fixed UTF-8
-output prologue inside the reading child; its exact grammar admits only one
-trusted file read. See the Console encoding incident in
+or unattested shells do not. Formal task read schedules also own a closed UTF-8
+read relay that preserves ConstrainedLanguage; its exact grammar admits only
+one trusted file read. See the Console encoding incident in
 `tests/semantic/HARNESS_PITFALLS.md`. This file-read equivalence never authorizes
 reconstructing a Gateway continuation.
 

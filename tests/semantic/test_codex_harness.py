@@ -2764,7 +2764,7 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
 
     assert (
         "Get-Content -Raw -Encoding UTF8 "
-        r"'.agents\skills\waapi-skill\SKILL.md'"
+        r"''.agents\skills\waapi-skill\SKILL.md''"
     ) in instructions
     assert (
         "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
@@ -2775,7 +2775,7 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
     assert "waapi-skill-workspace\\root" not in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "
-        r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
+        r"''.agents\skills\waapi-skill\references\waapi-operate.md''"
     ) in instructions
     assert "Exact turn; no early/late/extra reads" in instructions
     assert instructions.count(codex_harness_module.WINDOWS_UTF8_READ_PREFIX) == 2
@@ -2806,7 +2806,7 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     )
 
     assert "Reads: 1" in instructions
-    assert "2 [" + codex_harness_module.WINDOWS_UTF8_READ_PREFIX + "Get-Content" in instructions
+    assert "2 [" + codex_harness_module.WINDOWS_UTF8_READ_PREFIX in instructions
     assert "3 none" in instructions
     assert "not Real64/int16" in instructions
     assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
@@ -7744,7 +7744,7 @@ def test_windows_utf8_read_prefix_preserves_exact_read_proof(tmp_path, monkeypat
     content = "# Skill\nWwise 适配版本、声音\n"
     (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
     body = r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
-    command = windows_powershell_recording(codex_harness_module.WINDOWS_UTF8_READ_PREFIX + body)
+    command = windows_powershell_recording(codex_harness_module._windows_skill_read_command("SKILL.md"))
     for output, accepted in ((content, True), (content.encode("gbk").decode("utf-8", errors="replace"), False)):
         record = completed_windows_record(command, output)
         facts = classify_commands((record,), skill_source=skill)
@@ -7768,7 +7768,9 @@ def test_windows_utf8_read_prefix_cannot_authorize_other_scripts(script):
 
 
 @pytest.mark.skipif(os.name != "nt", reason="native Windows console encoding")
-def test_native_windows_skill_read_survives_child_cp936(tmp_path):
+@pytest.mark.parametrize("language_mode", ("FullLanguage", "ConstrainedLanguage"))
+@pytest.mark.parametrize("child_already_constrained", (False, True))
+def test_native_windows_utf8_skill_read_survives_child_cp936(tmp_path, language_mode, child_already_constrained):
     from tests.semantic.test_codex_gateway_broker import native_pwsh_73_or_skip
     pwsh = native_pwsh_73_or_skip()
     skill = tmp_path / ".agents/skills/waapi-skill"
@@ -7776,21 +7778,26 @@ def test_native_windows_skill_read_survives_child_cp936(tmp_path):
     content = "# Skill\nWwise 适配版本、声音\n"
     (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
     body = r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
-    fixed = codex_harness_module.WINDOWS_UTF8_READ_PREFIX + body
+    fixed = codex_harness_module._windows_skill_read_command("SKILL.md")
     instructions = codex_harness_module.semantic_task_developer_instructions(
         TASK_LOCAL_RUNNER_WINDOWS, task_skill_source=str(skill),
         expected_skill_reads=(("SKILL.md",),),
     )
     assert fixed in instructions
+    if child_already_constrained:
+        # Exercise the guard's no-assignment branch as well as Full -> CLM.
+        fixed = fixed.replace(" -Command '", " -Command '$ExecutionContext.SessionState.LanguageMode=''ConstrainedLanguage''; ", 1)
     outputs = []
     for command in (body, fixed):
         result = subprocess.run(
             [pwsh, "-NoProfile", "-Command",
-             "[Console]::OutputEncoding=[Text.Encoding]::GetEncoding(936); " + command],
+             "[Console]::OutputEncoding=[Text.Encoding]::GetEncoding(936); "
+             + f"$ExecutionContext.SessionState.LanguageMode='{language_mode}'; " + command],
             cwd=tmp_path, capture_output=True, timeout=15, check=False,
             creationflags=subprocess.CREATE_NEW_CONSOLE,
         )
         assert result.returncode == 0, result.stderr
+        assert result.stderr == b"", result.stderr
         outputs.append(result.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n").rstrip())
     assert outputs[0] == content.rstrip().encode("gbk").decode("utf-8", errors="replace")
     assert outputs[0] != content.rstrip()
@@ -7803,3 +7810,25 @@ def test_semantic_developer_instructions_remain_bounded(tmp_path):
             workspace=tmp_path, skill_source=tmp_path / "skill", codex_binary=tmp_path / "codex",
             developer_instructions="x" * (codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES + 1),
         )
+
+
+@pytest.mark.parametrize("damage", ("missing_guard", "gateway", "append", "wrong_host", "failed_chcp", "wrong_codepage"))
+def test_windows_utf8_read_relay_rejects_changed_program(damage):
+    script = codex_harness_module._windows_skill_read_command("SKILL.md")
+    if damage == "missing_guard":
+        script = script.replace(codex_harness_module.WINDOWS_READ_LANGUAGE_GUARD.replace("'", "''"), "")
+    elif damage == "gateway":
+        script = script.replace("Get-Content -Raw -Encoding UTF8", "python run.py gateway.py execute")
+    elif damage == "append":
+        script += "; whoami"
+    elif damage == "wrong_host":
+        script = script.replace("$PSHOME", "$env:TEMP")
+    elif damage == "failed_chcp":
+        script = script.replace(" && ", "; ")
+    else:
+        script = script.replace("65001", "936")
+    argv, operators, error = parse_command_argv(
+        windows_powershell_recording(script), platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+    assert argv == () and operators and error

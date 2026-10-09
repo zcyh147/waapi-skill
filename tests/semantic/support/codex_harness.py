@@ -46,9 +46,16 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
-SEMANTIC_DEVELOPER_MAX_BYTES = 2304
+SEMANTIC_DEVELOPER_MAX_BYTES = 3072
 WINDOWS_UTF8_CODE_PAGE = 65001
-WINDOWS_UTF8_READ_PREFIX = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; "
+WINDOWS_UTF8_READ_PREFIX = (
+    r"& $env:SystemRoot\System32\chcp.com 65001 >$null && "
+    r"& $PSHOME\pwsh.exe -NoProfile -Command "
+)
+WINDOWS_READ_LANGUAGE_GUARD = (
+    "if($ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage')"
+    "{$ExecutionContext.SessionState.LanguageMode='ConstrainedLanguage'}; "
+)
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "First read SKILL.md once, standalone; no pre-read reply/questions. "
     "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
@@ -128,6 +135,15 @@ def semantic_skill_bootstrap_developer_instructions(
     )
 
 
+def _windows_skill_read_command(relative: str) -> str:
+    if relative not in _ALLOWED_SKILL_READS:
+        raise CodexHarnessError("Windows Skill read path is not closed")
+    relative_windows = relative.replace("/", "\\")
+    inner = (WINDOWS_READ_LANGUAGE_GUARD + "Get-Content -Raw -Encoding UTF8 "
+             + f"'.agents\\skills\\waapi-skill\\{relative_windows}'")
+    return WINDOWS_UTF8_READ_PREFIX + "'" + inner.replace("'", "''") + "'"
+
+
 def semantic_task_developer_instructions(
     runner_path: str | Path,
     *,
@@ -171,11 +187,7 @@ def semantic_task_developer_instructions(
         commands: list[str] = []
         for relative in reads:
             if is_windows:
-                relative_windows = relative.replace("/", "\\")
-                commands.append(
-                    WINDOWS_UTF8_READ_PREFIX + "Get-Content -Raw -Encoding UTF8 "
-                    f"'.agents\\skills\\waapi-skill\\{relative_windows}'"
-                )
+                commands.append(_windows_skill_read_command(relative))
             else:
                 path = PurePosixPath(".agents/skills/waapi-skill").joinpath(
                     *PurePosixPath(relative).parts
@@ -4515,10 +4527,14 @@ def _parse_windows_powershell_core_command_wrapper(
         return (), True, "PowerShell Core wrapper executable is not the attested host"
     script = outer_argv[3]
     if script.startswith(WINDOWS_UTF8_READ_PREFIX):
-        # Only this fixed encoding assignment followed by one closed UTF-8
-        # file read is admitted. It never applies to Gateway continuations.
+        # The native code-page command must succeed before a fresh instance
+        # of the same attested pwsh reads the file. The child preserves CLM,
+        # and tightens FullLanguage to CLM; no language restriction is lifted.
         try:
-            argv = _split_literal_powershell_argv(script[len(WINDOWS_UTF8_READ_PREFIX):])
+            nested = _split_literal_powershell_argv(script[len(WINDOWS_UTF8_READ_PREFIX):])
+            if len(nested) != 1 or not nested[0].startswith(WINDOWS_READ_LANGUAGE_GUARD):
+                return (), True, "UTF-8 read relay requires its exact language guard"
+            argv = _split_literal_powershell_argv(nested[0][len(WINDOWS_READ_LANGUAGE_GUARD):])
         except ValueError as exc:
             return (), True, str(exc)
         if len(argv) != 5 or argv[:4] != ("Get-Content", "-Raw", "-Encoding", "UTF8"):
