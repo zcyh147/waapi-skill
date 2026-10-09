@@ -62,6 +62,11 @@ legacy grades and original negative fixtures remain immutable. Named versioned
 tests and an explicit semantic rationale own prospective expectation changes.
 Retain legacy deterministic replay behavior for legacy records.
 
+Both review admission paths use Gateway-owned `validate_transaction_id`: compact
+IDs contain exactly 20 lowercase Crockford Base32 characters after `tx1-`; safe
+legacy IDs retain the public Gateway contract. Identity is never coerced or
+normalized. Exact transaction, Preview and timeline bindings remain mandatory.
+
 ## Bounded implementation and dependencies
 
 | Ticket | Parent / dependency | Completion boundary |

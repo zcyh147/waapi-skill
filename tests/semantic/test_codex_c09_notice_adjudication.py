@@ -125,7 +125,7 @@ def test_archive_notice_gate_requires_receipt_only_for_review_required_and_check
     assert replay_c09_notice(tmp_path, result, commands, other_gates={'authorization': False}, expected_runtime={}, **kwargs) is False
 
 
-def sealed_c09_archive(root, monkeypatch, damage=None):
+def sealed_c09_archive(root, monkeypatch, damage=None, transaction_id=None):
     """Adapt the existing complete fake archive fixture, with a separate C09 oracle."""
     import shlex
     import shutil
@@ -167,7 +167,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None):
         notice_adjudication={'configuration': review.reviewer_configuration(), 'runtime': runtime})
     digest = canonical_digest(plan)
     _write(root / 'expansion-plan.json', {**plan, 'sha256': digest})
-    tx = 'tx1-00000000000000000001'
+    tx = transaction_id or 'tx1-00000000000000000001'
     shutil.rmtree(root / 'broker/state')  # disposable fake fixture only
     store = TransactionStore(root / 'broker/state')
     store.create_preview(tx, artifact)
@@ -178,20 +178,23 @@ def sealed_c09_archive(root, monkeypatch, damage=None):
     store.record_verification(tx, outcome='verified')
     oracle = json.loads((root / 'expansion-oracle.json').read_text())
     artifact_hash = canonical_digest(artifact)
-    oracle.update(before=before, after=after, preview_before=before, preview_after=before,
+    oracle.update(transaction_id=tx, before=before, after=after, preview_before=before, preview_after=before,
         assertions=assertions, artifact_hash=artifact_hash, gateway_verification_state='verified')
     oracle['permit']['artifact_sha256'] = artifact_hash
+    oracle['permit']['transaction_id'] = tx
     _write(root / 'expansion-oracle.json', oracle)
     broker = json.loads((root / 'expansion-broker.json').read_text())
     directory = root / 'turns/turn-01'
     events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
     for record in broker['records']:
         argv = record['gateway_arguments']
+        argv[:] = [tx if value == 'tx1-00000000000000000001' else value for value in argv]
         if argv[0] == 'draft-start': argv[1] = 'object.createPlugin'
         model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
         semantic = ['runner-owned-version', '2025.1', *argv]
         if '--expected-revision' in argv: semantic[-1] = 1
         payload = record['payload']
+        if 'transaction_id' in payload: payload['transaction_id'] = tx
         if 'artifact_hash' in payload: payload['artifact_hash'] = artifact_hash
         if argv[0] == 'verify': payload['state'] = 'verified'
         record.update(model_argv=model, normalized_model_argv=model, raw_argv_sha256=canonical_digest(model),
@@ -497,3 +500,83 @@ def test_bounded_subprocess_preserves_valid_UTF8_and_CRLF_bytes(tmp_path):
     assert result.exit_status == result.process_exit_status == 0
     assert result.output_decoding_error is None
     assert result.stdout.encode('utf-8') == base64.b64decode(result.stdout_base64) == raw
+
+
+@pytest.mark.parametrize('contract', ['c09', 'expansion'])
+def test_gateway_generated_nonhex_identity_reaches_review_and_readonly_archive(tmp_path, monkeypatch, contract):
+    from wwise_waapi import transactions
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
+
+    monkeypatch.setattr(transactions.secrets, 'randbits', lambda bits: (1 << bits) - 1)
+    tx = transactions.new_transaction_id()
+    assert tx == 'tx1-zzzzzzzzzzzzzzzzzzzz'
+    if contract == 'c09':
+        sealed_c09_archive(tmp_path, monkeypatch, transaction_id=tx)
+    else:
+        sealed_workflow(tmp_path, monkeypatch, 'C09', '2025.1', transaction_id=tx)
+    preview = transactions.TransactionStore(tmp_path / 'broker/state').load_preview(tx)
+    receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert receipt['input']['transaction_id'] == preview.transaction_id == tx
+    assert receipt['input']['preview_sha256'] == preview.artifact_hash
+    before = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('rejudgment')))
+    replay = verify_expansion_task_archive(tmp_path, expected_unit_id='EXP25-C09',
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert replay['business_pass'] is True
+    assert before == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+@pytest.mark.parametrize('contract', ['c09', 'expansion'])
+def test_notice_review_rejects_malformed_transaction_id_before_reviewer(tmp_path, monkeypatch, contract):
+    from wwise_waapi.transactions import TransactionStore, UnsafeTransactionId
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice
+    from tests.semantic.support.codex_harness import completed_command_records
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
+
+    if contract == 'c09':
+        sealed_c09_archive(tmp_path, monkeypatch)
+    else:
+        sealed_workflow(tmp_path, monkeypatch, 'C09', '2025.1')
+    plan = json.loads((tmp_path / 'expansion-plan.json').read_text())
+    artifact = TransactionStore(tmp_path / 'broker/state').load_preview('tx1-00000000000000000001').artifact
+    stdout = (tmp_path / 'turns/turn-01/events.jsonl').read_text()
+    commands = completed_command_records([json.loads(line) for line in stdout.splitlines()], platform_name='posix')
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('reviewer called')))
+    grader = review.grade_c09_notice if contract == 'c09' else grade_expansion_notice
+    kwargs = {} if contract == 'c09' else {'case_id': 'C09', 'preview_parameters': plan['preview_parameters']}
+    invalid_ids = [
+        'tx1-' + 'z' * 19, 'tx1-' + 'z' * 21, 'tx1-' + 'Z' * 20,
+        *['tx1-' + letter + '0' * 19 for letter in 'ilou'],
+        'tx1-' + '0' * 19 + '/', '../transaction', 'legacy/transaction',
+        'legacy\\transaction', 'legacy transaction', 'tx1-' + '0' * 20 + '\n',
+        '', None, 42,
+    ]
+    for index, transaction_id in enumerate(invalid_ids):
+        with pytest.raises(UnsafeTransactionId):
+            grader(SimpleNamespace(stdout=stdout), commands, version='2025.1', execute_expected=True,
+                preview_artifact=artifact, before_snapshot=plan['before'], user_prompt=plan['prompts'][0],
+                transaction_id=transaction_id, other_gates={'authorization': True},
+                root=tmp_path / f'rejected-{index}', options=None, **kwargs)
+        assert not (tmp_path / f'rejected-{index}/notice-review').exists()
+
+
+@pytest.mark.parametrize('contract', ['c09', 'expansion'])
+def test_gateway_legacy_identity_preserves_review_and_archive_binding(tmp_path, monkeypatch, contract):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
+
+    tx = 'legacy-transaction_01.record'
+    if contract == 'c09':
+        sealed_c09_archive(tmp_path, monkeypatch, transaction_id=tx)
+    else:
+        sealed_workflow(tmp_path, monkeypatch, 'C09', '2025.1', transaction_id=tx)
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('rejudgment')))
+    before = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    replay = verify_expansion_task_archive(tmp_path, expected_unit_id='EXP25-C09',
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert replay['business_pass'] is True
+    assert before == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}

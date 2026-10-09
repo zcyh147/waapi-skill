@@ -263,7 +263,7 @@ def case_facts(case_id, version='2025.1'):
     return artifact, before, after, parameters, oracle, notice
 
 
-def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None, text=None):
+def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None, text=None, transaction_id=None):
     """Complete real-TransactionStore fixture through runner grade and archive."""
     import hashlib
     import importlib
@@ -313,7 +313,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     _write(root / 'expansion-plan.json', {**plan, 'sha256': digest})
     shutil.rmtree(root / 'broker/state')  # only the disposable fixture above
     store = TransactionStore(root / 'broker/state')
-    tx = 'tx1-00000000000000000001'
+    tx = transaction_id or 'tx1-00000000000000000001'
     preview = store.create_preview(tx, artifact)
     token = None
     if ask:
@@ -328,10 +328,10 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     store.record_verification(tx, outcome=state)
     artifact_hash = canonical_digest(artifact)
     oracle = json.loads((root / 'expansion-oracle.json').read_text())
-    oracle.update(before=before, after=after, preview_before=before, preview_after=before, assertions=assertions,
+    oracle.update(transaction_id=tx, before=before, after=after, preview_before=before, preview_after=before, assertions=assertions,
         artifact_hash=artifact_hash, gateway_verification_state=state, authorization={'mode': 'explicit_confirmation' if ask else 'policy_authorization',
             'explicit_confirmation': ask, 'authority': 'caller_asserted_current_user_change_request'})
-    oracle['permit'].update(artifact_sha256=artifact_hash, authorized_turn=2 if ask else 1)
+    oracle['permit'].update(transaction_id=tx, artifact_sha256=artifact_hash, authorized_turn=2 if ask else 1)
     _write(root / 'expansion-oracle.json', oracle)
     original = json.loads((root / 'expansion-broker.json').read_text())['records']
     args = [['draft-start', plan['request_schema_uri'] or plan['operation']],

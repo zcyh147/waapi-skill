@@ -278,7 +278,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
 
 def grade_expansion_notice(result, command_records, *, other_gates, root, options, **kwargs):
     from pathlib import Path
-    import re
+    from wwise_waapi.transactions import validate_transaction_id
     from tests.semantic.support.codex_c09_notice_adjudication import review_c09_notice, verify_c09_review_receipt, _decode
     decision = decide_expansion_notice(result, command_records, **kwargs)
     root = Path(root)
@@ -287,8 +287,7 @@ def grade_expansion_notice(result, command_records, *, other_gates, root, option
     hard_passed = bool(other_gates) and all(value is True for value in other_gates.values())
     passed, receipt = decision['outcome'] == 'accepted', None
     if decision['outcome'] == 'review_required' and hard_passed:
-        if not re.fullmatch(r'tx1-[a-f0-9]{20}', str(decision['input']['transaction_id'])):
-            raise ValueError('independent review requires exact transaction identity')
+        validate_transaction_id(decision['input']['transaction_id'])
         receipt = review_c09_notice(decision, root=root / 'notice-review', options=options)
         binding = _decode((root / 'notice-review/invocation-binding.json').read_text(encoding='utf-8'))
         passed = verify_c09_review_receipt(receipt, decision=decision, expected_binding=binding)

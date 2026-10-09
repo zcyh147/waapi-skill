@@ -13,6 +13,8 @@ import json
 import re
 from typing import Any, Mapping, Sequence
 
+from wwise_waapi.transactions import validate_transaction_id
+
 from tests.semantic.support.codex_expansion_policy import canonical_digest
 from tests.semantic.support.codex_harness import normalized_gateway_command_argv, parse_jsonl_events
 
@@ -460,8 +462,7 @@ def grade_c09_notice(result: Any, command_records: Sequence[Any], *, other_gates
     passed = decision['outcome'] == 'accepted'
     receipt = None
     if decision['outcome'] == 'review_required' and other_gates and all(value is True for value in other_gates.values()):
-        if not re.fullmatch(r'tx1-[a-f0-9]{20}', str(decision['input']['transaction_id'])):
-            raise ValueError('independent review requires exact transaction identity')
+        validate_transaction_id(decision['input']['transaction_id'])
         receipt = review_c09_notice(decision, root=Path(root) / 'notice-review', options=options)
         binding = _decode((Path(root) / 'notice-review/invocation-binding.json').read_text(encoding='utf-8'))
         passed = verify_c09_review_receipt(receipt, decision=decision, expected_binding=binding)
