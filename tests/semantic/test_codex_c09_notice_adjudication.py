@@ -62,7 +62,7 @@ def grounded_judgment(review_input, verdict='accepted'):
 
 def test_independent_reviewer_receipt_replays_without_model_and_rejects_tampering(tmp_path, monkeypatch):
     from tests.semantic.support import codex_c09_notice_adjudication as review
-    from tests.semantic.support.codex_harness import ProcessResult
+    from tests.semantic.support.codex_harness import BoundedProcessResult as ProcessResult
     result, commands, fixture = witness()
     decision = review.decide_c09_notice(result, commands, version='2025.1', execute_expected=True,
         preview_artifact=fixture['preview_artifact'], before_snapshot=fixture['before_snapshot'])
@@ -93,12 +93,12 @@ def test_independent_reviewer_receipt_replays_without_model_and_rejects_tamperin
     receipt = review.review_c09_notice(decision, root=tmp_path / 'review', options=options)
     assert receipt['outcome'] == 'accepted'
     assert receipt['usage'] == {'input_tokens': 100, 'output_tokens': 50}
-    assert review.verify_c09_review_receipt(receipt, decision=decision) is True
+    assert review.verify_c09_review_receipt(receipt, decision=decision, expected_binding=json.loads((tmp_path / 'review/invocation-binding.json').read_text())) is True
     assert len(calls) == 4  # two CLI probes, one prompt audit, one model turn
     receipt['input']['visible_messages'][-1]['text'] += 'tampered'
     import pytest
     with pytest.raises(ValueError, match='receipt'):
-        review.verify_c09_review_receipt(receipt, decision=decision)
+        review.verify_c09_review_receipt(receipt, decision=decision, expected_binding=json.loads((tmp_path / 'review/invocation-binding.json').read_text()))
 
 
 def test_task_gate_never_invokes_reviewer_to_rescue_a_hard_failure(tmp_path, monkeypatch):
@@ -135,7 +135,7 @@ def sealed_c09_archive(root, monkeypatch, damage=None):
     from tests.semantic.test_codex_expansion_archive import _sealed_c08, _write, INPUTS
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     from tests.semantic.support.codex_expansion_effects_case import verify_c09, C09_ASSERTIONS
-    from tests.semantic.support.codex_harness import completed_command_records, ProcessResult
+    from tests.semantic.support.codex_harness import completed_command_records, BoundedProcessResult as ProcessResult
     from tests.semantic.support import codex_c09_notice_adjudication as review
     from wwise_waapi.transactions import TransactionStore
     _sealed_c08(root)
@@ -240,12 +240,23 @@ def sealed_c09_archive(root, monkeypatch, damage=None):
             {'type': 'turn.completed', 'usage': {'input_tokens': 50, 'output_tokens': 30}}]
         if damage == 'tool_use': events.insert(2, {'type': 'item.completed', 'item': {'type': 'mcp_tool_call'}})
         if damage == 'truncated': events.pop()
-        return ProcessResult(0, '\n'.join(json.dumps(event) for event in events), '', .01)
+        stdout = '\n'.join(json.dumps(event) for event in events)
+        if damage == 'invalid_utf8':
+            from tests.semantic.support.codex_harness import run_process
+            raw = stdout.encode('utf-8').replace(b'accepted', b'ac\xffcepted')
+            return run_process([sys.executable, '-c',
+                'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))', raw.hex()], **kwargs)
+        return ProcessResult(0, stdout, '', .01)
     monkeypatch.setattr(review, 'run_process', process)
     graded = review.grade_c09_notice(SimpleNamespace(stdout=(directory / 'events.jsonl').read_text()), commands,
         version='2025.1', execute_expected=True, preview_artifact=artifact, before_snapshot=before,
         transaction_id=tx, user_prompt=plan['prompts'][0], other_gates={'authorization': True}, root=directory, options=options)
     assert graded['passed'] is (damage is None)
+    budget = json.loads((root / 'expansion-agent-budget.json').read_text())
+    for row in (budget['turns'][0], result['turns'][0]):
+        row['notice_invocation_binding_sha256'] = graded['invocation_binding_sha256']
+    _write(root / 'expansion-agent-budget.json', budget)
+    _write(root / 'expansion-task-result.json', result)
     return root
 
 
@@ -352,3 +363,137 @@ def test_explicit_material_C09_contradictions_cannot_become_review_required(clai
     decision = decide_c09_notice(result, commands, version='2025.1', execute_expected=True,
         preview_artifact=fixture['preview_artifact'], before_snapshot=fixture['before_snapshot'])
     assert decision['outcome'] == 'material_reject'
+
+
+@pytest.mark.parametrize('change', ['model', 'effort', 'tier', 'sandbox', 'network', 'schema', 'enabled_shell', 'duplicate_model', 'audit_model', 'audit_override'])
+def test_complete_C09_archive_rejects_changed_effective_reviewer_settings(tmp_path, monkeypatch, change):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    root = sealed_c09_archive(tmp_path, monkeypatch)
+    path = root / 'turns/turn-01/notice-review/receipt.json'
+    receipt = json.loads(path.read_text())
+    command = receipt['invocation']
+    if change == 'model': command[command.index('--model') + 1] = 'different-model'
+    elif change == 'effort': command[command.index('model_reasoning_effort="medium"')] = 'model_reasoning_effort="high"'
+    elif change == 'tier': command[command.index('service_tier="default"')] = 'service_tier="priority"'
+    elif change == 'sandbox': command[command.index('--sandbox') + 1] = 'danger-full-access'; command.insert(-1, 'read-only')
+    elif change == 'network': command[command.index('sandbox_workspace_write.network_access=false')] = 'sandbox_workspace_write.network_access=true'
+    elif change == 'schema': command[command.index('--output-schema') + 1] = '/tmp/unrelated-schema.json'
+    elif change == 'enabled_shell': command[-1:-1] = ['--enable', 'shell_tool']
+    elif change == 'duplicate_model': command[-1:-1] = ['--model', 'gpt-6.1-sol']
+    elif change == 'audit_model':
+        audit = receipt['audit_command']
+        audit[audit.index('model="gpt-6.1-sol"')] = 'model="different-model"'
+    elif change == 'audit_override': receipt['audit_command'][-1:-1] = ['-c', 'features.shell_tool=true']
+    receipt['sha256'] = canonical_digest({key: value for key, value in receipt.items() if key != 'sha256'})
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ExpansionArchiveError, match='invocation'):
+        verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
+
+
+@pytest.mark.parametrize('change', ['schema_content', 'configuration', 'decision', 'runtime', 'workspace', 'missing'])
+def test_complete_C09_archive_rejects_rewritten_binding_and_receipt(tmp_path, monkeypatch, change):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    root = sealed_c09_archive(tmp_path, monkeypatch)
+    directory = root / 'turns/turn-01/notice-review'
+    path = directory / 'invocation-binding.json'
+    binding = json.loads(path.read_text())
+    receipt_path = directory / 'receipt.json'
+    receipt = json.loads(receipt_path.read_text())
+    if change == 'missing': path.unlink()
+    else:
+        if change == 'schema_content': binding['schema_utf8'] = '{}'
+        elif change == 'configuration': binding['configuration']['model'] = 'different-model'
+        elif change == 'decision': binding['decision_sha256'] = 'e' * 64
+        elif change == 'runtime': binding['runtime']['codex_sha256'] = 'e' * 64
+        elif change == 'workspace':
+            binding['context']['workspace'] += '-other'
+            binding['context']['schema'] = str(Path(binding['context']['workspace']) / 'judgment-schema.json')
+        binding['sha256'] = canonical_digest({k: v for k, v in binding.items() if k != 'sha256'})
+        receipt['invocation_binding_sha256'] = binding['sha256']
+        receipt['sha256'] = canonical_digest({k: v for k, v in receipt.items() if k != 'sha256'})
+        path.write_text(json.dumps(binding))
+        receipt_path.write_text(json.dumps(receipt))
+    with pytest.raises(ExpansionArchiveError):
+        verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
+
+
+@pytest.mark.parametrize('stream', ['stdout', 'stderr'])
+def test_bounded_subprocess_invalid_UTF8_is_explicit_failure_with_exact_raw_evidence(tmp_path, stream):
+    import base64
+    import os
+    import sys
+    from tests.semantic.support.codex_harness import run_process
+    result = run_process([sys.executable, '-c', 'import sys; getattr(sys, sys.argv[1]).buffer.write(b"ac\\xffcepted")', stream],
+        cwd=tmp_path, env=os.environ, timeout=2, max_output_bytes=4096)
+    assert result.exit_status != 0
+    assert stream in result.output_decoding_error
+    assert base64.b64decode(getattr(result, stream + '_base64')) == b'ac\xffcepted'
+    assert getattr(result, stream) != 'accepted'
+
+
+def test_damaged_UTF8_never_passes_live_C09_gate_or_complete_archive(tmp_path, monkeypatch):
+    import base64
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    root = sealed_c09_archive(tmp_path, monkeypatch, damage='invalid_utf8')
+    receipt = json.loads((root / 'turns/turn-01/notice-review/receipt.json').read_text())
+    assert receipt['outcome'] == 'review_required' and receipt['judgment'] is None
+    assert receipt['execution']['exit_status'] == 126
+    assert receipt['execution']['process_exit_status'] == 0
+    assert receipt['execution']['output_decoding_error'] is not None
+    assert b'ac\xffcepted' in base64.b64decode(receipt['execution']['stdout_base64'])
+    with pytest.raises(ExpansionArchiveError):
+        verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
+
+
+def test_receipt_cannot_repair_damaged_original_bytes_into_accepted_judgment(tmp_path, monkeypatch):
+    import base64
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    root = sealed_c09_archive(tmp_path, monkeypatch, damage='invalid_utf8')
+    path = root / 'turns/turn-01/notice-review/receipt.json'
+    receipt = json.loads(path.read_text())
+    # Reproduce the old lossy repair as an attempted receipt rewrite, keeping
+    # the independently recorded original raw byte stream.
+    repaired = base64.b64decode(receipt['execution']['stdout_base64']).decode('utf-8', 'ignore')
+    events = [json.loads(line) for line in repaired.splitlines()]
+    receipt.update(outcome='accepted', error=None, stdout=repaired,
+        judgment=json.loads(events[-2]['item']['text']), usage=events[-1]['usage'])
+    receipt['execution'].update(exit_status=0, output_decoding_error=None, stdout=repaired)
+    receipt['sha256'] = canonical_digest({k: v for k, v in receipt.items() if k != 'sha256'})
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ExpansionArchiveError):
+        verify_expansion_task_archive(root, expected_unit_id='EXP25-C09', expected_version='2025.1', expected_inputs_sha256='a' * 64)
+
+
+def test_bounded_invalid_UTF8_timeout_still_reaps_the_actual_process(tmp_path):
+    import base64
+    import os
+    import sys
+    from tests.semantic.support.codex_harness import run_process
+    pid_file = tmp_path / 'owned-pid.txt'
+    result = run_process([sys.executable, '-c',
+        'import os,pathlib,sys,time; pathlib.Path(sys.argv[1]).write_text(str(os.getpid())); '
+        'sys.stdout.buffer.write(b"ac\\xffcepted"); sys.stdout.buffer.flush(); time.sleep(60)', str(pid_file)],
+        cwd=tmp_path, env=os.environ, timeout=.5, max_output_bytes=4096)
+    assert result.exit_status == 124 and result.timed_out
+    assert result.output_decoding_error is not None
+    assert base64.b64decode(result.stdout_base64) == b'ac\xffcepted'
+    if os.name != 'nt':
+        with pytest.raises(ProcessLookupError):
+            os.kill(int(pid_file.read_text()), 0)
+
+
+def test_bounded_subprocess_preserves_valid_UTF8_and_CRLF_bytes(tmp_path):
+    import base64
+    import os
+    import sys
+    from tests.semantic.support.codex_harness import run_process
+    raw = '有效的中文\r\n'.encode('utf-8')
+    result = run_process([sys.executable, '-c',
+        'import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))', raw.hex()],
+        cwd=tmp_path, env=os.environ, timeout=2, max_output_bytes=4096)
+    assert result.exit_status == result.process_exit_status == 0
+    assert result.output_decoding_error is None
+    assert result.stdout.encode('utf-8') == base64.b64decode(result.stdout_base64) == raw

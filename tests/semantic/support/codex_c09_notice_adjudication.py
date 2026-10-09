@@ -6,7 +6,9 @@ rewriting by the owner of that root. Legacy notice parsing remains unchanged.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
+import os
 import json
 import re
 from typing import Any, Mapping, Sequence
@@ -229,8 +231,65 @@ def _capabilities(rows: Any) -> None:
         raise ValueError('reviewer CLI lacks required attested flags/features')
 
 
+def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[list[str], list[str]]:
+    """Render exact argv from fixed settings and separately sealed host locators."""
+    context = binding.get('context', {})
+    if (binding.get('configuration') != reviewer_configuration()
+            or binding.get('schema_utf8') != json.dumps(JUDGMENT_SCHEMA)
+            or not isinstance(context, dict) or set(context) != {'binary', 'workspace', 'schema', 'platform_name', 'disabled_user_skill_paths'}
+            or context['platform_name'] != os.name):
+        raise ValueError('review invocation binding configuration/schema/host mismatch')
+    for key in ('binary', 'workspace', 'schema'):
+        value = context[key]
+        if not isinstance(value, str) or not value or '\x00' in value or not Path(value).is_absolute():
+            raise ValueError('review invocation binding has invalid host locator')
+    workspace = Path(context['workspace'])
+    if context['schema'] != str(workspace / 'judgment-schema.json'):
+        raise ValueError('review invocation schema locator differs from owned workspace')
+    paths = context['disabled_user_skill_paths']
+    if (not isinstance(paths, list) or len(paths) != len(set(paths))
+            or any(not isinstance(value, str) or '\x00' in value or not Path(value).is_absolute()
+                or Path(value).name != 'SKILL.md' for value in paths)):
+        raise ValueError('review invocation binding has invalid disabled Skill identities')
+    # No discovery or filesystem resolution during replay. These paths were
+    # already normalized by the live HarnessConfig before this artifact sealed.
+    config = CodexHarnessConfig(workspace=workspace, skill_source=workspace,
+        codex_binary=Path(context['binary']), disabled_user_skill_paths=(),
+        model='gpt-6.1-sol', reasoning_effort='medium', service_tier='default',
+        timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
+        network_access=False, developer_instructions=RUBRIC)
+    audit = build_prompt_audit_command(config, prompt=prompt)
+    execution = build_exec_command(config, prompt=prompt, writable_dir=workspace)
+    if paths:
+        rows = ','.join('{path=' + json.dumps(value) + ',enabled=false}' for value in paths)
+        override = ['-c', 'skills.config=[' + rows + ']']
+        for command in (audit, execution):
+            position = command.index('developer_instructions=' + json.dumps(RUBRIC)) - 1
+            command[position:position] = override
+    execution[-1:-1] = ['--ignore-rules', '--output-schema', context['schema']]
+    return _disable(audit), _disable(execution)
+
+
+def _validate_bounded_output(result: Mapping[str, Any]) -> None:
+    """Validate exact UTF-8 streams before any positive review replay."""
+    if (result.get('output_decoding_error') is not None or result.get('exit_status') != 0
+            or result.get('process_exit_status') != 0 or result.get('timed_out') is not False):
+        raise ValueError('review invocation output is incomplete or invalid UTF-8')
+    total = 0
+    for label in ('stdout', 'stderr'):
+        encoded = result.get(label + '_base64')
+        if not isinstance(encoded, str) or len(encoded) > 4 * ((OUTPUT_MAX_BYTES + 2) // 3):
+            raise ValueError('review raw output exceeds byte bound')
+        raw = base64.b64decode(encoded, validate=True)
+        total += len(raw)
+        if raw.decode('utf-8', 'strict') != result.get(label):
+            raise ValueError('review raw bytes differ from decoded output')
+    if total > OUTPUT_MAX_BYTES:
+        raise ValueError('review raw output exceeds byte bound')
+
+
 def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) -> dict[str, Any]:
-    """One isolated model turn; the two subprocess calls are audit then review."""
+    """One isolated model turn after CLI probes and one prompt audit."""
     if decision.get('outcome') != 'review_required':
         raise ValueError('only review-required C09 evidence can enter independent review')
     root = Path(root)
@@ -243,9 +302,9 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
     receipt = {'contract': CONTRACT, 'input': review_input, 'configuration': configuration,
         'prompt_sha256': hashlib.sha256(prompt.encode('utf-8')).hexdigest(), 'rubric': RUBRIC,
         'runtime': reviewer_runtime_identity(options),
-        'invocation': None, 'audit_command': None, 'capabilities': None,
+        'invocation': None, 'audit_command': None, 'capabilities': None, 'invocation_binding_sha256': None,
         'outcome': 'review_required', 'judgment': None, 'usage': {}, 'audit_stdout': '',
-        'stdout': '', 'stderr': '', 'execution': None, 'isolation': None, 'error': None}
+        'stdout': '', 'stderr': '', 'audit_execution': None, 'execution': None, 'isolation': None, 'error': None}
     started = time.monotonic()
     try:
         with tempfile.TemporaryDirectory(prefix='waapi-notice-review-') as workspace_text:
@@ -258,7 +317,16 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
                 network_access=False, developer_instructions=RUBRIC,
                 windows_powershell_core_host=options.windows_powershell_core_host)
-            audit_command = _disable(build_prompt_audit_command(config, prompt=prompt))
+            binding = {'contract': 'waapi-skill.c09-review-invocation/v1',
+                'configuration': configuration, 'runtime': receipt['runtime'],
+                'decision_sha256': canonical_digest(decision), 'schema_utf8': schema.read_text(encoding='utf-8'),
+                'context': {'binary': str(options.codex_binary), 'workspace': str(workspace),
+                    'schema': str(schema), 'platform_name': os.name,
+                    'disabled_user_skill_paths': [str(path) for path in config.disabled_user_skill_paths]}}
+            binding['sha256'] = canonical_digest(binding)
+            (root / 'invocation-binding.json').write_text(json.dumps(binding, ensure_ascii=False, indent=2), encoding='utf-8')
+            receipt['invocation_binding_sha256'] = binding['sha256']
+            audit_command, command = _review_invocations(binding, prompt=prompt)
             with isolated_codex_environment(options.auth_json) as env:
                 env = codex_process_environment(options.codex_binary, env,
                     powershell_core_host=options.windows_powershell_core_host)
@@ -279,8 +347,8 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 audited = run_process(audit_command, cwd=workspace, env=env,
                     timeout=min(30, TIMEOUT_SECONDS - (time.monotonic() - started)), max_output_bytes=OUTPUT_MAX_BYTES)
                 receipt['audit_stdout'] = audited.stdout
-                if audited.exit_status or audited.timed_out:
-                    raise ValueError('reviewer prompt audit unavailable')
+                receipt['audit_execution'] = asdict(audited)
+                _validate_bounded_output(asdict(audited))
                 audit = audit_prompt_input_payload(_decode(audited.stdout), expected_developer_instructions=RUBRIC)
                 if audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact:
                     raise ValueError('reviewer prompt contains executor memory or skills')
@@ -291,15 +359,12 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 isolation = inspect_isolated_environment(env, auth_json=options.auth_json)
                 if not isolation.passed or isolation.broker_environment_keys:
                     raise ValueError('reviewer environment is not isolated')
-                command = _disable(build_exec_command(config, prompt=prompt, writable_dir=workspace))
-                command[-1:-1] = ['--ignore-rules', '--output-schema', str(schema)]
                 receipt['invocation'] = command
                 completed = run_process(command, cwd=workspace, env=env,
                     timeout=TIMEOUT_SECONDS - (time.monotonic() - started), max_output_bytes=OUTPUT_MAX_BYTES)
                 receipt.update(stdout=completed.stdout, stderr=completed.stderr,
                     execution=asdict(completed), isolation={'passed': isolation.passed, 'broker_environment_keys': []})
-                if completed.exit_status or completed.timed_out:
-                    raise ValueError('reviewer unavailable, timed out or output truncated')
+                _validate_bounded_output(asdict(completed))
                 judgment, usage = _judgment(completed.stdout, review_input)
                 receipt.update(judgment=judgment, outcome=judgment['outcome'], usage=usage)
     except Exception as exc:
@@ -310,7 +375,7 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
     return receipt
 
 
-def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[str, Any], expected_runtime: Mapping[str, str] | None = None) -> bool:
+def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[str, Any], expected_runtime: Mapping[str, str] | None = None, expected_binding: Mapping[str, Any] | None = None) -> bool:
     """Read-only binding validation. No model call and no deterministic grade rescue."""
     if decision.get('outcome') != 'review_required':
         raise ValueError('receipt cannot override deterministic notice decision')
@@ -336,20 +401,23 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
     if not isinstance(receipt.get('audit_stdout'), str) or len(receipt['audit_stdout'].encode('utf-8')) > OUTPUT_MAX_BYTES:
         raise ValueError('review receipt prompt audit exceeds bound')
     _capabilities(receipt.get('capabilities'))
-    invocation = receipt.get('invocation')
-    audit_command = receipt.get('audit_command')
-    if (not isinstance(invocation, list) or not isinstance(audit_command, list)
-            or not all(isinstance(part, str) for part in invocation + audit_command)
-            or not invocation or not audit_command or invocation[-1] != prompt or audit_command[-1] != prompt
-            or invocation[0] != audit_command[0] or invocation[0] != receipt['capabilities'][0]['command'][0]
-            or '--ephemeral' not in invocation or '--output-schema' not in invocation
-            or '--ignore-user-config' not in invocation or '--ignore-rules' not in invocation
-            or 'read-only' not in invocation
-            or any(not any(a == '--disable' and b == feature for a, b in zip(command, command[1:]))
-                for command in (invocation, audit_command) for feature in DISABLED_FEATURES)):
-        raise ValueError('review receipt lacks independent invocation provenance')
+    if (not isinstance(expected_binding, Mapping)
+            or expected_binding.get('contract') != 'waapi-skill.c09-review-invocation/v1'
+            or expected_binding.get('sha256') != canonical_digest({key: value for key, value in expected_binding.items() if key != 'sha256'})
+            or expected_binding['sha256'] != receipt.get('invocation_binding_sha256')
+            or expected_binding.get('decision_sha256') != canonical_digest(decision)
+            or expected_binding.get('runtime') != receipt['runtime']):
+        raise ValueError('review receipt lacks trusted invocation binding')
+    audit_command, invocation = _review_invocations(expected_binding, prompt=prompt)
+    if (receipt.get('audit_command') != audit_command or receipt.get('invocation') != invocation
+            or invocation[0] != receipt['capabilities'][0]['command'][0]):
+        raise ValueError('review receipt differs from canonical invocation')
+    _validate_bounded_output(receipt.get('audit_execution') or {})
+    if receipt['audit_execution'].get('stdout') != receipt['audit_stdout']:
+        raise ValueError('review receipt prompt audit raw/text mismatch')
     audit = audit_prompt_input_payload(_decode(receipt['audit_stdout']), expected_developer_instructions=RUBRIC)
     execution = receipt.get('execution', {})
+    _validate_bounded_output(execution)
     if (audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact
             or receipt.get('isolation') != {'passed': True, 'broker_environment_keys': []}
             or execution.get('exit_status') != 0 or execution.get('timed_out') is not False
@@ -374,6 +442,8 @@ def grade_c09_notice(result: Any, command_records: Sequence[Any], *, other_gates
         if not re.fullmatch(r'tx1-[a-f0-9]{20}', str(decision['input']['transaction_id'])):
             raise ValueError('independent review requires exact transaction identity')
         receipt = review_c09_notice(decision, root=Path(root) / 'notice-review', options=options)
-        passed = verify_c09_review_receipt(receipt, decision=decision)
+        binding = _decode((Path(root) / 'notice-review/invocation-binding.json').read_text(encoding='utf-8'))
+        passed = verify_c09_review_receipt(receipt, decision=decision, expected_binding=binding)
     return {'passed': passed and bool(other_gates) and all(value is True for value in other_gates.values()),
-        'decision': decision, 'receipt': receipt}
+        'decision': decision, 'receipt': receipt,
+        'invocation_binding_sha256': receipt.get('invocation_binding_sha256') if receipt else None}

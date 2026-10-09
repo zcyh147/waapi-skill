@@ -164,8 +164,25 @@ controls, not a claim of complete security isolation against a hostile CLI.
 No credentials are included in reviewer input; model authentication remains
 inside the disposable Codex environment.
 
-The existing archive verifier validates the exact receipt, its invocation,
-configuration, runtime hashes, grounded text references and source bindings.
+Before subprocess launch, a separate harness-owned invocation binding records
+fixed configuration/runtime, the decision digest, sealed temporary host locators
+and exact schema text. Its digest is stored separately in the task turn record.
+The existing archive verifier reconstructs both canonical commands using fixed
+settings and those locators, and requires exact argv equality. Duplicate settings,
+conflicting feature overrides and changed schema operands cannot be accepted by
+token membership. Neither command expectations nor configuration are selected
+from the reviewer receipt. Rewriting the binding and receipt checksums cannot
+replace the turn's independently sealed binding digest.
+
+The capped subprocess path retains bounded original stdout/stderr bytes as
+base64 and decodes them strictly. Invalid UTF-8 records an explicit non-PASS
+status plus a decoding diagnostic; it cannot be deleted or repaired into an
+accepted judgment. The native child exit status remains distinct, and process
+cleanup still completes. Successful replay validates original bytes against the
+recorded text before judging. The legacy uncapped subprocess contract is unchanged.
+
+The existing archive verifier also validates the exact receipt, configuration,
+runtime hashes, grounded text references and source bindings.
 It makes no reviewer or Wwise call and writes no grades. This introduces the
 preserved independent model judgment as a new evidence authority. Replay proves
 that judgment was preserved and bound; it does not deterministically recompute

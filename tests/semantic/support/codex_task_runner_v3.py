@@ -1841,7 +1841,9 @@ def run_expansion_codex_task(
                                         reconciliation, gates, tuple(key for key, passed in gates.items() if not passed))
                     _archive_turn(output_dir, prompt=prompt, result=result, grade=grade)
                     turn_rows.append({"index": index, "gates": gates,
-                                      "agent_seconds": budget.elapsed_seconds - elapsed_before})
+                                      "agent_seconds": budget.elapsed_seconds - elapsed_before,
+                                      **({"notice_invocation_binding_sha256": notice["invocation_binding_sha256"]}
+                                         if index == 1 and "notice_adjudication" in plan else {})})
                     if not grade.passed:
                         raise V3TaskRunnerError("expansion turn failed: " + ", ".join(grade.errors), thread_id=thread_id)
                 broker.seal_expansion_outcome()

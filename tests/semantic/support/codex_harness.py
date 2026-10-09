@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import ctypes
 import hashlib
 import json
@@ -2265,6 +2266,24 @@ class ProcessResult:
     timed_out: bool = False
 
 
+@dataclass(frozen=True, slots=True)
+class BoundedProcessResult(ProcessResult):
+    """Bounded exact bytes, with decoding failure distinct from process exit."""
+    stdout_base64: str | None = None
+    stderr_base64: str | None = None
+    output_decoding_error: str | None = None
+    process_exit_status: int | None = None
+
+    def __post_init__(self) -> None:
+        # Text-only fake subprocess adapters have an unambiguous UTF-8 stream.
+        # The real bounded drain always supplies its retained original bytes.
+        for key, text in (("stdout_base64", self.stdout), ("stderr_base64", self.stderr)):
+            if getattr(self, key) is None:
+                object.__setattr__(self, key, base64.b64encode(text.encode("utf-8")).decode("ascii"))
+        if self.process_exit_status is None:
+            object.__setattr__(self, "process_exit_status", self.exit_status)
+
+
 def _finalize_codex_run(
     *,
     config: CodexHarnessConfig,
@@ -2468,8 +2487,18 @@ def _bounded_process_output(process: Any, *, started: float, timeout: float, max
         if any(reader.is_alive() for reader in readers):
             kill_process_group(process)
             raise CodexHarnessError("bounded subprocess pipes did not close after reaping")
-    return ProcessResult(exit_status=124 if expired else 125 if exceeded.is_set() else int(process.returncode),
-        stdout=buffers[0].decode("utf-8", "ignore"), stderr=buffers[1].decode("utf-8", "ignore"),
+    decoded = []
+    errors = []
+    for label, raw in zip(("stdout", "stderr"), buffers):
+        try:
+            decoded.append(raw.decode("utf-8", "strict"))
+        except UnicodeDecodeError as exc:
+            decoded.append("")  # Damaged text must never be repaired into evidence.
+            errors.append(f"{label}: invalid UTF-8 at byte {exc.start} ({exc.reason})")
+    return BoundedProcessResult(exit_status=124 if expired else 125 if exceeded.is_set() else 126 if errors else int(process.returncode),
+        stdout=decoded[0], stderr=decoded[1], output_decoding_error="; ".join(errors) if errors else None,
+        stdout_base64=base64.b64encode(buffers[0]).decode("ascii"),
+        stderr_base64=base64.b64encode(buffers[1]).decode("ascii"), process_exit_status=int(process.returncode),
         duration_seconds=round(time.monotonic() - started, 6), timed_out=expired)
 
 
@@ -5571,6 +5600,7 @@ __all__ = [
     "CodexRunResult",
     "CodexSessionAudit",
     "ProcessResult",
+    "BoundedProcessResult",
     "WindowsPowerShellCoreHost",
     "WORKSPACE_SKILL_EXCLUDED_NAMES",
     "assert_detached_workspace_skill_copy",

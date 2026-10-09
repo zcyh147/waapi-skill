@@ -580,7 +580,7 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
 
 
 def replay_c09_notice(root: Path, result: Any, command_records: Any, *, other_gates: Mapping[str, bool],
-                      expected_runtime: Mapping[str, str], **kwargs: Any) -> bool:
+                      expected_runtime: Mapping[str, str], expected_binding_sha256: str | None = None, **kwargs: Any) -> bool:
     """Validate preserved independent evidence, never rejudge a model's meaning."""
     from tests.semantic.support.codex_c09_notice_adjudication import decide_c09_notice, verify_c09_review_receipt
     decision = decide_c09_notice(result, command_records, **kwargs)
@@ -592,8 +592,11 @@ def replay_c09_notice(root: Path, result: Any, command_records: Any, *, other_ga
         if decision["outcome"] != "review_required" or not hard_passed:
             _require(not receipt_path.exists(), "review receipt cannot override deterministic hard gates")
             return hard_passed and decision["outcome"] == "accepted"
+        binding = _json(root, "notice-review/invocation-binding.json")
+        _require(isinstance(expected_binding_sha256, str) and _SHA.fullmatch(expected_binding_sha256)
+            and binding.get("sha256") == expected_binding_sha256, "review invocation binding differs from sealed turn")
         receipt = _json(root, "notice-review/receipt.json")
-        return verify_c09_review_receipt(receipt, decision=decision, expected_runtime=expected_runtime)
+        return verify_c09_review_receipt(receipt, decision=decision, expected_runtime=expected_runtime, expected_binding=binding)
     except ExpansionArchiveError:
         raise
     except Exception as exc:
@@ -671,7 +674,8 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 preview_artifact=artifact, before_snapshot=oracle.get("preview_before") or plan["before"],
                 transaction_id=oracle.get("transaction_id") or "", user_prompt=plan["prompts"][0],
                 other_gates={key: value for key, value in grade["common_gates"].items() if key != "visible_preview_notice"},
-                expected_runtime=plan["notice_adjudication"]["runtime"])
+                expected_runtime=plan["notice_adjudication"]["runtime"],
+                expected_binding_sha256=turn.get("notice_invocation_binding_sha256"))
             _require(grade["common_gates"]["visible_preview_notice"] is c09_notice,
                      "recorded adjudicated notice grade differs from sealed evidence")
         rejected_read = any(record.get("accepted") is False for record in records)
