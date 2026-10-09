@@ -199,3 +199,67 @@ These are developer tests, not Fresh or Wwise acceptance. Independent review,
 combined-candidate development gates, targeted Fresh fallback proof and identical
 successful-root verify-only remain pending at this paused checkpoint. #160 and
 broader adapter activation remain outside this implementation.
+
+## Expansion workflow implementation checkpoint — #160
+
+New task plans pin `waapi-skill.expansion-notice-adjudication/v1` for C01,
+C03, C06, C08, C09, M01 and M05/2025.1. M05/2022.1 remains the separate
+capability boundary. Plans without adjudication retain their original parser;
+C09 plans pinned to the original C09/v1 contract retain that decision and
+replay path. Original business prompts, independent oracles, fixtures and
+product runtime are unchanged. The new contract and rubric hashes are sealed
+in the plan, and the existing campaign semantic-tree fingerprint includes the
+new Adapter source and fixtures.
+
+`codex_expansion_notice_adjudication.py` owns the operation-specific Adapter
+contexts. Before any positive decision or review admission, the existing case
+Preview approver and typed role attestations must agree with the independent
+before-state. Imports additionally compare prepared source snapshots, exact
+source language/owner identities, target pre-state identities, file proofs and
+music parent anchors. C06 reuses the sealed existing-association, before/delta
+and ordered-point attestation; C08 reuses exact target/dispatch/curve binding;
+C09 and M05 reuse the existing owner/reference attestations. New object roles
+in M01 are typed creation destinations, never invented GUIDs. Numeric units
+belong to their field: Track Volume and curve y are decibels, RTPC x is a
+GameParameter value, and attenuation x uses the sealed distance domain without
+assuming a unit conversion. M05 display labels may derive from associations;
+its oracle preserves identity and real settings rather than literal display
+name/path.
+
+The historical import notice parser only matches lexical groups. A match
+cannot decide complete media mappings, property owners, extra writes or scope.
+New C01/C03/M01 notices therefore generally require independent review after
+typed attestation, with reason
+`legacy-lexical-match-insufficient-for-complete-import-mappings-and-scope`.
+Other supported contextual notices keep deterministic acceptance, and the
+existing C09 exact material-rejection checks remain authoritative. Unsupported
+wording is never automatic PASS. Narrative order may differ when the exact
+mapping and curve point/shape meaning is clear; preservation need not use a
+verbatim or exhaustive bookkeeping list. Missing or ambiguous edit meaning
+remains non-PASS. The frozen independent contrasts have a separate source
+provenance and do not redefine parser vocabulary or historical fixture grades.
+
+All contexts reuse the same #159 isolated Codex invocation, fixed settings,
+limits, strict original UTF-8 bytes, independently sealed invocation binding,
+receipt validator and archive verifier. The extra rubric describes per-case
+roles, quantities, field ownership and preservation. It receives neither
+after-state nor business verdict. Ask-mode review applies to the first-turn
+proposal; the later user confirmation, exact token and second-turn Execute
+remain mandatory. Allow-mode review cannot supply the separate durable grant.
+Attenuation keeps `result_schema_checked` Gateway strength and its separate
+independent curve oracle. CLI feature pins and absence of observed tool events
+still do not prove a complete hidden-tool inventory is absent.
+
+`test_codex_expansion_notice_adjudication.py` is included in `notice-fast`.
+It exercises all 13 positive version units through the real TransactionStore,
+runner notice gate, fake isolated subprocess and complete archive verifier,
+including both confirmation workflows. Independently grounded held-out
+contrasts, uncertain judgments, reviewer timeout/malformed output, missing
+notices, mismatched prepared roles, receipt substitution and authority
+substitution remain failed or rejected on read-only replay without any model
+call or grade write. These are fake developer proofs, not Wwise/Fresh or model
+semantic acceptance. The evidence itself classifies deterministic material
+failure, unsupported-language judgment, reviewer infrastructure and provenance;
+execution/authorization and business outcomes retain their independent gates.
+Combined independent review, frozen-candidate broad development gates and
+final #147/#122 acceptance remain separate pending promotion work.

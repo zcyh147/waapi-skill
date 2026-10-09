@@ -1722,9 +1722,10 @@ def run_expansion_codex_task(
         "model": options.model, "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
     }
-    if unit.unit_id.endswith("-C09"):
+    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as notice_contract, CASES as notice_cases
+    if unit.unit_id.rsplit("-", 1)[-1] in notice_cases:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_runtime_identity
-        plan["notice_adjudication"] = {"configuration": reviewer_configuration(),
+        plan["notice_adjudication"] = {"configuration": reviewer_configuration(notice_contract),
             "runtime": reviewer_runtime_identity(options)}
     _write_json(root / "expansion-plan.json", {**plan, "sha256": canonical_digest(plan)})
     allowed_subcommands = (
@@ -1828,8 +1829,10 @@ def run_expansion_codex_task(
                         "cumulative_agent_budget": budget.elapsed_seconds <= budget.hard_seconds,
                     }
                     if index == 1 and "notice_adjudication" in plan:
-                        from tests.semantic.support.codex_c09_notice_adjudication import grade_c09_notice
-                        notice = grade_c09_notice(result, command_rows, version=unit.version,
+                        from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice
+                        notice = grade_expansion_notice(result, command_rows, version=unit.version,
+                            case_id=unit.unit_id.rsplit("-", 1)[-1],
+                            preview_parameters=prepared.archive_preview_parameters,
                             execute_expected=prepared.policy == "allow_changes",
                             preview_artifact=(TransactionStore(broker.state_directory).load_preview(
                                 policy.transaction_id).artifact if policy.transaction_id else {}),

@@ -956,6 +956,7 @@ def test_expansion_returns_classified_failure_and_reconciles_only_after_broker_c
     options = SimpleNamespace(skill_source=SKILL, model="gpt-6.1-sol", reasoning_effort="medium",
         service_tier="default", campaign_inputs_sha256="a" * 64, codex_binary=tmp_path / "codex", auth_json=tmp_path / "auth",
         windows_powershell_core_host=None)
+    options.codex_binary.write_bytes(b"fake isolated CLI identity")
     outcome = runner.run_expansion_codex_task(unit=SimpleNamespace(unit_id="EXP25-M01", version="2025.1"),
         prepared=prepared, task_root=tmp_path / "task", options=options, runner_environment={}, scoped_paths={},
         reconcile_after_failure=reconcile)

@@ -580,10 +580,16 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
 
 
 def replay_c09_notice(root: Path, result: Any, command_records: Any, *, other_gates: Mapping[str, bool],
-                      expected_runtime: Mapping[str, str], expected_binding_sha256: str | None = None, **kwargs: Any) -> bool:
+                      expected_runtime: Mapping[str, str], expected_binding_sha256: str | None = None,
+                      adjudication_contract: str | None = None, **kwargs: Any) -> bool:
     """Validate preserved independent evidence, never rejudge a model's meaning."""
     from tests.semantic.support.codex_c09_notice_adjudication import decide_c09_notice, verify_c09_review_receipt
-    decision = decide_c09_notice(result, command_records, **kwargs)
+    if adjudication_contract is None:
+        decision = decide_c09_notice(result, command_records, **kwargs)
+    else:
+        from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice, CONTRACT
+        _require(adjudication_contract == CONTRACT, "unknown adjudication contract")
+        decision = decide_expansion_notice(result, command_records, **kwargs)
     try:
         recorded = _json(root, "notice-decision.json")
         _require(canonical_digest(recorded) == canonical_digest(decision), "notice decision binding changed")
@@ -669,13 +675,18 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
         if index == 1 and "notice_adjudication" in plan:
             artifact = (_transaction(root, oracle["transaction_id"])[0]["artifact"]
                         if oracle.get("transaction_id") else {})
+            from tests.semantic.support.codex_c09_notice_adjudication import CONTRACT as legacy_notice_contract
+            review_contract = plan["notice_adjudication"]["configuration"]["contract"]
+            notice_kwargs = ({} if review_contract == legacy_notice_contract else {
+                "adjudication_contract": review_contract, "case_id": plan["unit_id"].rsplit("-", 1)[-1],
+                "preview_parameters": plan["preview_parameters"]})
             c09_notice = replay_c09_notice(root / directory, SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
                 preview_artifact=artifact, before_snapshot=oracle.get("preview_before") or plan["before"],
                 transaction_id=oracle.get("transaction_id") or "", user_prompt=plan["prompts"][0],
                 other_gates={key: value for key, value in grade["common_gates"].items() if key != "visible_preview_notice"},
                 expected_runtime=plan["notice_adjudication"]["runtime"],
-                expected_binding_sha256=turn.get("notice_invocation_binding_sha256"))
+                expected_binding_sha256=turn.get("notice_invocation_binding_sha256"), **notice_kwargs)
             _require(grade["common_gates"]["visible_preview_notice"] is c09_notice,
                      "recorded adjudicated notice grade differs from sealed evidence")
         rejected_read = any(record.get("accepted") is False for record in records)
@@ -752,11 +763,16 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(plan.get("contract") == "waapi-skill.integration-expansion-task-plan/v1"
         and plan.get("unit_id") == unit_id and plan.get("version") == version, "task plan identity mismatch")
     if "notice_adjudication" in plan:
-        from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration
+        from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, CONTRACT as legacy_notice_contract
+        from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as notice_contract, CASES
         review = plan["notice_adjudication"]
-        _require(unit_id.endswith("-C09") and isinstance(review, dict)
-            and set(review) == {"configuration", "runtime"} and review["configuration"] == reviewer_configuration()
-            and isinstance(review["runtime"], dict), "adjudication is outside the pinned C09 contract")
+        _require(isinstance(review, dict) and set(review) == {"configuration", "runtime"}
+            and isinstance(review["configuration"], dict), "invalid adjudication binding")
+        review_contract = review["configuration"].get("contract")
+        _require((review_contract == legacy_notice_contract and unit_id.endswith("-C09")
+                or review_contract == notice_contract and unit_id.rsplit("-", 1)[-1] in CASES)
+            and review["configuration"] == reviewer_configuration(review_contract)
+            and isinstance(review["runtime"], dict), "adjudication is outside the pinned workflow contract")
     module, case_id = _case(plan)
     _require(unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"}
         and (case_id, version) != ("M05", "2022.1"), "unit is not an Agent case")

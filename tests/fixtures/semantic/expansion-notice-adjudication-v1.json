@@ -1,0 +1,581 @@
+{
+  "contract": "waapi-skill.expansion-notice-adjudication/v1",
+  "provenance": "Prospective developer fixtures from the existing C01/C03/M01 business definitions; no historical grade changes.",
+  "cases": {
+    "C01": {
+      "before": {
+        "sound": {
+          "id": "{11111111-1111-1111-1111-111111111111}",
+          "name": "Voice",
+          "type": "Sound",
+          "path": "\\Containers\\Voice",
+          "volume_db": -3,
+          "output_bus": {
+            "id": "{44444444-4444-4444-4444-444444444444}"
+          }
+        },
+        "sources": {
+          "Japanese": {
+            "object": {
+              "id": "{22222222-2222-2222-2222-222222222222}",
+              "name": "JP",
+              "type": "AudioFileSource",
+              "path": "\\Containers\\Voice\\JP",
+              "parent": {
+                "id": "{11111111-1111-1111-1111-111111111111}"
+              },
+              "source_language": {
+                "name": "Japanese"
+              }
+            },
+            "media": {
+              "path": "/Originals/Japanese.wav",
+              "sha256": "Japanese"
+            },
+            "volume_offset_db": 0
+          },
+          "English(US)": {
+            "object": {
+              "id": "{33333333-3333-3333-3333-333333333333}",
+              "name": "EN",
+              "type": "AudioFileSource",
+              "path": "\\Containers\\Voice\\EN",
+              "parent": {
+                "id": "{11111111-1111-1111-1111-111111111111}"
+              },
+              "source_language": {
+                "name": "English(US)"
+              }
+            },
+            "media": {
+              "path": "/Originals/English(US).wav",
+              "sha256": "English(US)"
+            },
+            "volume_offset_db": 0
+          }
+        },
+        "event": {
+          "id": "{55555555-5555-5555-5555-555555555555}",
+          "name": "Play_Voice",
+          "type": "Event",
+          "path": "\\Events\\Play_Voice"
+        },
+        "actions": [
+          {
+            "id": "{66666666-6666-6666-6666-666666666666}",
+            "target": {
+              "id": "{11111111-1111-1111-1111-111111111111}"
+            }
+          }
+        ],
+        "distractor": {
+          "id": "{77777777-7777-7777-7777-777777777777}",
+          "name": "Spare",
+          "type": "Sound",
+          "path": "\\Containers\\Spare"
+        },
+        "members": [
+          "{11111111-1111-1111-1111-111111111111}",
+          "{77777777-7777-7777-7777-777777777777}"
+        ]
+      },
+      "parameters": {
+        "version": "2025.1",
+        "sound_id": "{11111111-1111-1111-1111-111111111111}",
+        "sound_path": "\\Containers\\Voice",
+        "replacement": "/replacement/JP.wav"
+      },
+      "unsupported_notice": "日文对白将换用 /replacement/JP.wav，落在已核对的 Voice 日文源上；英文原样，音量和事件都保留。这个预览等你确认后才执行。",
+      "artifact": {
+        "request": {
+          "operation": "audio.import",
+          "version": "2025.1",
+          "arguments": {
+            "imports": [
+              {
+                "object_path": "\\Containers\\Voice",
+                "object_type": "Sound Voice",
+                "audio_file": "/replacement/JP.wav",
+                "import_language": "Japanese"
+              }
+            ],
+            "import_operation": "useExisting"
+          },
+          "contract": "waapi-skill.operation-request/v1"
+        },
+        "prepared_operation": {
+          "operation": "audio.import",
+          "version": "2025.1",
+          "request": {
+            "operation": "audio.import",
+            "version": "2025.1",
+            "arguments": {
+              "imports": [
+                {
+                  "object_path": "\\Containers\\Voice",
+                  "object_type": "Sound Voice",
+                  "audio_file": "/replacement/JP.wav",
+                  "import_language": "Japanese"
+                }
+              ],
+              "import_operation": "useExisting"
+            },
+            "contract": "waapi-skill.operation-request/v1"
+          },
+          "verification_plan": {
+            "kind": "closed-audio-import",
+            "version": "2025.1",
+            "targets": [
+              {
+                "canonical_target_path": "\\Containers\\Voice",
+                "requested_object_type": "Sound Voice",
+                "requested_language": "Japanese",
+                "source_file": {
+                  "kind": "regular_file",
+                  "path": "/replacement/JP.wav"
+                },
+                "media_expected": true,
+                "preexisting_id": "{11111111-1111-1111-1111-111111111111}",
+                "pre_state_rows": [
+                  {
+                    "id": "{11111111-1111-1111-1111-111111111111}",
+                    "name": "Voice",
+                    "type": "Sound",
+                    "path": "\\Containers\\Voice",
+                    "volume_db": -3,
+                    "output_bus": {
+                      "id": "{44444444-4444-4444-4444-444444444444}"
+                    }
+                  }
+                ],
+                "localized_source_snapshot": {
+                  "owner_id": "{11111111-1111-1111-1111-111111111111}",
+                  "rows": [
+                    {
+                      "id": "{22222222-2222-2222-2222-222222222222}",
+                      "name": "JP",
+                      "type": "AudioFileSource",
+                      "path": "\\Containers\\Voice\\JP",
+                      "parent": {
+                        "id": "{11111111-1111-1111-1111-111111111111}"
+                      },
+                      "audioSource:language": {
+                        "name": "Japanese"
+                      }
+                    },
+                    {
+                      "id": "{33333333-3333-3333-3333-333333333333}",
+                      "name": "EN",
+                      "type": "AudioFileSource",
+                      "path": "\\Containers\\Voice\\EN",
+                      "parent": {
+                        "id": "{11111111-1111-1111-1111-111111111111}"
+                      },
+                      "audioSource:language": {
+                        "name": "English(US)"
+                      }
+                    }
+                  ]
+                },
+                "localized_audio_file_source_id": "{22222222-2222-2222-2222-222222222222}"
+              }
+            ],
+            "native_directive_boundaries": []
+          }
+        }
+      }
+    },
+    "C03": {
+      "before": {
+        "sounds": {
+          "{11111111-1111-1111-1111-111111111111}": {
+            "object": {
+              "id": "{11111111-1111-1111-1111-111111111111}",
+              "name": "Left",
+              "type": "Sound",
+              "path": "\\Containers\\Left",
+              "volume_db": -3
+            },
+            "source": {
+              "id": "{33333333-3333-3333-3333-333333333333}",
+              "name": "Hit",
+              "type": "AudioFileSource",
+              "path": "\\Containers\\Left\\Hit",
+              "parent": {
+                "id": "{11111111-1111-1111-1111-111111111111}"
+              },
+              "source_language": {
+                "name": "SFX"
+              }
+            },
+            "source_volume_offset": 0,
+            "media": {
+              "path": "/Originals/left/Hit.wav",
+              "sha256": "old-left"
+            }
+          },
+          "{22222222-2222-2222-2222-222222222222}": {
+            "object": {
+              "id": "{22222222-2222-2222-2222-222222222222}",
+              "name": "Right",
+              "type": "Sound",
+              "path": "\\Containers\\Right",
+              "volume_db": -6
+            },
+            "source": {
+              "id": "{44444444-4444-4444-4444-444444444444}",
+              "name": "Hit",
+              "type": "AudioFileSource",
+              "path": "\\Containers\\Right\\Hit",
+              "parent": {
+                "id": "{22222222-2222-2222-2222-222222222222}"
+              },
+              "source_language": {
+                "name": "SFX"
+              }
+            },
+            "source_volume_offset": 0,
+            "media": {
+              "path": "/Originals/right/Hit.wav",
+              "sha256": "old-right"
+            }
+          }
+        },
+        "members": [
+          "{11111111-1111-1111-1111-111111111111}",
+          "{22222222-2222-2222-2222-222222222222}",
+          "{77777777-7777-7777-7777-777777777777}"
+        ],
+        "distractor": {
+          "id": "{77777777-7777-7777-7777-777777777777}",
+          "name": "Spare",
+          "type": "Sound",
+          "path": "\\Containers\\Spare"
+        }
+      },
+      "parameters": {
+        "version": "2025.1",
+        "target_ids": {
+          "\\Containers\\Left": "{11111111-1111-1111-1111-111111111111}",
+          "\\Containers\\Right": "{22222222-2222-2222-2222-222222222222}"
+        },
+        "mappings": {
+          "\\Containers\\Left": "/replacement/left/Hit.wav",
+          "\\Containers\\Right": "/replacement/right/Hit.wav"
+        }
+      },
+      "unsupported_notice": "两条现有声音将各收一份同名媒体：Left 收 /replacement/left/Hit.wav，Right 收 /replacement/right/Hit.wav；原声源身份和路径、音量及备用对象保留，等待你确认。",
+      "artifact": {
+        "request": {
+          "operation": "audio.import",
+          "version": "2025.1",
+          "arguments": {
+            "imports": [
+              {
+                "object_path": "\\Containers\\Left",
+                "object_type": "Sound SFX",
+                "audio_file": "/replacement/left/Hit.wav",
+                "import_language": "SFX"
+              },
+              {
+                "object_path": "\\Containers\\Right",
+                "object_type": "Sound SFX",
+                "audio_file": "/replacement/right/Hit.wav",
+                "import_language": "SFX"
+              }
+            ],
+            "import_operation": "useExisting"
+          },
+          "contract": "waapi-skill.operation-request/v1"
+        },
+        "prepared_operation": {
+          "operation": "audio.import",
+          "version": "2025.1",
+          "request": {
+            "operation": "audio.import",
+            "version": "2025.1",
+            "arguments": {
+              "imports": [
+                {
+                  "object_path": "\\Containers\\Left",
+                  "object_type": "Sound SFX",
+                  "audio_file": "/replacement/left/Hit.wav",
+                  "import_language": "SFX"
+                },
+                {
+                  "object_path": "\\Containers\\Right",
+                  "object_type": "Sound SFX",
+                  "audio_file": "/replacement/right/Hit.wav",
+                  "import_language": "SFX"
+                }
+              ],
+              "import_operation": "useExisting"
+            },
+            "contract": "waapi-skill.operation-request/v1"
+          },
+          "verification_plan": {
+            "kind": "closed-audio-import",
+            "version": "2025.1",
+            "targets": [
+              {
+                "canonical_target_path": "\\Containers\\Left",
+                "requested_object_type": "Sound SFX",
+                "requested_language": "SFX",
+                "source_file": {
+                  "kind": "regular_file",
+                  "path": "/replacement/left/Hit.wav"
+                },
+                "media_expected": true,
+                "preexisting_id": "{11111111-1111-1111-1111-111111111111}",
+                "pre_state_rows": [
+                  {
+                    "id": "{11111111-1111-1111-1111-111111111111}",
+                    "name": "Left",
+                    "type": "Sound",
+                    "path": "\\Containers\\Left",
+                    "volume_db": -3
+                  }
+                ],
+                "existing_sfx_source_snapshot": {
+                  "owner_id": "{11111111-1111-1111-1111-111111111111}",
+                  "version": "2025.1",
+                  "rows": [
+                    {
+                      "id": "{33333333-3333-3333-3333-333333333333}",
+                      "name": "Hit",
+                      "type": "AudioFileSource",
+                      "path": "\\Containers\\Left\\Hit",
+                      "parent": {
+                        "id": "{11111111-1111-1111-1111-111111111111}"
+                      },
+                      "audioSource:language": {
+                        "name": "SFX"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "canonical_target_path": "\\Containers\\Right",
+                "requested_object_type": "Sound SFX",
+                "requested_language": "SFX",
+                "source_file": {
+                  "kind": "regular_file",
+                  "path": "/replacement/right/Hit.wav"
+                },
+                "media_expected": true,
+                "preexisting_id": "{22222222-2222-2222-2222-222222222222}",
+                "pre_state_rows": [
+                  {
+                    "id": "{22222222-2222-2222-2222-222222222222}",
+                    "name": "Right",
+                    "type": "Sound",
+                    "path": "\\Containers\\Right",
+                    "volume_db": -6
+                  }
+                ],
+                "existing_sfx_source_snapshot": {
+                  "owner_id": "{22222222-2222-2222-2222-222222222222}",
+                  "version": "2025.1",
+                  "rows": [
+                    {
+                      "id": "{44444444-4444-4444-4444-444444444444}",
+                      "name": "Hit",
+                      "type": "AudioFileSource",
+                      "path": "\\Containers\\Right\\Hit",
+                      "parent": {
+                        "id": "{22222222-2222-2222-2222-222222222222}"
+                      },
+                      "audioSource:language": {
+                        "name": "SFX"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "native_directive_boundaries": []
+          }
+        }
+      }
+    },
+    "M01": {
+      "before": {
+        "parent": {
+          "id": "{11111111-1111-1111-1111-111111111111}",
+          "name": "Owned",
+          "type": "MusicPlaylistContainer",
+          "path": "\\Containers\\Owned"
+        },
+        "protected": {
+          "id": "{22222222-2222-2222-2222-222222222222}",
+          "name": "Keep",
+          "type": "MusicSegment",
+          "path": "\\Containers\\Owned\\Keep",
+          "parent": {
+            "id": "{11111111-1111-1111-1111-111111111111}"
+          }
+        },
+        "children": [
+          {
+            "id": "{22222222-2222-2222-2222-222222222222}",
+            "name": "Keep",
+            "type": "MusicSegment",
+            "path": "\\Containers\\Owned\\Keep",
+            "parent": {
+              "id": "{11111111-1111-1111-1111-111111111111}"
+            }
+          }
+        ],
+        "segment": null,
+        "tracks": {}
+      },
+      "parameters": {
+        "version": "2025.1",
+        "parent_path": "\\Containers\\Owned",
+        "segment_name": "Imported",
+        "media": {
+          "Quiet": "/replacement/Quiet.wav",
+          "Full": "/replacement/Full.wav"
+        }
+      },
+      "unsupported_notice": "将让 Owned 多一个 Imported 音乐段，两条轨道 Quiet、Full 各收对应的 /replacement/Quiet.wav、/replacement/Full.wav。Quiet 轨道为负六分贝，Full 默认零；Clip 和 Source 增益保持零，Keep 保留，不设播放列表。现在按授权完成。",
+      "artifact": {
+        "request": {
+          "operation": "audio.import",
+          "version": "2025.1",
+          "arguments": {
+            "imports": [
+              {
+                "object_path": "\\Containers\\Owned\\<MusicSegment>Imported",
+                "object_type": "MusicSegment"
+              },
+              {
+                "object_path": "\\Containers\\Owned\\<MusicSegment>Imported\\<MusicTrack>Quiet",
+                "object_type": "MusicTrack",
+                "audio_file": "/replacement/Quiet.wav",
+                "import_language": "SFX",
+                "properties": [
+                  {
+                    "name": "Volume",
+                    "value": -6
+                  }
+                ]
+              },
+              {
+                "object_path": "\\Containers\\Owned\\<MusicSegment>Imported\\<MusicTrack>Full",
+                "object_type": "MusicTrack",
+                "audio_file": "/replacement/Full.wav",
+                "import_language": "SFX"
+              }
+            ],
+            "import_operation": "createNew"
+          },
+          "contract": "waapi-skill.operation-request/v1"
+        },
+        "prepared_operation": {
+          "operation": "audio.import",
+          "version": "2025.1",
+          "request": {
+            "operation": "audio.import",
+            "version": "2025.1",
+            "arguments": {
+              "imports": [
+                {
+                  "object_path": "\\Containers\\Owned\\<MusicSegment>Imported",
+                  "object_type": "MusicSegment"
+                },
+                {
+                  "object_path": "\\Containers\\Owned\\<MusicSegment>Imported\\<MusicTrack>Quiet",
+                  "object_type": "MusicTrack",
+                  "audio_file": "/replacement/Quiet.wav",
+                  "import_language": "SFX",
+                  "properties": [
+                    {
+                      "name": "Volume",
+                      "value": -6
+                    }
+                  ]
+                },
+                {
+                  "object_path": "\\Containers\\Owned\\<MusicSegment>Imported\\<MusicTrack>Full",
+                  "object_type": "MusicTrack",
+                  "audio_file": "/replacement/Full.wav",
+                  "import_language": "SFX"
+                }
+              ],
+              "import_operation": "createNew"
+            },
+            "contract": "waapi-skill.operation-request/v1"
+          },
+          "verification_plan": {
+            "kind": "closed-audio-import",
+            "version": "2025.1",
+            "targets": [
+              {
+                "canonical_target_path": "\\Containers\\Owned\\Imported",
+                "requested_object_type": "MusicSegment",
+                "requested_language": "SFX",
+                "source_file": null,
+                "media_expected": false,
+                "pre_state_rows": []
+              },
+              {
+                "canonical_target_path": "\\Containers\\Owned\\Imported\\Quiet",
+                "requested_object_type": "MusicTrack",
+                "requested_language": "SFX",
+                "source_file": {
+                  "kind": "regular_file",
+                  "path": "/replacement/Quiet.wav"
+                },
+                "media_expected": true,
+                "pre_state_rows": []
+              },
+              {
+                "canonical_target_path": "\\Containers\\Owned\\Imported\\Full",
+                "requested_object_type": "MusicTrack",
+                "requested_language": "SFX",
+                "source_file": {
+                  "kind": "regular_file",
+                  "path": "/replacement/Full.wav"
+                },
+                "media_expected": true,
+                "pre_state_rows": []
+              }
+            ],
+            "native_directive_boundaries": []
+          },
+          "resolved_roles": {
+            "targets[0].anchor": {
+              "object": "{11111111-1111-1111-1111-111111111111}",
+              "row": {
+                "id": "{11111111-1111-1111-1111-111111111111}",
+                "name": "Owned",
+                "type": "MusicPlaylistContainer",
+                "path": "\\Containers\\Owned"
+              }
+            },
+            "targets[1].anchor": {
+              "object": "{11111111-1111-1111-1111-111111111111}",
+              "row": {
+                "id": "{11111111-1111-1111-1111-111111111111}",
+                "name": "Owned",
+                "type": "MusicPlaylistContainer",
+                "path": "\\Containers\\Owned"
+              }
+            },
+            "targets[2].anchor": {
+              "object": "{11111111-1111-1111-1111-111111111111}",
+              "row": {
+                "id": "{11111111-1111-1111-1111-111111111111}",
+                "name": "Owned",
+                "type": "MusicPlaylistContainer",
+                "path": "\\Containers\\Owned"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

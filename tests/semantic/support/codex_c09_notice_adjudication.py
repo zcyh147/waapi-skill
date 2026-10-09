@@ -1,4 +1,4 @@
-"""C09-only, outcome-blind notice adjudication for new frozen runs.
+"""Legacy C09 decisions and shared outcome-blind isolated notice review.
 
 The receipt preserves a stochastic judgment, never recomputes it. Campaign
 seals and this binding check assume a trusted root; neither prevents wholesale
@@ -200,11 +200,25 @@ def _judgment(stdout: str, review_input: Mapping[str, Any]) -> tuple[dict, dict]
     return judgment, usage
 
 
-def reviewer_configuration() -> dict[str, Any]:
-    return {'contract': CONTRACT, 'model': 'gpt-6.1-sol', 'reasoning_effort': 'medium', 'service_tier': 'default',
+def reviewer_rubric(contract: str = CONTRACT) -> str:
+    if contract == CONTRACT:
+        return RUBRIC
+    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as EXPANSION
+    if contract != EXPANSION:
+        raise ValueError('unknown notice adjudication contract')
+    return RUBRIC.replace('C09 notice reviewer', 'expansion workflow notice reviewer').replace(
+        'the exact target Sound, one appended Effect and its exact\nname/class/notes, scope and preservation',
+        'the exact attested workflow roles, source/destination mapping, quantities and units, ordered curve points,\nbefore/delta facts, field owner, scope and preservation; use the attested_roles as obligations').replace(
+        'Actual authorization and all execution/oracle gates are',
+        'Narration may list mappings or points in a different order if the exact associations and curve semantics remain clear.\nPreservation needs complete meaning, not a verbatim or exhaustive bookkeeping list.\nAn ask-mode notice is a proposal awaiting later human confirmation; it never authorizes execution.\nAttenuation Gateway verification remains result-schema-only. Actual authorization and all execution/oracle gates are')
+
+
+def reviewer_configuration(contract: str = CONTRACT) -> dict[str, Any]:
+    rubric = reviewer_rubric(contract)
+    return {'contract': contract, 'model': 'gpt-6.1-sol', 'reasoning_effort': 'medium', 'service_tier': 'default',
         'timeout_seconds': TIMEOUT_SECONDS, 'input_max_bytes': INPUT_MAX_BYTES,
         'output_max_bytes': OUTPUT_MAX_BYTES, 'judgment_max_bytes': JUDGMENT_MAX_BYTES,
-        'rubric_sha256': hashlib.sha256(RUBRIC.encode('utf-8')).hexdigest(),
+        'rubric_sha256': hashlib.sha256(rubric.encode('utf-8')).hexdigest(),
         'schema_sha256': canonical_digest(JUDGMENT_SCHEMA), 'disabled_features': list(DISABLED_FEATURES),
         'sandbox': 'read-only', 'network_access': False, 'ephemeral': True}
 
@@ -234,7 +248,9 @@ def _capabilities(rows: Any) -> None:
 def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[list[str], list[str]]:
     """Render exact argv from fixed settings and separately sealed host locators."""
     context = binding.get('context', {})
-    if (binding.get('configuration') != reviewer_configuration()
+    contract = binding.get('configuration', {}).get('contract')
+    rubric = reviewer_rubric(contract)
+    if (binding.get('configuration') != reviewer_configuration(contract)
             or binding.get('schema_utf8') != json.dumps(JUDGMENT_SCHEMA)
             or not isinstance(context, dict) or set(context) != {'binary', 'workspace', 'schema', 'platform_name', 'disabled_user_skill_paths'}
             or context['platform_name'] != os.name):
@@ -257,14 +273,14 @@ def _review_invocations(binding: Mapping[str, Any], *, prompt: str) -> tuple[lis
         codex_binary=Path(context['binary']), disabled_user_skill_paths=(),
         model='gpt-6.1-sol', reasoning_effort='medium', service_tier='default',
         timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
-        network_access=False, developer_instructions=RUBRIC)
+        network_access=False, developer_instructions=rubric)
     audit = build_prompt_audit_command(config, prompt=prompt)
     execution = build_exec_command(config, prompt=prompt, writable_dir=workspace)
     if paths:
         rows = ','.join('{path=' + json.dumps(value) + ',enabled=false}' for value in paths)
         override = ['-c', 'skills.config=[' + rows + ']']
         for command in (audit, execution):
-            position = command.index('developer_instructions=' + json.dumps(RUBRIC)) - 1
+            position = command.index('developer_instructions=' + json.dumps(rubric)) - 1
             command[position:position] = override
     execution[-1:-1] = ['--ignore-rules', '--output-schema', context['schema']]
     return _disable(audit), _disable(execution)
@@ -291,16 +307,18 @@ def _validate_bounded_output(result: Mapping[str, Any]) -> None:
 def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) -> dict[str, Any]:
     """One isolated model turn after CLI probes and one prompt audit."""
     if decision.get('outcome') != 'review_required':
-        raise ValueError('only review-required C09 evidence can enter independent review')
+        raise ValueError('only review-required notice evidence can enter independent review')
     root = Path(root)
     root.mkdir(parents=True, exist_ok=False)
     review_input = decision['input']
     prompt = json.dumps(review_input, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
     if len(prompt.encode('utf-8')) > INPUT_MAX_BYTES:
         raise ValueError('complete reviewer input exceeds bound')
-    configuration = reviewer_configuration()
-    receipt = {'contract': CONTRACT, 'input': review_input, 'configuration': configuration,
-        'prompt_sha256': hashlib.sha256(prompt.encode('utf-8')).hexdigest(), 'rubric': RUBRIC,
+    contract = review_input.get('contract')
+    configuration = reviewer_configuration(contract)
+    rubric = reviewer_rubric(contract)
+    receipt = {'contract': contract, 'input': review_input, 'configuration': configuration,
+        'prompt_sha256': hashlib.sha256(prompt.encode('utf-8')).hexdigest(), 'rubric': rubric,
         'runtime': reviewer_runtime_identity(options),
         'invocation': None, 'audit_command': None, 'capabilities': None, 'invocation_binding_sha256': None,
         'outcome': 'review_required', 'judgment': None, 'usage': {}, 'audit_stdout': '',
@@ -315,7 +333,7 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 codex_binary=options.codex_binary, auth_json=options.auth_json,
                 model=configuration['model'], reasoning_effort='medium', service_tier='default',
                 timeout_seconds=TIMEOUT_SECONDS, sandbox_mode='read-only', allow_output_write=False,
-                network_access=False, developer_instructions=RUBRIC,
+                network_access=False, developer_instructions=rubric,
                 windows_powershell_core_host=options.windows_powershell_core_host)
             binding = {'contract': 'waapi-skill.c09-review-invocation/v1',
                 'configuration': configuration, 'runtime': receipt['runtime'],
@@ -349,7 +367,7 @@ def review_c09_notice(decision: Mapping[str, Any], *, root: Path, options: Any) 
                 receipt['audit_stdout'] = audited.stdout
                 receipt['audit_execution'] = asdict(audited)
                 _validate_bounded_output(asdict(audited))
-                audit = audit_prompt_input_payload(_decode(audited.stdout), expected_developer_instructions=RUBRIC)
+                audit = audit_prompt_input_payload(_decode(audited.stdout), expected_developer_instructions=rubric)
                 if audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact:
                     raise ValueError('reviewer prompt contains executor memory or skills')
             # A distinct disposable HOME/CODEX_HOME prevents even audit state reuse.
@@ -379,10 +397,12 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
     """Read-only binding validation. No model call and no deterministic grade rescue."""
     if decision.get('outcome') != 'review_required':
         raise ValueError('receipt cannot override deterministic notice decision')
+    contract = decision['input'].get('contract')
+    rubric = reviewer_rubric(contract)
     body = {key: value for key, value in receipt.items() if key != 'sha256'}
-    if (receipt.get('sha256') != canonical_digest(body) or receipt.get('contract') != CONTRACT
+    if (receipt.get('sha256') != canonical_digest(body) or receipt.get('contract') != contract
             or canonical_digest(receipt.get('input')) != canonical_digest(decision.get('input'))
-            or receipt.get('configuration') != reviewer_configuration() or receipt.get('rubric') != RUBRIC
+            or receipt.get('configuration') != reviewer_configuration(contract) or receipt.get('rubric') != rubric
             or not isinstance(receipt.get('runtime'), dict) or set(receipt['runtime']) != {
                 'codex_sha256', 'python_sha256', 'reviewer_source_sha256', 'harness_source_sha256'}
             or any(not isinstance(value, str) or not re.fullmatch('[a-f0-9]{64}', value) for value in receipt['runtime'].values())
@@ -415,7 +435,7 @@ def verify_c09_review_receipt(receipt: Mapping[str, Any], *, decision: Mapping[s
     _validate_bounded_output(receipt.get('audit_execution') or {})
     if receipt['audit_execution'].get('stdout') != receipt['audit_stdout']:
         raise ValueError('review receipt prompt audit raw/text mismatch')
-    audit = audit_prompt_input_payload(_decode(receipt['audit_stdout']), expected_developer_instructions=RUBRIC)
+    audit = audit_prompt_input_payload(_decode(receipt['audit_stdout']), expected_developer_instructions=rubric)
     execution = receipt.get('execution', {})
     _validate_bounded_output(execution)
     if (audit.has_memory or audit.has_target_skill or audit.unexpected_skills or not audit.developer_instructions_exact
