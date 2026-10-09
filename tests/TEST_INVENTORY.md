@@ -7,6 +7,26 @@ are not live-Wwise or Fresh Agent evidence.
 
 ## Runner modes and strict real behavior
 
+### 2026-10-09 Expansion completion under targeted business acceptance
+
+Candidate `5562104` passed Full Non-live: **17254 passed, 120 skipped,
+27 deselected** (920.46s), exit 0. Affected discovery-repair focused validation
+passed 360 tests; both independent review findings closed. Product Skill bytes
+remain unchanged. These developer gates grant no additional per-API/live credit.
+
+Fresh macOS EXP25-C09 passed six business assertions and actual v8 notice review,
+then identical successful-root verify-only with 84 byte-identical root files.
+All 69 artifacts and 11 seals validated; source full hash/mtime were unchanged,
+the passing sandbox removed and temporary job/scoped processes cleared.
+
+The earlier `8079061` full root retains 12 overall PASS / 1 notice-only FAIL plus
+separate EXP22-M05 boundary. All 13 positive business outcomes passed. The user
+explicitly approved closure after the repaired targeted run without another full
+matrix; this is not a final-candidate full-matrix PASS or a historical regrade.
+Detailed phase timing is deferred. See the [acceptance report](../docs/research/integration-expansion-acceptance-2026-10-09.md)
+and [machine-readable record](../docs/research/integration-expansion-acceptance-2026-10-09.json).
+
+
 ### 2026-10-01 Pristine-Draft regression and music read investigations
 
 Frozen macOS candidate `cc8707a` passed Full Non-live:

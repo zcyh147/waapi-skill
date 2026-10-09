@@ -13,8 +13,12 @@ EXP22-M05 boundary. Its original overall result remains 12 PASS / 1 notice-only
 FAIL / 1 boundary. The failed C09 unit passed all six business assertions and
 every turn gate except notice review. The repair supplies authenticated Draft
 discovery facts to that reviewer; both independent review findings are closed,
-with 360 affected focused tests passing. The new candidate still requires its
-combined development gate and targeted Fresh proof before issue closure.
+with 360 affected focused tests passing. Candidate `5562104` subsequently passed Full Non-live **17254 / 120 skipped /
+27 deselected**, then fresh EXP25-C09 and identical verify-only (84 unchanged
+root files). The reviewer accepted v8 with actual discovery evidence; all six
+business assertions passed and source/sandbox/process checks completed. See the
+[final acceptance report](../research/integration-expansion-acceptance-2026-10-09.md).
+The user-amended delivery is complete; older outstanding-work lists are historical.
 
 Date: 2026-09-28. Parent issue #108; implementation tasks #109–#122, repairs #123/#124.
 The user requested a quota pause on 2026-09-28 and explicitly resumed implementation
