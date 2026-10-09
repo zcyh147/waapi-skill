@@ -37,6 +37,57 @@ class ExpansionPolicyError(ValueError):
     """A proposed action cannot be proven inside the sealed business scope."""
 
 
+def is_public_query_timeout_failure(payload: Mapping[str, object]) -> bool:
+    """Recognize only the fixed public object-query deadline failure envelope.
+
+    This receipt proves an authenticated failed read, never object data or a
+    safe infrastructure checkpoint. Unknown nested dispatch errors stay closed.
+    The caller separately enforces the admitted command and receipt byte cap.
+    """
+    call = payload.get("call")
+    if (payload.get("contract") != "waapi-skill.gateway-result/v1"
+            or payload.get("command") != "query-object"
+            or payload.get("ok") is not False or payload.get("status") != "error"
+            or "error_code" in payload
+            or any(key not in payload or payload[key] is not None
+                   for key in ("count", "objects", "agent_result"))
+            or not isinstance(call, Mapping)):
+        return False
+    if (call.get("api") != "ak.wwise.core.object.get"
+            or call.get("item_type") != "function" or call.get("ok") is not False
+            or call.get("error_code") != "TIMEOUT" or call.get("result") is not None
+            or call.get("version") not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            or call.get("version") != payload.get("detected_version")
+            or not isinstance(call.get("message"), str) or not call["message"]
+            or not isinstance(call.get("evidence_path"), str) or not call["evidence_path"]):
+        return False
+    details = call.get("details")
+    if (not isinstance(details, Mapping)
+            or details.get("provenance") != "waapi-skill.gateway-deadline/v1"
+            or details.get("phase") != "WAAPI call ak.wwise.core.object.get"
+            or details.get("timeout_mode") != "finite"
+            or details.get("deadline_exhausted") is not True
+            or type(details.get("cleanup_pending")) is not bool
+            or details.get("abort_requested") is not True):
+        return False
+    for key in ("configured_timeout_seconds", "elapsed_seconds", "operation_timeout_seconds"):
+        number = details.get(key)
+        if type(number) not in (int, float) or not math.isfinite(number) or number <= 0:
+            return False
+    cleanup = payload.get("details")
+    if cleanup is not None:
+        if not isinstance(cleanup, Mapping):
+            return False
+        failure = cleanup.get("cleanup_failure")
+        if (not isinstance(failure, Mapping) or failure.get("error_code") != "TIMEOUT"
+                or failure.get("details") != details
+                or not isinstance(failure.get("message"), str) or not failure["message"]):
+            return False
+    elif details["cleanup_pending"]:
+        return False
+    return True
+
+
 def canonical_digest(value: object) -> str:
     return hashlib.sha256(json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -239,9 +290,11 @@ class BoundedExpansionReads:
             raise ExpansionPolicyError("read receipt exceeds byte ceiling")
         if payload.get("command") != self._pending[0]:
             raise ExpansionPolicyError("read receipt does not match the admitted command")
-        if ((payload.get("ok") is False and isinstance(payload.get("error_code"), str))
+        if (is_public_query_timeout_failure(payload)
+                or (payload.get("ok") is False and isinstance(payload.get("error_code"), str))
                 or (payload.get("ok") is True and payload.get("status") == "needs_clarification")):
-            # A bounded failed read is a repair opportunity, never oracle proof.
+            # Failed reads never prove business state. Input rejection may be
+            # repaired; the Broker stops dispatch after a deadline failure.
             self.failed_receipts.append((self._pending, canonical_digest(payload)))
             self._pending = None
             return False
