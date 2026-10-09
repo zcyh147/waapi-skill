@@ -118,6 +118,10 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "if effective_argv and Path(effective_argv[0]).name == 'test_driver.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from test_driver import main\n"
+        "    import test_driver, test_readiness\n"
+        # Routing-only fake children; readiness has its own selected-lane fixtures.
+        "    test_driver.validate_nonlive_readiness = lambda *args: None\n"
+        "    test_readiness.scoped_process_snapshot = lambda: ''\n"
         "    sys.exit(main(effective_argv[1:], environment=os.environ, python_executable=sys.executable, command_runner=record_live_child, windows=True))\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
@@ -661,7 +665,7 @@ def test_ci_test_bat_reads_versioned_live_environment_config(tmp_path: Path) -> 
     console_path.write_text("console\n", encoding="utf-8")
     project_path = configured_root / "SampleProject.wproj"
     project_path.write_text("<Project />\n", encoding="utf-8")
-    sandbox_root = configured_root / "sandbox"
+    sandbox_root = tmp_path / "configured-sandbox"
     config_path = tmp_path / "配置 !percent% & equals= environment.json"
     config_path.write_text(
         json.dumps(
