@@ -691,7 +691,8 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 "preview_parameters": plan["preview_parameters"]})
             if review_contract in {"waapi-skill.expansion-notice-adjudication/v4",
                     "waapi-skill.expansion-notice-adjudication/v5",
-                    "waapi-skill.expansion-notice-adjudication/v6"}:
+                    "waapi-skill.expansion-notice-adjudication/v6",
+                    "waapi-skill.expansion-notice-adjudication/v7"}:
                 notice_kwargs.update(broker_records=turn_records, read_admission=_scope(plan))
             c09_notice = replay_c09_notice(root / directory, SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",

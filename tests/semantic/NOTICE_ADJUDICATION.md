@@ -1,6 +1,31 @@
 # Limited notice adjudication and development gates
 
-## Current prospective checkpoint — v6, #147
+## Current prospective checkpoint — v7, #147
+
+New plans use `waapi-skill.expansion-notice-adjudication/v7`, adding only
+`pre_execution_authorization` from the authenticated matching Preview receipt.
+It binds transaction/Preview, original event position, Broker sequence, payload,
+record and pre-Execute timeline digests, plus exact decoded output equality.
+Closed state/policy/authority and distinct durable event summaries describe
+Preview-time facts only. Ask confirmation stays pending; no receipt supplies
+no acquired fact. Wrong identity, policy, authentication, phase or payload
+fails closed. Credentials, continuations and raw commands never enter this
+projection. Existing deterministic authorization and current-policy execution
+gates remain the sole authority; independent review cannot grant permission.
+
+V7 aliases the exact v6 rubric bytes and High/default settings. V1–v6 retain
+exact configurations, inputs and replay, including both v5/v6 High pins. Schema,
+120-second deadline, bounds and non-PASS gates remain fixed. The source receipt
+witness keeps exact Preview/payload facts; credential-redacted fixture command
+and reconstructed timeline/record digests are explicitly labelled separately
+from original provenance. Fake runner/archive and tamper checks prove transport
+and binding only. Historical FAIL roots remain frozen without replay/regrade.
+Focused developer validation passed 479 with one native-Windows UNC skip;
+fixed `notice-fast` passed 3801 with the same skip. Both exited 0 through
+`ci/test.sh` and the pinned developer interpreter. Combined Non-live, independent review and new targeted Fresh acceptance remain
+coordinator-owned promotion work; no model or Wwise run occurred here.
+
+## Earlier prospective checkpoint — v6, #147
 
 New plans use `waapi-skill.expansion-notice-adjudication/v6`. V6 keeps v5's
 input/evidence semantics and High/default reviewer settings, clarifying only

@@ -118,7 +118,7 @@ def test_attenuation_unsupported_equivalent_binds_typed_curve_and_weaker_verifie
 
 
 def test_new_attenuation_runner_receipt_replays_without_model(tmp_path, monkeypatch):
-    from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice, CONTRACT
+    from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice, FUTURE_INTENT_CONTRACT as CONTRACT
     from tests.semantic.support.codex_expansion_archive import replay_c09_notice, _scope
     from tests.semantic.support import codex_c09_notice_adjudication as review
     from tests.semantic.test_codex_expansion_archive import _sealed_c08
@@ -155,14 +155,14 @@ def test_new_attenuation_runner_receipt_replays_without_model(tmp_path, monkeypa
     monkeypatch.setattr(review, 'run_process', process)
     kwargs = dict(case_id='C08', version='2025.1', execute_expected=True, preview_artifact=artifact,
         before_snapshot=plan['before'], preview_parameters=plan['preview_parameters'], transaction_id='tx1-00000000000000000001',
-        user_prompt=plan['prompts'][0], read_admission=_scope(plan),
+        user_prompt=plan['prompts'][0], read_admission=_scope(plan), adjudication_contract=CONTRACT,
         broker_records=json.loads((tmp_path / 'expansion-broker.json').read_text())['records'])
     graded = grade_expansion_notice(result, commands, other_gates={'authorization': True}, root=directory, options=options, **kwargs)
     assert graded['passed'] is True
     monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
     assert replay_c09_notice(directory, result, commands, other_gates={'authorization': True},
         expected_runtime=review.reviewer_runtime_identity(options), expected_binding_sha256=graded['invocation_binding_sha256'],
-        adjudication_contract=CONTRACT, **kwargs) is True
+        **kwargs) is True
     from dataclasses import asdict
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
@@ -474,9 +474,13 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         awaiting = store.submit_for_confirmation(tx)
         token = confirmation_token_for(transaction_id=tx, artifact_hash=preview.artifact_hash,
             state='awaiting_confirmation', event_sequence=awaiting.event_sequence, last_event_hash=awaiting.last_event_hash)
+        preview_record = store.load(tx)
+        preview_events = store.read_events(tx)
         store.confirm(tx, confirmation_token=token)
     else:
         store.authorize_by_policy(tx, policy='allow_changes', authority='caller_asserted_current_user_change_request')
+        preview_record = store.load(tx)
+        preview_events = store.read_events(tx)
     store.begin_execution(tx, expected_authorization='confirmed' if ask else 'policy_authorized')
     store.mark_executed_unverified(tx)
     store.record_verification(tx, outcome=state)
@@ -508,6 +512,19 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         template['payload'] = payload
         payload['command'] = argv[0]
         if argv[0] not in {'draft-start', 'query-object', 'metadata', 'query-schema'}: payload.update(transaction_id=tx, artifact_hash=artifact_hash)
+        if argv[0] == 'preview-from-draft':
+            authorization = ({'mode': 'explicit_confirmation', 'policy': 'ask_before_changes',
+                'explicit_confirmation': False, 'notice_required': True, 'requires_later_user_message': True}
+                if ask else {'mode': 'policy_authorization', 'policy': 'allow_changes',
+                    'authority': 'caller_asserted_current_user_change_request',
+                    'explicit_confirmation': False, 'notice_required': True})
+            payload.update(state=preview_record.state.value, executed=False, change_requested=True,
+                detected_version=version, authorization=authorization, event_count=len(preview_events),
+                events=[{key: row[key] for key in ('sequence', 'event_type', 'from_state', 'to_state', 'event_hash')
+                    if row.get(key) is not None} for row in preview_events],
+                agent_result={'transaction_id': tx, 'artifact_hash': artifact_hash, 'state': preview_record.state.value,
+                    'executed': False, 'authorization': authorization,
+                    'operation': artifact['request']['operation'], 'request': artifact['request']})
         if argv[0] == 'verify': payload['state'] = state
         elif argv[0] == 'confirm': payload['state'] = 'confirmed'
         template.update(sequence=index, step_name=f'expansion.step.{index:04d}', model_argv=model, normalized_model_argv=model,
@@ -1147,7 +1164,7 @@ def test_v4_notice_receives_authenticated_complete_empty_child_read():
     result, commands, kwargs = public_read_notice_context()
     admission, record = kwargs['read_admission'], kwargs['broker_records'][0]
     argv, payload = record['gateway_arguments'], record['payload']
-    decision = decide_expansion_notice(result, commands, **kwargs)
+    decision = decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)
     assert decision['outcome'] == 'review_required'
     evidence = decision['input']['pre_execution_public_reads']
     assert evidence['read_scope_sha256'] == admission.scope.digest
@@ -1197,7 +1214,7 @@ def test_v4_unbound_or_out_of_scope_reads_cannot_supply_notice_facts(damage):
         events = [json.loads(line) for line in result.stdout.splitlines()]
         events[0]['item']['aggregated_output'] = json.dumps(payload)
         result.stdout = '\n'.join(json.dumps(row) for row in events)
-    assert decide_expansion_notice(result, commands, **kwargs) == {
+    assert decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs) == {
         'outcome': 'material_reject', 'reason': 'unbound-pre-execution-public-read-evidence'}
 
 
@@ -1213,7 +1230,7 @@ def test_v4_explicit_incomplete_read_never_proves_absence(marker):
     events = [json.loads(line) for line in result.stdout.splitlines()]
     events[0]['item']['aggregated_output'] = json.dumps(record['payload'])
     result.stdout = '\n'.join(json.dumps(row) for row in events)
-    decision = decide_expansion_notice(result, commands, **kwargs)
+    decision = decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)
     read = decision['input']['pre_execution_public_reads']['reads'][0]
     assert read['scope_complete'] is False
     assert all(read['result'][key] == value for key, value in marker.items())
@@ -1229,7 +1246,7 @@ def test_v4_reads_completed_after_execute_are_excluded():
     case = import_case('M01')
     kwargs.update(case_id='M01', execute_expected=True, preview_artifact=case['artifact'],
         before_snapshot=case['before'], preview_parameters=case['parameters'])
-    decision = decide_expansion_notice(result, commands, **kwargs)
+    decision = decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)
     assert decision['outcome'] == 'review_required'
     assert decision['input']['pre_execution_public_reads']['reads'] == []
     assert decision['input']['execute_event_position'] == 2
@@ -1252,7 +1269,7 @@ def test_v4_selected_object_fields_preserve_absent_versus_null(present):
     events = [json.loads(line) for line in result.stdout.splitlines()]
     events[0]['item']['aggregated_output'] = json.dumps(record['payload'])
     result.stdout = '\n'.join(json.dumps(row) for row in events)
-    actual = decide_expansion_notice(result, commands, **kwargs)['input']['pre_execution_public_reads']['reads'][0]['result']['objects'][0]
+    actual = decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)['input']['pre_execution_public_reads']['reads'][0]['result']['objects'][0]
     assert ('active_source' in actual) is present
     assert actual == row
 
@@ -1329,7 +1346,8 @@ def test_v4_original_backup_witness_restores_only_acquired_public_facts():
         preview_artifact={'transaction_id': witness['transaction_id'], 'request': witness['immutable_request'],
             'prepared_operation': witness['prepared_operation']}, preview_parameters={'version':'2022.1',
             'sound_id':sound['id'], 'sound_path':sound['path'], 'replacement':witness['attested_roles']['mappings'][0]['source_file']},
-        broker_records=reads['records'], read_admission=admission)
+        broker_records=reads['records'], read_admission=admission,
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v4')
     assert decision['outcome'] == 'review_required'
     input = decision['input']
     projected = input['pre_execution_public_reads']['reads']
@@ -1409,7 +1427,7 @@ def test_v4_owned_ceiling_retains_observed_values_without_complete_scope_proof()
     record = kwargs['broker_records'][0]
     admission.admit(record['gateway_arguments'])
     assert admission.observe(record['payload']) is False  # Business proof policy remains unchanged.
-    decision = decide_expansion_notice(result, commands, **kwargs)
+    decision = decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)
     read = decision['input']['pre_execution_public_reads']['reads'][0]
     assert read['result']['objects'][0]['volume_offset_db'] == -3.0
     assert read['result']['count'] == 1
@@ -1420,7 +1438,7 @@ def test_v4_owned_ceiling_retains_observed_values_without_complete_scope_proof()
 def test_v4_owned_ceiling_cannot_hide_malformed_returned_identity():
     from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
     result, commands, kwargs = owned_ceiling_notice_context(malformed=True)
-    assert decide_expansion_notice(result, commands, **kwargs) == {
+    assert decide_expansion_notice(result, commands, adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs) == {
         'outcome': 'material_reject', 'reason': 'unbound-pre-execution-public-read-evidence'}
 
 
@@ -1477,7 +1495,7 @@ def test_v5_changes_only_reviewer_effort_and_preserves_legacy_configuration():
 
 def test_v6_clarifies_future_intent_without_changing_legacy_contracts_or_bounds():
     from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_rubric
-    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT
+    from tests.semantic.support.codex_expansion_notice_adjudication import FUTURE_INTENT_CONTRACT as CONTRACT
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     assert CONTRACT == 'waapi-skill.expansion-notice-adjudication/v6'
     v5 = reviewer_configuration('waapi-skill.expansion-notice-adjudication/v5')
@@ -1500,6 +1518,7 @@ def test_v6_clarifies_future_intent_without_changing_legacy_contracts_or_bounds(
     ('waapi-skill.expansion-notice-adjudication/v4', 'medium'),
     ('waapi-skill.expansion-notice-adjudication/v5', 'high'),
     ('waapi-skill.expansion-notice-adjudication/v6', 'high'),
+    ('waapi-skill.expansion-notice-adjudication/v7', 'high'),
 ])
 def test_versioned_reviewer_effort_reaches_invocations_and_readonly_archive(tmp_path, monkeypatch, contract, effort):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
@@ -1543,8 +1562,8 @@ def test_v5_v6_preserve_v4_input_semantics_except_contract(version):
 
 
 @pytest.mark.parametrize('tamper', ['effort', 'contract', 'argv', 'binding-and-receipt', 'rubric'])
-@pytest.mark.parametrize('version', [5, 6])
-def test_v5_v6_reviewer_setting_substitution_fails_full_archive_without_rejudgment(tmp_path, monkeypatch, tamper, version):
+@pytest.mark.parametrize('version', [5, 6, 7])
+def test_v5_v6_v7_reviewer_setting_substitution_fails_full_archive_without_rejudgment(tmp_path, monkeypatch, tamper, version):
     from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     from tests.semantic.support import codex_c09_notice_adjudication as review
@@ -1600,7 +1619,7 @@ def test_v6_future_plan_contrasts_transport_pinned_fake_judgments_through_full_a
     prompt = ('请追加这个 Gain，保留全部旧效果器身份、slot 绑定、顺序、类型、名称、备注，'
         '声音音量、备注、父级保持。执行后核验保持结果。')
     unit = sealed_workflow(tmp_path, monkeypatch, 'C09', version, text=notice,
-        user_prompt=prompt, damage=damage)
+        user_prompt=prompt, damage=damage, adjudication_contract='waapi-skill.expansion-notice-adjudication/v6')
     receipt = json.loads((tmp_path / 'turns/turn-01/notice-review/receipt.json').read_text())
     assert receipt['input']['contract'] == 'waapi-skill.expansion-notice-adjudication/v6'
     assert receipt['input']['visible_messages'][-1]['text'] == notice

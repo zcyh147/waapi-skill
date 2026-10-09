@@ -19,9 +19,10 @@ INTENT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v3'
 READ_EVIDENCE_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v4'
 # V5 keeps its exact V4 rubric and High pin; V6 clarifies ordinary future intent.
 HIGH_EFFORT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v5'
-CONTRACT = 'waapi-skill.expansion-notice-adjudication/v6'
+FUTURE_INTENT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v6'
+CONTRACT = 'waapi-skill.expansion-notice-adjudication/v7'
 CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, INTENT_CONTRACT,
-    READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, CONTRACT})
+    READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, CONTRACT})
 CASES = frozenset({'C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'})
 
 
@@ -330,10 +331,104 @@ def _validate_partial_public_query(payload, argv, gate):
         raise ValueError('partial exact query returned another identity')
 
 
+def _authenticated_event_receipt(event, record, normalized, *, exact=False):
+    """Existing Broker/event equality boundary, shared by read and Preview facts."""
+    from tests.semantic.support.codex_c09_notice_adjudication import _decode
+    item, payload = event['item'], record['payload']
+    from_event = _decode(item.get('aggregated_output', ''))
+    if (record.get('authenticated') is not True or record.get('accepted') is not True
+            or record.get('succeeded') is not True or record.get('payload_error')
+            or record.get('exit_code') != record.get('runner_exit_code')
+            or record.get('exit_code') != item.get('exit_code')
+            or not isinstance(payload, Mapping)
+            or record.get('payload_sha256') != canonical_digest(payload)
+            or (canonical_digest(from_event) != canonical_digest(payload) if exact else from_event != payload)
+            or payload.get('command') != normalized[3]
+            or tuple(record['gateway_arguments']) != normalized[3:]):
+        raise ValueError('event differs from authenticated Broker receipt')
+    return payload
+
+
+def _preview_authorization_evidence(events, command_records, *, version, broker_records,
+        preview_position, transaction_id, preview_artifact):
+    from dataclasses import asdict, is_dataclass
+    from wwise_waapi.transactions import validate_transaction_id
+    records = [{**asdict(row), 'succeeded': row.succeeded} if is_dataclass(row) else row
+        for row in broker_records]
+    # No receipt means no acquired authorization fact, including prose-only claims.
+    if not records:
+        return None
+    event = events[preview_position]
+    command = next(row for row in command_records if row.command == event['item']['command'])
+    normalized = normalized_gateway_command_argv(command.argv, expected_wwise_version=version)
+    matches = [row for row in records
+        if tuple(normalized_gateway_command_argv(row['model_argv'], expected_wwise_version=version))[1:] == normalized[1:]
+        and normalized[0] in {row['model_argv'][0], row['normalized_model_argv'][0]}]
+    if len(matches) != 1:
+        raise ValueError('Preview lacks one matching Broker receipt')
+    record = matches[0]
+    if (type(record.get('sequence')) is not int or record['sequence'] < 1
+            or any(tuple(row.get('gateway_arguments', ()))[:1] == ('execute',)
+                and row['sequence'] <= record['sequence'] for row in records)):
+        raise ValueError('Preview receipt is not pre-Execute')
+    payload = _authenticated_event_receipt(event, record, normalized, exact=True)
+    agent = payload.get('agent_result')
+    preview_hash = canonical_digest(preview_artifact)
+    validate_transaction_id(transaction_id)
+    authorization = payload.get('authorization')
+    if (payload.get('ok') is not True or payload.get('executed') is not False
+            or type(record.get('exit_code')) is not int or record['exit_code'] != 0
+            or payload.get('detected_version') != version or not isinstance(agent, Mapping)
+            or payload.get('transaction_id') != transaction_id or payload.get('artifact_hash') != preview_hash
+            or canonical_digest({key: agent.get(key) for key in
+                ('transaction_id', 'artifact_hash', 'state', 'executed', 'authorization')})
+                != canonical_digest({key: payload.get(key) for key in
+                    ('transaction_id', 'artifact_hash', 'state', 'executed', 'authorization')})
+            or canonical_digest(agent.get('request')) != canonical_digest(preview_artifact['request'])
+            or agent.get('operation') != preview_artifact['request']['operation']
+            or type(payload.get('change_requested')) is not bool or not isinstance(authorization, Mapping)):
+        raise ValueError('Preview authorization facts differ from immutable identity')
+    state = payload.get('state')
+    if state == 'policy_authorized':
+        expected = {'mode': 'policy_authorization', 'policy': 'allow_changes',
+            'authority': 'caller_asserted_current_user_change_request',
+            'explicit_confirmation': False, 'notice_required': True}
+        if canonical_digest(authorization) != canonical_digest(expected) or payload['change_requested'] is not True:
+            raise ValueError('Preview policy authorization is not attested')
+        final_event = 'policy_authorized'
+    elif state == 'awaiting_confirmation':
+        expected = {'mode': 'explicit_confirmation', 'policy': 'ask_before_changes',
+            'explicit_confirmation': False, 'notice_required': True, 'requires_later_user_message': True}
+        if canonical_digest(authorization) != canonical_digest(expected):
+            raise ValueError('Preview confirmation must remain pending')
+        final_event = 'confirmation_requested'
+    else:
+        raise ValueError('Preview has no supported pre-Execute authorization state')
+    session = payload.get('session_context')
+    if session is not None and (not isinstance(session, Mapping)
+            or session.get('project_modification_policy') != expected['policy']):
+        raise ValueError('Preview authorization differs from acquired session policy')
+    summary = payload.get('events')
+    if (not isinstance(summary, list) or type(payload.get('event_count')) is not int or payload['event_count'] != 2 or len(summary) != 2
+            or any(not isinstance(row, Mapping) or type(row.get('sequence')) is not int or not isinstance(row.get('event_hash'), str)
+                or not re.fullmatch(r'[0-9a-f]{64}', row['event_hash']) for row in summary)
+            or summary[0] != {'sequence': 1, 'event_type': 'preview_created',
+                'to_state': 'draft', 'event_hash': summary[0]['event_hash']}
+            or summary[1] != {'sequence': 2, 'event_type': final_event, 'from_state': 'draft',
+                'to_state': state, 'event_hash': summary[1]['event_hash']}):
+        raise ValueError('Preview lacks distinct durable authorization event summary')
+    return {'scope': 'preview-time-facts-only-not-execution-permission-or-human-confirmation',
+        'transaction_id': transaction_id, 'preview_sha256': preview_hash,
+        'pre_execution_timeline_sha256': canonical_digest(events), 'event_position': preview_position,
+        'broker_sequence': record['sequence'], 'payload_sha256': record['payload_sha256'],
+        'broker_record_sha256': canonical_digest(record), 'state': state,
+        'executed': False, 'change_requested': payload['change_requested'],
+        'authorization': dict(expected), 'events': [dict(row) for row in summary]}
+
+
 def _public_read_evidence(events, command_records, *, version, broker_records, read_admission):
     from dataclasses import asdict, is_dataclass
     from tests.semantic.support.codex_expansion_policy import BoundedExpansionReads
-    from tests.semantic.support.codex_c09_notice_adjudication import _decode
     records = [{**asdict(row), 'succeeded': row.succeeded} if is_dataclass(row) else row
         for row in broker_records]
     execute_sequence = next((row['sequence'] for row in records
@@ -362,16 +457,7 @@ def _public_read_evidence(events, command_records, *, version, broker_records, r
         index, record = matches[0]
         used.add(index)
         argv, payload = tuple(record['gateway_arguments']), record['payload']
-        if (record.get('authenticated') is not True or record.get('accepted') is not True
-                or record.get('succeeded') is not True or record.get('payload_error')
-                or record.get('exit_code') != record.get('runner_exit_code')
-                or record.get('exit_code') != item.get('exit_code')
-                or not isinstance(payload, Mapping)
-                or record.get('payload_sha256') != canonical_digest(payload)
-                or _decode(item.get('aggregated_output', '')) != payload
-                or payload.get('command') != normalized[3]
-                or argv != normalized[3:]):
-            raise ValueError('public read differs from authenticated Broker receipt')
+        _authenticated_event_receipt(event, record, normalized)
         gate.admit(argv)
         complete = gate.observe(payload)
         if not complete:
@@ -455,7 +541,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     }
     if adjudication_contract != LEGACY_CONTRACT:
         obligations = _notice_obligations(case_id, roles)
-        if adjudication_contract in {INTENT_CONTRACT, READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, CONTRACT}:
+        if adjudication_contract in {INTENT_CONTRACT, READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, CONTRACT}:
             # Protected invariants and transaction strength remain attested
             # facts, not an exhaustive inventory of required spoken promises.
             obligations.pop('preserve')
@@ -464,7 +550,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
                 'only_declared_changes': True, 'adopt_user_preservation_scope': True}
             review_input['verification_context'] = _verification_context(preview_artifact)
         review_input['notice_obligations'] = obligations
-    if adjudication_contract in {READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, CONTRACT}:
+    if adjudication_contract in {READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, CONTRACT}:
         try:
             review_input['pre_execution_public_reads'] = _public_read_evidence(events_before_execute, command_records,
                 version=version, broker_records=broker_records, read_admission=read_admission)
@@ -476,6 +562,13 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
             'fixed_commands': list(FIXED_COMMANDS_BY_URI['ak.wwise.core.object.get']),
             'scope': 'bounded-public-query-schema-selectors-relationships-and-projections',
             'authority': 'packaged-interface-only-not-acquisition-or-live-availability'}
+    if adjudication_contract == CONTRACT:
+        try:
+            review_input['pre_execution_authorization'] = _preview_authorization_evidence(
+                events_before_execute, command_records, version=version, broker_records=broker_records,
+                preview_position=preview, transaction_id=review_input['transaction_id'], preview_artifact=preview_artifact)
+        except (KeyError, TypeError, ValueError, IndexError, StopIteration):
+            return {'outcome': 'material_reject', 'reason': 'unbound-pre-execution-authorization-evidence'}
     if len(json.dumps(review_input, ensure_ascii=False).encode('utf-8')) > INPUT_MAX_BYTES:
         return {'outcome': 'material_reject', 'reason': 'complete-review-input-exceeds-bound'}
     return {'outcome': 'review_required', 'reason': (
