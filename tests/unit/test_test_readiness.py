@@ -204,11 +204,11 @@ def test_live_launcher_blocks_other_root_macos_real_lane(tmp_path, capsys):
     assert 'shared' in capsys.readouterr().err
 
 
-def _static_checkout(tmp_path):
+def _static_checkout(tmp_path, versions=None):
     from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
     repo = Path(__file__).resolve().parents[2]
     (tmp_path / 'pyproject.toml').write_bytes((repo / 'pyproject.toml').read_bytes())
-    for version in SUPPORTED_WWISE_VERSION_KEYS:
+    for version in versions or SUPPORTED_WWISE_VERSION_KEYS:
         source = tmp_path / 'tests' / '_org' / version
         source.mkdir(parents=True)
         project = source / 'SampleProject.wproj'
@@ -314,3 +314,92 @@ def test_launcher_keeps_windows_path_metacharacters_as_argv_data(tmp_path):
     assert resolve_live_python_command(command, python_executable=sys.executable) == (
         sys.executable, '-m', 'pytest', *values,
     )
+
+
+@pytest.mark.parametrize('command', [
+    "/other/WwiseConsole.sh waapi-server /other/Artist's 溪 夜 Project.wproj",
+    "/bin/sh /other/Artist's Tools/WwiseConsole.sh waapi-server /other/Project.wproj",
+    "/usr/bin/python /other/Artist's Tools/ci/test_driver.py --version 2022.1 --mode live",
+])
+def test_shared_bottle_exclusion_uses_literal_ps_text_with_apostrophes(command):
+    from ci.test_readiness import ReadinessBlocked, validate_process_readiness
+    with pytest.raises(ReadinessBlocked, match='shared'):
+        validate_process_readiness(f'999999 {command}', scopes=('/selected/source',),
+                                  real_lane=True, platform_name='darwin')
+
+
+@pytest.mark.parametrize('selection', [
+    'tests/', 'tests', '.', 'tests/unit/',
+    'tests/unit/test_org_fixture_source.py',
+    'tests/unit/test_org_fixture_source.py::test_org_fixture_manifest_hashes_match_committed_files',
+])
+def test_explicit_broad_or_static_selection_blocks_missing_fixture_before_child(tmp_path, selection):
+    repo = Path(__file__).resolve().parents[2]
+    (tmp_path / 'pyproject.toml').write_bytes((repo / 'pyproject.toml').read_bytes())
+    calls = []
+    result = developer_launch(('--mode', 'nonlive', '--', selection, '-q'), repo_root=tmp_path,
+        command_runner=lambda command, **kwargs: (calls.append(command) or subprocess.CompletedProcess(command, 7)))
+    assert result == 1
+    assert calls == []
+
+
+@pytest.mark.parametrize('filename,version', [
+    ('test_org_fixture_source.py', '2022.1'),
+    ('test_2023_fixture_source.py', '2023.1'),
+    ('test_2024_fixture_inventory.py', '2024.1'),
+    ('test_2025_1_fixture_inventory.py', '2025.1'),
+    ('test_2023_cross_version_audit.py', '2023.1'),
+    ('test_2024_cross_version_audit.py', '2024.1'),
+])
+@pytest.mark.parametrize('fault', ['ready', 'dehydrated', 'process'])
+def test_explicit_static_node_checks_only_its_version_before_child(tmp_path, monkeypatch, filename, version, fault):
+    from ci import test_readiness
+    _static_checkout(tmp_path, versions=(version,))
+    if fault == 'dehydrated':
+        (tmp_path / 'tests' / '_org' / version / 'SampleProject.wproj').write_bytes(b'version https://git-lfs.github.com/spec/v1')
+    command = f'python "{tmp_path}/ci/test_driver.py" --mode nonlive'
+    snapshot = json.dumps([{'ProcessId': 999999, 'CommandLine': command}]) if os.name == 'nt' else f'999999 {command}'
+    monkeypatch.setattr(test_readiness, 'scoped_process_snapshot', lambda: snapshot if fault == 'process' else '')
+    fixture_nodes = {
+        'test_org_fixture_source.py': 'test_org_fixture_manifest_hashes_match_committed_files',
+        'test_2023_fixture_source.py': 'test_2023_fixture_manifest_hashes_match_committed_files',
+        'test_2024_fixture_inventory.py': 'test_2024_fixture_manifest_hashes_match_committed_files',
+        'test_2025_1_fixture_inventory.py': 'test_2025_1_fixture_manifest_hashes_match_committed_files',
+        'test_2023_cross_version_audit.py': 'test_2023_fixture_tree_is_versioned_and_contains_no_committed_runtime_artifacts',
+        'test_2024_cross_version_audit.py': 'test_default_dispatcher_remains_2022_1_and_explicit_2024_1_dispatch_succeeds',
+    }
+    selector = str(tmp_path / 'tests' / 'unit' / filename) + '::' + fixture_nodes[filename]
+    calls = []
+    result = developer_launch(('--mode', 'nonlive', '--', selector, '-q'), repo_root=tmp_path,
+        environment={'WWISE_TEST_CONFIG': '/missing/unrelated/live.json'},
+        command_runner=lambda command, **kwargs: (calls.append((command, kwargs)) or subprocess.CompletedProcess(command, 7)))
+    assert result == (7 if fault == 'ready' else 1)
+    assert len(calls) == (1 if fault == 'ready' else 0)
+    if calls:
+        assert selector in calls[0][0]
+        assert calls[0][1]['env']['WWISE_LIVE'] == '0'
+
+
+def test_explicit_absolute_tests_root_still_requires_all_static_versions(tmp_path, monkeypatch):
+    from ci import test_readiness
+    _static_checkout(tmp_path, versions=('2022.1',))
+    monkeypatch.setattr(test_readiness, 'scoped_process_snapshot', lambda: '')
+    calls = []
+    result = developer_launch(('--mode', 'nonlive', '--', str(tmp_path / 'tests'), '-q'),
+        repo_root=tmp_path, command_runner=lambda command, **kwargs: calls.append(command))
+    assert result == 1
+    assert calls == []
+
+
+@pytest.mark.parametrize('selection', [
+    'tests/unit/test_2023_fixture_source.py::test_2023_destructive_target_rejects_installed_and_org_fixture_paths',
+    'tests/unit/test_2023_cross_version_audit.py::test_explicit_2023_resource_lookups_never_read_2022_or_global_semantic_paths',
+])
+def test_known_fixture_free_node_preserves_unrelated_fixture_independence(tmp_path, selection):
+    repo = Path(__file__).resolve().parents[2]
+    (tmp_path / 'pyproject.toml').write_bytes((repo / 'pyproject.toml').read_bytes())
+    calls = []
+    result = developer_launch(('--mode', 'nonlive', '--', selection, '-q'), repo_root=tmp_path,
+        command_runner=lambda command, **kwargs: (calls.append(command) or subprocess.CompletedProcess(command, 7)))
+    assert result == 7
+    assert len(calls) == 1

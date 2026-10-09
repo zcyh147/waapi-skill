@@ -244,8 +244,10 @@ payloads when a fixture manifest exists, and conflicts scoped to the selected
 source/sandbox. On macOS, real lanes also exclude other active real lanes
 across roots because Audiokinetic wrappers share the Wwise2019x64 bottle.
 Custom installed SampleProjects do not need a repository manifest. Complete
-Non-live checks the five static fixture payloads and scoped gate conflicts;
-focused fake selections remain independent of unrelated fixtures. Program,
+Non-live checks the five static fixture payloads and scoped gate conflicts,
+including explicit repository/tests/unit root selections. Known fixture files
+and dependent nodes check their applicable version only; focused fake selections
+remain independent of unrelated fixtures. Program,
 Non-live, and notice-fast do not require live configuration;
 archive verify-only retains its existing evidence checks without current live
 readiness. A blocked result requires an explicit prerequisite repair and retry:

@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 import time
@@ -135,10 +134,9 @@ def _command_mentions_scope(command: str, scope: str) -> bool:
 
 def _proved_real_lane(command: str) -> bool:
     lowered = command.casefold()
-    try:
-        argv = shlex.split(command)
-    except ValueError:
-        return False
+    # ps renders literal command text, not reusable shell-escaped argv. Only
+    # inspect the fixed shell/execution prefix; punctuation in later paths is data.
+    argv = command.split(None, 3)
     if argv and Path(argv[0]).name in {'bash', 'sh', 'zsh', 'fish'} and any(
         option in {'-c', '-lc', '-ic'} for option in argv[1:3]
     ):
@@ -186,20 +184,76 @@ def validate_process_readiness(
             raise ReadinessBlocked(f'scoped Wwise/test process pid={pid} is still using the selected source or sandbox; inspect and resolve it before retrying')
 
 
+# Closed, fixture-dependent selections already present in the developer suite.
+_STATIC_FIXTURE_TEST_VERSIONS = {
+    'tests/unit/test_org_fixture_source.py': ('2022.1',),
+    'tests/unit/test_2023_fixture_source.py': ('2023.1',),
+    'tests/unit/test_2024_fixture_inventory.py': ('2024.1',),
+    'tests/unit/test_2025_1_fixture_inventory.py': ('2025.1',),
+    'tests/unit/test_2023_cross_version_audit.py': ('2023.1',),
+    'tests/unit/test_2024_cross_version_audit.py': ('2024.1',),
+}
+
+
+# These selected nodes prove fake safety/resource behavior without source payloads.
+_STATIC_FIXTURE_FREE_NODES = {
+    'test_2023_destructive_target_rejects_installed_and_org_fixture_paths',
+    'test_2024_destructive_target_rejects_installed_and_org_fixture_paths',
+    'test_2025_1_destructive_target_rejects_installed_and_org_fixture_paths',
+}
+_STATIC_AUDIT_FIXTURE_NODES = {
+    'tests/unit/test_2023_cross_version_audit.py': {
+        'test_2023_and_2022_resources_are_independently_addressable',
+        'test_2023_fixture_tree_is_versioned_and_contains_no_committed_runtime_artifacts',
+    },
+    'tests/unit/test_2024_cross_version_audit.py': {
+        'test_default_dispatcher_remains_2022_1_and_explicit_2024_1_dispatch_succeeds',
+    },
+}
+
+
 def validate_nonlive_readiness(repo_root: Path, pytest_args: tuple[str, ...]) -> None:
-    """Complete Non-live needs static fixtures, not live machine configuration."""
+    """Check bounded known static selections, not general pytest dependencies."""
+    if '--collect-only' in pytest_args:
+        return
+    from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
+    root = repo_root.resolve()
+    broad_roots = {root, root / 'tests', root / 'tests' / 'unit'}
+    selected_versions: set[str] = set()
+    broad = False
+    for argument in pytest_args:
+        if argument.startswith('-'):
+            continue
+        selector = Path(argument.split('::', 1)[0]).expanduser()
+        if not selector.is_absolute():
+            selector = root / selector
+        selector = selector.resolve(strict=False)
+        if selector in broad_roots:
+            broad = True
+        if selector.is_relative_to(root):
+            relative = selector.relative_to(root).as_posix()
+            node = argument.partition('::')[2].split('::', 1)[0].split('[', 1)[0]
+            if node and (node in _STATIC_FIXTURE_FREE_NODES or (
+                relative in _STATIC_AUDIT_FIXTURE_NODES
+                and node not in _STATIC_AUDIT_FIXTURE_NODES[relative]
+            )):
+                continue
+            selected_versions.update(_STATIC_FIXTURE_TEST_VERSIONS.get(relative, ()))
     focused = any(
         arg in {'-k', '-m', '--collect-only', '--deselect', '--ignore', '--ignore-glob', '--pyargs'}
         or arg.startswith(('-k', '-m', '--deselect=', '--ignore=', '--ignore-glob='))
         or (not arg.startswith('-') and (arg.endswith('.py') or '::' in arg or arg.startswith('tests/')))
         for arg in pytest_args
     )
-    if focused:
+    if broad or not focused:
+        selected_versions.update(SUPPORTED_WWISE_VERSION_KEYS)
+    if not selected_versions:
         return
-    from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
     for version in SUPPORTED_WWISE_VERSION_KEYS:
-        project = repo_root / 'tests' / '_org' / version / 'SampleProject.wproj'
+        if version not in selected_versions:
+            continue
+        project = root / 'tests' / '_org' / version / 'SampleProject.wproj'
         if not (project.parent / 'fixture-manifest.json').is_file():
-            raise ReadinessBlocked(f'complete Non-live requires the static fixture manifest: {project.parent}; provision this checkout explicitly before retrying')
+            raise ReadinessBlocked(f'selected Non-live tests require the static fixture manifest: {project.parent}; provision this checkout explicitly before retrying')
         validate_project_materialization(project, version=version)
-    validate_process_readiness(scoped_process_snapshot(), scopes=(str(repo_root),))
+    validate_process_readiness(scoped_process_snapshot(), scopes=(str(root),))
