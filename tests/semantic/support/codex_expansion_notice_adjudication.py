@@ -20,9 +20,10 @@ READ_EVIDENCE_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v4'
 # V5 keeps its exact V4 rubric and High pin; V6 clarifies ordinary future intent.
 HIGH_EFFORT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v5'
 FUTURE_INTENT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v6'
-CONTRACT = 'waapi-skill.expansion-notice-adjudication/v7'
+AUTHORIZATION_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v7'
+CONTRACT = 'waapi-skill.expansion-notice-adjudication/v8'
 CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, INTENT_CONTRACT,
-    READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, CONTRACT})
+    READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, AUTHORIZATION_CONTRACT, CONTRACT})
 CASES = frozenset({'C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'})
 
 
@@ -541,7 +542,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     }
     if adjudication_contract != LEGACY_CONTRACT:
         obligations = _notice_obligations(case_id, roles)
-        if adjudication_contract in {INTENT_CONTRACT, READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, CONTRACT}:
+        if adjudication_contract in {INTENT_CONTRACT, READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, AUTHORIZATION_CONTRACT, CONTRACT}:
             # Protected invariants and transaction strength remain attested
             # facts, not an exhaustive inventory of required spoken promises.
             obligations.pop('preserve')
@@ -550,7 +551,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
                 'only_declared_changes': True, 'adopt_user_preservation_scope': True}
             review_input['verification_context'] = _verification_context(preview_artifact)
         review_input['notice_obligations'] = obligations
-    if adjudication_contract in {READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, CONTRACT}:
+    if adjudication_contract in {READ_EVIDENCE_CONTRACT, HIGH_EFFORT_CONTRACT, FUTURE_INTENT_CONTRACT, AUTHORIZATION_CONTRACT, CONTRACT}:
         try:
             review_input['pre_execution_public_reads'] = _public_read_evidence(events_before_execute, command_records,
                 version=version, broker_records=broker_records, read_admission=read_admission)
@@ -562,13 +563,22 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
             'fixed_commands': list(FIXED_COMMANDS_BY_URI['ak.wwise.core.object.get']),
             'scope': 'bounded-public-query-schema-selectors-relationships-and-projections',
             'authority': 'packaged-interface-only-not-acquisition-or-live-availability'}
-    if adjudication_contract == CONTRACT:
+    if adjudication_contract in {AUTHORIZATION_CONTRACT, CONTRACT}:
         try:
             review_input['pre_execution_authorization'] = _preview_authorization_evidence(
                 events_before_execute, command_records, version=version, broker_records=broker_records,
                 preview_position=preview, transaction_id=review_input['transaction_id'], preview_artifact=preview_artifact)
         except (KeyError, TypeError, ValueError, IndexError, StopIteration):
             return {'outcome': 'material_reject', 'reason': 'unbound-pre-execution-authorization-evidence'}
+    if adjudication_contract == CONTRACT:
+        from tests.semantic.support.codex_notice_discovery_facts import draft_discovery_evidence
+        try:
+            review_input['pre_execution_draft_discoveries'] = draft_discovery_evidence(
+                events_before_execute, command_records, version=version, broker_records=broker_records,
+                preview_position=preview, transaction_id=review_input['transaction_id'], preview_artifact=preview_artifact,
+                public_parser=read_admission.public_parser if read_admission is not None else None)
+        except (KeyError, TypeError, ValueError, IndexError, StopIteration):
+            return {'outcome': 'material_reject', 'reason': 'unbound-pre-execution-draft-discovery-evidence'}
     if len(json.dumps(review_input, ensure_ascii=False).encode('utf-8')) > INPUT_MAX_BYTES:
         return {'outcome': 'material_reject', 'reason': 'complete-review-input-exceeds-bound'}
     return {'outcome': 'review_required', 'reason': (

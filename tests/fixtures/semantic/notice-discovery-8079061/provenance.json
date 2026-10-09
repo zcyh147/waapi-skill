@@ -1,0 +1,11 @@
+{
+  "source_commit": "8079061878ed10254d4b674b4f3885b66b480203",
+  "source_excerpt_sha256": {
+    "preexecution-input.json": "2b8ddef71061f2a11a5b4ca554805c828810804f49f88e03b62fd5ea04c763ca",
+    "preexecution-events.jsonl": "951156ea2385ca3b43c6e33ce0fb85983c0ce4bb0a66f71dd74b1d08ab4c89a4",
+    "broker-records.json": "3145a03b955d535fd9a5e69662713260530ab8a59902139a72983ea4318ea404",
+    "preview.json": "d5386c735bd7e12f28d46d391714791f8f0a31c1ae31a511f2bf09bb7e023c2b"
+  },
+  "fixture_sha256": "b53ad3151281e95ccd5c96f66fd6572de9ff1b31cc13127a9b9b0c4a7f480a66",
+  "construction": "Original pre-Execute semantic payload rows and Preview artifact; commands/authority/handles redacted, irrelevant payload fields omitted. Events and Broker records reconstructed. Their digests differ from original and never attest original timeline bytes. No outcome or judgment copied."
+}
