@@ -220,10 +220,13 @@ def draft_discovery_evidence(events, command_records, *, version, broker_records
             'broker_record_sha256': canonical_digest(record), 'expected_revision': previous_revision,
             'result_revision': revision})
         if argv[0] == 'draft-bind-object':
+            from wwise_waapi.object_capabilities import object_identity_semantics
             bound = payload['bound_object']
             if (not isinstance(bound, Mapping) or not isinstance(bound.get('handle'), str)
                     or not re.fullmatch(r'boh1-[0-9a-f]{32}', bound['handle'])
-                    or not all(isinstance(bound.get(key), str) and bound[key] for key in ('name', 'type'))):
+                    or not isinstance(bound.get('type'), str) or not bound['type']
+                    or not isinstance(bound.get('name'), str)
+                    or not bound['name'] and not object_identity_semantics(bound['type']).empty_name_allowed):
                 raise ValueError('invalid exposed bound object')
             bound_objects[bound['handle']] = {'kind': 'bound-object', 'object_sha256': canonical_digest(bound['handle']),
                 **{key: bound[key] for key in ('name', 'type', 'id', 'path') if key in bound}}

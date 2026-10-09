@@ -478,3 +478,72 @@ def test_real_redacted_witness_projects_acquired_type_without_freshness_or_selec
     for credential in ('fixture-redacted-authority', 'task_authority', 'handle', 'next_command',
             'gateway_arguments', 'model_argv', 'shell_command', 'endpoint', 'auth.json'):
         assert credential not in projected
+
+
+def test_unnamed_stinger_real_binding_reaches_reviewer_and_readonly_archive(tmp_path, monkeypatch):
+    from tests.unit.test_object_metadata_business_gateway import (
+        waapi_gateway, _env, _info, _project, FakeClient)
+    from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow, historical_case
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    producer = tmp_path / 'producer'
+    producer.mkdir()
+    env = {**_env(producer), 'WWISE_VERSION': '2025.1'}
+    common = ['--state-dir', str(producer / 'state')]
+    code, started = waapi_gateway.execute_gateway([*common, 'draft-start', 'object.setReference'], env=env,
+        client_factory=lambda _: pytest.fail('offline start connected'))
+    assert code == 0, started
+    source = historical_case('M05')['before']['stinger']
+    info = _info()
+    info['version'].update(year=2025, displayName='v2025.1.0.1')
+    client = FakeClient({'ak.wwise.core.getInfo': [info], 'ak.wwise.core.getProjectInfo': [_project(producer)],
+        'ak.wwise.core.object.get': [{'return': [{'id': source['id'], 'name': '', 'type': 'MusicStinger',
+            'path': '[Stinger : Bonus,Stinger Bonus]'}]}]})
+    code, bound = waapi_gateway.execute_gateway([*common, 'draft-bind-object', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', '1', '--object-id', source['id']],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, bound
+    exposed = bound['bound_object']
+    assert exposed['name'] == '' and exposed['type'] == 'MusicStinger'
+    candidate = {'handle': 'bfh1-' + '2' * 32, 'label': 'Trigger', 'field_kind': 'reference',
+        'value_type': 'reference', 'platform': None, 'restrictions': {'allowed_target_types': ['Trigger']},
+        'value_input': {'type': 'reference'}, 'matched_meanings': ['stinger trigger']}
+    discoveries = [(['draft-bind-object', '--object-id', source['id']], {'bound_object': exposed}),
+        (['draft-discover-fields', '--object-handle', exposed['handle'], '--meaning', 'stinger trigger'],
+        {'field_candidates': [candidate], 'candidate_count': 1, 'meaning_count': 1,
+            'meaning_results': [{'meaning': 'stinger trigger', 'candidate_count': 1, 'candidates': [candidate]}],
+            'rejected_candidate_count': 0, 'selection_required': False,
+            'selection_rule': 'copy_exactly_one_candidate.handle_per_requested_meaning'})]
+    root = tmp_path / 'archive'
+    root.mkdir()
+    unit = sealed_workflow(root, monkeypatch, 'M05', adjudication_contract=V8, draft_discoveries=discoveries)
+    receipt = json.loads((root / 'turns/turn-01/notice-review/receipt.json').read_text())
+    fact, = receipt['input']['pre_execution_draft_discoveries']['discoveries']
+    assert fact['scope'] == {'kind': 'bound-object', 'object_sha256': canonical_digest(exposed['handle']),
+        'name': '', 'type': 'MusicStinger', 'platform': None}
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: pytest.fail('archive rejudged'))
+    before = {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+    assert verify_expansion_task_archive(root, expected_unit_id=unit, expected_version='2025.1',
+        expected_inputs_sha256='a' * 64)['business_pass'] is True
+    assert before == {str(p): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+
+
+@pytest.mark.parametrize('name,kind,handle', [('', 'Bus', 'boh1-' + '8' * 32),
+    (None, 'MusicStinger', 'boh1-' + '8' * 32), ('', '', 'boh1-' + '8' * 32),
+    ('', None, 'boh1-' + '8' * 32), ('', 'UnknownType', 'boh1-' + '8' * 32),
+    ('', 'musicstinger', 'boh1-' + '8' * 32), ('', 'MusicStinger', 'invalid')],
+    ids=['ordinary-empty-name', 'nontext-name', 'empty-type', 'nontext-type', 'unknown-type', 'wrong-case', 'invalid-handle'])
+def test_unnamed_bound_scope_still_rejects_invalid_identity(field_context, name, kind, handle):
+    context = field_context
+    records = context[2]['broker_records']
+    bound = records[1]
+    bound['gateway_arguments'] = ['draft-bind-object', *bound['gateway_arguments'][1:6],
+        '--object-id', context[2]['before_snapshot']['owner']['id']]
+    bound['payload']['command'] = 'draft-bind-object'
+    bound['payload']['bound_object'] = {'handle': handle, 'name': name, 'type': kind}
+    for key in ('type_candidates', 'candidate_count', 'selection_required', 'selection_rule'):
+        bound['payload'].pop(key)
+    records[2]['gateway_arguments'][6:8] = ['--object-handle', handle]
+    reseal(context, 1)
+    reseal(context, 2)
+    assert decide(context)['outcome'] == 'material_reject'

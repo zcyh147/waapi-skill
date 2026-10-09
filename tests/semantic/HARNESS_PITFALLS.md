@@ -3558,3 +3558,17 @@ gate was run by the implementer; promotion owns the combined candidate gates.
   verified transaction retains its verification. Archive replay enforces the
   same terminal stop and rejects a fabricated PASS. Preserve the old FAIL root
   without retry or after-state rescue.
+
+
+## An unnamed Stinger was rejected before notice review
+
+Native Windows expansion M05/2025 on `7b4e1164` completed and passed every
+business assertion, but discovery-fact projection rejected its authenticated
+`bound_object.name == ""`. Wwise exposes unnamed owned objects; consult the
+packaged `object_identity_semantics` for the exact reflected type. Preserve the
+empty name as observed. Do not invent a label or require every object to have
+an intrinsic name. Ordinary types that require names remain strict, as do
+handle, type, receipt, revision and Preview bindings. Regression covers the
+real Gateway producer through reviewer input and immutable archive replay.
+See [the Windows assessment](../../docs/research/windows-expansion-assessment-2026-10-10.md)
+for the preserved raw FAIL and focused repair evidence.

@@ -454,10 +454,12 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         required_assertions=sorted(getattr(module, case_id + '_ASSERTIONS')),
         oracle_parameters=oracle_parameters, preview_parameters=parameters,
         notice_adjudication={'configuration': review.reviewer_configuration(CONTRACT), 'runtime': review.reviewer_runtime_identity(options)})
-    if public_reads:
+    binding_ids = {argv[argv.index('--object-id') + 1] for argv, _ in draft_discoveries
+        if argv[0] == 'draft-bind-object' and '--object-id' in argv}
+    if public_reads or binding_ids:
         from tests.semantic.support.codex_expansion_policy import ExpansionReadScope
         read_ids = {argv[argv.index('--exact-id') + 1] for argv, _ in public_reads if '--exact-id' in argv}
-        scope = ExpansionReadScope(frozenset(set(plan['read_scope']['object_ids']) | read_ids),
+        scope = ExpansionReadScope(frozenset(set(plan['read_scope']['object_ids']) | read_ids | binding_ids),
             frozenset({plan['operation']}), owned_project_reads=True, max_rows=100)
         plan['read_scope'] = {key: sorted(value) if isinstance(value, frozenset) else value
             for key, value in asdict(scope).items()}
@@ -519,7 +521,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         payload['command'] = argv[0]
         preparation_failed = (argv[0] in {'draft-discover-types', 'draft-discover-fields'}
             and (payload.get('ok') is False or payload.get('status') == 'needs_clarification'))
-        if draft_discoveries and argv[0] in {'draft-start', 'draft-discover-types', 'draft-discover-fields'} and not preparation_failed:
+        if draft_discoveries and argv[0] in {'draft-start', 'draft-bind-object', 'draft-discover-types', 'draft-discover-fields'} and not preparation_failed:
             payload.update(ok=True, offline=argv[0] == 'draft-start', detected_version=version,
                 draft={'draft_id': 'draft', 'revision': 1 if argv[0] == 'draft-start' else int(argv[5]) + 1,
                     'binding': {'operation': artifact['request']['operation'], 'version': version},
