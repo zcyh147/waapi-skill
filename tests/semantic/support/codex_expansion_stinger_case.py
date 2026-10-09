@@ -169,7 +169,7 @@ def prepare_m05(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
             raise CaseBoundaryError("M05 owned Stinger/configuration/protected witness cannot be sealed")
         return result
 
-    before = ctx.observe_before(snapshot)
+    before = snapshot()
     stinger = before["stinger"]
     if (stinger.get("@Trigger", {}).get("id") != BONUS or stinger.get("@Segment", {}).get("id") != SEGMENT
             or before["target"].get("type") != "Trigger"):

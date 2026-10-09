@@ -107,164 +107,6 @@ def _finite(value: Any) -> bool:
     return type(value) in {int, float} and math.isfinite(value) and value >= 0
 
 
-def verify_expansion_phase_archive(scenario_root: Path) -> dict[str, Any]:
-    """Bind final phase evidence outside the removable case-owned tree."""
-    try:
-        root = Path(scenario_root)
-        outcome = _json(root, "outcome.json")
-        if outcome.get("contract") != "waapi-skill.integration-expansion-project-outcome/v2":
-            return {"phase_timing_measured": False}
-        sealed = _json(root, "evidence/phase-timing.json")
-        digest = sealed.pop("sha256", None)
-        checks = outcome["checks"]
-        _require(digest == canonical_digest(sealed) == checks.get("phase_timing_sha256")
-            and checks.get("phase_timing") == sealed, "scenario phase timing seal mismatch")
-        _validate_phase_timing(sealed)
-        exhausted = any(row["exhausted"] for row in sealed["phases"].values())
-        if exhausted:
-            _require(outcome.get("status") == "BLOCKED"
-                and checks.get("phase_infrastructure", {}).get("kind") == "cooperative_phase_exhaustion",
-                "exhausted phase was not classified as incomplete infrastructure")
-        if outcome.get("status") in {"PASS", "BOUNDARY_PROVEN"}:
-            _require(all(row["measured"] for row in sealed["phases"].values()),
-                "successful outcome omitted measured phase work")
-        task = checks.get("task")
-        if task is not None:
-            _require(isinstance(task, dict) and task.get("phase_timing_sha256") == digest,
-                "scenario/task phase timing binding mismatch")
-        for name in ("fixture_gateway_receipts", "trusted_oracle_calls"):
-            receipts = checks.get(name, [])
-            _require(isinstance(receipts, list), "invalid measured receipt list")
-            for receipt in receipts:
-                timing = receipt.get("timing") if isinstance(receipt, dict) else None
-                _require(isinstance(timing, dict) and _finite(timing.get("elapsed_seconds")),
-                    "receipt omitted valid elapsed timing")
-                if name == "fixture_gateway_receipts":
-                    _require(set(timing) == {"elapsed_seconds", "subprocess_seconds", "gateway_seconds"}
-                        and _finite(timing["subprocess_seconds"]) and 0 < timing["subprocess_seconds"] <= 45
-                        and _finite(timing["gateway_seconds"]) and timing["gateway_seconds"] == min(30, timing["subprocess_seconds"]),
-                        "setup receipt timing bounds changed")
-                else:
-                    wait = timing.get("effective_wait_seconds")
-                    _require(set(timing) == {"elapsed_seconds", "effective_wait_seconds", "component_wait_seconds"}
-                        and type(timing["component_wait_seconds"]) in {int, float} and timing["component_wait_seconds"] == 180
-                        and ((wait is None and receipt.get("result_type") is None)
-                            or _finite(wait) and 0 < wait <= 180), "direct receipt timing bounds changed")
-        return {"phase_timing_measured": True, "phase_timing_sha256": digest,
-                "phase_infrastructure_exhausted": exhausted}
-    except ExpansionArchiveError:
-        raise
-    except Exception as exc:
-        raise ExpansionArchiveError(f"invalid scenario phase timing: {type(exc).__name__}: {exc}") from exc
-
-
-def _phase_timing(root, plan, result):
-    from tests.semantic.support.codex_expansion_timing import CONTRACT, PHASES, phase_policy
-    policy = plan.get("phase_timing_policy")
-    if policy is None:
-        _require(plan.get("contract") != "waapi-skill.integration-expansion-task-plan/v2", "new timing plan omitted policy")
-        _require("phase_timing_sha256" not in result, "timing evidence has no sealed policy")
-        return {"phase_timing_measured": False}
-    _require(policy == phase_policy(), "phase timing policy changed")
-    sealed = _json(root, "expansion-phase-timing.json")
-    digest = sealed.pop("sha256", None)
-    _require(digest == canonical_digest(sealed) == result.get("phase_timing_sha256"),
-        "phase timing digest or terminal binding mismatch")
-    _validate_phase_timing(sealed)
-    scopes = {row["scope"] for row in sealed["intervals"]}
-    _require({"prelaunch", "postlaunch", "launch-through-readiness", "runtime-teardown",
-        "oracle-close", "lifecycle-total", "wwise-shutdown", "source-proof"}.issubset(scopes),
-        "phase timing lacks complete measured task lifecycle")
-    return {"phase_timing_measured": True, "phase_timing_sha256": digest,
-        "phase_infrastructure_exhausted": any(row["exhausted"] for row in sealed["phases"].values())}
-
-
-def _validate_phase_timing(value):
-    from tests.semantic.support.codex_expansion_timing import CONTRACT, PHASES, phase_policy
-    _require(set(value) == {"contract", "policy", "phases", "intervals"}
-        and value["contract"] == CONTRACT and value["policy"] == phase_policy()
-        and isinstance(value["phases"], dict) and set(value["phases"]) == set(PHASES)
-        and isinstance(value["intervals"], list) and 0 < len(value["intervals"]) <= 4096,
-        "invalid fixed phase timing evidence")
-    scopes = {"startup": {"launch-through-readiness"}, "preparation": {"prelaunch", "postlaunch"},
-        "oracle": {"fixture-before", "preview-before", "preview-after", "verification-snapshot",
-                   "verification-assertions", "direct-connect", "direct-rpc"},
-        "cleanup": {"runtime-teardown", "oracle-close", "lifecycle-total", "wwise-shutdown",
-                    "source-proof", "owned-removal", "post-shutdown-oracle-close",
-                    "start-failure-recovery", "failure-reconciliation"}}
-    rows, previous_start = {}, None
-    keys = {"sequence", "phase", "scope", "parent", "attribution", "recovery",
-        "component_bounds_seconds", "started_seconds", "finished_seconds", "elapsed_seconds", "status", "error_type"}
-    for index, row in enumerate(value["intervals"], 1):
-        _require(isinstance(row, dict) and keys.issubset(row) and set(row) <= keys | {"effective_wait_seconds"},
-            "malformed phase timing interval")
-        phase, start, finish = row["phase"], row["started_seconds"], row["finished_seconds"]
-        _require(type(row["sequence"]) is int and row["sequence"] == index
-            and phase in scopes and row["scope"] in scopes[phase]
-            and all(_finite(row[key]) for key in ("started_seconds", "finished_seconds", "elapsed_seconds"))
-            and finish >= start and math.isclose(finish - start, row["elapsed_seconds"], rel_tol=0, abs_tol=1e-9)
-            and (previous_start is None or start >= previous_start), "invalid/reordered phase timing measurement")
-        _require(type(row["recovery"]) is bool and row["status"] in {"completed", "error"}
-            and (row["error_type"] is None if row["status"] == "completed" else
-                 isinstance(row["error_type"], str) and bool(row["error_type"]))
-            and isinstance(row["component_bounds_seconds"], dict)
-            and all(isinstance(key, str) and _finite(bound) and bound > 0
-                    for key, bound in row["component_bounds_seconds"].items()), "invalid timing completion/bounds")
-        if "effective_wait_seconds" in row:
-            _require(row["scope"] in {"direct-connect", "direct-rpc"}
-                and _finite(row["effective_wait_seconds"]) and 0 < row["effective_wait_seconds"] <= (30 if row["scope"] == "direct-connect" else 180),
-                "invalid effective direct wait")
-        parent = row["parent"]
-        if parent is None:
-            _require(row["attribution"] == ("agent" if phase == "oracle" else phase), "top-level timing attribution changed")
-        else:
-            _require(type(parent) is int and parent in rows, "invalid timing parent")
-            owner = rows[parent]
-            _require(owner["started_seconds"] <= start <= finish <= owner["finished_seconds"]
-                and row["attribution"] == owner["phase"], "timing overlap attribution changed")
-        ancestors, cursor = set(), parent
-        while cursor is not None:
-            ancestors.add(cursor)
-            cursor = rows[cursor]["parent"]
-        _require(all(prior["finished_seconds"] <= start or prior_id in ancestors
-                     for prior_id, prior in rows.items()), "inconsistent timing interval overlap")
-        _require(phase != "cleanup" or row["recovery"] is True, "cleanup recovery timing changed")
-        if "effective_wait_seconds" in row:
-            applicable = {phase} | {rows[ancestor]["phase"] for ancestor in ancestors}
-            for name in applicable:
-                allowance = phase_policy()["allowances_seconds"][name]
-                if allowance is None:
-                    continue
-                elapsed, end = 0.0, None
-                for earlier in rows.values():
-                    if earlier["phase"] != name:
-                        continue
-                    left, right = earlier["started_seconds"], min(start, earlier["finished_seconds"])
-                    elapsed += max(0.0, right - (left if end is None else max(left, end)))
-                    end = right if end is None else max(end, right)
-                remaining = max(0.0, allowance - elapsed)
-                _require((row["recovery"] is True and remaining == 0)
-                    or 0 < row["effective_wait_seconds"] <= remaining + 1e-9,
-                    "direct wait exceeds remaining phase allowance")
-        rows[index], previous_start = row, start
-    for phase in PHASES:
-        selected = [row for row in rows.values() if row["phase"] == phase]
-        elapsed, end = 0.0, None
-        for row in selected:
-            start, finish = row["started_seconds"], row["finished_seconds"]
-            elapsed += max(0.0, finish - (start if end is None else max(start, end)))
-            end = finish if end is None else max(end, finish)
-        summary = value["phases"][phase]
-        allowance = phase_policy()["allowances_seconds"][phase]
-        _require(isinstance(summary, dict) and set(summary) == {"elapsed_seconds", "measured", "exhausted", "errors"}
-            and _finite(summary["elapsed_seconds"])
-            and math.isclose(summary["elapsed_seconds"], elapsed, rel_tol=0, abs_tol=1e-9)
-            and type(summary["measured"]) is bool and summary["measured"] is bool(selected)
-            and type(summary["exhausted"]) is bool and summary["exhausted"] is (allowance is not None and elapsed >= allowance)
-            and type(summary["errors"]) is int and summary["errors"] == sum(row["status"] == "error" for row in selected),
-            "phase timing summary or cumulative allowance mismatch")
-
-
 def _case(plan: Mapping[str, Any]) -> tuple[Any, str]:
     case_id = str(plan["unit_id"]).split("-")[-1]
     _require(case_id in _CASE_MODULES, "unknown expansion case")
@@ -934,7 +776,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     digest = plan.pop("sha256", None)
     _require(digest == canonical_digest(plan), "plan digest mismatch")
     _require(plan.get("inputs_sha256") == inputs_sha256, "immutable campaign inputs mismatch")
-    _require(plan.get("contract") in {"waapi-skill.integration-expansion-task-plan/v1", "waapi-skill.integration-expansion-task-plan/v2"}
+    _require(plan.get("contract") == "waapi-skill.integration-expansion-task-plan/v1"
         and plan.get("unit_id") == unit_id and plan.get("version") == version, "task plan identity mismatch")
     if "notice_adjudication" in plan:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, CONTRACT as legacy_notice_contract
@@ -959,7 +801,6 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     result = _json(root, "expansion-task-result.json")
     _require(type(result.get("passed")) is bool and result.get("unit_id") == unit_id
         and result.get("version") == version and result.get("plan_sha256") == digest, "terminal result binding mismatch")
-    timing = _phase_timing(root, plan, result)
     broker = _json(root, "expansion-broker.json")
     budget = _json(root, "expansion-agent-budget.json")
     oracle = _json(root, "expansion-oracle.json")
@@ -1145,7 +986,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(result.get("status", original_status) == original_status, "original outcome classification changed")
     if "status" in result and not result["passed"]:
         _require(reconciliation is not None, "classified negative outcome omitted reconciliation")
-    return {"archive_valid": True, **timing, "original_status": original_status,
+    return {"archive_valid": True, "original_status": original_status,
         "business_pass": result["passed"], "preview_approved": preview_approval,
         "gateway_verification_state": result.get("gateway_verification_state"),
         "agent_seconds": budget["elapsed_seconds"], "slow": budget["slow"], "reconciliation": reconciliation,
@@ -1203,7 +1044,6 @@ def verify_expansion_boundary_archive(scenario_root: Path, *, expected_unit_id: 
         expected_version: str, expected_inputs_sha256: str) -> dict[str, Any]:
     """M05/2022 unavailable-reference evidence is never an Agent/business PASS."""
     try:
-        timing = verify_expansion_phase_archive(scenario_root)
         outcome = _json(Path(scenario_root), "outcome.json")
         _require((expected_unit_id, expected_version) == ("EXP22-M05", "2022.1")
             and outcome.get("scenario_id") == expected_unit_id and outcome.get("version") == expected_version
@@ -1223,7 +1063,7 @@ def verify_expansion_boundary_archive(scenario_root: Path, *, expected_unit_id: 
             and evidence["identity_before"] == evidence.get("identity_after")
             and evidence.get("agent_executed") is False and evidence.get("business_effect_verified") is False,
                  "unavailable references were not independently reproduced")
-        return {"archive_valid": True, **timing, "boundary_proven": True, "business_pass": False,
+        return {"archive_valid": True, "boundary_proven": True, "business_pass": False,
                 "agent_started": False, "original_status": "BOUNDARY_PROVEN"}
     except ExpansionArchiveError:
         raise

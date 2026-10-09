@@ -14,7 +14,6 @@ import json
 import os
 import shutil
 import stat
-from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -201,13 +200,11 @@ class ScenarioLifecycle:
         launch_environment_overrides: Mapping[str, str] | None = None,
         owned_wine_prefix: Path | None = None,
         lock_root: Path = GLOBAL_LIVE_LIFECYCLE_LOCK_ROOT,
-        phase_timing=None,
     ) -> None:
         if not scenario_id or not scenario_id.strip():
             raise ValueError("scenario_id must be non-empty")
         if version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}:
             raise ValueError(f"unsupported Wwise version: {version}")
-        self.phase_timing = phase_timing
         self.scenario_id = scenario_id
         self.version = version
         self.scenario_root = Path(scenario_root).expanduser().resolve(strict=False)
@@ -229,10 +226,6 @@ class ScenarioLifecycle:
         self._launch_environment_symlink_baseline: (
             dict[str, tuple[tuple[str, str], ...]] | None
         ) = None
-
-    def _measure(self, phase, scope, *, component_bounds=None):
-        return (self.phase_timing.measure(phase, scope, recovery=phase == "cleanup",
-                    component_bounds=component_bounds) if self.phase_timing is not None else nullcontext())
 
     def start(self) -> ScenarioRuntime:
         if self.runtime is not None or self._finished:
@@ -273,41 +266,33 @@ class ScenarioLifecycle:
         source_mtime_before_ns: int | None = None
         stage = "lock-acquire"
         try:
-            with self._measure("preparation", "prelaunch"):
-                self.lock.__enter__()
-                self._lock_acquired = True
-                stage = "sandbox-copy"
-                sandbox = prepare_sample_project_sandbox(
+            self.lock.__enter__()
+            self._lock_acquired = True
+            stage = "sandbox-copy"
+            sandbox = prepare_sample_project_sandbox(
+                env,
+                sandbox_root=sandbox_root,
+                hash_strategy="full",
+            )
+            stage = "source-before-proof"
+            source_hash_before = hash_project(
+                sandbox.source_root,
+                preferred_strategy="full",
+            )
+            source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
+            if self.prelaunch_hook is not None:
+                stage = "prelaunch"
+                self.prelaunch_hook(sandbox, asset_root, io_root)
+            stage = "wwise-launch"
+            if self.owned_wine_prefix is None:
+                lifecycle = launch_sandboxed_wwise(sandbox, env)
+            else:
+                lifecycle = launch_sandboxed_wwise(
+                    sandbox,
                     env,
-                    sandbox_root=sandbox_root,
-                    hash_strategy="full",
+                    wine_prefix_path=self.owned_wine_prefix,
+                    case_owned_root=owned_root,
                 )
-                stage = "source-before-proof"
-                source_hash_before = hash_project(
-                    sandbox.source_root,
-                    preferred_strategy="full",
-                )
-                source_mtime_before_ns = sandbox.source_project.stat().st_mtime_ns
-                if self.prelaunch_hook is not None:
-                    stage = "prelaunch"
-                    self.prelaunch_hook(sandbox, asset_root, io_root)
-            if self.phase_timing is not None:
-                self.phase_timing.bounded_wait(1, phase="preparation")
-            with self._measure("startup", "launch-through-readiness", component_bounds={
-                "startup": float(env.get("WWISE_STARTUP_TIMEOUT", "10")),
-                "readiness": float(env.get("WWISE_READINESS_TIMEOUT", "60")),
-                "probe": float(env.get("WWISE_PROBE_TIMEOUT", "5")),
-            }):
-                stage = "wwise-launch"
-                if self.owned_wine_prefix is None:
-                    lifecycle = launch_sandboxed_wwise(sandbox, env)
-                else:
-                    lifecycle = launch_sandboxed_wwise(
-                        sandbox,
-                        env,
-                        wine_prefix_path=self.owned_wine_prefix,
-                        case_owned_root=owned_root,
-                    )
             stage = "wwise-launch-identity"
             if lifecycle.port is None or str(sandbox.sandbox_project) not in lifecycle.command:
                 raise ScenarioLifecycleError(
@@ -374,124 +359,123 @@ class ScenarioLifecycle:
             )
             return self.runtime
         except BaseException as primary_exc:
-            with self._measure("cleanup", "start-failure-recovery"):
-                proof_errors: list[str] = []
-                wwise_stop_status = "not-started"
-                if lifecycle is not None and sandbox is not None:
-                    try:
-                        shutdown_sandboxed_wwise(lifecycle, sandbox, suppress_errors=False)
-                    except BaseException as exc:  # noqa: BLE001 - residuals poison the lane
-                        proof_errors.append(_format_error("wwise-start-cleanup", exc))
-                        wwise_stop_status = "unproven"
-                    else:
-                        wwise_stop_status = "stopped"
-                elif stage == "wwise-launch" and sandbox is not None:
-                    # launch_sandboxed_wwise owns its internal lifecycle until it
-                    # returns.  On a failed readiness attempt it records whether
-                    # that internal process cleanup was complete.
-                    cleanup_result = getattr(
-                        sandbox.metadata,
-                        "process_cleanup_result",
-                        None,
-                    )
-                    if cleanup_result == "cleaned":
-                        wwise_stop_status = "stopped-by-launch-helper"
-                    else:
-                        proof_errors.append(
-                            "wwise-start-cleanup:unproven launch-helper cleanup:"
-                            f"{cleanup_result!r}"
-                        )
-                        wwise_stop_status = "unproven"
-
-                source_hash_after: ProjectHash | None = None
-                source_mtime_after_ns: int | None = None
-                if (
-                    sandbox is not None
-                    and source_hash_before is not None
-                    and source_mtime_before_ns is not None
-                ):
-                    try:
-                        source_hash_after = hash_project(
-                            sandbox.source_root,
-                            preferred_strategy="full",
-                        )
-                        source_mtime_after_ns = sandbox.source_project.stat().st_mtime_ns
-                        if source_hash_after != source_hash_before:
-                            raise ScenarioLifecycleError(
-                                "immutable SampleProject source hash changed during failed start"
-                            )
-                        if source_mtime_after_ns != source_mtime_before_ns:
-                            raise ScenarioLifecycleError(
-                                "immutable SampleProject source mtime changed during failed start"
-                            )
-                    except BaseException as exc:  # noqa: BLE001 - source proof is systemic
-                        proof_errors.append(_format_error("source-start-proof", exc))
-
-                launch_environment_archive_path: Path | None = None
-                if wwise_stop_status in {
-                    "not-started",
-                    "stopped",
-                    "stopped-by-launch-helper",
-                }:
-                    try:
-                        launch_environment_archive_path = (
-                            self._archive_launch_environment_roots(
-                                evidence_root=evidence_root,
-                                owned_root=owned_root,
-                                phase="start-failure",
-                                require_ready_baseline=False,
-                            )
-                        )
-                    except BaseException as exc:  # noqa: BLE001 - archive gates sealing
-                        proof_errors.append(
-                            _format_error("launch-environment-archive", exc)
-                        )
-
-                if sandbox is not None:
-                    sandbox.metadata.keep_decision = "quarantined-after-start-failure"
-                    try:
-                        sandbox.write_metadata()
-                    except BaseException as exc:  # noqa: BLE001
-                        proof_errors.append(_format_error("start-metadata", exc))
+            proof_errors: list[str] = []
+            wwise_stop_status = "not-started"
+            if lifecycle is not None and sandbox is not None:
                 try:
-                    self._release_lock_best_effort()
-                except BaseException as exc:  # noqa: BLE001 - lock uncertainty poisons the lane
-                    proof_errors.append(_format_error("sandbox-lock-release", exc))
-
-                evidence_path: Path | None = evidence_root / "start-failure.json"
-                try:
-                    _write_json(
-                        evidence_path,
-                        {
-                            "contract": SCENARIO_START_FAILURE_CONTRACT,
-                            "scenario_id": self.scenario_id,
-                            "version": self.version,
-                            "failed_at": _utc_now(),
-                            "stage": stage,
-                            "primary_error": _format_error("start", primary_exc),
-                            "wwise_stop_status": wwise_stop_status,
-                            "source_hash_before": (
-                                asdict(source_hash_before) if source_hash_before else None
-                            ),
-                            "source_hash_after": (
-                                asdict(source_hash_after) if source_hash_after else None
-                            ),
-                            "source_mtime_before_ns": source_mtime_before_ns,
-                            "source_mtime_after_ns": source_mtime_after_ns,
-                            "owned_root": str(owned_root),
-                            "owned_tree_sha256": stable_tree_sha256(owned_root),
-                            "launch_environment_archive_path": (
-                                str(launch_environment_archive_path)
-                                if launch_environment_archive_path is not None
-                                else None
-                            ),
-                            "errors": list(proof_errors),
-                            "never_reuse": True,
-                        },
+                    shutdown_sandboxed_wwise(lifecycle, sandbox, suppress_errors=False)
+                except BaseException as exc:  # noqa: BLE001 - residuals poison the lane
+                    proof_errors.append(_format_error("wwise-start-cleanup", exc))
+                    wwise_stop_status = "unproven"
+                else:
+                    wwise_stop_status = "stopped"
+            elif stage == "wwise-launch" and sandbox is not None:
+                # launch_sandboxed_wwise owns its internal lifecycle until it
+                # returns.  On a failed readiness attempt it records whether
+                # that internal process cleanup was complete.
+                cleanup_result = getattr(
+                    sandbox.metadata,
+                    "process_cleanup_result",
+                    None,
+                )
+                if cleanup_result == "cleaned":
+                    wwise_stop_status = "stopped-by-launch-helper"
+                else:
+                    proof_errors.append(
+                        "wwise-start-cleanup:unproven launch-helper cleanup:"
+                        f"{cleanup_result!r}"
                     )
-                except BaseException as exc:  # noqa: BLE001 - retain primary failure
-                    proof_errors.append(_format_error("start-failure-evidence", exc))
-                    evidence_path = None
+                    wwise_stop_status = "unproven"
+
+            source_hash_after: ProjectHash | None = None
+            source_mtime_after_ns: int | None = None
+            if (
+                sandbox is not None
+                and source_hash_before is not None
+                and source_mtime_before_ns is not None
+            ):
+                try:
+                    source_hash_after = hash_project(
+                        sandbox.source_root,
+                        preferred_strategy="full",
+                    )
+                    source_mtime_after_ns = sandbox.source_project.stat().st_mtime_ns
+                    if source_hash_after != source_hash_before:
+                        raise ScenarioLifecycleError(
+                            "immutable SampleProject source hash changed during failed start"
+                        )
+                    if source_mtime_after_ns != source_mtime_before_ns:
+                        raise ScenarioLifecycleError(
+                            "immutable SampleProject source mtime changed during failed start"
+                        )
+                except BaseException as exc:  # noqa: BLE001 - source proof is systemic
+                    proof_errors.append(_format_error("source-start-proof", exc))
+
+            launch_environment_archive_path: Path | None = None
+            if wwise_stop_status in {
+                "not-started",
+                "stopped",
+                "stopped-by-launch-helper",
+            }:
+                try:
+                    launch_environment_archive_path = (
+                        self._archive_launch_environment_roots(
+                            evidence_root=evidence_root,
+                            owned_root=owned_root,
+                            phase="start-failure",
+                            require_ready_baseline=False,
+                        )
+                    )
+                except BaseException as exc:  # noqa: BLE001 - archive gates sealing
+                    proof_errors.append(
+                        _format_error("launch-environment-archive", exc)
+                    )
+
+            if sandbox is not None:
+                sandbox.metadata.keep_decision = "quarantined-after-start-failure"
+                try:
+                    sandbox.write_metadata()
+                except BaseException as exc:  # noqa: BLE001
+                    proof_errors.append(_format_error("start-metadata", exc))
+            try:
+                self._release_lock_best_effort()
+            except BaseException as exc:  # noqa: BLE001 - lock uncertainty poisons the lane
+                proof_errors.append(_format_error("sandbox-lock-release", exc))
+
+            evidence_path: Path | None = evidence_root / "start-failure.json"
+            try:
+                _write_json(
+                    evidence_path,
+                    {
+                        "contract": SCENARIO_START_FAILURE_CONTRACT,
+                        "scenario_id": self.scenario_id,
+                        "version": self.version,
+                        "failed_at": _utc_now(),
+                        "stage": stage,
+                        "primary_error": _format_error("start", primary_exc),
+                        "wwise_stop_status": wwise_stop_status,
+                        "source_hash_before": (
+                            asdict(source_hash_before) if source_hash_before else None
+                        ),
+                        "source_hash_after": (
+                            asdict(source_hash_after) if source_hash_after else None
+                        ),
+                        "source_mtime_before_ns": source_mtime_before_ns,
+                        "source_mtime_after_ns": source_mtime_after_ns,
+                        "owned_root": str(owned_root),
+                        "owned_tree_sha256": stable_tree_sha256(owned_root),
+                        "launch_environment_archive_path": (
+                            str(launch_environment_archive_path)
+                            if launch_environment_archive_path is not None
+                            else None
+                        ),
+                        "errors": list(proof_errors),
+                        "never_reuse": True,
+                    },
+                )
+            except BaseException as exc:  # noqa: BLE001 - retain primary failure
+                proof_errors.append(_format_error("start-failure-evidence", exc))
+                evidence_path = None
             self._finished = True
             unsafe_to_continue = (
                 wwise_stop_status == "unproven"
@@ -522,11 +506,7 @@ class ScenarioLifecycle:
                 unsafe_to_continue=unsafe_to_continue,
             ) from primary_exc
 
-    def finish(self, status, *, reason="", post_shutdown_hook=None):
-        with self._measure("cleanup", "lifecycle-total"):
-            return self._finish(status, reason=reason, post_shutdown_hook=post_shutdown_hook)
-
-    def _finish(
+    def finish(
         self,
         status: str,
         *,
@@ -545,15 +525,11 @@ class ScenarioLifecycle:
             errors.append(f"scenario:{reason}")
 
         try:
-            with self._measure("cleanup", "wwise-shutdown", component_bounds={
-                "shutdown": getattr(getattr(runtime.lifecycle, "timeouts", None), "shutdown", 10),
-                "kill": getattr(getattr(runtime.lifecycle, "timeouts", None), "kill", 10),
-            }):
-                shutdown_sandboxed_wwise(
-                    runtime.lifecycle,
-                    runtime.sandbox,
-                    suppress_errors=False,
-                )
+            shutdown_sandboxed_wwise(
+                runtime.lifecycle,
+                runtime.sandbox,
+                suppress_errors=False,
+            )
         except BaseException as exc:  # noqa: BLE001 - cleanup faults block evidence
             errors.append(_format_error("wwise-shutdown", exc))
             shutdown_proved = False
@@ -561,27 +537,25 @@ class ScenarioLifecycle:
         source_hash_after: ProjectHash | None = None
         source_mtime_after_ns: int | None = None
         try:
-            with self._measure("cleanup", "source-proof"):
-                source_hash_after = hash_project(
-                    runtime.sandbox.source_root,
-                    preferred_strategy="full",
+            source_hash_after = hash_project(
+                runtime.sandbox.source_root,
+                preferred_strategy="full",
+            )
+            source_mtime_after_ns = runtime.sandbox.source_project.stat().st_mtime_ns
+            if source_hash_after != runtime.source_hash_before:
+                raise ScenarioLifecycleError(
+                    "immutable SampleProject source hash changed during the scenario"
                 )
-                source_mtime_after_ns = runtime.sandbox.source_project.stat().st_mtime_ns
-                if source_hash_after != runtime.source_hash_before:
-                    raise ScenarioLifecycleError(
-                        "immutable SampleProject source hash changed during the scenario"
-                    )
-                if source_mtime_after_ns != runtime.source_mtime_before_ns:
-                    raise ScenarioLifecycleError(
-                        "immutable SampleProject source project mtime changed during the scenario"
-                    )
+            if source_mtime_after_ns != runtime.source_mtime_before_ns:
+                raise ScenarioLifecycleError(
+                    "immutable SampleProject source project mtime changed during the scenario"
+                )
         except BaseException as exc:  # noqa: BLE001 - source drift is systemic
             errors.append(_format_error("source-project-proof", exc))
 
         if post_shutdown_hook is not None:
             try:
-                with self._measure("cleanup", "post-shutdown-oracle-close"):
-                    post_shutdown_hook(runtime)
+                post_shutdown_hook(runtime)
             except BaseException as exc:  # noqa: BLE001 - post-stop proof gates cleanup
                 errors.append(_format_error("post-shutdown-proof", exc))
                 post_shutdown_proved = False
@@ -618,14 +592,13 @@ class ScenarioLifecycle:
                 quarantine = self._write_quarantine(final_status, errors)
                 quarantine_path = str(quarantine)
             else:
-                with self._measure("cleanup", "owned-removal"):
-                    cleanup_sandbox(runtime.sandbox, keep=False, failed=False)
-                    if runtime.owned_root.exists():
-                        shutil.rmtree(runtime.owned_root, ignore_errors=False)
-                    if runtime.owned_root.exists():
-                        raise ScenarioLifecycleError(
-                            "successful scenario retained runner-owned runtime state"
-                        )
+                cleanup_sandbox(runtime.sandbox, keep=False, failed=False)
+                if runtime.owned_root.exists():
+                    shutil.rmtree(runtime.owned_root, ignore_errors=False)
+                if runtime.owned_root.exists():
+                    raise ScenarioLifecycleError(
+                        "successful scenario retained runner-owned runtime state"
+                    )
         except BaseException as exc:  # noqa: BLE001 - cleanup proof is systemic
             errors.append(_format_error("sandbox-cleanup", exc))
             final_status = "BLOCKED"

@@ -1438,7 +1438,6 @@ def _validate_expansion_outcome(outcome: Mapping[str, Any], *, expected_unit: An
                                 scenario_root: Path, options: CampaignOptions) -> None:
     from tests.semantic.support.codex_expansion_archive import (
         ExpansionArchiveError, verify_expansion_task_archive, verify_expansion_boundary_archive,
-        verify_expansion_phase_archive,
     )
     if not options.campaign_inputs_sha256:
         raise CampaignEvidenceError("expansion evidence lacks its frozen campaign input digest")
@@ -1447,9 +1446,6 @@ def _validate_expansion_outcome(outcome: Mapping[str, Any], *, expected_unit: An
     expected = dict(expected_unit_id=expected_unit.unit_id, expected_version=expected_unit.version,
                     expected_inputs_sha256=options.campaign_inputs_sha256)
     try:
-        phase_evidence = (verify_expansion_phase_archive(scenario_root)
-            if outcome.get("contract") == "waapi-skill.integration-expansion-project-outcome/v2"
-            else {"phase_timing_measured": False})
         if expected_unit.evidence_kind == "capability_boundary" and status == "BOUNDARY_PROVEN":
             evidence = verify_expansion_boundary_archive(scenario_root, **expected)
         elif task_root is not None:
@@ -1461,10 +1457,6 @@ def _validate_expansion_outcome(outcome: Mapping[str, Any], *, expected_unit: An
             return
     except ExpansionArchiveError as exc:
         raise CampaignEvidenceError(f"expansion archive is untrusted: {exc}") from exc
-    if phase_evidence.get("phase_timing_measured") is True:
-        if (outcome["checks"].get("phase_timing_sha256") != phase_evidence.get("phase_timing_sha256")
-                or (task_root is not None and evidence.get("phase_timing_sha256") != phase_evidence.get("phase_timing_sha256"))):
-            raise CampaignEvidenceError("scenario/task phase evidence differs from its authenticated outcome")
     task_result = outcome["checks"].get("task", {})
     task_passed = task_result.get("passed") is True
     if status == "BOUNDARY_PROVEN":

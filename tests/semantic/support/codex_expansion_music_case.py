@@ -191,7 +191,7 @@ def prepare_m01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     segment_name = "Imported"
     def snapshot():
         return _music_snapshot(ctx, parent_id=parent_object["id"], protected_id=keep["id"], segment_name=segment_name)
-    before = ctx.observe_before(snapshot)
+    before = snapshot()
     if before["segment"] is not None:
         raise CaseBoundaryError("M01 fixture unexpectedly already has the import target")
     return PreparedExpansionCase(

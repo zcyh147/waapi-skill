@@ -204,7 +204,7 @@ def prepare_c09(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     def snapshot() -> Mapping[str, Any]:
         return _effect_snapshot(ctx, owner["id"])
 
-    before = ctx.observe_before(snapshot)
+    before = snapshot()
     entries = before["entries"]
     if (len(entries) != 2 or {row["effect"]["name"] for row in entries}
             != {"Protected_Gain_0", "Protected_Gain_1"}

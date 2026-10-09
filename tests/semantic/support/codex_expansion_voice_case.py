@@ -278,7 +278,7 @@ def prepare_c01(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         return _voice_snapshot(ctx, sound_id=sound["id"], event_id=event["id"],
                                decoy_id=decoy_row["id"], parent_id=parent_row["id"])
 
-    before = ctx.observe_before(snapshot)
+    before = snapshot()
     if set(before["sources"]) != {"English(US)", "Japanese"}:
         raise CaseBoundaryError("C01 baseline must have exactly two Voice language associations")
     replacement_sha = hashlib.sha256(replacement.read_bytes()).hexdigest()

@@ -1675,7 +1675,7 @@ def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
 def run_expansion_codex_task(
     *, unit: Any, prepared: Any, task_root: Path, options: Any,
     runner_environment: Mapping[str, str], scoped_paths: Mapping[str, str],
-    reconcile_after_failure: Callable[[], Mapping[str, Any]], phase_timing=None,
+    reconcile_after_failure: Callable[[], Mapping[str, Any]],
 ) -> Mapping[str, Any]:
     """Use the existing fresh task/Broker with the opt-in outcome policy.
 
@@ -1694,7 +1694,7 @@ def run_expansion_codex_task(
     workspace = root / "agent-workspace"
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
     policy = ExpansionBrokerPolicy(prepared=prepared, version=unit.version,
-                                    skill_source=options.skill_source, scoped_paths=scoped_paths, phase_timing=phase_timing)
+                                    skill_source=options.skill_source, scoped_paths=scoped_paths)
     budget = CumulativeAgentBudget()
     prompts = (prepared.prompt,)
     if prepared.policy == "ask_before_changes":
@@ -1727,10 +1727,6 @@ def run_expansion_codex_task(
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_runtime_identity
         plan["notice_adjudication"] = {"configuration": reviewer_configuration(notice_contract),
             "runtime": reviewer_runtime_identity(options)}
-    if phase_timing is not None:
-        from tests.semantic.support.codex_expansion_timing import phase_policy
-        plan["contract"] = "waapi-skill.integration-expansion-task-plan/v2"
-        plan["phase_timing_policy"] = phase_policy()
     _write_json(root / "expansion-plan.json", {**plan, "sha256": canonical_digest(plan)})
     allowed_subcommands = (
         "status", "operations", "operation-schema", "request-schema", "query-schema", "query-object", "metadata",
