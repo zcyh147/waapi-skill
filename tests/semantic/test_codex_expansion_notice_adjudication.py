@@ -407,7 +407,7 @@ def test_exact_pre_execution_witness_produces_business_obligations_without_regra
 
 
 def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None, text=None, transaction_id=None,
-        adjudication_contract=None, user_prompt=None, public_reads=(), subprocess_commands=None):
+        adjudication_contract=None, user_prompt=None, public_reads=(), subprocess_commands=None, draft_discoveries=()):
     """Complete real-TransactionStore fixture through runner grade and archive."""
     import hashlib
     import importlib
@@ -492,8 +492,10 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     oracle['permit'].update(transaction_id=tx, artifact_sha256=artifact_hash, authorized_turn=2 if ask else 1)
     _write(root / 'expansion-oracle.json', oracle)
     original = json.loads((root / 'expansion-broker.json').read_text())['records']
-    args = [list(argv) for argv, _ in public_reads] + [['draft-start', plan['request_schema_uri'] or plan['operation']],
-        ['preview-from-draft', 'draft', '--task-authority', 'auth', '--expected-revision', '1']]
+    args = [list(argv) for argv, _ in public_reads] + [['draft-start', plan['request_schema_uri'] or plan['operation']]]
+    args += [[argv[0], 'draft', '--task-authority', 'auth', '--expected-revision', str(index), *argv[1:]]
+        for index, (argv, _) in enumerate(draft_discoveries, 1)]
+    args += [['preview-from-draft', 'draft', '--task-authority', 'auth', '--expected-revision', str(1 + len(draft_discoveries))]]
     preview_index = len(args)
     if ask: args.append(['confirm', tx, '--confirmation-token', token])
     args += [['execute', tx], ['verify', tx]]
@@ -507,10 +509,17 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
         template = deepcopy(original[0 if argv[0] == 'draft-start' else 1 if argv[0] == 'preview-from-draft' else 2 if argv[0] in {'execute', 'confirm'} else 3])
         model = ['python', plan['skill_source'] + '/scripts/run.py', 'gateway.py', *argv]
         semantic = ['runner-owned-version', version, *argv]
-        if '--expected-revision' in argv: semantic[-1] = 1
+        if '--expected-revision' in argv: semantic[semantic.index('--expected-revision') + 1] = int(argv[argv.index('--expected-revision') + 1])
         payload = deepcopy(public_reads[index - 1][1]) if index <= len(public_reads) else template['payload']
+        if len(public_reads) + 1 < index <= len(public_reads) + 1 + len(draft_discoveries):
+            payload = deepcopy(draft_discoveries[index - len(public_reads) - 2][1])
         template['payload'] = payload
         payload['command'] = argv[0]
+        if draft_discoveries and argv[0] in {'draft-start', 'draft-discover-types', 'draft-discover-fields'}:
+            payload.update(ok=True, offline=argv[0] == 'draft-start', detected_version=version,
+                draft={'draft_id': 'draft', 'revision': index - len(public_reads),
+                    'binding': {'operation': artifact['request']['operation'], 'version': version},
+                    'response_integrity': {'complete': True, 'truncated': False}})
         if argv[0] not in {'draft-start', 'query-object', 'metadata', 'query-schema'}: payload.update(transaction_id=tx, artifact_hash=artifact_hash)
         if argv[0] == 'preview-from-draft':
             authorization = ({'mode': 'explicit_confirmation', 'policy': 'ask_before_changes',

@@ -194,7 +194,7 @@ def test_malformed_or_conflicting_receipt_semantics_fail_closed(acquired_context
 
 def test_v7_adds_only_bound_facts_and_aliases_exact_v6_rubric_and_high_settings(acquired_context):
     from types import SimpleNamespace
-    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice, CONTRACT
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice, AUTHORIZATION_CONTRACT as CONTRACT
     from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_rubric
     from tests.semantic.support.codex_expansion_policy import canonical_digest
     assert CONTRACT == V7

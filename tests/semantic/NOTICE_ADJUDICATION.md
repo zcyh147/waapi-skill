@@ -1,6 +1,27 @@
 # Limited notice adjudication and development gates
 
-## Current prospective checkpoint — v7, #147
+## Current prospective checkpoint — v8, #147
+
+New plans use `waapi-skill.expansion-notice-adjudication/v8`, adding only closed
+`pre_execution_draft_discoveries` for authenticated `draft-discover-types` and
+`draft-discover-fields` receipts. Exact event/receipt equality and Draft revision
+lineage bind acquisition to the matching immutable Preview. Meaning, role/scope,
+candidate labels, typed restrictions, counts and partial projections remain
+distinct from selection, current values, catalog completeness and fresh network
+retrieval. Acquisition is session-bound live metadata; freshness is unattested.
+Authority, handles and continuations stay outside the projection.
+
+V8 retains exact v7/v6 rubric bytes and High/default settings. V1–v7 configuration,
+input and replay remain unchanged. The compact real witness explicitly separates
+original provenance from redacted commands and reconstructed receipt/timeline
+digests. Fake runner/archive tests prove both discovery families, scope and
+typed-value rejection, credentials, legacy pins, invocation binding and tampering;
+they prove plumbing, not language accuracy. Focused validation passed 406 / skipped
+one native-Windows-only case; `notice-fast` passed 3860 / skipped the same case,
+both exit 0. Combined promotion and new Fresh acceptance remain coordinator-owned.
+No Wwise/model run or historical replay/regrade occurred here.
+
+## Earlier prospective checkpoint — v7, #147
 
 New plans use `waapi-skill.expansion-notice-adjudication/v7`, adding only
 `pre_execution_authorization` from the authenticated matching Preview receipt.
