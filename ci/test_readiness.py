@@ -12,6 +12,18 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable, Mapping
 from pathlib import Path, PurePosixPath
 
+if __package__:
+    from .run_program_tests import PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE
+else:
+    from run_program_tests import PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE
+
+# Reuse the closed launcher options, plus ordinary Non-live selection/path flags.
+_NONLIVE_PYTEST_OPTIONS_REQUIRING_VALUE = PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE | {
+    '-m', '-r', '-c', '-o', '--override-ini', '--ignore', '--ignore-glob',
+    '--deselect', '--basetemp', '--rootdir', '--confcutdir', '--junitxml',
+    '--junit-xml', '--log-file', '--log-level', '--log-file-level',
+}
+
 
 class ReadinessBlocked(ValueError):
     """The selected lane cannot dispatch safely with its current prerequisites."""
@@ -212,18 +224,41 @@ _STATIC_AUDIT_FIXTURE_NODES = {
 }
 
 
+def _nonlive_pytest_token_roles(arguments: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Identify positive locators without reinterpreting or validating pytest values."""
+    selectors: list[str] = []
+    options: list[str] = []
+    expects_value = False
+    literal_selectors = False
+    for argument in arguments:
+        if literal_selectors:
+            selectors.append(argument)
+            continue
+        if expects_value:
+            expects_value = False
+            continue
+        if argument == '--':
+            literal_selectors = True
+            continue
+        if argument.startswith('-'):
+            options.append(argument.split('=', 1)[0])
+            expects_value = argument in _NONLIVE_PYTEST_OPTIONS_REQUIRING_VALUE
+            continue
+        selectors.append(argument)
+    return tuple(selectors), tuple(options)
+
+
 def validate_nonlive_readiness(repo_root: Path, pytest_args: tuple[str, ...]) -> None:
     """Check bounded known static selections, not general pytest dependencies."""
-    if '--collect-only' in pytest_args:
+    selectors, options = _nonlive_pytest_token_roles(pytest_args)
+    if any(option in {'--collect-only', '--co'} for option in options):
         return
     from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
     root = repo_root.resolve()
     broad_roots = {root, root / 'tests', root / 'tests' / 'unit'}
     selected_versions: set[str] = set()
     broad = False
-    for argument in pytest_args:
-        if argument.startswith('-'):
-            continue
+    for argument in selectors:
         selector = Path(argument.split('::', 1)[0]).expanduser()
         if not selector.is_absolute():
             selector = root / selector
@@ -239,11 +274,10 @@ def validate_nonlive_readiness(repo_root: Path, pytest_args: tuple[str, ...]) ->
             )):
                 continue
             selected_versions.update(_STATIC_FIXTURE_TEST_VERSIONS.get(relative, ()))
-    focused = any(
-        arg in {'-k', '-m', '--collect-only', '--deselect', '--ignore', '--ignore-glob', '--pyargs'}
-        or arg.startswith(('-k', '-m', '--deselect=', '--ignore=', '--ignore-glob='))
-        or (not arg.startswith('-') and (arg.endswith('.py') or '::' in arg or arg.startswith('tests/')))
-        for arg in pytest_args
+    focused = bool(selectors) or any(
+        option in {'--deselect', '--ignore', '--ignore-glob', '--pyargs'}
+        or option.startswith(('-k', '-m'))
+        for option in options
     )
     if broad or not focused:
         selected_versions.update(SUPPORTED_WWISE_VERSION_KEYS)

@@ -403,3 +403,55 @@ def test_known_fixture_free_node_preserves_unrelated_fixture_independence(tmp_pa
         command_runner=lambda command, **kwargs: (calls.append(command) or subprocess.CompletedProcess(command, 7)))
     assert result == 7
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize('option_args', [
+    ('--ignore', 'tests/unit'), ('--ignore=tests/unit',),
+    ('--ignore-glob', 'tests/unit/*'), ('--ignore-glob=tests/unit/*',),
+    ('--deselect', 'tests/unit/test_org_fixture_source.py::test_org_fixture_manifest_hashes_match_committed_files'),
+    ('--deselect=tests/unit/test_org_fixture_source.py::test_org_fixture_manifest_hashes_match_committed_files',),
+    ('-k', 'tests/unit'), ('-k=tests/unit',),
+    ('-m', 'tests/unit'), ('-m=tests/unit',),
+    ('--basetemp', 'tests/unit'), ('--basetemp=tests/unit',),
+    ('-c', 'tests/unit/test_org_fixture_source.py'),
+    ('-o', 'tests/unit'),
+])
+def test_option_operands_do_not_become_positive_static_selectors(tmp_path, option_args):
+    repo = Path(__file__).resolve().parents[2]
+    (tmp_path / 'pyproject.toml').write_bytes((repo / 'pyproject.toml').read_bytes())
+    calls = []
+    pytest_args = ('tests/semantic/test_codex_harness.py', *option_args, '-q')
+    result = developer_launch(('--mode', 'nonlive', '--', *pytest_args), repo_root=tmp_path,
+        command_runner=lambda command, **kwargs: (calls.append((command, kwargs)) or subprocess.CompletedProcess(command, 7)))
+    assert result == 7
+    assert len(calls) == 1
+    assert calls[0][0][-len(pytest_args):] == pytest_args
+    assert calls[0][1]['shell'] is False
+
+
+@pytest.mark.parametrize('positive_selection', [
+    'tests/',
+    'tests/unit/test_org_fixture_source.py::test_org_fixture_manifest_hashes_match_committed_files',
+])
+@pytest.mark.parametrize('option_args', [
+    ('--ignore', 'tests/semantic'), ('--ignore=tests/semantic',),
+    ('-k', 'tests/unit'), ('-m', 'tests/unit'),
+])
+def test_positive_root_or_static_selector_still_controls_readiness(tmp_path, positive_selection, option_args):
+    repo = Path(__file__).resolve().parents[2]
+    (tmp_path / 'pyproject.toml').write_bytes((repo / 'pyproject.toml').read_bytes())
+    calls = []
+    result = developer_launch(('--mode', 'nonlive', '--', positive_selection, *option_args, '-q'),
+        repo_root=tmp_path, command_runner=lambda command, **kwargs: calls.append(command))
+    assert result == 1
+    assert calls == []
+
+
+def test_nonselection_option_operand_does_not_hide_default_complete_selection(tmp_path):
+    repo = Path(__file__).resolve().parents[2]
+    (tmp_path / 'pyproject.toml').write_bytes((repo / 'pyproject.toml').read_bytes())
+    calls = []
+    result = developer_launch(('--mode', 'nonlive', '--', '--basetemp', 'tests/unit', '-q'),
+        repo_root=tmp_path, command_runner=lambda command, **kwargs: calls.append(command))
+    assert result == 1
+    assert calls == []
