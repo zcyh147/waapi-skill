@@ -38,7 +38,9 @@ from tests.semantic.support.codex_harness import (
     classify_codex_infrastructure_failure,
     workspace_skill_install_path,
 )
-from tests.semantic.support.codex_gateway_broker import resolve_gateway_invocation, _validate_branching_execute_payload
+from tests.semantic.support.codex_gateway_broker import (
+    resolve_gateway_invocation, _validate_branching_execute_payload, _BROKER_INDETERMINATE,
+)
 from tests.semantic.support.codex_transaction_seal import (
     _validate_artifact, _validate_legal_event_states,
 )
@@ -801,7 +803,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     records = _receipts(root, plan, broker)
     if any(is_public_query_timeout_failure(record.get("payload") or {}) for record in records):
         _require(result["passed"] is False and broker.get("passed") is False
-            and broker.get("complete") is False and broker.get("terminal_state") == "indeterminate",
+            and broker.get("complete") is False and broker.get("terminal_state") == _BROKER_INDETERMINATE,
             "query timeout is terminal infrastructure and cannot seal a PASS")
     turns = _turns(root, plan, result, budget, records, oracle)
     mutations = [row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["execute"]]

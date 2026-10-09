@@ -1327,7 +1327,11 @@ def test_rejected_declaration_requires_exact_bound_draft_and_terminal_no_dispatc
 
 def _sealed_post_verification_query_timeout(root, *, continuation=False, fabricated_pass=False):
     """Exact authenticated read failure after a separately verified transaction."""
-    from tests.semantic.test_codex_expansion_broker_reads import query_timeout_receipt
+    from tests.semantic.test_codex_expansion_broker_reads import query_timeout_receipt, failure_broker, invoke, OWNER
+    from tests.semantic.support.codex_gateway_broker import _BROKER_COMPLETE
+    with failure_broker(root / "fake-timeout-emitter", query_timeout_receipt()) as live_fake:
+        assert invoke(live_fake, "query-object", "--exact-id", OWNER)["exit_code"] == 2
+        emitted = live_fake.evidence().as_dict(include_output=True)
     _sealed_c08(root)
     plan = json.loads((root / 'expansion-plan.json').read_text())
     broker = json.loads((root / 'expansion-broker.json').read_text())
@@ -1335,7 +1339,8 @@ def _sealed_post_verification_query_timeout(root, *, continuation=False, fabrica
     events = [json.loads(line) for line in (directory / 'events.jsonl').read_text().splitlines()]
     final = events[-2:]
     events = events[:-2]
-    extra = [(['query-object', '--exact-id', plan['read_scope']['object_ids'][0]], query_timeout_receipt(), 2)]
+    extra = [(['query-object', '--exact-id', plan['read_scope']['object_ids'][0]],
+        emitted['records'][0]['payload'], emitted['records'][0]['runner_exit_code'])]
     if continuation:
         extra.append((['operations'], {'ok': True, 'status': 'ok', 'command': 'operations'}, 0))
     for argv, payload, exit_code in extra:
@@ -1354,7 +1359,9 @@ def _sealed_post_verification_query_timeout(root, *, continuation=False, fabrica
         events.extend([{'type': 'item.started', 'item': {**item, 'status': 'in_progress'}},
             {'type': 'item.completed', 'item': item}])
     names = [record['step_name'] for record in broker['records']]
-    broker.update(passed=fabricated_pass, complete=fabricated_pass, terminal_state='complete' if fabricated_pass else 'indeterminate',
+    broker.update(passed=True if fabricated_pass else emitted['passed'],
+        complete=True if fabricated_pass else emitted['complete'],
+        terminal_state=_BROKER_COMPLETE if fabricated_pass else emitted['terminal_state'],
         expected_step_names=names, consumed_step_names=names)
     _write(root / 'expansion-broker.json', broker)
     events.extend(final)
@@ -1378,6 +1385,7 @@ def _sealed_post_verification_query_timeout(root, *, continuation=False, fabrica
 def test_authenticated_post_verification_read_timeout_replays_fail_without_changing_verified_state(tmp_path):
     _sealed_post_verification_query_timeout(tmp_path)
     files = {str(path): (path.read_bytes(), path.stat().st_mtime_ns) for path in tmp_path.rglob('*') if path.is_file()}
+    assert json.loads((tmp_path / 'expansion-broker.json').read_text())['terminal_state'] == 'INDETERMINATE'
     replay = _verify(tmp_path)
     assert replay['archive_valid'] is True and replay['original_status'] == 'FAIL'
     assert replay['business_pass'] is False and replay['gateway_verification_state'] == 'result_schema_checked'
@@ -1388,4 +1396,14 @@ def test_authenticated_post_verification_read_timeout_replays_fail_without_chang
 def test_exact_read_timeout_cannot_replay_later_dispatch_or_pass(tmp_path, contradiction):
     _sealed_post_verification_query_timeout(tmp_path, **{contradiction: True})
     with pytest.raises(ExpansionArchiveError, match='terminal|timeout'):
+        _verify(tmp_path)
+
+
+def test_query_timeout_archive_requires_exact_production_terminal_state_casing(tmp_path):
+    _sealed_post_verification_query_timeout(tmp_path)
+    path = tmp_path / 'expansion-broker.json'
+    broker = json.loads(path.read_text())
+    broker['terminal_state'] = broker['terminal_state'].lower()
+    _write(path, broker)
+    with pytest.raises(ExpansionArchiveError, match='query timeout is terminal'):
         _verify(tmp_path)
