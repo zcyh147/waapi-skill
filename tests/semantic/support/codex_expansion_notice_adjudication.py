@@ -16,8 +16,10 @@ from tests.semantic.support.codex_harness import normalized_gateway_command_argv
 LEGACY_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v1'
 BUSINESS_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v2'
 INTENT_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v3'
-CONTRACT = 'waapi-skill.expansion-notice-adjudication/v4'
-CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, INTENT_CONTRACT, CONTRACT})
+READ_EVIDENCE_CONTRACT = 'waapi-skill.expansion-notice-adjudication/v4'
+# V5 aliases V4 input/rubric semantics with the prospective High reviewer pin.
+CONTRACT = 'waapi-skill.expansion-notice-adjudication/v5'
+CONTRACTS = frozenset({LEGACY_CONTRACT, BUSINESS_CONTRACT, INTENT_CONTRACT, READ_EVIDENCE_CONTRACT, CONTRACT})
 CASES = frozenset({'C01', 'C03', 'C06', 'C08', 'C09', 'M01', 'M05'})
 
 
@@ -451,7 +453,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
     }
     if adjudication_contract != LEGACY_CONTRACT:
         obligations = _notice_obligations(case_id, roles)
-        if adjudication_contract in {INTENT_CONTRACT, CONTRACT}:
+        if adjudication_contract in {INTENT_CONTRACT, READ_EVIDENCE_CONTRACT, CONTRACT}:
             # Protected invariants and transaction strength remain attested
             # facts, not an exhaustive inventory of required spoken promises.
             obligations.pop('preserve')
@@ -460,7 +462,7 @@ def decide_expansion_notice(result: Any, command_records: Sequence[Any], *, case
                 'only_declared_changes': True, 'adopt_user_preservation_scope': True}
             review_input['verification_context'] = _verification_context(preview_artifact)
         review_input['notice_obligations'] = obligations
-    if adjudication_contract == CONTRACT:
+    if adjudication_contract in {READ_EVIDENCE_CONTRACT, CONTRACT}:
         try:
             review_input['pre_execution_public_reads'] = _public_read_evidence(events_before_execute, command_records,
                 version=version, broker_records=broker_records, read_admission=read_admission)

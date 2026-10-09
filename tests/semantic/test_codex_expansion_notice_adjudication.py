@@ -407,7 +407,7 @@ def test_exact_pre_execution_witness_produces_business_obligations_without_regra
 
 
 def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None, text=None, transaction_id=None,
-        adjudication_contract=None, user_prompt=None, public_reads=()):
+        adjudication_contract=None, user_prompt=None, public_reads=(), subprocess_commands=None):
     """Complete real-TransactionStore fixture through runner grade and archive."""
     import hashlib
     import importlib
@@ -541,6 +541,7 @@ def sealed_workflow(root, monkeypatch, case_id, version='2025.1', *, damage=None
     _write(root / 'expansion-broker.json', {'records': records, 'passed': True, 'complete': True,
         'expected_step_names': names, 'consumed_step_names': names})
     def process(command, **kwargs):
+        if subprocess_commands is not None: subprocess_commands.append(list(command))
         if command[1:] == ['features', 'list']: return BoundedProcessResult(0, '\n'.join(review.DISABLED_FEATURES), '', .01)
         if command[1:] == ['exec', '--help']: return BoundedProcessResult(0, '--output-schema --ephemeral --ignore-user-config --ignore-rules --sandbox', '', .01)
         if 'prompt-input' in command: return BoundedProcessResult(0, json.dumps([{'role': 'developer', 'content': review.reviewer_rubric(CONTRACT)}]), '', .01)
@@ -1450,4 +1451,102 @@ def test_v4_owned_ceiling_facts_and_incomplete_scope_survive_full_fake_archive(
         expected_inputs_sha256='a' * 64)
     assert replay['archive_valid'] is True
     assert replay['business_pass'] is (not complete_absence_claim)
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+def test_v5_changes_only_reviewer_effort_and_preserves_legacy_configuration():
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_rubric
+    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT
+    expected = {
+        1: '6877acd8c7f602e71cc30cb0d6c1da1f1d85d454c5254cb6b4aad62fba26f01e',
+        2: '3c85dd766d3b0997c558765400d584c2ebbcd6f7da5cc28a9be947462cc78320',
+        3: '0e29ecf0f752f5000432c95992c83f9049483dd857b1ab8506cd7994fb2c00de',
+        4: '636dc027977718d8946b3d1d1b558d16056c929ba462dd4832f527edc73cab1f',
+    }
+    for version, digest in expected.items():
+        config = reviewer_configuration('waapi-skill.expansion-notice-adjudication/v' + str(version))
+        assert config['reasoning_effort'] == 'medium'
+        assert canonical_digest(config) == digest
+    assert CONTRACT == 'waapi-skill.expansion-notice-adjudication/v5'
+    v4 = reviewer_configuration('waapi-skill.expansion-notice-adjudication/v4')
+    v5 = reviewer_configuration(CONTRACT)
+    assert v5 == {**v4, 'contract': CONTRACT, 'reasoning_effort': 'high'}
+    assert v5['rubric_sha256'] == '51bff17e37318bea0b87b7ae3a71d07f0d195e8109d8ded72c15eb288f00ff54'
+    assert reviewer_rubric(CONTRACT).encode() == reviewer_rubric(v4['contract']).encode()
+
+
+@pytest.mark.parametrize('contract,effort', [
+    ('waapi-skill.expansion-notice-adjudication/v4', 'medium'),
+    ('waapi-skill.expansion-notice-adjudication/v5', 'high'),
+])
+def test_versioned_reviewer_effort_reaches_invocations_and_readonly_archive(tmp_path, monkeypatch, contract, effort):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    identifier = import_case('C01')['before']['distractor']['id']
+    reads = [(('query-object', '--exact-id', identifier, '--relationship', 'children', '--max-results', '100'),
+        {'ok': True, 'status': 'ok', 'command': 'query-object', 'count': 0, 'objects': [], 'agent_result': [],
+         'query_bound': {'mode': 'take', 'value': 100}})]
+    subprocess_commands = []
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C01', adjudication_contract=contract, public_reads=reads,
+        subprocess_commands=subprocess_commands)
+    directory = tmp_path / 'turns/turn-01/notice-review'
+    receipt = json.loads((directory / 'receipt.json').read_text())
+    binding = json.loads((directory / 'invocation-binding.json').read_text())
+    assert receipt['configuration']['reasoning_effort'] == effort
+    assert binding['configuration'] == receipt['configuration']
+    assert receipt['invocation_binding_sha256'] == binding['sha256']
+    assert subprocess_commands[-2:] == [receipt['audit_command'], receipt['invocation']]
+    for command in subprocess_commands[-2:]:
+        assert [token for token in command if token.startswith('model_reasoning_effort=')] == [
+            'model_reasoning_effort="' + effort + '"']
+    assert receipt['input']['pre_execution_public_reads']['reads'][0]['result']['objects'] == []
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    replay = verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+        expected_version='2025.1', expected_inputs_sha256='a' * 64)
+    assert replay['archive_valid'] is True and replay['business_pass'] is True
+    assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+
+
+def test_v5_preserves_v4_input_semantics_except_contract():
+    from tests.semantic.support.codex_expansion_notice_adjudication import decide_expansion_notice
+    result, commands, kwargs = public_read_notice_context()
+    v4 = decide_expansion_notice(result, commands,
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v4', **kwargs)
+    v5 = decide_expansion_notice(result, commands,
+        adjudication_contract='waapi-skill.expansion-notice-adjudication/v5', **kwargs)
+    assert v4['outcome'] == v5['outcome'] == 'review_required'
+    assert v5 == {**v4, 'input': {**v4['input'], 'contract': 'waapi-skill.expansion-notice-adjudication/v5'}}
+
+
+@pytest.mark.parametrize('tamper', ['effort', 'contract', 'argv', 'binding-and-receipt'])
+def test_v5_reviewer_setting_substitution_fails_full_archive_without_rejudgment(tmp_path, monkeypatch, tamper):
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
+    from tests.semantic.support.codex_expansion_policy import canonical_digest
+    from tests.semantic.support import codex_c09_notice_adjudication as review
+    unit = sealed_workflow(tmp_path, monkeypatch, 'C06')
+    directory = tmp_path / 'turns/turn-01/notice-review'
+    receipt = json.loads((directory / 'receipt.json').read_text())
+    assert receipt['configuration']['contract'] == 'waapi-skill.expansion-notice-adjudication/v5'
+    if tamper == 'effort':
+        receipt['configuration']['reasoning_effort'] = 'medium'
+    elif tamper == 'contract':
+        receipt['configuration']['contract'] = 'waapi-skill.expansion-notice-adjudication/v4'
+    elif tamper == 'argv':
+        command = receipt['invocation']
+        command[command.index('model_reasoning_effort="high"')] = 'model_reasoning_effort="medium"'
+    else:
+        binding = json.loads((directory / 'invocation-binding.json').read_text())
+        binding['configuration']['reasoning_effort'] = receipt['configuration']['reasoning_effort'] = 'medium'
+        binding['sha256'] = canonical_digest({key: value for key, value in binding.items() if key != 'sha256'})
+        receipt['invocation_binding_sha256'] = binding['sha256']
+        (directory / 'invocation-binding.json').write_text(json.dumps(binding))
+    receipt['sha256'] = canonical_digest({key: value for key, value in receipt.items() if key != 'sha256'})
+    (directory / 'receipt.json').write_text(json.dumps(receipt))
+    monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
+    files = {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}
+    with pytest.raises(ExpansionArchiveError):
+        verify_expansion_task_archive(tmp_path, expected_unit_id=unit,
+            expected_version='2025.1', expected_inputs_sha256='a' * 64)
     assert files == {str(path): path.read_bytes() for path in tmp_path.rglob('*') if path.is_file()}

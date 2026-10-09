@@ -437,3 +437,30 @@ After these review corrections, the same focused selection passed 398 with
 one native-Windows UNC skip; fixed `notice-fast` passed 3722 with the same skip.
 Both exited 0 using the pinned developer interpreter. No Non-live, Wwise or
 model execution/replay was run in this correction.
+
+## Reviewer effort checkpoint — prospective v5
+
+New expansion plans use `waapi-skill.expansion-notice-adjudication/v5` and pin
+only the independent reviewer to `gpt-6.1-sol`, high reasoning and default
+service tier. V5 aliases v4 input/evidence and judgment semantics; the v4 rubric
+bytes and schema remain identical. The executor settings, 120-second reviewer
+deadline, isolation, hard gates and non-PASS handling retain their existing
+contracts. V1–v4 keep medium/default configuration, original rubric/configuration
+hashes and sealed replay. This is a bounded judgment-reliability experiment,
+not evidence that higher effort fixes any notice or a model ranking.
+
+Both actual Codex commands derive their effort from the source-owned versioned
+configuration. The independent invocation binding and receipt seal that setting;
+archive replay validates exact argv and rejects contract/effort substitution
+without model calls or grade writes. Configuration hashes, v4/v5 input parity,
+actual fake subprocess argv, read-evidence replay and resealed tampering have
+focused developer coverage. Those fake judgments establish transport and binding,
+not language accuracy or semantic acceptance. No old notices are rejudged or
+historical FAILs upgraded; new Fresh workflows and final full acceptance remain
+separate promotion gates.
+
+This macOS developer patch passed the four affected reviewer/producer/archive
+files: 2401 passed and one native-Windows UNC case skipped. The fixed
+`notice-fast` gate passed 3731 with the same skip; both exited 0 through
+`ci/test.sh` with the pinned developer Python. No full Non-live, native-Windows,
+Wwise or Fresh model acceptance was run for this checkpoint.

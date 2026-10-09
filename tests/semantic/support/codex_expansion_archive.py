@@ -689,7 +689,8 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
             notice_kwargs = ({} if review_contract == legacy_notice_contract else {
                 "adjudication_contract": review_contract, "case_id": plan["unit_id"].rsplit("-", 1)[-1],
                 "preview_parameters": plan["preview_parameters"]})
-            if review_contract == "waapi-skill.expansion-notice-adjudication/v4":
+            if review_contract in {"waapi-skill.expansion-notice-adjudication/v4",
+                    "waapi-skill.expansion-notice-adjudication/v5"}:
                 notice_kwargs.update(broker_records=turn_records, read_admission=_scope(plan))
             c09_notice = replay_c09_notice(root / directory, SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
