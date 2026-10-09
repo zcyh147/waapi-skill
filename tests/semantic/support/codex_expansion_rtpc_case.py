@@ -213,7 +213,7 @@ def prepare_c06(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
     def snapshot() -> Mapping[str, Any]:
         return _rtpc_snapshot(ctx, owner["id"], control_ids)
 
-    before = ctx.observe_before(snapshot)
+    before = snapshot()
     targets = [key for key, row in before["rtpcs"].items()
                if row["@PropertyName"] == "Volume"
                and _reference_id(row["@ControlInput"]) == control_ids[0]]

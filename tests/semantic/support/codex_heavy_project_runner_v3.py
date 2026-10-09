@@ -418,15 +418,7 @@ class OwnedDirectWaapiCall:
     third-party disconnect cannot hold Python process finalization forever.
     """
 
-    def __init__(self, *, host: str, port: int, phase_timing=None) -> None:
-        self.phase_timing = phase_timing
-        if phase_timing is None:
-            self._initialize(host=host, port=port)
-        else:
-            with phase_timing.measure("oracle", "direct-connect", component_bounds={"connect": _DIRECT_CONNECT_WAIT_SECONDS}):
-                self._initialize(host=host, port=port)
-
-    def _initialize(self, *, host: str, port: int) -> None:
+    def __init__(self, *, host: str, port: int) -> None:
         if host not in {"127.0.0.1", "localhost", "::1"}:
             raise HeavyProjectRunnerError("trusted direct WAAPI host must be loopback")
         if not isinstance(port, int) or isinstance(port, bool) or not 1 <= port <= 65535:
@@ -447,14 +439,10 @@ class OwnedDirectWaapiCall:
             name=f"v3-direct-waapi-{host}-{port}",
             daemon=True,
         )
-        connect_wait = (_DIRECT_CONNECT_WAIT_SECONDS if self.phase_timing is None else
-                        self.phase_timing.bounded_wait(_DIRECT_CONNECT_WAIT_SECONDS))
-        if self.phase_timing is not None:
-            self.phase_timing.active[-1]["effective_wait_seconds"] = connect_wait
         self._owner_thread.start()
         try:
             initialized, value = self._initial_response.get(
-                timeout=connect_wait
+                timeout=_DIRECT_CONNECT_WAIT_SECONDS
             )
         except queue.Empty as exc:
             self._closed = True
@@ -573,24 +561,7 @@ class OwnedDirectWaapiCall:
             "same-process direct WAAPI peers are prohibited; use spawn isolation"
         )
 
-    def __call__(self, uri, args, options):
-        if self.phase_timing is None:
-            return self._call(uri, args, options)
-        with self.phase_timing.measure("oracle", "direct-rpc", recovery=self.phase_timing.recovering, component_bounds={"call": _DIRECT_CALL_WAIT_SECONDS}) as interval:
-            count = len(self.calls)
-            try:
-                return self._call(uri, args, options)
-            finally:
-                receipt = (self.calls[-1] if len(self.calls) > count else
-                    {"uri": uri, "args": _strict_plain_json_object(args, field="args"),
-                     "options": _strict_plain_json_object(options, field="options"), "result_type": None})
-                if len(self.calls) == count:
-                    self.calls.append(receipt)
-                receipt["timing"] = {"elapsed_seconds": self.phase_timing.clock() - interval["started_seconds"],
-                    "effective_wait_seconds": interval.get("effective_wait_seconds"),
-                    "component_wait_seconds": _DIRECT_CALL_WAIT_SECONDS}
-
-    def _call(
+    def __call__(
         self,
         uri: str,
         args: Mapping[str, Any],
@@ -609,14 +580,10 @@ class OwnedDirectWaapiCall:
         with self._rpc_lock:
             if self._closed:
                 raise HeavyProjectRunnerError("trusted direct WAAPI client is closed")
-            call_wait = (_DIRECT_CALL_WAIT_SECONDS if self.phase_timing is None else
-                         self.phase_timing.bounded_wait(_DIRECT_CALL_WAIT_SECONDS, recovery=self.phase_timing.recovering))
-            if self.phase_timing is not None:
-                self.phase_timing.active[-1]["effective_wait_seconds"] = call_wait
             self._requests.put(request)
             try:
                 succeeded, result = request.response.get(
-                    timeout=call_wait
+                    timeout=_DIRECT_CALL_WAIT_SECONDS
                 )
             except queue.Empty as exc:
                 # The actor may still be blocked inside waapi-client.  Poison
@@ -645,8 +612,6 @@ class OwnedDirectWaapiCall:
     def close(self, *, wait_seconds: float = _DIRECT_CLOSE_WAIT_SECONDS) -> bool:
         """Request actor-owned disconnect and wait only for ``wait_seconds``."""
 
-        if self.phase_timing is not None:
-            wait_seconds = self.phase_timing.bounded_wait(wait_seconds, phase="cleanup", recovery=True)
         with self._close_lock:
             self._closed = True
             if self._close_request is None:
@@ -661,8 +626,6 @@ class OwnedDirectWaapiCall:
     ) -> bool:
         """Boundedly reap a close request after Wwise has been stopped."""
 
-        if self.phase_timing is not None:
-            wait_seconds = self.phase_timing.bounded_wait(wait_seconds, phase="cleanup", recovery=True)
         with self._close_lock:
             if self._close_request is None:
                 self._closed = True

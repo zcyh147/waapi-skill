@@ -167,7 +167,7 @@ def prepare_c03(ctx: ExpansionCaseContext) -> PreparedExpansionCase:
         return {"sounds": captured, "members": sorted(row["id"] for row in _children(ctx, folder["id"])),
                 "distractor": read_object(ctx, decoy["id"], includes=SOUND_INCLUDES)}
 
-    before = ctx.observe_before(snapshot)
+    before = snapshot()
     replacements = {sounds["Left"]["id"]: replacement_left, sounds["Right"]["id"]: replacement_right}
     expected = {key: hashlib.sha256(path.read_bytes()).hexdigest() for key, path in replacements.items()}
     mappings = {sound["path"]: replacements[sound["id"]] for sound in sounds.values()}

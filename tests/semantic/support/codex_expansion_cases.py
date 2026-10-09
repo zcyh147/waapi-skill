@@ -6,7 +6,6 @@ interface itself grants neither a live connection nor execution permission.
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
@@ -43,11 +42,6 @@ class ExpansionCaseContext:
     asset_root: Path
     gateway: GatewayCall
     trusted_read: TrustedOracleRead | None = None
-    phase_timing: Any = None
-
-    def observe_before(self, snapshot):
-        with (self.phase_timing.measure("oracle", "fixture-before") if self.phase_timing else nullcontext()):
-            return snapshot()
 
 
 @dataclass(frozen=True)

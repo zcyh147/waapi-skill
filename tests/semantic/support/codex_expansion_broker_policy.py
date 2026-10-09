@@ -38,10 +38,9 @@ class ExpansionBrokerPolicy:
     """
 
     def __init__(self, *, prepared: PreparedExpansionCase, version: str, skill_source: Path,
-                 scoped_paths: Mapping[str, str], phase_timing=None) -> None:
+                 scoped_paths: Mapping[str, str]) -> None:
         if prepared.operation not in _DECLARATIONS:
             raise ExpansionPolicyError("expansion case has no closed declaration family")
-        self.phase_timing = phase_timing
         self.prepared = prepared
         self.version = version
         self.operation = prepared.request_schema_uri or prepared.operation
@@ -93,14 +92,6 @@ class ExpansionBrokerPolicy:
         }
         self.preparation_failures: list[Mapping[str, Any]] = []
 
-    def observe_oracle(self, scope, callback, *args):
-        if self.phase_timing is None:
-            return callback(*args)
-        with self.phase_timing.measure("oracle", scope):
-            value = callback(*args)
-            self.phase_timing.bounded_wait(1)
-            return value
-
     def repairable_preparation(self, command: str) -> bool:
         return command in (_DRAFT_READS | _BUSINESS_EDITS | _DECLARATIONS[self.prepared.operation]) and self.transaction.state == "unprepared"
 
@@ -123,8 +114,6 @@ class ExpansionBrokerPolicy:
 
     def prepare(self, argv: Sequence[str], *, state_directory: Path):
         from tests.semantic.support.codex_gateway_broker import ExpectedGatewayStep, ResponseBinding
-        if self.phase_timing is not None:
-            self.phase_timing.bounded_wait(1, phase="oracle")
         if self.calls >= 96:
             raise ExpansionPolicyError("case command budget exhausted")
         self.calls += 1
@@ -171,7 +160,7 @@ class ExpansionBrokerPolicy:
             if command == "preview-from-draft":
                 # Business adapters may auto-apply Preview; the persisted
                 # authorization state, not an optional transport flag, is proof.
-                self.oracle_evidence["preview_before"] = self.observe_oracle("preview-before", self.prepared.snapshot)
+                self.oracle_evidence["preview_before"] = self.prepared.snapshot()
                 self.before_preview = canonical_digest(self.oracle_evidence["preview_before"])
         elif command in {"transaction-show", "confirm", "execute", "verify"}:
             if getattr(args, "transaction_id", None) != self.transaction_id or self.transaction_id is None:
@@ -239,7 +228,7 @@ class ExpansionBrokerPolicy:
         if command == "preview-from-draft":
             transaction_id = payload["transaction_id"]
             preview = TransactionStore(state_directory).load_preview(transaction_id)
-            preview_after = self.observe_oracle("preview-after", self.prepared.snapshot)
+            preview_after = self.prepared.snapshot()
             preview_after_sha256 = canonical_digest(preview_after)
             self.oracle_evidence["preview_after"] = preview_after
             if (self.transaction.state != "unprepared" or self.turn < 1
@@ -281,9 +270,8 @@ class ExpansionBrokerPolicy:
             record = TransactionStore(state_directory).load(self.transaction_id)
             if record.state.value != payload.get("state") or record.artifact_hash != self.artifact_hash:
                 raise ExpansionPolicyError("verification receipt differs from its durable transaction state")
-            self.oracle_evidence["after"] = self.observe_oracle("verification-snapshot", self.prepared.snapshot)
-            self.assertions = self.observe_oracle("verification-assertions", self.prepared.verify,
-                self.prepared.before, self.oracle_evidence["after"])
+            self.oracle_evidence["after"] = self.prepared.snapshot()
+            self.assertions = self.prepared.verify(self.prepared.before, self.oracle_evidence["after"])
             self.oracle_evidence.update(assertions=dict(self.assertions), gateway_verification_state=payload.get("state"))
             self.transaction.verify(transaction_id=payload.get("transaction_id"),
                 artifact_sha256=payload.get("artifact_hash"), assertions=self.assertions,
