@@ -187,3 +187,58 @@ EXP22-C06, EXP22-C08 and EXP25-C08 in a new frozen root; C06 is included because
 this code change affects its command path, not because of the ancillary notice.
 M05 and the other completed business units stay closed. No complete Program or
 Non-live pass is claimed from these focused checks.
+
+## Native-Windows acceptance closeout
+
+Candidate `56339bb116c5833f3b48c790848203e7bf559e36`, root
+`iwin-expansion-56339bb1-target3-r1`, completed all three selected units with
+independent business PASS. The original verdict is **2 PASS / 1 FAIL**, not a
+raw three-unit PASS. All 55 observed commands reconciled exactly with the
+accepted authenticated Broker records; the runner-escaping defect did not
+recur in this attempt.
+
+| Unit | Raw verdict | Independent business assertions | Commands reconciled | Agent seconds |
+| --- | --- | --- | --- | --- |
+| EXP22-C06 | PASS | 7/7 | 11/11 | 178.25 |
+| EXP22-C08 | PASS | 5/5 | 23/23 | 222.40 |
+| EXP25-C08 | FAIL: notice review | 5/5 | 21/21 | 250.81 |
+
+All material gates passed, including policy authorization, bounded authenticated
+execution, memory isolation, source protection and command provenance. The
+Gateway's C08 verification remains `result_schema_checked`; the stronger
+business outcome comes from the separate five-assertion oracle, including the
+requested curve, unchanged target identity, other curves, users/references and
+source Attenuation. Do not describe the Gateway's weaker result as stronger
+verification.
+
+For EXP25-C08 the independent reviewer ran normally (`error=null`). Target,
+effect, values, scope/preservation and prospective meaning were satisfied.
+Only `optional_baseline_claims` was unresolved: the progress sentence
+“已核对目标为指定的衰减对象。正在读取修改前的曲线及关联状态” lacked the
+reviewer's public-read support. The final answer explicitly disclosed that the
+Agent had omitted the pre-edit preservation baseline and could not itself
+prove a before/after comparison. The independent oracle nevertheless proved
+all five outcome/preservation checks. Under the approved business-acceptance
+policy this is a nonblocking progress-wording/evidence note, not an unperformed
+change or a false claim of completed baseline verification. The original FAIL,
+review receipt and retained sandbox remain unchanged. No repair or extra Fresh
+attempt was made for that wording, and no verify-only replay was run on this
+FAIL-containing root.
+
+All three lifecycle records and the final full-source check confirm unchanged
+project hashes and mtimes for 2022.1 and 2025.1. The two raw-PASS sandboxes were
+removed; the raw-FAIL sandbox and quarantine record remain sealed. A separate
+SSH process check confirmed zero residual processes, no remaining
+`WaapiRunner5633-target3` task and no live action script. Launcher, task XML,
+preparation/start and cleanup scripts are archived. The root's 365 regular
+artifact files are inventoried by a manifest with SHA-256
+`f8c80e70b53056a84564bad5848b30fb5a97582767afa4a67c947e16bd886a5b`.
+
+Machine-readable assessment, source checks, artifact manifest and residual
+proof are retained on Windows at
+`.waapi-skill-state/evidence/windows-expansion-56339bb1-assessment/` and copied
+to the local ignored
+`.waapi-skill-state/evidence/windows-expansion-56339bb1-closeout/`.
+This closes the authorized C06/C08 repair with targeted Windows evidence.
+It neither regrades earlier candidates nor establishes a general model-copying
+success rate. M05 and other completed business cases were not rerun.
