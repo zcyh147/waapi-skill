@@ -38,8 +38,8 @@ or the spelling of a path. A missing or truncated read stops the workflow.
 For query/operate references, the matching `WAAPI_QUERY_REFERENCE_END` or
 `WAAPI_OPERATE_REFERENCE_END` sentinel must be the final visible line.
 
-Keep Gateway calls separate. Copy each returned continuation exactly as
-instructed; do not reconstruct its command or change its shell syntax.
+Keep Gateway calls separate. Copy decoded JSON command values exactly.
+Windows: keep backslashes literal; serialize only outer tool-call JSON.
 
 ## One-time conversation introduction
 
