@@ -44,6 +44,7 @@ tests/unit/test_operation_draft_store.py
 tests/unit/test_operation_draft_gateway.py
 tests/unit/test_audio_import_business_adapter.py
 tests/unit/test_audio_import_business_gateway.py
+tests/unit/test_existing_sfx_import.py
 tests/unit/test_audio_import_business_migration.py
 tests/unit/test_business_declarations.py
 tests/unit/test_non_intrinsic_identity_gateway.py
@@ -55,6 +56,7 @@ tests/unit/test_business_declaration_state.py
 tests/unit/test_business_planning.py
 tests/unit/test_core_business_adapter.py
 tests/unit/test_core_business_gateway.py
+tests/unit/test_attenuation_curve_business_gateway.py
 tests/unit/test_media_build_business_adapter.py
 tests/unit/test_media_build_business_gateway.py
 tests/unit/test_remaining_core_business_adapter.py

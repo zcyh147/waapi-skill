@@ -1,0 +1,209 @@
+{
+  "status": "reviewed_expectation_erratum_r2_not_executed",
+  "withhold_from_implementation_author_until_source_held": false,
+  "context_binding": {
+    "curve": "EXP22-C08 frozen a1979db request/Preview and independent before snapshot; old Custom/Linear points (0,0),(100,4.71844785465692e-16); requested Custom/Linear (0,0),(50,-12),(100,-48)",
+    "plugin": "EXP22-C09 frozen a1979db Sound owner; create Effect Wwise Gain NAME/notes, preserve original two effects",
+    "timing": "Each paragraph is the post-matching-Preview pre-Execute notice; machine authority/provenance remains required."
+  },
+  "interpretation": [
+    "These are independent semantic judgments, not implementation-derived goldens or formal campaign evidence.",
+    "Exact owner names are fixtures; generic roles resolve only against a unique sealed primary role.",
+    "Every negative remains negative even when a correct effect precedes its conflicting claim.",
+    "Auth and execution-status prose cannot fulfill the expected effect alone.",
+    "No new public grammar, runtime permission, historical status or model-grader behavior is implied."
+  ],
+  "pairs": [
+    {
+      "id": "WITHHELD-01",
+      "family": "curve",
+      "positive": "已核对目标衰减对象。即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。目前尚未执行。",
+      "negative": "已核对目标 Sound。即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。目前尚未执行。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong attested role"
+    },
+    {
+      "id": "WITHHELD-02",
+      "family": "curve",
+      "positive": "待执行的变更只涉及 Expansion_EXP22-C08_Attenuation 的干声音量曲线：设为自定义，点为 (0,0)、(50,-12)、(100,-48)，每段线性。",
+      "negative": "待执行的变更只涉及 OtherOwner 的干声音量曲线：设为自定义，点为 (0,0)、(50,-12)、(100,-48)，每段线性。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "foreign colon subject"
+    },
+    {
+      "id": "WITHHELD-03",
+      "family": "curve",
+      "positive": "已确认目标是 Expansion_EXP22-C08_Attenuation。即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。",
+      "negative": "已确认目标是 Expansion_EXP22-C08_Attenuation。处理对象是 OtherOwner，即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "interposed foreign subject"
+    },
+    {
+      "id": "WITHHELD-04",
+      "family": "curve",
+      "positive": "已核对目标衰减对象：将干声音量曲线设为 Custom，点为 (0e0,0e0)、(5e1,-1.2e1)、(1e2,-4.8e1)，都是 Linear。",
+      "negative": "已核对目标衰减对象：将干声音量曲线设为 Custom，点为 (0e0,0e0)、(5e1,-1.2e2)、(1e2,-4.8e1)，都是 Linear。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong prospective scientific value"
+    },
+    {
+      "id": "WITHHELD-05",
+      "family": "curve",
+      "positive": "当前 Expansion_EXP22-C08_Attenuation 的干声音量曲线是自定义线性两点 (0.0,0)、(100.0,4.71844785465692e-16)。即将把 Expansion_EXP22-C08_Attenuation 的干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。",
+      "negative": "当前 Expansion_EXP22-C08_Attenuation 的干声音量曲线是自定义线性两点 (0.0,0)、(100.0,4.71844785465692e-10)。即将把 Expansion_EXP22-C08_Attenuation 的干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong historical value"
+    },
+    {
+      "id": "WITHHELD-06",
+      "family": "curve",
+      "positive": "即将把 Expansion_EXP22-C08_Attenuation 的干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。本次修改已按 allow_changes 策略获得独立授权，目前尚未执行。",
+      "negative": "即将把 Expansion_EXP22-C08_Attenuation 的干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。本次修改已按 read_only 策略获得独立授权，目前尚未执行。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong policy after valid edit"
+    },
+    {
+      "id": "WITHHELD-07",
+      "family": "curve",
+      "positive": "已核对目标衰减对象。将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。本次修改已取得独立授权，接下来执行该变更。",
+      "negative": "已核对目标衰减对象。将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。本次修改已取得独立授权，但不会执行该变更。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "prospective execution refusal"
+    },
+    {
+      "id": "WITHHELD-08",
+      "family": "curve",
+      "positive": "已核对目标衰减对象。即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。不会修改其他对象的曲线。",
+      "negative": "已核对目标衰减对象。即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。同时清空其他对象的曲线。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "extra affirmative mutation"
+    },
+    {
+      "id": "WITHHELD-09",
+      "family": "curve",
+      "positive": "已确认目标是 Expansion_EXP22-C08_Attenuation。\n\n即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。",
+      "negative": "已确认目标是 Expansion_EXP22-C08_Attenuation。处理对象是 OtherOwner，即将把干声音量曲线设为自定义，三个点依次为 (0,0)、(50,-12)、(100,-48)，均为线性。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "interposed foreign subject prevents omitted-owner inheritance"
+    },
+    {
+      "id": "WITHHELD-10",
+      "family": "curve",
+      "positive": "待提交的是 Expansion_EXP22-C08_Attenuation 的干声音量曲线：自定义，依次 (0,0)、(50,-12)、(100,-48)，线性。尚未执行。",
+      "negative": "当前数据是 Expansion_EXP22-C08_Attenuation 的干声音量曲线：自定义，依次 (0,0)、(50,-12)、(100,-48)，线性。尚未执行。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "current state cannot fulfill prospective effect"
+    },
+    {
+      "id": "WITHHELD-11",
+      "family": "plugin",
+      "positive": "已核对目标声音。将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。接下来执行该变更。",
+      "negative": "已核对目标 ActorMixer。将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。接下来执行该变更。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong primary type"
+    },
+    {
+      "id": "WITHHELD-12",
+      "family": "plugin",
+      "positive": "待执行的是目标声音的效果链追加：Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”。原有两个效果器保留。",
+      "negative": "待执行的是 OtherSound 的效果链追加：Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”。原有两个效果器保留。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "foreign mutation subject"
+    },
+    {
+      "id": "WITHHELD-13",
+      "family": "plugin",
+      "positive": "已核对目标声音。将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。此次修改已取得 allow_changes 策略的独立授权记录。",
+      "negative": "已核对目标声音。将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。此次修改可能取得 allow_changes 策略的独立授权记录。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "uncertain current authorization"
+    },
+    {
+      "id": "WITHHELD-14",
+      "family": "plugin",
+      "positive": "已核对目标声音：将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。目前尚未执行。",
+      "negative": "已核对目标声音和 OtherSound：将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。目前尚未执行。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "compound source owner"
+    },
+    {
+      "id": "WITHHELD-15",
+      "family": "plugin",
+      "positive": "将向目标声音的效果链追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。执行后检查新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "将向目标声音的效果链追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。执行后检查新增效果器，同时删除原有效果器。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "verification cannot hide extra deletion"
+    },
+    {
+      "id": "WITHHELD-16",
+      "family": "plugin",
+      "positive": "已核对目标声音。将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。本次修改已获得授权，当前策略为 allow_changes。",
+      "negative": "已核对目标声音。将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。本次修改已获得授权，当前策略为 read_only。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "contradictory coordinated policy"
+    },
+    {
+      "id": "WITHHELD-17",
+      "family": "plugin",
+      "positive": "预览将在目标声音上新增名为 Expansion_EXP22-C09_NewGain 的 Effect，备注为“Expansion C09 appended gain”。",
+      "negative": "预览将在目标声音上新增名为 Expansion_EXP22-C09_NewGain 的 Sound，备注为“Expansion C09 appended gain”。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "wrong created native kind"
+    },
+    {
+      "id": "WITHHELD-18",
+      "family": "plugin",
+      "positive": "已核对目标声音。即将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”；原有两个效果器不做替换。",
+      "negative": "已核对目标声音。即将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”；原有两个效果器将被替换。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "passive extra replacement"
+    },
+    {
+      "id": "WITHHELD-19",
+      "family": "plugin",
+      "positive": "即将向目标声音追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。现在尚未修改。",
+      "negative": "目标声音已经追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。现在尚未修改。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "historical creation cannot fulfill impending effect"
+    },
+    {
+      "id": "WITHHELD-20",
+      "family": "plugin",
+      "positive": "已核对目标声音。即将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。不改声音的音量或路由。",
+      "negative": "已核对目标声音。即将追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。同时把声音音量设为 -12 dB。",
+      "expected_positive": true,
+      "expected_negative": false,
+      "negative_reason": "additional protected field edit"
+    }
+  ],
+  "provenance": {
+    "source_r1_fixture": "expansion-notice-role-context-withheld-r1.json",
+    "source_r1_sha256": "4c0130a00fd35886d22a6000116f838536b0fcea1717cbde0f11106f675d3ddf",
+    "first_audit": "ignored expansion-notice-role-context-withheld-r1 first-summary.json remains sealed:29passed/11failed",
+    "erratum": "WITHHELD-09 blank whitespace alone is valid adjacent-substantive-clause inheritance, as already approved; the original expectation error is not a production defect. R1 corpus/results/summary and their hashes are unchanged. R2 uses the original blank-paragraph witness as positive and an interposed foreign subject as negative.",
+    "contract_evidence": [
+      "test_codex_expansion_task_runner.py::test_immediate_owner_omitted_curve_clause_allows_only_whitespace_before_the_edit",
+      "test_codex_expansion_task_runner.py::test_immediate_anaphoric_curve_owner_allows_whitespace_only",
+      "codex_attenuation_notice.py::_following_first_clause"
+    ]
+  }
+}

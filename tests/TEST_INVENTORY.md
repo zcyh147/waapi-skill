@@ -5,7 +5,148 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 1.1.0 release validation (2026-10-10)
+
+The seven-workflow `integration_expansion_v1` selection has cumulative business
+acceptance for all 13 positive units on both macOS and native Windows, plus the
+separate EXP22-M05 capability boundary. This combines explicitly identified
+candidates/roots; it is not a single-candidate or single-root automated 13/13.
+
+- **macOS:** the [completion record](../docs/research/integration-expansion-acceptance-2026-10-09.md)
+  records all 13 business outcomes, the raw full-root 12 PASS / 1 notice FAIL,
+  and the later targeted C09 PASS with identical verify-only. The latest full
+  macOS Non-live result remains the dated `5562104` entry below.
+- **Windows baseline:** the [assessment](../docs/research/windows-expansion-assessment-2026-10-10.md)
+  retains `7b4e1164`'s raw 9 PASS / 4 FAIL across four roots: 11 business
+  completions and two C08 operations rejected before execution. M05's valid
+  unnamed-object discovery defect was repaired and program-tested; its already
+  proven business result was accepted without another Fresh attempt.
+- **Windows repair:** [targeted acceptance](../docs/research/windows-agent-command-escaping-2026-10-10.md#native-windows-acceptance-closeout)
+  on `56339bb1` completed C06/2022 and C08/2022/2025 with all independent
+  business checks and all 55 command reconciliations passing. Raw results are
+  2 PASS / 1 ancillary-progress-notice FAIL. The latter remains frozen without
+  verify-only. All source hashes/mtimes were unchanged, passing sandboxes were
+  removed, failed evidence retained, and scoped processes/jobs cleared.
+- **Windows developer limits:** the [portability report](../docs/research/windows-expansion-portability-2026-10-10.md)
+  records the original failed full collection and focused repairs. No new
+  all-green full native-Windows Non-live run is claimed; one retired-Composer
+  transport fixture remains a documented nonblocking failure. Focused selections
+  overlap and are not summed into a new total.
+
+This is reliability and workflow validation, not additional reflected-API or
+exhaustive parameter coverage. Full Playlist/Transition authoring, audible
+playback acceptance and detailed expansion phase timing are not delivered by
+this evidence. [Business acceptance](semantic/TEST_ACCEPTANCE.md) governs new
+rerun decisions; historical verdicts stay unchanged.
+
 ## Runner modes and strict real behavior
+
+### 2026-10-09 Expansion completion under targeted business acceptance
+
+Candidate `5562104` passed Full Non-live: **17254 passed, 120 skipped,
+27 deselected** (920.46s), exit 0. Affected discovery-repair focused validation
+passed 360 tests; both independent review findings closed. Product Skill bytes
+remain unchanged. These developer gates grant no additional per-API/live credit.
+
+Fresh macOS EXP25-C09 passed six business assertions and actual v8 notice review,
+then identical successful-root verify-only with 84 byte-identical root files.
+All 69 artifacts and 11 seals validated; source full hash/mtime were unchanged,
+the passing sandbox removed and temporary job/scoped processes cleared.
+
+The earlier `8079061` full root retains 12 overall PASS / 1 notice-only FAIL plus
+separate EXP22-M05 boundary. All 13 positive business outcomes passed. The user
+explicitly approved closure after the repaired targeted run without another full
+matrix; this is not a final-candidate full-matrix PASS or a historical regrade.
+Detailed phase timing is deferred. See the [acceptance report](../docs/research/integration-expansion-acceptance-2026-10-09.md)
+and [machine-readable record](../docs/research/integration-expansion-acceptance-2026-10-09.json).
+
+
+### 2026-10-01 Pristine-Draft regression and music read investigations
+
+Frozen macOS candidate `cc8707a` passed Full Non-live:
+**12044 passed, 118 skipped, 27 deselected** (777.20 s), exit zero.
+Logs/JUnit digests are in [the completed gate record](../docs/research/integration-expansion-pristine-draft-gates-2026-10-01.json).
+
+Six copied-project public read investigations completed: three on 2025.1
+(3 passed / 32 deselected, 11.45 s) and three on 2022.1 (3 passed / 32
+ deselected, 15.40 s). Every source full hash, mtime, tree metadata and scoped
+cleanup check passed; investigation copies were deleted. These are completed
+bounded investigations, **not complete music authoring or Agent acceptance**.
+Read failures, clarification, unavailable representations and unproven order
+remain findings. The omitted property-state platform was a probe input error,
+not an upstream boundary. See [music read findings](../docs/research/integration-expansion-music-read-findings-2026-10-01.json).
+
+The narrow platform correction passed 35 focused fake-client tests. The new
+existing-2025-reference goal passed 23 focused tests after independent order
+and evidence-bound review repairs; it has not run live yet. Neither adds
+Agent credit or silently changes the formal seven-case selection.
+
+### 2026-10-01 Expansion receipt binding and completed regression
+
+Frozen macOS candidate `dd1ad71` (harness implementation `7c81406`) passed
+Full Non-live: **11998 passed, 118 skipped, 27 deselected** (784.07 s), exit zero.
+JUnit reports zero failures and errors. This is program/harness evidence;
+it grants no live-Wwise or Fresh Agent business acceptance.
+See [completed gate records](../docs/research/integration-expansion-read-receipt-gates-2026-10-01.json).
+
+Its Luna-high C01 pilot retained an ordinary model input FAIL: the Agent omitted
+the required GUID braces during object binding. The authenticated command was
+rejected before dispatch; no Preview or project change occurred. Source full
+hash and mtime remained unchanged and the failed copy was quarantined. Negative
+archive validation stopped the batch, leaving C06/M01 pending. The model
+comparison remains incomplete; no Gateway grammar relaxation is justified.
+See [pilot evidence](../docs/research/integration-expansion-invalid-bind-pilot-2026-10-01.json).
+
+### 2026-10-01 Fresh workspace repository-boundary repair
+
+Frozen macOS harness candidate `d78be5b` completed Full Non-live:
+**11967 passed, 1 failed, 118 skipped, 27 deselected** (788.75 s), exit one.
+The sole failure was the inventory document's lowercase `full Non-live` label;
+its newest dated evidence did not match the documented count assertion.
+The label is corrected in the documentation-only follow-up. This is **not a
+single all-green full Non-live run**; preserve the failed log and JUnit.
+The focused documentation rerun passed **9 tests**, exit zero. The follow-up
+changes documentation only; the broadly tested harness and Skill bytes remain
+unchanged. No additional passing full-run count is inferred.
+
+The targeted workspace checks passed **18 tests**; the full harness file passed
+**381 tests, 9 native-Windows-only skips**. Independent Spec and Standards
+reviews reported no actionable findings. The minimal valid Git boundary uses
+fixed local metadata, rejects drift and external links, and bounds metadata
+reads without adding a Git executable dependency.
+
+CLI-only startup probes passed with the valid boundary; they grant no Agent
+or Wwise business PASS. The prior Luna pilot retains three pre-exec prompt-audit
+FAILs, with unchanged source hashes/mtimes and quarantined copies. The new
+Luna-high / GPT-6.1-Sol-medium comparison and final macOS acceptance remain
+pending. See [startup diagnostics](../docs/research/integration-expansion-startup-diagnostics-2026-10-01.json).
+
+### 2026-10-01 Outcome-based integration expansion: development gates
+
+Frozen macOS candidate `9256ae8` passed the fixed five-version Program gate:
+**5886 passed, 2 skipped** (275.05 s), and Full Non-live:
+**11954 passed, 118 skipped, 27 deselected** (809.03 s), both exit zero.
+The two Program skips require native Windows. Earlier interrupted/failed gate
+roots remain retained; failed-only fixture reruns preceded this complete pass.
+The final tests correct fake-CI interpreter isolation, local LFS hydration,
+host-dependent Wine mapping expectations, per-field evidence bounds, and
+compact verification proof; these are not additional live API coverage.
+
+Real copied-project preparation passed 13 baselines plus the separate
+M05/2022 capability boundary. Developer-owned M01 music import and C06 existing
+RTPC updates passed on 2022.1/2025.1 with approved immutable Previews, single
+execution, Gateway verification, and independent outcome checks. Source full
+hashes/mtimes/tree metadata and scoped cleanup were proven. This is **not Agent
+semantic acceptance**. The matching 2025.1.7 Console smoke passed, with 4.41 s
+readiness and cleaned/deleted test copy.
+
+The six-task Luna-high / GPT-6.1-Sol-medium pilot remains pending: its first
+one-shot launcher blocked in file-open before creating a campaign root while
+the Mac was locked. No Agent or Wwise case started; the job was unloaded and
+the diagnostic retained. No new Windows or playback evidence is claimed.
+See [development gate records](../docs/research/integration-expansion-development-gates-2026-10-01.json),
+[native follow-ups](../docs/research/integration-expansion-native-followups-2026-10-01.json),
+and [music investigation dispositions](../docs/research/music-expansion-dispositions-2026-10-01.md).
 
 ### 2026-09-14 Portable Skill entry and scoped first-use validation
 

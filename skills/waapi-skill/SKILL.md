@@ -38,8 +38,8 @@ or the spelling of a path. A missing or truncated read stops the workflow.
 For query/operate references, the matching `WAAPI_QUERY_REFERENCE_END` or
 `WAAPI_OPERATE_REFERENCE_END` sentinel must be the final visible line.
 
-Keep Gateway calls separate. Copy each returned continuation exactly as
-instructed; do not reconstruct its command or change its shell syntax.
+Keep Gateway calls separate. Copy decoded JSON command values exactly.
+Windows: keep backslashes literal; serialize only outer tool-call JSON.
 
 ## One-time conversation introduction
 
@@ -66,7 +66,7 @@ facts, not later Skill invocations. Send machine answers separately.
 2. Use the supplied Skill root and the loading rules above, including for Wwise CLI and project-migration requests. Do not probe the repository or working directory to locate the Skill.
 3. For common reads below, run the absolute `scripts/run.py` before `ls`, `find`, `rg`, research, or implementation reads.
 4. Connection precedence is explicit flags, `WWISE_WAAPI_HOST` / `WWISE_WAAPI_PORT` / `WWISE_VERSION`, then config. Put version after `gateway.py`: `python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2022.1 operation-schema object.copy`. `--wwise-version` is the compatibility/config field. Never hand-edit config or scan unrelated ports/processes.
-5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. A structured error or shell failure stops the workflow; do not retry the Gateway command.
+5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. For discovery/schema, use supported `max_output_tokens=20000`, capped at the tool's documented maximum. Copy returned GUIDs exactly, including `{}` braces. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. A structured error or shell failure stops the workflow; do not retry the Gateway command.
 6. Read only the current-turn lane; never preload. Read-only work cannot read `waapi-operate.md` before a change request.
 
 ## Fixed gateway commands
@@ -132,7 +132,7 @@ terminal record includes the completion and unsubscribe result.
 
 For `ak.wwise.waapi.getFunctions`/`getTopics`, run `request-schema` and follow its sole typed continuation. Do not run `describe` or `capabilities` first.
 
-For five-version totals, read coverage then use its host-scoped summary command. The default capability profile is Console; `--profile wwise-authoring-ui` inspects the packaged Console-plus-Authoring union, not a complete live Authoring inventory. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal function URI uses `request-schema`. For another natural-language request not covered by a fixed route, run one `operations` lookup and copy its `next_command`/guidance; never synthesize a route or choose from memory/examples. This offline directory includes named operations, business reads, and zero-input routes for the configured version. Live host checks still apply. Use `operations --detail` only for an explicit all-version catalog audit.
+For five-version totals, read coverage then use its host-scoped summary command. The default capability profile is Console; `--profile wwise-authoring-ui` inspects the packaged Console-plus-Authoring union, not a complete live Authoring inventory. Row filters omit `--summary-only`. The list defaults to at most 50 compact rows; `--limit 0` requests all and `--detail` is diagnostic. A user-literal function URI uses `request-schema`. Outside fixed routes, run one `operations` lookup: inherit its disclosed defaults, honor overrides, and instantiate its static schema template with the selected name/api. Follow guidance; typed continuations still require exact copying; never synthesize a route or choose from memory. Directory version is configured; live host checks apply. `operations --detail` is for all-version catalog audits.
 
 For totals, coverage, exclusions, or matrix proof, read `references/waapi-coverage.md` once after `SKILL.md` and before the summary. Program tests are not live-Wwise verification.
 

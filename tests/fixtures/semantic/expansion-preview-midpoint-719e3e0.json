@@ -1,0 +1,378 @@
+{
+  "candidate": "719e3e0",
+  "projection": "Bounded actual C06 visible plan, Preview, post-Preview notice and Execute ordering; selected immutable request/prepared snapshot/verification plan and independent owner/control/RTPC baseline. Original FAIL unchanged.",
+  "events_sha256": "751f9208f695ad304118cec8a266185670cfeb25a91d0973ea6b21206ad93916",
+  "events": [
+    {
+      "type": "item.completed",
+      "item": {
+        "type": "agent_message",
+        "text": "草稿已通过完整性校验：将只更新该 Sound 上由 `Rain_Intensity` 控制的 `Voice Volume` 曲线，设为三点 `(0, -48)`、`(50, -6)`、`(100, 0)`，各点按线性段处理；没有提交备注改动。接下来生成不可变预览，预览会用于核对关系是否按原身份更新。"
+      },
+      "original_index": 24
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "type": "command_execution",
+        "command": "preview-from-draft"
+      },
+      "original_index": 26
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "type": "agent_message",
+        "text": "预览确认选中的仍是原来的 Volume／Rain_Intensity 控制关系，其备注为“Preserve volume association”；当前中点是 `-12 dB`。另有一条 Voice Pitch／Time 曲线，预览显示它不在本次改动范围内。现在按预览把中点改为 `-6 dB`，保留同一关系身份与备注，并在执行后核验。"
+      },
+      "original_index": 27
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "type": "command_execution",
+        "command": "execute"
+      },
+      "original_index": 28
+    }
+  ],
+  "artifact": {
+    "request": {
+      "arguments": {
+        "control_input": {
+          "kind": "id",
+          "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+        },
+        "mode": "add_or_replace",
+        "object": {
+          "kind": "id",
+          "value": "{230D7EDE-28E7-4AF8-AB54-0A73A49CDF63}"
+        },
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0,
+            "y": -48
+          },
+          {
+            "shape": "Linear",
+            "x": 50,
+            "y": -6
+          },
+          {
+            "shape": "Linear",
+            "x": 100,
+            "y": 0
+          }
+        ],
+        "property": "Volume"
+      },
+      "contract": "waapi-skill.operation-request/v1",
+      "operation": "object.setRTPC",
+      "version": "2022.1"
+    },
+    "prepared_operation": {
+      "operation": "object.setRTPC",
+      "version": "2022.1",
+      "pre_state": {
+        "control_input": {
+          "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+          "name": "Rain_Intensity",
+          "notes": "",
+          "parent": {
+            "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+            "name": "Ambience"
+          },
+          "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+          "type": "GameParameter"
+        },
+        "object": {
+          "id": "{230D7EDE-28E7-4AF8-AB54-0A73A49CDF63}",
+          "name": "Expansion_EXP22-C06_Bed",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+          "type": "Sound"
+        },
+        "rtpc_snapshot": {
+          "fields": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "notes",
+            "@PropertyName",
+            "@ControlInput",
+            "@Curve"
+          ],
+          "object_id": "{230D7EDE-28E7-4AF8-AB54-0A73A49CDF63}",
+          "readback_compatibility": [],
+          "rows": [
+            {
+              "@ControlInput": {
+                "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                "name": "Rain_Intensity"
+              },
+              "@Curve": {
+                "@Flags": 3,
+                "id": "{DBAC98E8-1A03-4E61-AC1C-16C7B58CABE4}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": -48.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 0.0
+                  }
+                ]
+              },
+              "@PropertyName": "Volume",
+              "id": "{DED7E91D-3C35-40CE-939A-FC1AA34F0CD7}",
+              "name": "",
+              "notes": "Preserve volume association",
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+              "type": "RTPC"
+            },
+            {
+              "@ControlInput": {
+                "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                "name": "Time"
+              },
+              "@Curve": {
+                "@Flags": 65537,
+                "id": "{27EA74DA-3C91-4091-B7A9-6E13C832F760}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": -100.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 240.0,
+                    "y": 100.0
+                  }
+                ]
+              },
+              "@PropertyName": "Pitch",
+              "id": "{0A63B66F-1882-4EC5-9B09-E2106617777E}",
+              "name": "",
+              "notes": "Preserve pitch association",
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+              "type": "RTPC"
+            }
+          ]
+        }
+      },
+      "verification_plan": {
+        "action": "update",
+        "before_rows": [
+          {
+            "@ControlInput": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{DBAC98E8-1A03-4E61-AC1C-16C7B58CABE4}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -48.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            },
+            "@PropertyName": "Volume",
+            "id": "{DED7E91D-3C35-40CE-939A-FC1AA34F0CD7}",
+            "name": "",
+            "notes": "Preserve volume association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+            "type": "RTPC"
+          },
+          {
+            "@ControlInput": {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time"
+            },
+            "@Curve": {
+              "@Flags": 65537,
+              "id": "{27EA74DA-3C91-4091-B7A9-6E13C832F760}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -100.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 240.0,
+                  "y": 100.0
+                }
+              ]
+            },
+            "@PropertyName": "Pitch",
+            "id": "{0A63B66F-1882-4EC5-9B09-E2106617777E}",
+            "name": "",
+            "notes": "Preserve pitch association",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+            "type": "RTPC"
+          }
+        ],
+        "control_input_id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+        "existing_rtpc_id": "{DED7E91D-3C35-40CE-939A-FC1AA34F0CD7}",
+        "expected_notes": null,
+        "kind": "object-rtpc-state",
+        "notes_supplied": false,
+        "object_id": "{230D7EDE-28E7-4AF8-AB54-0A73A49CDF63}",
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0,
+            "y": -48
+          },
+          {
+            "shape": "Linear",
+            "x": 50,
+            "y": -6
+          },
+          {
+            "shape": "Linear",
+            "x": 100,
+            "y": 0
+          }
+        ],
+        "property": "Volume",
+        "version": "2022.1"
+      }
+    }
+  },
+  "before": {
+    "owner": {
+      "@OutputBus": {
+        "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "name": "Master Audio Bus"
+      },
+      "@Volume": -3.0,
+      "id": "{230D7EDE-28E7-4AF8-AB54-0A73A49CDF63}",
+      "name": "Expansion_EXP22-C06_Bed",
+      "notes": "",
+      "parent": {
+        "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+        "name": "Default Work Unit"
+      },
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed",
+      "type": "Sound"
+    },
+    "controls": [
+      {
+        "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+        "name": "Rain_Intensity",
+        "notes": "",
+        "parent": {
+          "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+          "name": "Ambience"
+        },
+        "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+        "type": "GameParameter"
+      },
+      {
+        "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+        "name": "Time",
+        "notes": "",
+        "parent": {
+          "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+          "name": "Ambience"
+        },
+        "path": "\\Game Parameters\\Ambience\\Time",
+        "type": "GameParameter"
+      }
+    ],
+    "rtpcs": {
+      "{0A63B66F-1882-4EC5-9B09-E2106617777E}": {
+        "@ControlInput": {
+          "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+          "name": "Time"
+        },
+        "@Curve": {
+          "@Flags": 65537,
+          "id": "{27EA74DA-3C91-4091-B7A9-6E13C832F760}",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": -100.0
+            },
+            {
+              "shape": "Linear",
+              "x": 240.0,
+              "y": 100.0
+            }
+          ]
+        },
+        "@PropertyName": "Pitch",
+        "id": "{0A63B66F-1882-4EC5-9B09-E2106617777E}",
+        "name": "",
+        "notes": "Preserve pitch association",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Pitch, Time]",
+        "type": "RTPC"
+      },
+      "{DED7E91D-3C35-40CE-939A-FC1AA34F0CD7}": {
+        "@ControlInput": {
+          "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+          "name": "Rain_Intensity"
+        },
+        "@Curve": {
+          "@Flags": 3,
+          "id": "{DBAC98E8-1A03-4E61-AC1C-16C7B58CABE4}",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": -48.0
+            },
+            {
+              "shape": "Linear",
+              "x": 50.0,
+              "y": -12.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 0.0
+            }
+          ]
+        },
+        "@PropertyName": "Volume",
+        "id": "{DED7E91D-3C35-40CE-939A-FC1AA34F0CD7}",
+        "name": "",
+        "notes": "Preserve volume association",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+        "type": "RTPC"
+      }
+    }
+  },
+  "preview_sha256": "066b4242726ef4aaf16227370eb7be278fa1b8df4c4f827214394ace36f0df32",
+  "matrix_case_sha256": "c154b4bdc1970edfa47d5d270dfb6f8793d2da6f7c791bc93686088bbeeb0930"
+}

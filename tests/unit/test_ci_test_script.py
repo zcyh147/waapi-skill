@@ -177,7 +177,8 @@ def test_live_command_main_runs_exact_argv_without_a_shell(
     console = tmp_path / "WwiseConsole"
     console.write_text("console\n", encoding="utf-8")
     console.chmod(0o755)
-    project = tmp_path / "SampleProject.wproj"
+    project = tmp_path / "source" / "SampleProject.wproj"
+    project.parent.mkdir()
     project.write_text("<Project />\n", encoding="utf-8")
     sandbox = tmp_path / "sandbox"
     interpreter = str(tmp_path / "venv" / "python")
@@ -473,6 +474,10 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
         "if effective_argv and Path(effective_argv[0]).name == 'test_driver.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from test_driver import main\n"
+        "    import test_driver, test_readiness\n"
+        # Routing-only fake children; readiness has its own selected-lane fixtures.
+        "    test_driver.validate_nonlive_readiness = lambda *args: None\n"
+        "    test_readiness.scoped_process_snapshot = lambda: ''\n"
         "    sys.exit(main(effective_argv[1:], environment=os.environ, python_executable=sys.executable, command_runner=record_live_child))\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
@@ -517,7 +522,12 @@ def _write_fake_python(bin_dir: Path, fail_on_nonlive: bool = False) -> Path:
 
 def _run_ci_test(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
     command = ["cmd.exe", "/d", "/c", str(CI_TEST_BAT), *args] if os.name == "nt" else ["bash", str(CI_TEST_SH), *args]
-    return subprocess.run(command, cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=False)
+    child_environment = dict(env)
+    if "CI_TEST_LOG" in child_environment:
+        # Fake Poetry owns the child runner; never inherit the outer gate's
+        # pinned interpreter and recursively launch a real pytest process.
+        child_environment.pop("WAAPI_TEST_PYTHON", None)
+    return subprocess.run(command, cwd=REPO_ROOT, env=child_environment, capture_output=True, text=True, check=False)
 
 
 def _pytest_argv(argv: list[str]) -> list[str]:
@@ -528,6 +538,22 @@ def _pytest_argv(argv: list[str]) -> list[str]:
     if argv and os.path.normcase(argv[0]) == os.path.normcase(sys.executable):
         return argv[1:]
     return argv
+
+
+def test_ci_fixture_ignores_inherited_interpreter_override(tmp_path: Path, monkeypatch) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _write_fake_python(bin_dir)
+    log_path = tmp_path / "python.log"
+    monkeypatch.setenv("WAAPI_TEST_PYTHON", str(tmp_path / "unrelated-interpreter"))
+    env = {**os.environ, "CI_TEST_LOG": str(log_path),
+           "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
+    result = _run_ci_test(env, "--mode", "nonlive", "--", "-q")
+    assert result.returncode == 0, result.stderr
+    calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert len(calls) == 1
+    assert _pytest_argv(calls[0]) == ["-m", "pytest", "-m", "not live and not destructive", "-q"]
+    assert "WAAPI_TEST_PYTHON" in env  # The caller's environment is untouched.
 
 
 def test_ci_test_help_mentions_all_mode() -> None:
@@ -550,7 +576,8 @@ def test_ci_test_all_runs_nonlive_before_matrix(tmp_path: Path) -> None:
     if os.name != "nt":
         console_path.chmod(0o755)
 
-    project_path = tmp_path / "SampleProject.wproj"
+    project_path = tmp_path / "source" / "SampleProject.wproj"
+    project_path.parent.mkdir()
     project_path.write_text("<Project />\n")
 
     env = os.environ.copy()
@@ -587,7 +614,8 @@ def test_ci_test_all_stops_when_nonlive_fails(tmp_path: Path) -> None:
     if os.name != "nt":
         console_path.chmod(0o755)
 
-    project_path = tmp_path / "SampleProject.wproj"
+    project_path = tmp_path / "source" / "SampleProject.wproj"
+    project_path.parent.mkdir()
     project_path.write_text("<Project />\n")
 
     env = os.environ.copy()
@@ -624,7 +652,7 @@ def test_ci_test_sh_reads_versioned_live_environment_config(tmp_path: Path) -> N
     console_path.chmod(0o755)
     project_path = tmp_path / "configured" / "SampleProject.wproj"
     project_path.write_text("<Project />\n", encoding="utf-8")
-    sandbox_root = tmp_path / "configured" / "sandbox"
+    sandbox_root = tmp_path / "sandbox"
     config_path = tmp_path / "live-environment.json"
     config_path.write_text(
         json.dumps(
@@ -682,7 +710,7 @@ def test_ci_test_sh_env_overrides_versioned_live_environment_config(tmp_path: Pa
     configured_console.chmod(0o755)
     configured_project = configured_root / "SampleProject.wproj"
     configured_project.write_text("<Project />\n", encoding="utf-8")
-    configured_sandbox = configured_root / "sandbox"
+    configured_sandbox = tmp_path / "configured-sandbox"
 
     override_root = tmp_path / "override"
     override_console = override_root / "WwiseConsole.sh"
@@ -691,7 +719,7 @@ def test_ci_test_sh_env_overrides_versioned_live_environment_config(tmp_path: Pa
     override_console.chmod(0o755)
     override_project = override_root / "SampleProject.wproj"
     override_project.write_text("<Project />\n", encoding="utf-8")
-    override_sandbox = override_root / "sandbox"
+    override_sandbox = tmp_path / "override-sandbox"
 
     config_path = tmp_path / "live-environment.json"
     config_path.write_text(

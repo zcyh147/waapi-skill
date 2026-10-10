@@ -7,10 +7,58 @@ from typing import Any
 
 CORE_BUSINESS_CONTRACT = "waapi-skill.core-business/v1"
 
+# Single compiler-owned mappings; public disclosures expose only business keys.
+_CURVE_KINDS = {
+    "volume-dry": "VolumeDryUsage",
+    "volume-wet-game": "VolumeWetGameUsage",
+    "volume-wet-user": "VolumeWetUserUsage",
+    "low-pass-filter": "LowPassFilterUsage",
+    "high-pass-filter": "HighPassFilterUsage",
+    "high-shelf": "HighShelfUsage",
+    "spread": "SpreadUsage",
+    "focus": "FocusUsage",
+    "obstruction-volume": "ObstructionVolumeUsage",
+    "obstruction-high-pass": "ObstructionHPFUsage",
+    "obstruction-low-pass": "ObstructionLPFUsage",
+    "obstruction-high-shelf": "ObstructionHSFUsage",
+    "occlusion-volume": "OcclusionVolumeUsage",
+    "occlusion-high-pass": "OcclusionHPFUsage",
+    "occlusion-low-pass": "OcclusionLPFUsage",
+    "occlusion-high-shelf": "OcclusionHSFUsage",
+    "diffraction-volume": "DiffractionVolumeUsage",
+    "diffraction-high-pass": "DiffractionHPFUsage",
+    "diffraction-low-pass": "DiffractionLPFUsage",
+    "diffraction-high-shelf": "DiffractionHSFUsage",
+    "transmission-volume": "TransmissionVolumeUsage",
+    "transmission-high-pass": "TransmissionHPFUsage",
+    "transmission-low-pass": "TransmissionLPFUsage",
+    "transmission-high-shelf": "TransmissionHSFUsage",
+}
+_CURVE_SOURCES = {
+    "none": "None",
+    "custom": "Custom",
+    "volume-dry": "UseVolumeDry",
+    "project": "UseProject",
+}
+_CURVE_SHAPES = {
+    "constant": "Constant",
+    "linear": "Linear",
+    "log-3": "Log3",
+    "log-2": "Log2",
+    "log-1": "Log1",
+    "inverted-s-curve": "InvertedSCurve",
+    "s-curve": "SCurve",
+    "exp-1": "Exp1",
+    "exp-2": "Exp2",
+    "exp-3": "Exp3",
+}
+MAX_CURVE_POINTS = 64
+
 _CONTRACTS: dict[str, dict[str, Any]] = {
     "ak.wwise.core.object.setAttenuationCurve": {
         "versions": ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
         "roles": ("attenuation",),
+        "role_live_types": {"attenuation": "Attenuation"},
         "required_fields": ("attenuation_handle", "curve_kind", "curve_source", "points"),
         "optional_fields": ("platform_name",),
         "field_types": {
@@ -318,6 +366,18 @@ def core_business_operations() -> frozenset[str]:
     return frozenset(_CONTRACTS)
 
 
+def core_business_role_live_type(operation: str, version: str, role: str | None) -> str | None:
+    """Return a pinned role's required live class, never a creatable kind.
+
+    Only explicit per-operation facts qualify. Other roles retain their normal
+    semantic/discriminator resolution and ambiguity boundary.
+    """
+    row = _CONTRACTS[operation]
+    if version not in row["versions"]:
+        raise ValueError("generic Core business operation is unavailable in this version")
+    return row.get("role_live_types", {}).get(role)
+
+
 def core_business_versions(operation: str) -> tuple[str, ...]:
     try:
         return tuple(_CONTRACTS[operation]["versions"])
@@ -354,6 +414,32 @@ def core_business_catalog_rows() -> tuple[dict[str, Any], ...]:
         }
         for operation in sorted(_CONTRACTS)
     )
+
+
+def attenuation_curve_value_domains(version: str) -> dict[str, Any]:
+    """Project compiler tokens through the exact version's reflected enums."""
+    from .builders.common import ManifestSchemaLoader
+
+    schema = ManifestSchemaLoader().schema_for(
+        "ak.wwise.core.object.setAttenuationCurve", version)
+    properties = schema["argsSchema"]["properties"]
+    return {
+        "curve_kind": {"choices": sorted(
+            key for key, native in _CURVE_KINDS.items()
+            if native in properties["curveType"]["enum"])},
+        "curve_source": {"choices": sorted(
+            key for key, native in _CURVE_SOURCES.items()
+            if native in properties["use"]["enum"])},
+        "points": {
+            "maximum_items": MAX_CURVE_POINTS,
+            "custom_minimum_items": 1,
+            "non_custom_items": 0,
+            "item_fields": ["x", "y", "shape"],
+            "coordinates": "finite_numbers",
+            "shape_choices": sorted(_CURVE_SHAPES),
+            "order": "preserve_supplied_order",
+        },
+    }
 
 
 def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
@@ -418,6 +504,8 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         "field_types": dict(public_field_types),
         "input_forms": dict(input_forms),
     }
+    if operation == "ak.wwise.core.object.setAttenuationCurve":
+        declaration["value_domains"] = attenuation_curve_value_domains(version)
     field_semantics = row.get("field_semantics")
     if field_semantics is not None:
         declaration["field_semantics"] = {
@@ -476,4 +564,5 @@ __all__ = [
     "core_business_operations",
     "core_business_read_operations",
     "core_business_versions",
+    "core_business_role_live_type",
 ]

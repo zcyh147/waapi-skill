@@ -1,0 +1,883 @@
+{
+  "contract": "waapi-skill.expansion-preflight-summary/v1",
+  "date": "2026-10-01",
+  "candidate": "e8ab17ce8f5268515c1657c4dd9583c8aac56506",
+  "scope": "Fixture preparation and independent oracle stability only; no Agent and no requested business mutation acceptance.",
+  "development_gates": {
+    "focused_expansion": {
+      "passed": 282
+    },
+    "program": {
+      "passed": 5819,
+      "skipped": 2,
+      "seconds": 261.03
+    },
+    "nonlive": {
+      "passed": 11766,
+      "skipped": 117,
+      "deselected": 27,
+      "seconds": 781.15
+    }
+  },
+  "runs": [
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r1",
+      "result": "environment_block_before_pytest",
+      "files_sha256": {
+        "run.log": "6068160786b1eaa5aabfaf38d7a7c82dd164d32c5338ef430e61bc74b813bb4e"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r2",
+      "result": "2_setup_pass_5_fail",
+      "files_sha256": {
+        "run.log": "1ee3d4394b900030db1552f92a700feb84ebf397320c5370d1b741f59b0e6b18",
+        "junit.xml": "d5f6bfdfe346e51455e530dc983ee2802f5de3d184d72e448b2b367c92bfd6d7"
+      }
+    },
+    {
+      "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r1",
+      "result": "3_setup_pass_3_fail_1_boundary",
+      "files_sha256": {
+        "run.log": "0300a5654203bf7b8a5d8502e18cf9f8c65bf239dc137138309113898f113c66",
+        "junit.xml": "0c7bf93d5a95c35a9524e619de007168e9fa4ecfa6527f4a02a94ca69204a1a5"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "version": "2025.1",
+      "case_id": "C01",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C01",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r2/pytest-tmp/gateway-workflows-2025-10/expansion-preflight-diagnostics/2025-1-C01.json",
+        "gateway_call_count": 20,
+        "oracle_call_count": 0,
+        "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "2c019d4973883e0bee72e38007c81cfb0557a1b4f6f5e20853e3d0317e0c8851",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-d09620cb14794840b7067c4628aa2ed3",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-d09620cb14794840b7067c4628aa2ed3"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2025.1",
+      "case_id": "C03",
+      "pytest_outcome": "PASS",
+      "category": {
+        "agent_pass": false,
+        "assertion_names": [
+          "distractor_unchanged",
+          "exact_media_mapping",
+          "exact_target_set",
+          "fixture_membership_unchanged",
+          "media_destinations_preserved",
+          "sound_identities_and_configuration_preserved",
+          "source_identities_and_configuration_preserved"
+        ],
+        "baseline_assertions": {
+          "distractor_unchanged": true,
+          "exact_media_mapping": false,
+          "exact_target_set": true,
+          "fixture_membership_unchanged": true,
+          "media_destinations_preserved": true,
+          "sound_identities_and_configuration_preserved": true,
+          "source_identities_and_configuration_preserved": true
+        },
+        "before_sha256": "9b9c3417d2ea051a7ceab51d1c6e44be84709981b583a903c20145f2a45f3d60",
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C03",
+        "setup_execute_count": 4,
+        "status": "PASS",
+        "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "70f9db692d261d6b0ed188af656d1f369e4c45ab904315de3fcd9a664ebf38a9",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-cc94fa8352da406e8cec99e1a9a95081",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-cc94fa8352da406e8cec99e1a9a95081"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2025.1",
+      "case_id": "C06",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C06",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r2/pytest-tmp/gateway-workflows-2025-12/expansion-preflight-diagnostics/2025-1-C06.json",
+        "gateway_call_count": 34,
+        "oracle_call_count": 0,
+        "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "348261b2875566fba3842314b5afe5357dd9d82b9061a380be04698ff563ef09",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-87f0345787404d5b88189ff5e67f627a",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-87f0345787404d5b88189ff5e67f627a"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2025.1",
+      "case_id": "C08",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C08",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r2/pytest-tmp/gateway-workflows-2025-13/expansion-preflight-diagnostics/2025-1-C08.json",
+        "gateway_call_count": 3,
+        "oracle_call_count": 0,
+        "reason": "public fixture Gateway failed (exit=2, status=error, error=None)",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "22cda7995352a569586be3d0b4e8ad34ac7bf6510e4bd5ee0508cd29c360b469",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-9ed545e4c5424537afaca3abdfaa2e13",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-9ed545e4c5424537afaca3abdfaa2e13"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2025.1",
+      "case_id": "C09",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C09",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r2/pytest-tmp/gateway-workflows-2025-14/expansion-preflight-diagnostics/2025-1-C09.json",
+        "gateway_call_count": 30,
+        "oracle_call_count": 3,
+        "reason": "C09 plugin identity, class or owner is incomplete",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "bb684fb5a9ecc5d9f8d8e89a1252362cb2edb1d0e9e4492e4f1d2fc12e123c76",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a732b933d2d74718a8b5251d749e728c",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a732b933d2d74718a8b5251d749e728c"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2025.1",
+      "case_id": "M01",
+      "pytest_outcome": "PASS",
+      "category": {
+        "agent_pass": false,
+        "assertion_names": [
+          "clip_media_matches_its_source",
+          "each_track_has_one_sequence_and_clip",
+          "exact_segment_track_source_topology",
+          "media_hashes_match_each_requested_track",
+          "only_track_has_requested_volume",
+          "parent_and_protected_sibling_unchanged"
+        ],
+        "baseline_assertions": {
+          "clip_media_matches_its_source": false,
+          "each_track_has_one_sequence_and_clip": false,
+          "exact_segment_track_source_topology": false,
+          "media_hashes_match_each_requested_track": false,
+          "only_track_has_requested_volume": false,
+          "parent_and_protected_sibling_unchanged": true
+        },
+        "before_sha256": "0cc54ed0384aa2513c6dedfc93aa648d80a63cb0cdf47dd4262e4a107b6be444",
+        "business_effect_verified": false,
+        "category": "expansion-preflight-M01",
+        "setup_execute_count": 2,
+        "status": "PASS",
+        "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "5313703b163ba258907185b61eac84d2d6423cba7cc15b0f96dd1102af0f5f9f",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a9d59d1edfe44138a2c26ed6e8456f1f",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-a9d59d1edfe44138a2c26ed6e8456f1f"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2025.1",
+      "case_id": "M05",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-M05",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2025-r2/pytest-tmp/gateway-workflows-2025-16/expansion-preflight-diagnostics/2025-1-M05.json",
+        "gateway_call_count": 0,
+        "oracle_call_count": 6,
+        "reason": "M05 cannot seal missing Stinger timing/configuration fields",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "record_sha256": "2272fc2c65eb512703cf5cb39c4360bebc35811fc249a0a25598599fab055115",
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-92769f3208494de3943a14686e84fcb5",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-92769f3208494de3943a14686e84fcb5"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "C01",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C01",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r1/pytest-tmp/gateway-workflows-2022-10/expansion-preflight-diagnostics/2022-1-C01.json",
+        "gateway_call_count": 20,
+        "oracle_call_count": 0,
+        "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "ba3ef6d53635f542bb872ac86909f6abc67c51f19acf6ad022582a23f8e0c993",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-de671a595fa64989a69a4eec7637ff5c",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-de671a595fa64989a69a4eec7637ff5c"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "C03",
+      "pytest_outcome": "PASS",
+      "category": {
+        "agent_pass": false,
+        "assertion_names": [
+          "distractor_unchanged",
+          "exact_media_mapping",
+          "exact_target_set",
+          "fixture_membership_unchanged",
+          "media_destinations_preserved",
+          "sound_identities_and_configuration_preserved",
+          "source_identities_and_configuration_preserved"
+        ],
+        "baseline_assertions": {
+          "distractor_unchanged": true,
+          "exact_media_mapping": false,
+          "exact_target_set": true,
+          "fixture_membership_unchanged": true,
+          "media_destinations_preserved": true,
+          "sound_identities_and_configuration_preserved": true,
+          "source_identities_and_configuration_preserved": true
+        },
+        "before_sha256": "eedde5005aa37306a54d04ffb5a46fc5aba2e699448256f3159812eab864bfd7",
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C03",
+        "setup_execute_count": 4,
+        "status": "PASS",
+        "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "e5eea8abf4c7938d2ce74775c735e27a68b71a8cf06851b3f85cd3a71d07f4e8",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-0e16cb7f099b42ea81793b2917101eb2",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-0e16cb7f099b42ea81793b2917101eb2"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "C06",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C06",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r1/pytest-tmp/gateway-workflows-2022-12/expansion-preflight-diagnostics/2022-1-C06.json",
+        "gateway_call_count": 34,
+        "oracle_call_count": 0,
+        "reason": "public fixture Gateway failed (exit=2, status=verification_failed, error=None)",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "ecb14e5d36638abe0ae282967e9521170c655f62dd82e62470155a104f2a881c",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-3e75c169a6f2441ba8deb16eca60acf5",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-3e75c169a6f2441ba8deb16eca60acf5"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "C08",
+      "pytest_outcome": "FAIL",
+      "category": {
+        "agent_pass": false,
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C08",
+        "diagnostics_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-preflight-20261001-2022-r1/pytest-tmp/gateway-workflows-2022-13/expansion-preflight-diagnostics/2022-1-C08.json",
+        "gateway_call_count": 3,
+        "oracle_call_count": 0,
+        "reason": "public fixture Gateway failed (exit=2, status=error, error=None)",
+        "status": "FAIL",
+        "verifier_strength": "setup_failed_with_preserved_gateway_and_oracle_diagnostics"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "fb6bc0a581887e494789c0c925aceeb9735fbf228b4c3205eb8a6cba9677c188",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-5cb6554fd2aa4eeaa1bb9ac1fc1c05f6",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-5cb6554fd2aa4eeaa1bb9ac1fc1c05f6"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "C09",
+      "pytest_outcome": "PASS",
+      "category": {
+        "agent_pass": false,
+        "assertion_names": [
+          "exactly_one_added_binding",
+          "existing_effects_and_bindings_unchanged",
+          "new_effect_matches",
+          "new_effect_owned_by_target",
+          "owner_unchanged",
+          "unique_effect_identities"
+        ],
+        "baseline_assertions": {
+          "exactly_one_added_binding": false,
+          "existing_effects_and_bindings_unchanged": true,
+          "new_effect_matches": false,
+          "new_effect_owned_by_target": false,
+          "owner_unchanged": true,
+          "unique_effect_identities": true
+        },
+        "before_sha256": "3a66dfcaed2bbf23d4707ead640ca3bf016c4c823811d94dd5cbcf379d2d154d",
+        "business_effect_verified": false,
+        "category": "expansion-preflight-C09",
+        "setup_execute_count": 3,
+        "status": "PASS",
+        "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "775b140263a842697d4bcd63e728981c0a50fd57de0037a184e3580a090d3f9e",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-b7b6ae809ede47a8bca0ecc2dec1a807",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-b7b6ae809ede47a8bca0ecc2dec1a807"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "M01",
+      "pytest_outcome": "PASS",
+      "category": {
+        "agent_pass": false,
+        "assertion_names": [
+          "clip_media_matches_its_source",
+          "each_track_has_one_sequence_and_clip",
+          "exact_segment_track_source_topology",
+          "media_hashes_match_each_requested_track",
+          "only_track_has_requested_volume",
+          "parent_and_protected_sibling_unchanged"
+        ],
+        "baseline_assertions": {
+          "clip_media_matches_its_source": false,
+          "each_track_has_one_sequence_and_clip": false,
+          "exact_segment_track_source_topology": false,
+          "media_hashes_match_each_requested_track": false,
+          "only_track_has_requested_volume": false,
+          "parent_and_protected_sibling_unchanged": true
+        },
+        "before_sha256": "003c89601acd83b3db688f63dca0c83374603323482e51f3f3d5bb4e78848eeb",
+        "business_effect_verified": false,
+        "category": "expansion-preflight-M01",
+        "setup_execute_count": 2,
+        "status": "PASS",
+        "verifier_strength": "fixture_setup_and_repeated_independent_snapshot_only"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "69068dc2f3f445606824e020342a7c9d80c616f7f2eb2109ef7a7e22710500a3",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-81554e51c1784626b24a2e88eba7291c",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-81554e51c1784626b24a2e88eba7291c"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    },
+    {
+      "version": "2022.1",
+      "case_id": "M05",
+      "pytest_outcome": "PASS",
+      "category": {
+        "agent_pass": false,
+        "boundary_code": "CAPABILITY_UNAVAILABLE",
+        "business_effect_verified": false,
+        "category": "expansion-preflight-M05",
+        "evidence": {
+          "agent_executed": false,
+          "business_effect_verified": false,
+          "identity_after": {
+            "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "name": "",
+            "path": "[Stinger : Bonus,Stinger Bonus]",
+            "type": "MusicStinger"
+          },
+          "identity_before": {
+            "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "name": "",
+            "path": "[Stinger : Bonus,Stinger Bonus]",
+            "type": "MusicStinger"
+          },
+          "public_observation": {
+            "agent_result": {
+              "metadata_authority": "live-waapi",
+              "repair": "refine each --include-field meaning until one live field matches",
+              "unresolved": [
+                {
+                  "candidate_names": [],
+                  "meaning": "Trigger"
+                },
+                {
+                  "candidate_names": [
+                    "NumSegmentAdvance",
+                    "PlaySegmentAt"
+                  ],
+                  "meaning": "Segment"
+                }
+              ]
+            },
+            "command": "query-object",
+            "contract": "waapi-skill.gateway-result/v1",
+            "detected_version": "2022.1",
+            "endpoint": {
+              "host": "127.0.0.1",
+              "port": 32266,
+              "url": "ws://127.0.0.1:32266/waapi"
+            },
+            "is_command_line": true,
+            "ok": true,
+            "query_layer": "business-declaration",
+            "session_context": {
+              "adapter_version": "2022.1",
+              "adapter_version_source": "live_detection",
+              "available": true,
+              "available_project_modification_policies": [
+                "read_only",
+                "ask_before_changes",
+                "allow_changes"
+              ],
+              "contract": "waapi-skill.session-context/v2",
+              "endpoint": {
+                "host": "127.0.0.1",
+                "port": 32266,
+                "url": "ws://127.0.0.1:32266/waapi"
+              },
+              "one_time_introduction": {
+                "atomic": true,
+                "contract": "waapi-skill.session-introduction/v2",
+                "emit_condition": "visible_conversation_intro_absent",
+                "emit_timing": "first_agent_message_after_gateway_result",
+                "facts": {
+                  "adapter_version": "2022.1",
+                  "available_project_modification_policies": [
+                    "read_only",
+                    "ask_before_changes",
+                    "allow_changes"
+                  ],
+                  "endpoint_url": "ws://127.0.0.1:32266/waapi",
+                  "project_modification_policy": "ask_before_changes",
+                  "skill_name": "waapi-skill"
+                },
+                "machine_readable_result_policy": "separate_progress_message",
+                "style": "natural_prose_in_user_language"
+              },
+              "project_modification_policy": "ask_before_changes"
+            },
+            "status": "needs_clarification"
+          },
+          "reason": "matching live metadata does not expose the required Stinger references"
+        },
+        "status": "blocked",
+        "verifier_strength": "affirmatively_observed_version_boundary_no_agent_execution"
+      },
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "record_sha256": "2123a4b42c7405bf27eda2975ed5fa8618e797c11abbd70b857a02f1dff2ef1d",
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-b6ae4728a4c645eabf4153059ac484c7",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-b6ae4728a4c645eabf4153059ac484c7"
+      },
+      "agent_started": false,
+      "business_pass_credit": false
+    }
+  ],
+  "historical_native_source_proof_scope": {
+    "native_category_content_hash": "Historical category.source.hash_before/hash_after cover .wproj/.wwu content only.",
+    "native_tree_metadata": "Whole-tree path, mode, size and mtime inventory; not a media-content hash.",
+    "copy_metadata": "Separate bounded-wproj-files copy audit; observed saved audit file_count=1.",
+    "full_source_content_integrity": "Not established by these historical native records; original raw records, digests and outcomes remain unchanged.",
+    "formal_fresh_lifecycle": "Separate full-source SHA-256 evidence remains valid and is not revised here."
+  }
+}

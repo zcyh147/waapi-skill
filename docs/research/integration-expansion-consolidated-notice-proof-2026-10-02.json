@@ -1,0 +1,126 @@
+{
+  "contract": "waapi-skill.integration-expansion-failed-rerun/v1",
+  "candidate": "977e71e4ff61d287c1b7367ea5126d1f85897a7d",
+  "cli_version": "0.159.2",
+  "service_tier": "default",
+  "selected_tasks": 2,
+  "completed_tasks": 2,
+  "passing_units": 2,
+  "all_selected_passed": true,
+  "model_selected": null,
+  "campaigns": [
+    {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "high",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-977e71e-luna-high-r1-retry1-cli1592",
+      "attempt_manifest_sha256": "1f229b112ab69bd910cda0c8d198dd71c4b125a5c3d32304e3118ccb82b01231",
+      "sealed_artifacts_rehashed": 95,
+      "sealed_artifact_bytes": 1751657,
+      "unit_id": "EXP25-C06",
+      "runner_status": "PASS",
+      "agent_seconds": 173.7051901249215,
+      "slow": false,
+      "usage": {
+        "input_tokens": 479227,
+        "cached_input_tokens": 418304,
+        "uncached_input_tokens": 60923,
+        "output_tokens": 4241,
+        "reasoning_tokens_included_in_output": 1768,
+        "cache_write_tokens": 0,
+        "usd_cost": null
+      },
+      "independent_business_assertions_passed": 7,
+      "trusted_oracle_closed": true,
+      "execute_count": 1,
+      "source_full_hash_unchanged": true,
+      "source_mtime_unchanged": true,
+      "sandbox_retained": false,
+      "quarantine_path": null,
+      "job_unloaded": true,
+      "verify_only": {
+        "performed": true,
+        "exit_code": 0,
+        "options_identical": true,
+        "extra_fresh_tasks": 0,
+        "extra_turns": 0,
+        "job_unloaded": true
+      }
+    },
+    {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium",
+      "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-977e71e-sol-medium-r1-retry1-cli1592",
+      "attempt_manifest_sha256": "bb6846981b0e9fcf291c96de1007a74d6bc453877e32ac7eee9b63fb5e2b2875",
+      "sealed_artifacts_rehashed": 95,
+      "sealed_artifact_bytes": 1746831,
+      "unit_id": "EXP25-C06",
+      "runner_status": "PASS",
+      "agent_seconds": 107.38720016693696,
+      "slow": false,
+      "usage": {
+        "input_tokens": 491987,
+        "cached_input_tokens": 415616,
+        "uncached_input_tokens": 76371,
+        "output_tokens": 1871,
+        "reasoning_tokens_included_in_output": 16,
+        "cache_write_tokens": 0,
+        "usd_cost": null
+      },
+      "independent_business_assertions_passed": 7,
+      "trusted_oracle_closed": true,
+      "execute_count": 1,
+      "source_full_hash_unchanged": true,
+      "source_mtime_unchanged": true,
+      "sandbox_retained": false,
+      "quarantine_path": null,
+      "job_unloaded": true,
+      "verify_only": {
+        "performed": true,
+        "exit_code": 0,
+        "options_identical": true,
+        "extra_fresh_tasks": 0,
+        "extra_turns": 0,
+        "job_unloaded": true
+      }
+    }
+  ],
+  "focused": {
+    "passed": 344,
+    "duration_seconds": 4.71,
+    "exit_code": 0
+  },
+  "nonlive": {
+    "candidate": "977e71e4ff61d287c1b7367ea5126d1f85897a7d",
+    "mode": "nonlive",
+    "exit_code": 0,
+    "passed": 12360,
+    "skipped": 118,
+    "deselected": 27,
+    "duration_seconds": 823.77,
+    "junit_counts": {
+      "tests": 12478,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 118
+    },
+    "log_sha256": "67e046ef3c46061eb49f92f0ee481edc5a53f59b324fa4c7426c03de90519dd4",
+    "junit_sha256": "d84eb70f46d4d6ab1189cd5782d6a7ea3ea4e0b5d021241b99eb21cd86465dda",
+    "source_tracked_clean": true,
+    "live_or_agent_credit": false
+  },
+  "unchanged_program_component": {
+    "candidate": "cf94158c5cf3e4e4e480bc6ef65bcad80370f077",
+    "passed": 5888,
+    "skipped": 2,
+    "exit_code": 0,
+    "current_candidate_program_rerun": false,
+    "unchanged_paths": [
+      "skills",
+      "ci",
+      "tests/unit",
+      "tests/maintenance"
+    ]
+  },
+  "scoped_processes_remaining_after_retry_cleanup": false,
+  "next": "Both failed units passed on the reviewed candidate; complete Luna C01/C06/M01 selection is now running, followed by the identical Sol selection. Original mixed roots remain frozen. Model selection, conditional Luna medium screening, and final 13-positive-plus-boundary acceptance remain pending."
+}

@@ -1,0 +1,808 @@
+{
+  "contract": "waapi-skill.integration-expansion-guid-validation/v1",
+  "time_utc": "2026-10-07T15:15:12.952248+00:00",
+  "candidate": "67279dbf6baec55ddec90448419587055f49ff57",
+  "report_branch": "codex/expansion-guid-validation",
+  "integration_tip_merge": "Already up to date at exact 67279db before reporting",
+  "scope": {
+    "issue": 147,
+    "final_acceptance_issue": 122,
+    "host": "macOS",
+    "profile": "integration_expansion_v1",
+    "selected": [
+      "EXP25-C09"
+    ],
+    "version": "2025.1",
+    "final13_released": false,
+    "windows_evidence": false
+  },
+  "terminal_status": "FAIL",
+  "reviews": [
+    {
+      "path": "/tmp/waapi-expansion-guid-review/standards-opaque.md",
+      "sha256": "f116a93fb0288bf1b77d3b82c07ab511db29e6376bfa6b5360160f33d99595e7"
+    },
+    {
+      "path": "/tmp/waapi-expansion-guid-review/spec-opaque.md",
+      "sha256": "87e835f63c7e64fff33733860e70ae4911506ec9c4813ec26bb2ef50b2a16ed1"
+    }
+  ],
+  "prior_component_evidence": {
+    "focused_passed": 3766,
+    "source": "docs/research/integration-expansion-guid-opaque-qualifier-repair-2026-10-07.json",
+    "program_inputs_unchanged": true,
+    "new_program_run": false,
+    "new_program_pass_claim": false
+  },
+  "readiness": {
+    "candidate": "67279dbf6baec55ddec90448419587055f49ff57",
+    "git_clean": true,
+    "source_guards": {
+      "2022.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+          "file_count": 84,
+          "bytes_hashed": 3788783
+        },
+        "mtime_ns": 1790531309484673590,
+        "project": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "console": "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh",
+        "sandbox_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2022.1"
+      },
+      "2025.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "mtime_ns": 1790531309503233691,
+        "project": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "console": "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
+        "sandbox_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1"
+      }
+    },
+    "lfs": [
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/Footstep/Footstep_Crouching_Concrete_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/Footstep/Footstep_Running_Hardwood_02.wav",
+        "oid": "474422f208c274b61253678676352a3d94627c63b208a725aee206a89542a8c4",
+        "sha256": "474422f208c274b61253678676352a3d94627c63b208a725aee206a89542a8c4",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      },
+      {
+        "path": "tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+        "oid": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97",
+        "matches": true
+      }
+    ],
+    "lfs_count": 32,
+    "config_sha256": "f4a672b5007631bead3180125652621fe903c2ca8dafbba0e132431a663b5b6a",
+    "cli_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704",
+    "cli_version": "codex-cli 0.159.2",
+    "runtime_versions": {
+      "autobahn": "24.4.2",
+      "pip": "25.1.1",
+      "hyperlink": "21.0.0",
+      "txaio": "26.6.1",
+      "pycparser": "3.0",
+      "setuptools": "80.9.0",
+      "cffi": "2.1.1",
+      "cryptography": "50.0.1",
+      "waapi-client": "0.8.1",
+      "idna": "3.20"
+    },
+    "default_config_exists": true,
+    "inputs": {
+      "skills/waapi-skill": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+      "tests/semantic": "c923e464de52e71d7665e9301326dbdfe9aa6d94f68a0964f1e17c07dc452072",
+      "tests/destructive/support": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+    },
+    "errors": [],
+    "argv": [
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill/.venv/bin/python",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "--profile",
+      "integration_expansion_v1",
+      "--model",
+      "gpt-6.1-sol",
+      "--reasoning-effort",
+      "high",
+      "--service-tier",
+      "default",
+      "--codex-binary",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+      "--auth-json",
+      "/Users/xiye/.codex/auth.json",
+      "--live-config",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/expansion-frozen-live-environment.json",
+      "--campaign-root",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592",
+      "--wwise-readiness-timeout",
+      "180",
+      "--timeout",
+      "600",
+      "--max-pre-action-retries",
+      "0",
+      "--version",
+      "2025.1",
+      "--case-id",
+      "EXP25-C09"
+    ],
+    "environment": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONIOENCODING": "utf-8:strict"
+    },
+    "root_absent": true,
+    "nonlive_terminal_audit_sha256": "84920e6ae17f23936e550480ce3b9a2b8df6d4f23c0c57ce176d9844733019d4"
+  },
+  "nonlive": {
+    "session_id": 83978,
+    "driver_pid": 71821,
+    "pytest_pid": 71825,
+    "direct_exit": 0,
+    "junit": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "119",
+      "tests": "16728",
+      "time": "865.466",
+      "timestamp": "2026-10-07T22:55:48.339323+08:00",
+      "hostname": "xiyes-Mac-mini.local"
+    },
+    "log_sha256": "52d50c76bcb6f605f510cadaace750c06098d77c8491ae6fc4d6c2317f9d464d",
+    "xml_sha256": "08ed3f6ecfb768056c835387d11cc566e88b627277e8978d79c5f9b9751a8098",
+    "passed": 16609,
+    "skipped": 119,
+    "deselected": 27,
+    "pytest_seconds": 865.8,
+    "developer_interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "argv": [
+      "ci/test.sh",
+      "--mode",
+      "nonlive",
+      "--",
+      "-q",
+      "-ra",
+      "--junitxml=/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/nonlive.xml"
+    ],
+    "no_source_head_inventory_inspection_while_active": true,
+    "scoped_processes": [],
+    "parent_audit": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/parent-gate-audit.json"
+  },
+  "fresh": {
+    "root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592",
+    "argv": [
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill/.venv/bin/python",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "--profile",
+      "integration_expansion_v1",
+      "--model",
+      "gpt-6.1-sol",
+      "--reasoning-effort",
+      "high",
+      "--service-tier",
+      "default",
+      "--codex-binary",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+      "--auth-json",
+      "/Users/xiye/.codex/auth.json",
+      "--live-config",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/expansion-frozen-live-environment.json",
+      "--campaign-root",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592",
+      "--wwise-readiness-timeout",
+      "180",
+      "--timeout",
+      "600",
+      "--max-pre-action-retries",
+      "0",
+      "--version",
+      "2025.1",
+      "--case-id",
+      "EXP25-C09"
+    ],
+    "environment": {
+      "PATH": "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "PYTHONIOENCODING": "utf-8:strict"
+    },
+    "launch": {
+      "launch_runs": 1,
+      "launch_exit_code": 1,
+      "launch_pid": 90527,
+      "job_unloaded": true,
+      "service_lookup_exit": 113
+    },
+    "summary": {
+      "all_selected_passed": false,
+      "attempt_ids": [
+        "attempt-000001"
+      ],
+      "blocked_unit_ids": [],
+      "contract": "waapi-skill.codex-semantic-consolidated-units/v1",
+      "failed_unit_ids": [
+        "EXP25-C09"
+      ],
+      "passed_unit_ids": [],
+      "pending_unit_ids": [],
+      "retryable_unit_ids": [],
+      "selected_unit_count": 1,
+      "units": {
+        "EXP25-C09": {
+          "observations": [
+            {
+              "attempt_id": "attempt-000001",
+              "effective_status": "FAIL",
+              "phases": [
+                {
+                  "phase": "scenario",
+                  "status": "FAIL"
+                }
+              ],
+              "status": "FAIL",
+              "unit_id": "EXP25-C09"
+            }
+          ],
+          "required_phases": [
+            "scenario"
+          ],
+          "status": "FAIL"
+        }
+      }
+    },
+    "accounting": {
+      "agent_units": {
+        "passed": [],
+        "selected": [
+          "EXP25-C09"
+        ]
+      },
+      "capability_boundaries": {
+        "agent_pass_credit": false,
+        "proven": [],
+        "selected": []
+      }
+    },
+    "outcome": {
+      "contract": "waapi-skill.integration-expansion-project-outcome/v1",
+      "scenario_id": "EXP25-C09",
+      "version": "2025.1",
+      "status": "FAIL",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "scenario_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09",
+      "task_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task",
+      "thread_id": "01a116eb-11aa-7a71-be43-f1c06c3aa130",
+      "inputs_sha256": "4f262297ccbcf9b6729e8ffeebeabe8e77fab1361b28fb6754aa2213c6b6b503"
+    },
+    "trusted_oracle_closed": true,
+    "task": {
+      "contract": "waapi-skill.integration-expansion-task-result/v1",
+      "unit_id": "EXP25-C09",
+      "version": "2025.1",
+      "thread_id": "01a116eb-11aa-7a71-be43-f1c06c3aa130",
+      "passed": false,
+      "status": "FAIL",
+      "infrastructure": null,
+      "error": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "terminal_state": "verified",
+      "assertions": {
+        "owner_unchanged": true,
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "unique_effect_identities": true,
+        "new_effect_owned_by_target": true
+      },
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "gateway_verification_state": "verified",
+      "agent_seconds": 92.3317985420581,
+      "slow": false,
+      "plan_sha256": "9195bc787aa172fb87ce83372bd928b7a4b381f3e278aba65c0040bd8a91c882",
+      "turns": [
+        {
+          "index": 1,
+          "gates": {
+            "memory_isolated": true,
+            "completed_turn": true,
+            "one_target_skill": true,
+            "no_collaboration": true,
+            "only_packaged_references": true,
+            "only_authenticated_gateway_and_skill_reads": true,
+            "no_discovery_or_direct_waapi": true,
+            "no_write_like_commands": true,
+            "source_and_workspace_unchanged": true,
+            "broker_provenance": true,
+            "policy_checkpoint": true,
+            "visible_preview_notice": false,
+            "final_response_present": true,
+            "cumulative_agent_budget": true
+          },
+          "agent_seconds": 92.3317985420581
+        }
+      ]
+    },
+    "notice_messages": [
+      {
+        "event_index": 8,
+        "item_id": "item_3",
+        "text": "已加载 waapi-skill；已配置 WAAPI 端口 31457，Wwise 适配版本为 2025.1。\n\n当前修改策略为 `allow_changes`，支持 `read_only`、`ask_before_changes` 和 `allow_changes`。我会先核对现有效果器及声音属性，告知具体追加变更，再取得独立的策略授权并执行核验。"
+      },
+      {
+        "event_index": 23,
+        "item_id": "item_11",
+        "text": "已核对目标为指定声音，并记录修改前状态。本次将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定和顺序，以及声音属性是否保持。\n\n当前尚未修改项目。此次变更已获得 `allow_changes` 策略的独立授权，现在执行追加并核验。"
+      },
+      {
+        "event_index": 28,
+        "item_id": "item_14",
+        "text": "已实际新增 `Expansion_EXP25-C09_NewGain`（Wwise Gain），并通过回读核验。\n\n- 效果器 GUID：`{40807B97-B559-4BA8-AA84-F8FB0C1E2CC9}`\n- 绑定 slot GUID：`{5ECBFC26-A1B3-4B10-BAEA-E2F0AA36A5DC}`\n- 备注：`Expansion C09 appended gain`\n- 未另设插件参数或平台值。\n\n核验摘要显示 6 项检查全部通过，但未披露原有两个效果器及声音属性的逐项前后对照，因此无法据此逐项确认身份、绑定、配置顺序及其他保留项均未改变。"
+      }
+    ],
+    "phase_events": [
+      {
+        "phase": "preview-from-draft",
+        "event_index": 22,
+        "item_id": "item_10",
+        "exit_code": 0,
+        "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-0512c683b19d7c036e3de1e312a17fb4 --task-authority da1-9a3feba200a1c01aae6527f67e8169eae23693d8 --expected-revision 5'"
+      },
+      {
+        "phase": "execute",
+        "event_index": 25,
+        "item_id": "item_12",
+        "exit_code": 0,
+        "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-c2vzbv24gppbxnzs5xqm'"
+      },
+      {
+        "phase": "verify",
+        "event_index": 27,
+        "item_id": "item_13",
+        "exit_code": 0,
+        "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py verify tx1-c2vzbv24gppbxnzs5xqm'"
+      }
+    ],
+    "usage": [
+      {
+        "input_tokens": 441857,
+        "cached_input_tokens": 395136,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 2017,
+        "reasoning_output_tokens": 170
+      }
+    ],
+    "replay_policy": "FAIL frozen; no retry/resume/replay/regrade/verify-only",
+    "audit": {
+      "artifact_count": 177,
+      "artifact_bytes": 6769542,
+      "manifest_sha256": "d4f9fb5bfbb33c7121a5867605b6c53f82904327a8a826ad94d679f1b2db4740",
+      "metadata_seal_count": 11,
+      "metadata_seals": {
+        ".campaign-lock-owner.json.sha256": {
+          "sha256": "293e0002b1c23995c9355e0af06dea5c743e81bd989f512a520b2089c95bf645",
+          "matches": true
+        },
+        ".waapi-semantic-campaign-root.json.sha256": {
+          "sha256": "c77f9ac34a6df35beaa9191cf5850febc07e416598f30a0f4c8f73b699227545",
+          "matches": true
+        },
+        "attempt-ledger.json.sha256": {
+          "sha256": "f2f886d4fb25ee6be03a4bb6cda8a3bb998fb64c441272574164798e82bae824",
+          "matches": true
+        },
+        "attempts/attempt-000001/attempt-manifest.json.sha256": {
+          "sha256": "d4f9fb5bfbb33c7121a5867605b6c53f82904327a8a826ad94d679f1b2db4740",
+          "matches": true
+        },
+        "attempts/attempt-000001/attempt.json.sha256": {
+          "sha256": "8564fb1bdb44e9a142b273e19dc7de9b1f457d2977f01035b14ad0b543d93b16",
+          "matches": true
+        },
+        "attempts/attempt-000001/runs/heavy-v3/child-request.json.sha256": {
+          "sha256": "7ea75d74a027809dafb4261c0a7febe4aa94dbec8b363884f3162e4876c157c2",
+          "matches": true
+        },
+        "attempts/attempt-000001/runs/heavy-v3/child-result.json.sha256": {
+          "sha256": "edc22bc923e8d861679b442a8baeb26065894d6f8edba790ed18781a9a00de18",
+          "matches": true
+        },
+        "attempts/attempt-000001/runs/heavy-v3/classification.json.sha256": {
+          "sha256": "3b158c84df9221662ea677c9f4d28dd84535d674ca93b9cb26a9b718901a5a5c",
+          "matches": true
+        },
+        "campaign-config.json.sha256": {
+          "sha256": "d5fb053639c8a0756ef5b22666492877a982c8d6ce159c2a4e0c3424c089c90b",
+          "matches": true
+        },
+        "consolidated-summary.json.sha256": {
+          "sha256": "d3bea48b3be5c38a213ae845bdfcc007b18bb5fc834f7b4f13be7362feb09d3a",
+          "matches": true
+        },
+        "expansion-accounting.json.sha256": {
+          "sha256": "9bac862f5eeb21d52023fd0279e66c10f05b701b67b1702aaca507a497d04149",
+          "matches": true
+        }
+      },
+      "manifest_inventory_extras": [
+        "attempt-manifest.json",
+        "attempt-manifest.json.sha256"
+      ],
+      "source_guards": {
+        "2022.1": {
+          "hash": {
+            "algorithm": "sha256",
+            "strategy": "full",
+            "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+            "file_count": 84,
+            "bytes_hashed": 3788783
+          },
+          "mtime_ns": 1790531309484673590
+        },
+        "2025.1": {
+          "hash": {
+            "algorithm": "sha256",
+            "strategy": "full",
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "bytes_hashed": 3943065
+          },
+          "mtime_ns": 1790531309503233691
+        }
+      },
+      "input_hashes": {
+        "skills/waapi-skill": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+        "tests/semantic": "c923e464de52e71d7665e9301326dbdfe9aa6d94f68a0964f1e17c07dc452072",
+        "tests/destructive/support": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+      },
+      "git_status": "",
+      "scoped_processes": [],
+      "audit_errors": []
+    }
+  },
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "errors": [
+      "scenario:V3TaskRunnerError: expansion turn failed: visible_preview_notice"
+    ],
+    "final_status": "FAIL",
+    "quarantine_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/quarantine.json",
+    "requested_status": "FAIL",
+    "sandbox_retained": true,
+    "scenario_id": "EXP25-C09",
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_mtime_after_ns": 1790531309503233691,
+    "source_mtime_before_ns": 1790531309503233691,
+    "version": "2025.1"
+  },
+  "terminal_extra_audit": {
+    "quarantine": {
+      "contract": "waapi-skill.codex-semantic-scenario-quarantine/v3",
+      "errors": [
+        "scenario:V3TaskRunnerError: expansion turn failed: visible_preview_notice"
+      ],
+      "never_reuse": true,
+      "owned_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned",
+      "owned_tree_sha256": "605a23116c29a5cf5a7c5cf0b76d040d723467e59b41023e9d2ab8d8989d3962",
+      "scenario_id": "EXP25-C09",
+      "sealed_at": "2026-10-07T15:12:38.464106+00:00",
+      "status": "FAIL",
+      "version": "2025.1"
+    },
+    "quarantine_tree_current": "605a23116c29a5cf5a7c5cf0b76d040d723467e59b41023e9d2ab8d8989d3962",
+    "quarantine_tree_matches": true,
+    "symlinks": [],
+    "symlink_audit_method": "os.walk followlinks=False; hash os.readlink bytes only; never dereference auth link",
+    "cleanup": [
+      {
+        "path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/sandbox-metadata.json",
+        "payload": {
+          "command": [
+            "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
+            "waapi-server",
+            "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/SampleProject.wproj",
+            "--wamp-port",
+            "31457",
+            "--http-port",
+            "0"
+          ],
+          "copy_duration_seconds": 0.013522833120077848,
+          "expected_project_identity": "SampleProject",
+          "get_info_display_name": "WwiseConsole",
+          "get_info_version": {
+            "build": 9143,
+            "displayName": "v2025.1.7",
+            "major": 1,
+            "minor": 7,
+            "nickname": "",
+            "schema": 133,
+            "year": 2025
+          },
+          "identity_verified": true,
+          "keep_decision": "quarantined:fail-scenario-never-reuse",
+          "launch_cwd_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root",
+          "launch_project_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/SampleProject.wproj",
+          "metadata_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/sandbox-metadata.json",
+          "notes": [],
+          "process_cleanup_details": {
+            "detached_cleanup_pids": [
+              90881
+            ],
+            "launch_pid": 90534,
+            "process_exited": true,
+            "residual_processes": [],
+            "wine_prefix": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/.wine-prefix",
+            "wineserver_commands": []
+          },
+          "process_cleanup_result": "cleaned",
+          "process_pid": 90534,
+          "ready_duration_seconds": 5.068498166045174,
+          "sandbox_hash": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "sandbox_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a",
+          "sandbox_project_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/SampleProject.wproj",
+          "selected_port": 31457,
+          "source_hash": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_mtime_after": 1790531309.5032337,
+          "source_mtime_before": 1790531309.5032337,
+          "source_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+          "source_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/tests/_org/2025.1",
+          "wine_prefix_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-67279db-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/owned/sandbox-root/sample-project-66230ab9a1e246d98c894364aa8b708a/.wine-prefix",
+          "wwise_version": "2025.1"
+        }
+      }
+    ],
+    "launch_runs": 1,
+    "launch_exit_code": 1,
+    "launch_pid": 90527,
+    "verify_only_run": false,
+    "final13_run": false,
+    "job_unloaded": true,
+    "service_lookup_exit": 113
+  },
+  "evidence_hashes": {
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/expansion-c09-67279db-sol-high-r1-cli1592.plist": "692b6a58b11751e19acdb2c7dd2318dd12e6fddbc6db91318dc89ebde9f4ff09",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/expansion-c09-67279db-sol-high-r1-cli1592.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/expansion-c09-67279db-sol-high-r1-cli1592.stdout.log": "4244cfb056f077d3a7faf88e176987fc0ea4f529916b80806e63b7b4840488c9",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/fresh-native-audit.json": "28badbd72506156812cda153dbbbcf682177cee2dad9827a66b1a174b6c652f7",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/job-unloaded.txt": "1daaea03981f45730e4e5d5de99a11a3b0c2b55c380dcbe28c8827ab883e2980",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/launch-terminal.txt": "ac827fe4d9406e444b965272970ec65af0358625a5139dfd9eecf98622c1c2e4",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/native_audit.py": "1e1861833cdb5ea1993907a728f92fcd0fb3850c00c92e6283fa948246265a02",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/resume-preflight-20261007.json": "98558dfd12a62063d69e04d429fa751f5c40c9db2de796847bdb43dcf36e54a1",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-c09-67279db-sol-high-r1-cli1592/terminal-extra-audit.json": "8a300bdd6583cd0f4763f2fef256c54987439ef9db005f100162a82b0e408857",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/end.txt": "d3aa929bb136b0dabc6d5baf4cc04524931798767d39460c1962708e64faea5c",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/environment-preflight.json": "0e11935c27553a1972386a2b49dea39db83b0b0e34a3772f30d2d1e240007633",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/exit-code.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/nonlive.log": "52d50c76bcb6f605f510cadaace750c06098d77c8491ae6fc4d6c2317f9d464d",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/nonlive.xml": "08ed3f6ecfb768056c835387d11cc566e88b627277e8978d79c5f9b9751a8098",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/parent-gate-audit.json": "229ab2505419fb54860f11d2088f1754e855e273a001ee27855d2afdce0e1c7e",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/readiness.py": "50c1f891775edd5e3d1af83c9dbd2d44f59af594005bca65d0afd76951c022c1",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/start.txt": "2b569f177b28a50a0a764f2d955d954bad15c267db181f97a9087e9fb21c4efb",
+    "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-67279db-r1/terminal-audit.json": "84920e6ae17f23936e550480ce3b9a2b8df6d4f23c0c57ce176d9844733019d4"
+  },
+  "preserved": {
+    "durable_host": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills",
+    "historical_roots": true,
+    "source_hosts_unmodified": true,
+    "runtime_config_media_dependencies_unmodified": true,
+    "children_spawned": false,
+    "implementation_changes": false,
+    "readme_inventory_edits": false,
+    "push_pr_issue_changes": false
+  }
+}

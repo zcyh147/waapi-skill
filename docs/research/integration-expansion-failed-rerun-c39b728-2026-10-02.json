@@ -1,0 +1,2252 @@
+{
+  "contract": "waapi-skill.integration-expansion-failed-rerun-report/v1",
+  "candidate": "c39b72867fb5f8d2a76a1a65f8c9cb5368d37131",
+  "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592",
+  "model": {
+    "id": "gpt-6-luna",
+    "effort": "high",
+    "service_tier": "default"
+  },
+  "scope": {
+    "agent_units": 9,
+    "runner_boundary_units": 1,
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ]
+  },
+  "formal_results": {
+    "agent_pass": 1,
+    "agent_fail": 8,
+    "boundary_proven": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "all_selected_passed": false,
+    "launch_runs": 1,
+    "launch_exit": 1,
+    "launcher_unloaded": true,
+    "scoped_residuals": 0,
+    "verify_only_performed": false
+  },
+  "integrity": {
+    "artifacts": 1602,
+    "bytes": 60832898,
+    "seals": [
+      {
+        "path": "expansion-accounting.json",
+        "sha256": "64f3253b67e0435e5a39ca86bfc7476da3667e6cd9f8e278efcbd5a21546c1fc"
+      },
+      {
+        "path": ".waapi-semantic-campaign-root.json",
+        "sha256": "1d55d52a19b8bfad1a4ad0912a48fd70f4793c8aca3ad50a09f04cd6b1ee9138"
+      },
+      {
+        "path": ".campaign-lock-owner.json",
+        "sha256": "f3aafa0e038a7b88b70f8d6b21f23bfebe3f92cdce73803d8f10e981446b8301"
+      },
+      {
+        "path": "campaign-config.json",
+        "sha256": "fd1549e9450a1df42f92c6ce81b5cd9266a4f8bd7c36dfda5fdd61d3acc8b827"
+      },
+      {
+        "path": "attempt-ledger.json",
+        "sha256": "3139fbf56e89f061426018c72f257a83bd902cd28d9b084ec00f5e69dc465d60"
+      },
+      {
+        "path": "consolidated-summary.json",
+        "sha256": "e6e7e64f75b969a65f2230d568af5d7b29f9db903ef799c35ebe16139e57e298"
+      },
+      {
+        "path": "attempts/attempt-000001/attempt.json",
+        "sha256": "6c583553dbba626221d3ee8253e75c875c04995b3ef9666599cba66d9b629444"
+      },
+      {
+        "path": "attempts/attempt-000001/attempt-manifest.json",
+        "sha256": "e0b1da790dd61d9c5dede12ebc35388286acf752bf41b5b4faf5288973cdaab4"
+      }
+    ],
+    "attempt_manifest_sha256": "e0b1da790dd61d9c5dede12ebc35388286acf752bf41b5b4faf5288973cdaab4",
+    "independent_audit": "passed"
+  },
+  "measurements": {
+    "agent_seconds": 1431.191725,
+    "turns": 11,
+    "slow_units": 0,
+    "usage": {
+      "input_tokens": 5554573,
+      "cached_input_tokens": 4977664,
+      "output_tokens": 54698,
+      "reasoning_output_tokens": 27685,
+      "cache_write_input_tokens": 0,
+      "uncached_input_tokens": 576909
+    },
+    "usd_cost": null
+  },
+  "units": [
+    {
+      "scenario_id": "EXP22-M05",
+      "version": "2022.1",
+      "status": "BOUNDARY_PROVEN",
+      "evidence_kind": "capability_boundary",
+      "reason": "M05/2022.1: expected capability boundary CAPABILITY_UNAVAILABLE",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309484673590,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-M05/evidence/quarantine.json"
+    },
+    {
+      "scenario_id": "EXP22-C03",
+      "version": "2022.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309484673590,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C03/evidence/quarantine.json",
+      "agent_seconds": 184.2483688329812,
+      "turns": 2,
+      "slow": false,
+      "gateway_verification_state": null,
+      "oracle_after_available": false,
+      "business_assertions": {},
+      "required_assertions": [
+        "distractor_unchanged",
+        "exact_media_mapping",
+        "exact_target_set",
+        "fixture_membership_unchanged",
+        "media_destinations_preserved",
+        "sound_identities_and_configuration_preserved",
+        "source_identities_and_configuration_preserved"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 1.9452004579361528,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "distractor": {
+            "id": "{5E68F11C-6DE4-4204-B2B5-E5C9DD05233F}",
+            "name": "Hit_Backup",
+            "notes": "",
+            "output_bus": {
+              "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "name": "Master Audio Bus"
+            },
+            "parent": {
+              "id": "{8BADF728-6088-4698-97A6-1B25E05934DF}",
+              "name": "Expansion_EXP22-C03_SameBasename"
+            },
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C03_SameBasename\\Hit_Backup",
+            "type": "Sound",
+            "volume_db": -9.0
+          },
+          "members": [
+            "{0B1B4819-D66E-4699-A37B-E7802A90EB80}",
+            "{5E68F11C-6DE4-4204-B2B5-E5C9DD05233F}",
+            "{B19AF191-0EEA-48C4-B762-7625DC9A5502}"
+          ],
+          "sounds": {
+            "{0B1B4819-D66E-4699-A37B-E7802A90EB80}": {
+              "media": {
+                "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C03/owned/sandbox-root/sample-project-72dfcf6c7ff745e88fbb76cca6ad3b12/Originals/SFX/Expansion/EXP22-C03/Left/Hit.wav",
+                "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5"
+              },
+              "object": {
+                "id": "{0B1B4819-D66E-4699-A37B-E7802A90EB80}",
+                "name": "Left",
+                "notes": "",
+                "output_bus": {
+                  "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+                  "name": "Master Audio Bus"
+                },
+                "parent": {
+                  "id": "{8BADF728-6088-4698-97A6-1B25E05934DF}",
+                  "name": "Expansion_EXP22-C03_SameBasename"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C03_SameBasename\\Left",
+                "type": "Sound",
+                "volume_db": -3.0
+              },
+              "source": {
+                "id": "{F7D986C8-3777-4B22-8100-9203F0EF0341}",
+                "name": "Hit",
+                "notes": "",
+                "original_file_path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-failed9-c39b728-luna-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C03\\owned\\sandbox-root\\sample-project-72dfcf6c7ff745e88fbb76cca6ad3b12\\Originals\\SFX\\Expansion\\EXP22-C03\\Left\\Hit.wav",
+                "parent": {
+                  "id": "{0B1B4819-D66E-4699-A37B-E7802A90EB80}",
+                  "name": "Left"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C03_SameBasename\\Left\\Hit",
+                "source_language": {
+                  "id": "{85A66963-A627-476E-91C1-2770B39D245A}",
+                  "name": "SFX"
+                },
+                "type": "AudioFileSource"
+              },
+              "source_volume_offset": 0.0
+            },
+            "{B19AF191-0EEA-48C4-B762-7625DC9A5502}": {
+              "media": {
+                "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C03/owned/sandbox-root/sample-project-72dfcf6c7ff745e88fbb76cca6ad3b12/Originals/SFX/Expansion/EXP22-C03/Right/Hit.wav",
+                "sha256": "edd72fbe2a4247d34a9e423d13971a93d2094f6b7cbb0d7766b9bcf020e5174f"
+              },
+              "object": {
+                "id": "{B19AF191-0EEA-48C4-B762-7625DC9A5502}",
+                "name": "Right",
+                "notes": "",
+                "output_bus": {
+                  "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+                  "name": "Master Audio Bus"
+                },
+                "parent": {
+                  "id": "{8BADF728-6088-4698-97A6-1B25E05934DF}",
+                  "name": "Expansion_EXP22-C03_SameBasename"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C03_SameBasename\\Right",
+                "type": "Sound",
+                "volume_db": -6.0
+              },
+              "source": {
+                "id": "{5219D598-CBB5-405E-A0E3-3117CA9A7202}",
+                "name": "Hit",
+                "notes": "",
+                "original_file_path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-failed9-c39b728-luna-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C03\\owned\\sandbox-root\\sample-project-72dfcf6c7ff745e88fbb76cca6ad3b12\\Originals\\SFX\\Expansion\\EXP22-C03\\Right\\Hit.wav",
+                "parent": {
+                  "id": "{B19AF191-0EEA-48C4-B762-7625DC9A5502}",
+                  "name": "Right"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C03_SameBasename\\Right\\Hit",
+                "source_language": {
+                  "id": "{85A66963-A627-476E-91C1-2770B39D245A}",
+                  "name": "SFX"
+                },
+                "type": "AudioFileSource"
+              },
+              "source_volume_offset": 0.0
+            }
+          }
+        },
+        "snapshot_sha256": "dec611bc755f6fd6e5fe62a87310a7a843f5d5aba979adf3bb65b5a02c2ce77c",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-import-batch",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-import-batch",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "transaction-show",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "confirm",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 2,
+          "broker_exit": 125
+        }
+      ],
+      "usage": {
+        "input_tokens": 1243830,
+        "cached_input_tokens": 1100032,
+        "output_tokens": 11821,
+        "reasoning_output_tokens": 6383,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP22-C06",
+      "version": "2022.1",
+      "status": "PASS",
+      "evidence_kind": "agent_acceptance",
+      "reason": "",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309484673590,
+      "sandbox_retained": false,
+      "quarantine_path": null,
+      "agent_seconds": 115.04554454190657,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "verified",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "required_assertions": [
+        "control_identity_notes_and_parent_unchanged",
+        "media_unchanged",
+        "owner_configuration_unchanged",
+        "rtpc_identity_set_unchanged",
+        "sibling_curves_unchanged",
+        "target_curve_matches",
+        "target_identity_and_binding_unchanged"
+      ],
+      "reconciliation": null,
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-discover-fields",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-rtpc",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 459582,
+        "cached_input_tokens": 414208,
+        "output_tokens": 4228,
+        "reasoning_output_tokens": 1987,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP22-C08",
+      "version": "2022.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309484673590,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/004-EXP22-C08/evidence/quarantine.json",
+      "agent_seconds": 171.38097533397377,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "result_schema_checked",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "attenuation_identity_unchanged": true,
+        "other_curves_unchanged": true,
+        "requested_curve_matches": true,
+        "source_attenuation_unchanged": true,
+        "users_and_references_unchanged": true
+      },
+      "required_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 4.339112125104293,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "attenuation": {
+            "id": "{DD2C0A3B-DD0D-492D-98CE-087019CAA3E3}",
+            "name": "Expansion_EXP22-C08_Attenuation",
+            "notes": "",
+            "parent": {
+              "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+            "type": "Attenuation"
+          },
+          "curves": {
+            "focus": {
+              "points": [],
+              "use": "None"
+            },
+            "game-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "high-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "low-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "spread": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 50.34965
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "user-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "volume-dry": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            }
+          },
+          "source": {
+            "curves": {
+              "focus": {
+                "points": [],
+                "use": "None"
+              },
+              "game-defined-aux-send-volume": {
+                "points": [],
+                "use": "UseVolumeDry"
+              },
+              "high-pass-filter": {
+                "points": [],
+                "use": "None"
+              },
+              "low-pass-filter": {
+                "points": [],
+                "use": "None"
+              },
+              "spread": {
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 50.34965
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 0.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "user-defined-aux-send-volume": {
+                "points": [],
+                "use": "UseVolumeDry"
+              },
+              "volume-dry": {
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 4.71844785465692e-16
+                  }
+                ],
+                "use": "Custom"
+              }
+            },
+            "object": {
+              "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+              "name": "Horns",
+              "notes": "",
+              "parent": {
+                "id": "{77ED99BF-A13C-437D-AAC6-63B399AA2E8C}",
+                "name": "Ambience"
+              },
+              "path": "\\Attenuations\\Ambience\\Horns",
+              "type": "Attenuation"
+            }
+          },
+          "users": {
+            "{42398AB9-DC21-45B9-8CFB-02ABF26E9A81}": {
+              "id": "{42398AB9-DC21-45B9-8CFB-02ABF26E9A81}",
+              "name": "Expansion_EXP22-C08_AttenuatedSound",
+              "notes": "",
+              "output_bus": {
+                "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+                "name": "Master Audio Bus"
+              },
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C08_AttenuatedSound",
+              "references": {
+                "Attenuation": {
+                  "id": "{DD2C0A3B-DD0D-492D-98CE-087019CAA3E3}",
+                  "name": "Expansion_EXP22-C08_Attenuation"
+                }
+              },
+              "type": "Sound",
+              "volume_db": -3.0
+            }
+          }
+        },
+        "snapshot_sha256": "5c43c27697b5e663c2af37ae429343aaf575d208a8771cac0aa912a95873b000",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "request-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-core-plan",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 396343,
+        "cached_input_tokens": 353280,
+        "output_tokens": 3898,
+        "reasoning_output_tokens": 1886,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP22-C09",
+      "version": "2022.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3788783,
+        "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+        "file_count": 84,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309484673590,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/005-EXP22-C09/evidence/quarantine.json",
+      "agent_seconds": 126.6976109999232,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "verified",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.3040338328573853,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "entries": [
+            {
+              "effect": {
+                "classId": 9109507,
+                "id": "{ECCE91C9-D4D3-44B7-90B1-D70D15D7F705}",
+                "name": "Protected_Gain_0",
+                "notes": "protected effect 0",
+                "owner": {
+                  "id": "{44BD1F0F-C23C-4513-A4AC-CCFFD1844C95}",
+                  "name": "Expansion_EXP22-C09_EffectsOwner"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Protected_Gain_0",
+                "type": "Effect"
+              },
+              "slot": "0",
+              "slot_state": null
+            },
+            {
+              "effect": {
+                "classId": 9109507,
+                "id": "{669DE0A5-700F-4B4D-9D78-D98FB1EA849A}",
+                "name": "Protected_Gain_1",
+                "notes": "protected effect 1",
+                "owner": {
+                  "id": "{44BD1F0F-C23C-4513-A4AC-CCFFD1844C95}",
+                  "name": "Expansion_EXP22-C09_EffectsOwner"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Protected_Gain_1",
+                "type": "Effect"
+              },
+              "slot": "1",
+              "slot_state": null
+            },
+            {
+              "effect": {
+                "classId": 9109507,
+                "id": "{1550BA3B-FF47-4813-81F1-36AB61BD4D9A}",
+                "name": "Expansion_EXP22-C09_NewGain",
+                "notes": "Expansion C09 appended gain",
+                "owner": {
+                  "id": "{44BD1F0F-C23C-4513-A4AC-CCFFD1844C95}",
+                  "name": "Expansion_EXP22-C09_EffectsOwner"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Expansion_EXP22-C09_NewGain",
+                "type": "Effect"
+              },
+              "slot": "2",
+              "slot_state": null
+            }
+          ],
+          "owner": {
+            "@Volume": -3.0,
+            "id": "{44BD1F0F-C23C-4513-A4AC-CCFFD1844C95}",
+            "name": "Expansion_EXP22-C09_EffectsOwner",
+            "notes": "",
+            "parent": {
+              "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+            "type": "Sound"
+          },
+          "slot_order": [
+            "0",
+            "1",
+            "2"
+          ]
+        },
+        "snapshot_sha256": "314f79ffd21dfcd1db6e29e15b4d52074ba9683a344f264786c4eb978658f6c1",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "query-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-discover-types",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-existing",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 468566,
+        "cached_input_tokens": 423424,
+        "output_tokens": 4899,
+        "reasoning_output_tokens": 2503,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP25-C03",
+      "version": "2025.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309503233691,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-C03/evidence/quarantine.json",
+      "agent_seconds": 180.24829741800204,
+      "turns": 2,
+      "slow": false,
+      "gateway_verification_state": null,
+      "oracle_after_available": false,
+      "business_assertions": {},
+      "required_assertions": [
+        "distractor_unchanged",
+        "exact_media_mapping",
+        "exact_target_set",
+        "fixture_membership_unchanged",
+        "media_destinations_preserved",
+        "sound_identities_and_configuration_preserved",
+        "source_identities_and_configuration_preserved"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.2602399578318,
+        "error": {
+          "message": "C03 requires one exact media source for each Sound",
+          "type": "CaseBoundaryError"
+        },
+        "read_seconds": 10,
+        "seconds": 30,
+        "status": "error",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-import-batch",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "transaction-show",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "confirm",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 2,
+          "broker_exit": 125
+        }
+      ],
+      "usage": {
+        "input_tokens": 1088146,
+        "cached_input_tokens": 975616,
+        "output_tokens": 9907,
+        "reasoning_output_tokens": 4958,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP25-C06",
+      "version": "2025.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309503233691,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-C06/evidence/quarantine.json",
+      "agent_seconds": 163.06296308292076,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "verified",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "control_identity_notes_and_parent_unchanged": true,
+        "media_unchanged": true,
+        "owner_configuration_unchanged": true,
+        "rtpc_identity_set_unchanged": true,
+        "sibling_curves_unchanged": true,
+        "target_curve_matches": true,
+        "target_identity_and_binding_unchanged": true
+      },
+      "required_assertions": [
+        "control_identity_notes_and_parent_unchanged",
+        "media_unchanged",
+        "owner_configuration_unchanged",
+        "rtpc_identity_set_unchanged",
+        "sibling_curves_unchanged",
+        "target_curve_matches",
+        "target_identity_and_binding_unchanged"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 1.0325796250253916,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "controls": [
+            {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity",
+              "notes": "",
+              "parent": {
+                "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+                "name": "Ambience"
+              },
+              "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+              "type": "GameParameter"
+            },
+            {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time",
+              "notes": "",
+              "parent": {
+                "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+                "name": "Ambience"
+              },
+              "path": "\\Game Parameters\\Ambience\\Time",
+              "type": "GameParameter"
+            }
+          ],
+          "media": {
+            "file": {
+              "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP25-C06/owned/sandbox-root/sample-project-657606936c114b36b21e2433866bbb71/Originals/SFX/C06_bed.wav",
+              "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+            },
+            "source": {
+              "id": "{3B6F1D13-40CD-4090-8BF5-23DB6D98A70C}",
+              "name": "C06_bed",
+              "original_file_path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-failed9-c39b728-luna-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\007-EXP25-C06\\owned\\sandbox-root\\sample-project-657606936c114b36b21e2433866bbb71\\Originals\\SFX\\C06_bed.wav",
+              "parent": {
+                "id": "{9F5F7DBA-2CBD-4055-9F38-AB3E57ED5E38}",
+                "name": "Expansion_EXP25-C06_Bed"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\C06_bed",
+              "source_language": {
+                "id": "{85A66963-A627-476E-91C1-2770B39D245A}",
+                "name": "SFX"
+              },
+              "type": "AudioFileSource"
+            }
+          },
+          "owner": {
+            "@OutputBus": {
+              "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "name": "Main Audio Bus"
+            },
+            "@Volume": -3.0,
+            "id": "{9F5F7DBA-2CBD-4055-9F38-AB3E57ED5E38}",
+            "name": "Expansion_EXP25-C06_Bed",
+            "notes": "",
+            "parent": {
+              "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed",
+            "type": "Sound"
+          },
+          "rtpcs": {
+            "{64A42B76-4659-4BF8-9D96-CE6A676998A2}": {
+              "@ControlInput": {
+                "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                "name": "Rain_Intensity"
+              },
+              "@Curve": {
+                "@Flags": 3,
+                "id": "{E25548A6-5145-450D-AA5E-E306E19DF960}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": -48.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -6.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 0.0
+                  }
+                ]
+              },
+              "@PropertyName": "Volume",
+              "id": "{64A42B76-4659-4BF8-9D96-CE6A676998A2}",
+              "name": "",
+              "notes": "Preserve volume association",
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+              "type": "RTPC"
+            },
+            "{682507AB-0DFC-42F6-B0A8-5B16309A4695}": {
+              "@ControlInput": {
+                "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                "name": "Time"
+              },
+              "@Curve": {
+                "@Flags": 65537,
+                "id": "{F5E63FDE-33EC-4ADC-9A83-2D4740ADFFDD}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": -100.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 240.0,
+                    "y": 100.0
+                  }
+                ]
+              },
+              "@PropertyName": "Pitch",
+              "id": "{682507AB-0DFC-42F6-B0A8-5B16309A4695}",
+              "name": "",
+              "notes": "Preserve pitch association",
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+              "type": "RTPC"
+            }
+          }
+        },
+        "snapshot_sha256": "80b531a664bd88683c7e17773262f2fac6f78eaa1bd5112c3332e3640f0fedaf",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "query-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "query-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-discover-fields",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "query-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-rtpc",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 609012,
+        "cached_input_tokens": 554752,
+        "output_tokens": 5413,
+        "reasoning_output_tokens": 2427,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP25-C08",
+      "version": "2025.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309503233691,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/008-EXP25-C08/evidence/quarantine.json",
+      "agent_seconds": 182.48522979207337,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "result_schema_checked",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "attenuation_identity_unchanged": true,
+        "other_curves_unchanged": true,
+        "requested_curve_matches": true,
+        "source_attenuation_unchanged": true,
+        "users_and_references_unchanged": true
+      },
+      "required_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 4.483216708991677,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "attenuation": {
+            "id": "{40FC6827-7859-494F-B92D-2E81E3E8BDAB}",
+            "name": "Expansion_EXP25-C08_Attenuation",
+            "notes": "",
+            "parent": {
+              "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP25-C08_Attenuation",
+            "type": "Attenuation"
+          },
+          "curves": {
+            "focus": {
+              "points": [],
+              "use": "None"
+            },
+            "game-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "high-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "low-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "spread": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 50.34965
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "user-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "volume-dry": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            }
+          },
+          "source": {
+            "curves": {
+              "focus": {
+                "points": [],
+                "use": "None"
+              },
+              "game-defined-aux-send-volume": {
+                "points": [],
+                "use": "UseVolumeDry"
+              },
+              "high-pass-filter": {
+                "points": [],
+                "use": "None"
+              },
+              "low-pass-filter": {
+                "points": [],
+                "use": "None"
+              },
+              "spread": {
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 50.34965
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 0.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "user-defined-aux-send-volume": {
+                "points": [],
+                "use": "UseVolumeDry"
+              },
+              "volume-dry": {
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": 4.71844785465692e-16
+                  }
+                ],
+                "use": "Custom"
+              }
+            },
+            "object": {
+              "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+              "name": "Horns",
+              "notes": "",
+              "parent": {
+                "id": "{77ED99BF-A13C-437D-AAC6-63B399AA2E8C}",
+                "name": "Ambience"
+              },
+              "path": "\\Attenuations\\Ambience\\Horns",
+              "type": "Attenuation"
+            }
+          },
+          "users": {
+            "{AA14F509-8F9F-4CEF-804C-10988A2BBB6C}": {
+              "id": "{AA14F509-8F9F-4CEF-804C-10988A2BBB6C}",
+              "name": "Expansion_EXP25-C08_AttenuatedSound",
+              "notes": "",
+              "output_bus": {
+                "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+                "name": "Main Audio Bus"
+              },
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C08_AttenuatedSound",
+              "references": {
+                "Attenuation": {
+                  "id": "{40FC6827-7859-494F-B92D-2E81E3E8BDAB}",
+                  "name": "Expansion_EXP25-C08_Attenuation"
+                }
+              },
+              "type": "Sound",
+              "volume_db": -3.0
+            }
+          }
+        },
+        "snapshot_sha256": "7fcc4c9620629570029552eb7a1503c69db7fc57a1f136982c40c30969c9796e",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "query-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "request-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-core-plan",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 442274,
+        "cached_input_tokens": 397056,
+        "output_tokens": 4157,
+        "reasoning_output_tokens": 2361,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP25-C09",
+      "version": "2025.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309503233691,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/009-EXP25-C09/evidence/quarantine.json",
+      "agent_seconds": 184.38869275012985,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "verified",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "new_effect_owned_by_target": true,
+        "owner_unchanged": true,
+        "unique_effect_identities": true
+      },
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.2808061249088496,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "entries": [
+            {
+              "effect": {
+                "classId": 9109507,
+                "id": "{4B9AA5FF-89CA-4A55-9979-335D8FB9A5A4}",
+                "name": "Expansion_EXP25-C09_NewGain",
+                "notes": "Expansion C09 appended gain",
+                "owner": {
+                  "id": "{2044E608-5CBA-4F1B-801B-3DBF80B18358}"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [2]: (Gain)]\\Expansion_EXP25-C09_NewGain",
+                "type": "Effect"
+              },
+              "slot": "{2044E608-5CBA-4F1B-801B-3DBF80B18358}",
+              "slot_state": {
+                "@Effect": {
+                  "id": "{4B9AA5FF-89CA-4A55-9979-335D8FB9A5A4}",
+                  "name": "Expansion_EXP25-C09_NewGain"
+                },
+                "id": "{2044E608-5CBA-4F1B-801B-3DBF80B18358}",
+                "name": "",
+                "owner": {
+                  "id": "{814B6811-AC3A-44B0-BB7C-590F057CB772}",
+                  "name": "Expansion_EXP25-C09_EffectsOwner"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [2]: (Gain)]",
+                "type": "EffectSlot"
+              }
+            },
+            {
+              "effect": {
+                "classId": 9109507,
+                "id": "{50F21AA1-E00E-434C-9940-359756B73743}",
+                "name": "Protected_Gain_0",
+                "notes": "protected effect 0",
+                "owner": {
+                  "id": "{317F5542-D952-4ED6-9F00-14C089C7C938}"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [0]: (Gain)]\\Protected_Gain_0",
+                "type": "Effect"
+              },
+              "slot": "{317F5542-D952-4ED6-9F00-14C089C7C938}",
+              "slot_state": {
+                "@Effect": {
+                  "id": "{50F21AA1-E00E-434C-9940-359756B73743}",
+                  "name": "Protected_Gain_0"
+                },
+                "id": "{317F5542-D952-4ED6-9F00-14C089C7C938}",
+                "name": "",
+                "owner": {
+                  "id": "{814B6811-AC3A-44B0-BB7C-590F057CB772}",
+                  "name": "Expansion_EXP25-C09_EffectsOwner"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [0]: (Gain)]",
+                "type": "EffectSlot"
+              }
+            },
+            {
+              "effect": {
+                "classId": 9109507,
+                "id": "{8027C060-3265-443E-9CEE-EAAACC4CE813}",
+                "name": "Protected_Gain_1",
+                "notes": "protected effect 1",
+                "owner": {
+                  "id": "{9AB91E03-40E8-4D46-8AB9-7B56262573C9}"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [1]: (Gain)]\\Protected_Gain_1",
+                "type": "Effect"
+              },
+              "slot": "{9AB91E03-40E8-4D46-8AB9-7B56262573C9}",
+              "slot_state": {
+                "@Effect": {
+                  "id": "{8027C060-3265-443E-9CEE-EAAACC4CE813}",
+                  "name": "Protected_Gain_1"
+                },
+                "id": "{9AB91E03-40E8-4D46-8AB9-7B56262573C9}",
+                "name": "",
+                "owner": {
+                  "id": "{814B6811-AC3A-44B0-BB7C-590F057CB772}",
+                  "name": "Expansion_EXP25-C09_EffectsOwner"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [1]: (Gain)]",
+                "type": "EffectSlot"
+              }
+            }
+          ],
+          "owner": {
+            "@Volume": -3.0,
+            "id": "{814B6811-AC3A-44B0-BB7C-590F057CB772}",
+            "name": "Expansion_EXP25-C09_EffectsOwner",
+            "notes": "",
+            "parent": {
+              "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+            "type": "Sound"
+          },
+          "slot_order": [
+            "{317F5542-D952-4ED6-9F00-14C089C7C938}",
+            "{9AB91E03-40E8-4D46-8AB9-7B56262573C9}",
+            "{2044E608-5CBA-4F1B-801B-3DBF80B18358}"
+          ]
+        },
+        "snapshot_sha256": "5de206f59a6eba55c6e4d7f14413319554d198885321d997793b4f16cf0bc098",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operations",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-discover-types",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-existing",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 452865,
+        "cached_input_tokens": 405248,
+        "output_tokens": 6118,
+        "reasoning_output_tokens": 3914,
+        "cache_write_input_tokens": 0
+      }
+    },
+    {
+      "scenario_id": "EXP25-M05",
+      "version": "2025.1",
+      "status": "FAIL",
+      "evidence_kind": "agent_acceptance",
+      "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "source_hash": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_ns": 1790531309503233691,
+      "sandbox_retained": true,
+      "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-failed9-c39b728-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/010-EXP25-M05/evidence/quarantine.json",
+      "agent_seconds": 123.63404199993238,
+      "turns": 1,
+      "slow": false,
+      "gateway_verification_state": "verified",
+      "oracle_after_available": true,
+      "business_assertions": {
+        "other_stingers_preserved": true,
+        "owner_unchanged": true,
+        "requested_trigger_matches": true,
+        "segment_reference_preserved": true,
+        "stinger_identity_and_other_configuration_preserved": true,
+        "target_and_segment_unchanged": true
+      },
+      "required_assertions": [
+        "other_stingers_preserved",
+        "owner_unchanged",
+        "requested_trigger_matches",
+        "segment_reference_preserved",
+        "stinger_identity_and_other_configuration_preserved",
+        "target_and_segment_unchanged"
+      ],
+      "reconciliation": {
+        "child_reaped": true,
+        "elapsed_seconds": 0.30648425011895597,
+        "read_seconds": 10,
+        "seconds": 30,
+        "snapshot": {
+          "owner": {
+            "@Stingers": [
+              {
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+              }
+            ],
+            "id": "{20FA9A69-7ECC-4B05-BD6B-2C9527CD88C2}",
+            "name": "Stealth",
+            "parent": {
+              "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+              "name": "In-Game Music"
+            },
+            "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stealth",
+            "type": "MusicPlaylistContainer"
+          },
+          "protected": {
+            "owner": {
+              "@Stingers": [
+                {
+                  "id": "{ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}"
+                }
+              ],
+              "id": "{52B9FAC3-636E-44F8-9015-E5F24E30E39E}",
+              "name": "Stress",
+              "parent": {
+                "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+                "name": "In-Game Music"
+              },
+              "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stress",
+              "type": "MusicPlaylistContainer"
+            },
+            "stinger": {
+              "@NumSegmentAdvance": 1,
+              "@PlaySegmentAt": 3,
+              "@Segment": {
+                "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+                "name": "Stinger Bonus"
+              },
+              "@Trigger": {
+                "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+                "name": "Bonus"
+              },
+              "id": "{ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}",
+              "name": "",
+              "notes": "",
+              "path": "[Stinger : Bonus,Stinger Bonus]",
+              "type": "MusicStinger"
+            }
+          },
+          "segment": {
+            "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+            "name": "Stinger Bonus",
+            "parent": {
+              "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+              "name": "In-Game Music"
+            },
+            "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stinger Bonus",
+            "type": "MusicSegment"
+          },
+          "siblings": [
+            {
+              "@NumSegmentAdvance": 1,
+              "@PlaySegmentAt": 3,
+              "@Segment": {
+                "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+                "name": "Stinger Bonus"
+              },
+              "@Trigger": {
+                "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                "name": "Backup_Team_Arrives"
+              },
+              "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+              "name": "",
+              "notes": "",
+              "path": "[Stinger : Backup_Team_Arrives,Stinger Bonus]",
+              "type": "MusicStinger"
+            }
+          ],
+          "stinger": {
+            "@NumSegmentAdvance": 1,
+            "@PlaySegmentAt": 3,
+            "@Segment": {
+              "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+              "name": "Stinger Bonus"
+            },
+            "@Trigger": {
+              "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+              "name": "Backup_Team_Arrives"
+            },
+            "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "name": "",
+            "notes": "",
+            "path": "[Stinger : Backup_Team_Arrives,Stinger Bonus]",
+            "type": "MusicStinger"
+          },
+          "target": {
+            "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+            "name": "Backup_Team_Arrives",
+            "parent": {
+              "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+              "name": "Music"
+            },
+            "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+            "type": "Trigger"
+          }
+        },
+        "snapshot_sha256": "84357909a9961d4b3d265a86d8f19932f7ea1f58260a6edcd974a13626d8c1fa",
+        "status": "completed",
+        "subprocesses_reaped": true
+      },
+      "commands": [
+        {
+          "subcommand": "operation-schema",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-start",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-discover-fields",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-bind-object",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-declare-field-change",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "draft-check",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "preview-from-draft",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "execute",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        },
+        {
+          "subcommand": "verify",
+          "accepted": true,
+          "runner_exit": 0,
+          "broker_exit": 0
+        }
+      ],
+      "usage": {
+        "input_tokens": 393955,
+        "cached_input_tokens": 354048,
+        "output_tokens": 4257,
+        "reasoning_output_tokens": 1266,
+        "cache_write_input_tokens": 0
+      }
+    }
+  ],
+  "diagnoses": {
+    "expansion_c39_c03_diagnosis": {
+      "status": "formalFAIL preserved",
+      "classification": "Gateway verifier false negative: unchanged existing SFX Source omitted from native import result; effect preserved and reconciled but no formal businessPASS",
+      "commands": 14,
+      "execute_count": 1,
+      "verify_assertions": {
+        "passed": 43,
+        "total": 45,
+        "failed": "2 AudioFileSource returned exactly once; matches empty"
+      },
+      "agent_seconds": 184.248369,
+      "future_seam": "operation_registry.py:18017 localized_source omission exception extend only fully Preview-bound existing SFX + live identity/path/language/ownership/children/hash proof",
+      "source_safe": true,
+      "cleanup": "quarantined/reconciliation reaped",
+      "state": "defer repair until whole10unitbatch finishes; no regrade",
+      "formal_business_oracle_complete": false,
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true
+    },
+    "expansion_c39_c03_25_diagnosis": {
+      "unit": "EXP25-C03",
+      "status": "formalFAIL preserved",
+      "classification": "real Source GUID/child collection preservation failure plus native-result omission verifier issue; media hashes corrected",
+      "broker": {
+        "admitted": 12,
+        "copy": true,
+        "notice": true,
+        "confirm_record": 10,
+        "execute_record": 11,
+        "verify_record": 12,
+        "execute_once": true,
+        "verify_runner_exit": 2,
+        "verify_broker_exit": 125
+      },
+      "verify": {
+        "passed": 43,
+        "total": 49,
+        "omitted_sources": 2,
+        "correct_guard_failures": 4
+      },
+      "agent_seconds": 180.248297,
+      "independent_after": "unavailable CaseBoundaryError requires1exactmediasource perSound; reconciliationchildrenreaped",
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "2025-specific existingSFX SourceGUID native targeting, using grounded version-pinned localized-importer pattern and owned-copy public Gateway proof; do not relax GUID/collection guards",
+      "no_regrade": true
+    },
+    "expansion_c39_c08_diagnosis": {
+      "unit": "EXP22-C08",
+      "status": "formalFAIL preserved",
+      "failure": "visible_preview_notice",
+      "classification": "literal attenuation identity notice matching rejects uniquely bound '该对象'; exact declared effect and advance timing present",
+      "preview_event": 21,
+      "notice_event": 22,
+      "execute_event": 23,
+      "verify_event": 25,
+      "broker": {
+        "accepted": 9,
+        "all_exit0": true,
+        "copy": true,
+        "policy": true
+      },
+      "business_assertions": {
+        "passed": 5,
+        "total": 5
+      },
+      "gateway_verification": "result_schema_checked (weaker boundary correctly disclosed by Agent)",
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "closed attenuation notice predicate attested request/role/baseline; exact kind/source/ordered points/shapes and contradictory/extra action negatives; no regrade"
+    },
+    "expansion_c39_c08_25_diagnosis": {
+      "unit": "EXP25-C08",
+      "status": "formalFAIL preserved",
+      "failure": "visible_preview_notice",
+      "classification": "accurate curve notice; literal target group rejects uniquely bound '该衰减对象'; action group omits '设为'",
+      "events": {
+        "preview": 22,
+        "notice": 23,
+        "execute": 24,
+        "verify": 26
+      },
+      "broker": {
+        "admitted": 10,
+        "all_exit0": true,
+        "copy": true,
+        "policy": true
+      },
+      "gateway_verification": "result_schema_checked limitation accurately disclosed",
+      "business_assertions": {
+        "passed": 5,
+        "total": 5
+      },
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "same closed attenuation numerical/context predicate asEXP22, include bounded affirmative setting action; retain all malformed/extra/contradictory negatives",
+      "no_regrade": true
+    },
+    "expansion_c39_c06_25_diagnosis": {
+      "unit": "EXP25-C06",
+      "status": "formalFAIL preserved",
+      "failure": "visible_preview_notice",
+      "classification": "accurate coherent RTPC delta/retained endpoints rejected by lexical retention '两端仍为' and three-point count '三个控制点' restrictions",
+      "events": {
+        "shape_plan": 32,
+        "preview": 34,
+        "notice": 35,
+        "execute": 36,
+        "verify": 38
+      },
+      "broker": {
+        "admitted": 14,
+        "all_exit0": true,
+        "copy": true,
+        "policy": true
+      },
+      "gateway_assertions": {
+        "passed": 7,
+        "total": 7
+      },
+      "business_assertions": {
+        "passed": 7,
+        "total": 7
+      },
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "derive point count from exact numerical plan; old/new middleY + exact retained endpoints + affirmative shape coherent proof, with strict missing/extra/order/domain/shape/extra change negatives",
+      "no_regrade": true
+    },
+    "expansion_c39_c09_diagnosis": {
+      "unit": "EXP22-C09",
+      "status": "formalFAIL preserved",
+      "failure": "visible_preview_notice",
+      "classification": "sole already checked/bound Sound described with abbreviated GUID in human prose; full executable identities intact, grader requires literal full identity or exact pronoun",
+      "events": {
+        "preview": 27,
+        "notice": 28,
+        "execute": 29,
+        "verify": 31
+      },
+      "broker": {
+        "accepted": 11,
+        "all_exit0": true,
+        "copy": true,
+        "policy": true
+      },
+      "gateway_assertions": {
+        "passed": 5,
+        "total": 5
+      },
+      "business_assertions": {
+        "passed": 6,
+        "total": 6
+      },
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "recognize uniquely bound already-checked owner context; abbreviation cannot become identity credential; exact effect details, contradictions and extra actions retained"
+    },
+    "expansion_c39_c09_25_diagnosis": {
+      "unit": "EXP25-C09",
+      "status": "formalFAIL preserved",
+      "failure": "visible_preview_notice",
+      "classification": "accurate '指定的 Sound' plus subsequent exact effect clause; literal owner alternatives/local action-owner anchoring reject coherent single-owner notice",
+      "events": {
+        "preview": 24,
+        "notice": 25,
+        "execute": 26,
+        "verify": 28
+      },
+      "broker": {
+        "admitted": 10,
+        "all_exit0": true,
+        "copy": true,
+        "policy": true
+      },
+      "gateway_assertions": {
+        "passed": 6,
+        "total": 6
+      },
+      "business_assertions": {
+        "passed": 6,
+        "total": 6
+      },
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "uniquely attested specified-owner discourse with locally validated effect/actions; no arbitrary owner inheritance or extra-change relaxation",
+      "no_regrade": true
+    },
+    "expansion_c39_m05_25_diagnosis": {
+      "unit": "EXP25-M05",
+      "status": "formalFAIL preserved",
+      "failure": "visible_preview_notice",
+      "classification": "correct reference notice; missing '设为'; noun '变更' interpreted action; negation omits '没有' on current no-change status",
+      "events": {
+        "preview": 24,
+        "notice": 25,
+        "execute": 26,
+        "verify": 28
+      },
+      "broker": {
+        "admitted": 10,
+        "all_exit0": true,
+        "copy": true,
+        "policy": true
+      },
+      "gateway_assertions": {
+        "passed": 2,
+        "total": 2,
+        "kind": "operation-specific readback"
+      },
+      "business_assertions": {
+        "passed": 6,
+        "total": 6
+      },
+      "source_safe": true,
+      "cleanup": "quarantined",
+      "future_seam": "bounded grammatical action/polarity around attested reference effect; reject genuine extras/conflicts; no regrade"
+    }
+  },
+  "repairs": [
+    141,
+    142,
+    143
+  ],
+  "acceptance_complete": false,
+  "next": "Reviewed repairs, failed-unit reruns, then complete thirteen Agent units plus separate 2022 M05 boundary on one final candidate. Do not replay or regrade the mixed FAIL roots."
+}

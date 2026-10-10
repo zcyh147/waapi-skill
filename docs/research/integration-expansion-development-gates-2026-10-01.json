@@ -1,0 +1,40 @@
+{
+  "contract": "waapi-skill.expansion-development-gate-summary/v1",
+  "date": "2026-10-01",
+  "candidate": "9256ae8",
+  "host": "macOS",
+  "program": {
+    "passed": 5886,
+    "skipped": 2,
+    "seconds": 275.05,
+    "exit_code": 0,
+    "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-program-20261001-final-r2"
+  },
+  "nonlive": {
+    "passed": 11954,
+    "skipped": 118,
+    "deselected": 27,
+    "seconds": 809.03,
+    "exit_code": 0,
+    "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-20261001-final-r3"
+  },
+  "smoke": {
+    "version": "2025.1",
+    "build": "2025.1.7.9143",
+    "ready_seconds": 4.408218000084162,
+    "cleanup": "cleaned",
+    "sandbox_deleted": true,
+    "exit_code": 0,
+    "root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-smoke-20261001-2025-r1"
+  },
+  "agent_acceptance": {
+    "started": false,
+    "reason": "Initial one-shot launcher blocked before campaign-root creation; no Agent outcome."
+  },
+  "files_sha256": {
+    "expansion-program-20261001-final-r2/run.log": "7b6922fc2b241f8ab55f64c8f0d6387abaab06de2b4e00329d089fd42037e515",
+    "expansion-nonlive-20261001-final-r3/run.log": "7ba0675f601491944123aded20c2121bb32fb7c16ecfb9cc6a9f5028a38a1e2b",
+    "expansion-nonlive-20261001-final-r3/junit.xml": "5e792c31e715e418855f8ac111dd6fbeb003f5b5913130eb0509469edffe01a4",
+    "expansion-smoke-20261001-2025-r1/run.log": "12e76ecf38776db1bfda7bfad0ea98729bcc8f9142c5a6783c6178c72bced18d"
+  }
+}

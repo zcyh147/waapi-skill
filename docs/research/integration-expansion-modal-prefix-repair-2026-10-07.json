@@ -1,0 +1,328 @@
+{
+  "contract": "waapi-skill.prospective-prefix-repair-report/v1",
+  "date": "2026-10-07",
+  "issue": 147,
+  "base": "fc9eb797737ba6ddba287238d6e2eab409f08427",
+  "functional_candidate": "f88f3a1c01a205b002692d8580914a41150dc5f5",
+  "branch": "codex/expansion-modal-prefix",
+  "integration_tip": "fc9eb797737ba6ddba287238d6e2eab409f08427",
+  "integration_merge": "Already up to date before final validation and reporting",
+  "public_seam": "expansion_preview_notice",
+  "original_notice": {
+    "bytes": 393,
+    "sha256": "c29a1e84a7d227aeb787891cfe1ce87e72ff9eb6a8420a2c8d88f8e28d358207",
+    "historical_verdict": "FAIL frozen",
+    "business_assertions": "6/6 PASS",
+    "gateway_verification": "verified",
+    "campaign_replay": false
+  },
+  "component_contract": {
+    "current_scopes": [
+      "本次",
+      "此次",
+      "这次",
+      "当前"
+    ],
+    "existing_modal_tokens": [
+      "即将",
+      "将",
+      "会"
+    ],
+    "omitted_recipient_authority": "only owner_inheritance window containing this action",
+    "supplied_recipient": "opaque operand checked against closed primary role; qualifiers before recipient retained",
+    "legacy_preview_carriers": "distinct existing noun/reference paths retain grammar and source-referent authority",
+    "unknown_text": "complete scoped-modal head rejects residual prefix text; no unknown component bridges owner inheritance",
+    "unchanged_boundaries": [
+      "negative/uncertain/completed scope",
+      "next/second operation",
+      "foreign/compound recipient",
+      "descriptor/notes/extra edits",
+      "Stinger primary versus Trigger destination",
+      "notice timing/artifact/baseline consistency"
+    ]
+  },
+  "frozen_preimplementation_contrasts": {
+    "count": 27,
+    "prior_proposal_vectors": 14,
+    "path": "tests/fixtures/semantic/expansion-modal-prefix-independent-20261007.json",
+    "sha256": "793b49a1f3fcb73f694355a75887abd9d16d7755ba18826118fe6eff5cd20462",
+    "expectation_changes": false
+  },
+  "validation": {
+    "lane": "focused developer pytest via ci/test.sh --mode nonlive; no full Non-live gate",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "runs": {
+      "class-contrasts": {
+        "tests": 29,
+        "passed": 29,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.162,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/class-contrasts.xml": "7c81152ceef78782f67102876cc20cd074a71ef2a7a196d111d048e2871f2d8e",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/class-contrasts.log": "9f46eec95bae1acae1bd2012ee6f7213fb312d262295edd1706a14214037e79c"
+        }
+      },
+      "focused-candidate": {
+        "tests": 3801,
+        "passed": 3801,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 7.5,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-candidate.xml": "274a91ce4e5e989708c799b0b6ace2a5e96e1c8fa551519092f9ce31720c945b",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-candidate.log": "8fd388197cb3d4fb40e762aca17b1062e0a9844d3f3906953c515d9ba20e20bb"
+        }
+      },
+      "focused-final-r2": {
+        "tests": 3807,
+        "passed": 3807,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 7.519,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-final-r2.xml": "ac54e3573f113f11b2ecd352268f07bf74ff914b950991e01e1774ef75878d2d",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-final-r2.log": "68314bfc6fcd691bbead43d5d928a84d854d605f4c2e190b60c7f8bebb42d2b6"
+        }
+      },
+      "focused-final": {
+        "tests": 3806,
+        "passed": 3806,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 7.493,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-final.xml": "81974d9f27b98755646278accfe78daebb5c8d9e0ddfbb20d06eecbedf936d26",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-final.log": "75d095464c2ce8f17cccc329d2231963e2b3fb161ce8a26f9e958040a614bfae"
+        }
+      },
+      "focused-initial": {
+        "tests": 3795,
+        "passed": 3789,
+        "failed": 6,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 8.107,
+        "direct_exit": 1,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-initial.xml": "a49f405192ab9fad61753810bd5c22e1abd63cd5de7019859d56e17c9bd5c39b",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-initial.log": "8bfe8703b34106499bd73d335e59c389ce3e0e790f66d2a59d09fb8bb4e3722a"
+        }
+      },
+      "green-next-scope": {
+        "tests": 2,
+        "passed": 2,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.131,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-next-scope.xml": "94c5ebe5b860dfff7402611c5699ae7793aeb25060390d8af1ae9f90d0d00449",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-next-scope.log": "c5589d5777556b933bac3539f521c61b33f57b8d1244f2604cdfdf66f9f5591f"
+        }
+      },
+      "green-scope-gap-final": {
+        "tests": 41,
+        "passed": 41,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.169,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-scope-gap-final.xml": "9ec0a945cf3d759f517beffc639ec2913a6dd538b0150161525110df896bfdcc",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-scope-gap-final.log": "681223b152f1e8f16618dca36ee982a638d29b7a696ca752c54a97305dd57d56"
+        }
+      },
+      "green-scope-gap": {
+        "tests": 41,
+        "passed": 32,
+        "failed": 9,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.198,
+        "direct_exit": 1,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-scope-gap.xml": "ee3f0a0cffc44b9298a761857dc8d6cbdbb7aad15a57e920fb1c9c7eb1d093c3",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-scope-gap.log": "fc2d4a28f65377eaba21ccddbfdd1dcde42154895c1c3fd5063dac295cd5e41d"
+        }
+      },
+      "green-unknown-prefix": {
+        "tests": 40,
+        "passed": 40,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.168,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-unknown-prefix.xml": "dbde77102cd91469c8ebe3ec4af1e11993f8bd5fad0be6fd5f2324ce29475d5c",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-unknown-prefix.log": "d85fb695ae5fb91e7ea1ea40645e79219487da2e6470ac47b5a8e6b77216c62b"
+        }
+      },
+      "green-witness": {
+        "tests": 1,
+        "passed": 1,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.144,
+        "direct_exit": 0,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-witness.xml": "5f94947c6c4620e29426fed025f278b1308993c25e16f3bd776b81ae1a0ac30c",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/green-witness.log": "d7729c0e332aec565da4a429311e485f1c9a8a8375507588cd7d9b8ce07a9d2e"
+        }
+      },
+      "red-next-scope": {
+        "tests": 2,
+        "passed": 1,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.145,
+        "direct_exit": 1,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-next-scope.xml": "f0980b10a1f5d359d398be424ac22edbed9e4fe95d973f4509278b1739d41989",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-next-scope.log": "9a84f4fc9c3d993e80f6cefda3be9adc308e5bc27fd03cefb2dbfd0d0d551463"
+        }
+      },
+      "red-scope-gap": {
+        "tests": 41,
+        "passed": 40,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.206,
+        "direct_exit": 1,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-scope-gap.xml": "400a62ede9c1b9d0dfbea65b51e720ed21a495a4e71d05a66fa88e72545afcfb",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-scope-gap.log": "7277de94c15c33b01fbf28500eec36057f042ee94057c5755841b3b6489ab3fd"
+        }
+      },
+      "red-unknown-prefix": {
+        "tests": 40,
+        "passed": 39,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.18,
+        "direct_exit": 1,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-unknown-prefix.xml": "fb6036f14f65cf3d23dcb0c022924497744a15a66c71872226aeb50cd2865921",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-unknown-prefix.log": "37ea41535d33c7cfbb6b7358e76874dd192b8a8c6920db38b6c040953632e991"
+        }
+      },
+      "red-witness": {
+        "tests": 1,
+        "passed": 0,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "junit_seconds": 0.455,
+        "direct_exit": 1,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-witness.xml": "dad4c2f7de063a757bccdfc9f2ef425637680c534621283a73b3a4eac4734a16",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/red-witness.log": "d020ab2929216a43d12e058bb38cf97854ee705132c056e8f37c41b8d0d5fcf0"
+        }
+      }
+    },
+    "final": {
+      "passed": 3807,
+      "prior_retained": 3766,
+      "new_public_notice_tests": 35,
+      "supplementary_component_tests": 6,
+      "argv": [
+        "ci/test.sh",
+        "--mode",
+        "nonlive",
+        "--",
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py",
+        "tests/semantic/test_codex_guid_span_review.py",
+        "tests/semantic/test_codex_guid_incomplete_review.py",
+        "tests/semantic/test_codex_guid_incomplete_operands_review.py",
+        "tests/semantic/test_codex_guid_opaque_qualifier_review.py",
+        "tests/semantic/test_codex_modal_prefix_notices.py",
+        "-q",
+        "-ra",
+        "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/focused-final-r2.xml"
+      ]
+    }
+  },
+  "preservation": {
+    "prior_fixture_count": 68,
+    "prior_fixture_hashes_match": true,
+    "diagnostic_input_hashes_match": true,
+    "changed_paths": [
+      "tests/fixtures/semantic/expansion-modal-prefix-67279db-fixture.json",
+      "tests/fixtures/semantic/expansion-modal-prefix-independent-20261007.json",
+      "tests/fixtures/semantic/expansion-modal-prefix-reference-controls-20261007.json",
+      "tests/semantic/support/codex_notice_language.py",
+      "tests/semantic/support/codex_task_runner_v3.py",
+      "tests/semantic/test_codex_modal_prefix_notices.py"
+    ],
+    "skill_suite_oracle_runtime_config_project_changes": false,
+    "historical_campaign_writes": false,
+    "auth_content_read": false,
+    "new_coders_or_wwise_processes": false,
+    "readme_global_coverage_updates": false,
+    "full_program_nonlive_live_fresh_runs": false,
+    "push_pr_issue_changes": false
+  },
+  "source_hashes": {
+    "tests/fixtures/semantic/expansion-modal-prefix-67279db-fixture.json": "18601391f2abb04bd0d07cc3498a1c885054f007fcc74aab655a1cb93d969bbf",
+    "tests/fixtures/semantic/expansion-modal-prefix-independent-20261007.json": "793b49a1f3fcb73f694355a75887abd9d16d7755ba18826118fe6eff5cd20462",
+    "tests/fixtures/semantic/expansion-modal-prefix-reference-controls-20261007.json": "bd5ff3e6f06f42c67916e397e71ddc0b55ec015c7da62e595addc4f25f0eae16",
+    "tests/semantic/support/codex_notice_language.py": "8ec446bd97fe2343af178ea576d01c8ac66868bc6a75116926fb2a7496f7bde5",
+    "tests/semantic/support/codex_task_runner_v3.py": "2eab382e7d04cea3166773ea2c0541265ba9cdb9ad9a9ebbb26a5dfcb694fe19",
+    "tests/semantic/test_codex_modal_prefix_notices.py": "ec610c8ed90530ea3c97974d9648a084947113c581a1d215998468db07ae2f90"
+  },
+  "preimplementation_freeze": {
+    "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-prefix-20261007/preimplementation-freeze.json",
+    "sha256": "0e980771434d8bd635313b2dd56072b29136ebcdf73673db8062c4748a73c9fe"
+  },
+  "proposal_only_contract_audit": {
+    "path": "/tmp/waapi-expansion-notice-contract-audit-20261007.md",
+    "sha256": "7f3b84da9cc0077b2fdffeee69a5b324bae7ae32d63e1b73eaa2519b4293809b",
+    "status": "read-only proposal context; no continuity/N18/expectation amendment implemented"
+  },
+  "limits": [
+    "Developer fixture results are not Agent acceptance evidence.",
+    "No arbitrary-Chinese convergence claim.",
+    "Independent review, complete applicable gate, new targeted Fresh and final13 remain coordinator work.",
+    "#147 remains open; historical FAIL remains unchanged."
+  ]
+}

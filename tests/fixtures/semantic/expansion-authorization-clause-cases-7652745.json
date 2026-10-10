@@ -1,0 +1,499 @@
+{
+  "status": "independent_review_matrix_not_executed",
+  "scope": "Private ancillary active/passive authorization language only; no Gateway authority is granted by prose.",
+  "context": {
+    "current_change": "one immutable Preview with Gateway-bound allow_changes authorization",
+    "primary_owner": "the unique independently attested primary mutation role",
+    "provider": "exact allow_changes, optionally saved/current qualification",
+    "timing": "post-Preview before Execute"
+  },
+  "interpretation": [
+    "Each positive is an ancillary noun-role exemption only and cannot fulfill an expected-effect notice.",
+    "Every negative must not be silently consumed as a valid authorization exemption. Extra-action and refusal negatives retain all spans for independent mutation/polarity rejection.",
+    "Unrelated authorization does not reject an otherwise valid notice solely for being unrelated, but grants no exemption or evidence about the current change.",
+    "An owner frame spanning a comma must retain its full prefix. Unknown, compound or foreign ownership cannot resolve through omitted-owner inheritance.",
+    "No claim here changes a frozen campaign status or provides runtime authorization."
+  ],
+  "pairs": [
+    {
+      "id": "AUTH-01",
+      "positive": {
+        "clause": "取得本次修改的独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "取得本次修改的 read_only 授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "wrong_policy"
+    },
+    {
+      "id": "AUTH-02",
+      "positive": {
+        "clause": "已获得这项变更的授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "尚未获得这项变更的授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "negative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "negative_grant"
+    },
+    {
+      "id": "AUTH-03",
+      "positive": {
+        "clause": "并取得此项改动的独立策略授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "并猜测此项改动已获得独立策略授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "uncertain",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "uncertainty"
+    },
+    {
+      "id": "AUTH-04",
+      "positive": {
+        "clause": "已按 allow_changes 策略取得本次修改授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "已按 read_only 策略取得本次修改授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "wrong_policy"
+    },
+    {
+      "id": "AUTH-05",
+      "positive": {
+        "clause": "按保存的 allow_changes 策略获得该变更的独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "按未知提供方的 allow_changes 策略获得该变更的独立授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "unknown_provider"
+    },
+    {
+      "id": "AUTH-06",
+      "positive": {
+        "clause": "并按当前 allow_changes 策略取得本次修改的授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "并在 OtherOwner 上按当前 allow_changes 策略取得本次修改的授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "foreign",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "foreign_owner"
+    },
+    {
+      "id": "AUTH-07",
+      "positive": {
+        "clause": "已按已保存的 allow_changes 策略获得此项修改的独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "已按已保存的 allow_changes 策略获得此项修改的独立授权，并删除原效果。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "extra_action"
+    },
+    {
+      "id": "AUTH-08",
+      "positive": {
+        "clause": "取得这个已授权的变更的授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "取得另一项变更的授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "unrelated_change"
+    },
+    {
+      "id": "AUTH-09",
+      "positive": {
+        "clause": "已为本次修改取得独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "已为本次修改和另一项修改取得独立授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "ambiguous",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "compound_change"
+    },
+    {
+      "id": "AUTH-10",
+      "positive": {
+        "clause": "在该对象上按 allow_changes 策略取得本次修改的独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "attested_primary",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "在该对象和 OtherOwner 上按 allow_changes 策略取得本次修改的独立授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "ambiguous",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "compound_owner"
+    },
+    {
+      "id": "AUTH-11",
+      "positive": {
+        "clause": "本次修改已取得独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "本次修改未取得独立授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "negative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "negative_grant"
+    },
+    {
+      "id": "AUTH-12",
+      "positive": {
+        "clause": "本次独立修改已按 allow_changes 策略获得授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "本次独立修改已按 unknown_policy 策略获得授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "wrong_policy"
+    },
+    {
+      "id": "AUTH-13",
+      "positive": {
+        "clause": "这项变更按保存的 allow_changes 策略取得独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "这项变更不按保存的 allow_changes 策略取得独立授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "negative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "negative_provider"
+    },
+    {
+      "id": "AUTH-14",
+      "positive": {
+        "clause": "并且此项改动已按当前 allow_changes 策略获得独立策略授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "并且此项改动可能已按当前 allow_changes 策略获得独立策略授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "uncertain",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "uncertainty"
+    },
+    {
+      "id": "AUTH-15",
+      "positive": {
+        "clause": "本次修改已按已保存的 allow_changes 策略取得授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "本次修改已按未知来源的 allow_changes 策略取得授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "unknown_provider"
+    },
+    {
+      "id": "AUTH-16",
+      "positive": {
+        "clause": "该变更已获得授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "该变更已获得授权，同时新增另一条关系。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "extra_action"
+    },
+    {
+      "id": "AUTH-17",
+      "positive": {
+        "clause": "这项独立修改已获得独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "这项独立修改已获得授权，但不会执行该变更。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "not_exempted",
+          "polarity": "negative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "execution_refusal"
+    },
+    {
+      "id": "AUTH-18",
+      "positive": {
+        "clause": "在该对象上，本次修改已按 allow_changes 策略取得授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "attested_primary",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "在 OtherOwner 上，本次修改已按 allow_changes 策略取得授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "foreign",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "foreign_owner"
+    },
+    {
+      "id": "AUTH-19",
+      "positive": {
+        "clause": "并已按 allow_changes 策略获得本次改动的授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "并已按 allow_changes 策略获得删除 OtherOwner 的授权。",
+        "expected": {
+          "classification": "reject_authorization_claim",
+          "owner": "foreign",
+          "polarity": "affirmative",
+          "role": "contradiction_or_unaccounted_claim",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "foreign_action"
+    },
+    {
+      "id": "AUTH-20",
+      "positive": {
+        "clause": "本次改动已按 allow_changes 策略取得独立授权。",
+        "expected": {
+          "classification": "ancillary_authorization",
+          "owner": "omitted",
+          "polarity": "affirmative",
+          "role": "authorization_summary",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "negative": {
+        "clause": "管理员已取得查看其他项目的授权。",
+        "expected": {
+          "classification": "unrelated",
+          "owner": "not_exempted",
+          "polarity": "affirmative",
+          "role": "unrelated",
+          "fulfills_expected_effect_notice": false
+        }
+      },
+      "reason": "unrelated_authorization"
+    }
+  ]
+}

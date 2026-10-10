@@ -5,6 +5,8 @@ import json
 
 import pytest
 
+from tests.support.operation_directory import expand_operations_directory_row
+
 from tests.unit.test_waapi_gateway import FakeClient, gateway_env, live_info, waapi_gateway as gateway
 from wwise_waapi.authoring_core_manifest import COMMON_URIS, FILENAME, merge_authoring_core
 from wwise_waapi.authoring_ui_commands_manifest import AuthoringUiCommandsSupplementError
@@ -30,7 +32,7 @@ def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path
     for lane, uri in LANES:
         if lane != version:
             continue
-        row = rows[uri]
+        row = expand_operations_directory_row(catalog, rows[uri])
         assert row["host_surface"] == "wwise-authoring"
         code, schema = gateway.execute_gateway(row["next_command"], env=env, client_factory=no_client)
         assert code == 0, schema
@@ -47,8 +49,9 @@ def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp
         pytest.fail("schema discovery must not connect")
     code, catalog = gateway.execute_gateway(["operations"], env=env, client_factory=no_client)
     assert code == 0, catalog
-    assert gateway.gateway_json_document_size(catalog) < 48 * 1024
+    assert gateway.gateway_json_document_size(catalog) < 26 * 1024
     for row in catalog["request_schema_routes"]:
+        row = expand_operations_directory_row(catalog, row)
         assert row["supported_versions"] == [version]
         if row["next_command"] == ["status"]:
             assert row["api"] == "ak.wwise.core.getInfo"

@@ -1,0 +1,206 @@
+{
+  "contract": "waapi-skill.expansion-guid-opaque-qualifier-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "fixed_review_candidate": "24c5154a630280a42262e23d978e825b85a552b7",
+  "functional_successor": "d2299687c4de1ea974bc2f72cd442e0466878a87",
+  "integration_tip": "875b6e727a7f73a0695b66dc8594e04e3f9dd0db",
+  "integration_merge": "Already up to date.",
+  "public_seam": "expansion_preview_notice",
+  "finding": "Intent guard partially validated qualifier brace syntax, hiding malformed incomplete/foreign GUID comparisons.",
+  "general_intent_criterion": "A standalone 与 comparison delimiter and a GUID token in either adjoining operand recognize a candidate, regardless of the intervening qualifier text. Intent checks no qualifier syntax, owner, canonical ID, type or relation completeness. All validation remains in the unchanged whole-frame validator. Existing equality/inequality-keyword detection remains.",
+  "unrelated_prose_rationale": "GUID 已记录 has no comparison separator. The retained GUID 已记录并与日志归档 uses 并与 verbal coordination, rather than the standalone 与 comparator; it remains unknown bookkeeping with no owner/effect credit. This separator-role distinction is justified by retained positives, not a qualifier exception. A negative with both standalone 与 and 并与 in the same component ensures verbal coordination cannot suppress that comparison.",
+  "source_review_evidence": [
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/spec-operands.md",
+      "sha256": "5a03a3e32ca5d38002c3a73d749c92d97cbd2a8d0b580c411cbb325f4b64791d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/spec-operands-probe.py",
+      "sha256": "a74439cc6774721baee89f7e250d85dda0d99cd04cefdc11127db3ed78b754fa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/spec-operands-probes.json",
+      "sha256": "b21e2a2baa1f4496d0e07f5c02dc5cd994fbec69fcf049af2e514019ae72eec3"
+    }
+  ],
+  "frozen_fixtures": [
+    {
+      "path": "tests/fixtures/semantic/expansion-guid-opaque-qualifier-review-20261007.json",
+      "sha256": "208f4ce3dcf3c034b21f1f346dffef7d0321a06d98d0142ebdc9b0471407eb11",
+      "vectors": 108
+    },
+    {
+      "path": "tests/fixtures/semantic/expansion-guid-opaque-qualifier-separator-control-20261007.json",
+      "sha256": "233ed915938c6fc65b72caf28eab7645d426ac30fc80eb436fc99cd69ef55fa4",
+      "vectors": 1
+    }
+  ],
+  "expectation_changes": 0,
+  "validation": {
+    "lane": "Focused developer pytest via ci/test.sh --mode nonlive; not full Non-live",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "runs": {
+      "red": {
+        "summary": "60 failed, 49 passed in 0.42s",
+        "direct_exit": 1,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "60",
+          "skipped": "0",
+          "tests": "109",
+          "time": "0.415",
+          "timestamp": "2026-10-07T22:47:05.244799+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/red.log",
+            "sha256": "44f2dc5b70f86ac0076ee0c3c45c3199951f48d0dd6882f7b7d78899a787dc23"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/red.xml",
+            "sha256": "ecde00d4d6d5b039ba847876c5b07ba032ede63087e204b1b0bc36a1dba48e4c"
+          }
+        ]
+      },
+      "red-complete": {
+        "summary": "61 failed, 50 passed in 0.43s",
+        "direct_exit": 1,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "61",
+          "skipped": "0",
+          "tests": "111",
+          "time": "0.426",
+          "timestamp": "2026-10-07T22:47:38.497585+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/red-complete.log",
+            "sha256": "ede12b30c03f6af100dfdde0da8ab442514e05e5c8dcd5d2dc0ee6a8e0f5dc7c"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/red-complete.xml",
+            "sha256": "fdd6dbcd3e6091a7ecbe1091d7aa451f27555d5a7529cc20db896f03d22438c0"
+          }
+        ]
+      },
+      "green": {
+        "summary": "111 passed in 0.34s",
+        "direct_exit": 0,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "111",
+          "time": "0.340",
+          "timestamp": "2026-10-07T22:47:53.022186+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/green.log",
+            "sha256": "60a9d8f65a31ee0c8becd4e13e6844127cc2c9525ba0165e75742424340b6fa3"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/green.xml",
+            "sha256": "46400edc08e2025ce5201526e9b4ee50d5d4866bf8809bd30264a5fb263b1c25"
+          }
+        ]
+      },
+      "focused-final": {
+        "summary": "3766 passed in 7.53s",
+        "direct_exit": 0,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "3766",
+          "time": "7.518",
+          "timestamp": "2026-10-07T22:48:22.655147+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/focused-final.log",
+            "sha256": "a40517c2c648e062ec855ef2113181b06a0d2d3db8793b60b6fa4347fde9924d"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/focused-final.xml",
+            "sha256": "521db69214d9e5cb2b4a995c4a2b04179a73c71ecd23936ffa3470d1dae7ee98"
+          }
+        ]
+      }
+    },
+    "final": {
+      "tests": 3766,
+      "prior_retained": 3655,
+      "new_review_vectors": 108,
+      "new_separator_negative": 1,
+      "new_hash_guards": 2,
+      "selected_files": [
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py",
+        "tests/semantic/test_codex_guid_span_review.py",
+        "tests/semantic/test_codex_guid_incomplete_review.py",
+        "tests/semantic/test_codex_guid_incomplete_operands_review.py",
+        "tests/semantic/test_codex_guid_opaque_qualifier_review.py"
+      ]
+    }
+  },
+  "preservation": {
+    "prior_fixture_report_files": 74,
+    "manifest": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/opaque-qualifier-delta/preserved-prior-sha256.json",
+      "sha256": "1b13ec9df6182f4cd3610024b8d198f8048fa30d298d5426c552cc1c6b7a56b9"
+    },
+    "prior_490_matrix_judgments_and_3655_expectations_unchanged": true,
+    "candidate_files": {
+      "tests/fixtures/semantic/expansion-guid-opaque-qualifier-review-20261007.json": "208f4ce3dcf3c034b21f1f346dffef7d0321a06d98d0142ebdc9b0471407eb11",
+      "tests/fixtures/semantic/expansion-guid-opaque-qualifier-separator-control-20261007.json": "233ed915938c6fc65b72caf28eab7645d426ac30fc80eb436fc99cd69ef55fa4",
+      "tests/semantic/test_codex_guid_opaque_qualifier_review.py": "de66ec48ab1dcf4ae7796fb9bba7d3449a781f0f75ec1529e2dfab8266807e6b",
+      "tests/semantic/support/codex_notice_claims.py": "e2d307822ea4aba78a6c34a865876f781a232ed6c0a668983cf2d7215435e9e5"
+    },
+    "unchanged_trees": {
+      "skills/waapi-skill": "10c034a0615ce41d84f61d3614546457b8aa5f8d",
+      "ci": "e8a2d4ad7b72a90f3692eab3c0f23afcb0c1c4c9",
+      "tests/_org": "6cb929c760b0df7b443d338c8ed8466d247223df"
+    }
+  },
+  "limits": [
+    "No new comparison synonyms, owner certification, authorization or effect criteria.",
+    "No full Program/Non-live, live/Fresh, historical replay/regrade/verify-only, config or source-project writes.",
+    "No Skill/suite/oracle/runtime/prompt change; no integration, push, PR or issue closure.",
+    "Developer proof only, with no Agent/Wwise/business-effect PASS credit. Parent owns independent rereview, integration and broader acceptance."
+  ]
+}

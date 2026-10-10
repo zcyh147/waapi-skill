@@ -1,0 +1,451 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "eba698d9c9f461182b36c7c55ff9b8d2253d9d06",
+  "candidate_identity_limit": "Exact revision supplied by the coordinator; archived Skill/harness tree digests remain authoritative.",
+  "date": "2026-10-03",
+  "host": "macOS",
+  "root": "expansion-retry5-eba698d-sol-high-r1-cli1592",
+  "status": "complete-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "cases": [
+      "EXP22-C08",
+      "EXP22-C09",
+      "EXP25-C08",
+      "EXP25-C09",
+      "EXP25-M05",
+      "EXP22-M05"
+    ],
+    "agent_budget_seconds": 600.0,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180.0,
+    "max_pre_action_retries": 0,
+    "codex_binary": "codex-cli 0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "frozen_candidate_digests": {
+    "skill_tree_sha256": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+    "semantic_harness_tree_sha256": "aa2cccddf429561929399dc39a9aa1be2ccf2b53d113604f8896727c03dbd303",
+    "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+  },
+  "development_gates": {
+    "program": {
+      "passed": 6345,
+      "skipped": 2,
+      "seconds": 303.27,
+      "log_sha256": "3b0231dd1b3bf9ac0e2a023c3ac52ae78bae032a35f10455639d996bcaac6040",
+      "scope": "New completed eba698d gate log independently checked; candidate binding/exit0 attested by coordinator before launch."
+    },
+    "nonlive": {
+      "passed": 14965,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 863.87,
+      "log_sha256": "2f188c68157b9fba2bf62788c65e52e370481f8aaf67d987570767ed167ad27c",
+      "junit_sha256": "2579aa439f1a1706727167c911682510e3eb72fca81e4d3fd4fa86bba8141c58",
+      "scope": "New completed eba698d log/XML independently checked; candidate binding/exit0 attested by coordinator before launch."
+    }
+  },
+  "result": {
+    "selected_units": 6,
+    "attempted_units": 6,
+    "agent_pass": 1,
+    "matrix_agent_fail": 4,
+    "canonical_agent_fail": 4,
+    "canonical_blocked": 0,
+    "boundary_proven": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "attempt_count": 1,
+    "child_exit_code": 1,
+    "launcher_exit_code": 1,
+    "launcher_exit_evidence": "Terminal exit 1 and bootout reported by root; sealed child-result and campaign output independently show returncode 1.",
+    "unloaded": true,
+    "unloaded_evidence": "Root reports LaunchAgent bootout; independent scoped ps is empty.",
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false,
+    "launcher_runs": 1,
+    "independently_completed_business_units": 5,
+    "unexecuted_agent_units": 0,
+    "required_agent_units": 5,
+    "full_agent_acceptance": false
+  },
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "matrix_status": "BOUNDARY_PROVEN",
+      "canonical_status": "BOUNDARY_PROVEN",
+      "source_guard_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "agent_pass_credit": false,
+      "cause": "Expected 2022.1 Stinger-reference capability boundary; no Agent or business PASS."
+    },
+    {
+      "id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "source_guard_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "agent_seconds": 173.16306958300993,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "formal_after_available": true,
+      "business_assertions": {
+        "requested_curve_matches": true,
+        "other_curves_unchanged": true,
+        "attenuation_identity_unchanged": true,
+        "users_and_references_unchanged": true,
+        "source_attenuation_unchanged": true
+      },
+      "required_business_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "required_business_assertions_total": 5,
+      "business_effect_verified": true,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ],
+      "gateway_command_count": 21,
+      "all_gateway_commands_authenticated_accepted_successful": true,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "usage": {
+        "input_tokens": 732422,
+        "cached_input_tokens": 673408,
+        "output_tokens": 3191,
+        "cache_write_input_tokens": 0,
+        "reasoning_output_tokens_included": 452
+      },
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "cause": "Automatic notice-only FAIL is preserved. Independent semantic review accepts the coherent exact prospective notice sequence; every other common gate and all independent business assertions pass.",
+      "independent_notice_review": "valid_notice_false_rejection",
+      "notice_evidence_review": {
+        "event_indices_zero_based": [
+          21
+        ],
+        "execute_started_event_zero_based": 22,
+        "notice": "Checked unique target attenuation and distinct saved-policy authorization precede the sole dry-volume Custom edit; 其 has the immediately preceding attested owner. Exact ordered points with Y dB units and Linear shape; no contradictory or extra effect.",
+        "agent_proof_limit": "Agent honestly lacks its own complete before-baseline preservation proof; current readback alone is not preservation proof. Independent before/after oracle nevertheless proves all five requirements."
+      },
+      "automatic_agent_pass_credit": false
+    },
+    {
+      "id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "source_guard_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "agent_seconds": 106.71825925004669,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "formal_after_available": true,
+      "business_assertions": {
+        "owner_unchanged": true,
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "unique_effect_identities": true,
+        "new_effect_owned_by_target": true
+      },
+      "required_business_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "required_business_assertions_total": 6,
+      "business_effect_verified": true,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ],
+      "gateway_command_count": 10,
+      "all_gateway_commands_authenticated_accepted_successful": true,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "usage": {
+        "input_tokens": 437581,
+        "cached_input_tokens": 400128,
+        "output_tokens": 2046,
+        "cache_write_input_tokens": 0,
+        "reasoning_output_tokens_included": 236
+      },
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "cause": "Automatic notice-only FAIL is preserved. Independent semantic review accepts the coherent exact prospective notice sequence; every other common gate and all independent business assertions pass.",
+      "independent_notice_review": "valid_notice_false_rejection",
+      "notice_evidence_review": {
+        "event_indices_zero_based": [
+          21,
+          24
+        ],
+        "execute_started_event_zero_based": 25,
+        "notice": "Earlier visible pre-Preview message states target Sound, live Wwise Gain, exact pending name/notes/no extra values. Post-Preview message confirms distinct policy authorization and executes that sole append with preservation verification. No competing descriptor; exact name/notes need not be repeated to maintain semantic identity.",
+        "timing_limit": "Exact name/notes occur before Preview; the coherent post-Preview execution message refers to the same sole announced plan. This semantic review is distinct from the automatic grader window.",
+        "agent_proof_limit": "Final explicitly limits claims about unexpanded per-object preservation comparisons; independent six-assertion oracle proves them."
+      },
+      "automatic_agent_pass_credit": false
+    },
+    {
+      "id": "EXP25-C08",
+      "matrix_status": "PASS",
+      "canonical_status": "PASS",
+      "source_guard_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": false,
+      "agent_seconds": 124.10478587495163,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "formal_after_available": true,
+      "business_assertions": {
+        "requested_curve_matches": true,
+        "other_curves_unchanged": true,
+        "attenuation_identity_unchanged": true,
+        "users_and_references_unchanged": true,
+        "source_attenuation_unchanged": true
+      },
+      "required_business_assertions": [
+        "attenuation_identity_unchanged",
+        "other_curves_unchanged",
+        "requested_curve_matches",
+        "source_attenuation_unchanged",
+        "users_and_references_unchanged"
+      ],
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "required_business_assertions_total": 5,
+      "business_effect_verified": true,
+      "formal_failed_gates": [],
+      "gateway_command_count": 11,
+      "all_gateway_commands_authenticated_accepted_successful": true,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "usage": {
+        "input_tokens": 526824,
+        "cached_input_tokens": 482944,
+        "output_tokens": 1977,
+        "cache_write_input_tokens": 0,
+        "reasoning_output_tokens_included": 275
+      },
+      "cause": "Fresh automatic Agent PASS; all five independent business assertions pass. Gateway result_schema_checked stays weaker; no historical truncation inference promoted."
+    },
+    {
+      "id": "EXP25-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "source_guard_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "agent_seconds": 111.15251437504776,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "formal_after_available": true,
+      "business_assertions": {
+        "owner_unchanged": true,
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "unique_effect_identities": true,
+        "new_effect_owned_by_target": true
+      },
+      "required_business_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "required_business_assertions_total": 6,
+      "business_effect_verified": true,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ],
+      "gateway_command_count": 10,
+      "all_gateway_commands_authenticated_accepted_successful": true,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "usage": {
+        "input_tokens": 457093,
+        "cached_input_tokens": 417792,
+        "output_tokens": 2064,
+        "cache_write_input_tokens": 0,
+        "reasoning_output_tokens_included": 197
+      },
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "cause": "Automatic notice-only FAIL is preserved. Independent semantic review accepts the coherent exact prospective notice sequence; every other common gate and all independent business assertions pass.",
+      "independent_notice_review": "valid_notice_false_rejection",
+      "notice_evidence_review": {
+        "event_indices_zero_based": [
+          23
+        ],
+        "execute_started_event_zero_based": 24,
+        "notice": "Checked target Sound, generated Preview and distinct allow_changes authorization precede exact impending Wwise Gain/new name/note append and existing identity/slot/order/Sound preservation verification. No extra fields or conflicting identity.",
+        "agent_proof_limit": "Final honestly limits preservation claims based on the unexpanded verification summary; independent six-assertion oracle proves them."
+      },
+      "automatic_agent_pass_credit": false
+    },
+    {
+      "id": "EXP25-M05",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "source_guard_unchanged": true,
+      "trusted_oracle_closed": true,
+      "sandbox_retained": true,
+      "agent_seconds": 116.79650095803663,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "verified",
+      "formal_after_available": true,
+      "business_assertions": {
+        "requested_trigger_matches": true,
+        "segment_reference_preserved": true,
+        "stinger_identity_and_other_configuration_preserved": true,
+        "other_stingers_preserved": true,
+        "target_and_segment_unchanged": true,
+        "owner_unchanged": true
+      },
+      "required_business_assertions": [
+        "other_stingers_preserved",
+        "owner_unchanged",
+        "requested_trigger_matches",
+        "segment_reference_preserved",
+        "stinger_identity_and_other_configuration_preserved",
+        "target_and_segment_unchanged"
+      ],
+      "business_assertions_passed": 6,
+      "business_assertions_total": 6,
+      "required_business_assertions_total": 6,
+      "business_effect_verified": true,
+      "formal_failed_gates": [
+        "visible_preview_notice"
+      ],
+      "gateway_command_count": 11,
+      "all_gateway_commands_authenticated_accepted_successful": true,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "usage": {
+        "input_tokens": 487951,
+        "cached_input_tokens": 440832,
+        "output_tokens": 2116,
+        "cache_write_input_tokens": 0,
+        "reasoning_output_tokens_included": 191
+      },
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "cause": "Automatic notice-only FAIL is preserved. Independent semantic review accepts the coherent exact prospective notice sequence; every other common gate and all independent business assertions pass.",
+      "independent_notice_review": "valid_notice_false_rejection",
+      "notice_evidence_review": {
+        "event_indices_zero_based": [
+          23,
+          26
+        ],
+        "execute_started_event_zero_based": 27,
+        "notice": "Matched existing Stinger and exact new Trigger are checked against live metadata. Post-Preview unique write changes its Trigger from Bonus to Backup_Team_Arrives, declares allow_changes authorization and present execution intent, then readback. No Segment/other-Stinger/owner edits or foreign target.",
+        "agent_proof_limit": "Agent reports it did not independently compare every preservation baseline; Gateway reference verification is not silently expanded into that proof. Trusted six-assertion before/after oracle proves the protected scope."
+      },
+      "automatic_agent_pass_credit": false
+    }
+  ],
+  "integrity": {
+    "artifact_count": 785,
+    "artifact_bytes": 32287115,
+    "metadata_seals": 8,
+    "manifest_sha256": "9236ec2e88cab9f2fdb0193e605b4df96b3f3cd9fb498a35b4dfe89a2d5f2f13",
+    "all_artifact_hashes_sizes_and_executable_flags_match": true,
+    "all_metadata_sidecar_hashes_match": true,
+    "source_full_hashes_and_project_mtimes_unchanged": 6,
+    "passing_projects_removed": 1,
+    "failed_projects_quarantined": 4,
+    "boundary_projects_quarantined": 1,
+    "retained_process_metadata_count": 5,
+    "retained_process_metadata": {
+      "cleanup_result": "cleaned",
+      "process_exited": true,
+      "residual_processes": []
+    },
+    "terminal_scoped_processes_empty": true,
+    "never_reuse": true,
+    "no_verify": true,
+    "failure_reconciliations_reaped": 4,
+    "metadata_seal_scope": "Eight business/campaign metadata sidecars, plus independently checked attempt-manifest sidecar and two root identity/lock sidecars (eleven total).",
+    "deleted_pass_process_detail_limit": "One PASS project path is absent and its sealed lifecycle reports removed. Detailed process metadata for that deleted PASS project is not separately sealed; retained five FAIL/boundary metadata records prove cleaned/exited/residual[].",
+    "codex_sessions_exit_zero_and_complete": 5,
+    "attempt_artifact_inventory_extras": "Only attempt-manifest.json and its own .sha256 sidecar are outside the artifact list; no missing or unexpected attempt artifact.",
+    "all_six_trusted_oracles_closed": true
+  },
+  "usage": {
+    "input_tokens": 2641871,
+    "cached_input_tokens": 2415104,
+    "output_tokens": 11394,
+    "reasoning_output_tokens_included": 1351,
+    "cache_write_input_tokens": 0,
+    "agent_seconds": 631.9351300410926,
+    "agent_turns": 5,
+    "slow_units": 0,
+    "goal_execute_count": 5,
+    "goal_verify_count": 5,
+    "goal_preview_count": 5,
+    "usd_cost": null,
+    "uncached_input_tokens": 226767
+  },
+  "disclosure149_evidence_limit": "Both C08 units consume getter schema and actual metadata readback; both business goals execute. Gateway result_schema_checked remains weaker and Agent-owned preservation-baseline limits remain explicit.",
+  "remaining": "All five selected Agent business effects are independently complete, but automatic acceptance is one PASS/four notice FAILs. Preserve those verdicts without verify-only/regrading; repair only grounded notice false rejections offline. This retry root does not establish full thirteen-Agent single-candidate acceptance or successful-root identical verify-only, and does not promote the earlier full534fdde automatic failures. No Windows acceptance or generalized model ranking.",
+  "model_evidence_limit": "No general Sol-high model ranking or historical Medium/Luna FAIL promotion.",
+  "business_outcome_accounting": {
+    "required_agent_units": 5,
+    "automatic_agent_pass": 1,
+    "additional_business_success_without_automatic_PASS": [
+      "EXP22-C08",
+      "EXP22-C09",
+      "EXP25-C09",
+      "EXP25-M05"
+    ],
+    "independent_business_effect_verified": 5,
+    "business_unexecuted": [],
+    "true_independent_assertions": 28,
+    "required_assertions": 28,
+    "expected_capability_boundary_units": 1,
+    "full_agent_acceptance": false
+  },
+  "typed_stinger153_component_evidence": "EXP25-M05 now progresses past exact MusicStinger binding into Preview, Execute and Verify; all six independent business assertions pass. This is fresh public preparation/effect component proof, not automatic Agent PASS or new field/version authority."
+}

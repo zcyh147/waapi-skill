@@ -1269,3 +1269,41 @@ def test_business_declarations_omit_every_unrequested_optional_fact() -> None:
         in OPERATE
     )
     assert "defaults, examples, expected results, and verifier facts are not inputs" in OPERATE
+
+
+def test_operate_completeness_rule_matches_ordinary_and_typed_stdout_producers(tmp_path) -> None:
+    from tests.unit.test_waapi_gateway import gateway_env, waapi_gateway
+
+    def no_client(_url):
+        raise AssertionError('offline discovery must not connect')
+
+    code, ordinary = waapi_gateway.execute_gateway(['operations'], env=gateway_env(tmp_path), client_factory=no_client)
+    assert code == 0 and ordinary['ok'] is True
+    encoded = waapi_gateway.gateway_stdout_json_encoder(ordinary).encode(ordinary)
+    assert json.loads(encoded) == ordinary
+    assert 'WAAPI_TYPED_CONTAINER_RESPONSE_END' not in encoded
+    typed = waapi_gateway.gateway_stdout_payload({'contract': 'waapi-skill.typed-container-handle/v1',
+        'uri': 'fixture.typed', 'handle': 'fixture-handle'})
+    assert list(typed)[-1] == 'response_end'
+    assert typed['response_end']['marker'] == 'WAAPI_TYPED_CONTAINER_RESPONSE_END'
+    assert typed['response_end']['complete'] is True and typed['response_end']['truncated'] is False
+    assert 'Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END`' in OPERATE
+    assert 'missing footer stops' in OPERATE
+    assert 'Read full visible JSON' in OPERATE and 'applicable integrity' in OPERATE
+    assert 'Truncation/omission stops; no retries' in OPERATE
+
+
+def test_discovery_budget_and_guid_copy_instruction_preserve_public_boundaries(tmp_path) -> None:
+    from tests.unit.test_waapi_gateway import gateway_env, waapi_gateway
+
+    def no_client(_url):
+        raise AssertionError('invalid identity must stop before connection')
+
+    code, failure = waapi_gateway.execute_gateway(['query-object', '--exact-id',
+        '11111111-1111-1111-1111-111111111111'], env=gateway_env(tmp_path), client_factory=no_client)
+    assert code == 2 and failure['error_code'] == 'SemanticValidationError'
+    assert 'Copy returned GUIDs exactly, including `{}` braces' in SKILL
+    assert 'For discovery/schema, use supported `max_output_tokens=20000`' in SKILL
+    assert "capped at the tool's documented maximum" in SKILL
+    assert 'If no complete JSON is visible, stop' in SKILL
+    assert 'do not retry the Gateway command' in SKILL

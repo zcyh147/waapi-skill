@@ -1,0 +1,2370 @@
+{
+  "audit_date": "2026-09-27",
+  "method": "Read-only historical artifacts; complete 12-record macOS integration batches under imac*int*; PASS workflow sums of codex-facts.duration_seconds; no regrade; no new test. Nearest-rank P95. Excludes readiness/setup/cleanup outside Codex invocations. Different historical code/harness candidates, repeated workloads; not independent reliability samples.",
+  "roots": [
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "created_at": "2026-08-11T14:17:26Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-9bd1ee7-integration-full-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "created_at": "2026-08-09T11:00:32Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-int-7f54506-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "created_at": "2026-08-12T02:32:33Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-198a510-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "created_at": "2026-08-11T06:05:56Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-1f2f0ac-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "created_at": "2026-08-11T23:56:07Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-3224042-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "created_at": "2026-08-11T02:12:28Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-a5a87ba-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "created_at": "2026-08-11T03:28:35Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-e02e426-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "created_at": "2026-08-11T18:52:33Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-f506d44-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "created_at": "2026-08-11T04:21:48Z",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "platform": "darwin",
+      "summary_path": "skills/waapi-skill-workspace/imac-integration-f5d9a1b-r1/attempts/attempt-000001/runs/heavy-v3/matrix/summary.json"
+    }
+  ],
+  "attempt_count": 108,
+  "pass_count": 76,
+  "recorded_timeout_turns": 0,
+  "successful_workflows": {
+    "n": 76,
+    "mean_seconds": 197.233,
+    "median_seconds": 175.703,
+    "p95_nearest_rank_seconds": 374.236,
+    "max_seconds": 406.431
+  },
+  "successful_turns": {
+    "n": 232,
+    "mean_seconds": 64.611,
+    "median_seconds": 50.86,
+    "p95_nearest_rank_seconds": 141.693,
+    "max_seconds": 180.399
+  },
+  "by_workflow": {
+    "WEATHER": {
+      "n": 15,
+      "mean_seconds": 337.808,
+      "median_seconds": 342.245,
+      "p95_nearest_rank_seconds": 406.431,
+      "max_seconds": 406.431
+    },
+    "ALARM": {
+      "n": 14,
+      "mean_seconds": 151.523,
+      "median_seconds": 139.677,
+      "p95_nearest_rank_seconds": 226.513,
+      "max_seconds": 226.513
+    },
+    "HARBOR": {
+      "n": 16,
+      "mean_seconds": 136.464,
+      "median_seconds": 133.487,
+      "p95_nearest_rank_seconds": 162.93,
+      "max_seconds": 162.93
+    },
+    "RIFLE": {
+      "n": 11,
+      "mean_seconds": 144.497,
+      "median_seconds": 151.4,
+      "p95_nearest_rank_seconds": 181.013,
+      "max_seconds": 181.013
+    },
+    "FOOTSTEPS": {
+      "n": 6,
+      "mean_seconds": 188.397,
+      "median_seconds": 183.643,
+      "p95_nearest_rank_seconds": 205.303,
+      "max_seconds": 205.303
+    },
+    "WEAPONS": {
+      "n": 14,
+      "mean_seconds": 206.998,
+      "median_seconds": 187.716,
+      "p95_nearest_rank_seconds": 328.404,
+      "max_seconds": 328.404
+    }
+  },
+  "observations": [
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "FAIL",
+      "agent_seconds": 274.065767,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 159.303732,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 114.762035,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "PASS",
+      "agent_seconds": 141.204646,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 74.406038,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 26.859448,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 39.93916,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 127.245496,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 42.3159,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 50.373379,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.556217,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 152.688828,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 113.999637,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 38.689191,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 50.525901,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 50.525901,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 311.269911,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 82.183767,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 151.996717,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 77.089427,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 331.444394,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 161.882463,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 95.325424,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 44.53175,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 29.704757,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 226.513216,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 111.336981,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 55.578,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 59.598235,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 151.32316600000001,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 66.046771,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 49.354559,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 35.921836,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 145.097682,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 109.080719,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 36.016963,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 74.8577,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 74.8577,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-9bd1ee7-integration-full-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 186.827626,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 53.090017,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 95.254157,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 38.483452,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 210.974075,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 74.994486,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 60.657129,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 41.904843,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 33.417617,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "PASS",
+      "agent_seconds": 123.472753,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 64.780081,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 25.161242,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.53143,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 114.92174,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 40.483466,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 43.118433,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 31.319841,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 79.55626,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 52.496303,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 27.059957,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 92.544997,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 46.301349,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 46.243648,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "FAIL",
+      "agent_seconds": 86.072462,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 44.563341,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 41.509121,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 214.177251,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 75.596276,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 58.824269,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 47.013263,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 32.743443,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 131.174948,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 72.172987,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 24.537435,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.464526,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 129.029402,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 46.81526,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 48.491753,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.722389,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 28.057409,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 28.057409,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 48.445832,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 48.445832,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-int-7f54506-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "FAIL",
+      "agent_seconds": 25.437886,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 25.437886,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "FAIL",
+      "agent_seconds": 356.895708,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 147.983946,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 106.074362,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 47.635196,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 55.202204,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "PASS",
+      "agent_seconds": 140.198047,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 69.395512,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 28.838303,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 41.964232,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 133.116447,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 45.112413,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 54.975548,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.028486,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 156.934544,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 121.595644,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 35.3389,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "PASS",
+      "agent_seconds": 185.750144,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 95.066896,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 57.159103,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.524145,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 175.316628,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 53.576424,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 85.465711,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 36.274493,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 356.534581,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 141.692663,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 112.509102,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 63.494508,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 38.838308,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 125.862181,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 68.96115,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 26.990324,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 29.910707,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 130.958241,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 45.85519,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 53.576889,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 31.526162,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 124.126143,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 96.225814,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 27.900329,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "PASS",
+      "agent_seconds": 181.536696,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 92.563092,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 58.00261,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 30.970994,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-198a510-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 193.85924599999998,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 48.975929,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 100.895264,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 43.988053,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 367.451757,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 149.049505,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 123.206367,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 55.8465,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 39.349385,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "FAIL",
+      "agent_seconds": 41.386476,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 41.386476,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 136.615015,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 45.523686,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 58.520155,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 32.571174,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 181.01314000000002,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 140.927108,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 40.086032,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "PASS",
+      "agent_seconds": 199.659359,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 111.736635,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 55.103753,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 32.818971,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 193.195066,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 56.303048,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 102.639917,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.252101,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 324.653379,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 141.552481,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 109.44655,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 42.376248,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 31.2781,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "FAIL",
+      "agent_seconds": 38.001633,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 38.001633,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 162.93035400000002,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 67.638461,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 60.254952,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 35.036941,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 151.399633,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 108.234942,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 43.164691,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 77.254588,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 77.254588,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-1f2f0ac-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "FAIL",
+      "agent_seconds": 150.75584800000001,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 59.606729,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 91.149119,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 341.205069,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 140.652584,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 114.649982,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 50.977865,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 34.924638,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "PASS",
+      "agent_seconds": 122.575198,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 62.20688,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 26.408164,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.960154,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 137.752384,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 54.817705,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 47.404978,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 35.529701,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 155.80564999999999,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 120.298436,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 35.507214,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 34.793957,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 34.793957,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 176.0892,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 49.642165,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 89.344818,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 37.102217,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 341.210689,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 150.265177,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 102.936963,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 50.742098,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 37.266451,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 139.15694100000002,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 74.19444,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 29.683672,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 35.278829,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "FAIL",
+      "agent_seconds": 49.101075,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 49.101075,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 141.974854,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 104.254762,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 37.720092,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "PASS",
+      "agent_seconds": 178.95899,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 95.845951,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 52.450667,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 30.662372,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-3224042-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 328.404498,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 49.815813,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 98.189285,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 180.3994,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 403.015969,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 170.002599,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 128.385041,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 61.998122,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 42.630207,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "FAIL",
+      "agent_seconds": 51.5138,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 51.5138,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 133.856579,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 47.639396,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 51.718742,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.498441,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 77.799133,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 77.799133,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 50.841144,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 50.841144,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 198.406532,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 64.689323,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 87.41554,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 46.301669,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 406.430857,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 172.713022,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 128.391126,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 63.803495,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 41.523214,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 146.741928,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 73.441655,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 34.846445,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 38.453828,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 132.618923,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 45.641043,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 52.326936,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.650944,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 53.487248,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 53.487248,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "PASS",
+      "agent_seconds": 205.303189,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 112.523904,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 58.837201,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.942084,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-a5a87ba-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 182.179622,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 51.5726,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 91.113832,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 39.49319,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 374.235779,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 171.755689,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 110.501838,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 50.209632,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 41.76862,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "FAIL",
+      "agent_seconds": 47.951716,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 47.951716,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 136.162414,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 44.969796,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 56.892357,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.300261,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 155.763128,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 113.880463,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 41.882665,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 45.842044,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 45.842044,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 182.18401500000002,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 52.432931,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 90.451614,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 39.29947,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 382.172705,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 161.194948,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 131.43797,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 53.326364,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 36.213423,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 145.315421,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 70.94568,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 33.454229,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 40.915512,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 152.77324299999998,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 61.22009,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 53.896885,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 37.656268,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 96.135438,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 96.135438,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 107.125852,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 107.125852,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-e02e426-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 188.540906,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 55.804326,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 94.197659,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 38.538921,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "FAIL",
+      "agent_seconds": 194.503244,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 132.303602,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 62.199642,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "PASS",
+      "agent_seconds": 132.70066,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 69.776763,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 26.791017,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 36.13288,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 126.90848299999999,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 41.735566,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 48.71026,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 36.462657,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 61.611824,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 61.611824,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 48.601029,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 48.601029,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "FAIL",
+      "agent_seconds": 109.291154,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 51.811845,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 57.479309,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 342.24462600000004,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 144.082524,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 105.74964,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 51.661954,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 40.750508,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 130.55683900000002,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 69.766709,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 26.925775,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 33.864355,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 125.967028,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 43.368073,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 47.77094,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 34.828015,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 73.057211,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 73.057211,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "PASS",
+      "agent_seconds": 179.170783,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 102.589739,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 48.595629,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 27.985415,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f506d44-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 215.38182,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 59.796058,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 107.772515,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 47.813247,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT22-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 324.647478,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 143.370904,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 96.996847,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 48.706221,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 35.573506,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT22-ALARM",
+      "status": "PASS",
+      "agent_seconds": 203.235262,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 100.106658,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 43.03895,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 60.089654,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT22-HARBOR",
+      "status": "FAIL",
+      "agent_seconds": 65.284298,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 65.284298,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT22-RIFLE",
+      "status": "PASS",
+      "agent_seconds": 145.110369,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 106.751596,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 38.358773,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT22-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 47.863718,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 47.863718,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT22-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 179.420869,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 54.745544,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 87.973832,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 36.701493,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT25-WEATHER",
+      "status": "PASS",
+      "agent_seconds": 346.72222899999997,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 141.199073,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 123.000644,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 48.492944,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-04",
+          "duration_seconds": 34.029568,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT25-ALARM",
+      "status": "PASS",
+      "agent_seconds": 212.618569,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 103.412857,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 60.02454,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 49.181172,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT25-HARBOR",
+      "status": "PASS",
+      "agent_seconds": 151.242239,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 46.862308,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 64.744909,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 39.635022,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT25-RIFLE",
+      "status": "FAIL",
+      "agent_seconds": 95.546554,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 95.546554,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT25-FOOTSTEPS",
+      "status": "FAIL",
+      "agent_seconds": 51.127722,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 51.127722,
+          "timed_out": false
+        }
+      ]
+    },
+    {
+      "root": "imac-integration-f5d9a1b-r1",
+      "scenario_id": "INT25-WEAPONS",
+      "status": "PASS",
+      "agent_seconds": 186.890839,
+      "turns": [
+        {
+          "turn": "turn-01",
+          "duration_seconds": 49.237825,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-02",
+          "duration_seconds": 95.236074,
+          "timed_out": false
+        },
+        {
+          "turn": "turn-03",
+          "duration_seconds": 42.41694,
+          "timed_out": false
+        }
+      ]
+    }
+  ]
+}

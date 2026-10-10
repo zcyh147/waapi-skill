@@ -1,0 +1,2111 @@
+{
+  "source_probe_sha256": "a0d5c1de5adb0cb5fd4129b7ca2221d6ca9a443bdd8da2565e0004428a6163ab",
+  "family_mapping": {
+    "effect": "effect",
+    "rtpc": "rtpc",
+    "attenuation": "attenuation",
+    "stinger": "stinger"
+  },
+  "cases": [
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与你提供的目标声音 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-exact-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与你提供的目标声音 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与目标声音 的 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-exact-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {2F0422D1-BF25-453D-8FE2-08BB8A3CC7E3} 与目标声音 的 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-wrong-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-wrong-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {not-a-guid} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {not-a-guid}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid} 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与你提供的目标声音 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-malformed-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与你提供的目标声音 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {not-a-guid} 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {not-a-guid}，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid} 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与目标声音 的 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-malformed-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与目标声音 的 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {not-a-guid 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {not-a-guid，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid 与你提供的目标声音 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与你提供的目标声音 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-resolved-first-unclosed-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与你提供的目标声音 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {not-a-guid 与，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {not-a-guid，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid 与目标声音 的 GUID，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与目标声音 的 GUID、且 解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-supplied-first-unclosed-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与目标声音 的 GUID一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "effect",
+      "id": "effect-read-guid",
+      "notice": "已核对目标声音，GUID 已记录，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "effect",
+      "id": "effect-read-relationship",
+      "notice": "已核对目标声音，GUID 已记录并与日志归档，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "effect",
+      "id": "effect-legacy",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {504F14BB-C97E-467F-9354-04811517B4D3}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与你提供的目标声音 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-exact-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与你提供的目标声音 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与目标声音 的 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-exact-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {504F14BB-C97E-467F-9354-04811517B4D3} 与目标声音 的 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-wrong-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标声音 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-wrong-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标声音 的 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {not-a-guid} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {not-a-guid}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid} 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与你提供的目标声音 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-malformed-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid} 与你提供的目标声音 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {not-a-guid} 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {not-a-guid}。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid} 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid} 与目标声音 的 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-malformed-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid} 与目标声音 的 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-missing-second",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-missing-second-colon",
+      "notice": "已核对目标声音：目标声音 的 GUID {not-a-guid 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-missing-relation",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-right-qualified",
+      "notice": "已核对目标声音，目标声音 的 GUID 与你提供的目标声音 GUID {not-a-guid。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid 与你提供的目标声音 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与你提供的目标声音 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-resolved-first-unclosed-complete",
+      "notice": "已核对目标声音，目标声音 的 GUID {not-a-guid 与你提供的目标声音 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-missing-second",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-missing-second-colon",
+      "notice": "已核对目标声音：你提供的目标声音 GUID {not-a-guid 与。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-missing-relation",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-right-qualified",
+      "notice": "已核对目标声音，你提供的目标声音 GUID 与目标声音 的 GUID {not-a-guid。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-foreign",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-foreign-colon",
+      "notice": "已核对目标声音：OtherObject 的 GUID {not-a-guid 与目标声音 的 GUID。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid 与目标声音 的 GUID、且 目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-supplied-first-unclosed-complete",
+      "notice": "已核对目标声音，你提供的目标声音 GUID {not-a-guid 与目标声音 的 GUID一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-read-guid",
+      "notice": "已核对目标声音，GUID 已记录。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-read-relationship",
+      "notice": "已核对目标声音，GUID 已记录并与日志归档。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "rtpc",
+      "id": "rtpc-legacy",
+      "notice": "已核对目标声音，GUID、名称、类型和路径与请求一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-missing-second",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-missing-second-colon",
+      "notice": "已核对目标衰减对象：目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-missing-relation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-right-qualified",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID 与你提供的目标衰减对象 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与你提供的目标衰减对象 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-exact-complete",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与你提供的目标衰减对象 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-missing-second",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-missing-second-colon",
+      "notice": "已核对目标衰减对象：你提供的目标衰减对象 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-missing-relation",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-right-qualified",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID 与目标衰减对象 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与目标衰减对象 的 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-exact-complete",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {E68369C4-8381-45B1-92B3-4D43924A0030} 与目标衰减对象 的 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-missing-second",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-missing-second-colon",
+      "notice": "已核对目标衰减对象：目标衰减对象 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-missing-relation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-right-qualified",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID 与你提供的目标衰减对象 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标衰减对象 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-wrong-complete",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标衰减对象 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-missing-second",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-missing-second-colon",
+      "notice": "已核对目标衰减对象：你提供的目标衰减对象 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-missing-relation",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-right-qualified",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID 与目标衰减对象 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标衰减对象 的 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-wrong-complete",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标衰减对象 的 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-missing-second",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-missing-second-colon",
+      "notice": "已核对目标衰减对象：目标衰减对象 的 GUID {not-a-guid} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-missing-relation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-right-qualified",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID 与你提供的目标衰减对象 GUID {not-a-guid}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {not-a-guid} 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid} 与你提供的目标衰减对象 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-malformed-complete",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid} 与你提供的目标衰减对象 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-missing-second",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-missing-second-colon",
+      "notice": "已核对目标衰减对象：你提供的目标衰减对象 GUID {not-a-guid} 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid} 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-missing-relation",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-right-qualified",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID 与目标衰减对象 的 GUID {not-a-guid}。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {not-a-guid} 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid} 与目标衰减对象 的 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-malformed-complete",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid} 与目标衰减对象 的 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-missing-second",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-missing-second-colon",
+      "notice": "已核对目标衰减对象：目标衰减对象 的 GUID {not-a-guid 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-missing-relation",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-right-qualified",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID 与你提供的目标衰减对象 GUID {not-a-guid。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {not-a-guid 与你提供的目标衰减对象 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid 与你提供的目标衰减对象 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-resolved-first-unclosed-complete",
+      "notice": "已核对目标衰减对象，目标衰减对象 的 GUID {not-a-guid 与你提供的目标衰减对象 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-missing-second",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-missing-second-colon",
+      "notice": "已核对目标衰减对象：你提供的目标衰减对象 GUID {not-a-guid 与。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid 与、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-missing-relation",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-right-qualified",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID 与目标衰减对象 的 GUID {not-a-guid。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-foreign",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-foreign-colon",
+      "notice": "已核对目标衰减对象：OtherObject 的 GUID {not-a-guid 与目标衰减对象 的 GUID。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标衰减对象，OtherObject 的 GUID {not-a-guid 与目标衰减对象 的 GUID、且 目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-supplied-first-unclosed-complete",
+      "notice": "已核对目标衰减对象，你提供的目标衰减对象 GUID {not-a-guid 与目标衰减对象 的 GUID一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-read-guid",
+      "notice": "已核对目标衰减对象，GUID 已记录。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-read-relationship",
+      "notice": "已核对目标衰减对象，GUID 已记录并与日志归档。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "attenuation",
+      "id": "attenuation-legacy",
+      "notice": "已核对目标衰减对象，GUID、名称、类型和路径与请求一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-missing-second",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-missing-second-colon",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-missing-relation",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-right-qualified",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与你提供的目标 Stinger GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-exact-complete",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与你提供的目标 Stinger GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-missing-second",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-missing-second-colon",
+      "notice": "已核对目标 Stinger：你提供的目标 Stinger GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-missing-relation",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-right-qualified",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID 与目标 Stinger 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与目标 Stinger 的 GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-exact-complete",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {B8D45849-AF76-4770-BE7B-5A6553B1337B} 与目标 Stinger 的 GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-missing-second",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-missing-second-colon",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-missing-relation",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-right-qualified",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标 Stinger GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-wrong-complete",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的目标 Stinger GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-missing-second",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-missing-second-colon",
+      "notice": "已核对目标 Stinger：你提供的目标 Stinger GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-missing-relation",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-right-qualified",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID 与目标 Stinger 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标 Stinger 的 GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-wrong-complete",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与目标 Stinger 的 GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-missing-second",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-missing-second-colon",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID {not-a-guid} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-missing-relation",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-right-qualified",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID {not-a-guid}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {not-a-guid} 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid} 与你提供的目标 Stinger GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-malformed-complete",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid} 与你提供的目标 Stinger GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-missing-second",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-missing-second-colon",
+      "notice": "已核对目标 Stinger：你提供的目标 Stinger GUID {not-a-guid} 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid} 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-missing-relation",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-right-qualified",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID 与目标 Stinger 的 GUID {not-a-guid}。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {not-a-guid} 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid} 与目标 Stinger 的 GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-malformed-complete",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid} 与目标 Stinger 的 GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-missing-second",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-missing-second-colon",
+      "notice": "已核对目标 Stinger：目标 Stinger 的 GUID {not-a-guid 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-missing-relation",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-right-qualified",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID {not-a-guid。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {not-a-guid 与你提供的目标 Stinger GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid 与你提供的目标 Stinger GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-resolved-first-unclosed-complete",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID {not-a-guid 与你提供的目标 Stinger GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-missing-second",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-missing-second-colon",
+      "notice": "已核对目标 Stinger：你提供的目标 Stinger GUID {not-a-guid 与。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-missing-second-coordinated",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid 与、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-missing-relation",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-right-qualified",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID 与目标 Stinger 的 GUID {not-a-guid。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-foreign",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-foreign-colon",
+      "notice": "已核对目标 Stinger：OtherObject 的 GUID {not-a-guid 与目标 Stinger 的 GUID。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-foreign-coordinated",
+      "notice": "已核对目标 Stinger，OtherObject 的 GUID {not-a-guid 与目标 Stinger 的 GUID、且 目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-supplied-first-unclosed-complete",
+      "notice": "已核对目标 Stinger，你提供的目标 Stinger GUID {not-a-guid 与目标 Stinger 的 GUID一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Existing operand alternatives and optional GUID qualifiers must reach the unchanged complete-frame validator."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-read-guid",
+      "notice": "已核对目标 Stinger，GUID 已记录。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-read-relationship",
+      "notice": "已核对目标 Stinger，GUID 已记录并与日志归档。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    },
+    {
+      "family": "stinger",
+      "id": "stinger-legacy",
+      "notice": "已核对目标 Stinger，GUID、名称、类型和路径与请求一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Unrelated bookkeeping and explicit-recipient legacy aggregate retain their existing judgments."
+    }
+  ]
+}

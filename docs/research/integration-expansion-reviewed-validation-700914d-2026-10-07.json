@@ -1,0 +1,747 @@
+{
+  "contract": "waapi-skill.reviewed-validation-report/v1",
+  "date": "2026-10-07",
+  "candidate": "700914d86b10dc1c586762fb3a617a0fd4e9ab2a",
+  "status": "NONLIVE_R2_PASSED_FRESH_NOTICE_FAILED_FROZEN",
+  "branch": "codex/expansion-reviewed-validation",
+  "host": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills",
+  "command": "WAAPI_TEST_PYTHON=/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python ci/test.sh --mode nonlive -- -q -ra --junitxml=/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-700914d-r1/nonlive.xml",
+  "evidence_directory": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-700914d-r1",
+  "evidence_sha256": {
+    "nonlive.log": "0582a4c5fa2d419c5efb8f6b6c417ff0078d62e28a4c6b5ba70ff41a743861c0",
+    "nonlive.xml": "5a4e7bc6e0608270b9c7008fdf8ebdf1fe6d76f103c0cab2e84f906a2781fa34",
+    "exit-code.txt": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "terminal-audit.json": "25f01381c57660084c196f4483dcf74d3b8e5718b39d4e42f8dcd6f9d1b2efaa"
+  },
+  "failure_groups": [
+    {
+      "failed": 10,
+      "errors": 6,
+      "reason": "Public integration component-02 invalid, caused by 2022.1 manifest full tree hash drift."
+    },
+    {
+      "failed": 1,
+      "errors": 0,
+      "reason": "V2 preflight: 2022.1 manifest full tree hash drift."
+    },
+    {
+      "failed": 3,
+      "errors": 0,
+      "reason": "Music fixture donor differs from pinned WAV hash; the injected-failure test stops before injection."
+    },
+    {
+      "failed": 3,
+      "errors": 0,
+      "reason": "Campaign parser SystemExit 2: missing tests/fixtures/local/live-environment.json."
+    },
+    {
+      "failed": 3,
+      "errors": 0,
+      "reason": "Org fixture manifest expected 12404 bytes, got 130-byte Git LFS pointer."
+    }
+  ],
+  "failure_cases": [
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_matrix_loader_accepts_public_and_legacy_case_aliases",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_public_and_legacy_case_spellings_seal_the_same_public_selection",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_child_argv_uses_public_profile_and_public_unit_ids",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_profile_cli_wiring::test_effective_config_fingerprints_both_components_and_replay_detects_drift",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_loader_composes_twelve_public_units_in_version_major_order",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_public_units_retain_component_runtime_and_closed_legacy_ids",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_weather_prompt_distinguishes_the_boolean_instance_limit_from_its_value",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT22-WEATHER-INT22-WEATHER]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT22-INTERACTIVE-WEATHER-BUILD-INT22-WEATHER]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT25-RIFLE-INT25-RIFLE]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_accepts_public_ids_and_legacy_aliases[INT25-V2-RIFLE-SAFE-REIMPORT-INT25-RIFLE]",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_filters_keep_public_version_major_order",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_public_integration_units_delegate_first_use_intro",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_component_source_digests_are_namespaced_and_include_baselines",
+      "kind": "error",
+      "message": "failed on setup with \"tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid\""
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_component_bytes_participate_in_the_unified_definition_digest",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows.IntegrationProfileError: integration component-02 is invalid"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows::test_case_selection_rejects_unknown_and_duplicate_aliases",
+      "kind": "failure",
+      "message": "AssertionError: Regex pattern did not match.\n Regex: 'unknown integration'\n Input: 'integration component-02 is invalid'"
+    },
+    {
+      "case": "tests.semantic.test_codex_integration_workflows_v2::test_real_execution_preflight_loads_sealed_committed_baselines",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_integration_workflows_v2.IntegrationWorkflowV2Error: 2022.1 manifest full tree hash drifted"
+    },
+    {
+      "case": "tests.semantic.test_codex_music_switch_reference_goal::test_missing_legacy_music_is_seeded_before_actual_hash_preservation",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_expansion_case_helpers.CaseBoundaryError: fixture donor differs from its pinned WAV hash"
+    },
+    {
+      "case": "tests.semantic.test_codex_music_switch_reference_goal::test_media_preparation_preserves_existing_input_without_overwrite",
+      "kind": "failure",
+      "message": "tests.semantic.support.codex_expansion_case_helpers.CaseBoundaryError: fixture donor differs from its pinned WAV hash"
+    },
+    {
+      "case": "tests.semantic.test_codex_music_switch_reference_goal::test_partial_fixture_copy_evidence_survives_later_failure",
+      "kind": "failure",
+      "message": "AssertionError: Regex pattern did not match.\n Regex: 'injected'\n Input: 'fixture donor differs from its pinned WAV hash'"
+    },
+    {
+      "case": "tests.semantic.test_codex_typed_input_profile_cli_wiring::test_campaign_uses_same_profile_and_disables_same_root_retry",
+      "kind": "failure",
+      "message": "SystemExit: 2"
+    },
+    {
+      "case": "tests.semantic.test_run_codex_skill_campaign::test_typed_input_profile_uses_a_bounded_long_form_turn_budget",
+      "kind": "failure",
+      "message": "SystemExit: 2"
+    },
+    {
+      "case": "tests.semantic.test_run_codex_skill_campaign::test_campaign_readiness_timeout_is_explicit_positive_and_finite",
+      "kind": "failure",
+      "message": "SystemExit: 2"
+    },
+    {
+      "case": "tests.unit.test_2025_1_fixture_inventory::test_2025_1_org_fixture_metadata_and_hash_manifest",
+      "kind": "failure",
+      "message": "AssertionError: assert 12404 == 130\n +  where 130 = len(b'version https://git-lfs.github.com/spec/v1\\noid sha256:b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97\\nsize 12404\\n')"
+    },
+    {
+      "case": "tests.unit.test_2025_1_fixture_inventory::test_2025_1_fixture_manifest_hashes_match_committed_files",
+      "kind": "failure",
+      "message": "AssertionError: assert 12404 == 130\n +  where 130 = len(b'version https://git-lfs.github.com/spec/v1\\noid sha256:b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97\\nsize 12404\\n')"
+    },
+    {
+      "case": "tests.unit.test_org_fixture_source::test_org_fixture_manifest_hashes_match_committed_files",
+      "kind": "failure",
+      "message": "AssertionError: assert 12404 == 130\n +  where 130 = len(b'version https://git-lfs.github.com/spec/v1\\noid sha256:b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97\\nsize 12404\\n')"
+    }
+  ],
+  "focused_component": {
+    "passed": 2657,
+    "seconds": 4.7,
+    "old_controls": 2566,
+    "new_controls": 91,
+    "authority": "integration-expansion-coordinated-attestation-repair-2026-10-07.json review_delta; not rerun here"
+  },
+  "program_component": "No new Program run. Existing Program component attribution remains unchanged; this semantic-only patch and validation report add no Program credit.",
+  "prior_frozen_fresh": {
+    "candidate": "0c2e75e0283b2c4dce1516149ee9bc0b944ed402",
+    "root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-0c2e75e-sol-high-r2-clean-cli1592",
+    "status": "FROZEN_SINGLE_NOTICE_FAIL; NOT_ACCEPTED",
+    "failed_gate": "visible_preview_notice",
+    "business_assertions_passed": 6,
+    "business_assertions_required": 6,
+    "gateway_verified": true,
+    "usage": {
+      "cache_write_input_tokens": 0,
+      "cached_input_tokens": 402432,
+      "input_tokens": 441330,
+      "output_tokens": 2053,
+      "reasoning_output_tokens": 304,
+      "uncached_input_tokens": 38898,
+      "agent_seconds": 96.78919045906514,
+      "reasoning_included_in_output": true,
+      "usd": null
+    },
+    "resume_verify_regrade": false
+  },
+  "priority_capability": {
+    "supported": false,
+    "parser": "tests/semantic/run_codex_skill_campaign.py:15740",
+    "loader": "tests/semantic/support/codex_expansion_profile.py:78",
+    "reason": "No priority/order CLI option; expansion loader builds version-major CASE_IDS order before filtering. case-id argv order cannot put C09 first. Changing selection on resume changes immutable options and cannot grow a targeted root into full acceptance."
+  },
+  "coordination": {
+    "new_subagents": "Every spawn_agent must explicitly set fork_turns=\"none\"; supply only necessary objective, constraints, acceptance, path pointers and essential unrecorded decisions; propagate recursively.",
+    "goal_metadata": "No goal metadata edit performed or claimed.",
+    "board": "137/138/139/140/142/143 closed with existing component proof;156 closed with explicit unsupported tool-inventory telemetry boundary;147/122/108 remain open, per coordinator."
+  },
+  "limits": [
+    "Failed r1 evidence remains immutable; recovery and r2 are separately recorded.",
+    "Fresh700914d ended FAIL despite6/6 business assertions and verified Gateway.",
+    "No verify-only/replay/regrade/retry or final-full campaign follows this FAIL.",
+    "No source-code/Skill/suite/prompt/oracle changes or new tests; only local LFS hydration and ignored default config restoration.",
+    "No new Program or native Windows run; no model ranking/USD claim."
+  ],
+  "r1_result": {
+    "exit_code": 1,
+    "passed": 15531,
+    "failed": 20,
+    "errors": 6,
+    "skipped": 119,
+    "deselected": 27,
+    "seconds": 886.28
+  },
+  "r1_terminal_bounds": {
+    "tracked_clean": true,
+    "source_guards": {
+      "2022.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+          "file_count": 84,
+          "bytes_hashed": 3788783
+        },
+        "mtime_ns": 1790531309484673590,
+        "matches_prior": true
+      },
+      "2025.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "mtime_ns": 1790531309503233691,
+        "matches_prior": true
+      }
+    },
+    "scoped_processes": [],
+    "inputs": {
+      "skills/waapi-skill": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+      "tests/semantic": "50c4f620f36aaccacfd70df1b735f085e075bac9f38bb0a8e45b6f86cfec09c8",
+      "tests/destructive/support": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+    },
+    "fresh_launched": false,
+    "fresh_root_absent": true,
+    "retry_or_regrade": false
+  },
+  "environment_recovery": {
+    "candidate": "700914d86b10dc1c586762fb3a617a0fd4e9ab2a",
+    "tracked_clean": true,
+    "lfs_checkout": "git lfs checkout;32/32 hydrated from local shared cache;no fetch/reset/clean",
+    "lfs_payloads_sha_verified": [
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/Footstep/Footstep_Crouching_Concrete_01.wav",
+      "474422f208c274b61253678676352a3d94627c63b208a725aee206a89542a8c4 * tests/_org/2022.1/Originals/SFX/Footstep/Footstep_Running_Hardwood_02.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2022.1/Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_clean.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_close.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_hot.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_legacy.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_mechanical.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_outside.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/audit_tail.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/metal_step_01.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/mud_step_01.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_backup.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_close_old.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_mechanical_old.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tail_old.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/rifle_tails_distractor.wav",
+      "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97 * tests/_org/2025.1/Originals/SFX/WAAPI Skill Integration V2/wood_step_01.wav"
+    ],
+    "default_config_source": "/Users/xiye/Documents/Git/waapi-skills/tests/fixtures/local/live-environment.json",
+    "default_config_sha256": "15d0e9cc992dae7c893761c9c7e4719cdc32437bf944e94bc3a8edea30dc742d",
+    "default_config_ignored": true,
+    "default_config_paths": {
+      "2021.1": {
+        "wwise_console": {
+          "path": "/Applications/Audiokinetic/Wwise2021.1.14.8108/Wwise.app/Contents/Tools/WwiseConsole.sh",
+          "exists": true
+        },
+        "sample_project": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/_org/2021.1/SampleProject.wproj",
+          "exists": true
+        },
+        "sandbox_root": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2021.1",
+          "exists": false
+        }
+      },
+      "2022.1": {
+        "wwise_console": {
+          "path": "/Applications/Audiokinetic/Wwise2022.1.19.8584/Wwise.app/Contents/Tools/WwiseConsole.sh",
+          "exists": true
+        },
+        "sample_project": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+          "exists": true
+        },
+        "sandbox_root": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2022.1",
+          "exists": false
+        }
+      },
+      "2023.1": {
+        "wwise_console": {
+          "path": "/Applications/Audiokinetic/Wwise2023.1.19.8928/Wwise.app/Contents/Tools/WwiseConsole.sh",
+          "exists": true
+        },
+        "sample_project": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/_org/2023.1/SampleProject.wproj",
+          "exists": true
+        },
+        "sandbox_root": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2023.1",
+          "exists": false
+        }
+      },
+      "2024.1": {
+        "wwise_console": {
+          "path": "/Applications/Audiokinetic/Wwise2024.1.13.9056/Wwise.app/Contents/Tools/WwiseConsole.sh",
+          "exists": true
+        },
+        "sample_project": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/_org/2024.1/SampleProject.wproj",
+          "exists": true
+        },
+        "sandbox_root": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2024.1",
+          "exists": false
+        }
+      },
+      "2025.1": {
+        "wwise_console": {
+          "path": "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
+          "exists": true
+        },
+        "sample_project": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+          "exists": true
+        },
+        "sandbox_root": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1",
+          "exists": false
+        }
+      }
+    },
+    "portable_config_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/expansion-frozen-live-environment.json",
+    "portable_config_sha256": "f4a672b5007631bead3180125652621fe903c2ca8dafbba0e132431a663b5b6a",
+    "protected_sources": {
+      "2022.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+          "file_count": 84,
+          "bytes_hashed": 3788783
+        },
+        "mtime_ns": 1790531309484673590
+      },
+      "2025.1": {
+        "hash": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "mtime_ns": 1790531309503233691
+      }
+    },
+    "r1_evidence_unchanged": true,
+    "focused_result": {
+      "passed": 144,
+      "seconds": 3.21,
+      "exit_code": 0
+    },
+    "artifacts_sha256": {
+      "focused.xml": "1c5b64f3b96f5c7144ea487fabaaf7d1db772fce5b744617b6b5fd9c260494af",
+      "focused-exit-code.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "preflight.json": "290b749bd079446f9cffa3eecf26a47e4af582ebf6aee8661a566c8b0b332c96",
+      "focused.log": "e739d7c1db23bfeed264095771bddf6c3714507c30541056d45777e9c27e1001"
+    }
+  },
+  "nonlive_r2": {
+    "passed": 15557,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 119,
+    "deselected": 27,
+    "seconds": 899.57,
+    "exit_code": 0,
+    "evidence_directory": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-700914d-r2",
+    "artifacts_sha256": {
+      "nonlive.log": "9ff943c3210c5024d0df990d172d61778fc21f9394e49306c5a221e1e524d231",
+      "nonlive.xml": "b04bb7b027c2bbe1462fe012f00ad2dca8dc096ee2edd8cdb51a18b57e0169d9",
+      "parent-gate-audit.json": "3d3d3ce42550ebdb4d219a401f2a02eac48e162c6faf46feb68619401f28ad6b",
+      "exit-code.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    }
+  },
+  "fresh": {
+    "root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592",
+    "status": "FAIL",
+    "reason": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+    "argv": [
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill/.venv/bin/python",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "--profile",
+      "integration_expansion_v1",
+      "--model",
+      "gpt-6.1-sol",
+      "--reasoning-effort",
+      "high",
+      "--service-tier",
+      "default",
+      "--codex-binary",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+      "--auth-json",
+      "/Users/xiye/.codex/auth.json",
+      "--live-config",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/expansion-frozen-live-environment.json",
+      "--campaign-root",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592",
+      "--wwise-readiness-timeout",
+      "180",
+      "--timeout",
+      "600",
+      "--max-pre-action-retries",
+      "0",
+      "--version",
+      "2025.1",
+      "--case-id",
+      "EXP25-C09"
+    ],
+    "preflight": {
+      "runtime_matches_historical": true,
+      "dependencies": {
+        "contract": "waapi-skill.codex-semantic-live-preflight/v1",
+        "ok": true,
+        "dependency": "waapi-client",
+        "module": "waapi",
+        "required_symbols": [
+          "WaapiClient",
+          "WaapiRequestFailed"
+        ],
+        "current_interpreter": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill/.venv/bin/python",
+        "automatic_install_attempted": false
+      },
+      "inputs": {
+        "skills/waapi-skill": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+        "tests/semantic": "50c4f620f36aaccacfd70df1b735f085e075bac9f38bb0a8e45b6f86cfec09c8",
+        "tests/destructive/support": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+      },
+      "config_sha256": "f4a672b5007631bead3180125652621fe903c2ca8dafbba0e132431a663b5b6a",
+      "cli_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704",
+      "cli_version": "codex-cli 0.159.2"
+    },
+    "task": {
+      "contract": "waapi-skill.integration-expansion-task-result/v1",
+      "unit_id": "EXP25-C09",
+      "version": "2025.1",
+      "thread_id": "01a1159c-4749-7850-a9eb-e33281f219c4",
+      "passed": false,
+      "status": "FAIL",
+      "infrastructure": null,
+      "error": "V3TaskRunnerError: expansion turn failed: visible_preview_notice",
+      "terminal_state": "verified",
+      "assertions": {
+        "owner_unchanged": true,
+        "exactly_one_added_binding": true,
+        "existing_effects_and_bindings_unchanged": true,
+        "new_effect_matches": true,
+        "unique_effect_identities": true,
+        "new_effect_owned_by_target": true
+      },
+      "required_assertions": [
+        "exactly_one_added_binding",
+        "existing_effects_and_bindings_unchanged",
+        "new_effect_matches",
+        "new_effect_owned_by_target",
+        "owner_unchanged",
+        "unique_effect_identities"
+      ],
+      "gateway_verification_state": "verified",
+      "agent_seconds": 95.65208924980834,
+      "slow": false,
+      "plan_sha256": "f1843e2a542ff272fe2678f37fa6296b21b837aefe20f3191b073031845f09d7",
+      "turns": [
+        {
+          "index": 1,
+          "gates": {
+            "memory_isolated": true,
+            "completed_turn": true,
+            "one_target_skill": true,
+            "no_collaboration": true,
+            "only_packaged_references": true,
+            "only_authenticated_gateway_and_skill_reads": true,
+            "no_discovery_or_direct_waapi": true,
+            "no_write_like_commands": true,
+            "source_and_workspace_unchanged": true,
+            "broker_provenance": true,
+            "policy_checkpoint": true,
+            "visible_preview_notice": false,
+            "final_response_present": true,
+            "cumulative_agent_budget": true
+          },
+          "agent_seconds": 95.65208924980834
+        }
+      ]
+    },
+    "trusted_oracle_closed": true,
+    "phase_events": [
+      {
+        "phase": "preview-from-draft",
+        "event_index": 22,
+        "item_id": "item_10",
+        "exit_code": 0,
+        "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-ac48e9262d4d35ecfd1b477124665b38 --task-authority da1-3b24ddb1db1213c53be1bf3941ca541427c611e7 --expected-revision 5'"
+      },
+      {
+        "phase": "execute",
+        "event_index": 25,
+        "item_id": "item_12",
+        "exit_code": 0,
+        "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-ktm5w8gh6hvdy2fbw1x9'"
+      },
+      {
+        "phase": "verify",
+        "event_index": 27,
+        "item_id": "item_13",
+        "exit_code": 0,
+        "command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py verify tx1-ktm5w8gh6hvdy2fbw1x9'"
+      }
+    ],
+    "notice_messages": [
+      {
+        "event_index": 8,
+        "item_id": "item_3",
+        "text": "已加载 waapi-skill，WAAPI 已配置端口为 30344，Wwise 适配版本为 2025.1。\n\n当前策略为 `allow_changes`；可用模式为 `read_only`、`ask_before_changes` 和 `allow_changes`。我会先核对现有效果器及绑定，再告知追加内容，取得独立策略授权后执行并核验。"
+      },
+      {
+        "event_index": 23,
+        "item_id": "item_11",
+        "text": "已核对目标声音并记录修改前状态；此次追加已取得 `allow_changes` 策略的独立授权，目前尚未修改。\n\n即将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”。执行后将核验现有两个效果器的身份、slot 绑定、配置顺序，以及声音音量、备注和父级的保持情况。"
+      },
+      {
+        "event_index": 28,
+        "item_id": "item_14",
+        "text": "已追加并通过回读核验：\n\n- 新效果器：`Expansion_EXP25-C09_NewGain`，类型为 Wwise Gain，备注为“Expansion C09 appended gain”。\n- GUID：`{0F87A57A-7E9C-4095-BE49-0DE73F234F77}`。\n- 新 slot GUID：`{3723F55E-ED36-432F-8DE2-27A92CF9B82B}`，绑定至新增效果器。\n\n配置顺序为原两个效果器在前、新增 Gain 在后。原效果器的 GUID、slot 绑定、类型、名称和备注保持；声音的音量、备注和父级保持。未另设插件参数或平台值。"
+      }
+    ],
+    "agent_usage": {
+      "input_tokens": 440982,
+      "cached_input_tokens": 396672,
+      "cache_write_input_tokens": 0,
+      "output_tokens": 2025,
+      "reasoning_output_tokens": 220,
+      "uncached_input_tokens": 44310,
+      "agent_seconds": 95.65208924980834,
+      "usd": null,
+      "reasoning_included_in_output": true
+    },
+    "native_audit": {
+      "artifact_count": 177,
+      "artifact_bytes": 6769572,
+      "manifest_sha256": "4dfb4adf8ed57e9f220a866b2fc1ce1ff07162358999d6e3ce7c1ceccec8fcca",
+      "metadata_seal_count": 11,
+      "metadata_seals": {
+        ".campaign-lock-owner.json.sha256": {
+          "sha256": "c9836c10232d27348729b0a6230ad677074a152bf4cb244fe582d4ca977262ce",
+          "matches": true
+        },
+        ".waapi-semantic-campaign-root.json.sha256": {
+          "sha256": "b8a07bc68ffe3e8fd28802c50a7e3b189f92704dadfabb0a45ca108e6e80f0c0",
+          "matches": true
+        },
+        "attempt-ledger.json.sha256": {
+          "sha256": "020bcfd4a43a1453473cd8d98a3995b25976efca8ad90b2b6e13ee0ca6bb98da",
+          "matches": true
+        },
+        "attempts/attempt-000001/attempt-manifest.json.sha256": {
+          "sha256": "4dfb4adf8ed57e9f220a866b2fc1ce1ff07162358999d6e3ce7c1ceccec8fcca",
+          "matches": true
+        },
+        "attempts/attempt-000001/attempt.json.sha256": {
+          "sha256": "f0991f3a1c8933fe89681518df8992837f4522d243d67111047dc3fc73d64d7d",
+          "matches": true
+        },
+        "attempts/attempt-000001/runs/heavy-v3/child-request.json.sha256": {
+          "sha256": "cd9de4b1f1a4f04d5dd99e737c22f8eb155d8db9e6fde283fb7670aeb9780f35",
+          "matches": true
+        },
+        "attempts/attempt-000001/runs/heavy-v3/child-result.json.sha256": {
+          "sha256": "95bdf9bb0ad3142f54ba17a213f74597e0087913f0993585abb9f1775442ffb7",
+          "matches": true
+        },
+        "attempts/attempt-000001/runs/heavy-v3/classification.json.sha256": {
+          "sha256": "3b158c84df9221662ea677c9f4d28dd84535d674ca93b9cb26a9b718901a5a5c",
+          "matches": true
+        },
+        "campaign-config.json.sha256": {
+          "sha256": "2d85567c4d52004714d0645bc67c9a984d8649a5d2a7c499b9e242baa23269b3",
+          "matches": true
+        },
+        "consolidated-summary.json.sha256": {
+          "sha256": "d3bea48b3be5c38a213ae845bdfcc007b18bb5fc834f7b4f13be7362feb09d3a",
+          "matches": true
+        },
+        "expansion-accounting.json.sha256": {
+          "sha256": "9bac862f5eeb21d52023fd0279e66c10f05b701b67b1702aaca507a497d04149",
+          "matches": true
+        }
+      },
+      "source_guards": {
+        "2022.1": {
+          "hash": {
+            "algorithm": "sha256",
+            "strategy": "full",
+            "digest": "0094292bd34fd6581cff062ce8aa6f715aba82556d7f783847e478c89913836e",
+            "file_count": 84,
+            "bytes_hashed": 3788783
+          },
+          "mtime_ns": 1790531309484673590
+        },
+        "2025.1": {
+          "hash": {
+            "algorithm": "sha256",
+            "strategy": "full",
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "bytes_hashed": 3943065
+          },
+          "mtime_ns": 1790531309503233691
+        }
+      },
+      "input_hashes": {
+        "skills/waapi-skill": "3049959ab97ea387bfaaabc3b0316ff332a400e0f921c540e7337aadd5217422",
+        "tests/semantic": "50c4f620f36aaccacfd70df1b735f085e075bac9f38bb0a8e45b6f86cfec09c8",
+        "tests/destructive/support": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+      },
+      "git_status": "",
+      "scoped_processes": [],
+      "audit_errors": [],
+      "lifecycle": {
+        "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+        "errors": [
+          "scenario:V3TaskRunnerError: expansion turn failed: visible_preview_notice"
+        ],
+        "final_status": "FAIL",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/quarantine.json",
+        "requested_status": "FAIL",
+        "sandbox_retained": true,
+        "scenario_id": "EXP25-C09",
+        "source_hash_after": {
+          "algorithm": "sha256",
+          "bytes_hashed": 3943065,
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "strategy": "full"
+        },
+        "source_hash_before": {
+          "algorithm": "sha256",
+          "bytes_hashed": 3943065,
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "strategy": "full"
+        },
+        "source_mtime_after_ns": 1790531309503233691,
+        "source_mtime_before_ns": 1790531309503233691,
+        "version": "2025.1"
+      }
+    },
+    "terminal_supplement": {
+      "time_utc": "2026-10-07T09:08:16.281137+00:00",
+      "quarantine_tree_sha256": "42163aa0f5d03392b416ef6196faf852267c0263fa6b3d3dc51e704d910d5dbc",
+      "quarantine_seal_matches": true,
+      "never_reuse": true,
+      "cleanup": {
+        "result": "cleaned",
+        "process_exited": true,
+        "residual_processes": []
+      },
+      "launchagent_unloaded": true,
+      "terminal_launch_records": {
+        "runs": 1,
+        "exit_code": 1,
+        "bootstrap_count": 1,
+        "kickstart_count": 0
+      },
+      "replay_verify_regrade": false,
+      "artifacts_sha256": {
+        "native_audit.py": "678ba04cdfebe283873fdde58770d82eca386b584de143c29ef599ddb17e7729",
+        "launch-state.json": "546211309868023cd0808d5fc352276f7d52a729b288e56a66a84447291d5bd6",
+        "expansion-c09-700914d-sol-high-r1-cli1592.plist": "456ee0d1eec263d19ee3d5236c97518641213efeb867e912f1fd97620d114ccb",
+        "expansion-c09-700914d-sol-high-r1-cli1592.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "resume-preflight-20261007.json": "6d3fe4e3263ebbf2e3e01bca1d3ce295374ec1f33c3e4657451966b619cd1a63",
+        "fresh-native-audit.json": "5ac675653318d9652128b9f313d21afd0f8bcdec78c1680d0b71888497236b8e",
+        "fresh-terminal-launchctl.txt": "a4f90797b8dca820e436157a2b65768b5fd04f9ffcd10a41ff0480482aeda0e5",
+        "expansion-c09-700914d-sol-high-r1-cli1592.stdout.log": "4244cfb056f077d3a7faf88e176987fc0ea4f529916b80806e63b7b4840488c9"
+      }
+    },
+    "artifacts_sha256": {
+      "native_audit.py": "678ba04cdfebe283873fdde58770d82eca386b584de143c29ef599ddb17e7729",
+      "launch-state.json": "546211309868023cd0808d5fc352276f7d52a729b288e56a66a84447291d5bd6",
+      "expansion-c09-700914d-sol-high-r1-cli1592.plist": "456ee0d1eec263d19ee3d5236c97518641213efeb867e912f1fd97620d114ccb",
+      "expansion-c09-700914d-sol-high-r1-cli1592.stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "terminal-native-supplement.json": "81d35c11f6bb696fbb7d6e57cb9550592bc2447932edff8628010ad1138fb0aa",
+      "resume-preflight-20261007.json": "6d3fe4e3263ebbf2e3e01bca1d3ce295374ec1f33c3e4657451966b619cd1a63",
+      "fresh-native-audit.json": "5ac675653318d9652128b9f313d21afd0f8bcdec78c1680d0b71888497236b8e",
+      "fresh-terminal-launchctl.txt": "a4f90797b8dca820e436157a2b65768b5fd04f9ffcd10a41ff0480482aeda0e5",
+      "expansion-c09-700914d-sol-high-r1-cli1592.stdout.log": "4244cfb056f077d3a7faf88e176987fc0ea4f529916b80806e63b7b4840488c9"
+    },
+    "no_verify_only_retry_regrade_or_full": true
+  }
+}

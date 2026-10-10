@@ -1,0 +1,25 @@
+{
+  "candidate": "dd1ad71",
+  "runtime_candidate": "7c81406",
+  "exit_code": 0,
+  "stats": {
+    "tests": 12116,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 118
+  },
+  "deselected": 27,
+  "summary": "11998 passed, 118 skipped, 27 deselected in 784.07s (0:13:04)",
+  "artifacts": [
+    {
+      "name": "run.log",
+      "sha256": "cc13b2f41cbe46710954628999aef86e2486152787a8333e4a1c03fbfde1005a"
+    },
+    {
+      "name": "junit.xml",
+      "sha256": "9414c5d0d9caf52138b1d7f886f799659c643a9ce674398f5da8b77ccb8408b1"
+    }
+  ],
+  "evidence_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-20261001-read-receipt-r1",
+  "interpretation": "Completed macOS non-live gate only; no real Wwise or Fresh Agent credit. Earlier failed roots remain unchanged."
+}

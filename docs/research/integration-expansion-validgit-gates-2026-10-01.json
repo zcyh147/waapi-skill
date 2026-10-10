@@ -1,0 +1,38 @@
+{
+  "runtime_harness_candidate": "d78be5b",
+  "documentation_only_followup": true,
+  "runtime_harness_and_skill_unchanged": true,
+  "records": [
+    {
+      "kind": "full_nonlive",
+      "exit_code": 1,
+      "completed_summary": "1 failed, 11967 passed, 118 skipped, 27 deselected in 788.75s (0:13:08)",
+      "artifacts": [
+        {
+          "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-20261001-validgit-r1/run.log",
+          "sha256": "6e2809227220558ae323e728a5715364104d4e67778e44d665bb06cf3db8b2c6"
+        },
+        {
+          "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-nonlive-20261001-validgit-r1/junit.xml",
+          "sha256": "74bba737db3a26998f5a92484d02a6c4e860c2aa12c0e270f1d4b1a7451638f1"
+        }
+      ]
+    },
+    {
+      "kind": "focused_documentation",
+      "exit_code": 0,
+      "completed_summary": "9 passed in 0.03s",
+      "artifacts": [
+        {
+          "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-docs-validgit-followup-r1/run.log",
+          "sha256": "29a3239d2e0bf660f7a76c470d88de442a6751b504b1357494a802cd3982e49f"
+        },
+        {
+          "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-docs-validgit-followup-r1/junit.xml",
+          "sha256": "09f9f7e2b2f861b7ae17499f109f95b7b5f8e20aec43086d7b2a23f5990a8d6e"
+        }
+      ]
+    }
+  ],
+  "interpretation": "Completed full Nonlive with one documentation-format failure, followed by passing focused documentation repair; not a single all-green full Nonlive run. No Codex or Wwise ran in these gates."
+}

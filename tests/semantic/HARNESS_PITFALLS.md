@@ -5,6 +5,10 @@ accepted Gateway command, differs by host, or repeats a failure family below.
 `tests/AGENTS.md` owns the rules. This file records signals, causes, and
 prevention checks that are expensive to rediscover.
 
+Before deciding whether a failure blocks business acceptance or needs a rerun,
+apply [business acceptance](TEST_ACCEPTANCE.md); then consult the matching
+incident below for its technical cause.
+
 ## Classify the failing layer first
 
 | Evidence signal | Classification | Next action |
@@ -250,6 +254,22 @@ prevention checks that are expensive to rediscover.
   may legitimately require new decisions. Never advance the fixed worktree
   while one of its Fresh or verify-only runs is active, and retain the worktree
   for as long as its sealed evidence is needed.
+
+### An empty Git marker can fail to bound Codex startup discovery
+
+- Evidence: Codex CLI 0.157.1 prompt-input audits under the managed macOS
+  worktree stalled in native file opens. The same isolated command completed in
+  3.26 seconds outside that Git ancestry. Replacing the nested workspace's empty
+  `.git` marker with minimal valid Git metadata completed in 3.12 seconds, passed
+  the unchanged isolation audit, and changed no workspace files. These probes
+  started no Agent or Wwise task. Unlocking alone did not resolve the stall;
+  the exact blocked Git/config filename was not established.
+- Prevention: the harness creates fixed `HEAD` and local core config bytes with
+  empty `objects` and `refs` directories. Verify the closed layout, file type,
+  link count, size, and bounded content before and after use; reject drift,
+  external links, hooks, and extra metadata. Do not require a Git executable or
+  widen macOS permissions. Keep portable live configuration inside the managed
+  worktree as well; a byte-identical copy preserves repository-relative inputs.
 
 ### A macOS verify-only replay can discover a different Codex binary
 
@@ -581,6 +601,37 @@ prevention checks that are expensive to rediscover.
   fixtures finish and recheck this setup before Wwise startup and before the
   ACK timer begins. Dependency installation time is therefore never classified
   as subscription latency.
+
+### A notice-review FAIL concealed a Windows process-launch failure
+
+- Evidence: native Windows `iwin-expansion-a898d8d8-c01-r1` passed its exact
+  Skill/reference read gates, then stopped at Preview with
+  `visible_preview_notice=false`. Its independent review receipt contained
+  `judgment=null` and `FileNotFoundError: [WinError 206]`: no reviewer started.
+  This was infrastructure failure, not an unfavorable language judgment.
+- Cause: the complete bounded review packet was still placed in both CLI
+  argument lists. A valid 128 KiB packet can exceed Windows' 32,767 UTF-16-unit
+  command-line limit before Codex runs.
+- Prevention: invocation v3 audits the isolated context with an empty user
+  prompt and sends the complete canonical UTF-8 packet through `codex exec -`
+  stdin. `debug prompt-input -` treats the dash literally on CLI 0.162.0; it is
+  not a stdin transport. The existing bounded process runner uses a private
+  input handle, caps input at 131072 bytes, and records its SHA-256 and length.
+  The prelaunch binding and replay require those exact input facts as well as
+  canonical argv, raw output, runtime identity, isolated context and grounded
+  judgment. Input is never shortened, repaired or summarized to fit argv.
+- Keep v1/v2 archive invocation semantics unchanged. Freeze failed roots;
+  diagnostic review of a copied packet grants no historical or business PASS.
+  Only fresh execution establishes the repaired candidate's business result.
+- When a notice gate fails, inspect `notice-review/receipt.json` before choosing
+  to continue the batch. A missing judgment with a launch/decoding/output error
+  is a reviewer infrastructure failure. Ordinary unsupported wording may
+  continue through the batch; repeated inability to run its required reviewer
+  must stop affected cases instead of spending one Fresh turn per recurrence.
+- Regression must include a native Windows child reading more than 32767
+  UTF-16 units, exact Chinese/quote/CRLF bytes, the maximum input boundary,
+  tampered input bindings, and unchanged legacy replay. A fake reviewer alone
+  cannot prove operating-system process creation or CLI stdin behavior.
 
 ### A clean Windows pytest worktree selected the Store Python alias
 
@@ -1310,6 +1361,48 @@ read only `waapi-operate.md`; that ordinary semantic failure is not clipping.
   repair independently of the remaining clipping boundary. Keep byte-normalized
   source equality as the Skill-read credit gate; accepting mojibake or merely
   setting `$OutputEncoding` does not repair this transport boundary.
+
+### A new child console can undo the parent UTF-8 preflight
+
+- Evidence: native Windows expansion root `iwin-expansion-1ff5427-sol-high-r1`
+  stopped before C01 execution. Its Skill and operate outputs contained 39 and
+  13 replacement characters; each output exactly matched the original text
+  encoded as CP936 and then decoded as UTF-8. The source files were intact.
+- Reproduction: the same PowerShell read inherited CP65001 successfully, while
+  `CREATE_NEW_CONSOLE` selected CP936 and reproduced the exact 39 replacements.
+  Parent code-page attestation therefore does not establish child encoding.
+- Initial repair `5126bcc1` tried to set `[Console]::OutputEncoding` in the
+  reading process. The real Codex shell uses ConstrainedLanguage, which rejects
+  that non-core property assignment. Source text was complete after the user's
+  system UTF-8 change, but an error prefix correctly prevented read credit.
+  The initial focused `-k utf8` selection also omitted a native test whose name
+  lacked `utf8`; neither its 84 passes nor FullLanguage probes established CLM
+  compatibility. Preserve the failed root and this attribution.
+- Repair: formal Windows read schedules use the fixed
+  `WINDOWS_UTF8_READ_PREFIX` and `WINDOWS_READ_LANGUAGE_GUARD` in
+  `codex_harness.py`. The exact System32 `chcp.com` command must succeed before
+  a fresh instance of the same attested PowerShell reads the file. This avoids
+  the parent's cached .NET output encoding. The child preserves CLM and tightens
+  FullLanguage to CLM; it never lowers the language restriction. The parser
+  admits only this literal wrapper followed by one complete UTF-8 file read.
+  Changed code pages, executable roots, language guards, command chaining,
+  redirection and wrapped Gateway continuations remain rejected. The bounded
+  developer-instruction ceiling is 3072 bytes for these fixed read wrappers.
+- Regression: `test_native_windows_utf8_skill_read_survives_child_cp936` forces
+  CP936 and covers FullLanguage/CLM parents crossed with initially ordinary/CLM
+  children. It proves the unwrapped read corrupts Unicode and the generated
+  read returns exact text with empty stderr. The four native parameterizations
+  passed explicitly, then were included in the corrected focused selection:
+  94 passed (`C:/w/waapi-clm-native-final.log`). macOS harness, expansion runner
+  and archive checks passed 2650, skipped 13. This is program proof, not a new
+  real-Wwise acceptance claim. Check the first fresh C01 separately before
+  continuing the remaining unique units on the same frozen candidate.
+- Attribution limit: an interim non-PTY C1 experiment passed one offline Fresh
+  unit, but the user enabled system UTF-8 during investigation. It does not
+  isolate the backend's effect or validate the final repair. The final repair
+  retains the original CLI backend settings and relies on the forced-CP936
+  child regression. The two earlier offline campaign admission attempts never
+  started an Agent; all diagnostic roots remain separate from business credit.
 
 ### Optional discovery and Composer setup may still complete out of recipe order
 
@@ -3411,3 +3504,71 @@ Complete every item before spending a Fresh turn:
    `Limited`, standalone Codex, and attested PowerShell Core before task start.
 6. Freeze every FAIL or BLOCKED root without replay. Replay only an all-PASS
    root with identical `--resume --verify-only` options.
+
+## macOS expansion cases need the wrapper's private HOME bottle (#161)
+
+The official 2022.1 and 2025.1 macOS wrappers select
+`$HOME/Library/Application Support/Wwise2019/Bottles/Wwise2019x64`, overriding
+an ordinary sandbox Wine prefix. Sequential expansion cases therefore pass a
+fresh `owned/wwise-user-home` and that exact owned prefix to the existing
+`ScenarioLifecycle`. Prelaunch requires an empty real HOME and a nonexistent
+prefix. Nothing copies the user's bottle, preferences or license files.
+The lifecycle retains its existing source proofs, scoped shutdown, archive and
+quarantine rules. Native Windows, the packaged Skill, readiness checks and the
+2022 CoreAudio startup mitigation are unchanged. Shared-helper adoption or
+host-wide signalling is not part of this repair.
+
+At frozen `8550bdd6c1f7b0a7f2514b7b50b9e8c2ca265e08`, the parent-owned
+existing-lifecycle probe started 2022.1.19.8584 in 9.028 seconds followed by
+2025.1.7.9143 in 8.514 seconds, each within a 15-second readiness bound and
+under a distinct initially empty HOME. Both passed owned-prefix cleanup,
+removed passing sandboxes, preserved source full hashes and mtimes, and left
+no scoped residual process. The measured real-account Wwise user-state tree
+was unchanged; this does not attest every settings or licensing location.
+The preserved proof manifest is
+`.waapi-skill-state/evidence/waapi-test-remediation/private-home-proof-8550bdd-20261009/proof-manifest.json`
+in the original development checkout. This is infrastructure proof only,
+with no expansion Agent PASS credit. Historical failures remain frozen; the
+later exact-candidate semantic campaign is a separate acceptance requirement.
+
+Focused fake regressions exercise the actual expansion-to-lifecycle path for
+2022.1 then 2025.1, distinct empty HOMEs, matching launch/evidence/cleanup
+prefixes, contaminated HOME rejection before launch, and unchanged non-macOS
+inputs. Existing lifecycle and sandbox tests retain the fresh-path, symlink,
+failed-start and unproven-shutdown boundaries.
+
+Developer checks for this bounded repair used the pinned Poetry interpreter
+through `WAAPI_TEST_PYTHON` and `ci/test.sh --mode nonlive`: the focused
+`test_codex_expansion_runtime.py` / `test_codex_scenario_lifecycle_v3.py` pair
+passed 38 tests; `test_sandbox_fixture.py` / `test_headless_lifecycle.py`
+passed 89 tests. No live process, Agent campaign, full Program or broad Non-live
+gate was run by the implementer; promotion owns the combined candidate gates.
+
+## An admitted read and an acquired fact need separate evidence (#147)
+
+- A reviewer packet may omit facts the Agent actually acquired. Preserve the
+  existing successful pre-Execute public read with its exact request scope,
+  returned fields/completeness, original event/receipt positions and sealed
+  digests. Valid owned-project ceiling rows remain observed facts with
+  incomplete scope; they cannot prove absence of further rows. Missing oracle fields cannot prove either absence or an unavailable
+  public capability; future verification intent is not completed proof.
+- An authentic `query-object` exit-2 failure may carry `call.error_code` and
+  null count/objects/agent_result. Exact Broker receipt admission grants no read
+  proof. Timeout/cleanup_pending stops further dispatch and sealing; an already
+  verified transaction retains its verification. Archive replay enforces the
+  same terminal stop and rejects a fabricated PASS. Preserve the old FAIL root
+  without retry or after-state rescue.
+
+
+## An unnamed Stinger was rejected before notice review
+
+Native Windows expansion M05/2025 on `7b4e1164` completed and passed every
+business assertion, but discovery-fact projection rejected its authenticated
+`bound_object.name == ""`. Wwise exposes unnamed owned objects; consult the
+packaged `object_identity_semantics` for the exact reflected type. Preserve the
+empty name as observed. Do not invent a label or require every object to have
+an intrinsic name. Ordinary types that require names remain strict, as do
+handle, type, receipt, revision and Preview bindings. Regression covers the
+real Gateway producer through reviewer input and immutable archive replay.
+See [the Windows assessment](../../docs/research/windows-expansion-assessment-2026-10-10.md)
+for the preserved raw FAIL and focused repair evidence.

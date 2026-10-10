@@ -118,6 +118,10 @@ def _write_fake_python(bin_dir: Path, fail_on: str | None = None) -> None:
         "if effective_argv and Path(effective_argv[0]).name == 'test_driver.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
         "    from test_driver import main\n"
+        "    import test_driver, test_readiness\n"
+        # Routing-only fake children; readiness has its own selected-lane fixtures.
+        "    test_driver.validate_nonlive_readiness = lambda *args: None\n"
+        "    test_readiness.scoped_process_snapshot = lambda: ''\n"
         "    sys.exit(main(effective_argv[1:], environment=os.environ, python_executable=sys.executable, command_runner=record_live_child, windows=True))\n"
         "if effective_argv and Path(effective_argv[0]).name == 'run_live_test_command.py':\n"
         "    sys.path.insert(0, str(Path(effective_argv[0]).resolve().parent))\n"
@@ -199,6 +203,8 @@ def _base_env(tmp_path: Path, *, fail_on: str | None = None) -> tuple[dict[str, 
     sandbox_root = tmp_path / "sandbox"
 
     env = os.environ.copy()
+    # This fixture routes through fake Poetry, independently of the host gate.
+    env.pop("WAAPI_TEST_PYTHON", None)
     env.update(
         {
             "PATH": f"{bin_dir}{os.pathsep}{env.get('PATH', '')}",
@@ -213,6 +219,13 @@ def _base_env(tmp_path: Path, *, fail_on: str | None = None) -> tuple[dict[str, 
 
 def _load_calls(log_path: Path) -> list[dict[str, object]]:
     return [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+
+
+def test_fake_ci_environment_ignores_outer_interpreter_override(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("WAAPI_TEST_PYTHON", str(tmp_path / "unrelated-interpreter"))
+    environment, _ = _base_env(tmp_path)
+    assert environment.get("WAAPI_TEST_PYTHON") is None
+    assert "WAAPI_TEST_PYTHON" in os.environ
 
 
 def _payload_argv(call: dict[str, object]) -> list[str]:
@@ -339,7 +352,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 195
+    assert len(nodes) == 197
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_host_ui_debug_business_adapter.py"
     assert len(nodes) == len(set(nodes))
@@ -348,6 +361,8 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_cross_family_bus_gateway.py",
         "tests/unit/test_cross_family_collection_gateway.py",
         "tests/unit/test_cross_family_voice_import.py",
+        "tests/unit/test_existing_sfx_import.py",
+        "tests/unit/test_attenuation_curve_business_gateway.py",
         "tests/unit/test_cross_family_game_sync_gateway.py",
         "tests/unit/test_script_helpers.py::test_environment_ready_marker_binds_requirements_and_rejects_symlink",
         "tests/unit/test_script_helpers.py::test_run_bootstrap_repairs_existing_venv_without_ready_marker",
@@ -650,7 +665,7 @@ def test_ci_test_bat_reads_versioned_live_environment_config(tmp_path: Path) -> 
     console_path.write_text("console\n", encoding="utf-8")
     project_path = configured_root / "SampleProject.wproj"
     project_path.write_text("<Project />\n", encoding="utf-8")
-    sandbox_root = configured_root / "sandbox"
+    sandbox_root = tmp_path / "configured-sandbox"
     config_path = tmp_path / "配置 !percent% & equals= environment.json"
     config_path.write_text(
         json.dumps(

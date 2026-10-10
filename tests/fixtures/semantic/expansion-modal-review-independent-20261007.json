@@ -1,0 +1,172 @@
+{
+  "contract": "Frozen review controls at expansion_preview_notice; no Agent acceptance credit",
+  "base": "fc9eb797737ba6ddba287238d6e2eab409f08427",
+  "reviewed_head": "85fc942f035ec79ac41183afb1eff6d94af2fbfb",
+  "vectors": [
+    {
+      "id": "claimside-on-primary-prior-False",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” on {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-on-foreign-prior-False",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” on OtherSound。",
+      "expected": false,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-on-primary-prior-True",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” on {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-on-foreign-prior-True",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” on OtherSound。",
+      "expected": false,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-to-primary-prior-False",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-to-foreign-prior-False",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to OtherSound。",
+      "expected": false,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-to-primary-prior-True",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-to-foreign-prior-True",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to OtherSound。",
+      "expected": false,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-到-primary-prior-False",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” 到 {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-到-foreign-prior-False",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” 到 OtherSound。",
+      "expected": false,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-到-primary-prior-True",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” 到 {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "claimside-到-foreign-prior-True",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” 到 OtherSound。",
+      "expected": false,
+      "reason": "Every explicit claim-side owner must agree; exact-primary does not require inherited authority."
+    },
+    {
+      "id": "prefix-primary-claimside-foreign",
+      "notice": "本次会向 {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E} 追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to OtherSound。",
+      "expected": false,
+      "reason": "A valid prefix owner cannot exempt a foreign claim-side owner."
+    },
+    {
+      "id": "prefix-foreign-claimside-primary",
+      "notice": "本次会向 OtherSound 追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": false,
+      "reason": "A valid claim-side owner cannot exempt a foreign prefix owner."
+    },
+    {
+      "id": "legacy-preview-claimside-foreign",
+      "notice": "已核对目标为指定声音。预览将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to OtherSound。",
+      "expected": false,
+      "reason": "The complete legacy Preview carrier must also account for supplied owners."
+    },
+    {
+      "id": "legacy-preview-claimside-primary",
+      "notice": "已核对目标为指定声音。预览将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain” to {B1B3FE2F-5F4C-48C7-B192-C1BF73A64F5E}。",
+      "expected": true,
+      "reason": "The legacy Preview reference path remains valid with agreeing supplied owner."
+    },
+    {
+      "id": "omitted-local",
+      "notice": "已核对目标为指定声音。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": true,
+      "reason": "Genuinely omitted owner inherits only in its action-local window."
+    },
+    {
+      "id": "omitted-missing",
+      "notice": "本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "A genuinely omitted owner still requires local evidence."
+    },
+    {
+      "id": "omitted-unknown-bridge",
+      "notice": "已核对目标为指定声音。普通进展说明。本次会追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "An unknown bridge still spends the local owner window."
+    },
+    {
+      "id": "malformed-本次",
+      "notice": "已核对目标为指定声音。本次将会向目标声音追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "Reviewed finite action-head recognition cannot drop invalid or contradictory modal composition."
+    },
+    {
+      "id": "malformed-下次",
+      "notice": "已核对目标为指定声音。下次将会向目标声音追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "Reviewed finite action-head recognition cannot drop invalid or contradictory modal composition."
+    },
+    {
+      "id": "malformed-第二次",
+      "notice": "已核对目标为指定声音。第二次将会向目标声音追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "Reviewed finite action-head recognition cannot drop invalid or contradictory modal composition."
+    },
+    {
+      "id": "malformed-已经",
+      "notice": "已核对目标为指定声音。已经将会向目标声音追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "Reviewed finite action-head recognition cannot drop invalid or contradictory modal composition."
+    },
+    {
+      "id": "malformed-可能",
+      "notice": "已核对目标为指定声音。可能将会向目标声音追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": false,
+      "reason": "Reviewed finite action-head recognition cannot drop invalid or contradictory modal composition."
+    },
+    {
+      "id": "opaque-下次将会向目标声音",
+      "notice": "本次会向 下次将会向目标声音 追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": true,
+      "reason": "Supplied exact owner names remain opaque, even with scope/modal tokens.",
+      "owner_name": "下次将会向目标声音"
+    },
+    {
+      "id": "opaque-第二次已经将会",
+      "notice": "本次会向 第二次已经将会 追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": true,
+      "reason": "Supplied exact owner names remain opaque, even with scope/modal tokens.",
+      "owner_name": "第二次已经将会"
+    },
+    {
+      "id": "opaque-可能本次将会",
+      "notice": "本次会向 可能本次将会 追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”。",
+      "expected": true,
+      "reason": "Supplied exact owner names remain opaque, even with scope/modal tokens.",
+      "owner_name": "可能本次将会"
+    }
+  ]
+}

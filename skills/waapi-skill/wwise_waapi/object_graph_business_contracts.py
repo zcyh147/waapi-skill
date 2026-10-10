@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
-from .business_fields import ACTION_DURATION_SEMANTICS, OBJECT_BUSINESS_FIELD_TYPES
+from .business_fields import ACTION_DURATION_FIELDS, ACTION_DURATION_SEMANTICS, OBJECT_BUSINESS_FIELD_TYPES
 
 
 OBJECT_GRAPH_BUSINESS_CONTRACT = "waapi-skill.object-graph-business/v1"
@@ -16,7 +16,17 @@ OBJECT_GRAPH_BUSINESS_OPERATIONS = (
     "object.setRTPC",
 )
 
-OBJECT_CREATE_BUSINESS_VALUE_TYPES = OBJECT_BUSINESS_FIELD_TYPES
+OBJECT_CREATE_BUSINESS_VALUE_TYPES = {
+    name: value_type
+    for name, value_type in OBJECT_BUSINESS_FIELD_TYPES.items()
+    if name not in ACTION_DURATION_FIELDS
+}
+
+ACTION_CREATION_BOUNDARY = {
+    "status": "unsupported_by_skill_interface",
+    "reason": "event_parent_and_derived_action_identity_require_a_dedicated_creation_contract",
+    "existing_object_edits": "supported_through_object_set_or_metadata_operations",
+}
 
 _SUPPORTED_VERSIONS = {
     "object.create": SUPPORTED_WWISE_VERSIONS,
@@ -229,7 +239,7 @@ def object_graph_business_contract_data(
                     "delay_ms",
                 ],
                 "field_value_types": {
-                    **OBJECT_CREATE_BUSINESS_VALUE_TYPES,
+                    **OBJECT_BUSINESS_FIELD_TYPES,
                     "language": "string",
                     "list_behavior": "string",
                     "new_name": "string",
@@ -284,6 +294,7 @@ def object_graph_business_contract_data(
                 "continuation",
             ],
             "legacy_shallow_composer_public": False,
+            "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
             "safety": {
                 "immutable_preview": True,
                 "single_execute": True,
@@ -308,7 +319,7 @@ def object_graph_business_contract_data(
             "subcommand": "draft-declare-new",
             "target_fields": ["parent_handle", "name", "kind"],
             "stable_fields": dict(OBJECT_CREATE_BUSINESS_VALUE_TYPES),
-            "field_semantics": ACTION_DURATION_SEMANTICS,
+            "field_semantics": {},
             "field_value_types": dict(OBJECT_CREATE_BUSINESS_VALUE_TYPES),
             "bound_field_handle_container": "field_values",
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
@@ -342,6 +353,7 @@ def object_graph_business_contract_data(
             "continuation",
         ],
         "legacy_shallow_composer_public": False,
+        "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
         "safety": {
             "immutable_preview": True,
             "single_execute": True,

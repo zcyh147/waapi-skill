@@ -1,0 +1,1621 @@
+{
+  "contract": "waapi-skill.expansion-notice-adjudication/v3",
+  "case_id": "C01",
+  "version": "2022.1",
+  "transaction_id": "tx1-5wshzax1mg57kad5kktw",
+  "preview_sha256": "b5c12fac26f03494a0d43f206f125f6ba2f05da83ac2f6df733b2944e6e1b863",
+  "pre_execution_timeline_sha256": "fd5cc34d3218067a30a4df9cb86f889b09e5d8968ad3de07ff142bbe20d059a1",
+  "preview_event_position": 35,
+  "execute_event_position": null,
+  "user_prompt": "声音 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01（{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}）已有日文 Japanese 和英文 English(US) 对白。请用 /Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav 只更新日文版本，英文素材和语言关联保持不变。沿用现有声音对象，音量、输出总线以及事件 \\Events\\Default Work Unit\\Expansion_EXP22_C01_Play_Line_01（{AA347E1F-3E09-44AF-B4E1-29CD0CBF605D}）的播放目标都不变；不要修改备用对象 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01_Backup（{75BE296C-505D-40C5-9BA1-316A86A287DD}）。先读取并核对当前状态，展示变更预览，等我确认后再执行；完成后说明两种语言实际关联的素材。",
+  "visible_messages": [
+    {
+      "event_position": 8,
+      "text": "已加载 waapi-skill，已配置 WAAPI 端口 32526，Wwise 适配版本为 2022.1。\n\n当前修改策略为 ask_before_changes；支持 read_only、ask_before_changes 和 allow_changes。我会先核对现有语言素材和需保留的设置，生成预览，等待你确认后再执行。\n"
+    },
+    {
+      "event_position": 27,
+      "text": "已核对：Line_01 有两个同名音源，分别关联 Japanese 和 English(US)，素材位于各自的语言目录。声音音量为 −3 dB，输出为 Master Audio Bus，指定事件的 Play 动作指向 Line_01。\n\n预览将只包含 Japanese 的素材更新，沿用现有声音对象。\n"
+    },
+    {
+      "event_position": 36,
+      "text": "已核对当前状态并生成变更预览，尚未执行。\n\n| 项目 | 当前状态与预览 |\n|---|---|\n| Japanese | 当前关联 `Originals\\Voices\\Japanese\\C01_line.wav`；拟用你指定的 `owned/assets/replacement/C01_line.wav` 更新 |\n| English(US) | 当前关联 `Originals\\Voices\\English(US)\\C01_line.wav`；保留素材及语言关联 |\n| Line_01 | 沿用现有声音对象，保持 −3 dB 音量和 Master Audio Bus 输出 |\n| 播放事件 | 保持 Play 目标为 Line_01 |\n| Line_01_Backup | 不包含在变更中；当前为 −9 dB、无音源子对象 |\n\n确认执行这次仅针对 Japanese 的更新吗？完成后我会核对并说明两种语言实际关联的素材。\n\n按你的要求及 [waapi-skill 的确认规则](.agents/skills/waapi-skill/SKILL.md)，当前 `ask_before_changes` 策略要求“summarize it, state nothing changed, ask to proceed, and end the turn”，因此这里等待你确认。"
+    }
+  ],
+  "before_snapshot": {
+    "sound": {
+      "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+      "name": "Line_01",
+      "type": "Sound",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+      "volume_db": -3.0,
+      "output_bus": {
+        "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "name": "Master Audio Bus"
+      },
+      "notes": "",
+      "parent": {
+        "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+        "name": "Expansion_EXP22-C01_Voices"
+      }
+    },
+    "sources": {
+      "English(US)": {
+        "object": {
+          "id": "{838F5C67-CD2D-4AAD-9174-83180C2A8754}",
+          "name": "C01_line",
+          "type": "AudioFileSource",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+          "source_language": {
+            "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+            "name": "English(US)"
+          },
+          "original_file_path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\English(US)\\C01_line.wav",
+          "parent": {
+            "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+            "name": "Line_01"
+          },
+          "notes": ""
+        },
+        "media": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/Originals/Voices/English(US)/C01_line.wav",
+          "sha256": "b1b29883097591b1de9a67ea780e0a2fef53784d2cd389c11d94bcaa0d695a97"
+        },
+        "volume_offset_db": 0.0
+      },
+      "Japanese": {
+        "object": {
+          "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+          "name": "C01_line",
+          "type": "AudioFileSource",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+          "source_language": {
+            "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+            "name": "Japanese"
+          },
+          "original_file_path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+          "parent": {
+            "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+            "name": "Line_01"
+          },
+          "notes": ""
+        },
+        "media": {
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/Originals/Voices/Japanese/C01_line.wav",
+          "sha256": "474422f208c274b61253678676352a3d94627c63b208a725aee206a89542a8c4"
+        },
+        "volume_offset_db": 0.0
+      }
+    },
+    "event": {
+      "id": "{AA347E1F-3E09-44AF-B4E1-29CD0CBF605D}",
+      "name": "Expansion_EXP22_C01_Play_Line_01",
+      "type": "Event",
+      "path": "\\Events\\Default Work Unit\\Expansion_EXP22_C01_Play_Line_01",
+      "notes": "",
+      "parent": {
+        "id": "{4113E002-9F9B-43CE-B15A-B1CBE8F9C520}",
+        "name": "Default Work Unit"
+      }
+    },
+    "actions": [
+      {
+        "id": "{7B724031-BA7C-4890-8313-1CCFA31DADF8}",
+        "name": "",
+        "type": "Action",
+        "path": "\\Events\\Default Work Unit\\Expansion_EXP22_C01_Play_Line_01\\[Play - Line_01]",
+        "action_type": 1,
+        "target": {
+          "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+          "name": "Line_01"
+        },
+        "parent": {
+          "id": "{AA347E1F-3E09-44AF-B4E1-29CD0CBF605D}",
+          "name": "Expansion_EXP22_C01_Play_Line_01"
+        },
+        "notes": ""
+      }
+    ],
+    "distractor": {
+      "id": "{75BE296C-505D-40C5-9BA1-316A86A287DD}",
+      "name": "Line_01_Backup",
+      "type": "Sound",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01_Backup",
+      "volume_db": -9.0,
+      "output_bus": {
+        "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "name": "Master Audio Bus"
+      },
+      "notes": "",
+      "parent": {
+        "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+        "name": "Expansion_EXP22-C01_Voices"
+      }
+    },
+    "members": [
+      "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+      "{75BE296C-505D-40C5-9BA1-316A86A287DD}"
+    ]
+  },
+  "immutable_request": {
+    "arguments": {
+      "import_operation": "useExisting",
+      "imports": [
+        {
+          "audio_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+          "import_language": "Japanese",
+          "object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+          "object_type": "Sound Voice"
+        }
+      ]
+    },
+    "contract": "waapi-skill.operation-request/v1",
+    "operation": "audio.import",
+    "version": "2022.1"
+  },
+  "prepared_operation": {
+    "cleanup": {
+      "automatic": false,
+      "automatic_retry": false,
+      "created_guid_source": "execution_result.result.objects",
+      "irreversible": false,
+      "kind": "discard-case-owned-project-copy"
+    },
+    "contract": "waapi-skill.prepared-operation/v1",
+    "dispatch": {
+      "args": {
+        "autoAddToSourceControl": false,
+        "importOperation": "useExisting",
+        "imports": [
+          {
+            "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+            "importLanguage": "Japanese",
+            "objectPath": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\<Sound Voice>Line_01"
+          }
+        ]
+      },
+      "options": {
+        "return": [
+          "id",
+          "name",
+          "type",
+          "path",
+          "parent",
+          "notes",
+          "activeSource",
+          "originalFilePath",
+          "sound:originalWavFilePath",
+          "audioSource:language"
+        ]
+      },
+      "uri": "ak.wwise.core.audio.import"
+    },
+    "operation": "audio.import",
+    "pre_state": {
+      "closed_import_plan": {
+        "contract": "waapi-skill.audio-import-plan/v1",
+        "dispatch_args": {
+          "autoAddToSourceControl": false,
+          "importOperation": "useExisting",
+          "imports": [
+            {
+              "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+              "importLanguage": "Japanese",
+              "objectPath": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\<Sound Voice>Line_01"
+            }
+          ]
+        },
+        "file_proofs": [
+          {
+            "device": 16777229,
+            "index": 0,
+            "inode": 314276512,
+            "mtime_ns": 1791534066753605632,
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+            "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+            "size": 1644
+          }
+        ],
+        "operation_policy": {
+          "absent_target_postcondition": "new_unique_guid_at_exact_path",
+          "automatic_retry": false,
+          "cleanup_policy": "discard_owned_project_copy_when_existing_media_was_updated",
+          "collision_policy": "reuse_exact_existing_target_else_create",
+          "disposable_project_required": false,
+          "existing_target_postcondition": "guid_preserved_and_media_source_updated",
+          "import_operation": "useExisting",
+          "in_place_restore_supported": false,
+          "notes_destination_policy": "preexisting_target_routes_notes_to_new_audio_file_source;absent_target_routes_notes_to_created_target",
+          "one_global_operation_per_call": true,
+          "owned_project_copy_required_for_clean_test": true,
+          "partial_success_is_failure": true,
+          "pre_execution_drift_check_required": true,
+          "pre_state_required": true,
+          "verify_every_derived_target": true
+        },
+        "oracle": {
+          "derived_from": "closed_request_and_hashed_source_files",
+          "dialogue_event_side_effects_present": false,
+          "event_side_effects_present": false,
+          "language_requires_live_project_validation": true,
+          "media_hash_readback_required": true,
+          "no_retry_after_dispatch": true,
+          "result_contract": "objects_only",
+          "switch_assignment_side_effects_present": false,
+          "targets": [
+            {
+              "canonical_parent_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices",
+              "canonical_target_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+              "expected_audio_file_source_result_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+              "index": 0,
+              "media_expected": true,
+              "pre_state_required": true,
+              "requested_language": "Japanese",
+              "requested_object_type": "Sound Voice",
+              "source_file": {
+                "device": 16777229,
+                "inode": 314276512,
+                "kind": "regular_file",
+                "mtime_ns": 1791534066753605632,
+                "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+                "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+                "size": 1644
+              }
+            }
+          ]
+        },
+        "version": "2022.1"
+      },
+      "import_guard": {
+        "existing_sfx_source_snapshots": [],
+        "file_proofs": [
+          {
+            "field": "file_proofs[0]",
+            "proof": {
+              "device": 16777229,
+              "index": 0,
+              "inode": 314276512,
+              "mtime_ns": 1791534066753605632,
+              "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+              "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+              "size": 1644
+            }
+          }
+        ],
+        "language_inventory": {
+          "authority": "waapi_getProjectInfo",
+          "languages": [
+            {
+              "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+              "name": "English(US)"
+            },
+            {
+              "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+              "name": "Japanese"
+            }
+          ],
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\SampleProject.wproj"
+          }
+        },
+        "localized_source_snapshots": [
+          {
+            "owner_id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+            "rows": [
+              {
+                "audioSource:language": {
+                  "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+                  "name": "English(US)"
+                },
+                "id": "{838F5C67-CD2D-4AAD-9174-83180C2A8754}",
+                "name": "C01_line",
+                "parent": {
+                  "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                  "name": "Line_01"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+                "type": "AudioFileSource"
+              },
+              {
+                "audioSource:language": {
+                  "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+                  "name": "Japanese"
+                },
+                "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+                "name": "C01_line",
+                "parent": {
+                  "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                  "name": "Line_01"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+                "type": "AudioFileSource"
+              }
+            ]
+          }
+        ],
+        "originals_context": {
+          "authority": "waapi_getProjectInfo",
+          "originals_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/Originals",
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/SampleProject.wproj"
+          },
+          "project_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e",
+          "source_proof_sha256": null,
+          "version": "2022.1"
+        },
+        "path_snapshots": [
+          {
+            "fields": [
+              "id",
+              "name",
+              "type",
+              "path",
+              "parent",
+              "notes",
+              "activeSource",
+              "originalFilePath",
+              "sound:originalWavFilePath",
+              "audioSource:language"
+            ],
+            "options": {
+              "language": "Japanese",
+              "return": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "parent",
+                "notes",
+                "activeSource",
+                "originalFilePath",
+                "sound:originalWavFilePath",
+                "audioSource:language"
+              ]
+            },
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+            "rows": [
+              {
+                "activeSource": {
+                  "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+                  "name": "C01_line"
+                },
+                "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                "name": "Line_01",
+                "notes": "",
+                "originalFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+                "parent": {
+                  "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+                  "name": "Expansion_EXP22-C01_Voices"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+                "sound:originalWavFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+                "type": "Sound"
+              }
+            ]
+          }
+        ],
+        "source_operation": "audio.import"
+      },
+      "targets[0].anchor": {
+        "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+        "name": "Expansion_EXP22-C01_Voices",
+        "notes": "",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices",
+        "type": "ActorMixer"
+      },
+      "targets[0].existing": {
+        "activeSource": {
+          "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+          "name": "C01_line"
+        },
+        "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+        "name": "Line_01",
+        "notes": "",
+        "originalFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+        "parent": {
+          "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+          "name": "Expansion_EXP22-C01_Voices"
+        },
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+        "sound:originalWavFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+        "type": "Sound"
+      }
+    },
+    "preflight_reads": [
+      {
+        "args": {},
+        "options": {},
+        "result": {
+          "return": [
+            {
+              "classId": 16,
+              "name": "AudioFileSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 65537,
+              "name": "PCM",
+              "type": "Conversion"
+            },
+            {
+              "classId": 65552,
+              "name": "Sound",
+              "type": "WObject"
+            },
+            {
+              "classId": 131073,
+              "name": "ADPCM",
+              "type": "Conversion"
+            },
+            {
+              "classId": 131088,
+              "name": "Folder",
+              "type": "WObject"
+            },
+            {
+              "classId": 196624,
+              "name": "Project",
+              "type": "WObject"
+            },
+            {
+              "classId": 262145,
+              "name": "Vorbis",
+              "type": "Conversion"
+            },
+            {
+              "classId": 262160,
+              "name": "Event",
+              "type": "WObject"
+            },
+            {
+              "classId": 327696,
+              "name": "Action",
+              "type": "WObject"
+            },
+            {
+              "classId": 393232,
+              "name": "State",
+              "type": "WObject"
+            },
+            {
+              "classId": 458768,
+              "name": "StateGroup",
+              "type": "WObject"
+            },
+            {
+              "classId": 524304,
+              "name": "ActorMixer",
+              "type": "WObject"
+            },
+            {
+              "classId": 589840,
+              "name": "RandomSequenceContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 655376,
+              "name": "SwitchContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 720912,
+              "name": "Path2D",
+              "type": "WObject"
+            },
+            {
+              "classId": 786448,
+              "name": "Position",
+              "type": "WObject"
+            },
+            {
+              "classId": 917520,
+              "name": "Curve",
+              "type": "WObject"
+            },
+            {
+              "classId": 983056,
+              "name": "Modifier",
+              "type": "WObject"
+            },
+            {
+              "classId": 1048592,
+              "name": "SourcePlugin",
+              "type": "WObject"
+            },
+            {
+              "classId": 1114128,
+              "name": "Effect",
+              "type": "WObject"
+            },
+            {
+              "classId": 1179664,
+              "name": "SoundBank",
+              "type": "WObject"
+            },
+            {
+              "classId": 1245200,
+              "name": "SwitchGroup",
+              "type": "WObject"
+            },
+            {
+              "classId": 1310721,
+              "name": "WEM Opus",
+              "type": "Conversion"
+            },
+            {
+              "classId": 1310736,
+              "name": "Switch",
+              "type": "WObject"
+            },
+            {
+              "classId": 1376272,
+              "name": "Bus",
+              "type": "WObject"
+            },
+            {
+              "classId": 1441808,
+              "name": "RTPC",
+              "type": "WObject"
+            },
+            {
+              "classId": 1507344,
+              "name": "GameParameter",
+              "type": "WObject"
+            },
+            {
+              "classId": 1572880,
+              "name": "ObjectSettingAssoc",
+              "type": "WObject"
+            },
+            {
+              "classId": 1638416,
+              "name": "WorkUnit",
+              "type": "WObject"
+            },
+            {
+              "classId": 1703952,
+              "name": "SoundcasterSession",
+              "type": "WObject"
+            },
+            {
+              "classId": 1769488,
+              "name": "MusicSegment",
+              "type": "WObject"
+            },
+            {
+              "classId": 1835024,
+              "name": "MusicTrack",
+              "type": "WObject"
+            },
+            {
+              "classId": 1900560,
+              "name": "BlendContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 1966096,
+              "name": "BlendTrack",
+              "type": "WObject"
+            },
+            {
+              "classId": 2097168,
+              "name": "Query",
+              "type": "WObject"
+            },
+            {
+              "classId": 2162704,
+              "name": "SearchCriteria",
+              "type": "WObject"
+            },
+            {
+              "classId": 2228240,
+              "name": "MusicPlaylistContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 2293776,
+              "name": "MusicSwitchContainer",
+              "type": "WObject"
+            },
+            {
+              "classId": 2359312,
+              "name": "MusicPlaylistItem",
+              "type": "WObject"
+            },
+            {
+              "classId": 2424848,
+              "name": "MusicTransition",
+              "type": "WObject"
+            },
+            {
+              "classId": 2490384,
+              "name": "MusicStinger",
+              "type": "WObject"
+            },
+            {
+              "classId": 2555920,
+              "name": "MusicFade",
+              "type": "WObject"
+            },
+            {
+              "classId": 2621456,
+              "name": "Trigger",
+              "type": "WObject"
+            },
+            {
+              "classId": 2686992,
+              "name": "Attenuation",
+              "type": "WObject"
+            },
+            {
+              "classId": 2752528,
+              "name": "Panner",
+              "type": "WObject"
+            },
+            {
+              "classId": 3014672,
+              "name": "DialogueEvent",
+              "type": "WObject"
+            },
+            {
+              "classId": 3342352,
+              "name": "UserProjectSettings",
+              "type": "WObject"
+            },
+            {
+              "classId": 3473424,
+              "name": "MixingSession",
+              "type": "WObject"
+            },
+            {
+              "classId": 3538960,
+              "name": "PluginDataSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 3604496,
+              "name": "Conversion",
+              "type": "WObject"
+            },
+            {
+              "classId": 3670032,
+              "name": "ExternalSourceFile",
+              "type": "WObject"
+            },
+            {
+              "classId": 3735568,
+              "name": "ExternalSource",
+              "type": "WObject"
+            },
+            {
+              "classId": 3801104,
+              "name": "MusicTrackSequence",
+              "type": "WObject"
+            },
+            {
+              "classId": 3866640,
+              "name": "MusicCue",
+              "type": "WObject"
+            },
+            {
+              "classId": 3932176,
+              "name": "MusicClip",
+              "type": "WObject"
+            },
+            {
+              "classId": 3997712,
+              "name": "AuxBus",
+              "type": "WObject"
+            },
+            {
+              "classId": 4063248,
+              "name": "MusicClipMidi",
+              "type": "WObject"
+            },
+            {
+              "classId": 4128784,
+              "name": "MidiParameter",
+              "type": "WObject"
+            },
+            {
+              "classId": 4194320,
+              "name": "ModulatorLfo",
+              "type": "WObject"
+            },
+            {
+              "classId": 4259856,
+              "name": "ModulatorEnvelope",
+              "type": "WObject"
+            },
+            {
+              "classId": 4325392,
+              "name": "ControlSurfaceSession",
+              "type": "WObject"
+            },
+            {
+              "classId": 4390928,
+              "name": "ControlSurfaceBinding",
+              "type": "WObject"
+            },
+            {
+              "classId": 4456464,
+              "name": "ControlSurfaceBindingGroup",
+              "type": "WObject"
+            },
+            {
+              "classId": 4522000,
+              "name": "Platform",
+              "type": "WObject"
+            },
+            {
+              "classId": 4653072,
+              "name": "AudioDevice",
+              "type": "WObject"
+            },
+            {
+              "classId": 4718608,
+              "name": "AcousticTexture",
+              "type": "WObject"
+            },
+            {
+              "classId": 4915216,
+              "name": "Language",
+              "type": "WObject"
+            },
+            {
+              "classId": 4980752,
+              "name": "ActionException",
+              "type": "WObject"
+            },
+            {
+              "classId": 5046288,
+              "name": "MusicEventCue",
+              "type": "WObject"
+            },
+            {
+              "classId": 5111824,
+              "name": "ModulatorTime",
+              "type": "WObject"
+            },
+            {
+              "classId": 5177360,
+              "name": "CustomState",
+              "type": "WObject"
+            },
+            {
+              "classId": 5308432,
+              "name": "Metadata",
+              "type": "WObject"
+            },
+            {
+              "classId": 6553602,
+              "name": "Wwise Sine",
+              "type": "Source"
+            },
+            {
+              "classId": 6619138,
+              "name": "Wwise Silence",
+              "type": "Source"
+            },
+            {
+              "classId": 6684674,
+              "name": "Wwise Tone Generator",
+              "type": "Source"
+            },
+            {
+              "classId": 6881283,
+              "name": "Wwise Parametric EQ",
+              "type": "Effect"
+            },
+            {
+              "classId": 6946819,
+              "name": "Wwise Delay",
+              "type": "Effect"
+            },
+            {
+              "classId": 7077891,
+              "name": "Wwise Compressor",
+              "type": "Effect"
+            },
+            {
+              "classId": 7143427,
+              "name": "Wwise Expander",
+              "type": "Effect"
+            },
+            {
+              "classId": 7208963,
+              "name": "Wwise Peak Limiter",
+              "type": "Effect"
+            },
+            {
+              "classId": 7536643,
+              "name": "Wwise Matrix Reverb",
+              "type": "Effect"
+            },
+            {
+              "classId": 7733251,
+              "name": "Wwise RoomVerb",
+              "type": "Effect"
+            },
+            {
+              "classId": 8192003,
+              "name": "Wwise Flanger",
+              "type": "Effect"
+            },
+            {
+              "classId": 8257539,
+              "name": "Wwise Guitar Distortion",
+              "type": "Effect"
+            },
+            {
+              "classId": 8454147,
+              "name": "Wwise Meter",
+              "type": "Effect"
+            },
+            {
+              "classId": 8519683,
+              "name": "Wwise Time Stretch",
+              "type": "Effect"
+            },
+            {
+              "classId": 8585219,
+              "name": "Wwise Tremolo",
+              "type": "Effect"
+            },
+            {
+              "classId": 8650755,
+              "name": "Wwise Recorder",
+              "type": "Effect"
+            },
+            {
+              "classId": 8847363,
+              "name": "Wwise Stereo Delay",
+              "type": "Effect"
+            },
+            {
+              "classId": 8912899,
+              "name": "Wwise Pitch Shifter",
+              "type": "Effect"
+            },
+            {
+              "classId": 9043971,
+              "name": "Wwise Harmonizer",
+              "type": "Effect"
+            },
+            {
+              "classId": 9109507,
+              "name": "Wwise Gain",
+              "type": "Effect"
+            },
+            {
+              "classId": 9699330,
+              "name": "Wwise Synth One",
+              "type": "Source"
+            },
+            {
+              "classId": 11403271,
+              "name": "System",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11468807,
+              "name": "DVR Bypass",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11534343,
+              "name": "Communication",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11599879,
+              "name": "Controller Headphones",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11730951,
+              "name": "Controller Speaker",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11796487,
+              "name": "Auxiliary",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11862023,
+              "name": "No Output",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 11927559,
+              "name": "Remote System",
+              "type": "AudioDevice"
+            },
+            {
+              "classId": 12451843,
+              "name": "Wwise 3D Audio Bed Mixer",
+              "type": "Effect"
+            },
+            {
+              "classId": 13107202,
+              "name": "Wwise Audio Input",
+              "type": "Source"
+            },
+            {
+              "classId": 58982409,
+              "name": "Wwise System Output Settings",
+              "type": "Metadata"
+            },
+            {
+              "classId": 65011712,
+              "name": "BatchRenameSettings",
+              "type": "Inner"
+            },
+            {
+              "classId": 65077248,
+              "name": "Marker",
+              "type": "Inner"
+            },
+            {
+              "classId": 655360016,
+              "name": "MultiSwitchEntry",
+              "type": "WObject"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.getTypes"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices"
+            ]
+          }
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+              "name": "Expansion_EXP22-C01_Voices",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices",
+              "type": "ActorMixer"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "from": {
+            "path": [
+              "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01"
+            ]
+          }
+        },
+        "options": {
+          "language": "Japanese",
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes",
+            "activeSource",
+            "originalFilePath",
+            "sound:originalWavFilePath",
+            "audioSource:language"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "activeSource": {
+                "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+                "name": "C01_line"
+              },
+              "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+              "name": "Line_01",
+              "notes": "",
+              "originalFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+              "parent": {
+                "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+                "name": "Expansion_EXP22-C01_Voices"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+              "sound:originalWavFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+              "type": "Sound"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {
+          "waql": "from object \"{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}\" select children take 129"
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "audioSource:language"
+          ]
+        },
+        "result": {
+          "return": [
+            {
+              "audioSource:language": {
+                "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+                "name": "English(US)"
+              },
+              "id": "{838F5C67-CD2D-4AAD-9174-83180C2A8754}",
+              "name": "C01_line",
+              "parent": {
+                "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                "name": "Line_01"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+              "type": "AudioFileSource"
+            },
+            {
+              "audioSource:language": {
+                "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+                "name": "Japanese"
+              },
+              "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+              "name": "C01_line",
+              "parent": {
+                "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                "name": "Line_01"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+              "type": "AudioFileSource"
+            }
+          ]
+        },
+        "uri": "ak.wwise.core.object.get"
+      },
+      {
+        "args": {},
+        "options": {},
+        "result": {
+          "currentLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+          "currentPlatformId": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+          "defaultConversion": {
+            "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+            "name": "PCM"
+          },
+          "directories": {
+            "cache": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\cache\\",
+            "commands": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Add-ons\\Commands",
+            "originals": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\",
+            "properties": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Add-ons\\Properties",
+            "root": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\",
+            "soundBankOutputRoot": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\"
+          },
+          "displayTitle": "SampleProject* - Wwise 2022.1.19 ",
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "isDirty": true,
+          "languages": [
+            {
+              "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+              "name": "English(US)",
+              "shortId": 684519430
+            },
+            {
+              "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+              "name": "Japanese",
+              "shortId": 2008704848
+            }
+          ],
+          "name": "SampleProject",
+          "path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\SampleProject.wproj",
+          "platforms": [
+            {
+              "baseDisplayName": "Mac®",
+              "baseName": "Mac",
+              "copiedMediaPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Mac\\Media",
+              "id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+              "name": "Mac",
+              "soundBankPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Mac\\"
+            },
+            {
+              "baseDisplayName": "Windows®",
+              "baseName": "Windows",
+              "copiedMediaPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Windows\\Media",
+              "id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}",
+              "name": "Windows",
+              "soundBankPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Windows\\"
+            }
+          ],
+          "referenceLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}"
+        },
+        "uri": "ak.wwise.core.getProjectInfo"
+      },
+      {
+        "args": {},
+        "options": {},
+        "result": {
+          "currentLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+          "currentPlatformId": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+          "defaultConversion": {
+            "id": "{D469C8FB-1FA9-4C2B-8250-3F8FFBCD1B40}",
+            "name": "PCM"
+          },
+          "directories": {
+            "cache": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\cache\\",
+            "commands": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Add-ons\\Commands",
+            "originals": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\",
+            "properties": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Add-ons\\Properties",
+            "root": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\",
+            "soundBankOutputRoot": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\"
+          },
+          "displayTitle": "SampleProject* - Wwise 2022.1.19 ",
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "isDirty": true,
+          "languages": [
+            {
+              "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+              "name": "English(US)",
+              "shortId": 684519430
+            },
+            {
+              "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+              "name": "Japanese",
+              "shortId": 2008704848
+            }
+          ],
+          "name": "SampleProject",
+          "path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\SampleProject.wproj",
+          "platforms": [
+            {
+              "baseDisplayName": "Mac®",
+              "baseName": "Mac",
+              "copiedMediaPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Mac\\Media",
+              "id": "{9C6217D5-DD11-4795-87C1-6CE02853C541}",
+              "name": "Mac",
+              "soundBankPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Mac\\"
+            },
+            {
+              "baseDisplayName": "Windows®",
+              "baseName": "Windows",
+              "copiedMediaPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Windows\\Media",
+              "id": "{6E0CB257-C6C8-4C5C-8366-2740DFC441EC}",
+              "name": "Windows",
+              "soundBankPath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\io\\soundbanks\\Windows\\"
+            }
+          ],
+          "referenceLanguageId": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}"
+        },
+        "uri": "ak.wwise.core.getProjectInfo"
+      }
+    ],
+    "raw_dispatch_allowed": false,
+    "request": {
+      "arguments": {
+        "import_operation": "useExisting",
+        "imports": [
+          {
+            "audio_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+            "import_language": "Japanese",
+            "object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+            "object_type": "Sound Voice"
+          }
+        ]
+      },
+      "contract": "waapi-skill.operation-request/v1",
+      "operation": "audio.import",
+      "version": "2022.1"
+    },
+    "resolved_roles": {
+      "targets[0].anchor": {
+        "identity": {
+          "id": null,
+          "name": null,
+          "parent": null,
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices",
+          "type": null,
+          "waql": null
+        },
+        "object": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+        "resolution": "live-path",
+        "row": {
+          "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+          "name": "Expansion_EXP22-C01_Voices",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices",
+          "type": "ActorMixer"
+        }
+      },
+      "targets[0].existing": {
+        "identity": {
+          "id": null,
+          "name": null,
+          "parent": null,
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+          "type": null,
+          "waql": null
+        },
+        "object": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+        "resolution": "live-path",
+        "row": {
+          "activeSource": {
+            "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+            "name": "C01_line"
+          },
+          "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+          "name": "Line_01",
+          "notes": "",
+          "originalFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+          "parent": {
+            "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+            "name": "Expansion_EXP22-C01_Voices"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+          "sound:originalWavFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+          "type": "Sound"
+        }
+      }
+    },
+    "semantic_preview": {
+      "envelope": {
+        "args": {
+          "autoAddToSourceControl": false,
+          "importOperation": "useExisting",
+          "imports": [
+            {
+              "audioFile": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+              "importLanguage": "Japanese",
+              "objectPath": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\<Sound Voice>Line_01"
+            }
+          ]
+        },
+        "metadata": {
+          "caller_expected_rows_accepted": false,
+          "closed_import_plan": "waapi-skill.audio-import-plan/v1",
+          "import_operation": "useExisting",
+          "localized_existing_wire_normalizations": [
+            {
+              "basis": {
+                "import_operation": "useExisting",
+                "localized_source_id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+                "preexisting_id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                "reflected_type": "Sound",
+                "requested_language": "Japanese"
+              },
+              "index": 0,
+              "input_object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+              "logical_target_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+              "wire_object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\<Sound Voice>Line_01",
+              "wire_object_type": "Sound Voice"
+            }
+          ],
+          "model_authored_code": false,
+          "native_row_count": 1,
+          "native_row_mapping": [
+            {
+              "logical_index": 0,
+              "native_rows": [
+                {
+                  "kind": "single",
+                  "native_index": 0,
+                  "object_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\<Sound Voice>Line_01"
+                }
+              ]
+            }
+          ],
+          "preflight_consumed_fields": [
+            {
+              "fields": [
+                "object_type"
+              ],
+              "index": 0,
+              "proof": "live target type matched before dispatch",
+              "target_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01"
+            }
+          ],
+          "request_validation_strength": "partial_reflected_schema",
+          "schema_validation": {
+            "required_families": [],
+            "required_fields": [
+              "imports"
+            ],
+            "section": "request",
+            "unresolved_refs": [
+              "#/definitions/importOperationType",
+              "#/definitions/objectReturnOptions",
+              "#/properties/default/properties/audioFile",
+              "#/properties/default/properties/importLanguage",
+              "#/properties/default/properties/objectPath"
+            ],
+            "uri": "ak.wwise.core.audio.import",
+            "validated_nodes": 9,
+            "version": "2022.1"
+          },
+          "source_control_policy": {
+            "auto_add_to_source_control": false,
+            "auto_check_out_to_source_control": false,
+            "auto_check_out_to_source_control_dispatched": false,
+            "auto_check_out_to_source_control_supported": false
+          },
+          "target_count": 1
+        },
+        "options": {
+          "return": [
+            "id",
+            "name",
+            "type",
+            "path",
+            "parent",
+            "notes",
+            "activeSource",
+            "originalFilePath",
+            "sound:originalWavFilePath",
+            "audioSource:language"
+          ]
+        },
+        "uri": "ak.wwise.core.audio.import"
+      },
+      "evidence_plan": [],
+      "raw_dispatch_allowed": false,
+      "readback_plan": [],
+      "requires_destructive_gate": true,
+      "source_note_family": "import",
+      "version": "2022.1"
+    },
+    "verification_plan": {
+      "allowed_result_paths": [
+        "\\actor-mixer hierarchy\\default work unit\\expansion_exp22-c01_voices\\line_01",
+        "\\actor-mixer hierarchy\\default work unit\\expansion_exp22-c01_voices\\line_01\\c01_line"
+      ],
+      "error_log_is_failure": true,
+      "import_operation": "useExisting",
+      "kind": "closed-audio-import",
+      "native_directive_boundaries": [],
+      "originals_context": {
+        "authority": "waapi_getProjectInfo",
+        "originals_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/Originals",
+        "project": {
+          "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+          "name": "SampleProject",
+          "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/SampleProject.wproj"
+        },
+        "project_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e",
+        "source_proof_sha256": null,
+        "version": "2022.1"
+      },
+      "result_contract": "objects_only",
+      "source_operation": "audio.import",
+      "targets": [
+        {
+          "anchor_id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+          "canonical_parent_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices",
+          "canonical_target_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+          "expected_audio_file_source_result_path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+          "index": 0,
+          "localized_audio_file_source_id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+          "localized_source_snapshot": {
+            "owner_id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+            "rows": [
+              {
+                "audioSource:language": {
+                  "id": "{273F02D0-F4F6-49D6-B2F2-B46585A2406B}",
+                  "name": "English(US)"
+                },
+                "id": "{838F5C67-CD2D-4AAD-9174-83180C2A8754}",
+                "name": "C01_line",
+                "parent": {
+                  "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                  "name": "Line_01"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+                "type": "AudioFileSource"
+              },
+              {
+                "audioSource:language": {
+                  "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+                  "name": "Japanese"
+                },
+                "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+                "name": "C01_line",
+                "parent": {
+                  "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+                  "name": "Line_01"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+                "type": "AudioFileSource"
+              }
+            ]
+          },
+          "media_expected": true,
+          "metadata_class_id": 65552,
+          "metadata_object_type": "Sound",
+          "missing_ancestor_paths": [],
+          "pre_state_required": true,
+          "pre_state_rows": [
+            {
+              "activeSource": {
+                "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+                "name": "C01_line"
+              },
+              "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+              "name": "Line_01",
+              "notes": "",
+              "originalFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+              "parent": {
+                "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+                "name": "Expansion_EXP22-C01_Voices"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+              "sound:originalWavFilePath": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+              "type": "Sound"
+            }
+          ],
+          "preexisting_id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+          "requested_language": "Japanese",
+          "requested_notes_destination": "audio_file_source",
+          "requested_object_type": "Sound Voice",
+          "source_file": {
+            "device": 16777229,
+            "inode": 314276512,
+            "kind": "regular_file",
+            "mtime_ns": 1791534066753605632,
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+            "sha256": "48a11d31b60d5b0acad0ca3e65e99580c58743957f74bcae672892f7cb1377e5",
+            "size": 1644
+          }
+        }
+      ],
+      "uri": "ak.wwise.core.audio.import",
+      "version": "2022.1"
+    },
+    "version": "2022.1",
+    "warnings": []
+  },
+  "attested_roles": {
+    "quantity": 1,
+    "mappings": [
+      {
+        "source_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+        "destination": {
+          "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+          "name": "Line_01",
+          "type": "Sound",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+          "volume_db": -3.0,
+          "output_bus": {
+            "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+            "name": "Master Audio Bus"
+          },
+          "notes": "",
+          "parent": {
+            "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+            "name": "Expansion_EXP22-C01_Voices"
+          }
+        },
+        "language": "Japanese",
+        "field_owner": "Sound Voice",
+        "properties": [],
+        "before_source": {
+          "object": {
+            "id": "{9702AABA-37DD-45D3-B531-2C167C09C424}",
+            "name": "C01_line",
+            "type": "AudioFileSource",
+            "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01\\C01_line",
+            "source_language": {
+              "id": "{B90EBE12-ACFE-5314-AB03-8B2766BB65EB}",
+              "name": "Japanese"
+            },
+            "original_file_path": "Z:\\Users\\xiye\\.codex\\worktrees\\expansion-frozen-campaign\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-full-e1f3e9b-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\002-EXP22-C01\\owned\\sandbox-root\\sample-project-18215c50fa2f44a38e10441d7fc4f74e\\Originals\\Voices\\Japanese\\C01_line.wav",
+            "parent": {
+              "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+              "name": "Line_01"
+            },
+            "notes": ""
+          },
+          "media": {
+            "path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/sandbox-root/sample-project-18215c50fa2f44a38e10441d7fc4f74e/Originals/Voices/Japanese/C01_line.wav",
+            "sha256": "474422f208c274b61253678676352a3d94627c63b208a725aee206a89542a8c4"
+          },
+          "volume_offset_db": 0.0
+        }
+      }
+    ],
+    "target": {
+      "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+      "name": "Line_01",
+      "type": "Sound",
+      "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01",
+      "volume_db": -3.0,
+      "output_bus": {
+        "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+        "name": "Master Audio Bus"
+      },
+      "notes": "",
+      "parent": {
+        "id": "{C9EE9626-0937-4075-AE7C-D0740067CA41}",
+        "name": "Expansion_EXP22-C01_Voices"
+      }
+    },
+    "topology": "existing Sound and AudioFileSource identities",
+    "units": {
+      "Volume": "decibels"
+    },
+    "preserve": [
+      "English(US) media and association",
+      "Sound volume and routing",
+      "Event and Action",
+      "distractor"
+    ]
+  },
+  "verification_context": {
+    "public_readback_routes": [],
+    "support_evidence": "packaged-public-interface-only",
+    "route_inventory_scope": "positive-support-evidence-only-not-exhaustive",
+    "live_availability_or_completed_read": "not_attested",
+    "disclosure_timing": {
+      "authority": "operation-contract-Skill-guidance-and-explicit-user-request",
+      "pre_execution": "only-at-required-source-timing",
+      "terminal": "report-actual-verification-strength-and-boundaries"
+    },
+    "sources": [
+      "skills/waapi-skill/references/waapi-operate.md#terminal-states",
+      "skills/waapi-skill/wwise_waapi/execution_contracts.py#FIXED_COMMANDS_BY_URI",
+      "skills/waapi-skill/scripts/gateway.py#fixed-command-disclosure"
+    ]
+  },
+  "notice_obligations": {
+    "action": "reimport-existing-media",
+    "media_count": 1,
+    "mappings": [
+      {
+        "source_file": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-e1f3e9b-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-EXP22-C01/owned/assets/replacement/C01_line.wav",
+        "destination": {
+          "id": "{6A8ECFC4-1CC5-4E42-B088-DDD36E0D401F}",
+          "name": "Line_01",
+          "type": "Sound",
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C01_Voices\\Line_01"
+        }
+      }
+    ],
+    "preserve_existing_sound_and_source_identity": true,
+    "selected_language": "Japanese",
+    "import_kind": "Sound Voice",
+    "preservation_intent": {
+      "only_declared_changes": true,
+      "adopt_user_preservation_scope": true
+    }
+  }
+}

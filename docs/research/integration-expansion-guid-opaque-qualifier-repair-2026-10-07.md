@@ -1,0 +1,13 @@
+# Opaque GUID qualifier recognition repair — 2026-10-07
+
+Final Spec review of `24c5154` found that intent detection still partly validated qualifier brace syntax. Extra braces hid malformed incomplete or foreign comparisons across all four families and both operand orders, including colon and coordinated forms. The previous reports and evidence remain immutable.
+
+Intent now means a **standalone 与 comparator delimiter plus a GUID token in either adjoining operand**. Qualifier text is opaque: no brace count, ID syntax, owner/type or relation-completeness check occurs during recognition. The unchanged complete-frame validator alone decides those properties and rejects malformed/incomplete/foreign candidates. Existing equality/inequality-keyword detection remains unchanged.
+
+Unrelated prose is preserved by the separator's role. `GUID 已记录` has no comparison separator; retained `GUID 已记录并与日志归档` uses **并与 verbal coordination**, rather than a standalone comparator. It stays unknown bookkeeping and gains no identity/effect credit. This distinction follows existing positive evidence, not a qualifier exception. A separately frozen negative includes a malformed foreign operand before standalone 与 and 并与 elsewhere in the same component; it proves there is no blanket whole-component skip.
+
+The exact 96 reviewer observations and 12 colon/coordinated reproductions were frozen before code. Initial RED: **60 failed / 49 passed**, exit 1. Adding the independently requested separator negative and its own frozen fixture produced RED-complete: **61 failed / 50 passed**, exit 1. GREEN: **111 passed**, exit 0. These counts include fixture hash guards. The retained focused gate passed **3766 tests**, exit 0, in **7.53 s**: all prior 3655 plus 108 review vectors, one separator negative and two hash guards. All prior 490 matrix judgments and 3655 test expectations remain unchanged.
+
+Functional commit `d229968` merged integration `875b6e7` (already up to date) before this additive report. Evidence is sealed in the original external root's `opaque-qualifier-delta` directory; the adjacent JSON records exact hashes, statuses, candidates and selected files. Prior fixtures/reports remain byte-identical to `24c5154`; Skill, CI and source-project trees are unchanged.
+
+This is bounded developer proof, with no Agent/Wwise/business-effect PASS credit. No broad gate, live/Fresh process, historical replay/regrade/verify-only, configuration/project write, Skill/suite/oracle/runtime/prompt edit, integration, push, PR or issue closure occurred. Historical FAILs remain FAIL. Parent owns independent rereview, integration and broader acceptance.

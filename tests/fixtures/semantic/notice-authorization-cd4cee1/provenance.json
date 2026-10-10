@@ -1,0 +1,23 @@
+{
+  "source_task": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-failed2-cd4cee1-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-C09/evidence/codex-task",
+  "execute_event_position": 24,
+  "excluded_execute_and_after": true,
+  "source_events_sha256": "0aa6adae4b2654191de918d41e5df4297abc0207c295c4ebc1444891eb905bf6",
+  "source_broker_sha256": "66a5efb4591fd27fc8afdfb3217368db212d7b2ec6a6fc451f61960d679d8a63",
+  "excerpt_sha256": {
+    "preexecution-input.json": "3abe31fc16f16ead34fa89ff8a423d264be52a4cb94d451619bb803cb9b67cb4",
+    "preexecution-events.jsonl": "f3b3a0fdce66755757d87cc882328467fd226da25ad251839d57fd6c4ce96382",
+    "broker-records.json": "a04adfbc2ab35cc33883107290165d4bacbb66deb5111b0a3b43f238db89a044"
+  },
+  "preview": {
+    "source": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-failed2-cd4cee1-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP22-C09/evidence/codex-task/broker/state/transactions/tx1-s43m7bhtwx6xg0kfjvpx/preview.json",
+    "sha256": "a0e6d02b5e9e993c10f931bc85837d55a5eb8733176a17c47306f8134aa88cc3",
+    "artifact_canonical_sha256": "48b624d4f4f127c13e07956cb81f116f4cc262694b9236f06e46624682d9f857",
+    "immutable_pre_execute": true
+  },
+  "source_preview_broker_record_canonical_sha256": "e208f79884cc2cfe1b963670907400da08f76249044882ce2aabd6b90fc71438",
+  "fixture_note": "Pre-Execute source facts only. Exact payload and decoded event output retained. Credential-bearing argv replaced with a fixture authority; unused Broker stdout removed; placeholder preceding timeline is reconstructed. Reconstructed record/timeline digests never claim source equality. No judgment or after-state.",
+  "files": {
+    "witness.json": "33d034e60939f6ba305da1f8349db9574f28173630f5b826a1d32b197dda1e25"
+  }
+}

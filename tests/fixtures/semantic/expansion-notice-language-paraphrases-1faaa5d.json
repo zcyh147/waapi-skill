@@ -1,0 +1,189 @@
+{
+  "status": "independent-design-proposal-not-executed",
+  "basis": "Separately authored meaning judgments from sealed business facts, before execution against the new shared-language implementation. Reviewer had prior legacy-code context; labels were not generated from parser outcomes. Offline specification data only; no Agent credit or blind/statistical validation claim.",
+  "timing": "Every positive belongs after the matching immutable Preview and before its single Execute. All negative variations use the same timing unless their text expressly refuses or describes history.",
+  "facts": {
+    "C09": {
+      "owner_id": "{F191B8D4-3B6B-4B49-B6F8-9D860E029527}",
+      "owner_name": "Expansion_EXP22-C09_EffectsOwner",
+      "owner_type": "Sound",
+      "effect_name": "Expansion_EXP22-C09_NewGain",
+      "effect_type": "Wwise Gain",
+      "effect_notes": "Expansion C09 appended gain",
+      "count": 1,
+      "placement": "after the two existing effects",
+      "plugin_parameters": "not supplied",
+      "platform_values": "not supplied"
+    },
+    "C08": {
+      "owner_id": "{20F15C75-0978-4C5C-927B-9280C128B289}",
+      "owner_name": "Expansion_EXP25-C08_Attenuation",
+      "owner_type": "Attenuation",
+      "quantity": "volume-dry",
+      "source": "custom",
+      "points": [
+        [
+          0,
+          0
+        ],
+        [
+          50,
+          -12
+        ],
+        [
+          100,
+          -48
+        ]
+      ],
+      "shape": "Linear",
+      "scope": "only this curve; identity, notes, other curves, Sound configuration and Horns unchanged",
+      "gateway_verification_strength": "result_schema_checked"
+    }
+  },
+  "pairs": [
+    {
+      "id": "C09-01",
+      "positive": "预览拟在该声音上新增一个 Wwise Gain 效果器，名为 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。独立授权已取得，接下来我将执行该变更并核验。",
+      "negative": "预览拟在 OtherSound 上新增一个 Wwise Gain 效果器，名为 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。独立授权已取得，接下来我将执行该变更并核验。",
+      "negative_reason": "explicit foreign owner"
+    },
+    {
+      "id": "C09-02",
+      "positive": "目标声音已核对为请求中的 Sound。将在它的效果链末尾追加 Expansion_EXP22-C09_NewGain，类型为 Wwise Gain，备注“Expansion C09 appended gain”；不提交插件参数或平台值。我现在执行本次预览。",
+      "negative": "目标声音已核对为请求中的 Sound。将在它的效果链末尾追加 Expansion_EXP22-C09_NewGain2，类型为 Wwise Gain，备注“Expansion C09 appended gain”；不提交插件参数或平台值。我现在执行本次预览。",
+      "negative_reason": "wrong complete effect name, despite sharing the expected prefix"
+    },
+    {
+      "id": "C09-03",
+      "positive": "GUID、名称、类型和路径均与指定声音一致。预览的新增项是 Wwise Gain：Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。原有两个效果器保留；下面按本次授权执行。",
+      "negative": "GUID、名称、类型和路径均与指定声音一致。预览的新增项是 Wwise Gain：Expansion_EXP22-C09_NewGain，备注为“Different notes”。原有两个效果器保留；下面按本次授权执行。",
+      "negative_reason": "wrong new-effect notes"
+    },
+    {
+      "id": "C09-04",
+      "positive": "本次预览只给目标 Sound 加一个名为 Expansion_EXP22-C09_NewGain 的 Wwise Gain，备注是“Expansion C09 appended gain”。已为本次修改取得独立授权，我将执行这一项。",
+      "negative": "本次预览只给目标 Sound 加一个名为 Expansion_EXP22-C09_NewGain 的 Wwise Gain，备注是“Expansion C09 appended gain”。已为本次修改取得独立授权，我不会执行这一项。",
+      "negative_reason": "explicit refusal of the owned change"
+    },
+    {
+      "id": "C09-05",
+      "positive": "预览显示：该声音的效果链将多一个 Wwise Gain，名称 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”，排在原有两项之后。现在应用这项变更，再按返回流程验证。",
+      "negative": "当前状态显示：该声音的效果链已经有一个 Wwise Gain，名称 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”，排在原有两项之后。现在应用这项变更，再按返回流程验证。",
+      "negative_reason": "current-state description does not state a prospective edit"
+    },
+    {
+      "id": "C09-06",
+      "positive": "该声音仍是原 GUID。拟创建 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”，作为效果链的新末项；旧两项的身份、绑定和顺序保持。接下来执行并检查新增项。",
+      "negative": "该声音仍是原 GUID。拟创建 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”，作为效果链的新末项；随后再创建另一个 Wwise Gain，名为 AnotherGain。接下来执行并检查新增项。",
+      "negative_reason": "additional creation outside the sealed plan"
+    },
+    {
+      "id": "C09-07",
+      "positive": "在 Sound {F191B8D4-3B6B-4B49-B6F8-9D860E029527} 上，仅追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，并为新效果器写入备注“Expansion C09 appended gain”。授权对应这份预览，我现在执行。",
+      "negative": "在 Sound {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 上，仅追加 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，并为新效果器写入备注“Expansion C09 appended gain”。授权对应这份预览，我现在执行。",
+      "negative_reason": "foreign GUID"
+    },
+    {
+      "id": "C09-08",
+      "positive": "预览确认将向声音对象 Expansion_EXP22-C09_EffectsOwner 添加 Expansion_EXP22-C09_NewGain，效果类型 Wwise Gain；新效果器的备注为“Expansion C09 appended gain”。本次独立授权已落实，现在执行并核验。",
+      "negative": "预览确认将向声音对象 Expansion_EXP22-C09_EffectsOwner 添加 Expansion_EXP22-C09_NewGain，效果类型 Wwise Gain；并将该声音的备注改为“Expansion C09 appended gain”。本次独立授权已落实，现在执行并核验。",
+      "negative_reason": "notes target changed from new effect to existing Sound"
+    },
+    {
+      "id": "C09-09",
+      "positive": "预览只包含一个追加：该声音上的 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”。接下来执行该预览，然后检查新增效果器及原有两个效果器的身份、绑定与顺序。",
+      "negative": "预览只包含一个追加：该声音上的 Wwise Gain 效果器 Expansion_EXP22-C09_NewGain，备注“Expansion C09 appended gain”。接下来执行该预览，然后新增另一个效果器来替换原有第一个效果器。",
+      "negative_reason": "verification summary replaced by genuine extra creation and replacement"
+    },
+    {
+      "id": "C09-10",
+      "positive": "目标对象已核实为指定声音。其本次预览会新增 Wwise Gain，名为 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。现在按独立授权执行这一项修改。",
+      "negative": "目标对象已核实为指定声音。其本次预览会新增 Wwise Gain，名为 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”。同时把该声音的 Pitch 设为 12。现在按独立授权执行这一项修改。",
+      "negative_reason": "unapproved extra property edit"
+    },
+    {
+      "id": "C09-11",
+      "positive": "已确认这就是请求中的声音。预览将新增 Expansion_EXP22-C09_NewGain（Wwise Gain），并保留备注“Expansion C09 appended gain”作为新效果器的备注；不会修改原有两项。接下来我会执行这个已授权的变更。",
+      "negative": "已确认这就是请求中的声音。预览将在该声音和 OtherSound 上新增 Expansion_EXP22-C09_NewGain（Wwise Gain），并保留备注“Expansion C09 appended gain”作为新效果器的备注；不会修改原有两项。接下来我会执行这个已授权的变更。",
+      "negative_reason": "ambiguous/additional owner"
+    },
+    {
+      "id": "C09-12",
+      "positive": "已保存策略已为这项预览给出独立授权。预览拟在目标声音上创建 Expansion_EXP22-C09_NewGain，类型 Wwise Gain，备注“Expansion C09 appended gain”；插件参数和平台值均不设置。下面我将执行，并核验新增效果器和原有链路。",
+      "negative": "已保存策略已为这项预览给出独立授权。下面我将执行，并核验新增效果器和原有链路。",
+      "negative_reason": "authorization and verification progress omit the expected effect"
+    },
+    {
+      "id": "C08-01",
+      "positive": "预览已将本次修改独立授权为 allow_changes 策略操作。即将只把该衰减对象的干声音量曲线设为自定义，三个点依次为 (0,0 dB)、(50,-12 dB)、(100,-48 dB)，每段为线性；随后按返回流程核验。",
+      "negative": "预览已将本次修改独立授权为 allow_changes 策略操作。即将只把 OtherAttenuation 的干声音量曲线设为自定义，三个点依次为 (0,0 dB)、(50,-12 dB)、(100,-48 dB)，每段为线性；随后按返回流程核验。",
+      "negative_reason": "explicit foreign owner"
+    },
+    {
+      "id": "C08-02",
+      "positive": "本次预览只修改指定衰减的 volume-dry 曲线：source 为 custom，线性点为 (0,0)、(50,-12)、(100,-48)。其余曲线和对象配置保持不变，我现在执行这项已授权修改。",
+      "negative": "本次预览只修改指定衰减的 volume-dry 曲线：source 为 custom，线性点为 (0,0)、(50,-60)、(100,-48)。其余曲线和对象配置保持不变，我现在执行这项已授权修改。",
+      "negative_reason": "wrong middle ordinate"
+    },
+    {
+      "id": "C08-03",
+      "positive": "目标已核对为请求中的 Attenuation。将其干声音量曲线改为 custom，使用 (0,0)、(50,−12)、(100,−48) 三个 Linear 点。现在应用该预览，不动其他曲线或声音设置。",
+      "negative": "目标已核对为请求中的 Attenuation。将其干声音量曲线改为 custom，使用 (0,0)、(50,12)、(100,-48) 三个 Linear 点。现在应用该预览，不动其他曲线或声音设置。",
+      "negative_reason": "wrong sign, not a typographical minus variant"
+    },
+    {
+      "id": "C08-04",
+      "positive": "预览的预期结果是：该衰减对象的干声音量曲线使用自定义来源，点为 (0,0)、(50,-12)、(100,-48)，各段线性。已取得此项修改的独立授权，接下来执行并核验调用回执。",
+      "negative": "当前状态是：该衰减对象的干声音量曲线使用自定义来源，点为 (0,0)、(50,-12)、(100,-48)，各段线性。已取得此项修改的独立授权，接下来执行并核验调用回执。",
+      "negative_reason": "before-state description cannot certify prospective effects"
+    },
+    {
+      "id": "C08-05",
+      "positive": "准备执行的只有干声音量这一条：把目标衰减的曲线来源设为自定义，并提交线性点 (0,0 dB)、(50,-12 dB)、(100,-48 dB)。身份、备注和另外六条曲线均保留，现在执行本次预览。",
+      "negative": "准备执行的只有干声音量这一条：把目标衰减的曲线来源设为 project，并提交线性点 (0,0 dB)、(50,-12 dB)、(100,-48 dB)。身份、备注和另外六条曲线均保留，现在执行本次预览。",
+      "negative_reason": "wrong source"
+    },
+    {
+      "id": "C08-06",
+      "positive": "这份预览将干声音量曲线更新为 custom：从距离 0 到 100，点按 (0,0)、(50,-12)、(100,-48) 排列，每段 Linear。只作用于该衰减对象，按本次独立授权立即执行。",
+      "negative": "这份预览将干声音量曲线更新为 custom：从距离 0 到 100，点按 (50,-12)、(0,0)、(100,-48) 排列，每段 Linear。只作用于该衰减对象，按本次独立授权立即执行。",
+      "negative_reason": "wrong coordinate order"
+    },
+    {
+      "id": "C08-07",
+      "positive": "预览限定的是 Attenuation {20F15C75-0978-4C5C-927B-9280C128B289} 的 volume-dry，自定义线性点 (0,0)、(50,-12)、(100,-48)。授权已绑定到此预览，我现在执行，随后按 Gateway 验证结果收尾。",
+      "negative": "预览限定的是 Attenuation {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 的 volume-dry，自定义线性点 (0,0)、(50,-12)、(100,-48)。授权已绑定到此预览，我现在执行，随后按 Gateway 验证结果收尾。",
+      "negative_reason": "foreign GUID"
+    },
+    {
+      "id": "C08-08",
+      "positive": "本次获授权的改动会把该衰减的干声音量曲线设成自定义：0 对应 0 dB、50 对应 -12 dB、100 对应 -48 dB，三个点的插值都是线性。其他字段不提交，现在执行并核验。",
+      "negative": "本次获授权的改动会把该衰减的干声音量曲线设成自定义：0 对应 0 dB、50 对应 -12 Hz、100 对应 -48 dB，三个点的插值都是线性。其他字段不提交，现在执行并核验。",
+      "negative_reason": "incompatible ordinate unit"
+    },
+    {
+      "id": "C08-09",
+      "positive": "预览中唯一的曲线编辑是目标衰减的干声音量：来源自定义，(0,0)、(50,-12)、(100,-48)，线性；不会动声音的衰减引用、音量和路由。接下来我会执行该修改并按返回流程核验。",
+      "negative": "预览中唯一的曲线编辑是目标衰减的干声音量：来源自定义，(0,0)、(50,-12)、(100,-48)，非线性；不会动声音的衰减引用、音量和路由。接下来我会执行该修改并按返回流程核验。",
+      "negative_reason": "explicit wrong interpolation"
+    },
+    {
+      "id": "C08-10",
+      "positive": "预览确认将在指定衰减对象上应用自定义干声音量曲线，使用三个线性点 (0,0)、(50,-12)、(100,-48)。原身份、备注、其他曲线及 Horns 不变，现按独立授权执行。",
+      "negative": "预览确认将在指定衰减对象上应用自定义干声音量曲线，使用三个线性点 (0,0)、(50,-12)、(100,-48)。同时清空 Horns 的曲线，现按独立授权执行。",
+      "negative_reason": "extra change to the protected other attenuation"
+    },
+    {
+      "id": "C08-11",
+      "positive": "这个衰减对象已按 GUID 核实。预览只会把其干声音量曲线改成 custom，三个点 (0,0)、(50,-12)、(100,-48) 均按 Linear 处理。现在执行该变更；其余曲线和声音属性保持原值。",
+      "negative": "这个衰减对象已按 GUID 核实。预览只会把其干声音量曲线改成 custom，三个点 (0,0)、(50,-12)、(100,-48) 均按 Linear 处理。现在不执行该变更；其余曲线和声音属性保持原值。",
+      "negative_reason": "explicit refusal of the owned edit"
+    },
+    {
+      "id": "C08-12",
+      "positive": "独立授权对应这次预览。将把该衰减的 volume-dry 曲线来源设为 custom，并按顺序写入 (0,0)、(50,-12)、(100,-48) 三个线性点；不改对象身份、备注或其他配置。下面执行并核验回执。",
+      "negative": "独立授权对应这次预览。将把该衰减的 volume-dry 曲线来源设为 custom，并按顺序写入 (0,0)、(50,-12) 两个线性点；不改对象身份、备注或其他配置。下面执行并核验回执。",
+      "negative_reason": "missing requested endpoint and incorrect count"
+    }
+  ]
+}

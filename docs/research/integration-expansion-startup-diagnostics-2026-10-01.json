@@ -1,0 +1,96 @@
+{
+  "candidate": "9256ae8bd0af14636e3d5819355ffe83df64cfdf",
+  "codex_cli_version": "0.157.1",
+  "evidence_kind": "startup_diagnostic_not_semantic_acceptance",
+  "pilot_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-9256ae8-luna-high-r3",
+  "pilot_failure_stage": "prompt_input_audit_before_codex_exec",
+  "pilot_units": [
+    {
+      "unit_id": "EXP25-C01",
+      "recorded_status": "FAIL",
+      "source_hash_unchanged": true,
+      "source_mtime_unchanged": true,
+      "sandbox_retained": true,
+      "record_sha256": "a3dfcba4fe436cc24b77ebd7b6e34ef05ce5b795060e4da787f265dc5c89c83e"
+    },
+    {
+      "unit_id": "EXP25-C06",
+      "recorded_status": "FAIL",
+      "source_hash_unchanged": true,
+      "source_mtime_unchanged": true,
+      "sandbox_retained": true,
+      "record_sha256": "40625908c399b7117c1cf9666b4a5d592cee1fb53d39b41e3a61b40ffb1ce382"
+    },
+    {
+      "unit_id": "EXP25-M01",
+      "recorded_status": "FAIL",
+      "source_hash_unchanged": true,
+      "source_mtime_unchanged": true,
+      "sandbox_retained": true,
+      "record_sha256": "625146cb3c1effacd4e1d96a74c5a876da33d1c9d85b9739b4d68268f4f841c2"
+    }
+  ],
+  "diagnostics": [
+    {
+      "probe": "nested",
+      "cwd": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-prompt-cwd-diagnostic-9256ae8-r1/nested/agent-workspace",
+      "exit_status": 124,
+      "timed_out": true,
+      "duration_seconds": 30.015488,
+      "source_skill_sha256": "1788c0904221fd74754968a19685bbf959933a7a61740682099726f10d88861c",
+      "command_equal": true,
+      "agent_started": false,
+      "wwise_started": false,
+      "semantic_pass_credit": false,
+      "process_returned_and_reaped": true,
+      "raw_record": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-prompt-cwd-diagnostic-9256ae8-r1/diagnostic-results.json",
+        "sha256": "87ecd3e74afb5cdc01e50030abcf5e023d79db560632e5c92cb119afac93785c"
+      }
+    },
+    {
+      "probe": "standalone",
+      "cwd": "/Users/xiye/.codex/diagnostics/expansion-prompt-cwd-diagnostic-9256ae8-r1/agent-workspace",
+      "exit_status": 0,
+      "timed_out": false,
+      "duration_seconds": 3.256644,
+      "source_skill_sha256": "1788c0904221fd74754968a19685bbf959933a7a61740682099726f10d88861c",
+      "command_equal": true,
+      "agent_started": false,
+      "wwise_started": false,
+      "semantic_pass_credit": false,
+      "process_returned_and_reaped": true,
+      "prompt_audit_passed": true,
+      "raw_record": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-prompt-cwd-diagnostic-9256ae8-r1/diagnostic-results.json",
+        "sha256": "87ecd3e74afb5cdc01e50030abcf5e023d79db560632e5c92cb119afac93785c"
+      }
+    },
+    {
+      "probe": "nested-valid-git",
+      "cwd": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-prompt-valid-git-diagnostic-9256ae8-r1/nested/agent-workspace",
+      "exit_status": 0,
+      "timed_out": false,
+      "duration_seconds": 3.11757,
+      "source_skill_sha256": "1788c0904221fd74754968a19685bbf959933a7a61740682099726f10d88861c",
+      "command_equal": true,
+      "agent_started": false,
+      "wwise_started": false,
+      "semantic_pass_credit": false,
+      "process_returned_and_reaped": true,
+      "prompt_audit_passed": true,
+      "workspace_unchanged": true,
+      "git_repository_validated": true,
+      "git_file_contents": {
+        "HEAD": "ref: refs/heads/main\n",
+        "config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n"
+      },
+      "raw_record": {
+        "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-prompt-valid-git-diagnostic-9256ae8-r1/diagnostic-results.json",
+        "sha256": "0a94c56ca10a43ce26b5414702dcf34f12ba78e4b2b9fad93937f923a568b31b"
+      }
+    }
+  ],
+  "conclusion": "Valid minimal Git metadata resolves the observed nested-workspace prompt audit stall; the exact blocked filename has not been established.",
+  "pending": "Repair and program-test the existing workspace boundary; freeze a new harness candidate and run fresh model pilots."
+}

@@ -1,0 +1,649 @@
+{
+  "contract": "waapi-skill.target-plan-family-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "base_candidate": "99adb520c2e42b03b563e10b442e4bfc55508e3d",
+  "historical_functional_candidate": "e93a57599387b3241170f79b21682c0230463ee3",
+  "branch": "codex/expansion-target-plan",
+  "integration_merge": "already up to date before final focused run",
+  "independent_matrix": {
+    "path": "tests/fixtures/semantic/expansion-target-plan-independent-20261007.json",
+    "sha256": "a4a087d4cbf58f7302a434baf350ef15fad44883db9d08e2a74105abacd0e67b",
+    "pairs": 22,
+    "vectors": 44,
+    "expectations_changed": false
+  },
+  "independent_fixture": {
+    "path": "tests/fixtures/semantic/expansion-target-plan-independent-fixture-20261007.json",
+    "sha256": "79c14d62eb9084737deb18dd8ed47f64cc8fc223590340b092ed48669deec6ca",
+    "main_artifact_and_before_equal_exact_latest": true
+  },
+  "addendum": {
+    "path": "/tmp/waapi-expansion-20261007-target-plan-contrasts-addendum.md",
+    "sha256": "794547e9df050791fdf527cc36f0c5868dd4b6d17ff8d403e7acd86f1e2a5e60"
+  },
+  "validation": {
+    "lane": "focused developer nonlive only; exact retained21 modules plus target-plan module",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "baseline": {
+      "passed": 2770,
+      "seconds": 4.97,
+      "exit_code": 0
+    },
+    "red": {
+      "exact": {
+        "failed": 1,
+        "passed": 0
+      },
+      "frozen_families": {
+        "failed": 18,
+        "passed": 27
+      },
+      "alias": {
+        "failed": 2,
+        "passed": 7,
+        "deselected": 45
+      },
+      "target_contradictions": {
+        "failed": 5,
+        "passed": 1,
+        "deselected": 54
+      }
+    },
+    "final": {
+      "passed": 2838,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 4.94,
+      "exit_code": 0,
+      "junit": {
+        "tests": 2838,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "retained_controls": 2770,
+    "new_controls": 68,
+    "new_controls_breakdown": {
+      "standalone_exact": 1,
+      "frozen_independent": 44,
+      "alias": 9,
+      "target_contradictions": 6,
+      "point_summary": 8
+    }
+  },
+  "preserved": [
+    "prior2770 assertions",
+    "frozen44 expectations and fixture bytes",
+    "historical frozen campaign FAIL/business6PASS",
+    "native context/class/descriptor and actual policy checkpoint",
+    "source/reference role separation",
+    "one-substantive owner window and reset boundaries",
+    "residual action accounting",
+    "optional baseline omission",
+    "Skill/runtime/prompt/suite/business oracle"
+  ],
+  "not_run": [
+    "full Program",
+    "full Non-live",
+    "Fresh",
+    "live Wwise",
+    "Windows",
+    "campaign verifier/replay/regrade/resume"
+  ],
+  "remaining": "Independent Standards/Spec reviews and coordinator-owned development/Fresh proof; no issue closure or acceptance claim",
+  "artifacts": [
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/alias-red-argv.json",
+      "sha256": "71efdbe3da4eb96bc1331987595a19b51e3eeade4c01eef7b72e8b5072fd372a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/alias-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/alias-red.log",
+      "sha256": "f61652f5836cecf3f41573ab31ba19e17107b94defd9c3a4d784bcefa12ec22f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/alias-red.xml",
+      "sha256": "a3c9aa3eb5cc54fe5715083e1b488c33c40c44f9a6a6d4229f8e4ed95cbe609a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/bounded-diagnoses.md",
+      "sha256": "cc98f129258e0a8965b6015c53270a2204aa570925d419fe5065a205551350e7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/exact-red-argv.json",
+      "sha256": "39f9084735fc94e8fc16113a027b4cfbd4d1b24475b88aefbdae5333693ab1f4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/exact-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/exact-red.log",
+      "sha256": "9d5af8bbcacbd016d1a275905abc3e1d86d4c81f3d24efd8275e2fb1b89fbeed"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/exact-red.xml",
+      "sha256": "6627c6786e04003690d33ce5f01ac0dc9aef9afe749c35a9face8a71cea3cd63"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/family-red-argv.json",
+      "sha256": "45793cc01ca6cbe21125ae8f130f68d49547c7fa4a3b25b49dc6dcb7ec3029b4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/family-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/family-red.log",
+      "sha256": "63d7f65654571942690e95585fad22ecb4795f1f0e4cb501c2c06c76a3ccec36"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/family-red.xml",
+      "sha256": "9653c9e33b917abe3e80c6aa0b0c337f1179b66a07c824b2e3f043834b375f7b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/lfs-attestation.json",
+      "sha256": "c22bba0f93f95378ace0b2db4a79a012acaad1987f16528aa72889799d22129a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/operation-slice-argv.json",
+      "sha256": "0b81695f68c8792f42870994006797a17803db8fbdb241f0543b7befe3cf4e22"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/operation-slice-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/operation-slice.log",
+      "sha256": "5afb4d554fe30e00b2c496849be25234e7f81bf342743170656167c6752a0843"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/operation-slice.xml",
+      "sha256": "3e2fcfc3bab65c80041367366c1dfb00e9fdfec43124849215ad66ed9223c3ca"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/preflight.json",
+      "sha256": "4658fed543eccf7fb67c44635d043eb15783e7962067e6615a4764b4ac09ce52"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-before-argv.json",
+      "sha256": "a883ecd43d2c8057fbec1d125918021144ab6486b2047ce2d61d479733c15750"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-before-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-before.log",
+      "sha256": "af9e466f7300f22a10e224ddb2455248d6e01f82de993a9caa51e7eeb3bbba5e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-before.xml",
+      "sha256": "aadfe7bd6d0087c08bab890539d8d148ba8ffa1af9bfef4424738abb0550cc85"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r1-argv.json",
+      "sha256": "544694c69757da3e9accc077b6780c6cc0c297be4130a844b71c849dbaa34999"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r1-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r1.log",
+      "sha256": "6165da215a066194e435171652a7ab017b21513404998c45702f9f69efdde4e0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r1.xml",
+      "sha256": "1eacf5b2cf65a85bfd1d83922a17209060034357006769ffc89bf1beb06badc5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r2-argv.json",
+      "sha256": "227947cd17d9184d20cd6944356c159d38faae66cd6dd1875006646dbba5d358"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r2-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r2.log",
+      "sha256": "53290405f0480203664dbd93f36043cfdb716faa8c835b1d5709afb306ae3de0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r2.xml",
+      "sha256": "0875321a6a9f2c5362ea40d0571e6b7c584b950d3311273e5f50cd1a5d3e7508"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r3-argv.json",
+      "sha256": "531e5411613e7422cf31415d8a4109c85e0274dd5d3f84c4a986d0817d6c7c45"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r3-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r3.log",
+      "sha256": "802c8c8f3ef99219e0654c18594ee9da9ac9f755940a839416e9ab9772aac819"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r3.xml",
+      "sha256": "a059de9495f6023e6998b7fd1da1133e32560999d78a0fda19de5fcea56b741f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r4-argv.json",
+      "sha256": "1556267d4b34c8142b8444548a52e033182ef0a4aa0f7bc6fda35c6fcc9804ae"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r4-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r4.log",
+      "sha256": "c6931e8d6968d2b7020b87d6d6d733c118c1896812e45d0b77d83681c781e207"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r4.xml",
+      "sha256": "8435124788044fe0ba45fccc03d2e19bd406ad3f3694ac9770a842f2e398e87f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r5-argv.json",
+      "sha256": "d366281038fdf847791b6a0df79dbcb9335385879bef06ccd36acd11da1f3a08"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r5-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r5.log",
+      "sha256": "ca8246ca42be40de1f987a98955ff6a727a3541891daa3b0cc1dbb67235bf989"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-family-r5.xml",
+      "sha256": "e30b2245cabe96088fa82d3f1fb57ec6f857b1536375aedfd314ddf531592f10"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-final-argv.json",
+      "sha256": "b336faf45e69b1fadc335b9dbc58e41bb28a85ad383669b4df88ff179e3069df"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-final-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-final.log",
+      "sha256": "1fb99d953bcce90d8a823ba5c6d1ef730d8e06ac5d654e807ad2dc8ada71a959"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/retained-final.xml",
+      "sha256": "ef57949d82d5bc10a15d5086968b641433c86b6b9b435b4ff794c039ebcfae1e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-contradiction-red-argv.json",
+      "sha256": "052b4593fb95d9d3b00608c6949de81861de731f6641dd4aee471ab32f002d92"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-contradiction-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-contradiction-red.log",
+      "sha256": "41fbe5703536a221da9f2a0bc8f818a43b212f7fba4b83ceefe408c138298838"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-contradiction-red.xml",
+      "sha256": "dbfb1615c76b60624fd87ad93b015076aba91773da515272b8c1b9c1917eb433"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-slice-argv.json",
+      "sha256": "60dbd78ccc297620ac8cd8191df6ec27a599d432b9fea66170467f6fae38960d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-slice-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-slice.log",
+      "sha256": "418aff7a8192fd38ba5a6058ca73d775e8e634bf889a515dfd7d83fee32b7715"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-e93a575-20261007/target-slice.xml",
+      "sha256": "653e2fea2c7de351229c03dc588e78b23b093e29e1a3900d1cd65bd07b7f8266"
+    }
+  ],
+  "review_delta": {
+    "scope": "Consolidated independent Standards/Spec P2 for #147; finite nonaffirmative target-attestation operands only",
+    "review_candidate": "1a58b53e2fef76506546f2545beed61653e96550",
+    "integration_tip": "99adb520c2e42b03b563e10b442e4bfc55508e3d",
+    "integration_merge": "already up to date before retained focused run and report",
+    "baseline_attribution": {
+      "newly_introduced": "Standards bare-owner notice returned False on base and True on review candidate",
+      "preexisting": "Changing the append owner to 向目标声音 already passed the same denied compound on base; not attributed to this candidate",
+      "source": "Independent copied-fixture probes in Standards/Spec reports; no baseline campaign replay or regrade"
+    },
+    "seam": "Existing _grammatical_notice -> expansion_preview_notice with unchanged sealed artifact, before-state, Preview and Execute receipts",
+    "behavior": "Complete existing denial/uncertainty frames identify exact sealed atoms, explicit target/typed-role frames, identity/configuration qualifiers and explicit GUID/path forms before singleton validation. Compound/foreign target operands become invalid; bare English tokens and unrelated operands retain unknown/reset behavior. Original full clause spans remain retained.",
+    "tdd": {
+      "red": {
+        "failed": 18,
+        "passed": 13,
+        "deselected": 68,
+        "skipped": 0,
+        "exit_code": 1,
+        "seconds": 0.27
+      },
+      "green": {
+        "passed": 31,
+        "failed": 0,
+        "deselected": 68,
+        "skipped": 0,
+        "exit_code": 0,
+        "seconds": 0.18
+      },
+      "retained_green": {
+        "passed": 2869,
+        "failed": 0,
+        "skipped": 0,
+        "exit_code": 0,
+        "seconds": 5.21,
+        "junit_tests": 2869
+      },
+      "prior_controls_unchanged": 2838,
+      "review_controls_added": 31,
+      "review_controls_breakdown": {
+        "exact_review_contrasts": 5,
+        "finite_nonaffirmative_frames": 16,
+        "affirmative_owner_attributes": 6,
+        "typed_reference_source_attributes": 2,
+        "unrelated_ancillary_reads": 2
+      }
+    },
+    "preserved": [
+      "prior2770 + original68 assertions",
+      "frozen44 matrix and fixture bytes",
+      "typed source/reference destination separation",
+      "unknown/reset ancillary behavior",
+      "historical frozen FAIL/business6PASS evidence"
+    ],
+    "not_run": [
+      "full Program",
+      "full Non-live",
+      "Fresh",
+      "live Wwise",
+      "Windows",
+      "campaign verifier/replay/regrade/resume"
+    ],
+    "artifacts": [
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/ancillary-english-red-argv.json",
+        "sha256": "29db57159e33c808b746d0b12caad133175d3f62fc1523f74b4aedc86e60cd61"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/ancillary-english-red-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/ancillary-english-red.log",
+        "sha256": "f37934a0aa561f14d6029b6a1342fcfeb6d735c508c7c6e1dc09f3a6362966b8"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/ancillary-english-red.xml",
+        "sha256": "6991cdea63b7f403d3423a9782ad387676efefa564c51afc02c8c246f5356079"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/expectation-erratum.json",
+        "sha256": "80a8fce6cf15cc3ab28fe0a4d3f6eb50cf90576c545dced8a545c35686c128d0"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-erratum-final-argv.json",
+        "sha256": "97490a77a9a03369d1d72638f0ec097817cb9c6e4897d9cebccb4d03599f795f"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-erratum-final-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-erratum-final.log",
+        "sha256": "32f7658052cc77b998c82ec02d66a4266d6d9f5ebca833a968c07d0712d15be5"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-erratum-final.xml",
+        "sha256": "f6a26f2ea0d375b87fd5732e98581714fd9b5db2a44776e6d2b97adafbcb4af5"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-final-argv.json",
+        "sha256": "88585eff1d4a521b257b29d3fd4f72f64e1517577aedaae74e0411aaff021dc2"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-final-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-final.log",
+        "sha256": "dbe831ffaf19a5ec5e3aa91fc9e3a4feac9ddfcefa12d9698ba0e552358b502d"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-final.xml",
+        "sha256": "f50c3174b7a912edebcea56fc2cb560041c92fa657120f53eb5a2e3cbb19f4d8"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-green-argv.json",
+        "sha256": "348feef6f9645bf6957487657cfe99a5979ec63575602ce87a960430f837b328"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-green-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-green.log",
+        "sha256": "5cf92d989d9dd3e7d9987b8e6a122cc157986a6263d6e195f2b37013c031048f"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/retained-review-green.xml",
+        "sha256": "bf74783b04b36e4f2d57c7be398d31cc336ea27bc2bf315898473fd37f13dd73"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-erratum-final-preflight.json",
+        "sha256": "7369ca7c8b5de807700289dafd8c063ea818ec54f1cd27ba9fc56c27138c3297"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-final-preflight.json",
+        "sha256": "ef73c56b6f8fe0ba87868a948dc70d2e3c60f87b65e78fdd2e3e03857b9b113f"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-green-argv.json",
+        "sha256": "508c21e9719f24b1cbd28d2ffc52a3a96bba6bb06c31d4b8064d516d62225dcd"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-green-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-green.log",
+        "sha256": "4101912f97ae57135f1c2955904866642490873dba3a4fa00d2cdfea2d4c383a"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-green.xml",
+        "sha256": "bb12bd1012e1e4c6273d396036a67f45c78a49f63f2dbf46d2fd83120913ba17"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-preflight.json",
+        "sha256": "9709eb34d87bb5d4dea2aff995bf6a08a7bddeceb13a1210d46fe702ddf7f45d"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-red-argv.json",
+        "sha256": "7f43ef829d25e21e5dc99f37bcdfc36491ee67e9c29d35ff500ccc37b40cbabc"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-red-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-red.log",
+        "sha256": "f63f8dbc291f650924c0b3b3e5645bc99c1c33ed8d6bff4a382633b7778eddcb"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-red.xml",
+        "sha256": "f710a711de656ce530a9e2759fc89bd22621284faae496de8c3a5964f6978f25"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-scoped-final-argv.json",
+        "sha256": "d1672d2987fd489ecf07c54af7ec76f4c4f2fdd08b4303db2409dbbee006a562"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-scoped-final-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-scoped-final.log",
+        "sha256": "f1f9d906f6a03cf12cdb1f72bb3643b969851c04a663f3b80e743ea1c30849db"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/review-scoped-final.xml",
+        "sha256": "3d70419627793402026b7f7975f1fa0475f4390d088ce4e769eed371422b5fd2"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/spec-review.md",
+        "sha256": "b2a7d326cc2e0ed003ed3e1aece08b1393e4a89a48801aa333459ca8923fcd9c"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/standards-review.md",
+        "sha256": "93ff0951b73f3ba68ea53b5fecbdb6e6334566af80dd6e2a2e780db7ac48d9ce"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-green-argv.json",
+        "sha256": "c3f1a67c9ba841c63d3c458235894f45a2bf42aeb4613f1a39bcbc384d37b2c0"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-green-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-green.log",
+        "sha256": "d71ece00980d03e9ab0e5f775ecaf886fa3229f96f8f840b18cd82b4d05a8bdf"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-green.xml",
+        "sha256": "7e58d9a427edfd881efdaea8568b7c1f25d907301aea7b9a42aa2da816137ab4"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-red-argv.json",
+        "sha256": "41558a7cbfe894a4625fb37c58f6be920764f0bcd09686f997cd7feb071d02ca"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-red-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-red.log",
+        "sha256": "91ab0dcc70b64521d51dac6e60999e458752a25500d0cebe12f0908ed26f4b8d"
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-target-plan-review-20261007/whole-identity-red.xml",
+        "sha256": "087e7b53ef8f0ec8bec3b84ae3c4edd199b69c06a76e0cfa9e905a47a18b4784"
+      }
+    ],
+    "remaining": "Independent Standards/Spec re-review and coordinator-owned development/Fresh proof; no acceptance or issue closure claim",
+    "self_audit": {
+      "intermediate_commit_preserved": "9d7da9d4b4e9c72e194930579aaddf2021d5e865",
+      "scope": "Restore whole sealed atom/attribute check before splitting conjunction characters; retain exact Unicode names",
+      "red": {
+        "failed": 2,
+        "passed": 2,
+        "deselected": 99,
+        "skipped": 0,
+        "exit_code": 1,
+        "seconds": 0.17
+      },
+      "green": {
+        "passed": 4,
+        "failed": 0,
+        "deselected": 99,
+        "skipped": 0,
+        "exit_code": 0,
+        "seconds": 0.15
+      },
+      "final_retained": {
+        "passed": 2873,
+        "failed": 0,
+        "skipped": 0,
+        "exit_code": 0,
+        "seconds": 4.99,
+        "junit_tests": 2873
+      },
+      "prior_controls_unchanged": 2838,
+      "total_review_controls_added": 35,
+      "additional_controls": "Two sealed Unicode names containing conjunction characters, each with affirmative and denied attribute polarity",
+      "integration_merge": "already up to date before final report and commit"
+    },
+    "expectation_erratum": {
+      "scope": "Only four newly authored controls in 9d7da9d; prior2838 and frozen44 untouched",
+      "reason": "A bare English token does not identify a target owner. The original negative assumptions incorrectly conflated unrelated reads with explicit target claims.",
+      "replacements": [
+        {
+          "old": "没有确认 OtherSound",
+          "new": "没有确认声音 OtherSound"
+        },
+        {
+          "old": "OtherSound 没有确认",
+          "new": "声音 OtherSound 没有确认"
+        },
+        {
+          "old": "或许已核实 OtherSound",
+          "new": "或许已核实 OtherSound身份"
+        },
+        {
+          "old": "OtherSound 或许已核实",
+          "new": "OtherSound身份或许已核实"
+        }
+      ],
+      "expectation_erratum": "Original untyped operands must remain unknown/reset rather than invalid-owner frames; replacement operands explicitly identify a typed owner or identity attribute and keep expected False.",
+      "new_ancillary_guards": [
+        "未核对 audio-docs",
+        "未确认 schedule",
+        "未确认 target schedule"
+      ],
+      "evidence": "Original RED/GREEN/retained2869 and whole-identity RED/GREEN/retained2873 logs remain preserved unchanged. Ancillary-English RED 2failed/3passed; corrected scoped GREEN38 and retained GREEN2876."
+    },
+    "final_validation": {
+      "scoped": {
+        "passed": 38,
+        "failed": 0,
+        "skipped": 0,
+        "deselected": 68,
+        "exit_code": 0,
+        "seconds": 0.19
+      },
+      "ancillary_red": {
+        "failed": 2,
+        "passed": 3,
+        "deselected": 101,
+        "exit_code": 1,
+        "seconds": 0.19
+      },
+      "retained": {
+        "passed": 2876,
+        "failed": 0,
+        "skipped": 0,
+        "exit_code": 0,
+        "seconds": 5.09,
+        "junit_tests": 2876
+      },
+      "prior_controls_unchanged": 2838,
+      "review_controls": 38,
+      "breakdown": {
+        "exact_review_contrasts": 5,
+        "finite_nonaffirmative_frames": 16,
+        "affirmative_owner_attributes": 6,
+        "typed_reference_source_attributes": 2,
+        "unrelated_ancillary_reads": 5,
+        "sealed_name_polarity": 4
+      },
+      "integration_merge": "already up to date before final report and commit"
+    }
+  }
+}

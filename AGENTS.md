@@ -4,6 +4,10 @@ This repository implements `waapi-skill`: a local, version-aware WAAPI interface
 for Wwise Authoring. Read this file before changing the Skill or running tests.
 `tests/AGENTS.md` adds more specific rules for files below `tests/`.
 
+For Fresh test planning, failure triage or rerun decisions, read
+[business acceptance](tests/semantic/TEST_ACCEPTANCE.md) before interpreting
+historical campaign requirements.
+
 ## Design intent
 
 - The Skill is the interface layer. It replaces an always-on MCP server with a
@@ -424,7 +428,10 @@ blocks before the Fresh turn. Skill reads use complete UTF-8 text from the
 exact trusted file. `Get-Content -Raw -Encoding UTF8 <path>` and the equivalent
 `Get-Content -Raw <path>` UTF-8 default receive credit only through the sealed,
 profile-free PowerShell Core wrapper and complete-content comparison; legacy
-or unattested shells do not. This file-read equivalence never authorizes
+or unattested shells do not. Formal task read schedules also own a closed UTF-8
+read relay that preserves ConstrainedLanguage; its exact grammar admits only
+one trusted file read. See the Console encoding incident in
+`tests/semantic/HARNESS_PITFALLS.md`. This file-read equivalence never authorizes
 reconstructing a Gateway continuation.
 
 The official profiles are `screening` (40 sessions), `formal_98` (98), and

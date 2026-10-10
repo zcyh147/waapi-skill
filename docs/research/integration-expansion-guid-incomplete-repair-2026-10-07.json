@@ -1,0 +1,186 @@
+{
+  "contract": "waapi-skill.expansion-guid-incomplete-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "fixed_review_candidate": "9c47f29dc525b8204548bd3fd348c11ed31e410b",
+  "functional_successor": "5dee90615f6881c7ef812389eef31fd2aa0c35d4",
+  "integration_tip": "875b6e727a7f73a0695b66dc8594e04e3f9dd0db",
+  "integration_merge": "Already up to date.",
+  "public_seam": "expansion_preview_notice",
+  "finding": "P2: intended GUID–与 comparison without completed equality relation escaped as unclassified, even with missing/foreign operands.",
+  "repair": "Recognize the existing GUID–与 intent before relation completion; retain the same whole-frame operand validation and invalid result.",
+  "source_review_evidence": [
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/fixed-candidate-review/spec-final-boundary-probe.py",
+      "sha256": "1e27c071449a09acd0b9faac4455174bee27e78b91ffe89241c72f55843f9ba2",
+      "bytes": 3844
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/fixed-candidate-review/spec-final-boundary-probes.json",
+      "sha256": "e2e6944d3b3da853729d627c4cff2f54791a9333574d8ee707dfa5fc501bc638",
+      "bytes": 42395
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/fixed-candidate-review/spec-final.md",
+      "sha256": "0ce1148970f3f7401cfdf7e305e7c5a8dbe169e58f5f2e88b6022271d1a8d1fd",
+      "bytes": 2628
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/fixed-candidate-review/standards-final.md",
+      "sha256": "12c62c67cb77441733ef049e275f8ee459fe4745c93de10ef355c1487959e0d1",
+      "bytes": 2686
+    }
+  ],
+  "frozen_fixture": {
+    "path": "tests/fixtures/semantic/expansion-guid-incomplete-review-20261007.json",
+    "sha256": "9ba4adcebd0e6ae3ebc10e59451ef28e102ac0cc5bb4d0dd0c9931df75f73b3a",
+    "vectors": 41,
+    "review_false_acceptances": 28,
+    "matching_controls": 13,
+    "expectation_changes": 0,
+    "family_mapping": {
+      "effect": "effect",
+      "rtpc": "rtpc",
+      "attenuation": "attenuation",
+      "stinger": "stinger"
+    }
+  },
+  "validation": {
+    "lane": "Focused offline developer pytest via ci/test.sh --mode nonlive; not full Non-live",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "runs": {
+      "red": {
+        "summary": "28 failed, 14 passed in 0.27s",
+        "direct_exit": 1,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "28",
+          "skipped": "0",
+          "tests": "42",
+          "time": "0.267",
+          "timestamp": "2026-10-07T22:31:24.714182+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/red.log",
+            "sha256": "f26e001180b8b41e84eb378577ea8e9515adcbbe08307719443e958401a7b9be"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/red.xml",
+            "sha256": "39c6dc1d35f7516f5347477a03c5034bf9a958b3cfd39353c2ccc4c71ad2b4db"
+          }
+        ]
+      },
+      "green": {
+        "summary": "42 passed in 0.25s",
+        "direct_exit": 0,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "42",
+          "time": "0.249",
+          "timestamp": "2026-10-07T22:31:49.593999+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/green.log",
+            "sha256": "f393c226eb44740b340ee7ea665d86d29212c358e3147be0514961e7eee76cd9"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/green.xml",
+            "sha256": "e0f28698d519e0055acd78bf098d2e333b80d65b144f74f5dc509f3c912f1e4b"
+          }
+        ]
+      },
+      "focused-final": {
+        "summary": "3354 passed in 6.73s",
+        "direct_exit": 0,
+        "junit": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "0",
+          "skipped": "0",
+          "tests": "3354",
+          "time": "6.724",
+          "timestamp": "2026-10-07T22:32:13.963687+08:00",
+          "hostname": "xiyes-Mac-mini.local"
+        },
+        "evidence": [
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/focused-final.log",
+            "sha256": "cf8c91cd32f7a40873fdd4e45bb643a9fffd44f7877da547f57b0fd09a0c130f"
+          },
+          {
+            "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/focused-final.xml",
+            "sha256": "c0ee2951a46f085c102aef194cb0f899ee5ae6f9869b45b2f13678e95a686ff4"
+          }
+        ]
+      }
+    },
+    "final": {
+      "tests": 3354,
+      "prior_retained": 3312,
+      "new_review_vectors": 41,
+      "new_hash_guard": 1,
+      "selected_files": [
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_guid_comparison_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_purpose_composition_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_task_runner_v3.py",
+        "tests/semantic/test_codex_guid_span_review.py",
+        "tests/semantic/test_codex_guid_incomplete_review.py"
+      ]
+    }
+  },
+  "preservation": {
+    "prior_files": 68,
+    "sha256_manifest": {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-guid-incomplete-20261007/preserved-prior-sha256.json",
+      "sha256": "d7a4698304704c6bc7f248ba555dca1a89ab5d05e50a18ea5f4a99ade421a21f"
+    },
+    "candidate_files": {
+      "tests/semantic/support/codex_notice_claims.py": "ff14e884aaef93a415065844d5dca7c2d2475dd67b8454cc8c612faca867aeac",
+      "tests/semantic/test_codex_guid_incomplete_review.py": "ef4d22c8507d2e7471bf963b02d5c54a6d609176fe5b3c60a92d482568261505",
+      "tests/fixtures/semantic/expansion-guid-incomplete-review-20261007.json": "9ba4adcebd0e6ae3ebc10e59451ef28e102ac0cc5bb4d0dd0c9931df75f73b3a"
+    },
+    "unchanged_trees": {
+      "skills/waapi-skill": "10c034a0615ce41d84f61d3614546457b8aa5f8d",
+      "ci": "e8a2d4ad7b72a90f3692eab3c0f23afcb0c1c4c9",
+      "tests/_org": "6cb929c760b0df7b443d338c8ed8466d247223df"
+    }
+  },
+  "limits": [
+    "Developer copied-fixture proof only; no Agent/Wwise or business-effect PASS credit.",
+    "No full Program/Non-live, live, Fresh, historical replay/regrade/verify-only, config or source-project write.",
+    "No Skill, suite, oracle, runtime, acceptance, owner-certification or prompt-wording changes.",
+    "Prior RTPC association role, Stinger source/destination, unknown adjacency reset, optional authorization prose and aggregate consumers remain unchanged.",
+    "Independent rereview, integration, broad gates and new-root acceptance remain coordinator-owned."
+  ]
+}

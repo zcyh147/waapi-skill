@@ -1,0 +1,500 @@
+{
+  "contract": "waapi-skill.integration-expansion-acceptance-report/v1",
+  "acceptance_basis": "Explicit user amendment: business-first baseline plus repaired EXP25-C09 targeted PASS; no final full-matrix claim",
+  "candidate": "5562104c7b2ba5e689744fb3e832b14eec62739c",
+  "skill_tree": "10c034a0615ce41d84f61d3614546457b8aa5f8d",
+  "baseline_business_assessment": {
+    "assessment": "User-approved business acceptance; original grades unchanged",
+    "baseline_candidate": "8079061878ed10254d4b674b4f3885b66b480203",
+    "baseline_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-8079061-sol-high-r1-cli1592",
+    "original_status_counts": {
+      "BLOCKED": 0,
+      "BOUNDARY_PROVEN": 1,
+      "FAIL": 1,
+      "INDETERMINATE": 0,
+      "PASS": 12
+    },
+    "artifact_integrity_rechecked": 1179,
+    "positive_business_units": [
+      {
+        "unit": "EXP22-C01",
+        "business_checks": "PASS",
+        "assertions": {
+          "requested_language_media_matches": true,
+          "other_language_unchanged": true,
+          "source_gain_unchanged": true,
+          "requested_language_source_identity_preserved": true,
+          "sound_identity_and_configuration_unchanged": true,
+          "exact_language_set": true,
+          "event_and_action_unchanged": true,
+          "distractor_unchanged": true,
+          "fixture_membership_unchanged": true
+        },
+        "required_assertions": [
+          "distractor_unchanged",
+          "event_and_action_unchanged",
+          "exact_language_set",
+          "fixture_membership_unchanged",
+          "other_language_unchanged",
+          "requested_language_media_matches",
+          "requested_language_source_identity_preserved",
+          "sound_identity_and_configuration_unchanged",
+          "source_gain_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "9fed9fd43479296cddc84167438871a7087680c7530c42869a27d55128a9e3c5"
+      },
+      {
+        "unit": "EXP22-C03",
+        "business_checks": "PASS",
+        "assertions": {
+          "exact_target_set": true,
+          "exact_media_mapping": true,
+          "sound_identities_and_configuration_preserved": true,
+          "source_identities_and_configuration_preserved": true,
+          "media_destinations_preserved": true,
+          "distractor_unchanged": true,
+          "fixture_membership_unchanged": true
+        },
+        "required_assertions": [
+          "distractor_unchanged",
+          "exact_media_mapping",
+          "exact_target_set",
+          "fixture_membership_unchanged",
+          "media_destinations_preserved",
+          "sound_identities_and_configuration_preserved",
+          "source_identities_and_configuration_preserved"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "d82c171ff2fc79befd79263e0ebc596208e38a27f1964a5cf799f0fcb4ad0ec0"
+      },
+      {
+        "unit": "EXP22-C06",
+        "business_checks": "PASS",
+        "assertions": {
+          "rtpc_identity_set_unchanged": true,
+          "target_identity_and_binding_unchanged": true,
+          "target_curve_matches": true,
+          "sibling_curves_unchanged": true,
+          "owner_configuration_unchanged": true,
+          "media_unchanged": true,
+          "control_identity_notes_and_parent_unchanged": true
+        },
+        "required_assertions": [
+          "control_identity_notes_and_parent_unchanged",
+          "media_unchanged",
+          "owner_configuration_unchanged",
+          "rtpc_identity_set_unchanged",
+          "sibling_curves_unchanged",
+          "target_curve_matches",
+          "target_identity_and_binding_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "45b7de69ccca5d8ff580a5db03b736d08e3766bb90e1236d5c8a62e992c39569"
+      },
+      {
+        "unit": "EXP22-C08",
+        "business_checks": "PASS",
+        "assertions": {
+          "requested_curve_matches": true,
+          "other_curves_unchanged": true,
+          "attenuation_identity_unchanged": true,
+          "users_and_references_unchanged": true,
+          "source_attenuation_unchanged": true
+        },
+        "required_assertions": [
+          "attenuation_identity_unchanged",
+          "other_curves_unchanged",
+          "requested_curve_matches",
+          "source_attenuation_unchanged",
+          "users_and_references_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "1c30dd803487a08363a2d69823bbac3ab678737c0e35d94430a8d20cd3e5e688"
+      },
+      {
+        "unit": "EXP22-C09",
+        "business_checks": "PASS",
+        "assertions": {
+          "owner_unchanged": true,
+          "exactly_one_added_binding": true,
+          "existing_effects_and_bindings_unchanged": true,
+          "new_effect_matches": true,
+          "unique_effect_identities": true,
+          "new_effect_owned_by_target": true
+        },
+        "required_assertions": [
+          "exactly_one_added_binding",
+          "existing_effects_and_bindings_unchanged",
+          "new_effect_matches",
+          "new_effect_owned_by_target",
+          "owner_unchanged",
+          "unique_effect_identities"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "b8906e74593bbd1deaba112195802f783af01e43352ed997748578aac1977877"
+      },
+      {
+        "unit": "EXP22-M01",
+        "business_checks": "PASS",
+        "assertions": {
+          "parent_and_protected_sibling_unchanged": true,
+          "exact_segment_track_source_topology": true,
+          "each_track_has_one_sequence_and_clip": true,
+          "media_hashes_match_each_requested_track": true,
+          "clip_media_matches_its_source": true,
+          "only_track_has_requested_volume": true
+        },
+        "required_assertions": [
+          "clip_media_matches_its_source",
+          "each_track_has_one_sequence_and_clip",
+          "exact_segment_track_source_topology",
+          "media_hashes_match_each_requested_track",
+          "only_track_has_requested_volume",
+          "parent_and_protected_sibling_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "e1ec201a9776c9acb5cb5bb610b47d4bcf8d24252503e610b22206efde2fa5f8"
+      },
+      {
+        "unit": "EXP25-C01",
+        "business_checks": "PASS",
+        "assertions": {
+          "requested_language_media_matches": true,
+          "other_language_unchanged": true,
+          "source_gain_unchanged": true,
+          "requested_language_source_identity_preserved": true,
+          "sound_identity_and_configuration_unchanged": true,
+          "exact_language_set": true,
+          "event_and_action_unchanged": true,
+          "distractor_unchanged": true,
+          "fixture_membership_unchanged": true
+        },
+        "required_assertions": [
+          "distractor_unchanged",
+          "event_and_action_unchanged",
+          "exact_language_set",
+          "fixture_membership_unchanged",
+          "other_language_unchanged",
+          "requested_language_media_matches",
+          "requested_language_source_identity_preserved",
+          "sound_identity_and_configuration_unchanged",
+          "source_gain_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "4d815c7ffbb49a9834a8f0e856a01f1ccdb9b0af238b586fd3a571d1f873d1a8"
+      },
+      {
+        "unit": "EXP25-C03",
+        "business_checks": "PASS",
+        "assertions": {
+          "exact_target_set": true,
+          "exact_media_mapping": true,
+          "sound_identities_and_configuration_preserved": true,
+          "source_identities_and_configuration_preserved": true,
+          "media_destinations_preserved": true,
+          "distractor_unchanged": true,
+          "fixture_membership_unchanged": true
+        },
+        "required_assertions": [
+          "distractor_unchanged",
+          "exact_media_mapping",
+          "exact_target_set",
+          "fixture_membership_unchanged",
+          "media_destinations_preserved",
+          "sound_identities_and_configuration_preserved",
+          "source_identities_and_configuration_preserved"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "96062122835fe83e8336221ef083924a501e7363a2a264670261c4e726023d3b"
+      },
+      {
+        "unit": "EXP25-C06",
+        "business_checks": "PASS",
+        "assertions": {
+          "rtpc_identity_set_unchanged": true,
+          "target_identity_and_binding_unchanged": true,
+          "target_curve_matches": true,
+          "sibling_curves_unchanged": true,
+          "owner_configuration_unchanged": true,
+          "media_unchanged": true,
+          "control_identity_notes_and_parent_unchanged": true
+        },
+        "required_assertions": [
+          "control_identity_notes_and_parent_unchanged",
+          "media_unchanged",
+          "owner_configuration_unchanged",
+          "rtpc_identity_set_unchanged",
+          "sibling_curves_unchanged",
+          "target_curve_matches",
+          "target_identity_and_binding_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "b333ac1f9186a4cc6a7ff0e44881862baea337dc5aace324e9e8f5530d7ca9cf"
+      },
+      {
+        "unit": "EXP25-C08",
+        "business_checks": "PASS",
+        "assertions": {
+          "requested_curve_matches": true,
+          "other_curves_unchanged": true,
+          "attenuation_identity_unchanged": true,
+          "users_and_references_unchanged": true,
+          "source_attenuation_unchanged": true
+        },
+        "required_assertions": [
+          "attenuation_identity_unchanged",
+          "other_curves_unchanged",
+          "requested_curve_matches",
+          "source_attenuation_unchanged",
+          "users_and_references_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "d621e37d0d5a4ec5268f6c3bf48913f73b909fb2455397608032e5b8c0e03a10"
+      },
+      {
+        "unit": "EXP25-C09",
+        "business_checks": "PASS",
+        "assertions": {
+          "owner_unchanged": true,
+          "exactly_one_added_binding": true,
+          "existing_effects_and_bindings_unchanged": true,
+          "new_effect_matches": true,
+          "unique_effect_identities": true,
+          "new_effect_owned_by_target": true
+        },
+        "required_assertions": [
+          "exactly_one_added_binding",
+          "existing_effects_and_bindings_unchanged",
+          "new_effect_matches",
+          "new_effect_owned_by_target",
+          "owner_unchanged",
+          "unique_effect_identities"
+        ],
+        "original_overall_status": "FAIL",
+        "original_failed_gates": [
+          {
+            "turn": 1,
+            "gate": "visible_preview_notice"
+          }
+        ],
+        "outcome_sha256": "8410f24852ea4bf79c0c8dfdd48436992cd5b92d9177cdbdfb5721f1622149f7"
+      },
+      {
+        "unit": "EXP25-M01",
+        "business_checks": "PASS",
+        "assertions": {
+          "parent_and_protected_sibling_unchanged": true,
+          "exact_segment_track_source_topology": true,
+          "each_track_has_one_sequence_and_clip": true,
+          "media_hashes_match_each_requested_track": true,
+          "clip_media_matches_its_source": true,
+          "only_track_has_requested_volume": true
+        },
+        "required_assertions": [
+          "clip_media_matches_its_source",
+          "each_track_has_one_sequence_and_clip",
+          "exact_segment_track_source_topology",
+          "media_hashes_match_each_requested_track",
+          "only_track_has_requested_volume",
+          "parent_and_protected_sibling_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "5ea750df3593f88d7cb720df48f883f7b4653a54972b54e6e9f92c4f4563cbc1"
+      },
+      {
+        "unit": "EXP25-M05",
+        "business_checks": "PASS",
+        "assertions": {
+          "requested_trigger_matches": true,
+          "segment_reference_preserved": true,
+          "stinger_identity_and_other_configuration_preserved": true,
+          "other_stingers_preserved": true,
+          "target_and_segment_unchanged": true,
+          "owner_unchanged": true
+        },
+        "required_assertions": [
+          "other_stingers_preserved",
+          "owner_unchanged",
+          "requested_trigger_matches",
+          "segment_reference_preserved",
+          "stinger_identity_and_other_configuration_preserved",
+          "target_and_segment_unchanged"
+        ],
+        "original_overall_status": "PASS",
+        "original_failed_gates": [],
+        "outcome_sha256": "dd6f09b289a8c460af9ed790b16200ac3de3475145a2b8abfdf6064f2279e99b"
+      }
+    ],
+    "separate_boundary": "EXP22-M05",
+    "historical_verify_only_run": false,
+    "remaining_requirement": "New repaired EXP25-C09 PASS and identical successful-root audit",
+    "phase_timing": "Deferred, excluded from delivery"
+  },
+  "nonlive": {
+    "candidate": "5562104c7b2ba5e689744fb3e832b14eec62739c",
+    "exit_code": 0,
+    "passed": 17254,
+    "skipped": 120,
+    "deselected": 27,
+    "seconds": 920.46,
+    "terminal": "17254 passed, 120 skipped, 27 deselected in 920.46s (0:15:20)",
+    "session_id": 43841,
+    "log": "/tmp/waapi-5562104-nonlive-20261009.log",
+    "log_sha256": "96cc8052a898589dee0060f5653f2da5804155855070f0386044cdcab0f94eca",
+    "owned_processes_after": []
+  },
+  "targeted": {
+    "root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-25-5562104-sol-high-r1-cli1592",
+    "candidate": "5562104c7b2ba5e689744fb3e832b14eec62739c",
+    "counts": {
+      "BLOCKED": 0,
+      "FAIL": 0,
+      "INDETERMINATE": 0,
+      "PASS": 1
+    },
+    "stop_reason": null,
+    "artifact_count": 69,
+    "artifact_bytes": 1845852,
+    "sidecar_seals": 11,
+    "integrity_errors": [],
+    "scoped_processes": [],
+    "cases": [
+      {
+        "unit": "EXP25-C09",
+        "status": "PASS",
+        "source_hash_unchanged": true,
+        "source_mtime_unchanged": true,
+        "sandbox_retained": false,
+        "owned_root_exists": false,
+        "private_home_bound": true,
+        "owned_prefix_bound": true,
+        "infrastructure_errors": [],
+        "agent_seconds": 108.92498516617343,
+        "slow": false,
+        "assertions": {
+          "owner_unchanged": true,
+          "exactly_one_added_binding": true,
+          "existing_effects_and_bindings_unchanged": true,
+          "new_effect_matches": true,
+          "unique_effect_identities": true,
+          "new_effect_owned_by_target": true
+        },
+        "reviews": [
+          {
+            "path": "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/notice-review/receipt.json",
+            "outcome": "accepted",
+            "contract": "waapi-skill.expansion-notice-adjudication/v8",
+            "seconds": 67.583833
+          }
+        ]
+      }
+    ],
+    "launch_state": [
+      "state = not running",
+      "runs = 1",
+      "last exit code = 0"
+    ],
+    "no_verify_only": true
+  },
+  "verify_only": {
+    "candidate": "5562104c7b2ba5e689744fb3e832b14eec62739c",
+    "root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-25-5562104-sol-high-r1-cli1592",
+    "argv": [
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill/.venv/bin/python",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+      "--profile",
+      "integration_expansion_v1",
+      "--skill-source",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill",
+      "--codex-binary",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/tooling/codex-0.159.2/package/bin/codex",
+      "--auth-json",
+      "/Users/xiye/.codex/auth.json",
+      "--live-config",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/.waapi-skill-state/runtime/expansion-frozen-live-environment.json",
+      "--model",
+      "gpt-6.1-sol",
+      "--reasoning-effort",
+      "high",
+      "--service-tier",
+      "default",
+      "--timeout",
+      "600",
+      "--wwise-readiness-timeout",
+      "180",
+      "--max-pre-action-retries",
+      "0",
+      "--campaign-root",
+      "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-25-5562104-sol-high-r1-cli1592",
+      "--case-id",
+      "EXP25-C09",
+      "--resume",
+      "--verify-only"
+    ],
+    "exit_code": 0,
+    "all_root_file_bytes_unchanged": true,
+    "file_count": 84,
+    "log": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/notice-discovery-5562104-20261009/c09-25-verify.log",
+    "log_sha256": "08bee676db4c8727d9fc7c857aa76c90f0f3a34299f826b77b5a7c97b14a6ec2"
+  },
+  "cleanup": {
+    "job_unloaded": true,
+    "temporary_plist_removed": true,
+    "saved_plist": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/notice-discovery-5562104-20261009/c09-25-launch-job.plist.saved",
+    "scoped_processes": []
+  },
+  "executor_usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 399360,
+    "input_tokens": 441592,
+    "output_tokens": 2236,
+    "reasoning_output_tokens": 424
+  },
+  "reviewer_usage": {
+    "input_tokens": 20497,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 1510,
+    "reasoning_output_tokens": 1034
+  },
+  "started_at": "2026-10-09T14:31:07Z",
+  "completed_at": "2026-10-09T14:34:24Z",
+  "discovery_evidence_present": true,
+  "reviewer_ran": true,
+  "phase_timing": {
+    "disposition": "deferred by user",
+    "branch": "expansion-phase-timing",
+    "checkpoint": "7308f2a4c085c4024c31b96dfb75d162d30a3858",
+    "delivered": false
+  },
+  "evidence_directory": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/notice-discovery-5562104-20261009",
+  "scope_exclusions": [
+    "Windows acceptance",
+    "playback",
+    "exhaustive API coverage",
+    "full Playlist/Transition/Music Switch workflow acceptance"
+  ],
+  "docs_check": {
+    "passed": 9,
+    "exit_code": 0,
+    "log": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/notice-discovery-5562104-20261009/final-docs.log",
+    "log_sha256": "a859a8742e8bfedab6bb66364193c90453440350200c58785e8976fb1315942f"
+  },
+  "final_record_review": {
+    "material_findings": 0,
+    "report": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/notice-discovery-5562104-20261009/waapi-5562104-final-record-review.md",
+    "sha256": "8d95e4cede8eaf69b6b6d0d3ad326da45cc0beccafd3da48e124ce4f1f6d3f02"
+  }
+}

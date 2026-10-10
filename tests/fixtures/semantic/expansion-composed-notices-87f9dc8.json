@@ -1,0 +1,3197 @@
+{
+  "scope": "Four exact frozen Agent witnesses, selected immutable artifact/baseline and checked Gateway phase projection; no functional credit",
+  "cases": [
+    {
+      "case": "006-EXP22-C09",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "已加载 waapi-skill；已配置 WAAPI 端口 30346，Wwise 适配版本为 2022.1。\n\n当前修改策略为 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会核对现有效果器与声音状态，告知具体追加内容，并取得策略提供的独立授权后执行、核验。"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_11",
+            "type": "agent_message",
+            "text": "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。即将追加 Expansion_EXP22-C09_NewGain，备注为“Expansion C09 appended gain”；不提交额外插件参数或平台值。\n\n预览已取得 allow_changes 策略的独立持久授权，目前尚未修改。现在执行，随后核验新增身份、slot 绑定及原有效果器顺序和配置的保持情况。"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        }
+      ],
+      "artifact": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "created_at": "2026-10-02T23:29:29.690431Z",
+        "execution_policy": {
+          "accepted_authorization_modes": [
+            "explicit_confirmation",
+            "policy_authorization"
+          ],
+          "authorization_selected_at_preview": true,
+          "automatic_retry_allowed": false,
+          "post_execution_verification_required": true,
+          "requires_authorization": true,
+          "revalidate_project_guard": true,
+          "revalidate_resolved_roles": true,
+          "revalidate_runtime_guard": true
+        },
+        "expires_at": "2026-10-02T23:59:29.690431Z",
+        "prepared_operation": {
+          "cleanup": {
+            "automatic": false,
+            "automatic_retry": false,
+            "description": "Cleanup may delete only the verified returned plug-in GUID after a separate fresh destructive preview.",
+            "kind": "delete-created-plugin-after-fresh-preview",
+            "source": "verification_result.plugin.id"
+          },
+          "contract": "waapi-skill.prepared-operation/v1",
+          "dispatch": {
+            "args": {
+              "autoAddToSourceControl": false,
+              "objects": [
+                {
+                  "@Effect2": {
+                    "classId": 9109507,
+                    "name": "Expansion_EXP22-C09_NewGain",
+                    "notes": "Expansion C09 appended gain",
+                    "type": "Effect"
+                  },
+                  "object": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                }
+              ]
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.set"
+          },
+          "operation": "object.createPlugin",
+          "pre_state": {
+            "plugin_creation_guard": {
+              "descriptor": {
+                "class_id": 9109507,
+                "kind": "effect",
+                "name": "Expansion_EXP22-C09_NewGain",
+                "notes": "Expansion C09 appended gain",
+                "properties": []
+              },
+              "plan": {
+                "dispatch": {
+                  "args": {
+                    "autoAddToSourceControl": false,
+                    "objects": [
+                      {
+                        "@Effect2": {
+                          "classId": 9109507,
+                          "name": "Expansion_EXP22-C09_NewGain",
+                          "notes": "Expansion C09 appended gain",
+                          "type": "Effect"
+                        },
+                        "object": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                      }
+                    ]
+                  },
+                  "options": {},
+                  "uri": "ak.wwise.core.object.set"
+                },
+                "operation": "object.createPlugin",
+                "placement": {
+                  "collection": "@Effect2",
+                  "create_only": true,
+                  "effect_slot": "@Effect2",
+                  "kind": "fixed_effect_reference",
+                  "raw_replace_all_allowed": false,
+                  "replace_existing_allowed": false,
+                  "requires_proven_empty_slot": true
+                },
+                "plugin": {
+                  "class_id": 9109507,
+                  "kind": "effect",
+                  "name": "Expansion_EXP22-C09_NewGain",
+                  "notes": "Expansion C09 appended gain",
+                  "properties": []
+                },
+                "property_validation": [],
+                "target": {
+                  "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+                  "type": "Sound"
+                },
+                "verification": {
+                  "business_state_verified_only_by_readback": true,
+                  "expected_plugin": {
+                    "classId": 9109507,
+                    "name": "Expansion_EXP22-C09_NewGain",
+                    "notes": "Expansion C09 appended gain",
+                    "owner": {
+                      "kind": "id",
+                      "value": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                    },
+                    "parent": {
+                      "kind": "id",
+                      "value": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                    },
+                    "properties": [],
+                    "type": "Effect"
+                  },
+                  "readback_fields": [
+                    "id",
+                    "name",
+                    "type",
+                    "classId",
+                    "parent",
+                    "owner",
+                    "notes"
+                  ],
+                  "readback_view": {
+                    "language": null,
+                    "platform": null
+                  },
+                  "require_new_plugin_id": true
+                },
+                "version": "2022.1"
+              },
+              "property_metadata": [],
+              "snapshot": {
+                "args": {
+                  "from": {
+                    "id": [
+                      "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                    ]
+                  }
+                },
+                "fixed_effects": {
+                  "@Effect0": "{6FB9212B-7261-4E80-96DA-F80D37A3928B}",
+                  "@Effect1": "{61D77EFB-5852-411C-BA6D-BA4BA62EA24D}",
+                  "@Effect2": null,
+                  "@Effect3": null
+                },
+                "kind": "fixed_effect_references",
+                "options": {
+                  "return": [
+                    "id",
+                    "@Effect0",
+                    "@Effect1",
+                    "@Effect2",
+                    "@Effect3"
+                  ]
+                },
+                "preexisting_plugin_ids": [
+                  "{6FB9212B-7261-4E80-96DA-F80D37A3928B}",
+                  "{61D77EFB-5852-411C-BA6D-BA4BA62EA24D}"
+                ],
+                "uri": "ak.wwise.core.object.get"
+              },
+              "target_id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+              "target_type": "Sound",
+              "version": "2022.1"
+            },
+            "target": {
+              "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+              "name": "Expansion_EXP22-C09_EffectsOwner",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+              "type": "Sound"
+            }
+          },
+          "preflight_reads": [
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "name",
+                  "type",
+                  "path",
+                  "parent",
+                  "notes"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+                    "name": "Expansion_EXP22-C09_EffectsOwner",
+                    "notes": "",
+                    "parent": {
+                      "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                      "name": "Default Work Unit"
+                    },
+                    "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+                    "type": "Sound"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            },
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "@Effect0",
+                  "@Effect1",
+                  "@Effect2",
+                  "@Effect3"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "@Effect0": {
+                      "id": "{6FB9212B-7261-4E80-96DA-F80D37A3928B}",
+                      "name": "Protected_Gain_0"
+                    },
+                    "@Effect1": {
+                      "id": "{61D77EFB-5852-411C-BA6D-BA4BA62EA24D}",
+                      "name": "Protected_Gain_1"
+                    },
+                    "@Effect2": {
+                      "id": "{00000000-0000-0000-0000-000000000000}"
+                    },
+                    "@Effect3": {
+                      "id": "{00000000-0000-0000-0000-000000000000}"
+                    },
+                    "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "request": {
+            "arguments": {
+              "plugin": {
+                "class_id": 9109507,
+                "kind": "effect",
+                "name": "Expansion_EXP22-C09_NewGain",
+                "notes": "Expansion C09 appended gain"
+              },
+              "target": {
+                "kind": "id",
+                "value": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+              }
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "object.createPlugin",
+            "version": "2022.1"
+          },
+          "resolved_roles": {
+            "target": {
+              "identity": {
+                "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+                "name": null,
+                "parent": null,
+                "path": null,
+                "type": null,
+                "waql": null
+              },
+              "object": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+              "resolution": "live-id",
+              "row": {
+                "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+                "name": "Expansion_EXP22-C09_EffectsOwner",
+                "notes": "",
+                "parent": {
+                  "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                  "name": "Default Work Unit"
+                },
+                "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+                "type": "Sound"
+              }
+            }
+          },
+          "semantic_preview": {
+            "envelope": {
+              "args": {
+                "autoAddToSourceControl": false,
+                "objects": [
+                  {
+                    "@Effect2": {
+                      "classId": 9109507,
+                      "name": "Expansion_EXP22-C09_NewGain",
+                      "notes": "Expansion C09 appended gain",
+                      "type": "Effect"
+                    },
+                    "object": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+                  }
+                ]
+              },
+              "metadata": {
+                "closed_plugin_creation": true,
+                "create_only": true,
+                "model_authored_code": false,
+                "placement": {
+                  "collection": "@Effect2",
+                  "create_only": true,
+                  "effect_slot": "@Effect2",
+                  "kind": "fixed_effect_reference",
+                  "raw_replace_all_allowed": false,
+                  "replace_existing_allowed": false,
+                  "requires_proven_empty_slot": true
+                },
+                "plugin_class_id": 9109507,
+                "plugin_kind": "effect",
+                "raw_replace_all_allowed": false,
+                "request_validation_strength": "partial_reflected_schema",
+                "schema_validation": {
+                  "required_families": [],
+                  "required_fields": [
+                    "objects"
+                  ],
+                  "section": "request",
+                  "unresolved_refs": [
+                    "#/definitions/curveObjectDefinition",
+                    "#/definitions/objectArg",
+                    "#/definitions/objectReturnOptions",
+                    "#/localDefinitions/object",
+                    "#/localDefinitions/objectArray"
+                  ],
+                  "uri": "ak.wwise.core.object.set",
+                  "validated_nodes": 14,
+                  "version": "2022.1"
+                }
+              },
+              "options": {},
+              "uri": "ak.wwise.core.object.set"
+            },
+            "evidence_plan": [],
+            "raw_dispatch_allowed": false,
+            "readback_plan": [],
+            "requires_destructive_gate": true,
+            "source_note_family": "object-mutation",
+            "version": "2022.1"
+          },
+          "verification_plan": {
+            "descriptor": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP22-C09_NewGain",
+              "notes": "Expansion C09 appended gain",
+              "properties": []
+            },
+            "kind": "object-plugin-created",
+            "placement": {
+              "collection": "@Effect2",
+              "create_only": true,
+              "effect_slot": "@Effect2",
+              "kind": "fixed_effect_reference",
+              "raw_replace_all_allowed": false,
+              "replace_existing_allowed": false,
+              "requires_proven_empty_slot": true
+            },
+            "pre_effect_references": {
+              "@Effect0": "{6FB9212B-7261-4E80-96DA-F80D37A3928B}",
+              "@Effect1": "{61D77EFB-5852-411C-BA6D-BA4BA62EA24D}",
+              "@Effect2": null,
+              "@Effect3": null
+            },
+            "preexisting_plugin_ids": [
+              "{6FB9212B-7261-4E80-96DA-F80D37A3928B}",
+              "{61D77EFB-5852-411C-BA6D-BA4BA62EA24D}"
+            ],
+            "property_validation": [],
+            "readback_fields": [
+              "id",
+              "name",
+              "type",
+              "classId",
+              "parent",
+              "owner",
+              "notes"
+            ],
+            "readback_view": {
+              "language": null,
+              "platform": null
+            },
+            "target_id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+            "target_type": "Sound",
+            "version": "2022.1"
+          },
+          "version": "2022.1",
+          "warnings": []
+        },
+        "project_guard": {
+          "context_fingerprint": "76914827656c0ee12f4854f53179376547a1e18ff319014b9f27deaa20eff594",
+          "contract": "waapi-skill.project-guard/v1",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 30346,
+            "url": "ws://127.0.0.1:30346/waapi"
+          },
+          "fingerprint": "74cc13610bddfb38a9bd9dad51e9b37190b179fb23062bc6b261f57b54e4a9e7",
+          "postcondition": {
+            "state": "same_project"
+          },
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-acceptance-87f9dc8-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\006-EXP22-C09\\owned\\sandbox-root\\sample-project-9204ab3447b744c4ab6e922f28063a8e\\SampleProject.wproj",
+            "state": "open"
+          },
+          "project_guard_mode": "invariant",
+          "version": "2022.1",
+          "wwise": {
+            "apiVersion": 1,
+            "configuration": "release",
+            "displayName": "Wwise",
+            "isCommandLine": true,
+            "platform": "x64",
+            "processId": 692,
+            "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2022.1.19.8584\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+            "sessionId": "{AE32DC6E-DA6E-4D84-8B3B-623044F36E2C}",
+            "version": {
+              "build": 8584,
+              "displayName": "v2022.1.19",
+              "major": 1,
+              "minor": 19,
+              "nickname": "",
+              "schema": 110,
+              "year": 2022
+            }
+          }
+        },
+        "request": {
+          "arguments": {
+            "plugin": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP22-C09_NewGain",
+              "notes": "Expansion C09 appended gain"
+            },
+            "target": {
+              "kind": "id",
+              "value": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.createPlugin",
+          "version": "2022.1"
+        },
+        "runtime_guard": {
+          "contract": "waapi-skill.runtime-guard/v1",
+          "files": {
+            "resources/manifest/2022.1/authoring-ui-commands-supplement.json": "dd0a10b0faaa41e0c96a1d44e4d9768e4611db4f32cd7b6ceaeb16667b2f7cc8",
+            "resources/manifest/2022.1/functions.json": "4c203061e62f5ff0f94097bcb9491bcf4d49bb537ce2f79bdd15c31afccbf671",
+            "resources/manifest/2022.1/manifest.json": "c426a8c29b307f6e7449fe37501e3900f8a20bbf3ea8d013728cc478b117d8a1",
+            "resources/manifest/2022.1/schemas.json": "685352fcf19f82c578ae9ae83c07101b1619f3ef1c0ee7bb763449f97b70b525",
+            "resources/manifest/2022.1/topics.json": "694357930dd7c78674670cb226aa09300b0b4d177f8ecf07331a4e42e0a50d5a",
+            "resources/semantic/2022.1/source_notes.json": "a4c96cfe033fc48fcf4f60397c1fe9a83a35943f52c1ea9c96aee79741aad276",
+            "scripts/gateway.py": "bfaea9bc03a08e9eaa47d3c6fdd376827c87c47bdbbc853ee40134380c497248",
+            "scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+            "wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
+            "wwise_waapi/audio_import_business.py": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32",
+            "wwise_waapi/audio_import_business_contracts.py": "d06a04e38e224fb32301996c4aa0a4cf5ec46f75f1dcded354d64bf3ff87bd7c",
+            "wwise_waapi/authoring_core_manifest.py": "8302d4d3ae491a2911c81122f5eebec9a7af09f757476d09190b11b97acaf4fb",
+            "wwise_waapi/authoring_ui_business.py": "980cbe1527329e569af6bca83858580db10fe8e1b43fd3ac20e73117a9dc3774",
+            "wwise_waapi/authoring_ui_business_cli.py": "6973229f8dfd1679500add47115e09e0e3a5b054ef2982f7212824d9d1c95d24",
+            "wwise_waapi/authoring_ui_business_contracts.py": "43c19305bdfc940622b66853659ee9692961ba81ecc2ff790bf7bd1a79927e4c",
+            "wwise_waapi/authoring_ui_commands_manifest.py": "5ee6d9e9b6236636a7b86f64b15d9037c4f2c4097c8eca4b44960c87f452f74f",
+            "wwise_waapi/authoring_ui_topics_manifest.py": "73b2a63f404e003baeb69aa8514eb30650f9024740fb3da5e602c708bb545e48",
+            "wwise_waapi/authorization.py": "b08c89a1f189f841068b6e21f92e0cd6c759ad0e5d445a27a186c01e9a02c387",
+            "wwise_waapi/builders/__init__.py": "8cbc9815e0c60dbb2ac32a17f1b8aeaeff62389f5972f150bf0e6ed990275916",
+            "wwise_waapi/builders/common.py": "6661b3359dff0c4ab20bc9a233c2d14985dd513df718486308df82c12e8229ad",
+            "wwise_waapi/builders/container_suitability.py": "2853ce4a0b55ce3818193879004ffdc9a5e1a7cf125c997556b21cfa19abc8b2",
+            "wwise_waapi/builders/debug_lua.py": "9d654aea2713e179e37a8e444b1f9fb21a55888ec90e36c3f651513be9e6400a",
+            "wwise_waapi/builders/identity.py": "b896f2ed2cf3b3dff6907bd9d50756c63c5f1dddca27580bf28eb47a2b938aff",
+            "wwise_waapi/builders/metadata.py": "999a0be50e0b2478e54e92f5257489852458308b48f587d4cde3025dafd64556",
+            "wwise_waapi/builders/object_mutation.py": "d6818b2acbb26763a8aef413aeff964fcba895ca2f9e528f20bea39d262a4c3b",
+            "wwise_waapi/builders/properties.py": "e1a1294738fad8cda5f471f655251cbe802b4cb7e21eea92085e028ab5e502f1",
+            "wwise_waapi/builders/query.py": "598ab62354f2b47925b73277740ec8857e6395fa96ba49882e34e68ed7635bce",
+            "wwise_waapi/builders/schema.py": "88291ac0315e3d10166b04d54bfdf514a822deb0275a68260378f6a4950ef0ad",
+            "wwise_waapi/builders/soundbank.py": "b50e7d131ff4bcbe0aa0fe29a4481456fe4a881b940c8fa32d2395b2c5d6a6ca",
+            "wwise_waapi/builders/source_notes.py": "cbc92bf050e3d8d177e694b3f8f75c66fab7b34372370d042624c46ee135f81c",
+            "wwise_waapi/builders/stable_reads.py": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+            "wwise_waapi/builders/switchcontainer.py": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da",
+            "wwise_waapi/business_adapters.py": "e12cdfe4eeaaf4848518a4f5f02fab80f63d429e5e53575ea8c6d23e1f46faf7",
+            "wwise_waapi/business_declaration_state.py": "8108e9eaa73d98a855496d9fca79025dae64b112d4447618c15a1c609d4d1267",
+            "wwise_waapi/business_declarations.py": "c0338869d5b22ed87425e692999e14c8735becb99f51a5f85d1b26e94eaf1ab3",
+            "wwise_waapi/business_fields.py": "b6d422ae8885c36aedb7f4288e05ac1e698e6ff320b4807c77068668c6516acb",
+            "wwise_waapi/business_planning.py": "90de5eef9653a7ddf863c56c86134b5272c52b5b93f30e91bbc03d9d016b7616",
+            "wwise_waapi/canonical.py": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8",
+            "wwise_waapi/capabilities.py": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+            "wwise_waapi/category_policy.py": "dc5bfcffff04c2eb965fa09ee3810775ed28b9b9353815f6edac2c0eb4a05bc1",
+            "wwise_waapi/cli_console_business.py": "32cb504109e759ff28c357adb5d21e3d38bd4d1f6850244042371d2db4fb27fd",
+            "wwise_waapi/cli_console_business_cli.py": "b519cb5907e885d30a5c7c0a1c2e83d4b35f9673779ace69b767af9e651bfafc",
+            "wwise_waapi/cli_console_business_contracts.py": "83ef1e8a710aae23dcd5313ff48fb44f2ee97149308b2054419570f0c4efa3d7",
+            "wwise_waapi/compound_undo_business.py": "4b83d3cc80e7ea404215a2af5c39dddd3e638d77afd62d1c6b0f1f920f420cfe",
+            "wwise_waapi/compound_undo_business_contracts.py": "dedc3242cb14a6dbe71f8854bab293025c70aefa215d91cb41a3a3b2ffb223b5",
+            "wwise_waapi/config.py": "6ff18012c76989531d7562a20dacba31557cb4c38e9561bc349d85c51732e012",
+            "wwise_waapi/core_business.py": "2cf7acd38728a2dcc8f3f45c4b2f5aa89ece7166d69dc5930604093c7ab20a92",
+            "wwise_waapi/core_business_contracts.py": "4615ec3009ea7941331610e43e4e9bd2a1f8a4acefb68debf60e24c4b5357c60",
+            "wwise_waapi/debug_business.py": "5b2595d7ba8a25c4b96850e5c78e854731e51c601e5a19dd13a128e3f0621148",
+            "wwise_waapi/debug_business_cli.py": "bf28d6b5cee0b19db97ef813c5d7627175b28a5358c713fe95f114ea25499c77",
+            "wwise_waapi/debug_business_contracts.py": "47383e70ffa3ae53abe7d930b932603e1009dff14ecdcfa0b00b16c2efa588f0",
+            "wwise_waapi/deferred_registry.py": "2099e37793dc12489d5a9a4b0eb281c356ca8b0a7f5beb05b8c0ec81b1dfe9d5",
+            "wwise_waapi/dispatcher.py": "94adbbdb21373a0a6bc2621fda7dae6f65585fce0582946ca5da5ef45c866653",
+            "wwise_waapi/endpoint_scope.py": "a30ba0c8974d394468ec7309fff24b8de0c699fbfa6f6b3d39e0f192109ffffc",
+            "wwise_waapi/exact_artifact_business.py": "f5cef8af57f20be68ebd3ef8e4ab79e55085cf32fc7ab6b48b071f4faadc6d34",
+            "wwise_waapi/exact_artifact_business_cli.py": "1a71d03bbba885e5a0335e34ee9e00d63c1e488513cf04f90610c5c2b620f2ef",
+            "wwise_waapi/exact_artifact_business_contracts.py": "01901d258bbb0c943431b949eed18cdbb3784b120f7b746b48abfd8d3c17d8c4",
+            "wwise_waapi/execution_contracts.py": "df89e676217e7ac9aac88177f141e943687b0bbf5d4973df1a8e7c1db430aca4",
+            "wwise_waapi/filesystem_security.py": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d",
+            "wwise_waapi/headless.py": "f7ce9d99b65b52fbf390119d29f67b8bb53e4738bf34bbc8ca5784f1c370cf97",
+            "wwise_waapi/host_paths.py": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea",
+            "wwise_waapi/host_ui_debug_business.py": "b1e15001b562abe5cab2f44b21b46a132ffc0bd34716b30f60eca72d5e2b6447",
+            "wwise_waapi/host_ui_debug_business_cli.py": "9f21068dbae720e444c76e5de8cf8361895565e46debcd6907b7187d605745b3",
+            "wwise_waapi/host_ui_debug_business_contracts.py": "73a105e910cab3b59e52ff89f265adc8cf4770975aa40d5105edbe9c9fb31dc1",
+            "wwise_waapi/identity_limits.py": "a51e6497844a66ddea2ffa58392aa7eff4fdbcffdbe2a7c95e54373ef985d591",
+            "wwise_waapi/io_policy.py": "bc3449238d9fb99329a9cbb22bcc00673faed229c59ac8cb6a87bee29d204059",
+            "wwise_waapi/manifest.py": "ef5bc0510c5042e202792b0f6202a2b200241c08016c8b621a6e79376f658b74",
+            "wwise_waapi/media_build_business.py": "25fdde83f2601948a9be033a7a45476fb4af1b8cd49f7dd1cc07c7ea764f8695",
+            "wwise_waapi/media_build_business_cli.py": "235a45af367c638a94d98ae3c1e246197588c49d5e6eaefdaad640b21742008e",
+            "wwise_waapi/media_build_business_contracts.py": "a2c1e2a759e877c3283187172d3ac0f91e9911af7e2fba611c61a86cc2ddbbd7",
+            "wwise_waapi/metadata_cache.py": "2da4634c3556b8de8813cfd30e28059d72b4388da81203352514877bf9311d06",
+            "wwise_waapi/metadata_catalog.py": "57e68afacda5c708c7713e54d3e06be6f9da0ed5e7c584d51c61cb0e4a541c28",
+            "wwise_waapi/metadata_discovery.py": "1baf53908b616dbe26f5ed7a748dbdcbcd76e3ecc047bbaf07a9c6302a6220ba",
+            "wwise_waapi/metadata_restrictions.py": "ad5d4470497ba0d51a911133a99006587747d2032a1707db7cef7afd21aea993",
+            "wwise_waapi/native_surface_policy.py": "895fcc1849d62438d30d6e17dc5515dd179e6c1d67fbd570dc999628e1848696",
+            "wwise_waapi/object_capabilities.py": "3204182b7f7e963296626aa1e6468fb7850d0531dd3a499a1e87877576a50c73",
+            "wwise_waapi/object_graph_business.py": "78893a02f2bb70cd8b2bda76973d478e616360d8ddb866a748cd79b8f191f8b3",
+            "wwise_waapi/object_graph_business_contracts.py": "1dd454dc85724e71c1828576a36077c244e693af3609ce9dc83fb132bb2c050f",
+            "wwise_waapi/object_lifecycle_business.py": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9",
+            "wwise_waapi/object_lifecycle_business_contracts.py": "dfadf2752512dc469b81a5ef374f01587611c7e176d4cf0f21085ce576773913",
+            "wwise_waapi/object_metadata_business.py": "616d6e63fb35d9615cf8b6dab3311ada8caae8a64ca85c2d04044e54f35d9bdc",
+            "wwise_waapi/object_metadata_business_contracts.py": "982056c6bbdfb27ad747a52b14536774402e721b3464e47b747456f0a36c289c",
+            "wwise_waapi/operation_composer.py": "b10e1363d62228667305fc4ced9fa35c74a7554e698f55e78e3214afd3a2d8fb",
+            "wwise_waapi/operation_drafts.py": "d7b4f7b60c4c007debcab9760a4da5b4048733ada295776820cff0a3cfe5ce88",
+            "wwise_waapi/operation_import.py": "59817ede02a8097552e042638d3e4a20e3f82242a1a946d5c07ae697b32cc646",
+            "wwise_waapi/operation_object.py": "dd8e934f071036dcb30265dc3c8389ee90efacad67004974265bee2a657fec40",
+            "wwise_waapi/operation_plugin.py": "1e3545ecf3f1439192f4f7742d769eacb0747db8b7bf3baa3493e461a4d39833",
+            "wwise_waapi/operation_registry.py": "1581d973d8481f8668160098d97ec801faa531021227a93990469ee30a4f8384",
+            "wwise_waapi/operation_soundbank.py": "85a84f010a75fdc02a0c556afc7e7c4875a95686723ae7816a005ecc57a7e673",
+            "wwise_waapi/operation_ui_commands.py": "78152a5e4ba9b002b2d740f43d7f6e94b88410b21391d101d93804611b9d0608",
+            "wwise_waapi/platform_commands.py": "85ee88c96c7d5246add85bab3ffd6d80fb631e832d885d9afbc24beb0f232d99",
+            "wwise_waapi/platform_paths.py": "84698d8ad65f07e41e996d3e425830c5c06fba87657ae381a7e1689a6e83f210",
+            "wwise_waapi/project_setting_business.py": "998c85b60188b1ce1130b4230e0c54e0f0dadb1fd02fe9ca00453a5a2a8736c1",
+            "wwise_waapi/project_setting_business_contracts.py": "029b8fdb3307f16dac99283af4a55db3f0a4d2cb8f886705e3fc0ff5ef9b4604",
+            "wwise_waapi/runtime_game_object_handles.py": "7ce46923c004a4c76769f609f55cfeeadd74b831e086eef28699412a4f5255c5",
+            "wwise_waapi/runtime_inspection_business.py": "1c0dfb0e9e52164586a43e7744ef49a2d31726039074a0035727c8f5ecb1b099",
+            "wwise_waapi/runtime_inspection_business_contracts.py": "7b4ce77333a0e6ae353435e546e800bacc4668b9ed61564d360197feecb18945",
+            "wwise_waapi/runtime_playing_handles.py": "6f3905f241203c756e3010d65967a0a7132d97225816cce800ee4a31c5f31ef9",
+            "wwise_waapi/runtime_transport_handles.py": "031501bec053a079a0d034b6032caf39d22e4b227404f5fdbf27fcb63fd9015f",
+            "wwise_waapi/safety.py": "10563ca318b15636de10de64fdfd5afcbb0a15077f1bc31a597667a64d4b212c",
+            "wwise_waapi/schema_inventory.py": "40af821ef05729ccfb12fe03b2bf453d7146f3ad4c977a22b49f1a83d3b6c93e",
+            "wwise_waapi/selection_guidance.py": "2ad015d91e16f359a922ccbbec0427a48491b4877266299448bc9b5fa20c0ff2",
+            "wwise_waapi/soundbank_business.py": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056",
+            "wwise_waapi/soundbank_business_cli.py": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f",
+            "wwise_waapi/soundbank_business_contracts.py": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca",
+            "wwise_waapi/soundengine_business.py": "55624d2cb93d2399eb3ba3c12d18cb2734bf27a50e15619f38a8bf64739133ad",
+            "wwise_waapi/soundengine_business_contracts.py": "034503a03892ad23fb1501e7ece38bdebcead4ac8ac6c61c29cd1408162b5514",
+            "wwise_waapi/source_control_business.py": "92c69f96cb32c343f8d50046462fa2bcff91afd604556ae92992ba9e6af2f6a8",
+            "wwise_waapi/source_control_business_cli.py": "11c7c959bb152404eb2f3c87496e1c8d25e63fa371e2b1aa3ba86128452e04ac",
+            "wwise_waapi/source_control_business_contracts.py": "01536fa4cfcdad62513c598bc4bae6571afb8aab1155ac53fc3f107e9c9d47a4",
+            "wwise_waapi/subscriptions.py": "d0b1487b2d3d1df4a1a55300dd005a8c432933fcd88f56ba1d7f5533d70a4cbf",
+            "wwise_waapi/switch_assignment_business.py": "8927d842674415909616beea40f2e411937f762a7f72e0526bce40015cba4afc",
+            "wwise_waapi/switch_assignment_business_contracts.py": "169e9b21ebb1f373356ea9df703d820a3213454b95d8dd5f3202a9b77ec9eeaa",
+            "wwise_waapi/topic_business.py": "1e56daf8efb678b3b582b335c2b5c567ecf673de4427421e5ff4f1aec2739648",
+            "wwise_waapi/transaction_cleanup.py": "19baeeaba9a8272f3a8a07eb9e9dc54b26814da7f0a5f7d998591a1d7d2e4ae7",
+            "wwise_waapi/transaction_locality.py": "8597532d63448219ef9a0b20517ffd1593d5d9f92fe7476f266f5485b96ccba1",
+            "wwise_waapi/transaction_runtime.py": "05158eae5d4ef95a996a0ada8f160ee2d3bb39ee3ccef24dd55da98b6da2440b",
+            "wwise_waapi/transactions.py": "7f9763900dd92ab6d0f0ba579b81d290fbc77c304da0430a92f95a47ce3396ee",
+            "wwise_waapi/typed_operations.py": "7aa251e73718b17237e19c2abe5923768827a633d899d846c159f1d04b9bce7f",
+            "wwise_waapi/typed_queries.py": "7b1b90f626cba688ae9cd33c6e7f0f1794b0f2279cf5150f9e04f899d6eea0e2",
+            "wwise_waapi/typed_requests.py": "ccdfe6d57af7d3f92759208f4b43a9d1095d8a207195270fc7ade7ed961fd88d",
+            "wwise_waapi/typed_topics.py": "607bc793300e1e71eb8132f5fcd5123a9d2b2cbe78eba6c74e2f9f4f983ee0f4",
+            "wwise_waapi/versions.py": "1757e1bdc33af98172c46b8e27a21b3abb7f279d086a4dfd2a3002aa37deac50",
+            "wwise_waapi/waql.py": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
+          },
+          "fingerprint": "8cf97d036d4cc12110ee262226a5f1690621436db0c35a3863d54d706fa33ba1",
+          "version": "2022.1"
+        }
+      },
+      "before": {
+        "entries": [
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{6FB9212B-7261-4E80-96DA-F80D37A3928B}",
+              "name": "Protected_Gain_0",
+              "notes": "protected effect 0",
+              "owner": {
+                "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+                "name": "Expansion_EXP22-C09_EffectsOwner"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Protected_Gain_0",
+              "type": "Effect"
+            },
+            "slot": "0",
+            "slot_state": null
+          },
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{61D77EFB-5852-411C-BA6D-BA4BA62EA24D}",
+              "name": "Protected_Gain_1",
+              "notes": "protected effect 1",
+              "owner": {
+                "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+                "name": "Expansion_EXP22-C09_EffectsOwner"
+              },
+              "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner\\Protected_Gain_1",
+              "type": "Effect"
+            },
+            "slot": "1",
+            "slot_state": null
+          }
+        ],
+        "owner": {
+          "@Volume": -3.0,
+          "id": "{CB83AC7A-3BCF-452D-A777-1458D491A55C}",
+          "name": "Expansion_EXP22-C09_EffectsOwner",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C09_EffectsOwner",
+          "type": "Sound"
+        },
+        "slot_order": [
+          "0",
+          "1"
+        ]
+      },
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "605bf8e06ae562a8bbdbc7ee4c7746d51a637ecddfa624acbb2c270931965f1a",
+        "preview_file_sha256": "5ff12a9e249cab06b31500cdcd14ee320347c964c3af1994c401dcf8125d73c3",
+        "oracle_file_sha256": "7c2053d14fd57002e997221d2ce1a80bc3165777073a7d56ad2dba8ff968cab5",
+        "phases": [
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP22-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-d704e924716005cd769a8e42af18a9bc --task-authority da1-54c495ddf8e82c5591f4ce6eb0ae5335484cb7dd --expected-revision 5'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 24,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP22-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-n9bc5h6ak4ngv4wpd4ay'",
+            "phase": "execute"
+          }
+        ]
+      }
+    },
+    {
+      "case": "011-EXP25-C08",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "已加载 waapi-skill，配置的 WAAPI 端口为 31984，Wwise 适配版本为 2025.1。\n\n已保存的修改策略为 allow_changes；支持 read_only、ask_before_changes 和 allow_changes。我会核对当前曲线及保护范围，只修改指定干声音量曲线，并取得本次独立授权后执行和核验。"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_10",
+            "type": "agent_message",
+            "text": "本次修改已按 allow_changes 策略取得独立授权。即将把 Expansion_EXP25-C08_Attenuation 的干声音量曲线设为自定义曲线，三个点均使用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。此次写入仅涉及这一条曲线；执行后将读取实际数据核验。"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        }
+      ],
+      "artifact": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "created_at": "2026-10-02T23:43:43.382957Z",
+        "execution_policy": {
+          "accepted_authorization_modes": [
+            "explicit_confirmation",
+            "policy_authorization"
+          ],
+          "authorization_selected_at_preview": true,
+          "automatic_retry_allowed": false,
+          "post_execution_verification_required": true,
+          "requires_authorization": true,
+          "revalidate_project_guard": true,
+          "revalidate_resolved_roles": true,
+          "revalidate_runtime_guard": true
+        },
+        "expires_at": "2026-10-03T00:13:43.382957Z",
+        "prepared_operation": {
+          "cleanup": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "automatic_cleanup": false,
+            "automatic_retry": false,
+            "binding": {
+              "kind": "none",
+              "materialized": true
+            },
+            "cleanup_requirement": "not_required",
+            "companion_request": null,
+            "contract": "waapi-skill.transaction-cleanup-spec/v1",
+            "lifecycle_action": "none",
+            "lifecycle_strategy": "not_required",
+            "spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+            "warnings": []
+          },
+          "contract": "waapi-skill.prepared-operation/v1",
+          "dispatch": {
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{844AB9D8-ED8C-4DB5-9DB8-13D658ADED19}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.setAttenuationCurve"
+          },
+          "operation": "waapi.call",
+          "pre_state": {
+            "execution_contract": {
+              "accepted_authorization_modes": [
+                "explicit_confirmation",
+                "policy_authorization"
+              ],
+              "companion_uris": [],
+              "contract": "waapi-skill.public-execution-contract/v2",
+              "effect": "project_mutation",
+              "excluded_reason": null,
+              "executable": true,
+              "gateway_commands": [
+                "request-schema"
+              ],
+              "io_audit": null,
+              "item_type": "function",
+              "lifecycle_strategy": "none",
+              "post_execution_project_guard_policy": "revalidate",
+              "program_case": "transaction-result-schema",
+              "project_guard_mode": "invariant",
+              "request_validation": {
+                "required_families": [],
+                "required_fields": [
+                  "object",
+                  "curveType",
+                  "use",
+                  "points"
+                ],
+                "section": "request",
+                "unresolved_refs": [
+                  "waapi_definitions.json#/definitions/objectArg",
+                  "waapi_definitions.json#/definitions/pointsDefinition"
+                ],
+                "uri": "ak.wwise.core.object.setAttenuationCurve",
+                "validated_nodes": 6,
+                "version": "2025.1"
+              },
+              "request_validation_strength": "partial_reflected_schema",
+              "requires_authorization": true,
+              "result_limit_bytes": 1048576,
+              "route": "transaction",
+              "timeout_seconds": 30.0,
+              "uri": "ak.wwise.core.object.setAttenuationCurve",
+              "verification_strategy": "result_schema",
+              "version": "2025.1"
+            }
+          },
+          "preflight_reads": [],
+          "raw_dispatch_allowed": false,
+          "request": {
+            "arguments": {
+              "api": "ak.wwise.core.object.setAttenuationCurve",
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{844AB9D8-ED8C-4DB5-9DB8-13D658ADED19}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": -48.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "options": {}
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "waapi.call",
+            "version": "2025.1"
+          },
+          "resolved_roles": {},
+          "semantic_preview": {
+            "envelope": {
+              "args": {
+                "curveType": "VolumeDryUsage",
+                "object": "{844AB9D8-ED8C-4DB5-9DB8-13D658ADED19}",
+                "points": [
+                  {
+                    "shape": "Linear",
+                    "x": 0.0,
+                    "y": 0.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 50.0,
+                    "y": -12.0
+                  },
+                  {
+                    "shape": "Linear",
+                    "x": 100.0,
+                    "y": -48.0
+                  }
+                ],
+                "use": "Custom"
+              },
+              "metadata": {
+                "execution_contract": {
+                  "accepted_authorization_modes": [
+                    "explicit_confirmation",
+                    "policy_authorization"
+                  ],
+                  "companion_uris": [],
+                  "contract": "waapi-skill.public-execution-contract/v2",
+                  "effect": "project_mutation",
+                  "excluded_reason": null,
+                  "executable": true,
+                  "gateway_commands": [
+                    "request-schema"
+                  ],
+                  "io_audit": null,
+                  "item_type": "function",
+                  "lifecycle_strategy": "none",
+                  "post_execution_project_guard_policy": "revalidate",
+                  "program_case": "transaction-result-schema",
+                  "project_guard_mode": "invariant",
+                  "request_validation": {
+                    "required_families": [],
+                    "required_fields": [
+                      "object",
+                      "curveType",
+                      "use",
+                      "points"
+                    ],
+                    "section": "request",
+                    "unresolved_refs": [
+                      "waapi_definitions.json#/definitions/objectArg",
+                      "waapi_definitions.json#/definitions/pointsDefinition"
+                    ],
+                    "uri": "ak.wwise.core.object.setAttenuationCurve",
+                    "validated_nodes": 6,
+                    "version": "2025.1"
+                  },
+                  "request_validation_strength": "partial_reflected_schema",
+                  "requires_authorization": true,
+                  "result_limit_bytes": 1048576,
+                  "route": "transaction",
+                  "timeout_seconds": 30.0,
+                  "uri": "ak.wwise.core.object.setAttenuationCurve",
+                  "verification_strategy": "result_schema",
+                  "version": "2025.1"
+                },
+                "model_authored_code": false
+              },
+              "options": {},
+              "uri": "ak.wwise.core.object.setAttenuationCurve"
+            },
+            "evidence_plan": [],
+            "raw_dispatch_allowed": false,
+            "readback_plan": [],
+            "requires_destructive_gate": true,
+            "source_note_family": "public-execution-contract",
+            "version": "2025.1"
+          },
+          "verification_plan": {
+            "kind": "result-schema",
+            "strategy": "result_schema",
+            "uri": "ak.wwise.core.object.setAttenuationCurve",
+            "version": "2025.1"
+          },
+          "version": "2025.1",
+          "warnings": []
+        },
+        "project_guard": {
+          "context_fingerprint": "b59db9185a410873df30a516222dde63022c4b91dfb4ba332a9c99a9b8e4b586",
+          "contract": "waapi-skill.project-guard/v1",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 31984,
+            "url": "ws://127.0.0.1:31984/waapi"
+          },
+          "fingerprint": "24e37801823aa0c83756d5d98ff4426fb502a3ef188d74c4cf1b82604d98dd54",
+          "postcondition": {
+            "state": "same_project"
+          },
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-acceptance-87f9dc8-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\011-EXP25-C08\\owned\\sandbox-root\\sample-project-b6b626c2dff1407e8d35f5e9e3c212d7\\SampleProject.wproj",
+            "state": "open"
+          },
+          "project_guard_mode": "invariant",
+          "version": "2025.1",
+          "wwise": {
+            "apiVersion": 1,
+            "configuration": "release",
+            "displayName": "WwiseConsole",
+            "isCommandLine": true,
+            "platform": "x64",
+            "processId": 1588,
+            "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+            "sessionId": "{072C0E30-FA5E-4607-9A27-66890CAF6FF2}",
+            "version": {
+              "build": 9143,
+              "displayName": "v2025.1.7",
+              "major": 1,
+              "minor": 7,
+              "nickname": "",
+              "schema": 133,
+              "year": 2025
+            }
+          }
+        },
+        "request": {
+          "arguments": {
+            "api": "ak.wwise.core.object.setAttenuationCurve",
+            "args": {
+              "curveType": "VolumeDryUsage",
+              "object": "{844AB9D8-ED8C-4DB5-9DB8-13D658ADED19}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": -48.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "options": {}
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "waapi.call",
+          "version": "2025.1"
+        },
+        "runtime_guard": {
+          "contract": "waapi-skill.runtime-guard/v1",
+          "files": {
+            "resources/manifest/2025.1/authoring-ui-commands-supplement.json": "593fbe73b0fa53af6107644bc81fb517e06e7564520d873e9357ff411771bf07",
+            "resources/manifest/2025.1/functions.json": "18b909203f591ca5ce3eb25c15f9f1041028949f000b28231f040a27de92ad36",
+            "resources/manifest/2025.1/manifest.json": "1b17b9c7726d70d4f5b5f4fac81b4e33efbfb778bae70ec7a37fbf449d106b95",
+            "resources/manifest/2025.1/schemas.json": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
+            "resources/manifest/2025.1/topics.json": "1508989ded3645d79bbf58e98eaaa14d52ad6dce94ce56fc5dac167321474570",
+            "resources/semantic/2025.1/source_notes.json": "8d7a2197f5525bb97f4fc3148d175e9dc6e16cb81e817bc0c2066e5af6c94244",
+            "scripts/gateway.py": "bfaea9bc03a08e9eaa47d3c6fdd376827c87c47bdbbc853ee40134380c497248",
+            "scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+            "wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
+            "wwise_waapi/audio_import_business.py": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32",
+            "wwise_waapi/audio_import_business_contracts.py": "d06a04e38e224fb32301996c4aa0a4cf5ec46f75f1dcded354d64bf3ff87bd7c",
+            "wwise_waapi/authoring_core_manifest.py": "8302d4d3ae491a2911c81122f5eebec9a7af09f757476d09190b11b97acaf4fb",
+            "wwise_waapi/authoring_ui_business.py": "980cbe1527329e569af6bca83858580db10fe8e1b43fd3ac20e73117a9dc3774",
+            "wwise_waapi/authoring_ui_business_cli.py": "6973229f8dfd1679500add47115e09e0e3a5b054ef2982f7212824d9d1c95d24",
+            "wwise_waapi/authoring_ui_business_contracts.py": "43c19305bdfc940622b66853659ee9692961ba81ecc2ff790bf7bd1a79927e4c",
+            "wwise_waapi/authoring_ui_commands_manifest.py": "5ee6d9e9b6236636a7b86f64b15d9037c4f2c4097c8eca4b44960c87f452f74f",
+            "wwise_waapi/authoring_ui_topics_manifest.py": "73b2a63f404e003baeb69aa8514eb30650f9024740fb3da5e602c708bb545e48",
+            "wwise_waapi/authorization.py": "b08c89a1f189f841068b6e21f92e0cd6c759ad0e5d445a27a186c01e9a02c387",
+            "wwise_waapi/builders/__init__.py": "8cbc9815e0c60dbb2ac32a17f1b8aeaeff62389f5972f150bf0e6ed990275916",
+            "wwise_waapi/builders/common.py": "6661b3359dff0c4ab20bc9a233c2d14985dd513df718486308df82c12e8229ad",
+            "wwise_waapi/builders/container_suitability.py": "2853ce4a0b55ce3818193879004ffdc9a5e1a7cf125c997556b21cfa19abc8b2",
+            "wwise_waapi/builders/debug_lua.py": "9d654aea2713e179e37a8e444b1f9fb21a55888ec90e36c3f651513be9e6400a",
+            "wwise_waapi/builders/identity.py": "b896f2ed2cf3b3dff6907bd9d50756c63c5f1dddca27580bf28eb47a2b938aff",
+            "wwise_waapi/builders/metadata.py": "999a0be50e0b2478e54e92f5257489852458308b48f587d4cde3025dafd64556",
+            "wwise_waapi/builders/object_mutation.py": "d6818b2acbb26763a8aef413aeff964fcba895ca2f9e528f20bea39d262a4c3b",
+            "wwise_waapi/builders/properties.py": "e1a1294738fad8cda5f471f655251cbe802b4cb7e21eea92085e028ab5e502f1",
+            "wwise_waapi/builders/query.py": "598ab62354f2b47925b73277740ec8857e6395fa96ba49882e34e68ed7635bce",
+            "wwise_waapi/builders/schema.py": "88291ac0315e3d10166b04d54bfdf514a822deb0275a68260378f6a4950ef0ad",
+            "wwise_waapi/builders/soundbank.py": "b50e7d131ff4bcbe0aa0fe29a4481456fe4a881b940c8fa32d2395b2c5d6a6ca",
+            "wwise_waapi/builders/source_notes.py": "cbc92bf050e3d8d177e694b3f8f75c66fab7b34372370d042624c46ee135f81c",
+            "wwise_waapi/builders/stable_reads.py": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+            "wwise_waapi/builders/switchcontainer.py": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da",
+            "wwise_waapi/business_adapters.py": "e12cdfe4eeaaf4848518a4f5f02fab80f63d429e5e53575ea8c6d23e1f46faf7",
+            "wwise_waapi/business_declaration_state.py": "8108e9eaa73d98a855496d9fca79025dae64b112d4447618c15a1c609d4d1267",
+            "wwise_waapi/business_declarations.py": "c0338869d5b22ed87425e692999e14c8735becb99f51a5f85d1b26e94eaf1ab3",
+            "wwise_waapi/business_fields.py": "b6d422ae8885c36aedb7f4288e05ac1e698e6ff320b4807c77068668c6516acb",
+            "wwise_waapi/business_planning.py": "90de5eef9653a7ddf863c56c86134b5272c52b5b93f30e91bbc03d9d016b7616",
+            "wwise_waapi/canonical.py": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8",
+            "wwise_waapi/capabilities.py": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+            "wwise_waapi/category_policy.py": "dc5bfcffff04c2eb965fa09ee3810775ed28b9b9353815f6edac2c0eb4a05bc1",
+            "wwise_waapi/cli_console_business.py": "32cb504109e759ff28c357adb5d21e3d38bd4d1f6850244042371d2db4fb27fd",
+            "wwise_waapi/cli_console_business_cli.py": "b519cb5907e885d30a5c7c0a1c2e83d4b35f9673779ace69b767af9e651bfafc",
+            "wwise_waapi/cli_console_business_contracts.py": "83ef1e8a710aae23dcd5313ff48fb44f2ee97149308b2054419570f0c4efa3d7",
+            "wwise_waapi/compound_undo_business.py": "4b83d3cc80e7ea404215a2af5c39dddd3e638d77afd62d1c6b0f1f920f420cfe",
+            "wwise_waapi/compound_undo_business_contracts.py": "dedc3242cb14a6dbe71f8854bab293025c70aefa215d91cb41a3a3b2ffb223b5",
+            "wwise_waapi/config.py": "6ff18012c76989531d7562a20dacba31557cb4c38e9561bc349d85c51732e012",
+            "wwise_waapi/core_business.py": "2cf7acd38728a2dcc8f3f45c4b2f5aa89ece7166d69dc5930604093c7ab20a92",
+            "wwise_waapi/core_business_contracts.py": "4615ec3009ea7941331610e43e4e9bd2a1f8a4acefb68debf60e24c4b5357c60",
+            "wwise_waapi/debug_business.py": "5b2595d7ba8a25c4b96850e5c78e854731e51c601e5a19dd13a128e3f0621148",
+            "wwise_waapi/debug_business_cli.py": "bf28d6b5cee0b19db97ef813c5d7627175b28a5358c713fe95f114ea25499c77",
+            "wwise_waapi/debug_business_contracts.py": "47383e70ffa3ae53abe7d930b932603e1009dff14ecdcfa0b00b16c2efa588f0",
+            "wwise_waapi/deferred_registry.py": "2099e37793dc12489d5a9a4b0eb281c356ca8b0a7f5beb05b8c0ec81b1dfe9d5",
+            "wwise_waapi/dispatcher.py": "94adbbdb21373a0a6bc2621fda7dae6f65585fce0582946ca5da5ef45c866653",
+            "wwise_waapi/endpoint_scope.py": "a30ba0c8974d394468ec7309fff24b8de0c699fbfa6f6b3d39e0f192109ffffc",
+            "wwise_waapi/exact_artifact_business.py": "f5cef8af57f20be68ebd3ef8e4ab79e55085cf32fc7ab6b48b071f4faadc6d34",
+            "wwise_waapi/exact_artifact_business_cli.py": "1a71d03bbba885e5a0335e34ee9e00d63c1e488513cf04f90610c5c2b620f2ef",
+            "wwise_waapi/exact_artifact_business_contracts.py": "01901d258bbb0c943431b949eed18cdbb3784b120f7b746b48abfd8d3c17d8c4",
+            "wwise_waapi/execution_contracts.py": "df89e676217e7ac9aac88177f141e943687b0bbf5d4973df1a8e7c1db430aca4",
+            "wwise_waapi/filesystem_security.py": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d",
+            "wwise_waapi/headless.py": "f7ce9d99b65b52fbf390119d29f67b8bb53e4738bf34bbc8ca5784f1c370cf97",
+            "wwise_waapi/host_paths.py": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea",
+            "wwise_waapi/host_ui_debug_business.py": "b1e15001b562abe5cab2f44b21b46a132ffc0bd34716b30f60eca72d5e2b6447",
+            "wwise_waapi/host_ui_debug_business_cli.py": "9f21068dbae720e444c76e5de8cf8361895565e46debcd6907b7187d605745b3",
+            "wwise_waapi/host_ui_debug_business_contracts.py": "73a105e910cab3b59e52ff89f265adc8cf4770975aa40d5105edbe9c9fb31dc1",
+            "wwise_waapi/identity_limits.py": "a51e6497844a66ddea2ffa58392aa7eff4fdbcffdbe2a7c95e54373ef985d591",
+            "wwise_waapi/io_policy.py": "bc3449238d9fb99329a9cbb22bcc00673faed229c59ac8cb6a87bee29d204059",
+            "wwise_waapi/manifest.py": "ef5bc0510c5042e202792b0f6202a2b200241c08016c8b621a6e79376f658b74",
+            "wwise_waapi/media_build_business.py": "25fdde83f2601948a9be033a7a45476fb4af1b8cd49f7dd1cc07c7ea764f8695",
+            "wwise_waapi/media_build_business_cli.py": "235a45af367c638a94d98ae3c1e246197588c49d5e6eaefdaad640b21742008e",
+            "wwise_waapi/media_build_business_contracts.py": "a2c1e2a759e877c3283187172d3ac0f91e9911af7e2fba611c61a86cc2ddbbd7",
+            "wwise_waapi/metadata_cache.py": "2da4634c3556b8de8813cfd30e28059d72b4388da81203352514877bf9311d06",
+            "wwise_waapi/metadata_catalog.py": "57e68afacda5c708c7713e54d3e06be6f9da0ed5e7c584d51c61cb0e4a541c28",
+            "wwise_waapi/metadata_discovery.py": "1baf53908b616dbe26f5ed7a748dbdcbcd76e3ecc047bbaf07a9c6302a6220ba",
+            "wwise_waapi/metadata_restrictions.py": "ad5d4470497ba0d51a911133a99006587747d2032a1707db7cef7afd21aea993",
+            "wwise_waapi/native_surface_policy.py": "895fcc1849d62438d30d6e17dc5515dd179e6c1d67fbd570dc999628e1848696",
+            "wwise_waapi/object_capabilities.py": "3204182b7f7e963296626aa1e6468fb7850d0531dd3a499a1e87877576a50c73",
+            "wwise_waapi/object_graph_business.py": "78893a02f2bb70cd8b2bda76973d478e616360d8ddb866a748cd79b8f191f8b3",
+            "wwise_waapi/object_graph_business_contracts.py": "1dd454dc85724e71c1828576a36077c244e693af3609ce9dc83fb132bb2c050f",
+            "wwise_waapi/object_lifecycle_business.py": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9",
+            "wwise_waapi/object_lifecycle_business_contracts.py": "dfadf2752512dc469b81a5ef374f01587611c7e176d4cf0f21085ce576773913",
+            "wwise_waapi/object_metadata_business.py": "616d6e63fb35d9615cf8b6dab3311ada8caae8a64ca85c2d04044e54f35d9bdc",
+            "wwise_waapi/object_metadata_business_contracts.py": "982056c6bbdfb27ad747a52b14536774402e721b3464e47b747456f0a36c289c",
+            "wwise_waapi/operation_composer.py": "b10e1363d62228667305fc4ced9fa35c74a7554e698f55e78e3214afd3a2d8fb",
+            "wwise_waapi/operation_drafts.py": "d7b4f7b60c4c007debcab9760a4da5b4048733ada295776820cff0a3cfe5ce88",
+            "wwise_waapi/operation_import.py": "59817ede02a8097552e042638d3e4a20e3f82242a1a946d5c07ae697b32cc646",
+            "wwise_waapi/operation_object.py": "dd8e934f071036dcb30265dc3c8389ee90efacad67004974265bee2a657fec40",
+            "wwise_waapi/operation_plugin.py": "1e3545ecf3f1439192f4f7742d769eacb0747db8b7bf3baa3493e461a4d39833",
+            "wwise_waapi/operation_registry.py": "1581d973d8481f8668160098d97ec801faa531021227a93990469ee30a4f8384",
+            "wwise_waapi/operation_soundbank.py": "85a84f010a75fdc02a0c556afc7e7c4875a95686723ae7816a005ecc57a7e673",
+            "wwise_waapi/operation_ui_commands.py": "78152a5e4ba9b002b2d740f43d7f6e94b88410b21391d101d93804611b9d0608",
+            "wwise_waapi/platform_commands.py": "85ee88c96c7d5246add85bab3ffd6d80fb631e832d885d9afbc24beb0f232d99",
+            "wwise_waapi/platform_paths.py": "84698d8ad65f07e41e996d3e425830c5c06fba87657ae381a7e1689a6e83f210",
+            "wwise_waapi/project_setting_business.py": "998c85b60188b1ce1130b4230e0c54e0f0dadb1fd02fe9ca00453a5a2a8736c1",
+            "wwise_waapi/project_setting_business_contracts.py": "029b8fdb3307f16dac99283af4a55db3f0a4d2cb8f886705e3fc0ff5ef9b4604",
+            "wwise_waapi/runtime_game_object_handles.py": "7ce46923c004a4c76769f609f55cfeeadd74b831e086eef28699412a4f5255c5",
+            "wwise_waapi/runtime_inspection_business.py": "1c0dfb0e9e52164586a43e7744ef49a2d31726039074a0035727c8f5ecb1b099",
+            "wwise_waapi/runtime_inspection_business_contracts.py": "7b4ce77333a0e6ae353435e546e800bacc4668b9ed61564d360197feecb18945",
+            "wwise_waapi/runtime_playing_handles.py": "6f3905f241203c756e3010d65967a0a7132d97225816cce800ee4a31c5f31ef9",
+            "wwise_waapi/runtime_transport_handles.py": "031501bec053a079a0d034b6032caf39d22e4b227404f5fdbf27fcb63fd9015f",
+            "wwise_waapi/safety.py": "10563ca318b15636de10de64fdfd5afcbb0a15077f1bc31a597667a64d4b212c",
+            "wwise_waapi/schema_inventory.py": "40af821ef05729ccfb12fe03b2bf453d7146f3ad4c977a22b49f1a83d3b6c93e",
+            "wwise_waapi/selection_guidance.py": "2ad015d91e16f359a922ccbbec0427a48491b4877266299448bc9b5fa20c0ff2",
+            "wwise_waapi/soundbank_business.py": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056",
+            "wwise_waapi/soundbank_business_cli.py": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f",
+            "wwise_waapi/soundbank_business_contracts.py": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca",
+            "wwise_waapi/soundengine_business.py": "55624d2cb93d2399eb3ba3c12d18cb2734bf27a50e15619f38a8bf64739133ad",
+            "wwise_waapi/soundengine_business_contracts.py": "034503a03892ad23fb1501e7ece38bdebcead4ac8ac6c61c29cd1408162b5514",
+            "wwise_waapi/source_control_business.py": "92c69f96cb32c343f8d50046462fa2bcff91afd604556ae92992ba9e6af2f6a8",
+            "wwise_waapi/source_control_business_cli.py": "11c7c959bb152404eb2f3c87496e1c8d25e63fa371e2b1aa3ba86128452e04ac",
+            "wwise_waapi/source_control_business_contracts.py": "01536fa4cfcdad62513c598bc4bae6571afb8aab1155ac53fc3f107e9c9d47a4",
+            "wwise_waapi/subscriptions.py": "d0b1487b2d3d1df4a1a55300dd005a8c432933fcd88f56ba1d7f5533d70a4cbf",
+            "wwise_waapi/switch_assignment_business.py": "8927d842674415909616beea40f2e411937f762a7f72e0526bce40015cba4afc",
+            "wwise_waapi/switch_assignment_business_contracts.py": "169e9b21ebb1f373356ea9df703d820a3213454b95d8dd5f3202a9b77ec9eeaa",
+            "wwise_waapi/topic_business.py": "1e56daf8efb678b3b582b335c2b5c567ecf673de4427421e5ff4f1aec2739648",
+            "wwise_waapi/transaction_cleanup.py": "19baeeaba9a8272f3a8a07eb9e9dc54b26814da7f0a5f7d998591a1d7d2e4ae7",
+            "wwise_waapi/transaction_locality.py": "8597532d63448219ef9a0b20517ffd1593d5d9f92fe7476f266f5485b96ccba1",
+            "wwise_waapi/transaction_runtime.py": "05158eae5d4ef95a996a0ada8f160ee2d3bb39ee3ccef24dd55da98b6da2440b",
+            "wwise_waapi/transactions.py": "7f9763900dd92ab6d0f0ba579b81d290fbc77c304da0430a92f95a47ce3396ee",
+            "wwise_waapi/typed_operations.py": "7aa251e73718b17237e19c2abe5923768827a633d899d846c159f1d04b9bce7f",
+            "wwise_waapi/typed_queries.py": "7b1b90f626cba688ae9cd33c6e7f0f1794b0f2279cf5150f9e04f899d6eea0e2",
+            "wwise_waapi/typed_requests.py": "ccdfe6d57af7d3f92759208f4b43a9d1095d8a207195270fc7ade7ed961fd88d",
+            "wwise_waapi/typed_topics.py": "607bc793300e1e71eb8132f5fcd5123a9d2b2cbe78eba6c74e2f9f4f983ee0f4",
+            "wwise_waapi/versions.py": "1757e1bdc33af98172c46b8e27a21b3abb7f279d086a4dfd2a3002aa37deac50",
+            "wwise_waapi/waql.py": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
+          },
+          "fingerprint": "4bdb9b0156d71ede11281e536be5b43d2ae0a615f3a4423ef39fa03599b57c73",
+          "version": "2025.1"
+        }
+      },
+      "before": {
+        "attenuation": {
+          "id": "{844AB9D8-ED8C-4DB5-9DB8-13D658ADED19}",
+          "name": "Expansion_EXP25-C08_Attenuation",
+          "notes": "",
+          "parent": {
+            "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP25-C08_Attenuation",
+          "type": "Attenuation"
+        },
+        "curves": {
+          "focus": {
+            "points": [],
+            "use": "None"
+          },
+          "game-defined-aux-send-volume": {
+            "points": [],
+            "use": "UseVolumeDry"
+          },
+          "high-pass-filter": {
+            "points": [],
+            "use": "None"
+          },
+          "low-pass-filter": {
+            "points": [],
+            "use": "None"
+          },
+          "spread": {
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0.0,
+                "y": 50.34965
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 0.0
+              }
+            ],
+            "use": "Custom"
+          },
+          "user-defined-aux-send-volume": {
+            "points": [],
+            "use": "UseVolumeDry"
+          },
+          "volume-dry": {
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0.0,
+                "y": 0.0
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 4.71844785465692e-16
+              }
+            ],
+            "use": "Custom"
+          }
+        },
+        "source": {
+          "curves": {
+            "focus": {
+              "points": [],
+              "use": "None"
+            },
+            "game-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "high-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "low-pass-filter": {
+              "points": [],
+              "use": "None"
+            },
+            "spread": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 50.34965
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ],
+              "use": "Custom"
+            },
+            "user-defined-aux-send-volume": {
+              "points": [],
+              "use": "UseVolumeDry"
+            },
+            "volume-dry": {
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": 0.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 4.71844785465692e-16
+                }
+              ],
+              "use": "Custom"
+            }
+          },
+          "object": {
+            "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+            "name": "Horns",
+            "notes": "",
+            "parent": {
+              "id": "{77ED99BF-A13C-437D-AAC6-63B399AA2E8C}",
+              "name": "Ambience"
+            },
+            "path": "\\Attenuations\\Ambience\\Horns",
+            "type": "Attenuation"
+          }
+        },
+        "users": {
+          "{8DF17FE1-D587-4356-94DB-1112ABD7A841}": {
+            "id": "{8DF17FE1-D587-4356-94DB-1112ABD7A841}",
+            "name": "Expansion_EXP25-C08_AttenuatedSound",
+            "notes": "",
+            "output_bus": {
+              "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+              "name": "Main Audio Bus"
+            },
+            "parent": {
+              "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+              "name": "Default Work Unit"
+            },
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C08_AttenuatedSound",
+            "references": {
+              "Attenuation": {
+                "id": "{844AB9D8-ED8C-4DB5-9DB8-13D658ADED19}",
+                "name": "Expansion_EXP25-C08_Attenuation"
+              }
+            },
+            "type": "Sound",
+            "volume_db": -3.0
+          }
+        }
+      },
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "c44440cc80c349a85427fbc3dc5f416158083115161239089b2dad09e7ed4c87",
+        "preview_file_sha256": "90f84373b18fc87a6c755f1264c1824370db25384e7b03c7ffbea90a4a4d3a80",
+        "oracle_file_sha256": "bd9cf843c5408b8b2bc46af4a447f42e3204ad4bc4de1031d357ed4ae4ce11e3",
+        "phases": [
+          {
+            "event_index": 20,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-eb5fa09ba9f5e4d814af76733b824355 --task-authority da1-21030abb1b96cdf78edf1533dd145b1569238bf9 --expected-revision 4'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-zzszghq11cejrz4rqjfq'",
+            "phase": "execute"
+          }
+        ]
+      }
+    },
+    {
+      "case": "012-EXP25-C09",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "已加载 waapi-skill；已配置 WAAPI 端口 31689，Wwise 适配版本为 2025.1。\n\n当前修改策略为 `allow_changes`，可用模式为 `read_only`、`ask_before_changes` 和 `allow_changes`。我会先核对现有配置，说明追加内容，再取得独立授权后执行并核验。"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_11",
+            "type": "agent_message",
+            "text": "已核对目标声音并记录修改前状态。将于现有效果器之后追加 `Expansion_EXP25-C09_NewGain`，类型为 Wwise Gain，备注为“Expansion C09 appended gain”；核验会检查原有效果器的身份、slot 绑定与配置顺序，以及声音本身的音量、备注和父级保持情况。\n\n预览已取得 `allow_changes` 策略的独立持久授权，目前尚未修改；现在执行追加并读取结果核验。"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        }
+      ],
+      "artifact": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "created_at": "2026-10-02T23:47:10.041244Z",
+        "execution_policy": {
+          "accepted_authorization_modes": [
+            "explicit_confirmation",
+            "policy_authorization"
+          ],
+          "authorization_selected_at_preview": true,
+          "automatic_retry_allowed": false,
+          "post_execution_verification_required": true,
+          "requires_authorization": true,
+          "revalidate_project_guard": true,
+          "revalidate_resolved_roles": true,
+          "revalidate_runtime_guard": true
+        },
+        "expires_at": "2026-10-03T00:17:10.041244Z",
+        "prepared_operation": {
+          "cleanup": {
+            "automatic": false,
+            "automatic_retry": false,
+            "description": "Cleanup may delete only the verified returned plug-in GUID after a separate fresh destructive preview.",
+            "kind": "delete-created-plugin-after-fresh-preview",
+            "source": "verification_result.plugin.id"
+          },
+          "contract": "waapi-skill.prepared-operation/v1",
+          "dispatch": {
+            "args": {
+              "autoAddToSourceControl": false,
+              "objects": [
+                {
+                  "@Effects": [
+                    {
+                      "@Effect": {
+                        "classId": 9109507,
+                        "name": "Expansion_EXP25-C09_NewGain",
+                        "notes": "Expansion C09 appended gain",
+                        "type": "Effect"
+                      },
+                      "name": "",
+                      "type": "EffectSlot"
+                    }
+                  ],
+                  "listMode": "append",
+                  "object": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                }
+              ]
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.set"
+          },
+          "operation": "object.createPlugin",
+          "pre_state": {
+            "plugin_creation_guard": {
+              "descriptor": {
+                "class_id": 9109507,
+                "kind": "effect",
+                "name": "Expansion_EXP25-C09_NewGain",
+                "notes": "Expansion C09 appended gain",
+                "properties": []
+              },
+              "plan": {
+                "dispatch": {
+                  "args": {
+                    "autoAddToSourceControl": false,
+                    "objects": [
+                      {
+                        "@Effects": [
+                          {
+                            "@Effect": {
+                              "classId": 9109507,
+                              "name": "Expansion_EXP25-C09_NewGain",
+                              "notes": "Expansion C09 appended gain",
+                              "type": "Effect"
+                            },
+                            "name": "",
+                            "type": "EffectSlot"
+                          }
+                        ],
+                        "listMode": "append",
+                        "object": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                      }
+                    ]
+                  },
+                  "options": {},
+                  "uri": "ak.wwise.core.object.set"
+                },
+                "operation": "object.createPlugin",
+                "placement": {
+                  "collection": "@Effects",
+                  "create_only": true,
+                  "effect_slot_type": "EffectSlot",
+                  "kind": "effect_slot_append",
+                  "list_mode": "append",
+                  "raw_replace_all_allowed": false,
+                  "replace_existing_allowed": false
+                },
+                "plugin": {
+                  "class_id": 9109507,
+                  "kind": "effect",
+                  "name": "Expansion_EXP25-C09_NewGain",
+                  "notes": "Expansion C09 appended gain",
+                  "properties": []
+                },
+                "property_validation": [],
+                "target": {
+                  "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                  "type": "Sound"
+                },
+                "verification": {
+                  "business_state_verified_only_by_readback": true,
+                  "expected_plugin": {
+                    "classId": 9109507,
+                    "name": "Expansion_EXP25-C09_NewGain",
+                    "notes": "Expansion C09 appended gain",
+                    "owner": {
+                      "kind": "id",
+                      "value": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                    },
+                    "parent": {
+                      "kind": "created_effect_slot"
+                    },
+                    "properties": [],
+                    "type": "Effect"
+                  },
+                  "readback_fields": [
+                    "id",
+                    "name",
+                    "type",
+                    "classId",
+                    "parent",
+                    "owner",
+                    "notes"
+                  ],
+                  "readback_view": {
+                    "language": null,
+                    "platform": null
+                  },
+                  "require_new_plugin_id": true
+                },
+                "version": "2025.1"
+              },
+              "property_metadata": [],
+              "snapshot": {
+                "args": {
+                  "from": {
+                    "id": [
+                      "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                    ]
+                  }
+                },
+                "effect_slots": [
+                  {
+                    "@Effect": "{F4879559-78AE-4CED-8ECD-201397DC2389}",
+                    "id": "{55190424-5E2B-4ABE-B39C-CC83991281AB}",
+                    "name": "",
+                    "owner": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                    "parent": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                    "type": "EffectSlot"
+                  },
+                  {
+                    "@Effect": "{64177908-B258-4D63-8DCD-34333572D124}",
+                    "id": "{CF80951F-DD95-4EA0-BC41-897AA256B322}",
+                    "name": "",
+                    "owner": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                    "parent": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                    "type": "EffectSlot"
+                  }
+                ],
+                "kind": "effect_slots",
+                "options": {
+                  "return": [
+                    "id",
+                    "@Effects"
+                  ]
+                },
+                "preexisting_plugin_ids": [
+                  "{64177908-B258-4D63-8DCD-34333572D124}",
+                  "{F4879559-78AE-4CED-8ECD-201397DC2389}"
+                ],
+                "uri": "ak.wwise.core.object.get"
+              },
+              "target_id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+              "target_type": "Sound",
+              "version": "2025.1"
+            },
+            "target": {
+              "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+              "name": "Expansion_EXP25-C09_EffectsOwner",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+              "type": "Sound"
+            }
+          },
+          "preflight_reads": [
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "name",
+                  "type",
+                  "path",
+                  "parent",
+                  "notes"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                    "name": "Expansion_EXP25-C09_EffectsOwner",
+                    "notes": "",
+                    "parent": {
+                      "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                      "name": "Default Work Unit"
+                    },
+                    "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+                    "type": "Sound"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            },
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "@Effects"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "@Effects": [
+                      {
+                        "id": "{CF80951F-DD95-4EA0-BC41-897AA256B322}"
+                      },
+                      {
+                        "id": "{55190424-5E2B-4ABE-B39C-CC83991281AB}"
+                      }
+                    ],
+                    "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            },
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{CF80951F-DD95-4EA0-BC41-897AA256B322}",
+                    "{55190424-5E2B-4ABE-B39C-CC83991281AB}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "name",
+                  "type",
+                  "parent",
+                  "owner",
+                  "@Effect"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "@Effect": {
+                      "id": "{64177908-B258-4D63-8DCD-34333572D124}",
+                      "name": "Protected_Gain_0"
+                    },
+                    "id": "{CF80951F-DD95-4EA0-BC41-897AA256B322}",
+                    "name": "",
+                    "owner": {
+                      "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                      "name": "Expansion_EXP25-C09_EffectsOwner"
+                    },
+                    "type": "EffectSlot"
+                  },
+                  {
+                    "@Effect": {
+                      "id": "{F4879559-78AE-4CED-8ECD-201397DC2389}",
+                      "name": "Protected_Gain_1"
+                    },
+                    "id": "{55190424-5E2B-4ABE-B39C-CC83991281AB}",
+                    "name": "",
+                    "owner": {
+                      "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                      "name": "Expansion_EXP25-C09_EffectsOwner"
+                    },
+                    "type": "EffectSlot"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "request": {
+            "arguments": {
+              "plugin": {
+                "class_id": 9109507,
+                "kind": "effect",
+                "name": "Expansion_EXP25-C09_NewGain",
+                "notes": "Expansion C09 appended gain"
+              },
+              "target": {
+                "kind": "id",
+                "value": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+              }
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "object.createPlugin",
+            "version": "2025.1"
+          },
+          "resolved_roles": {
+            "target": {
+              "identity": {
+                "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                "name": null,
+                "parent": null,
+                "path": null,
+                "type": null,
+                "waql": null
+              },
+              "object": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+              "resolution": "live-id",
+              "row": {
+                "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                "name": "Expansion_EXP25-C09_EffectsOwner",
+                "notes": "",
+                "parent": {
+                  "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                  "name": "Default Work Unit"
+                },
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+                "type": "Sound"
+              }
+            }
+          },
+          "semantic_preview": {
+            "envelope": {
+              "args": {
+                "autoAddToSourceControl": false,
+                "objects": [
+                  {
+                    "@Effects": [
+                      {
+                        "@Effect": {
+                          "classId": 9109507,
+                          "name": "Expansion_EXP25-C09_NewGain",
+                          "notes": "Expansion C09 appended gain",
+                          "type": "Effect"
+                        },
+                        "name": "",
+                        "type": "EffectSlot"
+                      }
+                    ],
+                    "listMode": "append",
+                    "object": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+                  }
+                ]
+              },
+              "metadata": {
+                "closed_plugin_creation": true,
+                "create_only": true,
+                "model_authored_code": false,
+                "placement": {
+                  "collection": "@Effects",
+                  "create_only": true,
+                  "effect_slot_type": "EffectSlot",
+                  "kind": "effect_slot_append",
+                  "list_mode": "append",
+                  "raw_replace_all_allowed": false,
+                  "replace_existing_allowed": false
+                },
+                "plugin_class_id": 9109507,
+                "plugin_kind": "effect",
+                "raw_replace_all_allowed": false,
+                "request_validation_strength": "partial_reflected_schema",
+                "schema_validation": {
+                  "required_families": [],
+                  "required_fields": [
+                    "objects"
+                  ],
+                  "section": "request",
+                  "unresolved_refs": [
+                    "#/definitions/object",
+                    "#/definitions/objectArray",
+                    "common_definitions.json#/definitions/arrayOfString",
+                    "waapi_definitions.json#/definitions/curveObjectDefinition",
+                    "waapi_definitions.json#/definitions/objectArg",
+                    "waapi_definitions.json#/definitions/objectReturnOptions"
+                  ],
+                  "uri": "ak.wwise.core.object.set",
+                  "validated_nodes": 19,
+                  "version": "2025.1"
+                }
+              },
+              "options": {},
+              "uri": "ak.wwise.core.object.set"
+            },
+            "evidence_plan": [],
+            "raw_dispatch_allowed": false,
+            "readback_plan": [],
+            "requires_destructive_gate": true,
+            "source_note_family": "object-mutation",
+            "version": "2025.1"
+          },
+          "verification_plan": {
+            "descriptor": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP25-C09_NewGain",
+              "notes": "Expansion C09 appended gain",
+              "properties": []
+            },
+            "kind": "object-plugin-created",
+            "placement": {
+              "collection": "@Effects",
+              "create_only": true,
+              "effect_slot_type": "EffectSlot",
+              "kind": "effect_slot_append",
+              "list_mode": "append",
+              "raw_replace_all_allowed": false,
+              "replace_existing_allowed": false
+            },
+            "preexisting_effect_slot_ids": [
+              "{55190424-5E2B-4ABE-B39C-CC83991281AB}",
+              "{CF80951F-DD95-4EA0-BC41-897AA256B322}"
+            ],
+            "preexisting_plugin_ids": [
+              "{64177908-B258-4D63-8DCD-34333572D124}",
+              "{F4879559-78AE-4CED-8ECD-201397DC2389}"
+            ],
+            "property_validation": [],
+            "readback_fields": [
+              "id",
+              "name",
+              "type",
+              "classId",
+              "parent",
+              "owner",
+              "notes"
+            ],
+            "readback_view": {
+              "language": null,
+              "platform": null
+            },
+            "target_id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+            "target_type": "Sound",
+            "version": "2025.1"
+          },
+          "version": "2025.1",
+          "warnings": []
+        },
+        "project_guard": {
+          "context_fingerprint": "1207f58479251a80f544db94253dcc986d641fd22911e479c27cfdfaa2b5fae7",
+          "contract": "waapi-skill.project-guard/v1",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 31689,
+            "url": "ws://127.0.0.1:31689/waapi"
+          },
+          "fingerprint": "f19d30d8b23042d6aad2a0fdab7ead7fe1d6a82a5380bc4f965fe9b5c53f44f3",
+          "postcondition": {
+            "state": "same_project"
+          },
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-acceptance-87f9dc8-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\012-EXP25-C09\\owned\\sandbox-root\\sample-project-32e3a715dd294e93990ce38fa8cbe02f\\SampleProject.wproj",
+            "state": "open"
+          },
+          "project_guard_mode": "invariant",
+          "version": "2025.1",
+          "wwise": {
+            "apiVersion": 1,
+            "configuration": "release",
+            "displayName": "WwiseConsole",
+            "isCommandLine": true,
+            "platform": "x64",
+            "processId": 1828,
+            "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+            "sessionId": "{D22E80DC-5B3E-476E-921D-8A52484BDA31}",
+            "version": {
+              "build": 9143,
+              "displayName": "v2025.1.7",
+              "major": 1,
+              "minor": 7,
+              "nickname": "",
+              "schema": 133,
+              "year": 2025
+            }
+          }
+        },
+        "request": {
+          "arguments": {
+            "plugin": {
+              "class_id": 9109507,
+              "kind": "effect",
+              "name": "Expansion_EXP25-C09_NewGain",
+              "notes": "Expansion C09 appended gain"
+            },
+            "target": {
+              "kind": "id",
+              "value": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.createPlugin",
+          "version": "2025.1"
+        },
+        "runtime_guard": {
+          "contract": "waapi-skill.runtime-guard/v1",
+          "files": {
+            "resources/manifest/2025.1/authoring-ui-commands-supplement.json": "593fbe73b0fa53af6107644bc81fb517e06e7564520d873e9357ff411771bf07",
+            "resources/manifest/2025.1/functions.json": "18b909203f591ca5ce3eb25c15f9f1041028949f000b28231f040a27de92ad36",
+            "resources/manifest/2025.1/manifest.json": "1b17b9c7726d70d4f5b5f4fac81b4e33efbfb778bae70ec7a37fbf449d106b95",
+            "resources/manifest/2025.1/schemas.json": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
+            "resources/manifest/2025.1/topics.json": "1508989ded3645d79bbf58e98eaaa14d52ad6dce94ce56fc5dac167321474570",
+            "resources/semantic/2025.1/source_notes.json": "8d7a2197f5525bb97f4fc3148d175e9dc6e16cb81e817bc0c2066e5af6c94244",
+            "scripts/gateway.py": "bfaea9bc03a08e9eaa47d3c6fdd376827c87c47bdbbc853ee40134380c497248",
+            "scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+            "wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
+            "wwise_waapi/audio_import_business.py": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32",
+            "wwise_waapi/audio_import_business_contracts.py": "d06a04e38e224fb32301996c4aa0a4cf5ec46f75f1dcded354d64bf3ff87bd7c",
+            "wwise_waapi/authoring_core_manifest.py": "8302d4d3ae491a2911c81122f5eebec9a7af09f757476d09190b11b97acaf4fb",
+            "wwise_waapi/authoring_ui_business.py": "980cbe1527329e569af6bca83858580db10fe8e1b43fd3ac20e73117a9dc3774",
+            "wwise_waapi/authoring_ui_business_cli.py": "6973229f8dfd1679500add47115e09e0e3a5b054ef2982f7212824d9d1c95d24",
+            "wwise_waapi/authoring_ui_business_contracts.py": "43c19305bdfc940622b66853659ee9692961ba81ecc2ff790bf7bd1a79927e4c",
+            "wwise_waapi/authoring_ui_commands_manifest.py": "5ee6d9e9b6236636a7b86f64b15d9037c4f2c4097c8eca4b44960c87f452f74f",
+            "wwise_waapi/authoring_ui_topics_manifest.py": "73b2a63f404e003baeb69aa8514eb30650f9024740fb3da5e602c708bb545e48",
+            "wwise_waapi/authorization.py": "b08c89a1f189f841068b6e21f92e0cd6c759ad0e5d445a27a186c01e9a02c387",
+            "wwise_waapi/builders/__init__.py": "8cbc9815e0c60dbb2ac32a17f1b8aeaeff62389f5972f150bf0e6ed990275916",
+            "wwise_waapi/builders/common.py": "6661b3359dff0c4ab20bc9a233c2d14985dd513df718486308df82c12e8229ad",
+            "wwise_waapi/builders/container_suitability.py": "2853ce4a0b55ce3818193879004ffdc9a5e1a7cf125c997556b21cfa19abc8b2",
+            "wwise_waapi/builders/debug_lua.py": "9d654aea2713e179e37a8e444b1f9fb21a55888ec90e36c3f651513be9e6400a",
+            "wwise_waapi/builders/identity.py": "b896f2ed2cf3b3dff6907bd9d50756c63c5f1dddca27580bf28eb47a2b938aff",
+            "wwise_waapi/builders/metadata.py": "999a0be50e0b2478e54e92f5257489852458308b48f587d4cde3025dafd64556",
+            "wwise_waapi/builders/object_mutation.py": "d6818b2acbb26763a8aef413aeff964fcba895ca2f9e528f20bea39d262a4c3b",
+            "wwise_waapi/builders/properties.py": "e1a1294738fad8cda5f471f655251cbe802b4cb7e21eea92085e028ab5e502f1",
+            "wwise_waapi/builders/query.py": "598ab62354f2b47925b73277740ec8857e6395fa96ba49882e34e68ed7635bce",
+            "wwise_waapi/builders/schema.py": "88291ac0315e3d10166b04d54bfdf514a822deb0275a68260378f6a4950ef0ad",
+            "wwise_waapi/builders/soundbank.py": "b50e7d131ff4bcbe0aa0fe29a4481456fe4a881b940c8fa32d2395b2c5d6a6ca",
+            "wwise_waapi/builders/source_notes.py": "cbc92bf050e3d8d177e694b3f8f75c66fab7b34372370d042624c46ee135f81c",
+            "wwise_waapi/builders/stable_reads.py": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+            "wwise_waapi/builders/switchcontainer.py": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da",
+            "wwise_waapi/business_adapters.py": "e12cdfe4eeaaf4848518a4f5f02fab80f63d429e5e53575ea8c6d23e1f46faf7",
+            "wwise_waapi/business_declaration_state.py": "8108e9eaa73d98a855496d9fca79025dae64b112d4447618c15a1c609d4d1267",
+            "wwise_waapi/business_declarations.py": "c0338869d5b22ed87425e692999e14c8735becb99f51a5f85d1b26e94eaf1ab3",
+            "wwise_waapi/business_fields.py": "b6d422ae8885c36aedb7f4288e05ac1e698e6ff320b4807c77068668c6516acb",
+            "wwise_waapi/business_planning.py": "90de5eef9653a7ddf863c56c86134b5272c52b5b93f30e91bbc03d9d016b7616",
+            "wwise_waapi/canonical.py": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8",
+            "wwise_waapi/capabilities.py": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+            "wwise_waapi/category_policy.py": "dc5bfcffff04c2eb965fa09ee3810775ed28b9b9353815f6edac2c0eb4a05bc1",
+            "wwise_waapi/cli_console_business.py": "32cb504109e759ff28c357adb5d21e3d38bd4d1f6850244042371d2db4fb27fd",
+            "wwise_waapi/cli_console_business_cli.py": "b519cb5907e885d30a5c7c0a1c2e83d4b35f9673779ace69b767af9e651bfafc",
+            "wwise_waapi/cli_console_business_contracts.py": "83ef1e8a710aae23dcd5313ff48fb44f2ee97149308b2054419570f0c4efa3d7",
+            "wwise_waapi/compound_undo_business.py": "4b83d3cc80e7ea404215a2af5c39dddd3e638d77afd62d1c6b0f1f920f420cfe",
+            "wwise_waapi/compound_undo_business_contracts.py": "dedc3242cb14a6dbe71f8854bab293025c70aefa215d91cb41a3a3b2ffb223b5",
+            "wwise_waapi/config.py": "6ff18012c76989531d7562a20dacba31557cb4c38e9561bc349d85c51732e012",
+            "wwise_waapi/core_business.py": "2cf7acd38728a2dcc8f3f45c4b2f5aa89ece7166d69dc5930604093c7ab20a92",
+            "wwise_waapi/core_business_contracts.py": "4615ec3009ea7941331610e43e4e9bd2a1f8a4acefb68debf60e24c4b5357c60",
+            "wwise_waapi/debug_business.py": "5b2595d7ba8a25c4b96850e5c78e854731e51c601e5a19dd13a128e3f0621148",
+            "wwise_waapi/debug_business_cli.py": "bf28d6b5cee0b19db97ef813c5d7627175b28a5358c713fe95f114ea25499c77",
+            "wwise_waapi/debug_business_contracts.py": "47383e70ffa3ae53abe7d930b932603e1009dff14ecdcfa0b00b16c2efa588f0",
+            "wwise_waapi/deferred_registry.py": "2099e37793dc12489d5a9a4b0eb281c356ca8b0a7f5beb05b8c0ec81b1dfe9d5",
+            "wwise_waapi/dispatcher.py": "94adbbdb21373a0a6bc2621fda7dae6f65585fce0582946ca5da5ef45c866653",
+            "wwise_waapi/endpoint_scope.py": "a30ba0c8974d394468ec7309fff24b8de0c699fbfa6f6b3d39e0f192109ffffc",
+            "wwise_waapi/exact_artifact_business.py": "f5cef8af57f20be68ebd3ef8e4ab79e55085cf32fc7ab6b48b071f4faadc6d34",
+            "wwise_waapi/exact_artifact_business_cli.py": "1a71d03bbba885e5a0335e34ee9e00d63c1e488513cf04f90610c5c2b620f2ef",
+            "wwise_waapi/exact_artifact_business_contracts.py": "01901d258bbb0c943431b949eed18cdbb3784b120f7b746b48abfd8d3c17d8c4",
+            "wwise_waapi/execution_contracts.py": "df89e676217e7ac9aac88177f141e943687b0bbf5d4973df1a8e7c1db430aca4",
+            "wwise_waapi/filesystem_security.py": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d",
+            "wwise_waapi/headless.py": "f7ce9d99b65b52fbf390119d29f67b8bb53e4738bf34bbc8ca5784f1c370cf97",
+            "wwise_waapi/host_paths.py": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea",
+            "wwise_waapi/host_ui_debug_business.py": "b1e15001b562abe5cab2f44b21b46a132ffc0bd34716b30f60eca72d5e2b6447",
+            "wwise_waapi/host_ui_debug_business_cli.py": "9f21068dbae720e444c76e5de8cf8361895565e46debcd6907b7187d605745b3",
+            "wwise_waapi/host_ui_debug_business_contracts.py": "73a105e910cab3b59e52ff89f265adc8cf4770975aa40d5105edbe9c9fb31dc1",
+            "wwise_waapi/identity_limits.py": "a51e6497844a66ddea2ffa58392aa7eff4fdbcffdbe2a7c95e54373ef985d591",
+            "wwise_waapi/io_policy.py": "bc3449238d9fb99329a9cbb22bcc00673faed229c59ac8cb6a87bee29d204059",
+            "wwise_waapi/manifest.py": "ef5bc0510c5042e202792b0f6202a2b200241c08016c8b621a6e79376f658b74",
+            "wwise_waapi/media_build_business.py": "25fdde83f2601948a9be033a7a45476fb4af1b8cd49f7dd1cc07c7ea764f8695",
+            "wwise_waapi/media_build_business_cli.py": "235a45af367c638a94d98ae3c1e246197588c49d5e6eaefdaad640b21742008e",
+            "wwise_waapi/media_build_business_contracts.py": "a2c1e2a759e877c3283187172d3ac0f91e9911af7e2fba611c61a86cc2ddbbd7",
+            "wwise_waapi/metadata_cache.py": "2da4634c3556b8de8813cfd30e28059d72b4388da81203352514877bf9311d06",
+            "wwise_waapi/metadata_catalog.py": "57e68afacda5c708c7713e54d3e06be6f9da0ed5e7c584d51c61cb0e4a541c28",
+            "wwise_waapi/metadata_discovery.py": "1baf53908b616dbe26f5ed7a748dbdcbcd76e3ecc047bbaf07a9c6302a6220ba",
+            "wwise_waapi/metadata_restrictions.py": "ad5d4470497ba0d51a911133a99006587747d2032a1707db7cef7afd21aea993",
+            "wwise_waapi/native_surface_policy.py": "895fcc1849d62438d30d6e17dc5515dd179e6c1d67fbd570dc999628e1848696",
+            "wwise_waapi/object_capabilities.py": "3204182b7f7e963296626aa1e6468fb7850d0531dd3a499a1e87877576a50c73",
+            "wwise_waapi/object_graph_business.py": "78893a02f2bb70cd8b2bda76973d478e616360d8ddb866a748cd79b8f191f8b3",
+            "wwise_waapi/object_graph_business_contracts.py": "1dd454dc85724e71c1828576a36077c244e693af3609ce9dc83fb132bb2c050f",
+            "wwise_waapi/object_lifecycle_business.py": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9",
+            "wwise_waapi/object_lifecycle_business_contracts.py": "dfadf2752512dc469b81a5ef374f01587611c7e176d4cf0f21085ce576773913",
+            "wwise_waapi/object_metadata_business.py": "616d6e63fb35d9615cf8b6dab3311ada8caae8a64ca85c2d04044e54f35d9bdc",
+            "wwise_waapi/object_metadata_business_contracts.py": "982056c6bbdfb27ad747a52b14536774402e721b3464e47b747456f0a36c289c",
+            "wwise_waapi/operation_composer.py": "b10e1363d62228667305fc4ced9fa35c74a7554e698f55e78e3214afd3a2d8fb",
+            "wwise_waapi/operation_drafts.py": "d7b4f7b60c4c007debcab9760a4da5b4048733ada295776820cff0a3cfe5ce88",
+            "wwise_waapi/operation_import.py": "59817ede02a8097552e042638d3e4a20e3f82242a1a946d5c07ae697b32cc646",
+            "wwise_waapi/operation_object.py": "dd8e934f071036dcb30265dc3c8389ee90efacad67004974265bee2a657fec40",
+            "wwise_waapi/operation_plugin.py": "1e3545ecf3f1439192f4f7742d769eacb0747db8b7bf3baa3493e461a4d39833",
+            "wwise_waapi/operation_registry.py": "1581d973d8481f8668160098d97ec801faa531021227a93990469ee30a4f8384",
+            "wwise_waapi/operation_soundbank.py": "85a84f010a75fdc02a0c556afc7e7c4875a95686723ae7816a005ecc57a7e673",
+            "wwise_waapi/operation_ui_commands.py": "78152a5e4ba9b002b2d740f43d7f6e94b88410b21391d101d93804611b9d0608",
+            "wwise_waapi/platform_commands.py": "85ee88c96c7d5246add85bab3ffd6d80fb631e832d885d9afbc24beb0f232d99",
+            "wwise_waapi/platform_paths.py": "84698d8ad65f07e41e996d3e425830c5c06fba87657ae381a7e1689a6e83f210",
+            "wwise_waapi/project_setting_business.py": "998c85b60188b1ce1130b4230e0c54e0f0dadb1fd02fe9ca00453a5a2a8736c1",
+            "wwise_waapi/project_setting_business_contracts.py": "029b8fdb3307f16dac99283af4a55db3f0a4d2cb8f886705e3fc0ff5ef9b4604",
+            "wwise_waapi/runtime_game_object_handles.py": "7ce46923c004a4c76769f609f55cfeeadd74b831e086eef28699412a4f5255c5",
+            "wwise_waapi/runtime_inspection_business.py": "1c0dfb0e9e52164586a43e7744ef49a2d31726039074a0035727c8f5ecb1b099",
+            "wwise_waapi/runtime_inspection_business_contracts.py": "7b4ce77333a0e6ae353435e546e800bacc4668b9ed61564d360197feecb18945",
+            "wwise_waapi/runtime_playing_handles.py": "6f3905f241203c756e3010d65967a0a7132d97225816cce800ee4a31c5f31ef9",
+            "wwise_waapi/runtime_transport_handles.py": "031501bec053a079a0d034b6032caf39d22e4b227404f5fdbf27fcb63fd9015f",
+            "wwise_waapi/safety.py": "10563ca318b15636de10de64fdfd5afcbb0a15077f1bc31a597667a64d4b212c",
+            "wwise_waapi/schema_inventory.py": "40af821ef05729ccfb12fe03b2bf453d7146f3ad4c977a22b49f1a83d3b6c93e",
+            "wwise_waapi/selection_guidance.py": "2ad015d91e16f359a922ccbbec0427a48491b4877266299448bc9b5fa20c0ff2",
+            "wwise_waapi/soundbank_business.py": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056",
+            "wwise_waapi/soundbank_business_cli.py": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f",
+            "wwise_waapi/soundbank_business_contracts.py": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca",
+            "wwise_waapi/soundengine_business.py": "55624d2cb93d2399eb3ba3c12d18cb2734bf27a50e15619f38a8bf64739133ad",
+            "wwise_waapi/soundengine_business_contracts.py": "034503a03892ad23fb1501e7ece38bdebcead4ac8ac6c61c29cd1408162b5514",
+            "wwise_waapi/source_control_business.py": "92c69f96cb32c343f8d50046462fa2bcff91afd604556ae92992ba9e6af2f6a8",
+            "wwise_waapi/source_control_business_cli.py": "11c7c959bb152404eb2f3c87496e1c8d25e63fa371e2b1aa3ba86128452e04ac",
+            "wwise_waapi/source_control_business_contracts.py": "01536fa4cfcdad62513c598bc4bae6571afb8aab1155ac53fc3f107e9c9d47a4",
+            "wwise_waapi/subscriptions.py": "d0b1487b2d3d1df4a1a55300dd005a8c432933fcd88f56ba1d7f5533d70a4cbf",
+            "wwise_waapi/switch_assignment_business.py": "8927d842674415909616beea40f2e411937f762a7f72e0526bce40015cba4afc",
+            "wwise_waapi/switch_assignment_business_contracts.py": "169e9b21ebb1f373356ea9df703d820a3213454b95d8dd5f3202a9b77ec9eeaa",
+            "wwise_waapi/topic_business.py": "1e56daf8efb678b3b582b335c2b5c567ecf673de4427421e5ff4f1aec2739648",
+            "wwise_waapi/transaction_cleanup.py": "19baeeaba9a8272f3a8a07eb9e9dc54b26814da7f0a5f7d998591a1d7d2e4ae7",
+            "wwise_waapi/transaction_locality.py": "8597532d63448219ef9a0b20517ffd1593d5d9f92fe7476f266f5485b96ccba1",
+            "wwise_waapi/transaction_runtime.py": "05158eae5d4ef95a996a0ada8f160ee2d3bb39ee3ccef24dd55da98b6da2440b",
+            "wwise_waapi/transactions.py": "7f9763900dd92ab6d0f0ba579b81d290fbc77c304da0430a92f95a47ce3396ee",
+            "wwise_waapi/typed_operations.py": "7aa251e73718b17237e19c2abe5923768827a633d899d846c159f1d04b9bce7f",
+            "wwise_waapi/typed_queries.py": "7b1b90f626cba688ae9cd33c6e7f0f1794b0f2279cf5150f9e04f899d6eea0e2",
+            "wwise_waapi/typed_requests.py": "ccdfe6d57af7d3f92759208f4b43a9d1095d8a207195270fc7ade7ed961fd88d",
+            "wwise_waapi/typed_topics.py": "607bc793300e1e71eb8132f5fcd5123a9d2b2cbe78eba6c74e2f9f4f983ee0f4",
+            "wwise_waapi/versions.py": "1757e1bdc33af98172c46b8e27a21b3abb7f279d086a4dfd2a3002aa37deac50",
+            "wwise_waapi/waql.py": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
+          },
+          "fingerprint": "4bdb9b0156d71ede11281e536be5b43d2ae0a615f3a4423ef39fa03599b57c73",
+          "version": "2025.1"
+        }
+      },
+      "before": {
+        "entries": [
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{F4879559-78AE-4CED-8ECD-201397DC2389}",
+              "name": "Protected_Gain_1",
+              "notes": "protected effect 1",
+              "owner": {
+                "id": "{55190424-5E2B-4ABE-B39C-CC83991281AB}"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [1]: (Gain)]\\Protected_Gain_1",
+              "type": "Effect"
+            },
+            "slot": "{55190424-5E2B-4ABE-B39C-CC83991281AB}",
+            "slot_state": {
+              "@Effect": {
+                "id": "{F4879559-78AE-4CED-8ECD-201397DC2389}",
+                "name": "Protected_Gain_1"
+              },
+              "id": "{55190424-5E2B-4ABE-B39C-CC83991281AB}",
+              "name": "",
+              "owner": {
+                "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                "name": "Expansion_EXP25-C09_EffectsOwner"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [1]: (Gain)]",
+              "type": "EffectSlot"
+            }
+          },
+          {
+            "effect": {
+              "classId": 9109507,
+              "id": "{64177908-B258-4D63-8DCD-34333572D124}",
+              "name": "Protected_Gain_0",
+              "notes": "protected effect 0",
+              "owner": {
+                "id": "{CF80951F-DD95-4EA0-BC41-897AA256B322}"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [0]: (Gain)]\\Protected_Gain_0",
+              "type": "Effect"
+            },
+            "slot": "{CF80951F-DD95-4EA0-BC41-897AA256B322}",
+            "slot_state": {
+              "@Effect": {
+                "id": "{64177908-B258-4D63-8DCD-34333572D124}",
+                "name": "Protected_Gain_0"
+              },
+              "id": "{CF80951F-DD95-4EA0-BC41-897AA256B322}",
+              "name": "",
+              "owner": {
+                "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+                "name": "Expansion_EXP25-C09_EffectsOwner"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner\\[Effect Slot [0]: (Gain)]",
+              "type": "EffectSlot"
+            }
+          }
+        ],
+        "owner": {
+          "@Volume": -3.0,
+          "id": "{12F0563E-E05F-4458-8D08-B2D24BE4259D}",
+          "name": "Expansion_EXP25-C09_EffectsOwner",
+          "notes": "",
+          "parent": {
+            "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+            "name": "Default Work Unit"
+          },
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner",
+          "type": "Sound"
+        },
+        "slot_order": [
+          "{CF80951F-DD95-4EA0-BC41-897AA256B322}",
+          "{55190424-5E2B-4ABE-B39C-CC83991281AB}"
+        ]
+      },
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "c16a47173a16fc1c78888c2520a1f31f433394df94962e995f054573523f9279",
+        "preview_file_sha256": "2aa61c3c2cdde70ad8b7bde52592151bf10d4863ba522fb2b63caff8f900bb56",
+        "oracle_file_sha256": "f534a755ae3ccf61114e6c43f7a5a7ce9d7a77de335090131325f4645ff041e1",
+        "phases": [
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/012-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-0cc6d0b5c5f7fe2aabbef182aa81e18c --task-authority da1-c6fb34ed21ee27cc289aaeeed8ad40485f8ff51c --expected-revision 5'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 24,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/012-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-zrgme5mbm6gr7p29zyqw'",
+            "phase": "execute"
+          }
+        ]
+      }
+    },
+    {
+      "case": "014-EXP25-M05",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "已加载 waapi-skill，配置的 WAAPI 端口为 32510，Wwise 适配版本为 2025.1。\n\n当前修改策略为 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会先核对实际对象并生成预览，再按授权执行并回读验收，不进行播放测试。"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_11",
+            "type": "agent_message",
+            "text": "已读取目标对象，确认其类型为 Stinger，并核对新触发器为 Backup_Team_Arrives。接下来生成仅替换触发器的预览，核对原触发器、关联音乐段及保留范围。"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_13",
+            "type": "agent_message",
+            "text": "预览已生成：仅将指定 Stinger 的 Trigger 改为 Backup_Team_Arrives，未包含音乐段、容器或其他设置的修改。预览已获得 allow_changes 策略授权；现在执行这项修改，随后回读验收。"
+          }
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        }
+      ],
+      "artifact": {
+        "contract": "waapi-skill.transaction-preview/v2",
+        "created_at": "2026-10-02T23:51:27.161140Z",
+        "execution_policy": {
+          "accepted_authorization_modes": [
+            "explicit_confirmation",
+            "policy_authorization"
+          ],
+          "authorization_selected_at_preview": true,
+          "automatic_retry_allowed": false,
+          "post_execution_verification_required": true,
+          "requires_authorization": true,
+          "revalidate_project_guard": true,
+          "revalidate_resolved_roles": true,
+          "revalidate_runtime_guard": true
+        },
+        "expires_at": "2026-10-03T00:21:27.161140Z",
+        "prepared_operation": {
+          "cleanup": {
+            "field_metadata": {
+              "audioEngineId": 4294967295,
+              "default": null,
+              "dependencies": [],
+              "display": {
+                "group": "",
+                "index": 1698,
+                "name": "Trigger"
+              },
+              "name": "Trigger",
+              "restriction": {
+                "restrictions": [
+                  {
+                    "sharedOnlyTypes": [],
+                    "type": [
+                      "Trigger"
+                    ]
+                  }
+                ],
+                "type": "reference"
+              },
+              "supports": {
+                "randomizer": false,
+                "rtpc": "None",
+                "unlink": false
+              },
+              "type": "",
+              "ui": {
+                "autoUpdate": false,
+                "dataMeaning": "None",
+                "displayAs": {
+                  "bitfield": false,
+                  "lrMix": false,
+                  "musicNote": false,
+                  "percentage": false
+                },
+                "value": {
+                  "decimals": 0,
+                  "fine": 0.0,
+                  "infinity": 0,
+                  "max": 0.0,
+                  "min": 0.0,
+                  "step": 0.0
+                }
+              }
+            },
+            "kind": "restore-pre-state",
+            "snapshot": {
+              "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+              "name": "",
+              "notes": "",
+              "path": "[Stinger : Bonus,Stinger Bonus]",
+              "type": "MusicStinger"
+            }
+          },
+          "contract": "waapi-skill.prepared-operation/v1",
+          "dispatch": {
+            "args": {
+              "object": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+              "reference": "Trigger",
+              "value": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"
+            },
+            "options": {},
+            "uri": "ak.wwise.core.object.setReference"
+          },
+          "operation": "object.setReference",
+          "pre_state": {
+            "field_before": {
+              "field": "Trigger",
+              "platform": null,
+              "row": {
+                "Trigger": {
+                  "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+                  "name": "Bonus"
+                },
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "path": "[Stinger : Bonus,Stinger Bonus]"
+              },
+              "value": {
+                "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+                "name": "Bonus"
+              }
+            },
+            "field_info": {
+              "audioEngineId": 4294967295,
+              "default": null,
+              "dependencies": [],
+              "display": {
+                "group": "",
+                "index": 1698,
+                "name": "Trigger"
+              },
+              "name": "Trigger",
+              "restriction": {
+                "restrictions": [
+                  {
+                    "sharedOnlyTypes": [],
+                    "type": [
+                      "Trigger"
+                    ]
+                  }
+                ],
+                "type": "reference"
+              },
+              "supports": {
+                "randomizer": false,
+                "rtpc": "None",
+                "unlink": false
+              },
+              "type": "",
+              "ui": {
+                "autoUpdate": false,
+                "dataMeaning": "None",
+                "displayAs": {
+                  "bitfield": false,
+                  "lrMix": false,
+                  "musicNote": false,
+                  "percentage": false
+                },
+                "value": {
+                  "decimals": 0,
+                  "fine": 0.0,
+                  "infinity": 0,
+                  "max": 0.0,
+                  "min": 0.0,
+                  "step": 0.0
+                }
+              }
+            },
+            "object": {
+              "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+              "name": "",
+              "notes": "",
+              "path": "[Stinger : Bonus,Stinger Bonus]",
+              "type": "MusicStinger"
+            },
+            "target": {
+              "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+              "name": "Backup_Team_Arrives",
+              "notes": "",
+              "parent": {
+                "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+                "name": "Music"
+              },
+              "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+              "type": "Trigger"
+            }
+          },
+          "preflight_reads": [
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "name",
+                  "type",
+                  "path",
+                  "parent",
+                  "notes"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                    "name": "",
+                    "notes": "",
+                    "path": "[Stinger : Bonus,Stinger Bonus]",
+                    "type": "MusicStinger"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            },
+            {
+              "args": {
+                "object": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "property": "Trigger"
+              },
+              "options": {},
+              "result": {
+                "audioEngineId": 4294967295,
+                "default": null,
+                "dependencies": [],
+                "display": {
+                  "group": "",
+                  "index": 1698,
+                  "name": "Trigger"
+                },
+                "name": "Trigger",
+                "restriction": {
+                  "restrictions": [
+                    {
+                      "sharedOnlyTypes": [],
+                      "type": [
+                        "Trigger"
+                      ]
+                    }
+                  ],
+                  "type": "reference"
+                },
+                "supports": {
+                  "randomizer": false,
+                  "rtpc": "None",
+                  "unlink": false
+                },
+                "type": "",
+                "ui": {
+                  "autoUpdate": false,
+                  "dataMeaning": "None",
+                  "displayAs": {
+                    "bitfield": false,
+                    "lrMix": false,
+                    "musicNote": false,
+                    "percentage": false
+                  },
+                  "value": {
+                    "decimals": 0,
+                    "fine": 0.0,
+                    "infinity": 0,
+                    "max": 0.0,
+                    "min": 0.0,
+                    "step": 0.0
+                  }
+                }
+              },
+              "uri": "ak.wwise.core.object.getPropertyInfo"
+            },
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "path",
+                  "Trigger"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "Trigger": {
+                      "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+                      "name": "Bonus"
+                    },
+                    "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                    "path": "[Stinger : Bonus,Stinger Bonus]"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            },
+            {
+              "args": {
+                "from": {
+                  "id": [
+                    "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"
+                  ]
+                }
+              },
+              "options": {
+                "return": [
+                  "id",
+                  "name",
+                  "type",
+                  "path",
+                  "parent",
+                  "notes"
+                ]
+              },
+              "result": {
+                "return": [
+                  {
+                    "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                    "name": "Backup_Team_Arrives",
+                    "notes": "",
+                    "parent": {
+                      "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+                      "name": "Music"
+                    },
+                    "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+                    "type": "Trigger"
+                  }
+                ]
+              },
+              "uri": "ak.wwise.core.object.get"
+            }
+          ],
+          "raw_dispatch_allowed": false,
+          "request": {
+            "arguments": {
+              "object": {
+                "kind": "id",
+                "value": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+              },
+              "reference": "Trigger",
+              "target": {
+                "kind": "id",
+                "value": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"
+              }
+            },
+            "contract": "waapi-skill.operation-request/v1",
+            "operation": "object.setReference",
+            "version": "2025.1"
+          },
+          "resolved_roles": {
+            "object": {
+              "identity": {
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "name": null,
+                "parent": null,
+                "path": null,
+                "type": null,
+                "waql": null
+              },
+              "object": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+              "resolution": "live-id",
+              "row": {
+                "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "name": "",
+                "notes": "",
+                "path": "[Stinger : Bonus,Stinger Bonus]",
+                "type": "MusicStinger"
+              }
+            },
+            "target": {
+              "identity": {
+                "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                "name": null,
+                "parent": null,
+                "path": null,
+                "type": null,
+                "waql": null
+              },
+              "object": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+              "resolution": "live-id",
+              "row": {
+                "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                "name": "Backup_Team_Arrives",
+                "notes": "",
+                "parent": {
+                  "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+                  "name": "Music"
+                },
+                "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+                "type": "Trigger"
+              }
+            }
+          },
+          "semantic_preview": {
+            "envelope": {
+              "args": {
+                "object": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                "reference": "Trigger",
+                "value": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"
+              },
+              "metadata": {
+                "applicability": {
+                  "clears_reference": false,
+                  "platform": null,
+                  "reference_info": {
+                    "audioEngineId": 4294967295,
+                    "default": null,
+                    "dependencies": [],
+                    "display": {
+                      "group": "",
+                      "index": 1698,
+                      "name": "Trigger"
+                    },
+                    "name": "Trigger",
+                    "restriction": {
+                      "restrictions": [
+                        {
+                          "sharedOnlyTypes": [],
+                          "type": [
+                            "Trigger"
+                          ]
+                        }
+                      ],
+                      "type": "reference"
+                    },
+                    "supports": {
+                      "randomizer": false,
+                      "rtpc": "None",
+                      "unlink": false
+                    },
+                    "type": "",
+                    "ui": {
+                      "autoUpdate": false,
+                      "dataMeaning": "None",
+                      "displayAs": {
+                        "bitfield": false,
+                        "lrMix": false,
+                        "musicNote": false,
+                        "percentage": false
+                      },
+                      "value": {
+                        "decimals": 0,
+                        "fine": 0.0,
+                        "infinity": 0,
+                        "max": 0.0,
+                        "min": 0.0,
+                        "step": 0.0
+                      }
+                    }
+                  },
+                  "target_identity": {
+                    "identity": {
+                      "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                      "name": null,
+                      "parent": null,
+                      "path": null,
+                      "type": null,
+                      "waql": null
+                    },
+                    "object": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                    "resolution": "live-id",
+                    "row": {
+                      "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                      "name": "Backup_Team_Arrives",
+                      "notes": "",
+                      "parent": {
+                        "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+                        "name": "Music"
+                      },
+                      "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+                      "type": "Trigger"
+                    }
+                  }
+                },
+                "builder_family": "property-reference",
+                "destructive_gate": {
+                  "reason": "property/reference setter previews must be reviewed before dispatch",
+                  "required": true
+                },
+                "operation": "setReference",
+                "read_only": false,
+                "schema_validation": {
+                  "required_families": [],
+                  "required_fields": [
+                    "object",
+                    "reference",
+                    "value"
+                  ],
+                  "section": "request",
+                  "unresolved_refs": [
+                    "waapi_definitions.json#/definitions/objectArg"
+                  ],
+                  "uri": "ak.wwise.core.object.setReference",
+                  "validated_nodes": 5,
+                  "version": "2025.1"
+                },
+                "source_note": {
+                  "allowed": true,
+                  "cited_fields": [
+                    "ak.wwise.core.object.getTypes: no required fields",
+                    "ak.wwise.core.object.getPropertyAndReferenceNames: exactly one of object or classId",
+                    "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                    "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                    "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                    "ak.wwise.core.object.setName: object, value",
+                    "ak.wwise.core.object.setNotes: object, value",
+                    "ak.wwise.core.object.setProperty: object, property, value",
+                    "ak.wwise.core.object.setReference: object, reference, value",
+                    "ak.wwise.core.object.setRandomizer: object, property, and at least one of enabled, min, or max",
+                    "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points",
+                    "ak.wwise.core.object.isLinked: object, property, platform"
+                  ],
+                  "error_code": null,
+                  "family": "property-reference",
+                  "missing_fields": [],
+                  "reason": "Semantic source note is grounded.",
+                  "uncited_fields": [],
+                  "version": "2025.1"
+                },
+                "uri": "ak.wwise.core.object.setReference"
+              },
+              "options": {},
+              "uri": "ak.wwise.core.object.setReference"
+            },
+            "evidence_plan": [
+              {
+                "family": "property-reference",
+                "kind": "source-note",
+                "status": {
+                  "allowed": true,
+                  "cited_fields": [
+                    "ak.wwise.core.object.getTypes: no required fields",
+                    "ak.wwise.core.object.getPropertyAndReferenceNames: exactly one of object or classId",
+                    "ak.wwise.core.object.getPropertyInfo: property and exactly one of object or classId",
+                    "ak.wwise.core.object.isPropertyEnabled: object, platform, property",
+                    "ak.wwise.core.object.getAttenuationCurve: object, curveType",
+                    "ak.wwise.core.object.setName: object, value",
+                    "ak.wwise.core.object.setNotes: object, value",
+                    "ak.wwise.core.object.setProperty: object, property, value",
+                    "ak.wwise.core.object.setReference: object, reference, value",
+                    "ak.wwise.core.object.setRandomizer: object, property, and at least one of enabled, min, or max",
+                    "ak.wwise.core.object.setAttenuationCurve: object, curveType, use, points",
+                    "ak.wwise.core.object.isLinked: object, property, platform"
+                  ],
+                  "error_code": null,
+                  "family": "property-reference",
+                  "missing_fields": [],
+                  "reason": "Semantic source note is grounded.",
+                  "uncited_fields": [],
+                  "version": "2025.1"
+                }
+              },
+              {
+                "kind": "schema",
+                "validation": {
+                  "required_families": [],
+                  "required_fields": [
+                    "object",
+                    "reference",
+                    "value"
+                  ],
+                  "section": "request",
+                  "unresolved_refs": [
+                    "waapi_definitions.json#/definitions/objectArg"
+                  ],
+                  "uri": "ak.wwise.core.object.setReference",
+                  "validated_nodes": 5,
+                  "version": "2025.1"
+                }
+              },
+              {
+                "description": "expect referenceChanged payload for 'Trigger'",
+                "expected_identity": {
+                  "source": {
+                    "identity": {
+                      "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                      "name": null,
+                      "parent": null,
+                      "path": null,
+                      "type": null,
+                      "waql": null
+                    },
+                    "object": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                    "resolution": "live-id",
+                    "row": {
+                      "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+                      "name": "",
+                      "notes": "",
+                      "path": "[Stinger : Bonus,Stinger Bonus]",
+                      "type": "MusicStinger"
+                    }
+                  },
+                  "target": {
+                    "identity": {
+                      "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                      "name": null,
+                      "parent": null,
+                      "path": null,
+                      "type": null,
+                      "waql": null
+                    },
+                    "object": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                    "resolution": "live-id",
+                    "row": {
+                      "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+                      "name": "Backup_Team_Arrives",
+                      "notes": "",
+                      "parent": {
+                        "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+                        "name": "Music"
+                      },
+                      "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+                      "type": "Trigger"
+                    }
+                  }
+                },
+                "kind": "topic-expectation",
+                "live_subscription": false,
+                "old_new_required": true,
+                "required_payload_fields": [
+                  "id",
+                  "path",
+                  "reference",
+                  "old",
+                  "new"
+                ],
+                "topic": "ak.wwise.core.object.referenceChanged"
+              },
+              {
+                "kind": "metadata-applicability",
+                "platform": null,
+                "property_enabled": null,
+                "property_info": {
+                  "audioEngineId": 4294967295,
+                  "default": null,
+                  "dependencies": [],
+                  "display": {
+                    "group": "",
+                    "index": 1698,
+                    "name": "Trigger"
+                  },
+                  "name": "Trigger",
+                  "restriction": {
+                    "restrictions": [
+                      {
+                        "sharedOnlyTypes": [],
+                        "type": [
+                          "Trigger"
+                        ]
+                      }
+                    ],
+                    "type": "reference"
+                  },
+                  "supports": {
+                    "randomizer": false,
+                    "rtpc": "None",
+                    "unlink": false
+                  },
+                  "type": "",
+                  "ui": {
+                    "autoUpdate": false,
+                    "dataMeaning": "None",
+                    "displayAs": {
+                      "bitfield": false,
+                      "lrMix": false,
+                      "musicNote": false,
+                      "percentage": false
+                    },
+                    "value": {
+                      "decimals": 0,
+                      "fine": 0.0,
+                      "infinity": 0,
+                      "max": 0.0,
+                      "min": 0.0,
+                      "step": 0.0
+                    }
+                  }
+                }
+              }
+            ],
+            "raw_dispatch_allowed": false,
+            "readback_plan": [
+              {
+                "args": {
+                  "waql": "from object \"{B8D45849-AF76-4770-BE7B-5A6553B1337B}\""
+                },
+                "description": "read back changed reference by exact identity when WAAPI exposes it",
+                "options": {
+                  "return": [
+                    "id",
+                    "path",
+                    "Trigger"
+                  ]
+                },
+                "uri": "ak.wwise.core.object.get"
+              }
+            ],
+            "requires_destructive_gate": true,
+            "source_note_family": "property-reference",
+            "version": "2025.1"
+          },
+          "verification_plan": {
+            "expected_clear": false,
+            "expected_target_id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+            "field": "Trigger",
+            "kind": "same-guid-reference",
+            "object_id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "platform": null
+          },
+          "version": "2025.1",
+          "warnings": []
+        },
+        "project_guard": {
+          "context_fingerprint": "c9427edb736ce98ba1bbdca19faea735db6711b9484ac193df1670d63519fa87",
+          "contract": "waapi-skill.project-guard/v1",
+          "endpoint": {
+            "host": "127.0.0.1",
+            "port": 32510,
+            "url": "ws://127.0.0.1:32510/waapi"
+          },
+          "fingerprint": "de38845afc4aca7ee0f8c6e766e9e5166549d9b915e6b0fa70a8228bb51fbcaf",
+          "postcondition": {
+            "state": "same_project"
+          },
+          "project": {
+            "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+            "name": "SampleProject",
+            "path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-acceptance-87f9dc8-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\014-EXP25-M05\\owned\\sandbox-root\\sample-project-24f9000f949e4c86a2769ea9c4ced909\\SampleProject.wproj",
+            "state": "open"
+          },
+          "project_guard_mode": "invariant",
+          "version": "2025.1",
+          "wwise": {
+            "apiVersion": 1,
+            "configuration": "release",
+            "displayName": "WwiseConsole",
+            "isCommandLine": true,
+            "platform": "x64",
+            "processId": 452,
+            "processPath": "c:\\Program Files\\Audiokinetic\\Wwise 2025.1.7.9143\\Authoring\\x64\\Release\\bin\\WwiseConsole.exe",
+            "sessionId": "{3B648760-BD73-4AEC-8324-338D4C6B645B}",
+            "version": {
+              "build": 9143,
+              "displayName": "v2025.1.7",
+              "major": 1,
+              "minor": 7,
+              "nickname": "",
+              "schema": 133,
+              "year": 2025
+            }
+          }
+        },
+        "request": {
+          "arguments": {
+            "object": {
+              "kind": "id",
+              "value": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+            },
+            "reference": "Trigger",
+            "target": {
+              "kind": "id",
+              "value": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}"
+            }
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.setReference",
+          "version": "2025.1"
+        },
+        "runtime_guard": {
+          "contract": "waapi-skill.runtime-guard/v1",
+          "files": {
+            "resources/manifest/2025.1/authoring-ui-commands-supplement.json": "593fbe73b0fa53af6107644bc81fb517e06e7564520d873e9357ff411771bf07",
+            "resources/manifest/2025.1/functions.json": "18b909203f591ca5ce3eb25c15f9f1041028949f000b28231f040a27de92ad36",
+            "resources/manifest/2025.1/manifest.json": "1b17b9c7726d70d4f5b5f4fac81b4e33efbfb778bae70ec7a37fbf449d106b95",
+            "resources/manifest/2025.1/schemas.json": "1d6d6e32ec042c19c5ebd99b7b964c88410f9b90d26b073eb0869950b1a39c60",
+            "resources/manifest/2025.1/topics.json": "1508989ded3645d79bbf58e98eaaa14d52ad6dce94ce56fc5dac167321474570",
+            "resources/semantic/2025.1/source_notes.json": "8d7a2197f5525bb97f4fc3148d175e9dc6e16cb81e817bc0c2066e5af6c94244",
+            "scripts/gateway.py": "bfaea9bc03a08e9eaa47d3c6fdd376827c87c47bdbbc853ee40134380c497248",
+            "scripts/run.py": "479fab4691a6d4b60d259637cf56aa404e86d433126ccd11afcdbac7377fda24",
+            "wwise_waapi/__init__.py": "4ccef307e6eefc0e06f93361daea2a7ea00b6f6ca2dad5ed6cd799ff40acea5a",
+            "wwise_waapi/audio_import_business.py": "e70d09d520b08d275bf56af8718af40aa9733b2fc9e9b405f84229bdba39bb32",
+            "wwise_waapi/audio_import_business_contracts.py": "d06a04e38e224fb32301996c4aa0a4cf5ec46f75f1dcded354d64bf3ff87bd7c",
+            "wwise_waapi/authoring_core_manifest.py": "8302d4d3ae491a2911c81122f5eebec9a7af09f757476d09190b11b97acaf4fb",
+            "wwise_waapi/authoring_ui_business.py": "980cbe1527329e569af6bca83858580db10fe8e1b43fd3ac20e73117a9dc3774",
+            "wwise_waapi/authoring_ui_business_cli.py": "6973229f8dfd1679500add47115e09e0e3a5b054ef2982f7212824d9d1c95d24",
+            "wwise_waapi/authoring_ui_business_contracts.py": "43c19305bdfc940622b66853659ee9692961ba81ecc2ff790bf7bd1a79927e4c",
+            "wwise_waapi/authoring_ui_commands_manifest.py": "5ee6d9e9b6236636a7b86f64b15d9037c4f2c4097c8eca4b44960c87f452f74f",
+            "wwise_waapi/authoring_ui_topics_manifest.py": "73b2a63f404e003baeb69aa8514eb30650f9024740fb3da5e602c708bb545e48",
+            "wwise_waapi/authorization.py": "b08c89a1f189f841068b6e21f92e0cd6c759ad0e5d445a27a186c01e9a02c387",
+            "wwise_waapi/builders/__init__.py": "8cbc9815e0c60dbb2ac32a17f1b8aeaeff62389f5972f150bf0e6ed990275916",
+            "wwise_waapi/builders/common.py": "6661b3359dff0c4ab20bc9a233c2d14985dd513df718486308df82c12e8229ad",
+            "wwise_waapi/builders/container_suitability.py": "2853ce4a0b55ce3818193879004ffdc9a5e1a7cf125c997556b21cfa19abc8b2",
+            "wwise_waapi/builders/debug_lua.py": "9d654aea2713e179e37a8e444b1f9fb21a55888ec90e36c3f651513be9e6400a",
+            "wwise_waapi/builders/identity.py": "b896f2ed2cf3b3dff6907bd9d50756c63c5f1dddca27580bf28eb47a2b938aff",
+            "wwise_waapi/builders/metadata.py": "999a0be50e0b2478e54e92f5257489852458308b48f587d4cde3025dafd64556",
+            "wwise_waapi/builders/object_mutation.py": "d6818b2acbb26763a8aef413aeff964fcba895ca2f9e528f20bea39d262a4c3b",
+            "wwise_waapi/builders/properties.py": "e1a1294738fad8cda5f471f655251cbe802b4cb7e21eea92085e028ab5e502f1",
+            "wwise_waapi/builders/query.py": "598ab62354f2b47925b73277740ec8857e6395fa96ba49882e34e68ed7635bce",
+            "wwise_waapi/builders/schema.py": "88291ac0315e3d10166b04d54bfdf514a822deb0275a68260378f6a4950ef0ad",
+            "wwise_waapi/builders/soundbank.py": "b50e7d131ff4bcbe0aa0fe29a4481456fe4a881b940c8fa32d2395b2c5d6a6ca",
+            "wwise_waapi/builders/source_notes.py": "cbc92bf050e3d8d177e694b3f8f75c66fab7b34372370d042624c46ee135f81c",
+            "wwise_waapi/builders/stable_reads.py": "74e37957692c6748f6c7f8f6c4dd795dc31c10b78ba0d30500a90d59b818412d",
+            "wwise_waapi/builders/switchcontainer.py": "14d1171d68c904946fddf9f0487721e460b616ccf2869ea73c299bbaac06e8da",
+            "wwise_waapi/business_adapters.py": "e12cdfe4eeaaf4848518a4f5f02fab80f63d429e5e53575ea8c6d23e1f46faf7",
+            "wwise_waapi/business_declaration_state.py": "8108e9eaa73d98a855496d9fca79025dae64b112d4447618c15a1c609d4d1267",
+            "wwise_waapi/business_declarations.py": "c0338869d5b22ed87425e692999e14c8735becb99f51a5f85d1b26e94eaf1ab3",
+            "wwise_waapi/business_fields.py": "b6d422ae8885c36aedb7f4288e05ac1e698e6ff320b4807c77068668c6516acb",
+            "wwise_waapi/business_planning.py": "90de5eef9653a7ddf863c56c86134b5272c52b5b93f30e91bbc03d9d016b7616",
+            "wwise_waapi/canonical.py": "eff0fa33755499b29332979fa08fd0345f9601878bd9ca237747091e4ab37bb8",
+            "wwise_waapi/capabilities.py": "1aaad4a488ce0c5999d529ee0bf9c4b8b9feff70d5af049f3f25059695101997",
+            "wwise_waapi/category_policy.py": "dc5bfcffff04c2eb965fa09ee3810775ed28b9b9353815f6edac2c0eb4a05bc1",
+            "wwise_waapi/cli_console_business.py": "32cb504109e759ff28c357adb5d21e3d38bd4d1f6850244042371d2db4fb27fd",
+            "wwise_waapi/cli_console_business_cli.py": "b519cb5907e885d30a5c7c0a1c2e83d4b35f9673779ace69b767af9e651bfafc",
+            "wwise_waapi/cli_console_business_contracts.py": "83ef1e8a710aae23dcd5313ff48fb44f2ee97149308b2054419570f0c4efa3d7",
+            "wwise_waapi/compound_undo_business.py": "4b83d3cc80e7ea404215a2af5c39dddd3e638d77afd62d1c6b0f1f920f420cfe",
+            "wwise_waapi/compound_undo_business_contracts.py": "dedc3242cb14a6dbe71f8854bab293025c70aefa215d91cb41a3a3b2ffb223b5",
+            "wwise_waapi/config.py": "6ff18012c76989531d7562a20dacba31557cb4c38e9561bc349d85c51732e012",
+            "wwise_waapi/core_business.py": "2cf7acd38728a2dcc8f3f45c4b2f5aa89ece7166d69dc5930604093c7ab20a92",
+            "wwise_waapi/core_business_contracts.py": "4615ec3009ea7941331610e43e4e9bd2a1f8a4acefb68debf60e24c4b5357c60",
+            "wwise_waapi/debug_business.py": "5b2595d7ba8a25c4b96850e5c78e854731e51c601e5a19dd13a128e3f0621148",
+            "wwise_waapi/debug_business_cli.py": "bf28d6b5cee0b19db97ef813c5d7627175b28a5358c713fe95f114ea25499c77",
+            "wwise_waapi/debug_business_contracts.py": "47383e70ffa3ae53abe7d930b932603e1009dff14ecdcfa0b00b16c2efa588f0",
+            "wwise_waapi/deferred_registry.py": "2099e37793dc12489d5a9a4b0eb281c356ca8b0a7f5beb05b8c0ec81b1dfe9d5",
+            "wwise_waapi/dispatcher.py": "94adbbdb21373a0a6bc2621fda7dae6f65585fce0582946ca5da5ef45c866653",
+            "wwise_waapi/endpoint_scope.py": "a30ba0c8974d394468ec7309fff24b8de0c699fbfa6f6b3d39e0f192109ffffc",
+            "wwise_waapi/exact_artifact_business.py": "f5cef8af57f20be68ebd3ef8e4ab79e55085cf32fc7ab6b48b071f4faadc6d34",
+            "wwise_waapi/exact_artifact_business_cli.py": "1a71d03bbba885e5a0335e34ee9e00d63c1e488513cf04f90610c5c2b620f2ef",
+            "wwise_waapi/exact_artifact_business_contracts.py": "01901d258bbb0c943431b949eed18cdbb3784b120f7b746b48abfd8d3c17d8c4",
+            "wwise_waapi/execution_contracts.py": "df89e676217e7ac9aac88177f141e943687b0bbf5d4973df1a8e7c1db430aca4",
+            "wwise_waapi/filesystem_security.py": "d284570865b57666bfeacc869600e6f0e7677689af46bec013ac6f16be1bc35d",
+            "wwise_waapi/headless.py": "f7ce9d99b65b52fbf390119d29f67b8bb53e4738bf34bbc8ca5784f1c370cf97",
+            "wwise_waapi/host_paths.py": "e70943b478d237eba3c0851f8b18881189f7132ccaf34d3b863f8f3aa3d594ea",
+            "wwise_waapi/host_ui_debug_business.py": "b1e15001b562abe5cab2f44b21b46a132ffc0bd34716b30f60eca72d5e2b6447",
+            "wwise_waapi/host_ui_debug_business_cli.py": "9f21068dbae720e444c76e5de8cf8361895565e46debcd6907b7187d605745b3",
+            "wwise_waapi/host_ui_debug_business_contracts.py": "73a105e910cab3b59e52ff89f265adc8cf4770975aa40d5105edbe9c9fb31dc1",
+            "wwise_waapi/identity_limits.py": "a51e6497844a66ddea2ffa58392aa7eff4fdbcffdbe2a7c95e54373ef985d591",
+            "wwise_waapi/io_policy.py": "bc3449238d9fb99329a9cbb22bcc00673faed229c59ac8cb6a87bee29d204059",
+            "wwise_waapi/manifest.py": "ef5bc0510c5042e202792b0f6202a2b200241c08016c8b621a6e79376f658b74",
+            "wwise_waapi/media_build_business.py": "25fdde83f2601948a9be033a7a45476fb4af1b8cd49f7dd1cc07c7ea764f8695",
+            "wwise_waapi/media_build_business_cli.py": "235a45af367c638a94d98ae3c1e246197588c49d5e6eaefdaad640b21742008e",
+            "wwise_waapi/media_build_business_contracts.py": "a2c1e2a759e877c3283187172d3ac0f91e9911af7e2fba611c61a86cc2ddbbd7",
+            "wwise_waapi/metadata_cache.py": "2da4634c3556b8de8813cfd30e28059d72b4388da81203352514877bf9311d06",
+            "wwise_waapi/metadata_catalog.py": "57e68afacda5c708c7713e54d3e06be6f9da0ed5e7c584d51c61cb0e4a541c28",
+            "wwise_waapi/metadata_discovery.py": "1baf53908b616dbe26f5ed7a748dbdcbcd76e3ecc047bbaf07a9c6302a6220ba",
+            "wwise_waapi/metadata_restrictions.py": "ad5d4470497ba0d51a911133a99006587747d2032a1707db7cef7afd21aea993",
+            "wwise_waapi/native_surface_policy.py": "895fcc1849d62438d30d6e17dc5515dd179e6c1d67fbd570dc999628e1848696",
+            "wwise_waapi/object_capabilities.py": "3204182b7f7e963296626aa1e6468fb7850d0531dd3a499a1e87877576a50c73",
+            "wwise_waapi/object_graph_business.py": "78893a02f2bb70cd8b2bda76973d478e616360d8ddb866a748cd79b8f191f8b3",
+            "wwise_waapi/object_graph_business_contracts.py": "1dd454dc85724e71c1828576a36077c244e693af3609ce9dc83fb132bb2c050f",
+            "wwise_waapi/object_lifecycle_business.py": "50e703c498afdee21a6cef3f14d1d1c99f870d834f598b5ed9eb0f9b068ab3a9",
+            "wwise_waapi/object_lifecycle_business_contracts.py": "dfadf2752512dc469b81a5ef374f01587611c7e176d4cf0f21085ce576773913",
+            "wwise_waapi/object_metadata_business.py": "616d6e63fb35d9615cf8b6dab3311ada8caae8a64ca85c2d04044e54f35d9bdc",
+            "wwise_waapi/object_metadata_business_contracts.py": "982056c6bbdfb27ad747a52b14536774402e721b3464e47b747456f0a36c289c",
+            "wwise_waapi/operation_composer.py": "b10e1363d62228667305fc4ced9fa35c74a7554e698f55e78e3214afd3a2d8fb",
+            "wwise_waapi/operation_drafts.py": "d7b4f7b60c4c007debcab9760a4da5b4048733ada295776820cff0a3cfe5ce88",
+            "wwise_waapi/operation_import.py": "59817ede02a8097552e042638d3e4a20e3f82242a1a946d5c07ae697b32cc646",
+            "wwise_waapi/operation_object.py": "dd8e934f071036dcb30265dc3c8389ee90efacad67004974265bee2a657fec40",
+            "wwise_waapi/operation_plugin.py": "1e3545ecf3f1439192f4f7742d769eacb0747db8b7bf3baa3493e461a4d39833",
+            "wwise_waapi/operation_registry.py": "1581d973d8481f8668160098d97ec801faa531021227a93990469ee30a4f8384",
+            "wwise_waapi/operation_soundbank.py": "85a84f010a75fdc02a0c556afc7e7c4875a95686723ae7816a005ecc57a7e673",
+            "wwise_waapi/operation_ui_commands.py": "78152a5e4ba9b002b2d740f43d7f6e94b88410b21391d101d93804611b9d0608",
+            "wwise_waapi/platform_commands.py": "85ee88c96c7d5246add85bab3ffd6d80fb631e832d885d9afbc24beb0f232d99",
+            "wwise_waapi/platform_paths.py": "84698d8ad65f07e41e996d3e425830c5c06fba87657ae381a7e1689a6e83f210",
+            "wwise_waapi/project_setting_business.py": "998c85b60188b1ce1130b4230e0c54e0f0dadb1fd02fe9ca00453a5a2a8736c1",
+            "wwise_waapi/project_setting_business_contracts.py": "029b8fdb3307f16dac99283af4a55db3f0a4d2cb8f886705e3fc0ff5ef9b4604",
+            "wwise_waapi/runtime_game_object_handles.py": "7ce46923c004a4c76769f609f55cfeeadd74b831e086eef28699412a4f5255c5",
+            "wwise_waapi/runtime_inspection_business.py": "1c0dfb0e9e52164586a43e7744ef49a2d31726039074a0035727c8f5ecb1b099",
+            "wwise_waapi/runtime_inspection_business_contracts.py": "7b4ce77333a0e6ae353435e546e800bacc4668b9ed61564d360197feecb18945",
+            "wwise_waapi/runtime_playing_handles.py": "6f3905f241203c756e3010d65967a0a7132d97225816cce800ee4a31c5f31ef9",
+            "wwise_waapi/runtime_transport_handles.py": "031501bec053a079a0d034b6032caf39d22e4b227404f5fdbf27fcb63fd9015f",
+            "wwise_waapi/safety.py": "10563ca318b15636de10de64fdfd5afcbb0a15077f1bc31a597667a64d4b212c",
+            "wwise_waapi/schema_inventory.py": "40af821ef05729ccfb12fe03b2bf453d7146f3ad4c977a22b49f1a83d3b6c93e",
+            "wwise_waapi/selection_guidance.py": "2ad015d91e16f359a922ccbbec0427a48491b4877266299448bc9b5fa20c0ff2",
+            "wwise_waapi/soundbank_business.py": "a4f6e0938b6167420d5e58fb5fdcfcc97c1770770dfb0ef00233c18520a4c056",
+            "wwise_waapi/soundbank_business_cli.py": "709e0be0ba845f882e09962ab2b330308232bdf469ba35953ed18adee6f5bf0f",
+            "wwise_waapi/soundbank_business_contracts.py": "68cff30fc77a78c220fdcd08c6051fb35e08409f3f01e5a322d06d91a96ac6ca",
+            "wwise_waapi/soundengine_business.py": "55624d2cb93d2399eb3ba3c12d18cb2734bf27a50e15619f38a8bf64739133ad",
+            "wwise_waapi/soundengine_business_contracts.py": "034503a03892ad23fb1501e7ece38bdebcead4ac8ac6c61c29cd1408162b5514",
+            "wwise_waapi/source_control_business.py": "92c69f96cb32c343f8d50046462fa2bcff91afd604556ae92992ba9e6af2f6a8",
+            "wwise_waapi/source_control_business_cli.py": "11c7c959bb152404eb2f3c87496e1c8d25e63fa371e2b1aa3ba86128452e04ac",
+            "wwise_waapi/source_control_business_contracts.py": "01536fa4cfcdad62513c598bc4bae6571afb8aab1155ac53fc3f107e9c9d47a4",
+            "wwise_waapi/subscriptions.py": "d0b1487b2d3d1df4a1a55300dd005a8c432933fcd88f56ba1d7f5533d70a4cbf",
+            "wwise_waapi/switch_assignment_business.py": "8927d842674415909616beea40f2e411937f762a7f72e0526bce40015cba4afc",
+            "wwise_waapi/switch_assignment_business_contracts.py": "169e9b21ebb1f373356ea9df703d820a3213454b95d8dd5f3202a9b77ec9eeaa",
+            "wwise_waapi/topic_business.py": "1e56daf8efb678b3b582b335c2b5c567ecf673de4427421e5ff4f1aec2739648",
+            "wwise_waapi/transaction_cleanup.py": "19baeeaba9a8272f3a8a07eb9e9dc54b26814da7f0a5f7d998591a1d7d2e4ae7",
+            "wwise_waapi/transaction_locality.py": "8597532d63448219ef9a0b20517ffd1593d5d9f92fe7476f266f5485b96ccba1",
+            "wwise_waapi/transaction_runtime.py": "05158eae5d4ef95a996a0ada8f160ee2d3bb39ee3ccef24dd55da98b6da2440b",
+            "wwise_waapi/transactions.py": "7f9763900dd92ab6d0f0ba579b81d290fbc77c304da0430a92f95a47ce3396ee",
+            "wwise_waapi/typed_operations.py": "7aa251e73718b17237e19c2abe5923768827a633d899d846c159f1d04b9bce7f",
+            "wwise_waapi/typed_queries.py": "7b1b90f626cba688ae9cd33c6e7f0f1794b0f2279cf5150f9e04f899d6eea0e2",
+            "wwise_waapi/typed_requests.py": "ccdfe6d57af7d3f92759208f4b43a9d1095d8a207195270fc7ade7ed961fd88d",
+            "wwise_waapi/typed_topics.py": "607bc793300e1e71eb8132f5fcd5123a9d2b2cbe78eba6c74e2f9f4f983ee0f4",
+            "wwise_waapi/versions.py": "1757e1bdc33af98172c46b8e27a21b3abb7f279d086a4dfd2a3002aa37deac50",
+            "wwise_waapi/waql.py": "982d70187e082433c9e01ea36dacd8244893b09ca665349d624be6699410b67a"
+          },
+          "fingerprint": "4bdb9b0156d71ede11281e536be5b43d2ae0a615f3a4423ef39fa03599b57c73",
+          "version": "2025.1"
+        }
+      },
+      "before": {
+        "owner": {
+          "@Stingers": [
+            {
+              "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}"
+            }
+          ],
+          "id": "{20FA9A69-7ECC-4B05-BD6B-2C9527CD88C2}",
+          "name": "Stealth",
+          "parent": {
+            "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+            "name": "In-Game Music"
+          },
+          "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stealth",
+          "type": "MusicPlaylistContainer"
+        },
+        "protected": {
+          "owner": {
+            "@Stingers": [
+              {
+                "id": "{ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}"
+              }
+            ],
+            "id": "{52B9FAC3-636E-44F8-9015-E5F24E30E39E}",
+            "name": "Stress",
+            "parent": {
+              "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+              "name": "In-Game Music"
+            },
+            "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stress",
+            "type": "MusicPlaylistContainer"
+          },
+          "stinger": {
+            "@NumSegmentAdvance": 1,
+            "@PlaySegmentAt": 3,
+            "@Segment": {
+              "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+              "name": "Stinger Bonus"
+            },
+            "@Trigger": {
+              "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+              "name": "Bonus"
+            },
+            "id": "{ACA5AD21-9FBC-4DA6-BA3A-CDF7CB27F023}",
+            "name": "",
+            "notes": "",
+            "path": "[Stinger : Bonus,Stinger Bonus]",
+            "type": "MusicStinger"
+          }
+        },
+        "segment": {
+          "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+          "name": "Stinger Bonus",
+          "parent": {
+            "id": "{5F1B4958-4CF6-4CC8-AE19-A78EB09C6232}",
+            "name": "In-Game Music"
+          },
+          "path": "\\Containers\\Music\\Music\\02_In-Game Music\\In-Game Music\\Stinger Bonus",
+          "type": "MusicSegment"
+        },
+        "siblings": [
+          {
+            "@NumSegmentAdvance": 1,
+            "@PlaySegmentAt": 3,
+            "@Segment": {
+              "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+              "name": "Stinger Bonus"
+            },
+            "@Trigger": {
+              "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+              "name": "Bonus"
+            },
+            "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+            "name": "",
+            "notes": "",
+            "path": "[Stinger : Bonus,Stinger Bonus]",
+            "type": "MusicStinger"
+          }
+        ],
+        "stinger": {
+          "@NumSegmentAdvance": 1,
+          "@PlaySegmentAt": 3,
+          "@Segment": {
+            "id": "{B54923CD-4369-451A-8E64-C142D368037E}",
+            "name": "Stinger Bonus"
+          },
+          "@Trigger": {
+            "id": "{25D1ACE1-D5FA-450D-826B-745E8B0838BB}",
+            "name": "Bonus"
+          },
+          "id": "{B8D45849-AF76-4770-BE7B-5A6553B1337B}",
+          "name": "",
+          "notes": "",
+          "path": "[Stinger : Bonus,Stinger Bonus]",
+          "type": "MusicStinger"
+        },
+        "target": {
+          "id": "{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}",
+          "name": "Backup_Team_Arrives",
+          "parent": {
+            "id": "{335C538B-915E-4048-A6E1-0DAE76253EAA}",
+            "name": "Music"
+          },
+          "path": "\\Triggers\\Music\\Backup_Team_Arrives",
+          "type": "Trigger"
+        }
+      },
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "a6eb670cf281fb7de9d9f6755017c2a1ebea762127db429a1d4eac5ddf7c0f2f",
+        "preview_file_sha256": "06840ff533b8566165529321afbc78ba55da337ffce85f259dd89b13edbd3b2a",
+        "oracle_file_sha256": "27598695b26ff6feb68c6aafbcc1b03dbd24113a626c378f409f19c226591d5c",
+        "phases": [
+          {
+            "event_index": 25,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-e248517bc225bc074d97f31823b93dc8 --task-authority da1-8284d8e7d75e4ea66152670c06b9f5db3288263b --expected-revision 6'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 27,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-vfrnr1pwdehgrgt66q4a'",
+            "phase": "execute"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,274 @@
+{
+  "contract": "waapi-skill.ancillary-endpoint-review-delta/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "base": "9ffb9ae61de70e240272e5ccef653ae7f05d18f2",
+  "branch": "codex/expansion-ancillary-roles",
+  "integration_tip": "f01485cee13a9a983d891c6972b834c07b216203",
+  "integration_merge": "Already up to date before final gate",
+  "public_seam": "expansion_preview_notice",
+  "finding": "Residual Standards P2: later same-owned endpoint-preservation denial accepted after earlier affirmative carrier.",
+  "repair": "Bound endpoint claims to the certified current Volume relation, using one local complete predicate/polarity classifier; reject denied/uncertain owned preservation when immutable endpoints are unchanged.",
+  "self_audit": {
+    "base": "9ffb9ae61de70e240272e5ccef653ae7f05d18f2",
+    "exact_review_notice_sha256": "f2e5c7de27384572719850cb35596abd2992c9eaeb82ee5e61ef84082f3983fa",
+    "exact_review_notice": "已核对声音 {3C2638B2-FB76-4DE0-A604-C6623A421792} 身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。即将只把该声音上 Rain_Intensity 控制的 Volume RTPC 中间点从 (50, -12 dB) 改为 (50, -6 dB)，端点 (0, -48 dB)、(100, 0 dB)、三点 Linear 形状、关系身份和备注保持，Pitch/Time 关系保持原样。现在执行。本次 Volume RTPC 曲线的两端点不会保持原样。",
+    "review_witness_matches_test": true,
+    "frozen58_matrix_sha256": "6fe9d9f3e5bbc5377b68f29cbfe8e500061dc8e3d329ae36add4926ec506234f",
+    "prior55_semantic_fixtures_byte_identical": true,
+    "prior_evidence_manifest_byte_identical": true,
+    "prior_review_sources_and_reports_byte_identical": true,
+    "code_hashes": [
+      {
+        "path": "tests/semantic/support/codex_task_runner_v3.py",
+        "sha256": "64ff0caa6eadb3bc34c76f4dec9aeb87e719fb061f0089edb6cf5d5f8a7f6bf0"
+      },
+      {
+        "path": "tests/semantic/test_codex_ancillary_role_notices.py",
+        "sha256": "d6220ee465a1180625ccffe3b67122790078330f400401db340528ede665d34c"
+      }
+    ],
+    "source_manifests": [
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-review/standards-delta-probes.json",
+        "sha256": "ebf6f59fdb535d857e0a433808ff45819d1d417d9d91ba86fa84612df18d2689"
+      },
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-review/standards-delta.md",
+        "sha256": "1e3f933793f135d65fa4745f19bed946b5979c0565c72c8b27a9eaff14f18344"
+      }
+    ],
+    "assertions": [
+      "Preservation predicate/polarity is shared by the original concrete endpoint carrier and later owned endpoint claims.",
+      "Later endpoint role binding is local to Volume/current-operation/exact relation GUID subjects; foreign and scheduling subjects receive no inherited role.",
+      "The early negative check applies only when sealed old/new endpoints are unchanged.",
+      "No requirement for endpoint-preservation prose is introduced; complete curve alternatives without it still pass.",
+      "Shared noun/action accounting, forward/reverse owner identity, all3004 prior assertions and frozen fixture bytes remain intact.",
+      "No Skill/Gateway/prompt/suite/oracle/criteria changes, root replay/resume/verify-only, Fresh/live/Windows/full gates."
+    ]
+  },
+  "validation": {
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "lane": "Focused developer nonlive through ci/test.sh, retained23 modules",
+    "retained": 3004,
+    "new_controls": 19,
+    "new_controls_breakdown": {
+      "later_owned_polarity_and_foreign_schedule_contrasts": 14,
+      "complete_curve_alternatives_without_required_preservation_prose": 5
+    },
+    "runs": {
+      "endpoint-delta-red": {
+        "tests": 14,
+        "failures": 5,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.521,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "later_endpoint_preservation",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-red.xml"
+        ]
+      },
+      "endpoint-delta-green": {
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.519,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "later_endpoint_preservation or endpoint_preservation_owns",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-green.xml"
+        ]
+      },
+      "endpoint-alternative-green": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.446,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "complete_curve_requires",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-alternative-green.xml"
+        ]
+      },
+      "endpoint-delta-retained-final": {
+        "tests": 3023,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 6.648,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_expansion_task_runner.py",
+          "tests/semantic/test_codex_attenuation_notice.py",
+          "tests/semantic/test_codex_baseline_purpose_notices.py",
+          "tests/semantic/test_codex_composed_notices.py",
+          "tests/semantic/test_codex_coordinated_attestation_notices.py",
+          "tests/semantic/test_codex_current_role_notices.py",
+          "tests/semantic/test_codex_independent_composed_notices.py",
+          "tests/semantic/test_codex_independent_staged_notices.py",
+          "tests/semantic/test_codex_notice_noun_components_review.py",
+          "tests/semantic/test_codex_notice_role_context_withheld.py",
+          "tests/semantic/test_codex_noun_span_notices.py",
+          "tests/semantic/test_codex_planned_effect_entity_notices.py",
+          "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+          "tests/semantic/test_codex_staged_notices.py",
+          "tests/semantic/test_codex_target_preflight_notices.py",
+          "tests/semantic/test_codex_verification_basis_notices.py",
+          "tests/semantic/test_codex_baseline_purpose_components_review.py",
+          "tests/semantic/test_codex_effect_coordination_withheld.py",
+          "tests/semantic/test_codex_preview_components_review.py",
+          "tests/semantic/test_codex_target_preflight_components_review.py",
+          "tests/semantic/test_codex_operation_noun_notices.py",
+          "tests/semantic/test_codex_target_plan_family_notices.py",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-retained-final.xml"
+        ]
+      }
+    },
+    "final": {
+      "tests": 3023,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 6.648,
+      "direct_exit": 0,
+      "argv": [
+        "ci/test.sh",
+        "--mode",
+        "nonlive",
+        "--",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "-q",
+        "-ra",
+        "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-retained-final.xml"
+      ]
+    }
+  },
+  "evidence_manifest": [
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-red-argv.json",
+      "sha256": "9828ff0c2c96ee38e06271b0c69d326da001b1080bf0bfb9cfbd7bc2bfc98c31"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-red.log",
+      "sha256": "eb932614bc375cd6f5bc1fff3f0d26fb2c7c4c4f7561959a575fe3e9b9c59109"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-red.xml",
+      "sha256": "dccb78940dac415b5d9381b7aa9a29024ab33e1a5d4c34e4c69241682930d44d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-green-argv.json",
+      "sha256": "49022227b2c1151f4a517c2c0716792bb6601fb069bf24a39b68033eda109c57"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-green.log",
+      "sha256": "261424c6e83fbe79f9d7d8e527c0a882c3568280ea7aeb89454bb720bf37ecbb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-green.xml",
+      "sha256": "2da1d69247600243cdb719e65aa240ae95f3a7390921c2eda02f6f144aa33753"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-alternative-green-argv.json",
+      "sha256": "abb32335bbdda92b04a6bacc188d096414245b7a859dd1082434097923f3512d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-alternative-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-alternative-green.log",
+      "sha256": "e2b7a40a1c9d2b6e22de95cfec404e0996b2e115acdf7472c06f840c9ee47f0d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-alternative-green.xml",
+      "sha256": "7cced002445d84b3e07ff206d2527376e380fc42709477a21cfddd5006d20538"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-retained-final-argv.json",
+      "sha256": "85f1062ef5413e77f6f6660a074e065b4740b9a78c04e5b8b300d85d8af715c5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-retained-final-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-retained-final.log",
+      "sha256": "913c3e1e07a6820052a3baefb5c0cf45627562bd2bdab7dfdf77cc9192a765c4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-retained-final.xml",
+      "sha256": "97053d8e8c56ad0f5f00611582db16e46d84fe3e247966d210e6ff609bca1c6e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-delta-self-audit.json",
+      "sha256": "82da725b1d2b40de1f7057ce12e1e51ee855614711e73a3fe6daaa941f0cd3d7"
+    }
+  ],
+  "raw_evidence_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007",
+  "acceptance": "Developer component proof only; no new Fresh/real acceptance or historical regrading. Original reviews, 9ff reports/evidence, frozen corpora and source projects preserved. Independent rereview and coordinator-owned new-root proof remain."
+}

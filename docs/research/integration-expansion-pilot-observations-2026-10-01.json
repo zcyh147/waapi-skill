@@ -1,0 +1,121 @@
+{
+  "candidate": "c566e85",
+  "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-c566e85-luna-high-r1",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "high",
+  "service_tier": "default",
+  "selected": [
+    "EXP25-C01",
+    "EXP25-C06",
+    "EXP25-M01"
+  ],
+  "completed": [
+    "EXP25-C01"
+  ],
+  "recorded_status": "FAIL",
+  "model_quality_comparison_complete": false,
+  "attribution": "Harness rejected Gateway-owned fixed-bound event-actions read; literal command/receipt binding prevented complete archive validation. No business mutation was executed.",
+  "timing": {
+    "agent_budget_seconds": 83.91526000015438,
+    "cli_seconds": 80.62631
+  },
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 138496,
+    "input_tokens": 168896,
+    "output_tokens": 3348,
+    "reasoning_output_tokens": 2148
+  },
+  "source_hash_unchanged": true,
+  "source_mtime_unchanged": true,
+  "failed_copy_retained": true,
+  "gateway_records": [
+    {
+      "sequence": 1,
+      "accepted": true,
+      "authenticated": true,
+      "arguments": [
+        "query-object",
+        "--exact-id",
+        "{ED90958C-0DBB-48BE-83BC-363839CE7A53}"
+      ],
+      "exit_code": 0,
+      "rejection": ""
+    },
+    {
+      "sequence": 2,
+      "accepted": true,
+      "authenticated": true,
+      "arguments": [
+        "query-schema"
+      ],
+      "exit_code": 0,
+      "rejection": ""
+    },
+    {
+      "sequence": 3,
+      "accepted": true,
+      "authenticated": true,
+      "arguments": [
+        "query-object",
+        "--exact-id",
+        "{ED90958C-0DBB-48BE-83BC-363839CE7A53}",
+        "--include",
+        "source-language",
+        "--include",
+        "file-path",
+        "--include",
+        "original-file-path",
+        "--include",
+        "volume-db",
+        "--include",
+        "output-bus",
+        "--include",
+        "active-source"
+      ],
+      "exit_code": 0,
+      "rejection": ""
+    },
+    {
+      "sequence": 4,
+      "accepted": false,
+      "authenticated": true,
+      "arguments": [
+        "query-object",
+        "--exact-id",
+        "{10522C5F-59AB-46D1-9A73-826A94AD5C5D}",
+        "--relationship",
+        "event-actions",
+        "--include",
+        "action-type",
+        "--include",
+        "target"
+      ],
+      "exit_code": 126,
+      "rejection": "expansion policy rejected command: project query requires a bounded public source"
+    }
+  ],
+  "raw_artifacts": [
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-c566e85-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/expansion-task-result.json",
+      "sha256": "11334bfddac4f0e91fbbc30e7412a4dc9c0051ab382a92af90a25a4389a09d21"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-c566e85-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/turns/turn-01/codex-facts.json",
+      "sha256": "f0686f808524d2849a6318b6f84d47cbccae917109b06d14da5008cd14e8479e"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-c566e85-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/codex-task/expansion-broker.json",
+      "sha256": "cce8a43fe055b630fdbe52403b31e18bd691466cda391f0fcf2af0bf8f74f5a8"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-c566e85-luna-high-r1/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/evidence/lifecycle.json",
+      "sha256": "5bc97397ecdd4e9cda92667125564b95490ae36dc74daf4232df0c4adb5e36be"
+    }
+  ],
+  "repair_evidence": {
+    "all_expansion_focus": "425 passed in 4.77s before the three final receipt-order/completeness regressions",
+    "archive_cli_taskrunner": "133 passed after both independent P1 findings were repaired",
+    "re_review": "Both independent review axes report the findings resolved and no new actionable findings."
+  }
+}

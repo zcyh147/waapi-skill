@@ -400,6 +400,8 @@ AUTHORING_UI_BUSINESS_PROFILE_ID = "authoring_ui_business_2"
 INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
+EXPANSION_PROFILE_ID = "integration_expansion_v1"
+DEFAULT_EXPANSION_SUITE = REPO_ROOT / "tests" / "semantic" / "data" / "integration-expansion-v1" / "profile.json"
 
 
 @dataclass(frozen=True, slots=True)
@@ -632,6 +634,7 @@ INTEGRATION_CODEX_TIMEOUT_SECONDS = 360.0
 EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
+        EXPANSION_PROFILE_ID,
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
@@ -740,6 +743,16 @@ def parse_profile_id(value: str) -> str:
     return profile_id
 
 
+def validate_expansion_cli(*, suite: Path, case_ids: Sequence[str], versions: Sequence[str],
+                           model: str, reasoning_effort: str, service_tier: str,
+                           timeout_seconds: float) -> None:
+    from tests.semantic.support.codex_expansion_profile import load_expansion_profile, validate_model_configuration
+    validate_model_configuration(model, reasoning_effort, service_tier)
+    if timeout_seconds != 600.0:
+        raise ValueError("integration_expansion_v1 fixes the cumulative Agent budget at 600 seconds")
+    load_expansion_profile(suite, unit_ids=case_ids, versions=versions)
+
+
 def canonicalize_integration_case_ids(values: Sequence[str]) -> tuple[str, ...]:
     """Adapt the core unit canonicalizer to the CLI's case-id vocabulary."""
 
@@ -805,6 +818,7 @@ class RunnerOptions:
     wwise_readiness_timeout_seconds: float = 60.0
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None
     require_first_use_intro: bool = True
+    campaign_inputs_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -845,6 +859,10 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == EXPANSION_PROFILE_ID:
+        from tests.semantic.support.codex_expansion_profile import load_expansion_profile
+        profile = load_expansion_profile(options.suite_path, unit_ids=options.case_ids, versions=options.versions)
+        return (*profile.capability_boundaries, *profile.units)
     if options.profile == DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID:
         acceptance_module = importlib.import_module(
             "tests.semantic.support.codex_deep_business_acceptance_profile"
@@ -976,6 +994,59 @@ def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     return units
 
 
+def expansion_case_isolated(record: Mapping[str, Any]) -> bool:
+    """Prove that this owned attempt cannot invalidate a later expansion unit."""
+    from tests.semantic.support.codex_expansion_archive import (
+        ExpansionArchiveError, verify_expansion_task_archive, verify_expansion_boundary_archive,
+    )
+    outcome = record.get("runner_outcome")
+    if not isinstance(outcome, Mapping):
+        return False
+    checks = outcome.get("checks")
+    if not isinstance(checks, Mapping) or checks.get("trusted_oracle_closed") is not True:
+        return False
+    lifecycle = outcome.get("lifecycle")
+    if not isinstance(lifecycle, Mapping):
+        return False
+    before = lifecycle.get("source_hash_before")
+    errors = lifecycle.get("errors")
+    if (lifecycle.get("scenario_id") != record.get("scenario_id")
+            or lifecycle.get("version") != record.get("version")
+            or not isinstance(before, Mapping) or not before
+            or before != lifecycle.get("source_hash_after")
+            or type(lifecycle.get("source_mtime_before_ns")) is not int
+            or lifecycle.get("source_mtime_before_ns") != lifecycle.get("source_mtime_after_ns")
+            or not isinstance(errors, (list, tuple))
+            or any(not isinstance(error, str) or not error.startswith("scenario:") for error in errors)):
+        return False
+    task_root = outcome.get("task_root")
+    expected = {"expected_unit_id": record.get("scenario_id"),
+                "expected_version": record.get("version"),
+                "expected_inputs_sha256": outcome.get("inputs_sha256")}
+    try:
+        if task_root is not None:
+            task_path = Path(task_root).resolve(strict=True)
+            task_path.relative_to(Path(record["scenario_root"]).resolve(strict=True))
+            replay = verify_expansion_task_archive(task_path, **expected)
+        elif record.get("status") == "BOUNDARY_PROVEN":
+            replay = verify_expansion_boundary_archive(Path(record["scenario_root"]), **expected)
+        else:
+            # A fixture failure before any Agent task has no task archive.
+            return record.get("status") == "BLOCKED"
+        if (not isinstance(replay, Mapping) or replay.get("archive_valid") is not True
+                or replay.get("original_status") != record.get("status")
+                or replay.get("business_pass") is not (record.get("status") == "PASS")):
+            return False
+        reconciliation = replay.get("reconciliation")
+        if reconciliation is not None and (not isinstance(reconciliation, Mapping)
+                or reconciliation.get("child_reaped") is not True
+                or reconciliation.get("subprocesses_reaped") is not True):
+            return False
+    except (ExpansionArchiveError, OSError, ValueError, TypeError):
+        return False
+    return True
+
+
 def run_heavy_v3_matrix(
     options: RunnerOptions,
     *,
@@ -988,6 +1059,8 @@ def run_heavy_v3_matrix(
     A semantic ``FAIL`` is retained and the next case runs.  ``BLOCKED``,
     ``INDETERMINATE``, an unavailable closed runner, or any orchestration fault
     seals the current record and stops before another Wwise lifecycle starts.
+    Expansion alone continues negative outcomes after source, evidence and
+    cleanup isolation is proved; any unproved isolation stops that profile.
     The injectable seams are for harness-only tests and are not exposed to the
     evaluated Codex task.
     """
@@ -1129,6 +1202,7 @@ def run_heavy_v3_matrix(
                 TYPED_INPUT_PROFILE_ID,
                 DEEP_INTERFACE_MVP_PROFILE_ID,
                 AUDIO_IMPORT_BUSINESS_PROFILE_ID,
+                EXPANSION_PROFILE_ID,
             }:
                 thread_id = getattr(outcome, "thread_id", None)
                 outcome_status = getattr(outcome, "status", None)
@@ -1158,8 +1232,10 @@ def run_heavy_v3_matrix(
             run_errors.append(format_exception(f"heavy-unit:{scenario_id}", exc))
 
         records.append(record)
+        archive_ok = False
         try:
             write_json(scenario_root / "matrix-case.json", record)
+            archive_ok = True
         except BaseException as exc:  # noqa: BLE001 - missing evidence is systemic
             archive_error = format_exception(
                 f"heavy-unit-archive:{scenario_id}", exc
@@ -1177,7 +1253,10 @@ def run_heavy_v3_matrix(
             f"[{status}] {scenario_id} version={unit_row['version']} "
             f"api={unit_row['api']} reason={reason or '-'}"
         )
-        if status in {"BLOCKED", "INDETERMINATE"}:
+        must_stop = (not archive_ok or not expansion_case_isolated(record)
+                     if options.profile == EXPANSION_PROFILE_ID
+                     else status in {"BLOCKED", "INDETERMINATE"})
+        if must_stop:
             stop_reason = f"{status.lower()}:{scenario_id}"
             if not any(f"heavy-unit:{scenario_id}" in error for error in run_errors):
                 run_errors.append(
@@ -1192,7 +1271,7 @@ def run_heavy_v3_matrix(
         len(records) == len(unit_rows)
         and not stop_reason
         and not run_errors
-        and all(record["status"] == "PASS" for record in records)
+        and all(_heavy_record_completed(record) for record in records)
     )
     return 0 if all_selected_passed else 1
 
@@ -1282,6 +1361,18 @@ def run_heavy_v3_unit(
             ),
         }
     )
+    if options.profile == EXPANSION_PROFILE_ID:
+        from tests.semantic.support.codex_expansion_runtime import ExpansionRunnerOptions, run_expansion_unit
+        if not options.campaign_inputs_sha256:
+            raise HeavyV3RunnerUnavailableError("expansion execution requires the immutable campaign input digest; use the campaign entrypoint")
+        return run_expansion_unit(unit, scenario_root=scenario_root, options=ExpansionRunnerOptions(
+            skill_source=options.skill_source, codex_binary=options.codex_binary,
+            auth_json=options.auth_json, model=options.model,
+            reasoning_effort=options.reasoning_effort, service_tier=options.service_tier,
+            timeout_seconds=options.timeout_seconds, live_environment=live_environment,
+            windows_powershell_core_host=options.windows_powershell_core_host,
+            require_first_use_intro=False, campaign_inputs_sha256=options.campaign_inputs_sha256,
+        ))
     if api.startswith("ak.wwise.cli."):
         module_name = "tests.semantic.support.codex_heavy_cli_case_runner_v3"
         try:
@@ -1417,6 +1508,11 @@ def _heavy_v3_unit_row(unit: Any, *, sequence: int) -> dict[str, Any]:
         "api": api,
         "runner": runner_lane,
     }
+    evidence_kind = getattr(unit, "evidence_kind", None)
+    if evidence_kind is not None:
+        if evidence_kind not in {"agent_acceptance", "capability_boundary"}:
+            raise HeavyV3MatrixError("invalid expansion evidence kind")
+        row["evidence_kind"] = evidence_kind
     base_scenario_id = getattr(unit, "base_scenario_id", None)
     if base_scenario_id is not None:
         if not isinstance(base_scenario_id, str) or not base_scenario_id:
@@ -1490,8 +1586,17 @@ def _heavy_v3_case_record(
     scenario_id = getattr(outcome, "scenario_id", payload.get("scenario_id"))
     version = getattr(outcome, "version", payload.get("version"))
     reason = getattr(outcome, "reason", payload.get("reason", ""))
-    if status not in HEAVY_V3_STATUSES:
+    boundary = unit_row.get("evidence_kind") == "capability_boundary"
+    if status not in HEAVY_V3_STATUSES and not (boundary and status == "BOUNDARY_PROVEN"):
         raise HeavyV3MatrixError(f"V3 runner returned invalid status {status!r}")
+    if boundary and status == "PASS":
+        raise HeavyV3MatrixError("a capability boundary cannot grant Agent PASS")
+    if status == "BOUNDARY_PROVEN":
+        evidence = payload.get("checks", {}).get("capability_boundary", {})
+        if (unit_row["scenario_id"] != "EXP22-M05" or unit_row["version"] != "2022.1"
+                or evidence.get("agent_started") is not False or evidence.get("business_pass") is not False
+                or payload.get("task_root") is not None or payload.get("thread_id") is not None):
+            raise HeavyV3MatrixError("capability boundary has no independent no-Agent evidence")
     if scenario_id != unit_row["scenario_id"] or version != unit_row["version"]:
         raise HeavyV3MatrixError(
             "V3 runner outcome identity differs from the selected unit"
@@ -1563,7 +1668,8 @@ def _heavy_v3_run_config(
         "fresh_process_thread_and_task_per_scenario": True,
         "sequential_wwise_lifecycles": True,
         "semantic_fail_policy": "continue",
-        "blocked_or_indeterminate_policy": "stop",
+        "blocked_or_indeterminate_policy": ("continue_only_after_proven_isolation"
+            if options.profile == EXPANSION_PROFILE_ID else "stop"),
         "skill_source": str(options.skill_source),
         "suite_path": str(options.suite_path),
         "live_config": str(options.live_config),
@@ -1608,7 +1714,7 @@ def _heavy_v3_summary(
         and not run_errors
         and len(records) == len(unit_rows)
         and bool(records)
-        and all(record.get("status") == "PASS" for record in records)
+        and all(_heavy_record_completed(record) for record in records)
     )
     return {
         "contract": HEAVY_V3_SUMMARY_CONTRACT,
@@ -1646,6 +1752,7 @@ def _heavy_v3_summary(
         "stopped_early": bool(stop_reason),
         "all_selected_passed": all_selected_passed,
         "run_errors": list(run_errors),
+        **({"expansion_accounting": expansion_accounting(unit_rows, records)} if profile == EXPANSION_PROFILE_ID else {}),
         "case_records": [
             {
                 key: record.get(key)
@@ -1655,6 +1762,7 @@ def _heavy_v3_summary(
                     "version",
                     "api",
                     "runner",
+                    "evidence_kind",
                     "base_scenario_id",
                     "component_profile_id",
                     "family",
@@ -1673,12 +1781,34 @@ def _heavy_v3_summary(
     }
 
 
+def _heavy_record_completed(record: Mapping[str, Any]) -> bool:
+    return record.get("status") == (
+        "BOUNDARY_PROVEN" if record.get("evidence_kind") == "capability_boundary" else "PASS"
+    )
+
+
+def expansion_accounting(unit_rows: Sequence[Mapping[str, Any]], records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    return {
+        "agent_units": {
+            "selected": [row["scenario_id"] for row in unit_rows if row.get("evidence_kind") == "agent_acceptance"],
+            "passed": [row["scenario_id"] for row in records if row.get("evidence_kind") == "agent_acceptance" and row.get("status") == "PASS"],
+        },
+        "capability_boundaries": {
+            "selected": [row["scenario_id"] for row in unit_rows if row.get("evidence_kind") == "capability_boundary"],
+            "proven": [row["scenario_id"] for row in records if row.get("evidence_kind") == "capability_boundary" and row.get("status") == "BOUNDARY_PROVEN"],
+            "agent_pass_credit": False,
+        },
+    }
+
+
 def _heavy_v3_status_counts(
     records: Sequence[Mapping[str, Any]],
 ) -> dict[str, int]:
     return {
         status: sum(record.get("status") == status for record in records)
-        for status in ("PASS", "FAIL", "BLOCKED", "INDETERMINATE")
+        for status in (("PASS", "FAIL", "BLOCKED", "INDETERMINATE", "BOUNDARY_PROVEN")
+                       if any(row.get("evidence_kind") == "capability_boundary" for row in records)
+                       else ("PASS", "FAIL", "BLOCKED", "INDETERMINATE"))
     }
 
 
@@ -4072,7 +4202,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     parser.add_argument(
         "--reasoning-effort",
         choices=("minimal", "low", "medium", "high", "xhigh", "ultra"),
-        default="medium",
+        default=None,
     )
     parser.add_argument("--service-tier")
     parser.add_argument("--timeout", type=float)
@@ -4090,7 +4220,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         "--sealed-windows-powershell-core-host-json",
         help=argparse.SUPPRESS,
     )
+    parser.add_argument("--sealed-campaign-inputs-sha256", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    is_expansion = args.profile == EXPANSION_PROFILE_ID
+    if args.reasoning_effort is None:
+        args.reasoning_effort = "high" if is_expansion and args.model in {None, "gpt-6-luna"} else "medium"
     is_first_use = args.profile == "first_use_2"
     if is_first_use and (
         not args.offline_only or not args.iteration_root or args.overwrite
@@ -4120,6 +4254,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             else DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
+    if is_expansion and args.timeout is None:
+        timeout_seconds = 600.0
     is_terra_v3 = (
         is_policy_v3
         or is_typed_input
@@ -4196,10 +4332,10 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             "--version 2022.1 and 2025.1"
         )
     model = args.model or (
-        "gpt-5.6-terra" if is_terra_v3 or is_first_use else "gpt-5.6-sol"
+        "gpt-6-luna" if is_expansion else "gpt-5.6-terra" if is_terra_v3 or is_first_use else "gpt-5.6-sol"
     )
     service_tier = args.service_tier or (
-        "default" if is_terra_v3 or is_first_use else "priority"
+        "default" if is_terra_v3 or is_first_use or is_expansion else "priority"
     )
     if (is_terra_v3 or is_first_use) and (
         model != "gpt-5.6-terra"
@@ -4276,6 +4412,20 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             else DEFAULT_ITERATION_ROOT
         )
     )
+    if is_expansion:
+        suite = args.suite or str(DEFAULT_EXPANSION_SUITE)
+        if not args.iteration_root or args.overwrite:
+            parser.error("integration_expansion_v1 requires a new explicit --iteration-root and forbids --overwrite")
+        try:
+            validate_expansion_cli(suite=Path(suite), case_ids=case_ids, versions=args.version,
+                model=model, reasoning_effort=args.reasoning_effort, service_tier=service_tier,
+                timeout_seconds=timeout_seconds)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
+    if args.sealed_campaign_inputs_sha256 is not None and (
+        not is_expansion or re.fullmatch(r"[0-9a-f]{64}", args.sealed_campaign_inputs_sha256) is None
+    ):
+        parser.error("sealed campaign digest is available only to the expansion campaign child")
     try:
         codex_binary = resolve_codex_binary(args.codex_binary)
         windows_powershell_core_host = _parse_sealed_windows_powershell_core_host(
@@ -4315,7 +4465,8 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         # Public integration acceptance grades cross-operation Wwise outcomes.
         # First-use prose remains a dedicated semantic-profile requirement and
         # must not abort a correct multi-turn workflow before its state oracle.
-        require_first_use_intro=not is_integration,
+        require_first_use_intro=not (is_integration or is_expansion),
+        campaign_inputs_sha256=args.sealed_campaign_inputs_sha256,
     )
 
 

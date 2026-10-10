@@ -1,0 +1,60 @@
+{
+  "contract": "waapi-skill.integration-expansion-development-gates/v1",
+  "candidate": "122eb09db261a6e82593ac60da658ee2dbf2a289",
+  "program": {
+    "candidate": "122eb09db261a6e82593ac60da658ee2dbf2a289",
+    "mode": "program",
+    "exit_code": 0,
+    "passed": 5888,
+    "skipped": 2,
+    "duration_seconds": 273.53,
+    "log_sha256": "fe0d423c14e712ea7a9d115f5607cdbaf646f1af5f62818169454a896ca7d96d",
+    "live_or_agent_credit": false
+  },
+  "nonlive": {
+    "candidate": "122eb09db261a6e82593ac60da658ee2dbf2a289",
+    "mode": "nonlive",
+    "exit_code": 0,
+    "passed": 12156,
+    "skipped": 118,
+    "deselected": 27,
+    "duration_seconds": 814.75,
+    "junit_counts": {
+      "tests": 12274,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 118
+    },
+    "log_sha256": "c049bedf87e83098bd7a34f622c3c7865aa658802a82d3859d61a2b9b7d9adfa",
+    "junit_sha256": "eee855251a20092521ad82a91b1b7ec198ce87d4e4bfc3a0c020d0f0e982c15d",
+    "source_tracked_clean": true,
+    "live_or_agent_credit": false
+  },
+  "smoke": {
+    "argv": [
+      "/Applications/Audiokinetic/Wwise2025.1.7.9143/Wwise.app/Contents/Tools/WwiseConsole.sh",
+      "waapi-server",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1/sample-project-d5066c19664046b28b403c67df00c835/SampleProject.wproj",
+      "--wamp-port",
+      "30103",
+      "--http-port",
+      "0"
+    ],
+    "build": "2025.1.7.9143",
+    "cleanup": "cleaned",
+    "contract": "waapi-skill.real-smoke/v1",
+    "display_name": "WwiseConsole",
+    "isCommandLine": true,
+    "pid": 71620,
+    "port": 30103,
+    "ready_duration_seconds": 4.130575417075306,
+    "sandbox_deleted": true,
+    "sandbox_project": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/runtime/wwise-waapi-sandboxes/2025.1/sample-project-d5066c19664046b28b403c67df00c835/SampleProject.wproj",
+    "source_mtime_ns": 1790531309503233691,
+    "source_sha256": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+    "version": "2025.1"
+  },
+  "smoke_log_sha256": "a3c2475d0c99b4a32b90f5769c151e7d662c29662cb53dd36436263a3135afc9",
+  "evidence_directory": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-122eb09-gates",
+  "formal_fresh_acceptance": false
+}

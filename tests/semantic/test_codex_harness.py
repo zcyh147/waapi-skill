@@ -547,6 +547,475 @@ def test_business_draft_prefix_continuation_binds_exact_copied_bytes() -> None:
     ) == ()
 
 
+def _expansion_interleaved_read_projection():
+    fixture = json.loads((Path(__file__).parents[1] / "fixtures/semantic/expansion-interleaved-reads-0997d20.json").read_text())
+    rows = fixture["records"]
+    commands = tuple(completed_record(row["command"], row["payload"]) for row in rows)
+    receipts = tuple({**row["receipt"], "payload": row["payload"]} for row in rows)
+    return commands, receipts
+
+
+def test_expansion_actual_thirteen_receipts_allow_authenticated_read_interleaving():
+    commands, receipts = _expansion_interleaved_read_projection()
+    assert len(receipts) == 13
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix")
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def _expansion_preview_read_interlude():
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-read-interlude-a1979db.json"
+    rows = json.loads(path.read_text())["records"]
+    commands = [completed_record(row["command"], row["payload"]) for row in rows]
+    receipts = [{**row["receipt"], "payload": row["payload"]} for row in rows]
+    return commands, receipts
+
+
+def test_expansion_actual_preview7_read8_execute27_keeps_the_selected_execute_pending():
+    commands, receipts = _expansion_preview_read_interlude()
+    assert len(commands) == 21
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix")
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+@pytest.mark.parametrize("damage", ["unauthenticated", "rejected", "failed_read", "incomplete_read",
+    "truncated_output", "raw_output", "other_mutation", "wrong_transaction", "rebuilt_copy",
+    "duplicate_execute", "missing_execute", "invalid_preview_policy"])
+def test_pending_preview_execute_cannot_survive_invalid_interludes_or_changed_copy(damage):
+    commands, receipts = _expansion_preview_read_interlude()
+    if damage in {"unauthenticated", "rejected"}:
+        receipts[1]["authenticated" if damage == "unauthenticated" else "accepted"] = False
+    elif damage == "failed_read":
+        receipts[1].update(succeeded=False, exit_code=2, runner_exit_code=2)
+    elif damage == "incomplete_read":
+        receipts[1]["payload"]["response_integrity"] = {"complete": False, "truncated": True}
+        commands[1] = completed_record(commands[1].command, receipts[1]["payload"])
+    elif damage == "truncated_output":
+        commands[1] = completed_record(commands[1].command)
+    elif damage == "raw_output":
+        commands[1] = completed_record(commands[1].command, {"command": "request-schema", "forged": True})
+    elif damage == "other_mutation":
+        inner = shlex.split(commands[1].command)[-1].replace("request-schema ak.wwise.core.object.getAttenuationCurve", "draft-start object.delete")
+        receipts[1]["gateway_arguments"] = ["draft-start", "object.delete"]
+        commands[1] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), receipts[1]["payload"])
+    elif damage in {"wrong_transaction", "rebuilt_copy"}:
+        inner = shlex.split(commands[-1].command)[-1]
+        if damage == "wrong_transaction":
+            inner = inner.replace(receipts[-1]["gateway_arguments"][1], "tx1-" + "0" * 20)
+        else:
+            inner = inner.replace("python ", "'python' ", 1)  # Equivalent argv, different selected bytes.
+        commands[-1] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), receipts[-1]["payload"])
+    elif damage == "duplicate_execute":
+        commands.append(commands[-1])
+        receipts.append(receipts[-1])
+    elif damage == "missing_execute":
+        commands.pop()
+        receipts.pop()
+    else:
+        receipts[0]["payload"]["authorization"]["policy"] = "read_only"
+        commands[0] = completed_record(commands[0].command, receipts[0]["payload"])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+def test_read_discovery_continuation_cannot_replace_the_pending_preview_execute():
+    commands, receipts = _expansion_preview_read_interlude()
+    receipts[1]["payload"].update(_business_prefix_payload("python other.py gateway.py draft-start object.delete"))
+    commands[1] = completed_record(commands[1].command, receipts[1]["payload"])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def test_ask_preview_turn_boundary_is_not_an_unconsumed_policy_execute():
+    commands, receipts = _expansion_preview_read_interlude()
+    payload = receipts[0]["payload"]
+    payload["authorization"].update(mode="confirmation", policy="ask_before_changes", explicit_confirmation=True)
+    payload["state"] = "awaiting_confirmation"
+    payload["next_command"]["requires_later_user_message"] = True
+    commands[0] = completed_record(commands[0].command, payload)
+    assert gateway_continuation_binding_errors(commands[:1], receipts[:1], platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def test_policy_preview_without_its_selected_execute_remains_an_obligation():
+    commands, receipts = _expansion_preview_read_interlude()
+    assert gateway_continuation_binding_errors(commands[:1], receipts[:1], platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+def _expansion_preview_snapshot_interlude():
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json"
+    rows = json.loads(path.read_text())["records"]
+    return ([completed_record(row["command"], row["payload"]) for row in rows],
+        [{**row["receipt"], "payload": row["payload"]} for row in rows])
+
+
+def test_actual_policy_preview8_snapshot9_execute10_preserves_original_selected_copy():
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    assert receipts[0]["payload"]["next_command"] == receipts[1]["payload"]["next_command"]
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix")
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def _snapshot_dataclass_receipts():
+    from dataclasses import fields
+    from tests.semantic.support.codex_gateway_broker import GatewayBrokerRecord
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json"
+    rows = json.loads(path.read_text())["records"]
+    records = []
+    for row in rows:
+        values = {field.name: row["broker_record"][field.name] for field in fields(GatewayBrokerRecord)
+            if field.name in row["broker_record"]}
+        for key in ("model_argv", "normalized_model_argv", "gateway_arguments", "allowed_exit_codes"):
+            values[key] = tuple(values[key])
+        records.append(GatewayBrokerRecord(**values, payload=row["payload"]))
+    return records
+
+
+def test_pending_snapshot_accepts_real_tuple_backed_gateway_broker_records():
+    commands, _ = _expansion_preview_snapshot_interlude()
+    receipts = _snapshot_dataclass_receipts()
+    assert isinstance(receipts[1].gateway_arguments, tuple)
+    assert all(record.succeeded for record in receipts)
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+@pytest.mark.parametrize("arguments", ["transaction-show tx1-other", {"transaction-show": "tx1-other"},
+    {"transaction-show", "tx1-other"}, ["transaction-show", 0]])
+def test_pending_snapshot_rejects_non_argv_containers_and_non_string_arguments(arguments):
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    receipts[1]["gateway_arguments"] = arguments
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", ["false_as_zero", "true_as_one", "float_event_count", "float_event_sequence",
+    "float_summary_count", "integer_copy_flag"])
+@pytest.mark.parametrize("record_form", ["json", "native"])
+def test_pending_snapshot_requires_type_exact_immutable_fields_even_when_broker_succeeds(damage, record_form):
+    commands, _ = _expansion_preview_snapshot_interlude()
+    receipts = _snapshot_dataclass_receipts()
+    snapshot = receipts[1].payload
+    if damage == "false_as_zero":
+        snapshot["authorization"]["explicit_confirmation"] = 0
+    elif damage == "true_as_one":
+        snapshot["authorization"]["notice_required"] = 1
+    elif damage == "float_event_count":
+        snapshot["event_count"] = float(snapshot["event_count"])
+    elif damage == "float_event_sequence":
+        snapshot["events"][0]["sequence"] = float(snapshot["events"][0]["sequence"])
+    elif damage == "float_summary_count":
+        snapshot["preview_summary"]["dispatch"]["argument_key_count"] = float(snapshot["preview_summary"]["dispatch"]["argument_key_count"])
+    else:
+        snapshot["next_command"]["copy_exactly"] = 1
+    commands[1] = completed_record(commands[1].command, snapshot)
+    assert receipts[1].succeeded  # Broker execution success does not validate an unchanged snapshot projection.
+    if record_form == "json":
+        receipts = [{"gateway_arguments": list(record.gateway_arguments), "payload": record.payload,
+            **{key: getattr(record, key) for key in ("authenticated", "accepted", "succeeded", "exit_code", "runner_exit_code")}}
+            for record in receipts]
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", ["unauthenticated", "rejected", "failed", "incomplete", "truncated",
+    "missing_raw", "wrong_raw", "foreign_tx", "stale_hash", "changed_state", "new_authorization",
+    "wrong_current_policy", "unknown_authorization", "changed_event_hash", "extra_event", "changed_count",
+    "changed_summary", "changed_selected_field", "rebuilt_continuation", "wrong_snapshot_argv",
+    "wrong_execute_tx", "rebuilt_execute", "duplicate_execute", "missing_execute"])
+def test_pending_execute_rejects_untrusted_or_changed_transaction_snapshots(damage):
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    snapshot = receipts[1]["payload"]
+    if damage in {"unauthenticated", "rejected"}:
+        receipts[1]["authenticated" if damage == "unauthenticated" else "accepted"] = False
+    elif damage == "failed":
+        receipts[1].update(succeeded=False, exit_code=2, runner_exit_code=2)
+    elif damage == "incomplete":
+        snapshot["response_integrity"] = {"complete": False, "truncated": False}
+    elif damage == "truncated":
+        snapshot["limit_reached"] = True
+    elif damage == "foreign_tx":
+        snapshot["transaction_id"] = "tx1-" + "0" * 20
+    elif damage == "stale_hash":
+        snapshot["artifact_hash"] = "0" * 64
+    elif damage == "changed_state":
+        snapshot["state"] = "executed_unverified"
+    elif damage == "new_authorization":
+        snapshot["authorization"]["explicit_confirmation"] = True
+    elif damage == "wrong_current_policy":
+        snapshot["authorization"]["current_policy"] = "read_only"
+    elif damage == "unknown_authorization":
+        snapshot["authorization"]["new_authority"] = True
+    elif damage == "changed_event_hash":
+        snapshot["events"][1]["event_hash"] = "0" * 64
+    elif damage == "extra_event":
+        snapshot["events"].append(dict(snapshot["events"][-1]))
+        snapshot["event_count"] += 1
+    elif damage == "changed_count":
+        snapshot["event_count"] += 1
+    elif damage == "changed_summary":
+        snapshot["preview_summary"]["dispatch"]["canonical_sha256"] = "0" * 64
+    elif damage == "changed_selected_field":
+        snapshot["next_command"]["copy_instruction"]["source_field"] = "model_command"
+    elif damage == "rebuilt_continuation":
+        snapshot["next_command"]["shell_command"] = snapshot["next_command"]["shell_command"].replace("python ", "'python' ", 1)
+    elif damage == "wrong_snapshot_argv":
+        receipts[1]["gateway_arguments"] = ["transaction-show", "tx1-" + "0" * 20]
+    elif damage in {"wrong_execute_tx", "rebuilt_execute"}:
+        inner = shlex.split(commands[2].command)[-1]
+        inner = (inner.replace(receipts[2]["gateway_arguments"][1], "tx1-" + "0" * 20)
+            if damage == "wrong_execute_tx" else inner.replace("python ", "'python' ", 1))
+        commands[2] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), receipts[2]["payload"])
+    elif damage == "duplicate_execute":
+        commands.insert(3, commands[2])
+        receipts.insert(3, receipts[2])
+    elif damage == "missing_execute":
+        commands, receipts = commands[:2], receipts[:2]
+    if damage == "missing_raw":
+        commands[1] = completed_record(commands[1].command)
+    elif damage == "wrong_raw":
+        commands[1] = completed_record(commands[1].command, {"ok": True, "command": "transaction-show"})
+    else:
+        commands[1] = completed_record(commands[1].command, snapshot)
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("projection", ["original", "without_current_policy", "complete", "repeated"])
+def test_unchanged_snapshot_projection_retains_the_original_pending_obligation(projection):
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    if projection == "without_current_policy":
+        receipts[1]["payload"]["authorization"].pop("current_policy")
+    elif projection == "complete":
+        receipts[1]["payload"]["response_integrity"] = {"complete": True, "truncated": False}
+    commands[1] = completed_record(commands[1].command, receipts[1]["payload"])
+    if projection == "repeated":
+        commands.insert(2, commands[1])
+        receipts.insert(2, receipts[1])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True) == ()
+
+
+def test_snapshot_cannot_rebind_the_pending_execute_even_when_its_copy_is_followed():
+    commands, receipts = _expansion_preview_snapshot_interlude()
+    selected = receipts[1]["payload"]["next_command"]
+    tx = "tx1-" + "0" * 20
+    for key in ("full_argv", "gateway_argv"):
+        selected[key][-1] = tx
+    selected["shell_command"] = selected["shell_command"].replace(receipts[2]["gateway_arguments"][1], tx)
+    commands[1] = completed_record(commands[1].command, receipts[1]["payload"])
+    receipts[2]["gateway_arguments"] = ["execute", tx]
+    commands[2] = completed_record(shlex.join(("/bin/bash", "-lc", selected["shell_command"])), receipts[2]["payload"])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", [None, "foreign_endpoint", "changed_transaction", "rejected", "unrecorded"])
+def test_snapshot_interlude_requires_positional_broker_receipt_correlation(damage):
+    from tests.semantic.support.codex_gateway_broker import reconcile_gateway_commands, resolve_gateway_invocation
+    from tests.semantic.support.codex_task_runner_v3 import _bind_gateway_prefix_reconciliation
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json"
+    text = path.read_text()
+    original = json.loads(text)
+    old_runner = original["records"][0]["payload"]["next_command"]["full_argv"][1]
+    skill = Path(__file__).parents[2] / "skills/waapi-skill"
+    runner = (skill / "scripts/run.py").as_posix()
+    rows = json.loads(text.replace(old_runner, runner).replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
+    commands = [completed_record(row["command"], row["payload"]) for row in rows]
+    accepted = []
+    for row, command in zip(rows, commands):
+        resolved = resolve_gateway_invocation(command.argv, skill_source=skill)
+        accepted.append(SimpleNamespace(**row["receipt"], payload=row["payload"],
+            normalized_model_argv=resolved.normalized_model_argv, argv_sha256=resolved.argv_sha256))
+    rejected = ()
+    if damage in {"foreign_endpoint", "changed_transaction"}:
+        inner = shlex.split(commands[1].command)[-1]
+        inner = (inner.replace("gateway.py ", "gateway.py --host foreign.example ", 1)
+            if damage == "foreign_endpoint" else inner.replace(rows[1]["receipt"]["gateway_arguments"][1], "tx1-" + "0" * 20))
+        commands[1] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), rows[1]["payload"])
+    elif damage == "rejected":
+        rejected = (accepted.pop(1),)
+    elif damage == "unrecorded":
+        commands.insert(2, commands[1])
+    evidence = SimpleNamespace(accepted_records=tuple(accepted), rejected_records=rejected,
+        complete=True, passed=True, terminal_state="RUNNING")
+    raw = reconcile_gateway_commands(tuple(command.argv for command in commands), evidence, skill_source=skill)
+    bound = _bind_gateway_prefix_reconciliation(raw, command_records=commands, broker_evidence=evidence,
+        platform_name="posix", allow_expansion_read_interleaving=True)
+    assert bound.passed is (damage is None)
+    if damage is not None:
+        assert not raw.passed
+
+
+@pytest.mark.parametrize("select_model,tamper", [(True, None), (False, None),
+    (True, "legacy_field"), (True, "outer_wrapper"), (False, "outer_wrapper")])
+def test_pending_snapshot_preserves_windows_selected_field_and_attested_envelope(select_model, tamper):
+    from copy import deepcopy
+    _, receipts = _expansion_preview_snapshot_interlude()
+    preview = receipts[0]["payload"]
+    tx = preview["transaction_id"]
+    continuation = _closed_next_command(("python", r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py",
+        "gateway.py", "execute", tx), platform_name="nt", select_model_command=select_model)
+    preview["next_command"] = continuation
+    snapshot = deepcopy(preview)
+    snapshot["command"] = "transaction-show"
+    snapshot["authorization"]["current_policy"] = "allow_changes"
+    receipts[1]["payload"] = snapshot
+    selected = continuation["copy_instruction"]["source_field"]
+    observed = continuation["shell_command" if tamper == "legacy_field" else selected]
+    commands = [completed_windows_record(windows_powershell_recording("python preview.py"), preview),
+        completed_windows_record(windows_powershell_recording("python snapshot.py"), snapshot),
+        completed_windows_record(observed if tamper == "outer_wrapper" else windows_powershell_recording(observed), {})]
+    receipts[2]["payload"] = {}
+    errors = gateway_continuation_binding_errors(commands, receipts[:3], platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST, allow_expansion_read_interleaving=True)
+    assert bool(errors) is (tamper is not None)
+
+
+@pytest.mark.parametrize("damage", [None, "foreign_endpoint", "changed_read_owner", "rejected_read", "unrecorded_read"])
+def test_preview_interlude_requires_positional_gateway_receipts_before_copy_admission(damage):
+    from tests.semantic.support.codex_gateway_broker import reconcile_gateway_commands, resolve_gateway_invocation
+    from tests.semantic.support.codex_task_runner_v3 import _bind_gateway_prefix_reconciliation
+
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-preview-read-interlude-a1979db.json"
+    original = json.loads(path.read_text())
+    old_runner = original["records"][0]["payload"]["next_command"]["full_argv"][1]
+    skill = Path(__file__).parents[2] / "skills/waapi-skill"
+    runner = (skill / "scripts/run.py").as_posix()
+    rows = json.loads(path.read_text().replace(old_runner, runner)
+        .replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
+    commands = [completed_record(row["command"], row["payload"]) for row in rows]
+    accepted = []
+    for row, command in zip(rows, commands):
+        resolved = resolve_gateway_invocation(command.argv, skill_source=skill)
+        accepted.append(SimpleNamespace(**row["receipt"], payload=row["payload"],
+            normalized_model_argv=resolved.normalized_model_argv, argv_sha256=resolved.argv_sha256))
+    rejected = ()
+    if damage == "foreign_endpoint":
+        inner = shlex.split(commands[1].command)[-1].replace("gateway.py ", "gateway.py --host foreign.example ", 1)
+        commands[1] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), rows[1]["payload"])
+    elif damage == "changed_read_owner":
+        inner = shlex.split(commands[2].command)[-1].replace(rows[2]["receipt"]["gateway_arguments"][3], "{00000000-0000-0000-0000-000000000000}")
+        commands[2] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), rows[2]["payload"])
+    elif damage == "rejected_read":
+        rejected = (accepted.pop(1),)
+    elif damage == "unrecorded_read":
+        commands.insert(2, commands[1])
+    evidence = SimpleNamespace(accepted_records=tuple(accepted), rejected_records=rejected,
+        complete=True, passed=True, terminal_state="RUNNING")
+    raw = reconcile_gateway_commands(tuple(command.argv for command in commands), evidence, skill_source=skill)
+    bound = _bind_gateway_prefix_reconciliation(raw, command_records=commands, broker_evidence=evidence,
+        platform_name="posix", allow_expansion_read_interleaving=True)
+    assert bound.passed is (damage is None)
+    if damage is not None:
+        assert not raw.passed
+
+
+@pytest.mark.parametrize("select_model,tamper", [(True, None), (False, None),
+    (True, "legacy_field"), (True, "outer_wrapper"), (False, "outer_wrapper")])
+def test_windows_pending_preview_preserves_selected_field_and_attested_envelope(select_model, tamper):
+    runner = r"C:\Agent Workspace\.agents\skills\waapi-skill\scripts\run.py"
+    tx = "tx1-" + "1" * 20
+    continuation = _closed_next_command(("python", runner, "gateway.py", "execute", tx),
+        platform_name="nt", select_model_command=select_model)
+    preview = {"ok": True, "command": "preview-from-draft", "state": "policy_authorized",
+        "transaction_id": tx, "authorization": {"mode": "policy_authorization", "policy": "allow_changes",
+        "explicit_confirmation": False}, "next_command": continuation}
+    read = {"ok": True, "command": "query-schema"}
+    selected = str(continuation["copy_instruction"]["source_field"])
+    observed = str(continuation["shell_command" if tamper == "legacy_field" else selected])
+    commands = [completed_windows_record(windows_powershell_recording("python initial.py"), preview),
+        completed_windows_record(windows_powershell_recording("python query.py"), read),
+        completed_windows_record(observed if tamper == "outer_wrapper" else windows_powershell_recording(observed), {})]
+    receipts = [{"payload": payload, "gateway_arguments": arguments, "authenticated": True,
+        "accepted": True, "succeeded": True, "exit_code": 0, "runner_exit_code": 0}
+        for payload, arguments in [(preview, ["preview-from-draft"]), (read, ["query-schema"]), ({}, ["execute", tx])]]
+    errors = gateway_continuation_binding_errors(commands, receipts, platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST, allow_expansion_read_interleaving=True)
+    assert bool(errors) is (tamper is not None)
+
+
+@pytest.mark.parametrize("damage", ["unrecorded", "rejected", "unauthenticated", "read_output", "mutation",
+    "prefix", "authority", "revision", "stale_binding"])
+def test_expansion_read_interleaving_preserves_pending_exact_copy_and_receipt_proof(damage):
+    from copy import deepcopy
+    commands, receipts = _expansion_interleaved_read_projection()
+    commands, receipts = list(commands), deepcopy(list(receipts))
+    if damage == "unrecorded":
+        commands.insert(5, completed_record("python .agents/skills/waapi-skill/scripts/run.py gateway.py query-schema", {}))
+    elif damage in {"rejected", "unauthenticated"}:
+        receipts[4]["accepted" if damage == "rejected" else "authenticated"] = False
+    elif damage == "read_output":
+        commands[4] = completed_record(commands[4].command, {"command": "query-schema", "forged": True})
+    elif damage == "mutation":
+        receipts[4]["gateway_arguments"] = ["execute", "tx1-other"]
+        commands[4] = completed_record("python .agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-other", {})
+    else:
+        command = commands[10].command
+        if damage == "prefix":
+            command = command.replace("python .agents/skills/waapi-skill/scripts/run.py", "python './.agents/skills/waapi-skill/scripts/run.py'")
+        elif damage == "authority":
+            command = command.replace("da1-f3dabcae8519e0e03783277fb39d9fa48ecfd585", "da1-" + "0" * 40)
+        elif damage == "revision":
+            command = command.replace("--expected-revision 2", "--expected-revision 1")
+        else:
+            # A later accepted Draft response replaces the old revision;
+            # reads cannot resurrect the earlier declaration prefix.
+            receipts[9]["payload"] = deepcopy(receipts[3]["payload"])
+            def advance(value):
+                if isinstance(value, dict):
+                    for key, child in value.items():
+                        if isinstance(child, str): value[key] = child.replace("--expected-revision 2", "--expected-revision 3")
+                        else: advance(child)
+            advance(receipts[9]["payload"])
+            binding = receipts[3]["payload"]["draft"]["next_action_binding"]["object_binding"]["by_id"]["fixed_argv_prefix_copy"]
+            inner = binding + " --object-id '{60650DE4-F870-43C4-923A-D601D67B6497}'"
+            commands[9] = completed_record(shlex.join(("/bin/bash", "-lc", inner)), receipts[9]["payload"])
+            receipts[9]["gateway_arguments"] = list(commands[9].argv[3:])
+        commands[10] = completed_record(command, receipts[10]["payload"])
+    assert gateway_continuation_binding_errors(commands, receipts, platform_name="posix",
+        allow_expansion_read_interleaving=True)
+
+
+@pytest.mark.parametrize("damage", [None, "facts", "unrecorded", "rejected", "receipt_order"])
+def test_expansion_copy_interleaving_requires_real_positional_argv_reconciliation(damage):
+    from tests.semantic.support.codex_gateway_broker import reconcile_gateway_commands, resolve_gateway_invocation
+    from tests.semantic.support.codex_task_runner_v3 import _bind_gateway_prefix_reconciliation
+    path = Path(__file__).parents[1] / "fixtures/semantic/expansion-interleaved-reads-0997d20.json"
+    text = path.read_text()
+    original = json.loads(text)
+    original_runner = completed_record(original["records"][3]["command"]).argv[1]
+    skill = Path(__file__).parents[2] / "skills/waapi-skill"
+    runner = (skill / "scripts/run.py").as_posix()
+    rows = json.loads(text.replace(original_runner, runner).replace(".agents/skills/waapi-skill/scripts/run.py", runner))["records"]
+    commands = [completed_record(row["command"], row["payload"]) for row in rows]
+    accepted = []
+    for row, command in zip(rows, commands):
+        resolved = resolve_gateway_invocation(command.argv, skill_source=skill)
+        accepted.append(SimpleNamespace(**row["receipt"], payload=row["payload"],
+            normalized_model_argv=resolved.normalized_model_argv, argv_sha256=resolved.argv_sha256))
+    rejected = ()
+    if damage == "facts":
+        commands[10] = completed_record(commands[10].command.replace("Japanese", "English"), rows[10]["payload"])
+    elif damage == "unrecorded":
+        commands.insert(5, commands[4])
+    elif damage == "rejected":
+        rejected = (accepted.pop(4),)
+    elif damage == "receipt_order":
+        accepted[4], accepted[5] = accepted[5], accepted[4]
+    evidence = SimpleNamespace(accepted_records=tuple(accepted), rejected_records=rejected,
+        complete=True, passed=True, terminal_state="RUNNING")
+    raw = reconcile_gateway_commands(tuple(command.argv for command in commands), evidence, skill_source=skill)
+    bound = _bind_gateway_prefix_reconciliation(raw, command_records=commands, broker_evidence=evidence,
+        platform_name="posix", allow_expansion_read_interleaving=True)
+    assert bound.passed is (damage is None)
+    if damage is not None:
+        assert not raw.passed and raw.errors
+
+
 def test_business_draft_accepts_its_nested_closed_standard_continuation() -> None:
     business_prefix = (
         "python '/tmp/Task Skill/scripts/run.py' gateway.py draft-check "
@@ -2121,13 +2590,21 @@ def test_task_commands_start_non_ephemeral_then_resume_exact_thread_with_isolati
         )
 
 
+@pytest.mark.parametrize("policy", [None, "ask_before_changes", "allow_changes", "read_only"])
 def test_task_and_prompt_audit_commands_seal_bootstrap_developer_instructions(
-    tmp_path: Path,
+    tmp_path: Path, policy: str | None,
 ) -> None:
     bootstrap = (
         "Before any other action, read the injected waapi-skill SKILL.md exactly once "
         "using one standalone complete file-read command."
     )
+    if policy is not None:
+        bootstrap = codex_harness_module.semantic_task_developer_instructions(
+            "/repo/skills/waapi-skill/scripts/run.py",
+            task_skill_source="/task/.agents/skills/waapi-skill",
+            expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+            expansion_modification_policy=policy,
+        )
     config = CodexHarnessConfig(
         workspace=tmp_path,
         skill_source=tmp_path / "skill",
@@ -2166,7 +2643,7 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "fixed_argv_prefix" in instructions
     assert "never reconstruct" in instructions
     assert "Omit workdir/cwd" in instructions
-    assert "Read now; no pre-read reply/questions" in instructions
+    assert "First read SKILL.md once, standalone; no pre-read reply/questions" in instructions
     assert "draft-apply: 1 argv/fact" in instructions
     assert "all facts" in instructions
     assert "batch=6" in instructions
@@ -2218,11 +2695,12 @@ def test_formal_bootstrap_instructions_precede_skill_and_forbid_continuation_reb
     assert "timeout_ms>=30000" in instructions
     assert "draft-check!=Preview" in instructions
     assert (
-        "Preview-now: finish schema/metadata/Preview now; "
+        "Finish schema/metadata/Preview now; "
         "only execution waits for confirmation"
     ) in instructions
     assert "Draft same turn" in instructions
-    assert "no progress reply" in instructions
+    assert "Preview: announce edits before Execute" in instructions
+    assert "Draft same turn; no progress reply." not in instructions
     assert "requires_later_user_message" in instructions
 
 
@@ -2240,7 +2718,7 @@ def test_formal_bootstrap_instructions_bind_one_exact_windows_runner_prefix() ->
     ) in instructions
     assert "No next_command: only" in instructions
     assert "append disclosed argv verbatim" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None:
@@ -2269,7 +2747,7 @@ def test_formal_task_instructions_bind_exact_posix_skill_read_schedule() -> None
     assert "Reads: 1" in instructions
     assert "2 none" in instructions
     assert "Exact turn; no early/late/extra reads" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> None:
@@ -2286,10 +2764,10 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
 
     assert (
         "Get-Content -Raw -Encoding UTF8 "
-        r"'.agents\skills\waapi-skill\SKILL.md'"
+        r"''.agents\skills\waapi-skill\SKILL.md''"
     ) in instructions
     assert (
-        "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
+        "python './.agents/skills/waapi-skill/scripts/run.py' "
         "'gateway.py'"
     ) in instructions
     assert "No next_command: only" in instructions
@@ -2297,10 +2775,11 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
     assert "waapi-skill-workspace\\root" not in instructions
     assert (
         "Get-Content -Raw -Encoding UTF8 "
-        r"'.agents\skills\waapi-skill\references\waapi-operate.md'"
+        r"''.agents\skills\waapi-skill\references\waapi-operate.md''"
     ) in instructions
     assert "Exact turn; no early/late/extra reads" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert instructions.count(codex_harness_module.WINDOWS_UTF8_READ_PREFIX) == 2
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
 
 
 def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> None:
@@ -2327,10 +2806,82 @@ def test_public_integration_alarm_instructions_fit_the_sealed_byte_limit() -> No
     )
 
     assert "Reads: 1" in instructions
-    assert "2 [Get-Content" in instructions
+    assert "2 [" + codex_harness_module.WINDOWS_UTF8_READ_PREFIX in instructions
     assert "3 none" in instructions
     assert "not Real64/int16" in instructions
-    assert len(instructions.encode("utf-8")) <= 2048
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
+
+
+@pytest.mark.parametrize("runner,source", [
+    ("/repo/skills/waapi-skill/scripts/run.py", "/task/.agents/skills/waapi-skill"),
+    (r"C:\repo\skills\waapi-skill\scripts\run.py", r"C:\task\.agents\skills\waapi-skill"),
+])
+def test_expansion_allow_instruction_follows_durable_authorization_without_extra_confirmation(runner, source):
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        runner, task_skill_source=source,
+        expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+        expansion_modification_policy="allow_changes",
+    )
+    assert "allow_changes: announce edits; Execute only with distinct durable policy authorization" in instructions
+    assert "only execution waits for confirmation" not in instructions
+    assert "requires_later_user_message" in instructions
+    assert "never reconstruct" in instructions
+    assert "Exact turn; no early/late/extra reads" in instructions
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
+
+
+@pytest.mark.parametrize("policy,required,forbidden", [
+    ("ask_before_changes", "Execute waits for later explicit user confirmation", "distinct durable policy authorization"),
+    ("read_only", "read_only: no project changes", "distinct durable policy authorization"),
+])
+@pytest.mark.parametrize("runner,source", [
+    ("/repo/skills/waapi-skill/scripts/run.py", "/task/.agents/skills/waapi-skill"),
+    (r"C:\repo\skills\waapi-skill\scripts\run.py", r"C:\task\.agents\skills\waapi-skill"),
+])
+def test_expansion_instructions_keep_other_policy_boundaries(policy, required, forbidden, runner, source):
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        runner, task_skill_source=source,
+        expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+        expansion_modification_policy=policy,
+    )
+    assert required in instructions
+    assert forbidden not in instructions
+    assert len(instructions.encode("utf-8")) <= codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES
+
+
+@pytest.mark.parametrize("policy", ["allow", "", "ALLOW_CHANGES"])
+def test_expansion_instruction_policy_rejects_unknown_values(policy):
+    with pytest.raises(CodexHarnessError, match="modification policy is invalid"):
+        codex_harness_module.semantic_task_developer_instructions(
+            "/repo/skills/waapi-skill/scripts/run.py",
+            task_skill_source="/task/.agents/skills/waapi-skill",
+            expected_skill_reads=(("SKILL.md",),), expansion_modification_policy=policy,
+        )
+
+
+def test_expansion_policy_cannot_rewrite_historical_custom_instructions():
+    with pytest.raises(CodexHarnessError, match="cannot override a custom base"):
+        codex_harness_module.semantic_task_developer_instructions(
+            "/repo/skills/waapi-skill/scripts/run.py",
+            task_skill_source="/task/.agents/skills/waapi-skill",
+            expected_skill_reads=(("SKILL.md",),),
+            base_developer_instructions="historical custom instructions",
+            expansion_modification_policy="allow_changes",
+        )
+
+
+def test_historical_default_task_instructions_keep_the_original_policy_clause():
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        "/repo/skills/waapi-skill/scripts/run.py",
+        task_skill_source="/task/.agents/skills/waapi-skill",
+        expected_skill_reads=(("SKILL.md",),),
+    )
+    expected_base = (
+        codex_harness_module.SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+        + " No next_command: only python .agents/skills/waapi-skill/scripts/run.py gateway.py"
+        + "; append disclosed argv verbatim."
+    )
+    assert instructions == expected_base + " Reads: 1 [cat '.agents/skills/waapi-skill/SKILL.md']. Exact turn; no early/late/extra reads."
 
 
 def test_prompt_audit_requires_exact_bootstrap_developer_instruction_once(
@@ -2385,6 +2936,83 @@ def test_prompt_audit_command_uses_supported_global_flags_with_pristine_codex_ho
     assert command[:3] == [str(config.codex_binary), "--disable", "memories"]
     assert "--ignore-user-config" not in command
     assert command[-3:] == ["debug", "prompt-input", "List buses."]
+
+
+@pytest.mark.parametrize("windows", [False, True], ids=("posix", "windows"))
+@pytest.mark.parametrize("phase", ["prompt-audit", "ephemeral-exec", "initial-task", "resume-task"])
+def test_formal_command_builders_disable_connected_apps_without_relaxing_isolation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, windows: bool, phase: str,
+) -> None:
+    monkeypatch.setattr(codex_harness_module, "_is_windows", lambda platform_name=None: windows)
+    config = CodexHarnessConfig(
+        workspace=tmp_path, skill_source=tmp_path / "skill", codex_binary=tmp_path / "codex",
+    )
+    if phase == "prompt-audit":
+        command = build_prompt_audit_command(config, prompt="Inspect the requested object.")
+    elif phase == "ephemeral-exec":
+        command = build_exec_command(config, prompt="Inspect the requested object.", writable_dir=tmp_path)
+    elif phase == "initial-task":
+        command = build_task_exec_command(config, prompt="Preview the requested change.", writable_dir=tmp_path)
+    else:
+        command = build_task_resume_command(config, thread_id="exact-thread", prompt="Confirm it.", writable_dir=tmp_path)
+
+    disabled = [command[index + 1] for index, value in enumerate(command) if value == "--disable"]
+    assert disabled == ["memories", "apps"]
+    assert not any(value.startswith("mcp_servers.") for value in command)
+    if phase == "prompt-audit":
+        assert command[-3:-1] == ["debug", "prompt-input"]
+    else:
+        assert 'approval_policy="never"' in command
+        assert "--ignore-user-config" in command
+        assert command[command.index("--sandbox") + 1] == "workspace-write"
+
+
+def test_prompt_audit_process_receives_apps_override_and_retains_skill_audit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    skill = workspace_skill_install_path(tmp_path)
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("target skill\n", encoding="utf-8")
+    config = CodexHarnessConfig(
+        workspace=tmp_path, skill_source=skill, codex_binary=tmp_path / "codex",
+        developer_instructions="Use the local Gateway only.",
+    )
+    payload = [
+        {"role": "developer", "content": config.developer_instructions},
+        {"role": "developer", "content": f"- waapi-skill: target (file: {skill / 'SKILL.md'})"},
+    ]
+    calls = []
+
+    def fake_process(command, *, cwd, env, timeout):
+        calls.append(command)
+        disabled = [command[index + 1] for index, value in enumerate(command) if value == "--disable"]
+        assert disabled == ["memories", "apps"]
+        assert command[-3:] == ["debug", "prompt-input", "Inspect it."]
+        return codex_harness_module.ProcessResult(0, json.dumps(payload), "", 0.1)
+
+    monkeypatch.setattr(codex_harness_module, "run_process", fake_process)
+    audit = CodexCliHarness(config).audit_prompt("Inspect it.", env={"CODEX_HOME": str(tmp_path / "state")})
+    assert len(calls) == 1
+    assert audit.passed is True
+    assert audit.target_skill_count == 1
+    assert audit.developer_instructions_exact is True
+
+
+@pytest.mark.parametrize("status", ["failed", "completed"])
+def test_session_audit_still_rejects_connected_app_calls_even_when_turn_completes(status: str) -> None:
+    item = {"id": "app-call", "type": "mcp_tool_call", "server": "codex_apps",
+            "tool": "remote_desktop_commander.start_process", "status": status}
+    events = [
+        {"type": "thread.started", "thread_id": "exact-thread"},
+        {"type": "turn.started"},
+        {"type": "item.completed", "item": item},
+        {"type": "turn.completed", "usage": {}},
+    ]
+    audit = audit_session_events(events)
+    assert audit.turn_completed_count == 1
+    assert audit.incomplete_command_count == 0
+    assert audit.unexpected_item_types == ("mcp_tool_call",)
+    assert audit.passed is False
 
 
 def test_native_windows_commands_disable_each_ambient_user_skill_by_exact_path(
@@ -2784,19 +3412,27 @@ def test_workspace_skill_copy_is_filtered_detached_and_attested(
         )
 
 
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
 def test_workspace_skill_install_creates_closed_repository_boundary(
     tmp_path: Path,
+    platform_name: str,
 ) -> None:
     source = tmp_path / "waapi-skill"
     source.mkdir()
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
 
-    prepare_workspace_skill_install(workspace, source, platform_name="posix")
+    prepare_workspace_skill_install(workspace, source, platform_name=platform_name)
 
     boundary = workspace / ".git"
     assert boundary.is_dir() and not boundary.is_symlink()
-    assert tuple(boundary.iterdir()) == ()
+    assert (boundary / "HEAD").read_bytes() == b"ref: refs/heads/main\n"
+    assert (boundary / "config").read_bytes() == (
+        b"[core]\n\trepositoryformatversion = 0\n\tbare = false\n"
+    )
+    for directory in ("objects", "refs"):
+        assert (boundary / directory).is_dir()
+        assert tuple((boundary / directory).iterdir()) == ()
     assert tuple(sorted(path.name for path in workspace.iterdir())) == (
         ".agents",
         ".git",
@@ -2804,16 +3440,165 @@ def test_workspace_skill_install_creates_closed_repository_boundary(
     assert verify_workspace_skill_install(
         workspace,
         source,
-        platform_name="posix",
+        platform_name=platform_name,
     ) == workspace_skill_install_path(workspace)
 
     (boundary / "unexpected").write_text("drift\n", encoding="utf-8")
     with pytest.raises(CodexHarnessError, match="repository boundary"):
-        verify_workspace_skill_install(
-            workspace,
-            source,
-            platform_name="posix",
-        )
+        verify_workspace_skill_install(workspace, source, platform_name=platform_name)
+
+
+@pytest.mark.parametrize("platform_name", ("posix", "nt"))
+def test_empty_git_marker_is_not_a_workspace_repository_boundary(
+    tmp_path: Path,
+    platform_name: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    install = workspace_skill_install_path(workspace)
+    install.mkdir(parents=True)
+    (install / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    (workspace / ".git").mkdir()
+
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source, platform_name=platform_name)
+
+
+@pytest.mark.parametrize(
+    "damage",
+    (
+        "missing_head",
+        "malformed_head",
+        "config_drift",
+        "hardlinked_config",
+        "missing_directory",
+        "extra_hook",
+    ),
+)
+def test_workspace_repository_boundary_rejects_metadata_drift(
+    tmp_path: Path,
+    damage: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    boundary = workspace / ".git"
+
+    if damage == "missing_head":
+        (boundary / "HEAD").unlink()
+    elif damage == "malformed_head":
+        (boundary / "HEAD").write_text("ref: refs/heads/other\n", encoding="utf-8")
+    elif damage == "config_drift":
+        with (boundary / "config").open("ab") as config:
+            config.write(b"\n[include]\n\tpath = /outside/config\n")
+    elif damage == "hardlinked_config":
+        external_config = tmp_path / "external-git-config"
+        external_config.write_bytes((boundary / "config").read_bytes())
+        (boundary / "config").unlink()
+        os.link(external_config, boundary / "config")
+    elif damage == "missing_directory":
+        (boundary / "objects").rmdir()
+    else:
+        hooks = boundary / "hooks"
+        hooks.mkdir()
+        (hooks / "post-checkout").write_text("unexpected\n", encoding="utf-8")
+
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source)
+
+
+@pytest.mark.parametrize("entry", ("HEAD", "objects"))
+def test_workspace_repository_boundary_rejects_symlinked_metadata(
+    tmp_path: Path,
+    entry: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    boundary = workspace / ".git"
+    if entry == "HEAD":
+        target = tmp_path / "external-head"
+        target.write_bytes(b"ref: refs/heads/main\n")
+        (boundary / entry).unlink()
+        create_symlink_or_skip(boundary / entry, target)
+    else:
+        target = tmp_path / "external-objects"
+        target.mkdir()
+        (boundary / entry).rmdir()
+        create_symlink_or_skip(boundary / entry, target, target_is_directory=True)
+
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source)
+
+
+@pytest.mark.parametrize("metadata_kind", ("directory", "oversized"))
+def test_repository_metadata_shape_is_rejected_before_file_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    metadata_kind: str,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    metadata = workspace / ".git" / "HEAD"
+    metadata.unlink()
+    if metadata_kind == "directory":
+        metadata.mkdir()
+    else:
+        metadata.write_bytes(b"x" * 1_048_576)
+
+    original_open = Path.open
+
+    def reject_open(path: Path, *args: Any, **kwargs: Any):
+        if path == metadata:
+            pytest.fail("invalid repository metadata was opened")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", reject_open)
+    with pytest.raises(CodexHarnessError, match="repository boundary"):
+        verify_workspace_skill_install(workspace, source)
+
+
+def test_repository_metadata_read_remains_bounded_after_size_check(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = tmp_path / "waapi-skill"
+    source.mkdir()
+    (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    prepare_workspace_skill_install(workspace, source)
+    head = workspace / ".git" / "HEAD"
+    expected = b"ref: refs/heads/main\n"
+    original_open = Path.open
+    read_limits: list[int] = []
+
+    class GrewAfterStat:
+        def __enter__(self):
+            return self
+        def __exit__(self, *_args):
+            return False
+        def read(self, size: int = -1) -> bytes:
+            read_limits.append(size)
+            return expected + b"x"
+
+    def grow_during_read(path: Path, *args: Any, **kwargs: Any):
+        if path == head:
+            return GrewAfterStat()
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", grow_during_read)
+    with pytest.raises(CodexHarnessError, match="repository boundary metadata changed"):
+        verify_workspace_skill_install(workspace, source)
+    assert read_limits == [len(expected) + 1]
 
 
 def test_windows_workspace_skill_copy_rejects_hardlink_alias(tmp_path: Path) -> None:
@@ -2821,9 +3606,9 @@ def test_windows_workspace_skill_copy_rejects_hardlink_alias(tmp_path: Path) -> 
     source.mkdir()
     (source / "SKILL.md").write_text("skill\n", encoding="utf-8")
     workspace = tmp_path / "workspace"
-    (workspace / ".git").mkdir(parents=True)
+    prepare_workspace_skill_install(workspace, source, platform_name="nt")
     install = workspace_skill_install_path(workspace)
-    install.mkdir(parents=True)
+    (install / "SKILL.md").unlink()
     os.link(source / "SKILL.md", install / "SKILL.md")
 
     with pytest.raises(CodexHarnessError, match="hardlink aliases"):
@@ -3223,6 +4008,8 @@ def test_native_windows_taskkill_command_is_tree_scoped_and_fail_closed(
     )
 
     def successful_run(command: Sequence[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert _kwargs["encoding"] == ("oem" if os.name == "nt" else "utf-8")
+        assert _kwargs["errors"] == "replace"
         observed.append(tuple(command))
         return subprocess.CompletedProcess(command, 0, "SUCCESS", "")
 
@@ -6948,3 +7735,100 @@ def test_workspace_snapshot_detects_content_change_after_mtime_restore(tmp_path:
 
     assert target.stat().st_mtime_ns == metadata.st_mtime_ns
     assert workspace_changes(before, after) == ((), ("existing.txt",))
+
+
+def test_windows_utf8_read_prefix_preserves_exact_read_proof(tmp_path, monkeypatch):
+    monkeypatch.setattr(codex_harness_module, "split_native_command_line", portable_windows_outer_split)
+    skill = tmp_path / "agent-workspace/.agents/skills/waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# Skill\nWwise 适配版本、声音\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    body = r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    command = windows_powershell_recording(codex_harness_module._windows_skill_read_command("SKILL.md"))
+    for output, accepted in ((content, True), (content.encode("gbk").decode("utf-8", errors="replace"), False)):
+        record = completed_windows_record(command, output)
+        facts = classify_commands((record,), skill_source=skill)
+        assert facts.skill_read is accepted
+        assert facts.allowed_read_commands == ((command,) if accepted else ())
+
+
+@pytest.mark.parametrize("script", (
+    "[Console]::OutputEncoding=[Text.Encoding]::Unicode; Get-Content -Raw -Encoding UTF8 'SKILL.md'",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; python run.py gateway.py execute tx",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'SKILL.md'; whoami",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 $(whoami)",
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-Content -Raw -Encoding UTF8 'SKILL.md' > stolen.txt",
+))
+def test_windows_utf8_read_prefix_cannot_authorize_other_scripts(script):
+    argv, operators, error = parse_command_argv(
+        windows_powershell_recording(script), platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+    assert argv == () and operators and error
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows console encoding")
+@pytest.mark.parametrize("language_mode", ("FullLanguage", "ConstrainedLanguage"))
+@pytest.mark.parametrize("child_already_constrained", (False, True))
+def test_native_windows_utf8_skill_read_survives_child_cp936(tmp_path, language_mode, child_already_constrained):
+    from tests.semantic.test_codex_gateway_broker import native_pwsh_73_or_skip
+    pwsh = native_pwsh_73_or_skip()
+    skill = tmp_path / ".agents/skills/waapi-skill"
+    skill.mkdir(parents=True)
+    content = "# Skill\nWwise 适配版本、声音\n"
+    (skill / "SKILL.md").write_bytes(content.encode("utf-8"))
+    body = r"Get-Content -Raw -Encoding UTF8 '.agents\skills\waapi-skill\SKILL.md'"
+    fixed = codex_harness_module._windows_skill_read_command("SKILL.md")
+    instructions = codex_harness_module.semantic_task_developer_instructions(
+        TASK_LOCAL_RUNNER_WINDOWS, task_skill_source=str(skill),
+        expected_skill_reads=(("SKILL.md",),),
+    )
+    assert fixed in instructions
+    if child_already_constrained:
+        # Exercise the guard's no-assignment branch as well as Full -> CLM.
+        fixed = fixed.replace(" -Command '", " -Command '$ExecutionContext.SessionState.LanguageMode=''ConstrainedLanguage''; ", 1)
+    outputs = []
+    for command in (body, fixed):
+        result = subprocess.run(
+            [pwsh, "-NoProfile", "-Command",
+             "[Console]::OutputEncoding=[Text.Encoding]::GetEncoding(936); "
+             + f"$ExecutionContext.SessionState.LanguageMode='{language_mode}'; " + command],
+            cwd=tmp_path, capture_output=True, timeout=15, check=False,
+            creationflags=subprocess.CREATE_NEW_CONSOLE,
+        )
+        assert result.returncode == 0, result.stderr
+        assert result.stderr == b"", result.stderr
+        outputs.append(result.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n").rstrip())
+    assert outputs[0] == content.rstrip().encode("gbk").decode("utf-8", errors="replace")
+    assert outputs[0] != content.rstrip()
+    assert outputs[1] == content.rstrip()
+
+
+def test_semantic_developer_instructions_remain_bounded(tmp_path):
+    with pytest.raises(ValueError, match="at most"):
+        CodexHarnessConfig(
+            workspace=tmp_path, skill_source=tmp_path / "skill", codex_binary=tmp_path / "codex",
+            developer_instructions="x" * (codex_harness_module.SEMANTIC_DEVELOPER_MAX_BYTES + 1),
+        )
+
+
+@pytest.mark.parametrize("damage", ("missing_guard", "gateway", "append", "wrong_host", "failed_chcp", "wrong_codepage"))
+def test_windows_utf8_read_relay_rejects_changed_program(damage):
+    script = codex_harness_module._windows_skill_read_command("SKILL.md")
+    if damage == "missing_guard":
+        script = script.replace(codex_harness_module.WINDOWS_READ_LANGUAGE_GUARD.replace("'", "''"), "")
+    elif damage == "gateway":
+        script = script.replace("Get-Content -Raw -Encoding UTF8", "python run.py gateway.py execute")
+    elif damage == "append":
+        script += "; whoami"
+    elif damage == "wrong_host":
+        script = script.replace("$PSHOME", "$env:TEMP")
+    elif damage == "failed_chcp":
+        script = script.replace(" && ", "; ")
+    else:
+        script = script.replace("65001", "936")
+    argv, operators, error = parse_command_argv(
+        windows_powershell_recording(script), platform_name="nt",
+        windows_powershell_core_host=_WINDOWS_POWERSHELL_CORE_HOST,
+    )
+    assert argv == () and operators and error

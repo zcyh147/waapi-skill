@@ -273,7 +273,7 @@ def test_business_draft_runner_projects_a_compact_copy_only_prefix(
     invocation.write_text("task", encoding="utf-8")
     argv = [
         "python",
-        str(candidate),
+        candidate.as_posix(),
         "gateway.py",
         "draft-bind-object",
         "od1-" + "1" * 32,
@@ -337,6 +337,9 @@ def test_business_draft_runner_projects_a_compact_copy_only_prefix(
         if platform_name == "nt"
         else TASK_LOCAL_RUNNER_POSIX
     )
+    if platform_name == "nt":
+        assert projected_argv[1] == "./.agents/skills/waapi-skill/scripts/run.py"
+        assert "\\" not in projected_argv[1]
     assert "fixed_argv_prefix" not in projected["route"]
     projected_recovery_argv = broker_module._decode_draft_copy_command(  # noqa: SLF001
         projected["recovery"]["copy_command"],
@@ -1816,7 +1819,7 @@ def expected_fake_confirmation_next_command(
     )
     full_argv = (
         "python",
-        str(runner_path.resolve()),
+        runner_path.resolve().as_posix(),
         "gateway.py",
         *gateway_argv,
     )
@@ -2006,7 +2009,7 @@ def test_broker_projects_nested_draft_next_command_to_task_install(
         platform_name="nt",
     )["next_command"]
 
-    assert projected["full_argv"][1] == str(invocation_runner)
+    assert projected["full_argv"][1] == invocation_runner.as_posix()
     assert decode_windows_model_argv(projected["model_command"]) == (
         "python",
         TASK_LOCAL_RUNNER_WINDOWS,
@@ -2034,7 +2037,7 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
     )
     action_prefix = [
         "python",
-        str(candidate_runner.resolve(strict=True)),
+        candidate_runner.resolve(strict=True).as_posix(),
         "gateway.py",
         "draft-apply",
         "od1-0123456789abcdef0123456789abcdef",
@@ -2047,7 +2050,7 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
     ]
     completion_prefix = [
         "python",
-        str(candidate_runner.resolve(strict=True)),
+        candidate_runner.resolve(strict=True).as_posix(),
         "gateway.py",
         "draft-check",
         "od1-0123456789abcdef0123456789abcdef",
@@ -2068,7 +2071,7 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
     ]
     disclosure_full_argv = [
         "python",
-        str(candidate_runner.resolve(strict=True)),
+        candidate_runner.resolve(strict=True).as_posix(),
         "gateway.py",
         *disclosure_argv,
     ]
@@ -2135,7 +2138,7 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         platform_name=platform_name,
     )
 
-    assert projected["fixed_argv_prefix"][1] == str(invocation_runner)
+    assert projected["fixed_argv_prefix"][1] == invocation_runner.as_posix()
     assert projected["fixed_argv_prefix_copy"] == (
         encode_windows_model_argv(projected["fixed_argv_prefix"])
         if platform_name == "nt"
@@ -2144,7 +2147,7 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
     disclosure = projected["root_dynamic_disclosure_commands"]["rows"][0]
     projected_disclosure_argv = [
         "python",
-        str(invocation_runner),
+        invocation_runner.as_posix(),
         "gateway.py",
         *disclosure["argv_by_shape"]["object"],
     ]
@@ -2158,7 +2161,7 @@ def test_broker_projects_draft_action_and_completion_prefixes_to_task_install(
         "copy_command_by_shape"
     ]
     completion = projected["completion_candidate"]
-    assert completion["fixed_argv_prefix"][1] == str(invocation_runner)
+    assert completion["fixed_argv_prefix"][1] == invocation_runner.as_posix()
     assert completion["copy_command"] == (
         encode_windows_model_argv(completion["fixed_argv_prefix"])
         if platform_name == "nt"
@@ -2230,7 +2233,7 @@ def test_broker_projects_every_business_draft_command_to_task_install(
         / "scripts"
         / "run.py"
     )
-    candidate = str(candidate_runner.resolve(strict=True))
+    candidate = candidate_runner.resolve(strict=True).as_posix()
 
     def command(subcommand: str, *suffix: str) -> list[str]:
         return ["python", candidate, "gateway.py", subcommand, *suffix]
@@ -2309,7 +2312,7 @@ def test_broker_projects_every_business_draft_command_to_task_install(
         return []
 
     assert runner_paths(projected)
-    assert set(runner_paths(projected)) == {str(invocation_runner)}
+    assert set(runner_paths(projected)) == {invocation_runner.as_posix()}
     projected_completion = projected["completion_candidate"]["fixed_full_argv"]
     assert projected["completion_candidate"]["copy_command"] == (
         encode_windows_model_argv(projected_completion)
@@ -2462,7 +2465,7 @@ with os.fdopen(descriptor, "wb") as stream:
     stream.write(encoded_ack)
     stream.flush()
     os.fsync(stream.fileno())
-if mode == "" and os.name == "nt":
+if os.name == "nt" and (mode == "" or mode.startswith("topic-stream")):
     # Keep the fake writer and both venv redirector layers alive while the
     # broker takes its native process snapshot.  The real wait-topic gateway
     # naturally remains alive after publishing its ACK.
@@ -2875,7 +2878,7 @@ elif command == "transaction-show":
     ]
     full_argv = [
         "python",
-        str(Path(__file__).resolve()),
+        Path(__file__).resolve().as_posix(),
         "gateway.py",
         *gateway_argv,
     ]
@@ -3902,10 +3905,15 @@ def test_broker_executes_exact_order_with_semantic_json_and_response_bindings(
                 "last_event_hash": FAKE_LAST_EVENT_HASH,
             },
         }
-        assert shown["next_command"] == expected_fake_confirmation_next_command(
+        expected_next = expected_fake_confirmation_next_command(
             invocation_runner,
             "tx-dynamic-123",
         )
+        if os.name == "nt":
+            expected_next["model_command"] = encode_windows_model_argv(
+                ["python", TASK_LOCAL_RUNNER_WINDOWS, "gateway.py", *expected_next["gateway_argv"]]
+            )
+        assert shown["next_command"] == expected_next
         assert results[3].stderr == ""
         assert preview["request"] == request
         assert preview["broker_token_visible"] is False
@@ -17557,3 +17565,53 @@ def test_audio_import_tab_equivalence_rejects_invalid_expected_scope(
             required_tokens=("IsLoopingEnabled",),
             equivalence="audio_import_tab_v1",
         )
+
+
+@pytest.mark.parametrize('bad_runner', (
+    r'.agents\skills\waapi-skill\scripts\run.py',
+    r'.agents\\skills\\waapi-skill\\scripts\\run.py',
+    r'./.agents/skills\waapi-skill/scripts/run.py',
+    './.agents/skills/../skills/waapi-skill/scripts/run.py',
+    './.agents//skills/waapi-skill/scripts/run.py',
+    '.agents/skills/waapi-skill/scripts/run.py',
+))
+def test_windows_task_runner_rejects_reconstructed_separator_spellings(bad_runner: str) -> None:
+    target = r'C:\task\.agents\skills\waapi-skill\scripts\run.py'
+    assert task_local_runner_matches_normalized(TASK_LOCAL_RUNNER_WINDOWS, target)
+    assert not task_local_runner_matches_normalized(bad_runner, target)
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='native Windows PowerShell transport')
+@pytest.mark.parametrize('relative', (False, True), ids=('absolute', 'task-local'))
+def test_native_windows_forward_runner_preserves_prefix_and_business_arguments(
+    tmp_path: Path, relative: bool,
+) -> None:
+    from tests.support.platform_process import run_windows_powershell_model_command
+
+    pwsh = Path(native_pwsh_73_or_skip())
+    candidate = make_fake_skill(tmp_path / 'candidate')
+    task = tmp_path / 'task'
+    invocation = make_fake_skill(task / '.agents' / 'skills')
+    business = (r'\Actor-Mixer Hierarchy\雪', "quote' & $env:TEMP", '')
+    with CodexGatewayBroker(
+        skill_source=candidate, invocation_skill_source=invocation,
+        expected_steps=(ExpectedGatewayStep('status', 'status', business),),
+        runner_environment={**os.environ, 'FAKE_GATEWAY_MODE': 'exact-output'},
+        transport='tcp',
+    ) as broker:
+        runner = TASK_LOCAL_RUNNER_WINDOWS if relative else broker.invocation_runner_path.as_posix()
+        prefix = encode_windows_model_argv(('python', runner, 'gateway.py', 'status'))
+        # Simulate JSON response/tool transport and typed arguments appended to
+        # the selected prefix. The codecs never rewrite business separators.
+        command = json.loads(json.dumps(prefix)) + ' ' + ' '.join(
+            "'" + value.replace("'", "''") + "'" for value in business
+        )
+        result = run_windows_powershell_model_command(
+            command, powershell_executable=pwsh,
+            environment=broker.model_environment(os.environ), cwd=task,
+        )
+        assert result.returncode == 0, result.stderr
+        record, = broker.evidence().records
+        assert record.model_argv == ('python', runner, 'gateway.py', 'status', *business)
+        assert record.succeeded
+        assert record.normalized_model_argv[1] == str(invocation / 'scripts' / 'run.py')

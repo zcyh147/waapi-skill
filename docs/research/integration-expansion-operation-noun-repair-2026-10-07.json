@@ -1,0 +1,384 @@
+{
+  "contract": "waapi-skill.notice-repair-evidence/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "branch": "codex/expansion-operation-noun",
+  "base_candidate": "9f17623b7e491c437dba39f59cd6b5c0b75609b1",
+  "scope": "Shared sealed-operation noun roles and singleton owner carry to the next substantive clause at expansion_preview_notice/_grammatical_notice.",
+  "frozen_source": {
+    "candidate": "700914d",
+    "campaign_root": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-700914d-sol-high-r1-cli1592",
+    "original_status": "FAIL",
+    "failed_gate": "visible_preview_notice",
+    "notice_event_index": 23,
+    "replayed": false,
+    "regraded": false,
+    "verify_only": false
+  },
+  "independent_design": {
+    "source": "/tmp/waapi-expansion-20261007-operation-noun-contrasts/operation-noun-contrasts.json",
+    "sha256": "c8c668d22c038813fa0996d8ca30fcab2e30553ef0f165d77238c6dfc274da8a",
+    "rationale_sha256": "d2dd4f13840c94531d7af4fec9e525ed4d48adbd5aa28dfed3ddcec7f5f08f6d",
+    "positive": 8,
+    "negative": 22,
+    "expectations_modified": false
+  },
+  "fixtures": [
+    {
+      "path": "tests/fixtures/semantic/expansion-operation-noun-700914d.json",
+      "sha256": "4ee90522f7cef2e5ac79ac039a2ac448082525b65aef19c3f9ced2313f65b286"
+    },
+    {
+      "path": "tests/fixtures/semantic/expansion-operation-noun-independent-20261007.json",
+      "sha256": "c8c668d22c038813fa0996d8ca30fcab2e30553ef0f165d77238c6dfc274da8a"
+    }
+  ],
+  "causal_reproduction": {
+    "exact": "_bound_context_effect returned false on nominal 追加, with expected=true but effect_anchor=false and approved_value=false.",
+    "noun_only_control": "Replacing 此次追加 with 此次变更 reached independent owner failure: actual 即将追加 had anchored=false and adjacent_owner=false.",
+    "original_red": "red-exact-attested: 1 assertion failure; initial red-exact was a fixture-envelope KeyError and grants no semantic RED credit.",
+    "frozen_contrasts_red": "9 failed /22 passed: exact plus all eight frozen positive vectors; no negative accepted."
+  },
+  "repair": [
+    "Current-operation nouns use only the existing closed action family from independently sealed operation context. Authorization, preview/pending status, execution and refusal share that grammar; none grants authority or proves a concrete edit.",
+    "Span-preserving complete clause classification carries one attested owner through validated authorization/status/read components, and consumes it at the next substantive clause. Unknown text stops carry; explicit owners remain validated.",
+    "Pre-execution not-yet status is distinct from prospective refusal; only exact status is ancillary. Horizontal whitespace at validated clause edges is consumed without masking unknown tails.",
+    "A local second-occurrence ordinal or paired repeat/count after a separately proven concrete plugin plan is rejected. Discourse coordinators, plan restatement and operation nouns remain compatible."
+  ],
+  "exploratory_expectation_correction": {
+    "reason": "Existing retained positive explicitly accepts 另外向该 Sound 新增名为...; 另外 alone is discourse coordination. Root review also established bare 再 can sequence the same plan.",
+    "initial_exploration": "family-r1 contained two locally designed exploratory expected-false vectors using 另外 and bare 再. Logs retained; these expectations were corrected, not claimed as repaired requirements. Frozen independent vectors and old assertions were never edited.",
+    "retained_guard_regression": "retained-final: 1 failed /2721 passed; overbroad 另外 guard rejected an existing positive.",
+    "narrow_guard_proof": "explicit-repeat-red with narrow guard absent: explicit second ordinal failed, paired repeat/count already rejected by existing grammar, 7 passed /60 deselected.",
+    "positive_controls": "Exact descriptor restatement, 另外 restatement, 之后再 same plan, first append after neutral read, and authorization/execution noun summaries."
+  },
+  "validation": {
+    "lane": "Focused developer pytest through ci/test.sh --mode nonlive with explicit paths; not full Non-live.",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "retained_previous": 2657,
+    "retained_modules": [
+      "tests/semantic/test_codex_expansion_task_runner.py",
+      "tests/semantic/test_codex_attenuation_notice.py",
+      "tests/semantic/test_codex_baseline_purpose_notices.py",
+      "tests/semantic/test_codex_composed_notices.py",
+      "tests/semantic/test_codex_coordinated_attestation_notices.py",
+      "tests/semantic/test_codex_current_role_notices.py",
+      "tests/semantic/test_codex_independent_composed_notices.py",
+      "tests/semantic/test_codex_independent_staged_notices.py",
+      "tests/semantic/test_codex_notice_noun_components_review.py",
+      "tests/semantic/test_codex_notice_role_context_withheld.py",
+      "tests/semantic/test_codex_noun_span_notices.py",
+      "tests/semantic/test_codex_planned_effect_entity_notices.py",
+      "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+      "tests/semantic/test_codex_staged_notices.py",
+      "tests/semantic/test_codex_target_preflight_notices.py",
+      "tests/semantic/test_codex_verification_basis_notices.py",
+      "tests/semantic/test_codex_baseline_purpose_components_review.py",
+      "tests/semantic/test_codex_effect_coordination_withheld.py",
+      "tests/semantic/test_codex_preview_components_review.py",
+      "tests/semantic/test_codex_target_preflight_components_review.py"
+    ],
+    "new_controls": 71,
+    "final": {
+      "passed": 2728,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 5.28,
+      "exit_code": 0,
+      "junit": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r4.xml"
+    },
+    "full_program": false,
+    "full_nonlive": false,
+    "fresh_codex": false,
+    "live_wwise": false,
+    "native_windows": false,
+    "artifacts": [
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/causal-reproduction-attested.txt",
+        "sha256": "5fbf36a8e315a7476c6c09ac7fdce9ef57a7430d0c55125c7394e7e3604f2042",
+        "bytes": 1848
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/causal-static-reproduction.txt",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/explicit-repeat-red-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/explicit-repeat-red.log",
+        "sha256": "4d8d5391f478ff48b6d4a0949aee92a9ced598c35442dd8b7242cd2c7fc348da",
+        "bytes": 2618
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/explicit-repeat-red.xml",
+        "sha256": "5cc5b44018736ccb0c6e78ba519702b808361a8d11cf3891fb0d5c1f768673c2",
+        "bytes": 4136
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r1-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r1.log",
+        "sha256": "ede16810fa8501c9d82a05da172e3f68f280de526a38afc9f552ba631a53ed4b",
+        "bytes": 4157
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r1.xml",
+        "sha256": "c17c35a9acad84ba04e84797c6095af6dd46c9b36d7507e9b25e944dc9f6a80d",
+        "bytes": 13918
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r2-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r2.log",
+        "sha256": "52a2623148521c674e7c2cbb482259fe6cfd1b6f6f92ae027a027579d37ba264",
+        "bytes": 648
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r2.xml",
+        "sha256": "c4497079e9875a1047243113d2e94d5e27077ef87ea565d8f949bbc8b35db0b7",
+        "bytes": 11896
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r3-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r3.log",
+        "sha256": "d9974b159df953def41683001f5f5d432611757e0b3cfb05e8e16cc169f18a93",
+        "bytes": 648
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/family-r3.xml",
+        "sha256": "7c2f1bad4064c8378d1089137922462eae71535cdf24a4ef0b8a855ee4e7bf54",
+        "bytes": 12759
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/green-independent-r1-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/green-independent-r1.log",
+        "sha256": "8597e82a4a4aa5877d8f464c5572f6d8191b77f1894a70b420e36ea88875acad",
+        "bytes": 3280
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/green-independent-r1.xml",
+        "sha256": "ab3ceb0d59b76779802ba209cdb899ba791bb75d5d12c1cbd43d1b5f3001b96f",
+        "bytes": 7684
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/green-independent-r2-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/green-independent-r2.log",
+        "sha256": "88ae843b8e3e54ed24d8fe9c59be82cbe3b1b5cd837412abede93f3e0827c21e",
+        "bytes": 670
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/green-independent-r2.xml",
+        "sha256": "ea0d988d1841ed586c845758eb2162c5e8a96d83be8e87d541a1a6e30be579e0",
+        "bytes": 4903
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/neutral-whitespace-red-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/neutral-whitespace-red.log",
+        "sha256": "d64f6389f77aa02319f3ad69a92315afab53f067d128dfc7f54502bf4f1b1778",
+        "bytes": 3902
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/neutral-whitespace-red.xml",
+        "sha256": "68f43c925bd8eb62e0615671a5d769cd1d450dcd632ff4210e07e8608f727d24",
+        "bytes": 4197
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-exact-attested-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-exact-attested.log",
+        "sha256": "18faf0011fd2658a644ce2ff773df0562a57e24bf03a2e38dca1ce99543fccab",
+        "bytes": 1769
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-exact-attested.xml",
+        "sha256": "2edfe15330ddd6a1a887c62094872aabc025b992ffee06b03029611f3ba007bb",
+        "bytes": 1498
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-exact-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-exact.log",
+        "sha256": "555c7b47fc858d78a53b22ab5d660cf59bac556513936ce2f89e21727d7c59eb",
+        "bytes": 2176
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-exact.xml",
+        "sha256": "c1b88aaa1236fbc10fa08916c084c916ec4e965400cfc9b7366410ae0f98a2ac",
+        "bytes": 1633
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-independent-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-independent.log",
+        "sha256": "da4755d287b638698657454240dd1172a49eb46ae981bb32811ae4a26538b0a6",
+        "bytes": 21354
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/red-independent.xml",
+        "sha256": "dadb83909b493a897519235d23ee6b34a6c1011a8aba7e40718ab67ef3bfbb8e",
+        "bytes": 28385
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-argv.json",
+        "sha256": "f47fc69a169163bf6988519f44bddde2f5fa7f38a63b796596c9eed5077b736e",
+        "bytes": 1499
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r2-argv.json",
+        "sha256": "1accffda81ce38329e931d1fb3c659bc948438308458e2ad06da649ca043554a",
+        "bytes": 1502
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r2-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r2.log",
+        "sha256": "92471ae48d569db202dc7432c4039e53b136f6364e5c6fb82af9ca102f5cc724",
+        "bytes": 4732
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r2.xml",
+        "sha256": "09c333544b674e2f213082c0bdf02bed00d71377a1a79c5d752af7ba3a522461",
+        "bytes": 583946
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r3-argv.json",
+        "sha256": "103f24819d1103894e5f64a42441f6b8cba6c84cf5958bc3049260362776fb00",
+        "bytes": 1502
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r3-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r3.log",
+        "sha256": "c55fa638fb5cd814d8a05292e8bfdba4a620aa9515626ad6e1057a05af5fa86d",
+        "bytes": 7933
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r3.xml",
+        "sha256": "5c1e92a642728542b6d3693566b526daabbbbfcc2f26882a7e64178bb2ad4d0f",
+        "bytes": 587887
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r4-argv.json",
+        "sha256": "a47f9e170f2cc5c2f04f6d356c9a11a6c98fe20eb38a7491cc570d1eca79e4cf",
+        "bytes": 1502
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r4-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r4.log",
+        "sha256": "280c89acf48d5da44e73f0424e14199bdad1c390e8303147c16538eb8937b324",
+        "bytes": 4732
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final-r4.xml",
+        "sha256": "130795de0086dff11fa016e7cb00c437f8f62a47d7281522f13e37a7b00e428b",
+        "bytes": 584424
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final.log",
+        "sha256": "f636ebadf87dcb5d6cdcedde7c389ee4c91eec629335393ff20e995dae7d660c",
+        "bytes": 7269
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-final.xml",
+        "sha256": "5773db0b159d50ccb0262b7242734496717b2f9aa3a7d06686a8d90ddcf3bbc5",
+        "bytes": 585853
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-r1-exit-code.txt",
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-r1.log",
+        "sha256": "9e07b3e9a00768cc22a8cf39785079ddf10251494504bb72adfa8e9c6a18b11f",
+        "bytes": 8365
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-r1.xml",
+        "sha256": "4facea7261303fef076af7463958a9a4eb85d3abd047f02eda77968a65968598",
+        "bytes": 579662
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-r2-exit-code.txt",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+        "bytes": 2
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-r2.log",
+        "sha256": "e93742087f6c1fd8afbb33b6b49887714c943cb5345d42d8f7066bbeb3af4743",
+        "bytes": 4720
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-r2.xml",
+        "sha256": "6ce33e4c033ef3cd35acf40a6a3cae667d55579bb50b6a5e5299dd6433dd5c80",
+        "bytes": 576090
+      },
+      {
+        "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-operation-noun-700914d-20261007/retained-selection.json",
+        "sha256": "2a480417c99f23377cd826c65841ace4d6559c6ed47c1331a2b62996a0b23f84",
+        "bytes": 1564
+      }
+    ]
+  },
+  "unchanged": [
+    "packaged Skill tree",
+    "Gateway/runtime",
+    "prompt",
+    "suite",
+    "business oracle",
+    "model judge",
+    "policy_checkpoint durable-authorization boundary",
+    "frozen historical campaign verdict/evidence"
+  ],
+  "remaining": "Independent Standards/Spec review and coordinator-owned subsequent development/Fresh gates; no acceptance or issue closure claimed."
+}

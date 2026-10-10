@@ -1,0 +1,935 @@
+{
+  "candidate": "0997d20",
+  "projection": "Original assistant text/order; authenticated Preview/Execute commands normalized for the existing notice seam. Frozen FAILs unchanged. Only notice-relevant sealed request, RTPC preparation and independent baseline retained.",
+  "cases": [
+    {
+      "model": "luna-high",
+      "unit": "EXP25-C06",
+      "source_events_sha256": "4caa0df17ead93cb306073fbcb93f38037638dee0f9602efc5ff6b8337b982ad",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_2",
+            "type": "agent_message",
+            "text": "我会先核对这条关系及曲线编辑所需的实时操作和字段，再生成并预览只改这条曲线的变更；执行后按返回的核验步骤确认实际结果。"
+          },
+          "original_index": 6
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_4",
+            "type": "agent_message",
+            "text": "waapi-skill 已加载；当前配置的 WAAPI 端口是 30773，Wwise 适配版本为 2025.1。\n\n当前工程修改策略为 `allow_changes`；可用模式为 `read_only`、`ask_before_changes` 和 `allow_changes`。我会按该策略继续完成这项明确授权的曲线修改。"
+          },
+          "original_index": 9
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_12",
+            "type": "agent_message",
+            "text": "已按指定对象和 Game Parameter 完成实时字段绑定，准备将音量曲线设为 `(0,-48)`、`(50,-6)`、`(100,0)`，三个点均为线性段；没有提交备注字段。现在生成预览，检查它是否只更新这条关系并保留关系身份、备注及其他曲线。"
+          },
+          "original_index": 24
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 25
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 26
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_14",
+            "type": "agent_message",
+            "text": "预览读取到的现状与指定关系相符：关系对象为 `{457EEF5A-A571-4B6B-ADC5-A29ED71685C9}`，备注是“Preserve volume association”，当前曲线中点为 `(50,-12)`；另有 Pitch/Time 曲线，预览显示它未被纳入修改。预览将只把 Volume/Rain_Intensity 曲线更新为你指定的三个线性点，并保留这条关系的备注和身份。我现在执行并随后核验。"
+          },
+          "original_index": 27
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 28
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 29
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_17",
+            "type": "agent_message",
+            "text": "已完成修改并通过核验。音量的 Rain_Intensity 曲线现在为：\n\n- `(0, -48)` → `(50, -6)`：线性\n- `(50, -6)` → `(100, 0)`：线性\n\n预览确认目标是现有控制关系，原备注为“Preserve volume association”；Gateway 报告该关系更新后核验通过，7 项断言全部通过。预览中也包含了现有的 Pitch/Time 曲线，未将其列为修改目标。此次变更只针对这条音量控制曲线，没有提交素材或路由变更。\n\nGateway 未在返回内容中展示逐项核验明细；我能确认其报告的核验结果，但无法独立列出每项断言的实际读回值。"
+          },
+          "original_index": 32
+        }
+      ],
+      "preview_artifact": {
+        "request": {
+          "arguments": {
+            "control_input": {
+              "kind": "id",
+              "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+            },
+            "mode": "add_or_replace",
+            "object": {
+              "kind": "id",
+              "value": "{35EF9382-25AA-4580-BD8A-3312366C2DAD}"
+            },
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume"
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.setRTPC",
+          "version": "2025.1"
+        },
+        "prepared_operation": {
+          "operation": "object.setRTPC",
+          "version": "2025.1",
+          "pre_state": {
+            "control_input": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity",
+              "notes": "",
+              "parent": {
+                "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+                "name": "Ambience"
+              },
+              "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+              "type": "GameParameter"
+            },
+            "object": {
+              "id": "{35EF9382-25AA-4580-BD8A-3312366C2DAD}",
+              "name": "Expansion_EXP25-C06_Bed",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed",
+              "type": "Sound"
+            },
+            "rtpc_snapshot": {
+              "fields": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "notes",
+                "@PropertyName",
+                "@ControlInput",
+                "@Curve"
+              ],
+              "object_id": "{35EF9382-25AA-4580-BD8A-3312366C2DAD}",
+              "readback_compatibility": [],
+              "rows": [
+                {
+                  "@ControlInput": {
+                    "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                    "name": "Rain_Intensity"
+                  },
+                  "@Curve": {
+                    "@Flags": 3,
+                    "id": "{915B2219-40A8-4838-87FF-DF75663BE9A9}",
+                    "points": [
+                      {
+                        "shape": "Linear",
+                        "x": 0.0,
+                        "y": -48.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 50.0,
+                        "y": -12.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  },
+                  "@PropertyName": "Volume",
+                  "id": "{457EEF5A-A571-4B6B-ADC5-A29ED71685C9}",
+                  "name": "",
+                  "notes": "Preserve volume association",
+                  "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+                  "type": "RTPC"
+                },
+                {
+                  "@ControlInput": {
+                    "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                    "name": "Time"
+                  },
+                  "@Curve": {
+                    "@Flags": 65537,
+                    "id": "{91F34FC2-3FAF-4485-9832-34A9D01F0BCC}",
+                    "points": [
+                      {
+                        "shape": "Linear",
+                        "x": 0.0,
+                        "y": -100.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 240.0,
+                        "y": 100.0
+                      }
+                    ]
+                  },
+                  "@PropertyName": "Pitch",
+                  "id": "{2C752D04-BB3D-4701-8D86-914B72D4B43D}",
+                  "name": "",
+                  "notes": "Preserve pitch association",
+                  "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+                  "type": "RTPC"
+                }
+              ]
+            }
+          },
+          "verification_plan": {
+            "action": "update",
+            "before_rows": [
+              {
+                "@ControlInput": {
+                  "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                  "name": "Rain_Intensity"
+                },
+                "@Curve": {
+                  "@Flags": 3,
+                  "id": "{915B2219-40A8-4838-87FF-DF75663BE9A9}",
+                  "points": [
+                    {
+                      "shape": "Linear",
+                      "x": 0.0,
+                      "y": -48.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 50.0,
+                      "y": -12.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 100.0,
+                      "y": 0.0
+                    }
+                  ]
+                },
+                "@PropertyName": "Volume",
+                "id": "{457EEF5A-A571-4B6B-ADC5-A29ED71685C9}",
+                "name": "",
+                "notes": "Preserve volume association",
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+                "type": "RTPC"
+              },
+              {
+                "@ControlInput": {
+                  "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                  "name": "Time"
+                },
+                "@Curve": {
+                  "@Flags": 65537,
+                  "id": "{91F34FC2-3FAF-4485-9832-34A9D01F0BCC}",
+                  "points": [
+                    {
+                      "shape": "Linear",
+                      "x": 0.0,
+                      "y": -100.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 240.0,
+                      "y": 100.0
+                    }
+                  ]
+                },
+                "@PropertyName": "Pitch",
+                "id": "{2C752D04-BB3D-4701-8D86-914B72D4B43D}",
+                "name": "",
+                "notes": "Preserve pitch association",
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+                "type": "RTPC"
+              }
+            ],
+            "control_input_id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "existing_rtpc_id": "{457EEF5A-A571-4B6B-ADC5-A29ED71685C9}",
+            "expected_notes": null,
+            "kind": "object-rtpc-state",
+            "notes_supplied": false,
+            "object_id": "{35EF9382-25AA-4580-BD8A-3312366C2DAD}",
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume",
+            "version": "2025.1"
+          }
+        }
+      },
+      "before_snapshot": {
+        "owner": {
+          "id": "{35EF9382-25AA-4580-BD8A-3312366C2DAD}",
+          "name": "Expansion_EXP25-C06_Bed",
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed",
+          "type": "Sound"
+        },
+        "controls": [
+          {
+            "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "name": "Rain_Intensity",
+            "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+            "type": "GameParameter"
+          },
+          {
+            "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+            "name": "Time",
+            "path": "\\Game Parameters\\Ambience\\Time",
+            "type": "GameParameter"
+          }
+        ],
+        "rtpcs": {
+          "{2C752D04-BB3D-4701-8D86-914B72D4B43D}": {
+            "@ControlInput": {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time"
+            },
+            "@Curve": {
+              "@Flags": 65537,
+              "id": "{91F34FC2-3FAF-4485-9832-34A9D01F0BCC}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -100.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 240.0,
+                  "y": 100.0
+                }
+              ]
+            },
+            "@PropertyName": "Pitch",
+            "id": "{2C752D04-BB3D-4701-8D86-914B72D4B43D}",
+            "name": "",
+            "notes": "Preserve pitch association",
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+            "type": "RTPC"
+          },
+          "{457EEF5A-A571-4B6B-ADC5-A29ED71685C9}": {
+            "@ControlInput": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{915B2219-40A8-4838-87FF-DF75663BE9A9}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -48.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            },
+            "@PropertyName": "Volume",
+            "id": "{457EEF5A-A571-4B6B-ADC5-A29ED71685C9}",
+            "name": "",
+            "notes": "Preserve volume association",
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+            "type": "RTPC"
+          }
+        }
+      }
+    },
+    {
+      "model": "sol-medium",
+      "unit": "EXP25-C06",
+      "source_events_sha256": "c62031b5f84316cc100da6e3d8bbe48787c5311a60641ef02a067dff43af31d7",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "已加载 waapi-skill，配置的 WAAPI 端口为 32471，Wwise 适配版本为 2025.1。\n\n当前策略为 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会先核对现有控制关系和可保留范围，再告知具体变更并执行核验。"
+          },
+          "original_index": 8
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 23
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 24
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_12",
+            "type": "agent_message",
+            "text": "已核对：现有音量曲线为 (0,-48)、(50,-12)、(100,0)，各段线性，备注为 “Preserve volume association”；同一声音还存在一条音高控制曲线。\n\n即将把音量曲线的中间点改为 (50,-6)，两端和线性插值保持原值。执行后将核验控制关系身份、备注及其他控制曲线；素材和路由是否保持不变，以返回的核验范围为准。"
+          },
+          "original_index": 25
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 26
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 27
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_15",
+            "type": "agent_message",
+            "text": "已实际执行，Expansion_EXP25-C06_Bed 的 Rain_Intensity 音量曲线已改为 **(0,-48)、(50,-6)、(100,0)，各段线性**，操作专属回读核验通过，7 项检查全部通过。\n\n核验返回仅提供汇总，未展示关系身份、备注及其他曲线的逐项检查结果，因此无法明确证明这些保留要求；声音其他属性、素材和路由也未获得独立核验。本次提交的修改仅涉及指定音量曲线。"
+          },
+          "original_index": 30
+        }
+      ],
+      "preview_artifact": {
+        "request": {
+          "arguments": {
+            "control_input": {
+              "kind": "id",
+              "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+            },
+            "mode": "add_or_replace",
+            "object": {
+              "kind": "id",
+              "value": "{D8027B14-794E-48BC-B3D0-E4DC9F4335E2}"
+            },
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume"
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.setRTPC",
+          "version": "2025.1"
+        },
+        "prepared_operation": {
+          "operation": "object.setRTPC",
+          "version": "2025.1",
+          "pre_state": {
+            "control_input": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity",
+              "notes": "",
+              "parent": {
+                "id": "{5E7787B2-2068-4365-9215-D0AA541958EC}",
+                "name": "Ambience"
+              },
+              "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+              "type": "GameParameter"
+            },
+            "object": {
+              "id": "{D8027B14-794E-48BC-B3D0-E4DC9F4335E2}",
+              "name": "Expansion_EXP25-C06_Bed",
+              "notes": "",
+              "parent": {
+                "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+                "name": "Default Work Unit"
+              },
+              "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed",
+              "type": "Sound"
+            },
+            "rtpc_snapshot": {
+              "fields": [
+                "id",
+                "name",
+                "type",
+                "path",
+                "notes",
+                "@PropertyName",
+                "@ControlInput",
+                "@Curve"
+              ],
+              "object_id": "{D8027B14-794E-48BC-B3D0-E4DC9F4335E2}",
+              "readback_compatibility": [],
+              "rows": [
+                {
+                  "@ControlInput": {
+                    "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                    "name": "Rain_Intensity"
+                  },
+                  "@Curve": {
+                    "@Flags": 3,
+                    "id": "{B0E502FE-45D5-447B-97F7-CC23975C9D8F}",
+                    "points": [
+                      {
+                        "shape": "Linear",
+                        "x": 0.0,
+                        "y": -48.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 50.0,
+                        "y": -12.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  },
+                  "@PropertyName": "Volume",
+                  "id": "{86F13153-A842-458D-809C-89D52F449236}",
+                  "name": "",
+                  "notes": "Preserve volume association",
+                  "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+                  "type": "RTPC"
+                },
+                {
+                  "@ControlInput": {
+                    "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                    "name": "Time"
+                  },
+                  "@Curve": {
+                    "@Flags": 65537,
+                    "id": "{4AF3CFB0-5905-47F5-8A93-01FDFDCE7A8C}",
+                    "points": [
+                      {
+                        "shape": "Linear",
+                        "x": 0.0,
+                        "y": -100.0
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 240.0,
+                        "y": 100.0
+                      }
+                    ]
+                  },
+                  "@PropertyName": "Pitch",
+                  "id": "{F150714F-77A1-4FAA-805B-7E057DD7D9D5}",
+                  "name": "",
+                  "notes": "Preserve pitch association",
+                  "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+                  "type": "RTPC"
+                }
+              ]
+            }
+          },
+          "verification_plan": {
+            "action": "update",
+            "before_rows": [
+              {
+                "@ControlInput": {
+                  "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+                  "name": "Rain_Intensity"
+                },
+                "@Curve": {
+                  "@Flags": 3,
+                  "id": "{B0E502FE-45D5-447B-97F7-CC23975C9D8F}",
+                  "points": [
+                    {
+                      "shape": "Linear",
+                      "x": 0.0,
+                      "y": -48.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 50.0,
+                      "y": -12.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 100.0,
+                      "y": 0.0
+                    }
+                  ]
+                },
+                "@PropertyName": "Volume",
+                "id": "{86F13153-A842-458D-809C-89D52F449236}",
+                "name": "",
+                "notes": "Preserve volume association",
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+                "type": "RTPC"
+              },
+              {
+                "@ControlInput": {
+                  "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+                  "name": "Time"
+                },
+                "@Curve": {
+                  "@Flags": 65537,
+                  "id": "{4AF3CFB0-5905-47F5-8A93-01FDFDCE7A8C}",
+                  "points": [
+                    {
+                      "shape": "Linear",
+                      "x": 0.0,
+                      "y": -100.0
+                    },
+                    {
+                      "shape": "Linear",
+                      "x": 240.0,
+                      "y": 100.0
+                    }
+                  ]
+                },
+                "@PropertyName": "Pitch",
+                "id": "{F150714F-77A1-4FAA-805B-7E057DD7D9D5}",
+                "name": "",
+                "notes": "Preserve pitch association",
+                "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+                "type": "RTPC"
+              }
+            ],
+            "control_input_id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "existing_rtpc_id": "{86F13153-A842-458D-809C-89D52F449236}",
+            "expected_notes": null,
+            "kind": "object-rtpc-state",
+            "notes_supplied": false,
+            "object_id": "{D8027B14-794E-48BC-B3D0-E4DC9F4335E2}",
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume",
+            "version": "2025.1"
+          }
+        }
+      },
+      "before_snapshot": {
+        "owner": {
+          "id": "{D8027B14-794E-48BC-B3D0-E4DC9F4335E2}",
+          "name": "Expansion_EXP25-C06_Bed",
+          "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed",
+          "type": "Sound"
+        },
+        "controls": [
+          {
+            "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "name": "Rain_Intensity",
+            "path": "\\Game Parameters\\Ambience\\Rain_Intensity",
+            "type": "GameParameter"
+          },
+          {
+            "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+            "name": "Time",
+            "path": "\\Game Parameters\\Ambience\\Time",
+            "type": "GameParameter"
+          }
+        ],
+        "rtpcs": {
+          "{86F13153-A842-458D-809C-89D52F449236}": {
+            "@ControlInput": {
+              "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+              "name": "Rain_Intensity"
+            },
+            "@Curve": {
+              "@Flags": 3,
+              "id": "{B0E502FE-45D5-447B-97F7-CC23975C9D8F}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -48.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 50.0,
+                  "y": -12.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 100.0,
+                  "y": 0.0
+                }
+              ]
+            },
+            "@PropertyName": "Volume",
+            "id": "{86F13153-A842-458D-809C-89D52F449236}",
+            "name": "",
+            "notes": "Preserve volume association",
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Volume, Rain_Intensity]",
+            "type": "RTPC"
+          },
+          "{F150714F-77A1-4FAA-805B-7E057DD7D9D5}": {
+            "@ControlInput": {
+              "id": "{BB9274CE-1A7C-4293-BD7F-B18D55577696}",
+              "name": "Time"
+            },
+            "@Curve": {
+              "@Flags": 65537,
+              "id": "{4AF3CFB0-5905-47F5-8A93-01FDFDCE7A8C}",
+              "points": [
+                {
+                  "shape": "Linear",
+                  "x": 0.0,
+                  "y": -100.0
+                },
+                {
+                  "shape": "Linear",
+                  "x": 240.0,
+                  "y": 100.0
+                }
+              ]
+            },
+            "@PropertyName": "Pitch",
+            "id": "{F150714F-77A1-4FAA-805B-7E057DD7D9D5}",
+            "name": "",
+            "notes": "Preserve pitch association",
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed\\[RTPC: Voice Pitch, Time]",
+            "type": "RTPC"
+          }
+        }
+      }
+    },
+    {
+      "model": "luna-high",
+      "unit": "EXP25-M01",
+      "source_events_sha256": "eea13b20dc07ea23fecb524bfdaae94ce45b7ae5ac6be6a90d4dcc4a38c2806a",
+      "events": [
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_0",
+            "type": "agent_message",
+            "text": "我先按要求读取 WAAPI 技能说明，再读取操作流程；随后核对 Wwise 当前状态，准备一次批量导入并按流程预览、执行和核验。"
+          },
+          "original_index": 2
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_3",
+            "type": "agent_message",
+            "text": "操作流程已读取。接下来先查这次导入对应的事务入口；后续每一步都按网关返回的原样续接命令进行。"
+          },
+          "original_index": 7
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_5",
+            "type": "agent_message",
+            "text": "waapi-skill 已加载；WAAPI 端口为 31671，配置的 Wwise 适配版本为 2025.1。\n\n当前项目修改策略为 `allow_changes`；可用模式为 `read_only`、`ask_before_changes` 和 `allow_changes`。"
+          },
+          "original_index": 10
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_8",
+            "type": "agent_message",
+            "text": "已确认这是一次以导入为主的批量操作。当前 Draft 要求先绑定用户给出的目标父对象；我将把 Quiet 与 Full 作为同一批次的两条新导入声明，并只给 Quiet 提供 Track 音量值。"
+          },
+          "original_index": 15
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_11",
+            "type": "agent_message",
+            "text": "三条声明已进入同一批次：Imported 段、Quiet 轨和 Full 轨；两份 WAV 共用用户给出的素材目录。现在让网关校验完整声明，并生成可审阅的预览。"
+          },
+          "original_index": 20
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 23
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          },
+          "original_index": 24
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_14",
+            "type": "agent_message",
+            "text": "预览显示将一次导入建立 `Imported` Music Segment，并在其中建立两条 Music Track：Quiet 使用 `Quiet.wav` 且 Track 音量为 −6 dB，Full 使用 `Full.wav` 且不设置音量字段。未包含片段或源音量、播放列表、Transition 或 Stinger 变更；现在执行这项已授权的导入。"
+          },
+          "original_index": 25
+        },
+        {
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 26
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          },
+          "original_index": 27
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_16",
+            "type": "agent_message",
+            "text": "导入调用已成功，返回的对象信息显示 Quiet 的 Track 音量是 −6 dB，Full 的 Track 音量是默认 0 dB；两者的素材源都位于 Wwise 工程的 `Originals/SFX` 副本中。正在执行事务终验，以核实最终对象与素材映射。"
+          },
+          "original_index": 28
+        },
+        {
+          "type": "item.completed",
+          "item": {
+            "id": "item_18",
+            "type": "agent_message",
+            "text": "已通过一次批量导入建立 `Imported` Music Segment，并在其中创建两条 Music Track。事务终验通过，63 项断言全部通过。\n\n- **Quiet**：使用 `Quiet.wav`，Track 音量为 **−6 dB**。\n- **Full**：使用 `Full.wav`，Track 音量保持默认 **0 dB**。\n\n两份素材均来自你提供的 `owned/assets/music` 目录；Wwise 已将它们导入工程的 `Originals/SFX`。只设置了 Quiet 的 Track 音量，没有修改片段或源音量，也没有设置播放列表、Transition 或 Stinger。"
+          },
+          "original_index": 31
+        }
+      ],
+      "preview_artifact": {
+        "request": {
+          "arguments": {
+            "imports": [
+              {
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+                "object_type": "MusicSegment"
+              },
+              {
+                "audio_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP25-M01/owned/assets/music/Quiet.wav",
+                "import_language": "SFX",
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+                "object_type": "MusicTrack",
+                "properties": [
+                  {
+                    "name": "Volume",
+                    "value": -6.0
+                  }
+                ]
+              },
+              {
+                "audio_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-0997d20-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP25-M01/owned/assets/music/Full.wav",
+                "import_language": "SFX",
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+                "object_type": "MusicTrack"
+              }
+            ]
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "audio.import",
+          "version": "2025.1"
+        }
+      },
+      "before_snapshot": {}
+    }
+  ]
+}

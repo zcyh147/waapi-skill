@@ -1,0 +1,268 @@
+{
+  "schema": "independent-notice-guid-comparison-contrasts/v1",
+  "implementation_baseline": "875b6e727a7f73a0695b66dc8594e04e3f9dd0db",
+  "expectations_frozen_before_probe": true,
+  "scope": "Developer-only copied-fixture offline notice predicate observations; no Fresh or Wwise credit.",
+  "cases": [
+    {
+      "id": "P01-exact-witness",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Exact complete prospective effect already has an independently attested primary owner; equality is nonwriting ancillary continuity."
+    },
+    {
+      "id": "P02-elision-control",
+      "family": "effect",
+      "notice": "已核对目标声音，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Existing accepted complete notice differs only by removal of the comparison; original verification clause is retained."
+    },
+    {
+      "id": "P03-explicit-recipient-control",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Explicit primary append recipient provides an independent owner even across the comparison."
+    },
+    {
+      "id": "P04-primary-qualified-guid",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "The comparator identifies the same definite primary role and supplied GUID; it adds no effect."
+    },
+    {
+      "id": "P05-reversed-operands",
+      "family": "effect",
+      "notice": "已核对目标声音，你提供的 GUID 与解析出的 GUID 一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Operand order does not change affirmative equality of the resolved and supplied primary GUID."
+    },
+    {
+      "id": "P06-read-auth-composition",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，此次具体变更已取得 allow_changes 策略下的独立持久授权，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": true,
+      "reason": "Closed read and authorization bookkeeping may compose around a comparison without consuming an independently established owner."
+    },
+    {
+      "id": "N01-no-primary-owner",
+      "family": "effect",
+      "notice": "解析出的 GUID 与你提供的一致，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Comparison cannot establish primary owner solely from singleton context."
+    },
+    {
+      "id": "N02-wrong-primary-owner",
+      "family": "effect",
+      "notice": "已核对 OtherSound 的身份，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Later explicit correct recipient cannot erase a conflicting initial primary assertion."
+    },
+    {
+      "id": "N03-denied-primary-owner",
+      "family": "effect",
+      "notice": "未核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Denied primary assertion cannot be repaired by equality or later recipient."
+    },
+    {
+      "id": "N04-wrong-primary-type",
+      "family": "effect",
+      "notice": "已核对目标 Stinger，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Live source type remains Sound; comparator cannot certify another owner type."
+    },
+    {
+      "id": "N05-foreign-left",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherSound 的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Foreign left operand contradicts the current primary owner."
+    },
+    {
+      "id": "N06-foreign-right",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与 OtherSound 的 GUID 一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Foreign right operand is not the supplied primary identity."
+    },
+    {
+      "id": "N07-compound-right",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你和 OtherSound 提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Compound supplying parties/owners are ambiguous rather than a singleton comparator."
+    },
+    {
+      "id": "N08-compound-guid",
+      "family": "effect",
+      "notice": "已核对目标声音，目标声音和 OtherSound 的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A comparison cannot collapse compound owners into the primary role."
+    },
+    {
+      "id": "N09-wrong-canonical-guid",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID {AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA} 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Explicit canonical GUID must agree with attested primary identity."
+    },
+    {
+      "id": "N10-malformed-guid",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID {not-a-guid} 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Malformed identity payload cannot be discarded as neutral comparison prose."
+    },
+    {
+      "id": "N11-incomplete-operand",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Missing comparison operand cannot bridge or be excused by later explicit recipient."
+    },
+    {
+      "id": "N12-denied-equality",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的不一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Unequal identity claim contradicts the attested intended target."
+    },
+    {
+      "id": "N13-uncertain-equality",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的可能一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Uncertain equality cannot bridge and must retain uncertainty rather than disappear."
+    },
+    {
+      "id": "N14-negated-comparison",
+      "family": "effect",
+      "notice": "已核对目标声音，尚未确认解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Unconfirmed identity comparison must not be upgraded to affirmative equality."
+    },
+    {
+      "id": "N15-typed-foreign-role",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 Attenuation GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Explicit GUID role is inconsistent with primary Sound."
+    },
+    {
+      "id": "N16-extra-edit-in-clause",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致并修改 Pitch 为12，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "A comparison cannot exempt a coordinated extra physical edit."
+    },
+    {
+      "id": "N17-unclosed-trailing-text",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致以及 OtherSound，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Unconsumed comparator operand/owner text cannot be swept into neutral span."
+    },
+    {
+      "id": "N18-unknown-intervening-clause",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，顺便核对了天气，并已记录修改前状态。将追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Unrelated text still consumes/reset adjacency; GUID support cannot generally skip unknown clauses."
+    },
+    {
+      "id": "N19-no-effect",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Equality, baseline and authorization do not prove the requested prospective effect."
+    },
+    {
+      "id": "N20-wrong-current-policy",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `read_only` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Comparison cannot grant authorization or excuse contradictory policy."
+    },
+    {
+      "id": "N21-baseline-mismatch",
+      "family": "effect",
+      "notice": "已核对目标声音，解析出的 GUID 与你提供的一致，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "Comparison cannot replace independently matching artifact/baseline identity.",
+      "context_damage": "before_owner_id"
+    },
+    {
+      "id": "X01-rtpc-primary-comparison",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": true,
+      "reason": "RTPC shares ancillary roles; primary Sound comparison must not alter the exact existing association/midpoint plan."
+    },
+    {
+      "id": "X02-rtpc-control-input-is-not-owner",
+      "family": "rtpc",
+      "notice": "已核对目标声音，Rain_Intensity 的 GUID 与你提供的 GUID 一致。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "The GameParameter/control input is not the primary Sound role."
+    },
+    {
+      "id": "X03-rtpc-comparison-extra-edit",
+      "family": "rtpc",
+      "notice": "已核对目标声音，目标声音的 GUID 与你提供的 GUID 一致并修改 Pitch 为12。预览确认这条现有关联的备注为“Preserve volume association”，当前节点是 (0,-48)、(50,-12)、(100,0)；同一声音的 Pitch/Time 曲线单独存在。预览仅把 Volume/Rain_Intensity 曲线的中间点从 -12 改为 -6，另外两点及线性段、关联身份和备注保持原样。现在执行这项变更。",
+      "expected_gate": false,
+      "reason": "No shared role may mask another RTPC/property mutation."
+    },
+    {
+      "id": "X04-attenuation-comparison",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": true,
+      "reason": "Same definite primary role and complete exact curve remain independently adapter-attested."
+    },
+    {
+      "id": "X05-attenuation-denied-equality",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标衰减对象的 GUID 与你提供的 GUID 不一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Explicit denied comparator cannot be ignored even with explicit curve owner."
+    },
+    {
+      "id": "X06-attenuation-wrong-type",
+      "family": "attenuation",
+      "notice": "已核对目标衰减对象，目标声音的 GUID 与你提供的 GUID 一致。即将把该衰减对象的干声音量曲线设为自定义曲线，三个点均采用线性插值：(0.0, 0)、(50.0, -12)、(100.0, -48)。现在执行这项修改。",
+      "expected_gate": false,
+      "reason": "Comparison must validate source live type across the shared inheritance seam."
+    },
+    {
+      "id": "X07-stinger-primary-qualified",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Reference context distinguishes the independently attested primary MusicStinger from Trigger destination."
+    },
+    {
+      "id": "X08-stinger-unqualified-supplied-guid",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，解析出的 GUID 与你提供的 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "Two independently attested reference roles make unqualified supplied GUID ambiguous; comparison cannot select the primary role."
+    },
+    {
+      "id": "X09-stinger-destination-is-not-primary",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，Trigger {FB63DE7B-12AF-4A12-A836-FFAE0B4DD858} 的 GUID 与你提供的目标 Stinger GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": false,
+      "reason": "A valid canonical destination GUID does not become the primary mutation owner."
+    },
+    {
+      "id": "X10-stinger-explicit-source-guid",
+      "family": "stinger",
+      "notice": "已核对目标 Stinger，目标 Stinger {B8D45849-AF76-4770-BE7B-5A6553B1337B} 的 GUID 与指定目标 Stinger {B8D45849-AF76-4770-BE7B-5A6553B1337B} 的 GUID 一致。将把目标 Stinger 的 Trigger 引用改为 Backup_Team_Arrives。现在执行此项引用修改。",
+      "expected_gate": true,
+      "reason": "Exact matching source GUID in both operands preserves existing primary owner without authorizing destination changes."
+    }
+  ]
+}

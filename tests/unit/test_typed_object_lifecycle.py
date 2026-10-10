@@ -305,7 +305,7 @@ def _archive_test_public_object_create_schema_exposes_one_followable_typed_draft
             "object": waapi_gateway.operation_draft_copy_command(
                 [
                     "python",
-                    str(waapi_gateway.GATEWAY_RUNNER_PATH),
+                    waapi_gateway.GATEWAY_RUNNER_PATH.as_posix(),
                     "gateway.py",
                     *sibling_argv,
                 ]
@@ -620,7 +620,7 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
                 "object": waapi_gateway.operation_draft_copy_command(
                     [
                         "python",
-                        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+                        waapi_gateway.GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "request-array-item",
                         "object.create",

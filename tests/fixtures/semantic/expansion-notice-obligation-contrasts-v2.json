@@ -1,0 +1,247 @@
+{
+  "contract": "waapi-skill.notice-obligation-contrasts/v2",
+  "source": "docs/research/integration-expansion-notice-obligation-audit-8550bdd.md#required-contrast-pairs-for-any-prospective-repair",
+  "scope": "Prospective source-grounded fixtures adapted from the independent source-only audit. Expected meanings are contract examples, not model grades, historical regrades or semantic PASS credit. Tokens resolve only through original independent case fixtures. Fake reviewer tests prove transport and archive binding only.",
+  "contrasts": [
+    {
+      "id": "C03-optional-omission",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将把 LF、RF 分别重新导入现有 Left（L）、Right（R）；声音与来源身份、Originals 位置、音量和路由及备用对象 D 均保持，等确认后执行。",
+      "expected_meaning": "sufficient",
+      "basis": "Exact business meaning; permitted native/default/axis omission from independent source audit."
+    },
+    {
+      "id": "C03-swapped-mapping",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将把 LF 导入现有 Right（R），RF 导入现有 Left（L）；其余按上述要求保持，等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "exact media associations"
+    },
+    {
+      "id": "C03-new-sounds",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将用 LF、RF 新建 Left 和 Right 声音，等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "existing-object action"
+    },
+    {
+      "id": "C03-changed-language",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将把 LF、RF 分别重新导入现有 Left（L）、Right（R），同时改为 Japanese 语言；其余保持，等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "false optional language change"
+    },
+    {
+      "id": "C03-moved-originals",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将把 LF、RF 分别重新导入现有 Left（L）、Right（R），搬到新的 Originals 目录；等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "protected Originals locations"
+    },
+    {
+      "id": "C03-false-native-count",
+      "case": "C03",
+      "user_prompt": "在一个预览中，把 LF、RF 分别重新导入现有 Left（L）、Right（R）；保留 Sound 和来源身份、Originals 位置、音量和路由，不改备用对象 D；等确认后执行。",
+      "notice": "将按上述映射重新导入现有 Left、Right；每个声音现有两个音频源；其他按上述要求保持，等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "false optional source count"
+    },
+    {
+      "id": "C06-optional-omission",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将上述现有参数到 Volume 的关系 T 更新为 (0,-48)、(50,-6)、(100,0)，各段线性；其余按上述要求保持不变。",
+      "expected_meaning": "sufficient",
+      "basis": "Exact business meaning; permitted native/default/axis omission from independent source audit."
+    },
+    {
+      "id": "C06-wrong-property",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将把声音 O 的 Rain_Intensity 到 Pitch 曲线更新为 (0,-48)、(50,-6)、(100,0)，各段线性；其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "field owner"
+    },
+    {
+      "id": "C06-wrong-value",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将上述现有参数到 Volume 的关系 T 更新为 (0,-48)、(50,-12)、(100,0)，各段线性；其余按上述要求保持。",
+      "expected_meaning": "contradicted",
+      "basis": "new ordinate"
+    },
+    {
+      "id": "C06-reversed-axes",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将现有关系 T 更新为上述三个点，各段线性，x 是分贝、y 是参数值；其余按上述要求保持。",
+      "expected_meaning": "contradicted",
+      "basis": "axis semantics"
+    },
+    {
+      "id": "C06-duplicate-relation",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将另建一条 Rain_Intensity 到 Volume 关系，点为 (0,-48)、(50,-6)、(100,0)，各段线性。",
+      "expected_meaning": "contradicted",
+      "basis": "update versus duplication"
+    },
+    {
+      "id": "C06-wrong-shape",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将现有关系 T 更新为 (0,-48)、(50,-6)、(100,0)，各段对数；其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "shape"
+    },
+    {
+      "id": "C06-narrow-preservation",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "将关系 T 更新为请求的三个线性点；其他不变仅指音量，Pitch 关系 PT 也会被移除。",
+      "expected_meaning": "contradicted",
+      "basis": "protected relationship"
+    },
+    {
+      "id": "M01-optional-omission",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet 轨音量 -6 dB，Full 默认，片段与来源增益、Keep（K）及其他内容保持，不设置 Playlist、Transition、Stinger。",
+      "expected_meaning": "sufficient",
+      "basis": "Exact business meaning; permitted native/default/axis omission from independent source audit."
+    },
+    {
+      "id": "M01-swapped-mapping",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下新建 Imported 音乐段及 Quiet、Full 音乐轨，Quiet 用 FF，Full 用 QF；Quiet 轨 -6 dB，其他按上述要求保持。",
+      "expected_meaning": "contradicted",
+      "basis": "media associations"
+    },
+    {
+      "id": "M01-empty-tracks",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下新建 Imported 音乐段及 Quiet、Full 空音乐轨，不导入素材；Quiet 轨 -6 dB，其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "media-bearing tracks"
+    },
+    {
+      "id": "M01-wrong-quantity",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下新建 Imported 音乐段和三条带素材的音乐轨；Quiet 轨 -6 dB，其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "track/media quantities"
+    },
+    {
+      "id": "M01-wrong-types",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下新建 Imported 和 Quiet、Full Sound 对象，分别导入 QF、FF；Quiet 音量 -6 dB。",
+      "expected_meaning": "contradicted",
+      "basis": "music object kinds"
+    },
+    {
+      "id": "M01-wrong-volume-owner",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下新建 Imported 音乐段和 Quiet、Full 音乐轨，分别导入 QF、FF；Quiet 的 clip 音量 -6 dB，Track 默认。",
+      "expected_meaning": "contradicted",
+      "basis": "Track versus clip gain"
+    },
+    {
+      "id": "M01-false-clip-count",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下按上述请求导入音乐段和两条音乐轨；每轨创建两个 clip，其他按上述要求保持。",
+      "expected_meaning": "contradicted",
+      "basis": "false optional topology"
+    },
+    {
+      "id": "M01-new-playlist",
+      "case": "M01",
+      "user_prompt": "在父级 P 下新建 Imported 音乐段和 Quiet、Full 两条音乐轨，分别导入 QF、FF；Quiet Track Volume -6 dB，Full 默认，片段和来源增益不变，Keep（K）和其他父级内容不变，不设置 Playlist、Transition、Stinger。",
+      "notice": "将在父级 P 下按上述请求导入音乐段和两条音乐轨，并创建 Playlist，其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "protected music scope"
+    },
+    {
+      "id": "C01-optional-omission",
+      "case": "C01",
+      "user_prompt": "现有对白声音 V 有 Japanese、English(US)；用 VF 只更新 Japanese，保留 English(US)、声音与来源身份、音量、路由和播放引用，不改备用对象 D，等确认后执行。",
+      "notice": "将用 VF 只更新 V 的 Japanese 素材，English(US) 与已有声音和来源身份及其他上述保留项保持，等确认后执行。",
+      "expected_meaning": "sufficient",
+      "basis": "Exact business meaning; permitted native/default/axis omission from independent source audit."
+    },
+    {
+      "id": "C01-wrong-language",
+      "case": "C01",
+      "user_prompt": "现有对白声音 V 有 Japanese、English(US)；用 VF 只更新 Japanese，保留 English(US)、声音与来源身份、音量、路由和播放引用，不改备用对象 D，等确认后执行。",
+      "notice": "将用 VF 更新 V 的 English(US)，Japanese 保留；等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "selected language"
+    },
+    {
+      "id": "C01-both-languages",
+      "case": "C01",
+      "user_prompt": "现有对白声音 V 有 Japanese、English(US)；用 VF 只更新 Japanese，保留 English(US)、声音与来源身份、音量、路由和播放引用，不改备用对象 D，等确认后执行。",
+      "notice": "将用 VF 更新 V 的 Japanese 和 English(US)；其他保持，等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "protected language association"
+    },
+    {
+      "id": "C01-voice-to-sfx",
+      "case": "C01",
+      "user_prompt": "现有对白声音 V 有 Japanese、English(US)；用 VF 只更新 Japanese，保留 English(US)、声音与来源身份、音量、路由和播放引用，不改备用对象 D，等确认后执行。",
+      "notice": "将用 VF 更新 V 的 Japanese 并把 Voice 改成 SFX；等确认后执行。",
+      "expected_meaning": "contradicted",
+      "basis": "voice kind"
+    },
+    {
+      "id": "C08-optional-omission",
+      "case": "C08",
+      "user_prompt": "把选中衰减 A 的干声音量曲线设为自定义线性，距离、分贝点 (0,0)、(50,-12)、(100,-48)；对象身份、备注、其他曲线、原衰减 AS、使用者及引用都保持。Gateway 仅校验结果结构，实际曲线另独立读回。",
+      "notice": "将选中衰减 A 的干声音量设为自定义曲线 (0,0)、(50,-12)、(100,-48)，各段线性；其余按上述要求保持。Gateway 只校验结果结构，实际曲线另作独立读回。",
+      "expected_meaning": "sufficient",
+      "basis": "Exact business meaning; permitted native/default/axis omission from independent source audit."
+    },
+    {
+      "id": "C08-overstated-verifier",
+      "case": "C08",
+      "user_prompt": "把选中衰减 A 的干声音量曲线设为自定义线性，距离、分贝点 (0,0)、(50,-12)、(100,-48)；对象身份、备注、其他曲线、原衰减 AS、使用者及引用都保持。Gateway 仅校验结果结构，实际曲线另独立读回。",
+      "notice": "将选中 A 的干声音量设为请求的自定义线性三点，其余按上述要求保持；Gateway 会读回证明保存的曲线且保证听感正确。",
+      "expected_meaning": "contradicted",
+      "basis": "Gateway result-schema-only boundary"
+    },
+    {
+      "id": "C08-distance-conversion",
+      "case": "C08",
+      "user_prompt": "把选中衰减 A 的干声音量曲线设为自定义线性，距离、分贝点 (0,0)、(50,-12)、(100,-48)；对象身份、备注、其他曲线、原衰减 AS、使用者及引用都保持。Gateway 仅校验结果结构，实际曲线另独立读回。",
+      "notice": "将选中 A 的干声音量设为上述自定义线性三点，把距离米转换成厘米后提交；其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "invented unit conversion"
+    },
+    {
+      "id": "C08-original-target",
+      "case": "C08",
+      "user_prompt": "把选中衰减 A 的干声音量曲线设为自定义线性，距离、分贝点 (0,0)、(50,-12)、(100,-48)；对象身份、备注、其他曲线、原衰减 AS、使用者及引用都保持。Gateway 仅校验结果结构，实际曲线另独立读回。",
+      "notice": "将修改原衰减 AS 的干声音量为请求的自定义线性三点，其余保持。",
+      "expected_meaning": "contradicted",
+      "basis": "protected source versus edited copy"
+    },
+    {
+      "id": "C06-empty-adoption",
+      "case": "C06",
+      "user_prompt": "声音 O 的现有 Rain_Intensity（RC）到 Volume 关系 T，只改为 (0,-48)、(50,-6)、(100,0)，各段线性；保留关系身份和备注、其余控制曲线、声音状态、素材、路由及控制参数身份、备注和父级。",
+      "notice": "预览好了，执行吧。",
+      "expected_meaning": "unresolved",
+      "basis": "Sealed operation cannot supply absent visible target/effect/value adoption."
+    }
+  ]
+}

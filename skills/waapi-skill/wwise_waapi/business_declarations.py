@@ -2294,7 +2294,10 @@ def normalize_live_object_identity(row: Any) -> LiveObjectIdentity:
         and bool(path[1:-1].strip())
         and not any(character in path for character in ("\x00", "\r", "\n"))
     )
-    if not path.startswith("\\") and not derived_display_path:
+    reviewed_relative_display_path = (
+        path in object_identity_semantics(object_type).relative_display_paths
+    )
+    if not path.startswith("\\") and not derived_display_path and not reviewed_relative_display_path:
         raise ValueError(
             "path must be an absolute Wwise path or a reviewed derived display identity"
         )

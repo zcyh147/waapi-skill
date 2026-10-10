@@ -3744,6 +3744,24 @@ def describe_operation(name: str) -> OperationSpec:
         ) from exc
 
 
+def existing_reference_source_business_kind(
+    operation: str, version: str, live_type: str,
+) -> str | None:
+    """Comparison noun for the named reference operation's existing source.
+
+    The five pinned object-type indexes reflect MusicStinger (class 2490384).
+    It is a native embedded-object class, not a creatable
+    SemanticKind. This fact classifies an already singleton-bound source;
+    it grants neither reference availability nor metadata/value authority.
+    """
+    if (operation == "object.setReference"
+            and version in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            and version in OPERATION_SPECS[operation].supported_versions
+            and live_type == "MusicStinger"):
+        return "music-stinger"
+    return None
+
+
 def operation_request_machine_contract(name: str, version: str) -> dict[str, Any]:
     """Return the versioned machine contract that governs request validity.
 
@@ -10334,6 +10352,83 @@ def _localized_source_snapshot(owner_id: str, *, read: ReadCall) -> dict[str, An
     return {"owner_id": owner_id, "rows": sorted(rows, key=lambda row: row["id"].casefold())}
 
 
+def _existing_sfx_source_snapshot(owner_id: str, *, version: str, read: ReadCall) -> dict[str, Any]:
+    """Seal bounded Sound children with version-pinned source placement accessors."""
+    if not isinstance(owner_id, str) or not _PLUGIN_GUID.fullmatch(owner_id) or version not in SUPPORTED_WWISE_VERSION_KEYS:
+        raise OperationContractError("INVALID_PREVIEW", "Existing SFX source snapshot lacks a canonical owner and supported version.")
+    rows = _rows(read(
+        OBJECT_GET_URI,
+        {"waql": f'from object "{owner_id}" select children take {OBJECT_LIST_MAX_SUBTREE_NODES + 1}'},
+        {"return": ["id", "name", "type", "path", "parent",
+                    "originalWavFilePath" if version == "2021.1" else "originalFilePath", "audioSource:language"]},
+    ))
+    if len(rows) > OBJECT_LIST_MAX_SUBTREE_NODES:
+        raise OperationContractError("SFX_SOURCE_LIMIT_EXCEEDED", "SFX source discovery exceeded its bounded child limit.")
+    seen: set[str] = set()
+    for row in rows:
+        object_id = row.get("id")
+        if (not isinstance(object_id, str) or not _PLUGIN_GUID.fullmatch(object_id) or str(object_id).casefold() in seen
+                or not _same_identity(_reference_identity(row.get("parent")), owner_id)
+                or not isinstance(row.get("path"), str)
+                or not isinstance(row.get("name"), str)
+                or not isinstance(row.get("type"), str) or not row["type"]):
+            raise OperationContractError("INVALID_READBACK", "SFX source discovery returned malformed or unrelated children.")
+        seen.add(str(object_id).casefold())
+    return {"owner_id": owner_id, "version": version, "rows": sorted(rows, key=lambda row: row["id"].casefold())}
+
+
+def _normalize_existing_sfx_imports(
+    targets: list[dict[str, Any]], dispatch_args: Mapping[str, Any],
+    originals_context: Mapping[str, Any], *, version: str, read: ReadCall,
+) -> dict[str, Any]:
+    rows = [dict(row) for row in dispatch_args["imports"]]
+    originals = Path(_import_originals_root_from_context(originals_context, version=version))
+    for target, row in zip(targets, rows, strict=True):
+        before = target.get("pre_state_rows", [])
+        if (target.get("requested_language") != "SFX" or not target.get("media_expected")
+                or len(before) != 1 or _object_type_token(before[0].get("type")) != "sound"):
+            continue
+        active = before[0].get("activeSource")
+        if active is None and not before[0].get("sound:originalWavFilePath"):
+            continue  # An existing empty Sound has no source placement to preserve.
+        source_id = _reference_identity(active)
+        if version != "2021.1" and (not isinstance(source_id, str) or not _PLUGIN_GUID.fullmatch(source_id)):
+            raise OperationContractError("INVALID_READBACK", "An existing SFX Sound has a malformed active Source identity.")
+        snapshot = _existing_sfx_source_snapshot(target["preexisting_id"], version=version, read=read)
+        matching = [source for source in snapshot["rows"]
+                    if source.get("path") == target.get("expected_audio_file_source_result_path")
+                    and _object_type_token(source.get("type")) == "audiofilesource"]
+        if len(matching) != 1 or (source_id is not None and not _same_identity(matching[0].get("id"), source_id)):
+            raise OperationContractError("AMBIGUOUS_SFX_SOURCE", "Existing SFX media must resolve to its one exact active AudioFileSource.")
+        source = matching[0]
+        source_id = source["id"]
+        language = source.get("audioSource:language")
+        if not isinstance(language, Mapping) or language.get("name") != "SFX":
+            raise OperationContractError("INVALID_READBACK", "The existing AudioFileSource must belong to SFX.")
+        original = _secure_import_filesystem_path(
+            Path(_localize_waapi_file_path(source.get("originalWavFilePath" if version == "2021.1" else "originalFilePath"))),
+            field="existing SFX originalFilePath", require_directory=False,
+        )
+        try:
+            relative = original.relative_to(originals / "SFX")
+        except ValueError as exc:
+            raise OperationContractError("UNSAFE_ORIGINALS_PATH", "Existing SFX media must remain inside the live Originals/SFX root.") from exc
+        if original.name != Path(target["source_file"].get("path", target["source_file"].get("relative_path", ""))).name:
+            raise OperationContractError("SFX_SOURCE_FILENAME_MISMATCH", "Existing SFX replacement must retain its attested source filename.")
+        subfolder = "\\".join(relative.parent.parts)
+        if subfolder:
+            subfolder = normalize_originals_subfolder(subfolder, field="existing SFX Originals subfolder")
+        supplied = row.get("originalsSubFolder")
+        if supplied is not None and supplied != subfolder:
+            raise OperationContractError("SFX_SOURCE_PLACEMENT_CONFLICT", "Existing SFX replacement cannot change its attested Originals subfolder.")
+        if subfolder:
+            row["originalsSubFolder"] = subfolder
+            target["requested_originals_subfolder"] = subfolder
+        target["existing_sfx_source_id"] = source_id
+        target["existing_sfx_source_snapshot"] = snapshot
+    return {**dict(dispatch_args), "imports": rows}
+
+
 def _import_requires_explicit_source(target: Mapping[str, Any]) -> bool:
     return target.get("media_expected") is True and (
         bool(target.get("validated_properties") or target.get("validated_references"))
@@ -11348,14 +11443,6 @@ def _prepare_closed_import_plan(
         dispatch_args = {**dict(dispatch_args), "imports": trusted_dispatch_rows}
         plan = {**dict(plan), "dispatch_args": dispatch_args}
 
-    native_row_mapping: list[dict[str, Any]] = []
-    if source_operation == "audio.import":
-        dispatch_args, native_row_mapping = _materialize_audio_import_dynamic_rows(
-            dispatch_args=dispatch_args,
-            targets=targets,
-        )
-        plan = {**dict(plan), "dispatch_args": dispatch_args}
-
     requested_languages = sorted(
         {
             str(target["requested_language"])
@@ -11393,6 +11480,39 @@ def _prepare_closed_import_plan(
         if media_present
         else None
     )
+    if source_operation == "audio.import" and import_operation == "useExisting" and originals_context is not None:
+        dispatch_args = _normalize_existing_sfx_imports(
+            targets, dispatch_args, originals_context, version=request.version, read=read,
+        )
+        plan = {**dict(plan), "dispatch_args": dispatch_args}
+    native_row_mapping: list[dict[str, Any]] = []
+    if source_operation == "audio.import":
+        dispatch_args, native_row_mapping = _materialize_audio_import_dynamic_rows(
+            dispatch_args=dispatch_args,
+            targets=targets,
+        )
+        if request.version == "2025.1":
+            # This lane has proven source-GUID importLocation support. Bind only
+            # media rows; expanded Sound property rows retain their own target.
+            for mapping in native_row_mapping:
+                target = targets[mapping["logical_index"]]
+                source_id = target.get("existing_sfx_source_id")
+                if source_id is None:
+                    continue
+                for native in mapping["native_rows"]:
+                    row = dispatch_args["imports"][native["native_index"]]
+                    if "audioFile" not in row and "audioFileBase64" not in row:
+                        continue
+                    row["objectPath"] = ""
+                    row["importLocation"] = source_id
+                    row.pop("objectType", None)
+                    # Source identity and copied-media destination are separate
+                    # native inputs. Retain the live-attested Originals folder:
+                    # dropping it flattens same-basename SFX rows onto one file.
+                    native["object_path"] = ""
+                    native["canonical_result_path"] = target["expected_audio_file_source_result_path"]
+        plan = {**dict(plan), "dispatch_args": dispatch_args}
+
     language_inventory: Mapping[str, Any] | None = None
     if requested_languages:
         language_inventory = _read_import_language_inventory(request.version, read=read)
@@ -11508,6 +11628,8 @@ def _prepare_closed_import_plan(
         "source_operation": source_operation,
         "file_proofs": file_proofs,
         "path_snapshots": path_snapshots,
+        "existing_sfx_source_snapshots": [target["existing_sfx_source_snapshot"] for target in targets
+                                          if "existing_sfx_source_snapshot" in target],
         "localized_source_snapshots": [target["localized_source_snapshot"] for target in targets
                                        if "localized_source_snapshot" in target],
         "language_inventory": _json_mapping(language_inventory) if language_inventory is not None else None,
@@ -14003,6 +14125,13 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "evidence": evidence,
                 }
             )
+        for snapshot in import_guard.get("existing_sfx_source_snapshots", []):
+            if (not isinstance(snapshot, Mapping) or not _valid_object_id(snapshot.get("owner_id"))
+                    or snapshot.get("version") != prepared_version):
+                raise OperationContractError("INVALID_PREVIEW", "Existing SFX source guard is malformed.")
+            actual = _existing_sfx_source_snapshot(snapshot["owner_id"], version=snapshot["version"], read=read_call)
+            assertions.append({"name": "existing SFX source identities and placement unchanged since preview",
+                               "passed": actual == snapshot, "evidence": {"expected": snapshot, "actual": actual}})
         for snapshot in import_guard.get("localized_source_snapshots", []):
             if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("rows"), list):
                 raise OperationContractError("INVALID_PREVIEW", "Localized source guard is malformed.")
@@ -17919,15 +18048,30 @@ def verify_prepared_operation(
                 if isinstance(expected_source_path, str)
                 else []
             )
-            # A source-bound localized reimport can omit its unchanged source
-            # from the native result. Only that preview-bound GUID permits the
-            # exception, with exact live ownership/language/hash proof below.
-            # This does not relax ordinary SFX or MusicTrack result contracts.
+            # An unchanged, preview-bound source may be omitted from the native
+            # result only when exact live ownership/language/hash and complete
+            # source collection proofs below still establish the postcondition.
+            sfx_snapshot = target.get("existing_sfx_source_snapshot")
+            sfx_source_id = target.get("existing_sfx_source_id")
+            bound_sfx_source = (
+                isinstance(sfx_source_id, str) and _PLUGIN_GUID.fullmatch(sfx_source_id) is not None
+                and isinstance(sfx_snapshot, Mapping) and sfx_snapshot.get("version") == version
+                and sfx_snapshot.get("owner_id") == target.get("preexisting_id")
+                and target.get("requested_language") == "SFX"
+                and isinstance(sfx_snapshot.get("rows"), list)
+                and sum(isinstance(row, Mapping) and row.get("id") == sfx_source_id
+                        and row.get("path") == expected_source_path
+                        and _object_type_token(row.get("type")) == "audiofilesource"
+                        and _same_identity(_reference_identity(row.get("parent")), target.get("preexisting_id"))
+                        and isinstance(row.get("audioSource:language"), Mapping)
+                        and row["audioSource:language"].get("name") == "SFX"
+                        for row in sfx_snapshot["rows"]) == 1
+            )
             omitted_sound_source = (
                 existing_use_existing
                 and isinstance(expected_source_path, str)
                 and not returned_source_matches
-                and _valid_object_id(target.get("localized_audio_file_source_id"))
+                and (_valid_object_id(target.get("localized_audio_file_source_id")) or bound_sfx_source)
                 and _object_type_token(target.get("requested_object_type", "Sound"))
                 in {"sound", "soundsfx", "soundvoice"}
             )
@@ -18063,7 +18207,8 @@ def verify_prepared_operation(
                     _field_value(live_row, "activeSource")
                 )
                 if music_media or (version == "2021.1" and active_source_id is None):
-                    active_source_id = returned_source_id or target.get("localized_audio_file_source_id")
+                    active_source_id = (returned_source_id or target.get("localized_audio_file_source_id")
+                                        or (sfx_source_id if omitted_sound_source and bound_sfx_source else None))
                 if omitted_sound_source:
                     check(
                         f"{label} omitted source result has a canonical live active source",
@@ -18107,6 +18252,10 @@ def verify_prepared_operation(
                     check(f"{label} active Audio Source resolves once", len(source_rows) == 1, source_rows)
                     if len(source_rows) == 1:
                         audio_source_row = source_rows[0]
+                        if target.get("existing_sfx_source_id") is not None:
+                            check(f"{label} reimport preserves the bound SFX source GUID",
+                                  _same_identity(audio_source_row.get("id"), target["existing_sfx_source_id"]),
+                                  {"expected": target["existing_sfx_source_id"], "actual": audio_source_row.get("id")})
                         if target.get("localized_audio_file_source_id") is not None:
                             check(
                                 f"{label} reimport preserves the bound localized source GUID",
@@ -18154,6 +18303,21 @@ def verify_prepared_operation(
                         False,
                         {"activeSource": _field_value(live_row, "activeSource")},
                     )
+
+                sfx_snapshot = target.get("existing_sfx_source_snapshot")
+                if isinstance(sfx_snapshot, Mapping):
+                    def read_sfx_sources(uri, args, options):
+                        result = read_call(uri, args, options)
+                        readbacks.append({"uri": uri, "args": args, "options": options, "result": result})
+                        return result
+
+                    try:
+                        after_sfx = _existing_sfx_source_snapshot(str(live_id), version=version, read=read_sfx_sources)
+                    except OperationContractError as exc:
+                        check(f"{label} existing SFX source collection remains valid", False, exc.as_dict())
+                    else:
+                        check(f"{label} existing SFX source identities and placement preserved",
+                              after_sfx == sfx_snapshot, {"expected": sfx_snapshot, "actual": after_sfx})
 
                 localized_snapshot = target.get("localized_source_snapshot")
                 if isinstance(localized_snapshot, Mapping):

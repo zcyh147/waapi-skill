@@ -4302,7 +4302,7 @@ def _synthetic_audio_transaction_request() -> dict[str, Any]:
                 "languages": ["SFX"],
             },
             "options": {},
-            "io_root": "/private/synthetic-io",
+            "io_root": str(Path(__file__).resolve().parent / "synthetic-io"),
         },
     }
 
@@ -4323,7 +4323,7 @@ def _synthetic_soundbank_generate_request() -> dict[str, Any]:
             "platforms": ["Windows"],
             "skip_languages": True,
             "write_to_disk": True,
-            "io_root": "/private/synthetic-io",
+            "io_root": str(Path(__file__).resolve().parent / "synthetic-io"),
             "rebuild_soundbanks": False,
             "clear_audio_file_cache": False,
             "rebuild_init_bank": False,
@@ -9384,6 +9384,7 @@ def test_heavy_fingerprint_covers_runner_model_options_and_mutable_inputs(
     assert effective["runner"]["campaign_sha256"]
     assert effective["codex"]["model"] == "gpt-5.6-terra"
     assert effective["codex"]["allow_login_shell"] is False
+    assert effective["codex"]["apps"] == "disabled"
     if os.name == "nt":
         assert effective["codex"]["windows_shell_backend"] == (
             campaign.WINDOWS_SHELL_BACKEND

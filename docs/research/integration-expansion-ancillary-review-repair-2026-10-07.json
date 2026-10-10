@@ -1,0 +1,899 @@
+{
+  "contract": "waapi-skill.ancillary-review-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "base": "52879b3a46194ccfddc0c90530b64bc6674d1177",
+  "integration_tip": "f01485cee13a9a983d891c6972b834c07b216203",
+  "branch": "codex/expansion-ancillary-roles",
+  "public_seam": "expansion_preview_notice",
+  "scope": "Four independent Standards/Spec review findings plus complete RTPC source identity guard required by shared role context.",
+  "findings": [
+    "Endpoint preservation predicate/polarity localized to complete endpoint carrier.",
+    "Local curve cardinalities agree with sealed immutable points, including later conflicting claims.",
+    "Validated midpoint verb spans feed complete residual affirmative action accounting.",
+    "Forward and reverse typed GUID assertions share sealed native source-role validation."
+  ],
+  "self_audit": {
+    "contract": "waapi-skill.ancillary-review-self-audit/v1",
+    "implementation_head": "52879b3a46194ccfddc0c90530b64bc6674d1177",
+    "integration_tip": "f01485cee13a9a983d891c6972b834c07b216203",
+    "integration_merge": "Already up to date before final gate",
+    "all_frozen_fixture_bytes_identical_to_head": true,
+    "fixture_inventory": [
+      {
+        "path": "tests/fixtures/semantic/expansion-ancillary-role-independent-20261007.json",
+        "sha256": "6fe9d9f3e5bbc5377b68f29cbfe8e500061dc8e3d329ae36add4926ec506234f"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-ancillary-role-independent-fixture-20261007.json",
+        "sha256": "776e7b08a737efec00f08024281bdc67f090e31a88aeb69a81ed34313c45bbbe"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-ancillary-roles-1cbc2d0.json",
+        "sha256": "4f1c0475e555a27de359b7cef2fa3fb8823c1aa3341bdc0d115f23d615b5e188"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-attenuation-notice-c39b728-2022.json",
+        "sha256": "c1981c4c5255ec4bedb21fe708c437f6fb1a875ff8403dad21fa9481103a5071"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-attenuation-notice-c39b728-2025.json",
+        "sha256": "60f449435c91ef39dcda18bb6ebf70038ec09b5fe5a164102692aaa1114d8ad9"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-attested-frame-notices-492c30a.json",
+        "sha256": "a456d5b005062a3ad6cc4537cbd0066d7855431d2dff06ace9bdcd8b828ae7f6"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-authority-target-notices-5278a15.json",
+        "sha256": "bf79c405470b14857fdb44634dc1e1f9c74df2f946b737d105a502d42de3d302"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-authorization-clause-cases-7652745.json",
+        "sha256": "7cbad0e1a5bf38a88b97cc20142571b840965a4c121e86705db6de45b8140bce"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-auxiliary-claims-534fdde.json",
+        "sha256": "d71532b7343038a56e87a9c887395492cd05f0f1ff4f859ca31a24acb0519ee6"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-baseline-purpose-a77c96a.json",
+        "sha256": "c50ccd4910953dbe82f0838a79f457a15b3629aa28f98b3cabab088eb455bfdb"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-composed-authority-notices-d6430a0.json",
+        "sha256": "1f2913121e33703d4d8c5f0edd26c9772a817ab9a4e377e9fa0c82c3f429a8a7"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-composed-notices-87f9dc8.json",
+        "sha256": "85312947d24b046eb9b4169bc7b66e77fb0483b47d30583818962ba2fe60318b"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-context-notice-cf94158.json",
+        "sha256": "96033e4713d7088b6d522c12710b485b18562dbf65173180782afec590011df7"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-contextual-notices-4d2c121.json",
+        "sha256": "c3bd47449fe9c6c61cd34d87ed81b5dfcd28225e2d64d4427777e1d17b580189"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-contextual-notices-86b475e.json",
+        "sha256": "1c1318f138d4cc58a3592c945931186aeb32cb8acb7ab30020f82569cbb859b6"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-contextual-notices-977e71e.json",
+        "sha256": "9ee0261b2e39fc3f7c258d9ceafb7f5851d6342bd53d509d2fd207a153487af4"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-contextual-notices-c39b728.json",
+        "sha256": "0087c9b17d74aac043e4b69b521ae746c226139452d8fce3a1ce97fb93843c7a"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-contextual-notices-fa51197.json",
+        "sha256": "0635f588f5b9cd9854504383327838d6616f2d95612ba6a714c08cb9ab6aa6a5"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-coordinated-attestation-0c2e75e.json",
+        "sha256": "e8113c7baab72b94fea53dd33dcf3d2e0a11b698deb56bbf5b3a160c43089366"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-coordinated-attestation-independent-20261007.json",
+        "sha256": "67ec04ea10f5aacad588dc28b1ace2fdbc6363d6339e8c3a27c408abf4339bb8"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-current-project-guard.json",
+        "sha256": "2e38ef74c5bad338111cfd3890a5ba2f23ad3c9b823facabf5a5c637b29875fc"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-current-role-notices-db2299c.json",
+        "sha256": "78f40bbcfdefcb3130e6de54ba109d76b5ddff9820babcb29c0a8788a78dcf53"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-effect-coordination-withheld-r1.json",
+        "sha256": "50a8062445b3b47c1377258c915a19acee419c2b95c034def276c61cdb6d64f9"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-expected-state-notices-db82de6.json",
+        "sha256": "e6db0f2aa8899f96dbd421222a5e9f237be2b4861857d50540987c6688baac26"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-independent-composition-87f9dc8-r2.json",
+        "sha256": "31b034f6880b42e75d4489289f8a81380ac862566d6a8415b25cbc9a6c635281"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-independent-composition-87f9dc8.json",
+        "sha256": "ae82fc5ec0f0de908c79009f2f22636dec09a9146cfc01458207e7a4a9047cf0"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-independent-stage-notices-eba698d.json",
+        "sha256": "c5b2fc33aeb2d417f0388203bf6b96fba63a50ee2479b76e978df0de79462981"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-interleaved-reads-0997d20.json",
+        "sha256": "15762f0a1920a7c78c0dd34838c2a068e41402448cc5376fe16dde60393fdc19"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-midpoint-notice-919043f.json",
+        "sha256": "8b436a9adb139eaf5845154ff4ddec75f753c3965f2bacbc0d8038460adc02f5"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-nominal-preview-6b906cb.json",
+        "sha256": "0913e93436db4d28091a4b21be6e4c7bc6dae2f73a8fddc0f4b03847d1cefdec"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-notice-language-paraphrases-1faaa5d.json",
+        "sha256": "50723bb69e29a69cb99bfd54a7ceea96db20675a6ab90e932019bf30651cafb2"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-notice-role-context-withheld-r1.json",
+        "sha256": "4c0130a00fd35886d22a6000116f838536b0fcea1717cbde0f11106f675d3ddf"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-notice-role-context-withheld-r2.json",
+        "sha256": "a662ce5196fe069b8ea8d80e0426a7f3f7cae72c6a640142eeb11ef7d8601d77"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-noun-span-notices-a7381ac.json",
+        "sha256": "d6936e44f7b44824805ffef84fd684594eb445c1892de841ec992770113f183c"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-operation-noun-700914d.json",
+        "sha256": "4ee90522f7cef2e5ac79ac039a2ac448082525b65aef19c3f9ced2313f65b286"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-operation-noun-independent-20261007.json",
+        "sha256": "c8c668d22c038813fa0996d8ca30fcab2e30553ef0f165d77238c6dfc274da8a"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-passive-authority-notices-7652745.json",
+        "sha256": "6d447310da34fa9edca036a625d3d3c591df3b81cfb94890ff0d4261efbdaff8"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-planned-effect-entity-notices-55df097.json",
+        "sha256": "4ed7bc7939ec6457d167171f1ab254f597839d933dead90ba5b29ab3d75f56a0"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-point-notice-86e23cd.json",
+        "sha256": "67f276d7605660148ad272a9ecb0654f6a398a6f3c5b275e01a8a5d8b55b1b99"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-preview-baseline-placement-e49354a.json",
+        "sha256": "0e9d97cd7881cffd04b8612197d1a79abf840985c21021880e6189f4f27bf8ad"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-preview-midpoint-719e3e0.json",
+        "sha256": "14f1e83ff8cae816e0dbf96a53e2e7aa162a101174b346696c1feeefc0ecd346"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-preview-notice-0997d20.json",
+        "sha256": "6c15e75a09ec1af73509fd55f12560968ccf25e17a9ef55965edce8f092216f8"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-preview-notice-122eb09.json",
+        "sha256": "d91b4b0f63cbd0f98b742a5e3c807fd01a2fee82a666f1d12c2a495ae5cdffe2"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-preview-read-interlude-a1979db.json",
+        "sha256": "712bfa4113cbc23f85b7f08ffc3a668b6649127d841cc2131da28021230f0b08"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-preview-snapshot-interlude-6b906cb.json",
+        "sha256": "e415de78d9ec034e562dfbb0efc0937e774f6affb9b687f33707f050fc997481"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-rejected-declaration-719e3e0.json",
+        "sha256": "0bb1447674e0ab97223439f3944c8859b2daa284707de5e67f7bfc48412253a1"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-rejected-draft-check-0e04c8c.json",
+        "sha256": "9579398aed256881d56f274f4ddd33db7206c8a2ff7c61bc74f93a127f576ddf"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-role-notices-1faaa5d.json",
+        "sha256": "c37923a3c44410fdb932d3fb01c495ed555f3b9a9ae8a007d3ed68d7d368bbd9"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-staged-notices-eba698d.json",
+        "sha256": "a8da472e71355cf3d5e8626e5bf3783457f4db07ca0ee06a6a6e9a683e11eec5"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-target-plan-e93a575.json",
+        "sha256": "27c19db62d48e2ef7f294aaab3694f787da48c6ce4e2c0434b86c1a1e216026d"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-target-plan-independent-20261007.json",
+        "sha256": "a4a087d4cbf58f7302a434baf350ef15fad44883db9d08e2a74105abacd0e67b"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-target-plan-independent-fixture-20261007.json",
+        "sha256": "79c14d62eb9084737deb18dd8ed47f64cc8fc223590340b092ed48669deec6ca"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-target-preflight-595cc85.json",
+        "sha256": "a24d1fb38ace6741331e3ee92612c0ed504c449110d9b824731eef0744f44a81"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-temporal-notices-a1979db.json",
+        "sha256": "61178317935878490222cc3a363a6079e76f50992e23c409b99618ed28d2dc24"
+      },
+      {
+        "path": "tests/fixtures/semantic/expansion-verification-basis-notice-0e04c8c.json",
+        "sha256": "a595e36a9d83de04cf968ea1d8971a8a608499c058eaeafe391528313d4119a9"
+      }
+    ],
+    "all_exact_review_probe_texts_matched": true,
+    "exact_review_notices": {
+      "denied_endpoints": "已核对声音 {3C2638B2-FB76-4DE0-A604-C6623A421792} 身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。即将只把该声音上 Rain_Intensity 控制的 Volume RTPC 中间点从 (50, -12 dB) 改为 (50, -6 dB)，端点 (0, -48 dB)、(100, 0 dB) 不会保持原样，三点 Linear 形状、关系身份和备注保持，Pitch/Time 关系保持原样。现在执行。",
+      "contradictory_count": "已核对声音 {3C2638B2-FB76-4DE0-A604-C6623A421792} 身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。即将只把该声音上 Rain_Intensity 控制的 Volume RTPC 中间点从 (50, -12 dB) 改为 (50, -6 dB)，端点 (0, -48 dB)、(100, 0 dB)、四点 Linear 形状、关系身份和备注保持，Pitch/Time 关系保持原样。现在执行。",
+      "protected_foreign_removal": "已核对声音 {3C2638B2-FB76-4DE0-A604-C6623A421792} 身份。记录修改前状态。allow_changes 策略已为这份具体变更签发独立授权。即将只把该声音上 Rain_Intensity 控制的 Volume RTPC 中间点从 (50, -12 dB) 改为 (50, -6 dB)，端点 (0, -48 dB)、(100, 0 dB)、三点 Linear 形状、关系身份和备注保持，Pitch/Time 关系保持原样。现在执行。同时移除 Pitch RTPC 关系。",
+      "typed_wrong_kind_and_guid": "已确认 Trigger {FB63DE7B-12AF-4A12-A836-FFAE0B4DD858} 身份。修改前状态已记录。allow_changes 策略已为这份具体变更签发独立授权。即将把该 Stinger 的 Trigger 引用改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}），原 Trigger 为 Bonus，其余配置、Segment 和其他 Stinger 保持。现在执行。",
+      "typed_wrong_guid": "已确认 Stinger {FB63DE7B-12AF-4A12-A836-FFAE0B4DD858} 身份。修改前状态已记录。allow_changes 策略已为这份具体变更签发独立授权。即将把该 Stinger 的 Trigger 引用改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}），原 Trigger 为 Bonus，其余配置、Segment 和其他 Stinger 保持。现在执行。"
+    },
+    "source_manifest": [
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-review/spec-probes.json",
+        "sha256": "1c6214754fee7588f55caa8aa61d20c9445ef7ac8bf0f5be4b5d4d845c5baa91"
+      },
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-review/spec.md",
+        "sha256": "60ac1e465c8e54b22166170305ec33f7e12eea2d2f995d8c83e8fc667d40b1bb"
+      },
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-review/standards-probes.json",
+        "sha256": "135c0d77bed7efc3d3ac61049f6487063e83f7f214f9452a62815c301b368279"
+      },
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-review/standards.md",
+        "sha256": "bb5f0e6ea78bac677378205438c373c7c91bcc9ed48e4c0131ec0287cffa9c0c"
+      },
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-role-contrasts/matrix.json",
+        "sha256": "6fe9d9f3e5bbc5377b68f29cbfe8e500061dc8e3d329ae36add4926ec506234f"
+      },
+      {
+        "path": "/tmp/waapi-expansion-20261007-ancillary-role-contrasts/rationale.md",
+        "sha256": "66ab2a30c8840d32a53eab5744cd9c50c825150fafe06ac4377b2c66571b19bf"
+      }
+    ],
+    "code_hashes": [
+      {
+        "path": "tests/semantic/support/codex_notice_claims.py",
+        "sha256": "b50a53f17dd24a5c5e06225733826ac36dd0be98734faf5210213455e560450f"
+      },
+      {
+        "path": "tests/semantic/support/codex_task_runner_v3.py",
+        "sha256": "4bae9dc5ed048fc7294df2cea3160706ecb9e87a16f69b9b30d9dfd70e1dd273"
+      },
+      {
+        "path": "tests/semantic/test_codex_ancillary_role_notices.py",
+        "sha256": "db8e3dd48656f73a64acea67ffa11d76613d08200201a592aa8537f4e2445207"
+      }
+    ],
+    "assertions": [
+      "Coordinate-aware local endpoint polarity cannot borrow a later shape predicate.",
+      "Missing endpoint predicate is an incomplete new local retained-middle form, not a global repetition rule; all prior supported alternatives remain.",
+      "Curve cardinality is checked in local shape or curve-count frames; time-of-day prose remains neutral.",
+      "Only a fully validated concrete edit verb is excluded from remaining affirmative action accounting; complete ancillary nouns retain their own spans.",
+      "Forward/reverse supplied identities use one sealed role/GUID classifier; destination type and GUID cannot attest source.",
+      "Matched incomplete owner facts fail closed before shared role parsing; identity is not synthesized from display text.",
+      "All2953 retained assertions and frozen58/prior44 unchanged.",
+      "Execute-start and second-Preview reset controls unchanged.",
+      "No Skill/Gateway/prompt/suite/oracle/criteria changes, historical regrades, replay/resume/verify-only, Fresh/live/Windows/full gates."
+    ]
+  },
+  "validation": {
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "lane": "Focused developer nonlive through ci/test.sh, retained23 modules",
+    "retained": 2953,
+    "new_controls": 51,
+    "new_controls_breakdown": {
+      "endpoint_polarity": 5,
+      "local_cardinality": 8,
+      "residual_actions": 10,
+      "forward_reverse_native_identity": 16,
+      "missing_malformed_rtpc_source": 12
+    },
+    "final": {
+      "tests": 3004,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 6.64,
+      "direct_exit": 0,
+      "argv": [
+        "ci/test.sh",
+        "--mode",
+        "nonlive",
+        "--",
+        "tests/semantic/test_codex_expansion_task_runner.py",
+        "tests/semantic/test_codex_attenuation_notice.py",
+        "tests/semantic/test_codex_baseline_purpose_notices.py",
+        "tests/semantic/test_codex_composed_notices.py",
+        "tests/semantic/test_codex_coordinated_attestation_notices.py",
+        "tests/semantic/test_codex_current_role_notices.py",
+        "tests/semantic/test_codex_independent_composed_notices.py",
+        "tests/semantic/test_codex_independent_staged_notices.py",
+        "tests/semantic/test_codex_notice_noun_components_review.py",
+        "tests/semantic/test_codex_notice_role_context_withheld.py",
+        "tests/semantic/test_codex_noun_span_notices.py",
+        "tests/semantic/test_codex_planned_effect_entity_notices.py",
+        "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+        "tests/semantic/test_codex_staged_notices.py",
+        "tests/semantic/test_codex_target_preflight_notices.py",
+        "tests/semantic/test_codex_verification_basis_notices.py",
+        "tests/semantic/test_codex_baseline_purpose_components_review.py",
+        "tests/semantic/test_codex_effect_coordination_withheld.py",
+        "tests/semantic/test_codex_preview_components_review.py",
+        "tests/semantic/test_codex_target_preflight_components_review.py",
+        "tests/semantic/test_codex_operation_noun_notices.py",
+        "tests/semantic/test_codex_target_plan_family_notices.py",
+        "tests/semantic/test_codex_ancillary_role_notices.py",
+        "-q",
+        "-ra",
+        "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-malformed.xml"
+      ]
+    },
+    "runs": {
+      "cardinality-green": {
+        "tests": 8,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.48,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "cardinality",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-green.xml"
+        ]
+      },
+      "cardinality-red": {
+        "tests": 8,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.482,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "cardinality",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-red.xml"
+        ]
+      },
+      "endpoint-green": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.453,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "endpoint_preservation",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-green.xml"
+        ]
+      },
+      "endpoint-red": {
+        "tests": 5,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.479,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "endpoint_preservation",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-red.xml"
+        ]
+      },
+      "identity-green": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.513,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "forward_and_reverse",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-green.xml"
+        ]
+      },
+      "identity-red": {
+        "tests": 16,
+        "failures": 8,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.561,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "forward_and_reverse",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-red.xml"
+        ]
+      },
+      "incomplete-owner-green": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.428,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "missing_owner_fields",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-green.xml"
+        ]
+      },
+      "incomplete-owner-red": {
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.638,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "missing_owner_fields",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-red.xml"
+        ]
+      },
+      "residual-cardinality-green": {
+        "tests": 23,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.569,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "residual_action or cardinality or endpoint_preservation",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-cardinality-green.xml"
+        ]
+      },
+      "residual-red": {
+        "tests": 10,
+        "failures": 6,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 0.502,
+        "direct_exit": 1,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-k",
+          "residual_action",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-red.xml"
+        ]
+      },
+      "retained-final-malformed": {
+        "tests": 3004,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 6.64,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_expansion_task_runner.py",
+          "tests/semantic/test_codex_attenuation_notice.py",
+          "tests/semantic/test_codex_baseline_purpose_notices.py",
+          "tests/semantic/test_codex_composed_notices.py",
+          "tests/semantic/test_codex_coordinated_attestation_notices.py",
+          "tests/semantic/test_codex_current_role_notices.py",
+          "tests/semantic/test_codex_independent_composed_notices.py",
+          "tests/semantic/test_codex_independent_staged_notices.py",
+          "tests/semantic/test_codex_notice_noun_components_review.py",
+          "tests/semantic/test_codex_notice_role_context_withheld.py",
+          "tests/semantic/test_codex_noun_span_notices.py",
+          "tests/semantic/test_codex_planned_effect_entity_notices.py",
+          "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+          "tests/semantic/test_codex_staged_notices.py",
+          "tests/semantic/test_codex_target_preflight_notices.py",
+          "tests/semantic/test_codex_verification_basis_notices.py",
+          "tests/semantic/test_codex_baseline_purpose_components_review.py",
+          "tests/semantic/test_codex_effect_coordination_withheld.py",
+          "tests/semantic/test_codex_preview_components_review.py",
+          "tests/semantic/test_codex_target_preflight_components_review.py",
+          "tests/semantic/test_codex_operation_noun_notices.py",
+          "tests/semantic/test_codex_target_plan_family_notices.py",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-malformed.xml"
+        ]
+      },
+      "retained-final": {
+        "tests": 2995,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 6.491,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_expansion_task_runner.py",
+          "tests/semantic/test_codex_attenuation_notice.py",
+          "tests/semantic/test_codex_baseline_purpose_notices.py",
+          "tests/semantic/test_codex_composed_notices.py",
+          "tests/semantic/test_codex_coordinated_attestation_notices.py",
+          "tests/semantic/test_codex_current_role_notices.py",
+          "tests/semantic/test_codex_independent_composed_notices.py",
+          "tests/semantic/test_codex_independent_staged_notices.py",
+          "tests/semantic/test_codex_notice_noun_components_review.py",
+          "tests/semantic/test_codex_notice_role_context_withheld.py",
+          "tests/semantic/test_codex_noun_span_notices.py",
+          "tests/semantic/test_codex_planned_effect_entity_notices.py",
+          "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+          "tests/semantic/test_codex_staged_notices.py",
+          "tests/semantic/test_codex_target_preflight_notices.py",
+          "tests/semantic/test_codex_verification_basis_notices.py",
+          "tests/semantic/test_codex_baseline_purpose_components_review.py",
+          "tests/semantic/test_codex_effect_coordination_withheld.py",
+          "tests/semantic/test_codex_preview_components_review.py",
+          "tests/semantic/test_codex_target_preflight_components_review.py",
+          "tests/semantic/test_codex_operation_noun_notices.py",
+          "tests/semantic/test_codex_target_plan_family_notices.py",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final.xml"
+        ]
+      },
+      "retained-first": {
+        "tests": 2992,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "seconds": 6.692,
+        "direct_exit": 0,
+        "argv": [
+          "ci/test.sh",
+          "--mode",
+          "nonlive",
+          "--",
+          "tests/semantic/test_codex_expansion_task_runner.py",
+          "tests/semantic/test_codex_attenuation_notice.py",
+          "tests/semantic/test_codex_baseline_purpose_notices.py",
+          "tests/semantic/test_codex_composed_notices.py",
+          "tests/semantic/test_codex_coordinated_attestation_notices.py",
+          "tests/semantic/test_codex_current_role_notices.py",
+          "tests/semantic/test_codex_independent_composed_notices.py",
+          "tests/semantic/test_codex_independent_staged_notices.py",
+          "tests/semantic/test_codex_notice_noun_components_review.py",
+          "tests/semantic/test_codex_notice_role_context_withheld.py",
+          "tests/semantic/test_codex_noun_span_notices.py",
+          "tests/semantic/test_codex_planned_effect_entity_notices.py",
+          "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+          "tests/semantic/test_codex_staged_notices.py",
+          "tests/semantic/test_codex_target_preflight_notices.py",
+          "tests/semantic/test_codex_verification_basis_notices.py",
+          "tests/semantic/test_codex_baseline_purpose_components_review.py",
+          "tests/semantic/test_codex_effect_coordination_withheld.py",
+          "tests/semantic/test_codex_preview_components_review.py",
+          "tests/semantic/test_codex_target_preflight_components_review.py",
+          "tests/semantic/test_codex_operation_noun_notices.py",
+          "tests/semantic/test_codex_target_plan_family_notices.py",
+          "tests/semantic/test_codex_ancillary_role_notices.py",
+          "-q",
+          "-ra",
+          "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-first.xml"
+        ]
+      }
+    }
+  },
+  "acceptance": "Developer component proof only. Historical FAILs stay FAIL; no new Fresh/real or Windows evidence. Coordinator owns independent rereview and new-root proof. No issue edit/push/PR.",
+  "raw_evidence_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007",
+  "evidence_manifest": [
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-green-argv.json",
+      "sha256": "ba310d191e1cfb5a4dd114d0d97fa84d057a7088fe53eaa96094b653ca14cf26"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-green-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-green.log",
+      "sha256": "0b2cdb315d19e31ad36a30af3484920dbe2e0d1e929c4850d23a69108d5a0482"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-green.xml",
+      "sha256": "4feb6b32989eac5606a25be98844ec82b6a652f9099755243d5865c906a2b5a3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-red-argv.json",
+      "sha256": "06d596a032c67ae685753da06b0ca8cb3b05c9ada87f3ee73906f28b35246f55"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-red.log",
+      "sha256": "5f21ecc3f906a180c3029746bbdebe61000e789c5abc0cec709b32882d7ce72c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/cardinality-red.xml",
+      "sha256": "860593b72d1083f2dedbcbba57e1c06c18bff86583f3133d679096f3b07ab230"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-green-argv.json",
+      "sha256": "5529fc2e8475406b6b168f306b5839522f01134ac0eef83990a6042a16779b0c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-green.log",
+      "sha256": "0a0a628f1c853e5cfe6f8f07890268f42bdce3bc286003378032b27213caa5aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-green.xml",
+      "sha256": "16dd4c013df678b446883b80b54d6fdad5e9f4bf2a2eda5c97d0f9d0c52d475a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-red-argv.json",
+      "sha256": "87545df8c88d7c064efd2d175e98fcee31fa7d61b3256103f41249f3c347ae6f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-red.log",
+      "sha256": "00ed2ffe7f71dc55d1d999fe1feaeac5fce1c5aa3efc580dba3a7467473c3176"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/endpoint-red.xml",
+      "sha256": "b83b3373198f0d8403c870581beb0e9100b60c8d09b8b6d7743f1b1785aef6de"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-green-argv.json",
+      "sha256": "9e2153f649189143354eb0afc6aab6c6b939a1937a660b3644d6687c1c14cd32"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-green.log",
+      "sha256": "45ff4a223ba95fb8299043ae7fc9e7b5c97c2e643b591813d65fadbeabc83385"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-green.xml",
+      "sha256": "7a4d40b2704d50183386d281a5172e5d91758a4f808e68713bf151a20099a1f7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-red-argv.json",
+      "sha256": "4e632df1e6a4391d952ad0ef3301d68581ddbbfeb490e294569ff8525031e826"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-red.log",
+      "sha256": "9c82b24dbb62031a029d7053af385f45f36bbf9eabb09fadefd1325ec17313c9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/identity-red.xml",
+      "sha256": "dba5257d610c208d480af693ae4607ff63733ea53e3c4adffb52d706f0a46ef7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-green-argv.json",
+      "sha256": "92b82da306862e70ca1ea2877ab26be7df7b41823280a2286433df4159257f72"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-green.log",
+      "sha256": "81dd2748c8c1a65cafda236a8ff6e918e1b0a9be22f88f0c3171bf67526e2585"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-green.xml",
+      "sha256": "85a4854639772843cbdb72ede75caaa90497eab9eee536281c39b9cf34a0eb18"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-red-argv.json",
+      "sha256": "9da7625e024a8d31ce54e190fada1df5ede257806d5995a8d46039dded41beb4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-red.log",
+      "sha256": "622e553aa47f42cd43ce460738ab953019211d37706424965877b7de61bee2de"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/incomplete-owner-red.xml",
+      "sha256": "16badba8f9833206f470cf4c63517c1df38e2ca6e676d0c21e3be817eb8a3fc3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-cardinality-green-argv.json",
+      "sha256": "18417f90947131133bf04ad335cf29f987628953b2c089d0348d5874643d8dc0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-cardinality-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-cardinality-green.log",
+      "sha256": "692cc24c2a80e953d82cd07604379914b30f2079553a043187381f10d882eba9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-cardinality-green.xml",
+      "sha256": "b325fe2a569d47d2170e33c1d9d091252520b66f1304e7bef3f322b865bfceb3"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-red-argv.json",
+      "sha256": "101e087d51dadb1115cdfc9744f61f6dce7eab0cf9682be10d4435d5877dc940"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-red.log",
+      "sha256": "72d9a2c43f100c09c92f77bfd5561e32c315476150dfbc29a863bc4a0f5e8e53"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/residual-red.xml",
+      "sha256": "f0e7a45e810ceb6972ac119f20e52b4b41a56703b099e7551fd52200a098ca4b"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-argv.json",
+      "sha256": "f7f7329b70c5c4e8f469722ece15c0e361c41e5ecf103e22a1557e36d3d0f3d2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-malformed-argv.json",
+      "sha256": "e0433d723098bb46503eebc94888595e5b6943e67ddedaa0477fdabc215378d1"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-malformed-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-malformed.log",
+      "sha256": "cf17e3816c5c8f06f7ed3657e17fa2eea608c10173d0b32963416c0de36a66be"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final-malformed.xml",
+      "sha256": "adb0aa5322a13a364cf3fd6188dedf8dfbc25da96eee6fc28c1961af70872752"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final.log",
+      "sha256": "3085f475a9d3f4ed636399d26ec03686666a8bc874660521610cad2f438d438c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-final.xml",
+      "sha256": "f7caf9d43f6969ee080c17e73ac1230cb61e4f8666eae9b59f79f8d998807c03"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-first-argv.json",
+      "sha256": "5bfd6d67ea594cf735abd6d8a279b4b4a227f68129553ffb4a3a061caeb08fc7"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-first-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-first.log",
+      "sha256": "3db3de37c500d8476c52aa5bea18eed7c85025bb6bba194eb9da4ea34a85568f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/retained-first.xml",
+      "sha256": "ef1757ff8fb8a7bfa265dbfc37cfcf6d231b0d509492bd435fb16b3c042455da"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/run-focused.py",
+      "sha256": "d428299a1e1e4b02c22f3cfa087a93ff5af9951232bce25bd5e3a75339e0b40d"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-review-20261007/self-audit.json",
+      "sha256": "6305d40757bce1919c6e99d5925e4ac132a4ce4a42a8d47faacb484e856211d2"
+    }
+  ]
+}

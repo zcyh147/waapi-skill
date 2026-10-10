@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import time
 import tomllib
 from importlib import metadata
 from collections.abc import Mapping, Sequence
@@ -17,9 +18,11 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 if __package__:
+    from .test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness
     from .resolve_live_test_config import LiveTestConfigError
     from .run_live_test_command import main as run_live_test_command
 else:  # Executed directly by ci/test.sh or ci/test.bat.
+    from test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness
     from resolve_live_test_config import LiveTestConfigError
     from run_live_test_command import main as run_live_test_command
 
@@ -30,6 +33,7 @@ SUPPORTED_MODES = frozenset(
     {
         "program",
         "nonlive",
+        "notice-fast",
         "default",
         "all",
         "smoke",
@@ -42,6 +46,7 @@ SUPPORTED_MODES = frozenset(
 DEFAULT_VERSION_BY_MODE = {
     "program": "none",
     "nonlive": "none",
+    "notice-fast": "none",
     "default": "none",
     "all": "all",
     "matrix": "all",
@@ -150,6 +155,7 @@ Versions:
 
 Modes:
   program      Run the focused pure-program public-route and transaction contract gate
+  notice-fast  Run fixed notice/fake runner/archive development regressions
   nonlive      Run default non-live test suite
   all          Run non-live suite first, then strict real matrix
   smoke        Run focused WAAPI getInfo smoke via HeadlessLifecycle
@@ -231,6 +237,8 @@ def parse_request(arguments: Sequence[str]) -> TestRequest | None:
         )
     if version not in SUPPORTED_VERSION_ARGUMENTS:
         raise TestDriverError(f"Unsupported version: {version}")
+    if mode == "notice-fast" and version != "none":
+        raise TestDriverError("notice-fast mode is non-live and requires version 'none'")
     if mode == "program" and version != "none":
         raise TestDriverError("program mode is all-version and requires version 'none'")
     if mode == "all" and version != "all":
@@ -361,6 +369,8 @@ class TestDriver:
         self.windows = os.name == "nt" if windows is None else windows
 
     def run(self, request: TestRequest) -> int:
+        if request.mode == "notice-fast":
+            return self._run_notice_fast(request.pytest_args)
         if request.mode == "program":
             return self._run_program(request.pytest_args)
         if request.mode in {"nonlive", "default"}:
@@ -400,6 +410,7 @@ class TestDriver:
                 "WWISE_LIVE": "0",
                 "WWISE_DESTRUCTIVE": "0",
                 "WWISE_STRICT_REAL": "0",
+                "PYTHONUTF8": "1",
             }
         )
         return environment
@@ -423,6 +434,14 @@ class TestDriver:
         print(flush=True)
 
     def _run_nonlive(self, pytest_args: Sequence[str]) -> int:
+        started = time.perf_counter()
+        try:
+            validate_nonlive_readiness(self.repo_root, tuple(pytest_args))
+        except (ReadinessBlocked, ValueError, OSError) as exc:
+            report_readiness(started, reason=str(exc), blocked=True)
+            print(f"TEST_READINESS_BLOCKED: {exc}", file=sys.stderr)
+            return 1
+        report_readiness(started, reason="selected Non-live prerequisites ready")
         environment = self._nonlive_environment()
         self._print_context(
             environment=environment,
@@ -439,6 +458,24 @@ class TestDriver:
                 "not live and not destructive",
                 *pytest_args,
             ),
+            environment,
+        )
+
+    def _run_notice_fast(self, pytest_args: Sequence[str]) -> int:
+        environment = self._nonlive_environment()
+        for name in (
+            "WWISE_VERSION", "WWISE_CONSOLE", "WWISE_SAMPLE_PROJECT_PATH",
+            "WWISE_SANDBOX_ROOT", "WWISE_TEST_CONFIG", "WWISE_WAAPI_HOST",
+            "WWISE_WAAPI_PORT", "PYTEST_ADDOPTS", "PYTEST_PLUGINS",
+        ):
+            environment.pop(name, None)
+        self._print_context(
+            environment=environment, version="none", mode="notice-fast",
+            pytest_args=pytest_args,
+        )
+        return self._run_child(
+            (self.python_executable,
+             str(self.repo_root / "ci" / "run_notice_fast_tests.py"), *pytest_args),
             environment,
         )
 
@@ -548,9 +585,11 @@ def main(
     if request is None:
         print(usage(windows=windows), end="")
         return 0
+    started = time.perf_counter()
     try:
         validate_test_environment(repo_root=repo_root)
     except TestEnvironmentError as exc:
+        report_readiness(started, reason=str(exc), blocked=True)
         print(f"TEST_ENVIRONMENT_BLOCKED: {exc}", file=sys.stderr)
         print(
             "Select a complete interpreter with WAAPI_TEST_PYTHON or provision "
@@ -558,6 +597,7 @@ def main(
             file=sys.stderr,
         )
         return 4
+    report_readiness(started, reason="locked developer interpreter ready")
     try:
         return TestDriver(
             repo_root=repo_root,

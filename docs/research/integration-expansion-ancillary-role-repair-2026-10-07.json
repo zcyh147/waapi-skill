@@ -1,0 +1,428 @@
+{
+  "contract": "waapi-skill.ancillary-role-repair/v1",
+  "date": "2026-10-07",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "base": "f01485cee13a9a983d891c6972b834c07b216203",
+  "branch": "codex/expansion-ancillary-roles",
+  "integration_tip_merge": "Already up to date at f01485cee13a9a983d891c6972b834c07b216203 before final gates/commit",
+  "public_seam": "expansion_preview_notice",
+  "historical_campaign": "FAIL preserved without regrading, replay, resume or verify-only",
+  "source_notice_sha256": "cb742e83003bbbf6bfada9bc21c39ec7e31d801170c0650e425ed298d28a2a14",
+  "source_indices": {
+    "preview_completion": 22,
+    "notice": 23,
+    "execute_start": 24,
+    "execute_completion": 25,
+    "verify_completion": 27
+  },
+  "independent_matrix": {
+    "vectors": 58,
+    "positive_notice_expectations": 31,
+    "negative_notice_expectations": 27,
+    "sha256": "6fe9d9f3e5bbc5377b68f29cbfe8e500061dc8e3d329ae36add4926ec506234f",
+    "fixture_sha256": "776e7b08a737efec00f08024281bdc67f090e31a88aeb69a81ed34313c45bbbe",
+    "expectations_changed": false,
+    "rationale_path": "/tmp/waapi-expansion-20261007-ancillary-role-contrasts/rationale.md",
+    "rationale_sha256": "66ab2a30c8840d32a53eab5744cd9c50c825150fafe06ac4377b2c66571b19bf"
+  },
+  "separate_policy_counterfactual": "Vector47 tests valid notice meaning only. Its false policy checkpoint and combined rejection are documentary design expectations, not new policy-gate coverage or simulated authorization proof.",
+  "changes": [
+    "Finite bare/completed/future before-state record carriers retain source spans; optional colon count validated against sealed protected effects.",
+    "Type confirmation forward/reverse carriers enter shared ancillary claims consumed by inheritance and mutation accounting. Unknown text still resets the single substantive owner window.",
+    "Provider-issued and passive current-operation grant predicates include \u7b7e\u53d1; explicit owner, current policy and denied/uncertain grants retain checks.",
+    "Typed canonical GUID identity assertions validate native source roles; a Trigger destination cannot attest a MusicStinger source.",
+    "Volume midpoint tuple recognizes compatible dB units and exact ordered retained endpoints with explicit Linear preservation, keeping later shape contradictions and protected edits visible."
+  ],
+  "validation": {
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "lane": "Focused developer nonlive through ci/test.sh; retained22 modules plus new ancillary module",
+    "baseline_passed": 2876,
+    "final_passed": 2953,
+    "final_seconds": 7.0,
+    "final_direct_exit": 0,
+    "new_controls": 77,
+    "new_controls_breakdown": {
+      "exact_witness": 1,
+      "frozen_independent_matrix": 58,
+      "typed_source_destination": 4,
+      "rtpc_local_quantity_order_shape_residual_guards": 14
+    },
+    "junit": {
+      "baseline-slice-green": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "cross-kind-green": {
+        "tests": 72,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0
+      },
+      "cross-kind-guards-red": {
+        "tests": 13,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0
+      },
+      "exact-red": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "exact-source-hashed-red": {
+        "tests": 1,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "family-red": {
+        "tests": 59,
+        "failures": 30,
+        "errors": 0,
+        "skipped": 0
+      },
+      "retained-before": {
+        "tests": 2876,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "retained-final-r2": {
+        "tests": 2953,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "retained-final": {
+        "tests": 2951,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "retained-shared-r1": {
+        "tests": 2935,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0
+      },
+      "rtpc-locality-red": {
+        "tests": 2,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "shared-family-green": {
+        "tests": 75,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "shared-family-r1": {
+        "tests": 59,
+        "failures": 2,
+        "errors": 0,
+        "skipped": 0
+      },
+      "type-slice-green": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "preserved": [
+    "prior2876 and frozen44 unchanged",
+    "all58 independent expectations and fixture bytes",
+    "historical FAIL and actual business6PASS provenance",
+    "native class9109507 from sealed descriptor rather than display label",
+    "definite prospective owned effect and actual policy gate independence",
+    "optional baseline/type/policy/verification descriptions",
+    "residual actions, unknown reset and Execute-start/second-Preview boundaries",
+    "Skill/runtime/Gateway/prompts/suite/business oracles/acceptance criteria"
+  ],
+  "not_run": [
+    "full Program",
+    "full Non-live",
+    "Fresh",
+    "live Wwise",
+    "Windows",
+    "historical replay/regrade/resume/verify-only"
+  ],
+  "remaining": "Independent Standards/Spec review; coordinator-owned development and new-root Fresh proof; no acceptance or issue closure claim",
+  "source_files": [
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/semantic/support/codex_notice_claims.py",
+      "sha256": "65e74fd6d0b28159fbeba789ef6eefdcb78dd0eaa9e34e785ec7f397c1493315"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/semantic/support/codex_notice_language.py",
+      "sha256": "0ff52558d3ba7fccb273933e4d50f470d576bc25543c34794fc285cb458b33df"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/semantic/support/codex_task_runner_v3.py",
+      "sha256": "2667e80915b9510de68de74eb444435fd10b785521ea4bdf4a36e4930edae9d3"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/semantic/test_codex_ancillary_role_notices.py",
+      "sha256": "5297e46ed0d6e19a675bd8f4bf3bfec08bb1f92e5b41088a306e4a5163ab2ae3"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/fixtures/semantic/expansion-ancillary-roles-1cbc2d0.json",
+      "sha256": "4f1c0475e555a27de359b7cef2fa3fb8823c1aa3341bdc0d115f23d615b5e188"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/fixtures/semantic/expansion-ancillary-role-independent-20261007.json",
+      "sha256": "6fe9d9f3e5bbc5377b68f29cbfe8e500061dc8e3d329ae36add4926ec506234f"
+    },
+    {
+      "path": "/Users/xiye/.codex/worktrees/expansion-ancillary-roles/waapi-skills/tests/fixtures/semantic/expansion-ancillary-role-independent-fixture-20261007.json",
+      "sha256": "776e7b08a737efec00f08024281bdc67f090e31a88aeb69a81ed34313c45bbbe"
+    }
+  ],
+  "evidence_artifacts": [
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/baseline-slice-green-argv.json",
+      "sha256": "b854d2b660628e994770f4ba1c7f6ea8713f25b91d86042fda744a6dd5499d50"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/baseline-slice-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/baseline-slice-green.log",
+      "sha256": "b14b538926fdfdb33a06801c32e207823b86d7963898124e81c8f4ace68e630c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/baseline-slice-green.xml",
+      "sha256": "d79f40a2a29e6204facbf1850f05b0135735d8bbe7f0c757c7827ab932b18710"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-diagnosis.json",
+      "sha256": "802453fbc7eace56113551ad9bfb279b7602f635e1f1ff3376f64a2da3beeb87"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-green-argv.json",
+      "sha256": "420cbb14a38cf67c9f44cfeb79a07112cd5058ec97995e74e8f1929fbc154e49"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-green-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-green.log",
+      "sha256": "246a1e2a4340f002af524cabc091c7f6b07c16e1b891165145c9c6545c35821a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-green.xml",
+      "sha256": "56c7da99b1bbac25ce0300e09f4078990e3ff75393e18d4a7cbcf78a8adf6776"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-guards-red-argv.json",
+      "sha256": "7c0c25fedbc7a6b6f909be2d7c7e16fb735a1a1ec12e2b9590ad7d5898aee3a8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-guards-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-guards-red.log",
+      "sha256": "260524a4e97ad8842fb53142b31dd881a9445dee3074c11249d31214d7d08a92"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/cross-kind-guards-red.xml",
+      "sha256": "455659c1943aaeb511d993763c5c76bf9178a76b1a1e395b86e6e30f40922f90"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-red-argv.json",
+      "sha256": "04328b78ed5d894de556ef253d3f2a6b1879efcbd7f15f660b80c797907740db"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-red.log",
+      "sha256": "8fe9cb7ee6ca1eb8bc44cd8690de716a2b874dfaad1b11803eba80abbf168d7c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-red.xml",
+      "sha256": "6f66876de6f5b098073e9a94ec4932861ecaf23d070f2e11a71e2bcb338ef6d0"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-source-hashed-red-argv.json",
+      "sha256": "589a35649f1ca2bf6ae05bc8aa264ba6b816b5c01e387165ae121be919f12ec2"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-source-hashed-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-source-hashed-red.log",
+      "sha256": "feca9ab0f3ed141ef132a33651d5788980283473555d1b7e401af34747ee7777"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/exact-source-hashed-red.xml",
+      "sha256": "f3cd4ead3dfa69b00c05e08d916bd76d4ba05bc2cbceba04d681325667ae04b9"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/family-red-argv.json",
+      "sha256": "a3816e6d9235c60180b98d150b20b85bab7bf7d7e7845b71dea5c33ff4affc0e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/family-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/family-red.log",
+      "sha256": "c79d2a81a5180c74cd74edfc7ce7900bae8612ac78a73af90995dfe5f5d51169"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/family-red.xml",
+      "sha256": "2f825ccf8b8ebd75cf7e9c4a12972732c97104c4f3a24fb264ed6a9f435c7c23"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/lfs-attestation.json",
+      "sha256": "d944fd4736bfc82ad5f2fdaf3952d8f488f2c675185e352db39637736bd8b6df"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/plan.md",
+      "sha256": "45c889e627f925a7dfdba47534f572c28c6da48b8f2bc3e7903eceb3abbfde71"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/pre-implementation-attestation.json",
+      "sha256": "b1a65adabb03267f7e5120b187d79336a88ff41620864e56061411bcd1f60daf"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-before-argv.json",
+      "sha256": "49e4c9d1b10b9056f6331ff431eb1c062fdc82faa6de527d91c4ccbedc06e05a"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-before-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-before.log",
+      "sha256": "08588318c49a500a15026179c95d76c2b751a3c92926d732c47d95648bfa1e0c"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-before.xml",
+      "sha256": "f4fb4436bc4a5b942e204aea7ccf271816b296837203908d8598793b903de667"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final-argv.json",
+      "sha256": "51bbf9f9abbc093a4bf21adbc1dfcebfeb8b9141818c16a82fe77c44fca905eb"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final-r2-argv.json",
+      "sha256": "4d11cd7423e2800a2085915a91d5fc9b4ad27b04b10458fa32812435f69dd4dd"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final-r2-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final-r2.log",
+      "sha256": "ddba4599e6a8a00de05518294197c26245f8bae2be3de8a652cb10659db2da73"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final-r2.xml",
+      "sha256": "c10401139717b905f2d9025b088b26b5d6683bc1eb79b673207456ac558fda94"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final.log",
+      "sha256": "e71591b4d0670e6644a2ee9083648a38483f891c7ab20738d67be24d3a30dcd4"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-final.xml",
+      "sha256": "a648e076c189d3b5aa5826eecba344209a607362fb932bb81f3e4283e4acb173"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-shared-r1-argv.json",
+      "sha256": "b5ab51866a335e1272572b8b692e321a8a83315fc554ca4881747839e4f1b73e"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-shared-r1-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-shared-r1.log",
+      "sha256": "d7ae80b4fbe94bc9394770ebfe2bd36a985f5330813f85883c9b52740979ace5"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/retained-shared-r1.xml",
+      "sha256": "1ff75259448a8aebbb7131316a44fc6c6b5e6694615a7df4dda5a553c2236f39"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/rtpc-locality-red-argv.json",
+      "sha256": "63323ea3b29b0d582ce254c090d3a887383c1c6ca203206ae72780911b6c36b6"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/rtpc-locality-red-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/rtpc-locality-red.log",
+      "sha256": "de637791eeb83da3b66f07de85a5faf4e789f6eeefb89cf2eebc8d164cbc1989"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/rtpc-locality-red.xml",
+      "sha256": "1b88d98be85c330d9282c112c3ebbb42314efac0b87cd0da290bf2ff88cf1a45"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-green-argv.json",
+      "sha256": "c4be163c6311115e2ca5541428b8207d4a8f20ae1cdf2012a713b681a95fda9f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-green.log",
+      "sha256": "cc6c85aa2bbacf643e867f38c952e49ea4fd9f7388e377d56139cb1b684d0904"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-green.xml",
+      "sha256": "04c550204fd219577eee325f65943fd8a52060ba3ee7310c6b4d2bf6e3ffd373"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-r1-argv.json",
+      "sha256": "30ffe6a13ffb310dc53322256c5cf53e75fc1561ba08be0606d5afeee80fe0c8"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-r1-exit-code.txt",
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-r1.log",
+      "sha256": "b4c74b8c0727e157e873f9e5a41a6d2cd00047ab02964056ab909506424b422f"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/shared-family-r1.xml",
+      "sha256": "bbac7abdb1a33f01c48ff3f05a716b01ff804d3ab9e5a75806b0d9d482674c15"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/type-slice-green-argv.json",
+      "sha256": "19a3d4ba72f1b8ce88ac499c88fdf1819a05a6ae10c1f68677b6d191d13a0e24"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/type-slice-green-exit-code.txt",
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/type-slice-green.log",
+      "sha256": "439e62a0f5d71d2106de713ccb8c43a048546c599cbb7162105f7de7c05a7533"
+    },
+    {
+      "path": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-ancillary-roles-1cbc2d0-20261007/type-slice-green.xml",
+      "sha256": "81a5db8ffe0295a8e9578da2249f0f7fb5f981fc79e63a3d38955734f8a7d403"
+    }
+  ]
+}

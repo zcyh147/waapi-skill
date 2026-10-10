@@ -1,0 +1,86 @@
+{
+  "contract": "waapi-skill.integration-expansion-failed-rerun/v1",
+  "candidate": "86e23cdbf016438ec4e89d1ecf64ffb3031022a2",
+  "cli_version": "0.159.2",
+  "service_tier": "default",
+  "selected_tasks": 1,
+  "completed_tasks": 1,
+  "model_selected": null,
+  "passing_units": 1,
+  "all_selected_passed": true,
+  "campaign_root": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-86e23cd-luna-high-r1-retry1-cli1592",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "high",
+  "attempt_manifest_sha256": "96bedafc0611bd60312023a754e8cb133065cfca861280c38144fd935ec5413d",
+  "sealed_artifacts_rehashed": 95,
+  "sealed_artifact_bytes": 1750803,
+  "units": [
+    {
+      "unit_id": "EXP25-C06",
+      "runner_status": "PASS",
+      "agent_elapsed_seconds": 112.12040199991316,
+      "source_full_hash_unchanged": true,
+      "source_mtime_unchanged": true,
+      "sandbox_retained": false,
+      "quarantine_path": null,
+      "independent_business_assertions_passed": 7,
+      "trusted_oracle_closed": true
+    }
+  ],
+  "usage": {
+    "input_tokens": 479142,
+    "cached_input_tokens": 431616,
+    "uncached_input_tokens": 47526,
+    "output_tokens": 4009,
+    "reasoning_tokens_included_in_output": 1738,
+    "cache_write_tokens": 0,
+    "usd_cost": null
+  },
+  "job_unloaded": true,
+  "verify_only": {
+    "performed": true,
+    "exit_code": 0,
+    "options_identical": true,
+    "additional_fresh_tasks": 0,
+    "additional_turns": 0,
+    "job_unloaded": true
+  },
+  "focused": {
+    "passed": 321,
+    "duration_seconds": 4.71,
+    "exit_code": 0
+  },
+  "nonlive": {
+    "candidate": "86e23cdbf016438ec4e89d1ecf64ffb3031022a2",
+    "mode": "nonlive",
+    "exit_code": 0,
+    "passed": 12337,
+    "skipped": 118,
+    "deselected": 27,
+    "duration_seconds": 822.69,
+    "junit_counts": {
+      "tests": 12455,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 118
+    },
+    "log_sha256": "a045ab17f966918f3cf65ba512624ebbff74b8fc911ab1dc27c17865bfe1baf6",
+    "junit_sha256": "0055c12455e220caf3b4c4a6dfb2b50df5453868eb9af771ef19f9b39e0245e8",
+    "source_tracked_clean": true,
+    "live_or_agent_credit": false
+  },
+  "unchanged_program_component": {
+    "candidate": "cf94158c5cf3e4e4e480bc6ef65bcad80370f077",
+    "passed": 5888,
+    "skipped": 2,
+    "exit_code": 0,
+    "current_candidate_program_rerun": false,
+    "unchanged_paths": [
+      "skills",
+      "ci",
+      "tests/unit",
+      "tests/maintenance"
+    ]
+  },
+  "next": "Complete matched C01/C06/M01 pilot for Luna high and GPT-6.1 Sol medium on this same frozen candidate, then model decision and final 13-positive-plus-boundary acceptance. Original FAILs stay frozen."
+}

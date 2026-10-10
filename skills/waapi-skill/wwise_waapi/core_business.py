@@ -7,7 +7,10 @@ from typing import Any, Mapping
 
 from .business_declaration_state import BusinessDeclarationSession
 from .business_declarations import business_repair
-from .core_business_contracts import core_business_contract_data
+from .core_business_contracts import (
+    MAX_CURVE_POINTS, _CURVE_KINDS, _CURVE_SOURCES, _CURVE_SHAPES,
+    core_business_contract_data,
+)
 from .operation_registry import parse_operation_request
 
 
@@ -15,50 +18,6 @@ _PASTE_MODES = {
     "replace": "replaceEntire",
     "merge-replace": "addReplace",
     "merge-keep": "addKeep",
-}
-_CURVE_KINDS = {
-    "volume-dry": "VolumeDryUsage",
-    "volume-wet-game": "VolumeWetGameUsage",
-    "volume-wet-user": "VolumeWetUserUsage",
-    "low-pass-filter": "LowPassFilterUsage",
-    "high-pass-filter": "HighPassFilterUsage",
-    "high-shelf": "HighShelfUsage",
-    "spread": "SpreadUsage",
-    "focus": "FocusUsage",
-    "obstruction-volume": "ObstructionVolumeUsage",
-    "obstruction-high-pass": "ObstructionHPFUsage",
-    "obstruction-low-pass": "ObstructionLPFUsage",
-    "obstruction-high-shelf": "ObstructionHSFUsage",
-    "occlusion-volume": "OcclusionVolumeUsage",
-    "occlusion-high-pass": "OcclusionHPFUsage",
-    "occlusion-low-pass": "OcclusionLPFUsage",
-    "occlusion-high-shelf": "OcclusionHSFUsage",
-    "diffraction-volume": "DiffractionVolumeUsage",
-    "diffraction-high-pass": "DiffractionHPFUsage",
-    "diffraction-low-pass": "DiffractionLPFUsage",
-    "diffraction-high-shelf": "DiffractionHSFUsage",
-    "transmission-volume": "TransmissionVolumeUsage",
-    "transmission-high-pass": "TransmissionHPFUsage",
-    "transmission-low-pass": "TransmissionLPFUsage",
-    "transmission-high-shelf": "TransmissionHSFUsage",
-}
-_CURVE_SOURCES = {
-    "none": "None",
-    "custom": "Custom",
-    "volume-dry": "UseVolumeDry",
-    "project": "UseProject",
-}
-_CURVE_SHAPES = {
-    "constant": "Constant",
-    "linear": "Linear",
-    "log-3": "Log3",
-    "log-2": "Log2",
-    "log-1": "Log1",
-    "inverted-s-curve": "InvertedSCurve",
-    "s-curve": "SCurve",
-    "exp-1": "Exp1",
-    "exp-2": "Exp2",
-    "exp-3": "Exp3",
 }
 _FADE_MODES = {
     "none": "None",
@@ -262,11 +221,11 @@ def _business_name(value: Any, *, field: str) -> str:
 
 
 def _curve_points(value: Any) -> list[dict[str, Any]]:
-    if not isinstance(value, list) or len(value) > 64:
+    if not isinstance(value, list) or len(value) > MAX_CURVE_POINTS:
         raise business_repair(
             "BUSINESS_COLLECTION_INVALID",
             field="points",
-            action="provide a bounded list of at most 64 curve points",
+            action=f"provide a bounded list of at most {MAX_CURVE_POINTS} curve points",
         )
     points: list[dict[str, Any]] = []
     for index, row in enumerate(value):
@@ -664,14 +623,18 @@ def materialize_core_business_request(
             required={"attenuation_handle", "curve_kind", "curve_source", "points"},
             optional={"platform_name"},
         )
-        curve_kind = _CURVE_KINDS.get(plan["curve_kind"])
-        curve_source = _CURVE_SOURCES.get(plan["curve_source"])
-        if curve_kind is None or curve_source is None:
-            raise business_repair(
-                "BUSINESS_ENUM_INVALID",
-                field="curve_kind_or_source",
-                action="choose disclosed attenuation curve meanings",
-            )
+        domains = contract["declaration"]["value_domains"]
+        for field in ("curve_kind", "curve_source"):
+            choices = domains[field]["choices"]
+            if plan[field] not in choices:
+                raise business_repair(
+                    "BUSINESS_ENUM_INVALID",
+                    field=field,
+                    choices=choices,
+                    action="choose one disclosed attenuation curve meaning",
+                )
+        curve_kind = _CURVE_KINDS[plan["curve_kind"]]
+        curve_source = _CURVE_SOURCES[plan["curve_source"]]
         points = _curve_points(plan["points"])
         if curve_source == "Custom" and not points:
             raise business_repair(

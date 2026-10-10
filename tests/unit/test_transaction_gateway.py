@@ -103,7 +103,7 @@ def expected_transaction_next_command(
     normalized = [str(value) for value in gateway_argv]
     full_argv = [
         "python",
-        str(SCRIPT_PATH.with_name("run.py")),
+        SCRIPT_PATH.with_name("run.py").as_posix(),
         "gateway.py",
     ]
     if state_dir is not None:
@@ -176,7 +176,7 @@ def test_transaction_next_command_preserves_explicit_state_dir_in_copy_envelope(
     ]
     assert continuation["full_argv"][:5] == [
         "python",
-        str(SCRIPT_PATH.with_name("run.py")),
+        SCRIPT_PATH.with_name("run.py").as_posix(),
         "gateway.py",
         "--state-dir",
         str(state_dir),
@@ -319,6 +319,14 @@ def local_project(tmp_path: Path) -> dict[str, Any]:
 def z_wire_path(path: Path) -> str:
     resolved = path.resolve()
     return "Z:\\" + "\\".join(resolved.parts[1:])
+
+
+def expected_wine_dispatch_path(path: Path, *, account_home: Path) -> str:
+    """Wine prefers the pinned account's Y: mapping; other paths use Z:."""
+    resolved = path.resolve()
+    if resolved.is_relative_to(account_home):
+        return "Y:\\" + "\\".join(resolved.relative_to(account_home).parts)
+    return z_wire_path(resolved)
 
 
 def test_runtime_state_uses_native_project_containment(tmp_path: Path) -> None:
@@ -1576,6 +1584,88 @@ def execute_migrate_successfully(
     return transaction, request, preview_client, execute_client
 
 
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_compact_operations_reconstructs_detailed_directory_without_loss(
+    tmp_path: Path,
+    version: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    full_directories = []
+    discover = waapi_gateway.discover_business_routes
+
+    def capture_full_directory(*args):
+        rows = discover(*args)
+        full_directories.append(json.loads(json.dumps(rows)))
+        return rows
+
+    monkeypatch.setattr(waapi_gateway, "discover_business_routes", capture_full_directory)
+    code, compact = execute(["operations"], tmp_path=tmp_path, version=version)
+    detail_code, detail = execute(
+        ["operations", "--detail"], tmp_path=tmp_path, version=version,
+    )
+    assert code == detail_code == 0
+    assert compact["versions"] == [version]
+    assert compact["routing_precedence"] == detail["routing_precedence"]
+    assert compact["selection_guidance"] == detail["selection_guidance"]
+    assert compact["session_context"] == detail["session_context"]
+    named = {row["name"]: row for row in compact["operations"]}
+    expected_named = {
+        row["name"]: row for row in detail["operations"]
+        if version in row["supported_versions"]
+    }
+    assert len(named) == compact["count"] == compact["implemented_count"]
+    assert set(named) == set(expected_named)
+    for name, row in named.items():
+        assert row["summary"] == expected_named[name]["summary"]
+        assert [
+            part.replace("<name>", name)
+            for part in compact["operation_schema_command_template"]
+        ] == ["operation-schema", name]
+    defaults = compact["request_schema_route_defaults"]
+    reconstructed = {}
+    for row in compact["request_schema_routes"]:
+        full = {**defaults, **row}
+        full.setdefault("next_command", [
+            part.replace("<api>", row["api"])
+            for part in compact["request_schema_command_template"]
+        ])
+        reconstructed[row["api"]] = full
+    expected_routes = {row["api"]: row for row in full_directories[0]}
+    assert reconstructed == expected_routes
+    # Detail intentionally takes descriptions from the first reflected lane;
+    # the compact lane must retain its own full version-specific descriptions.
+    assert set(reconstructed) == {
+        row["api"] for row in detail["request_schema_routes"]
+        if version in row["supported_versions"]
+    }
+    assert detail["request_schema_routes"] == full_directories[1]
+    assert len(reconstructed) == compact["request_schema_route_count"]
+    assert sum(len(row) for row in compact["request_schema_routes"]) < sum(
+        len(row) for row in reconstructed.values()
+    )
+    for host in ("wwise-console", "wwise-authoring"):
+        observed = {
+            api for api, row in reconstructed.items() if row["host_surface"] == host
+        }
+        expected = {
+            api for api, row in expected_routes.items() if row["host_surface"] == host
+        }
+        assert observed == expected
+        assert expected
+    assert reconstructed["ak.wwise.core.getInfo"]["next_command"] == ["status"]
+    assert "static schema-command templates" in compact["directory_reading"]
+    assert "typed continuations" in compact["directory_reading"]
+    assert waapi_gateway.gateway_json_document_size(compact) < 26 * 1024
+    # Exercise the terminal CLI serializer, not only the execute_gateway result.
+    monkeypatch.setattr(waapi_gateway, "execute_gateway", lambda argv: (code, compact))
+    assert waapi_gateway.main(["operations"]) == 0
+    stdout = capsys.readouterr().out
+    assert json.loads(stdout) == compact
+    assert len(stdout.encode("utf-8")) < 26 * 1024
+    assert "WAAPI_TYPED_CONTAINER_RESPONSE_END" not in stdout
+
+
 def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: Path) -> None:
     exit_code, catalog = execute(["operations"], tmp_path=tmp_path)
 
@@ -1583,14 +1673,9 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     assert catalog["ok"] is True
     assert catalog["offline"] is True
     operations = {item["name"]: item for item in catalog["operations"]}
-    assert set(operations["object.create"]) == {"name", "summary", "next_command"}
-    assert operations["object.create"]["next_command"] == [
-        "operation-schema",
-        "object.create",
-    ]
-    assert operations["object.copy"]["next_command"] == [
-        "operation-schema",
-        "object.copy",
+    assert set(operations["object.create"]) == {"name", "summary"}
+    assert catalog["operation_schema_command_template"] == [
+        "operation-schema", "<name>",
     ]
     assert catalog["request_schema_routes"]
     assert catalog["detail_available"] is True
@@ -1600,7 +1685,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
     ]
     assert catalog["request_schema_route_count"] == len(catalog["request_schema_routes"])
     encoded_size = waapi_gateway.gateway_json_document_size(catalog)
-    assert encoded_size < 48 * 1024
+    assert encoded_size < 26 * 1024
     assert "\n" not in waapi_gateway.gateway_stdout_json_encoder(catalog).encode(catalog)
 
     exit_code, detail_catalog = execute(["operations", "--detail"], tmp_path=tmp_path)
@@ -2191,7 +2276,11 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
     assert list(payload).index("next_command") > list(payload).index("events")
     assert "session_context" not in payload
     assert list(payload)[-1] == "next_command"
-    assert waapi_gateway.gateway_json_document_size(payload) < 5_500
+    # The exact continuation is checked above. Its encoded Windows shell form
+    # grows with the host's absolute paths; measure the business summary apart.
+    assert waapi_gateway.gateway_json_document_size(
+        {key: value for key, value in payload.items() if key != "next_command"}
+    ) < 5_500
     assert payload["summary_only"] is True
     assert "artifact" not in payload
     assert payload["preview_summary"]["contract"] == artifact["contract"]
@@ -2271,7 +2360,7 @@ def test_transaction_next_command_uses_short_task_local_posix_runner(
         ["execute", "tx1-task-local"],
     )
 
-    assert payload["full_argv"][1] == str(runner)
+    assert payload["full_argv"][1] == runner.as_posix()
     assert payload["shell_command"] == (
         "python .agents/skills/waapi-skill/scripts/run.py "
         "gateway.py execute tx1-task-local"
@@ -2279,6 +2368,26 @@ def test_transaction_next_command_uses_short_task_local_posix_runner(
     selected = shlex.split(payload["shell_command"])
     assert (tmp_path / selected[1]).resolve() == runner.resolve()
     assert payload["copy_instruction"]["source_field"] == "shell_command"
+
+
+@pytest.mark.parametrize("runner", (
+    PureWindowsPath(r"C:\Skill & 雪\scripts\run.py"),
+    PureWindowsPath(r"\\server\share\Skill\scripts\run.py"),
+))
+def test_windows_generated_runner_has_no_json_separator_ambiguity(
+    runner: PureWindowsPath, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(waapi_gateway, "os", type("WindowsOS", (), {"name": "nt"})())
+    monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", runner)
+    business_value = r"\Actor-Mixer Hierarchy\Default Work Unit"
+    payload = waapi_gateway.transaction_next_command(
+        "status", ["status", business_value],
+    )
+    wire = json.loads(json.dumps(payload))
+    expected = ("python", runner.as_posix(), "gateway.py", "status", business_value)
+    assert decode_windows_model_argv(wire["model_command"]) == expected
+    assert decode_windows_powershell_argv(wire["shell_command"]) == expected
+    assert tuple(wire["full_argv"]) == expected
 
 
 def test_transaction_next_command_adds_one_short_copy_source_on_windows(
@@ -2305,7 +2414,7 @@ def test_transaction_next_command_adds_one_short_copy_source_on_windows(
     )
     assert payload["model_shell_family"] == WINDOWS_MODEL_COMMAND_FAMILY
     assert payload["model_command"] == (
-        "python 'C:\\WAAPI Skill\\scripts\\run.py' 'gateway.py' "
+        "python 'C:/WAAPI Skill/scripts/run.py' 'gateway.py' "
         "'execute' 'tx1-windows'"
     )
     assert decode_windows_model_argv(payload["model_command"]) == tuple(
@@ -2331,7 +2440,7 @@ def test_transaction_next_command_adds_one_short_copy_source_on_windows(
     )
 
     serialized = json.dumps(payload, ensure_ascii=False)
-    assert r"C:\\WAAPI Skill\\scripts\\run.py" in serialized
+    assert "C:/WAAPI Skill/scripts/run.py" in serialized
     decoded_payload = json.loads(serialized)
     assert decode_windows_model_argv(decoded_payload["model_command"]) == tuple(
         decoded_payload["full_argv"]
@@ -6885,9 +6994,14 @@ def test_remote_named_capture_screen_still_requires_authoring(
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+@pytest.mark.parametrize("inside_home", (False, True))
 def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inside_home: bool,
 ) -> None:
+    from wwise_waapi import platform_paths
+    account_home = tmp_path.resolve() if inside_home else tmp_path / "mapped-account-home"
+    account_home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths, "_account_home", lambda value: account_home)
     state_dir = tmp_path / "wine-cli-state"
     io_root = (tmp_path / "wine-cli-case").resolve()
     target_project = io_root / "project" / "SampleProject.wproj"
@@ -6952,10 +7066,10 @@ def test_local_wine_cli_execute_translates_only_the_transient_dispatch_paths(
         (
             "ak.wwise.cli.convertExternalSource",
             {
-                "project": z_wire_path(target_project),
+                "project": expected_wine_dispatch_path(target_project, account_home=account_home),
                 "platform": ["Windows"],
-                "source-file": z_wire_path(manifest),
-                "output": z_wire_path(output),
+                "source-file": expected_wine_dispatch_path(manifest, account_home=account_home),
+                "output": expected_wine_dispatch_path(output, account_home=account_home),
             },
             {},
         )
@@ -7008,9 +7122,14 @@ def test_console_project_open_selects_the_sealed_isolated_io_audit() -> None:
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+@pytest.mark.parametrize("inside_home", (False, True))
 def test_local_wine_authoring_project_open_translates_target_after_close(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inside_home: bool,
 ) -> None:
+    from wwise_waapi import platform_paths
+    account_home = tmp_path.resolve() if inside_home else tmp_path / "mapped-account-home"
+    account_home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths, "_account_home", lambda value: account_home)
     version = "2022.1"
     api = "ak.wwise.ui.project.open"
     state_dir = tmp_path / "wine-authoring-project-state"
@@ -7070,7 +7189,7 @@ def test_local_wine_authoring_project_open_translates_target_after_close(
     assert exit_code == 0, json.dumps(payload, indent=2)
     assert next(call for call in execute_client.calls if call[0] == api) == (
         api,
-        {"path": z_wire_path(target)},
+        {"path": expected_wine_dispatch_path(target, account_home=account_home)},
         {},
     )
     assert payload["wire_path_adaptation"]["mapping"]["anchor_source"] == (
@@ -7082,9 +7201,14 @@ def test_local_wine_authoring_project_open_translates_target_after_close(
     os.name == "nt",
     reason="Wine host path translation is POSIX-only",
 )
+@pytest.mark.parametrize("inside_home", (False, True))
 def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, inside_home: bool,
 ) -> None:
+    from wwise_waapi import platform_paths
+    account_home = tmp_path.resolve() if inside_home else tmp_path / "mapped-account-home"
+    account_home.mkdir(exist_ok=True)
+    monkeypatch.setattr(platform_paths, "_account_home", lambda value: account_home)
     state_dir = tmp_path / "wine-soundbank-state"
     io_root = (tmp_path / "wine-soundbank-case").resolve()
     project_root = io_root / "project"
@@ -7164,9 +7288,9 @@ def test_local_wine_soundbank_execute_translates_sealed_host_paths_transiently(
             {
                 "sources": [
                     {
-                        "input": z_wire_path(source_list),
+                        "input": expected_wine_dispatch_path(source_list, account_home=account_home),
                         "platform": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
-                        "output": z_wire_path(io_root / "external-output"),
+                        "output": expected_wine_dispatch_path(io_root / "external-output", account_home=account_home),
                     }
                 ]
             },
@@ -8104,9 +8228,12 @@ def test_project_transition_mismatch_stays_executed_unverified_for_manual_verify
     assert "agent_result" not in payload
 
 
+@pytest.mark.parametrize("compact", (False, True))
 def test_undo_group_success_uses_one_client_and_aggregates_child_verification(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, compact: bool,
 ) -> None:
+    if compact:
+        monkeypatch.setattr(waapi_gateway, "TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES", 1)
     state_dir = tmp_path / "state"
     transaction = preview_and_confirm_undo_group(tmp_path=tmp_path, state_dir=state_dir)
     execute_client = FakeClient(
@@ -8179,10 +8306,24 @@ def test_undo_group_success_uses_one_client_and_aggregates_child_verification(
     assert verify_payload["verification"]["verification_strength"] == (
         "compound_child_readback"
     )
+    # Successful stdout can compact its evidence under longer state paths.
+    # Prove the same complete child readback from the durable journal and bind
+    # it to the returned projection rather than requiring one stdout variant.
+    verification_event = next(event for event in TransactionStore(state_dir).read_events(
+        transaction["transaction_id"]
+    ) if event["event_type"] == "verification_recorded")
+    journal_verification = verification_event["details"]["verification"]
+    assert canonical_sha256(journal_verification) == (
+        verify_payload["stdout_projection"]["verification_canonical_sha256"]
+    )
     assert any(
         assertion["name"].startswith("Undo Group child[0]")
-        for assertion in verify_payload["verification"]["assertions"]
+        for assertion in journal_verification["assertions"]
     )
+    assert all(assertion["passed"] is True for assertion in journal_verification["assertions"])
+    if compact:
+        assert verify_payload["stdout_projection"]["full_verification_evidence_in_stdout"] is False
+        assert verify_payload["verification"]["canonical_sha256"] == canonical_sha256(journal_verification)
 
 
 def test_undo_group_success_keeps_one_phase_copy_below_the_final_gateway_ceiling(

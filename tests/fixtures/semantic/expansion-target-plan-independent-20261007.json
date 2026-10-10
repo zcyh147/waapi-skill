@@ -1,0 +1,1140 @@
+{
+  "contract": "waapi-skill.independent-target-plan-contrasts/v1",
+  "status": "FROZEN_EXPECTATIONS_NOT_EXECUTED",
+  "candidate": "e93a57599387b3241170f79b21682c0230463ee3",
+  "issue": "https://github.com/zcyh147/waapi-skill/issues/147",
+  "fixture_ref": "fixture.json",
+  "scope": "Independent finite pairwise C09 semantic notice family matrix; 22 meaningful pairs / 44 vectors, not arbitrary prose coverage. No test, grader, replay, regrade, verification or live execution.",
+  "raw_witness": {
+    "text": "目标已核对，追加方案已按 allow_changes 策略取得独立持久授权，目前尚未修改工程。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后将核验原有效果器的身份、slot 绑定和顺序，以及声音属性的保持情况。\n",
+    "proof": {
+      "source_copy": "sources/codex-events.jsonl",
+      "zero_based_index": 23,
+      "physical_line": 24,
+      "byte_offset": 125371,
+      "byte_length": 445,
+      "line_sha256": "d8a3e8f1a06e3f6d938e771255d4964a76820c078c68e0e19bf77b33ccaa177f",
+      "json_pointer": "/item/text"
+    },
+    "historical_gate": "visible_preview_notice=false",
+    "new_acceptance_claim": false
+  },
+  "expectation_authority": "Sealed independent before + immutable prepared operation + exact receipts; no parser evaluation or inferred class ID from display labels. Adapter head/suffix classification alone cannot prove an effect.",
+  "independent_gates": {
+    "policy_checkpoint": "Independent unchanged durable authorization evidence. expected_notice_evidence=false does not mean durable authority absent; absent prose alone does not fail the positive notice.",
+    "native_context": "Positive fixture owns exactly one Sound role and one effect descriptor from native proof; Wwise Gain lexical label does not establish classId.",
+    "phase_admission": "Exactly one accepted Preview and receipts transaction/hash binding independently required. Synthetic stage records never claim real execution."
+  },
+  "context_scope": "20 C09 pairs cover the full finite target/operation families. Two representative typed cross-kind pairs cover Attenuation forward and MusicStinger reverse identity/configuration attributes from source-hashed db2299c fixtures. A bare target alias is not stipulated valid for the Stinger source-versus-reference-destination ambiguity. Historical fixture receipt/provenance and verifier strength remain unchanged.",
+  "pairs": [
+    {
+      "pair_id": "01-exact-raw",
+      "families": [
+        "reverse-attestation",
+        "bare-target",
+        "passive-grant",
+        "append-plan-no-determiner",
+        "pending",
+        "optional-verification"
+      ],
+      "positive": {
+        "messages": [
+          "目标已核对，追加方案已按 allow_changes 策略取得独立持久授权，目前尚未修改工程。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后将核验原有效果器的身份、slot 绑定和顺序，以及声音属性的保持情况。\n"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "目标尚未核对，追加方案已按 allow_changes 策略取得独立持久授权，目前尚未修改工程。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后将核验原有效果器的身份、slot 绑定和顺序，以及声音属性的保持情况。\n"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "The only target claim explicitly denies completion of target attestation."
+      }
+    },
+    {
+      "pair_id": "02-forward-bare",
+      "families": [
+        "forward-attestation",
+        "bare-target",
+        "no-bookkeeping"
+      ],
+      "positive": {
+        "messages": [
+          "已核对目标。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核对 {7D91CD36-279D-404A-9631-F790A29F40A4}。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Foreign sealed Effect GUID is not the singleton primary Sound owner."
+      }
+    },
+    {
+      "pair_id": "03-exact-id",
+      "families": [
+        "forward-attestation",
+        "exact-guid",
+        "compound-owner"
+      ],
+      "positive": {
+        "messages": [
+          "已核实 {E49C6AC7-5B8E-443F-AE82-5CC9899D76A2}。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核实 {E49C6AC7-5B8E-443F-AE82-5CC9899D76A2} 和 {7D91CD36-279D-404A-9631-F790A29F40A4}。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "A compound target claim names both primary owner and a protected Effect; no unique role binding."
+      }
+    },
+    {
+      "pair_id": "04-exact-name",
+      "families": [
+        "forward-attestation",
+        "exact-name",
+        "ambiguous-owner"
+      ],
+      "positive": {
+        "messages": [
+          "已确认 Expansion_EXP25-C09_EffectsOwner。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已确认目标是 Expansion_EXP25-C09_EffectsOwner 或 Protected_Gain_0。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Alternative competing owners prevent unique antecedent binding."
+      }
+    },
+    {
+      "pair_id": "05-exact-path",
+      "families": [
+        "reverse-attestation",
+        "exact-path",
+        "wrong-native-role"
+      ],
+      "positive": {
+        "messages": [
+          "\\Containers\\Default Work Unit\\Expansion_EXP25-C09_EffectsOwner已核实。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "目标衰减对象已核实。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Attenuation alias cannot attest the independently sealed Sound role."
+      }
+    },
+    {
+      "pair_id": "06-forward-identity",
+      "families": [
+        "forward-attribute",
+        "typed-role",
+        "identity",
+        "unsupported-attribute"
+      ],
+      "positive": {
+        "messages": [
+          "已确认目标声音身份。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已确认目标声音听感。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Listening impression is not a sealed identity/configuration attestation and cannot supply a primary role."
+      }
+    },
+    {
+      "pair_id": "07-reverse-configuration",
+      "families": [
+        "reverse-attribute",
+        "typed-role",
+        "configuration",
+        "compound-attribute"
+      ],
+      "positive": {
+        "messages": [
+          "目标声音配置已核实。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "目标声音和 Protected_Gain_0 的配置已核实。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "The attribute claim combines owner and protected Effect rather than a unique primary role."
+      }
+    },
+    {
+      "pair_id": "08-reverse-identity",
+      "families": [
+        "reverse-attribute",
+        "identity",
+        "active-grant",
+        "current-determiner",
+        "append-plan"
+      ],
+      "positive": {
+        "messages": [
+          "目标声音身份已核对。已按 allow_changes 策略取得该追加计划独立持久授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "目标声音身份已核对。已按 read_only 策略取得该追加计划独立持久授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Explicit read_only authorization claim contradicts the sealed allow_changes policy."
+      }
+    },
+    {
+      "pair_id": "09-forward-configuration",
+      "families": [
+        "forward-attribute",
+        "configuration",
+        "generic-object",
+        "beneficiary-grant",
+        "append-operation"
+      ],
+      "positive": {
+        "messages": [
+          "已核对指定对象配置。已为追加操作取得独立持久授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核对指定对象配置。尚未为追加操作取得独立持久授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Denial of the current operation authorization contradicts the durable policy record; prose does not itself confer authority."
+      }
+    },
+    {
+      "pair_id": "10-add-plan",
+      "families": [
+        "generic-object",
+        "reverse-attestation",
+        "passive-grant",
+        "add-plan"
+      ],
+      "positive": {
+        "messages": [
+          "该对象已确认。添加方案已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "该对象已确认。删除方案已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Deletion is incompatible with this immutable single append operation; a suffix must not mask it."
+      }
+    },
+    {
+      "pair_id": "11-create-plan",
+      "families": [
+        "generic-object",
+        "forward-attestation",
+        "passive-grant",
+        "create-plan",
+        "bounded-suffix"
+      ],
+      "positive": {
+        "messages": [
+          "已核实此对象。该创建计划已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核实此对象。该创建清单已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "The unsupported 清单 suffix is outside the finite current-operation noun contract; fail closed, without treating it as a whitelisted authorization carrier."
+      }
+    },
+    {
+      "pair_id": "12-new-operation",
+      "families": [
+        "typed-role",
+        "pending-carrier",
+        "new-operation",
+        "residual-edit"
+      ],
+      "positive": {
+        "messages": [
+          "已确认目标声音。新增操作目前尚未执行。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已确认目标声音。新增操作目前尚未执行，并将声音音量改为 -5 dB。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "The coordinated affirmative Volume change is an extra actual edit, not status prose; sealed before Volume is -3 dB."
+      }
+    },
+    {
+      "pair_id": "13-preview-plan",
+      "families": [
+        "typed-role",
+        "preview-carrier",
+        "append-plan",
+        "uncertain-concrete-plan"
+      ],
+      "positive": {
+        "messages": [
+          "已核对该声音。追加方案预览已生成。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核对该声音。追加方案预览已生成。可能追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Concrete append is uncertain rather than a definite prospective effect."
+      }
+    },
+    {
+      "pair_id": "14-execution-summary",
+      "families": [
+        "generic-object",
+        "execution-carrier",
+        "create-operation",
+        "refusal"
+      ],
+      "positive": {
+        "messages": [
+          "此对象已核实。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。接下来执行创建操作并回读实际结果核验。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "此对象已核实。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。不会执行创建操作。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Explicit refusal of the same operation invalidates the earlier concrete plan."
+      }
+    },
+    {
+      "pair_id": "15-neutral-permutation",
+      "families": [
+        "neutral-permutation",
+        "baseline-optional",
+        "status-authorization-order",
+        "second-actual-append",
+        "approved-add-head"
+      ],
+      "positive": {
+        "messages": [
+          "已核对目标。追加操作目前尚未执行。预览已保存当前状态。本次 add 方案已按 allow_changes 策略取得独立持久授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核对目标。追加操作目前尚未执行。预览已保存当前状态。本次 add 方案已按 allow_changes 策略取得独立持久授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。随后再追加另一个效果器 ExtraGain，备注为 extra。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Another named Effect and 另一个 explicitly assert a second append; not a restatement."
+      }
+    },
+    {
+      "pair_id": "16-optional-bookkeeping",
+      "families": [
+        "bookkeeping-omitted",
+        "authorization-omitted",
+        "verification-prose-omitted",
+        "foreign-owner-grant"
+      ],
+      "positive": {
+        "messages": [
+          "已核对目标声音。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核对目标声音。在 Protected_Gain_0 上，追加方案已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "An explicitly foreign authorization beneficiary cannot be erased or inherited into the primary owner; actual durable authority remains independently checked."
+      }
+    },
+    {
+      "pair_id": "17-bare-again",
+      "families": [
+        "bare-again-restatement",
+        "deictic-same-effect",
+        "additional-count",
+        "approved-create-head"
+      ],
+      "positive": {
+        "messages": [
+          "目标已核对。该 create 计划已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。接下来再追加上述效果器。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "目标已核对。该 create 计划已按 allow_changes 策略取得独立授权。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。接下来再追加另一个上述效果器。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Bare 再 restates the one effect in the positive; 另一个 adds a second-instance claim in the negative."
+      }
+    },
+    {
+      "pair_id": "18-bare-additionally",
+      "families": [
+        "bare-additionally-restatement",
+        "deictic-same-effect",
+        "explicit-second-count",
+        "approved-append-head"
+      ],
+      "positive": {
+        "messages": [
+          "已核实目标。append 操作目前尚未执行。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。另外，即将追加上述效果器。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核实目标。append 操作目前尚未执行。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。另外，即将追加第二个上述效果器。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "另外 alone is neutral coordination; 第二个 explicitly exceeds the one-effect sealed scope."
+      }
+    },
+    {
+      "pair_id": "19-staged-adoption",
+      "families": [
+        "pre-preview-plan",
+        "neutral-intervening",
+        "operation-specific-adoption",
+        "stale-target-reset"
+      ],
+      "positive": {
+        "messages": [
+          "已核对目标。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。",
+          "目前尚未修改工程。",
+          "该追加方案预览已生成。接下来执行该追加操作。"
+        ],
+        "stage_schedule": [
+          "message:0",
+          "message:1",
+          "preview_receipt",
+          "message:2",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "已核对目标。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。",
+          "目标改为 Protected_Gain_0。",
+          "该追加方案预览已生成。接下来执行该追加操作。"
+        ],
+        "stage_schedule": [
+          "message:0",
+          "message:1",
+          "preview_receipt",
+          "message:2",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "A later conflicting target assertion invalidates the earlier plan; the adoption cannot resurrect it."
+      }
+    },
+    {
+      "pair_id": "20-second-preview",
+      "families": [
+        "approved-insert-head",
+        "pending-execution-summary",
+        "second-preview-reset"
+      ],
+      "positive": {
+        "messages": [
+          "目标已核对。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。",
+          "该插入操作目前尚未执行。接下来执行该插入操作。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "message:1",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "One independently sealed primary Sound and the exact single prospective append; auxiliary claims agree with immutable evidence."
+      },
+      "negative": {
+        "messages": [
+          "目标已核对。即将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。",
+          "该插入操作目前尚未执行。接下来执行该插入操作。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "message:1",
+          "synthetic_second_preview",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "A second accepted Preview after the notice invalidates prior notice state; this synthetic schedule also violates one-Preview archive admission."
+      }
+    },
+    {
+      "pair_id": "21-attenuation-cross-kind",
+      "fixture_ref": "cross_kind_fixtures.011-EXP25-C08",
+      "families": [
+        "Attenuation",
+        "forward-attributes",
+        "identity",
+        "configuration",
+        "wrong-native-role"
+      ],
+      "positive": {
+        "messages": [
+          "已核对目标衰减对象身份。已核实该衰减对象配置。即将把该衰减对象的 volume-dry 干声音量曲线设置为 Custom，按顺序写入 Linear 点 (0, 0 dB)、(50, -12 dB)、(100, -48 dB)，其他曲线、引用和对象身份保持。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "Typed source role attributes refer uniquely to the immutable prepared source and the exact prospective delta; no generic two-role target assumption."
+      },
+      "negative": {
+        "messages": [
+          "已核对目标声音身份。已核实该声音配置。即将把该衰减对象的 volume-dry 干声音量曲线设置为 Custom，按顺序写入 Linear 点 (0, 0 dB)、(50, -12 dB)、(100, -48 dB)，其他曲线、引用和对象身份保持。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "Sound role attributes do not attest the independently sealed Attenuation source."
+      }
+    },
+    {
+      "pair_id": "22-stinger-cross-kind",
+      "fixture_ref": "cross_kind_fixtures.014-EXP25-M05",
+      "families": [
+        "MusicStinger",
+        "reverse-attributes",
+        "identity",
+        "configuration",
+        "source-destination-separation"
+      ],
+      "positive": {
+        "messages": [
+          "目标 Stinger 身份已确认。该 Stinger 配置已核实。即将把该 Stinger 的 Trigger 引用改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}），原 Trigger 为 Bonus，其余配置、Segment 和其他 Stinger 保持。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": true,
+        "rationale": "Typed source role attributes refer uniquely to the immutable prepared source and the exact prospective delta; no generic two-role target assumption."
+      },
+      "negative": {
+        "messages": [
+          "目标 Trigger 身份已确认。该 Trigger 配置已核实。即将把该 Stinger 的 Trigger 引用改为 Backup_Team_Arrives（{FB63DE7B-12AF-4A12-A836-FFAE0B4DD858}），原 Trigger 为 Bonus，其余配置、Segment 和其他 Stinger 保持。"
+        ],
+        "stage_schedule": [
+          "preview_receipt",
+          "message:0",
+          "execute_start"
+        ],
+        "expected_notice_evidence": false,
+        "rationale": "The independently sealed Trigger is the reference destination, not the primary mutation source MusicStinger; destination attributes cannot attest source identity."
+      }
+    }
+  ],
+  "source_manifest": [
+    {
+      "source_absolute_path": "/tmp/waapi-expansion-20261007-target-plan-family-audit.md",
+      "copy_relative_path": "sources/family-audit.md",
+      "sha256": "4832920242d905ddd4073fd393acb176a94068c91f63b1df02f8543b124c79fa",
+      "bytes": 6737
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/research/integration-expansion-operation-noun-validation-e93a575-2026-10-07.md",
+      "copy_relative_path": "sources/integration-expansion-operation-noun-validation-e93a575-2026-10-07.md",
+      "sha256": "2ec5ce3d0244c231e6c2dbc8a5539c839534077a0734033fff2795de56b7e221",
+      "bytes": 5907
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/research/integration-expansion-operation-noun-validation-e93a575-2026-10-07.json",
+      "copy_relative_path": "sources/integration-expansion-operation-noun-validation-e93a575-2026-10-07.json",
+      "sha256": "2d446b755cce02d0b65b950355060083ec30266ba7bff376983c3870dc2d0455",
+      "bytes": 22814
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/docs/specs/authoring-integration-expansion.md",
+      "copy_relative_path": "sources/expansion-spec.md",
+      "sha256": "a1029e6c1aeac8f23cd3e9450312fdbc8dad66c67ced7dabb2def30009ae12a0",
+      "bytes": 19037
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/expansion-plan.json",
+      "copy_relative_path": "sources/expansion-plan.json",
+      "sha256": "19158241dc9f50236f5ce7676a59af9a485948ee17196c18b467bb23072ac970",
+      "bytes": 6602
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/expansion-oracle.json",
+      "copy_relative_path": "sources/expansion-oracle.json",
+      "sha256": "10b535c69f8d6d56187688c2f327885de8899cc173196432da40cbacdcb6c864",
+      "bytes": 17560
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/expansion-task-result.json",
+      "copy_relative_path": "sources/expansion-task-result.json",
+      "sha256": "7e99eee34498344fee49c82041b523b8ba1c4fa4d72f778d757a796b508ac333",
+      "bytes": 1687
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/turn-grade.json",
+      "copy_relative_path": "sources/turn-grade.json",
+      "sha256": "ff8fbaf751809dcb3c9e62b96e7562508dd697d9449c1e57cd67d23eee56f785",
+      "bytes": 860
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/turns/turn-01/events.jsonl",
+      "copy_relative_path": "sources/codex-events.jsonl",
+      "sha256": "a2e0a3e81dc2e0caf7fe6ce338966265b28f4e3fe8dff648adbdacb8f9f8716e",
+      "bytes": 142734
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/broker/state/transactions/tx1-mshakj1xgpe8k25grmsd/preview.json",
+      "copy_relative_path": "sources/preview.json",
+      "sha256": "03876b4fd29a22e3c823fe3ac0b033b0770ceb700c19c71e7b47b6b429cbd58f",
+      "bytes": 23546
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-c09-e93a575-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C09/evidence/codex-task/broker/state/transactions/tx1-mshakj1xgpe8k25grmsd/events.jsonl",
+      "copy_relative_path": "sources/transaction-events.jsonl",
+      "sha256": "db2f63cedee18088419536f279c95e299515936bbbaba56b687f3c656e9ca39d",
+      "bytes": 31696
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/semantic/support/codex_notice_language.py",
+      "copy_relative_path": "sources/codex_notice_language.py",
+      "sha256": "d28dc7be464464d1bcae6a181ecb93121cfb648571a67cd2f985e9f6f5cccb99",
+      "bytes": 15803
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/semantic/support/codex_notice_claims.py",
+      "copy_relative_path": "sources/codex_notice_claims.py",
+      "sha256": "b3e43f73f9e9411ef51c8d6ae7d0af633a11587e8bc468f129223a76f0f59eb9",
+      "bytes": 36306
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/semantic/support/codex_task_runner_v3.py",
+      "copy_relative_path": "sources/codex_task_runner_v3.py",
+      "sha256": "a769fbebbfd02bb00600eabf391fab09f5f14fea03b946ab6a34b973cd8f0b96",
+      "bytes": 177791
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/semantic/support/codex_expansion_effects_case.py",
+      "copy_relative_path": "sources/codex_expansion_effects_case.py",
+      "sha256": "da5312f15250bd50fd019635b76f4bcd7d29d9050461118a41bdf4c7281026ac",
+      "bytes": 13605
+    },
+    {
+      "source_url": "https://github.com/zcyh147/waapi-skill/issues/147",
+      "retrieval": "gh issue view 147 --repo zcyh147/waapi-skill --json number,title,body,comments,url",
+      "copy_relative_path": "sources/github-147.json",
+      "sha256": "6866ef6a6f11ba4cd9f35d30ace7d8c7764dc8a7471c7f99a12d49c893909bfa",
+      "bytes": 33089
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/waapi-expansion-integration/waapi-skills/tests/fixtures/semantic/expansion-current-role-notices-db2299c.json",
+      "copy_relative_path": "sources/expansion-current-role-notices-db2299c.json",
+      "sha256": "78f40bbcfdefcb3130e6de54ba109d76b5ddff9820babcb29c0a8788a78dcf53",
+      "bytes": 203868
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/turns/turn-01/events.jsonl",
+      "copy_relative_path": "sources/011-EXP25-C08-events.jsonl",
+      "sha256": "70aa6f3b4052132d4df61915bbd1f673665122759068925b548dbfed3e0afd19",
+      "bytes": 160468,
+      "sealed_source_sha256": "70aa6f3b4052132d4df61915bbd1f673665122759068925b548dbfed3e0afd19",
+      "matches_sealed_source_sha256": true
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/expansion-oracle.json",
+      "copy_relative_path": "sources/011-EXP25-C08-oracle.json",
+      "sha256": "f8221f1aa528194f91efed222825cd9abac0e82be1702300f3cecca7d1daf3cc",
+      "bytes": 20698,
+      "sealed_source_sha256": "f8221f1aa528194f91efed222825cd9abac0e82be1702300f3cecca7d1daf3cc",
+      "matches_sealed_source_sha256": true
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/broker/state/transactions/tx1-nf3z2nwp14getdgn0wka/preview.json",
+      "copy_relative_path": "sources/011-EXP25-C08-preview.json",
+      "sha256": "edbb2b66b4ef0699fceca2241e8fd6aaa38ae5164d402c94db0c67c15add7a0e",
+      "bytes": 19717,
+      "sealed_source_sha256": "edbb2b66b4ef0699fceca2241e8fd6aaa38ae5164d402c94db0c67c15add7a0e",
+      "matches_sealed_source_sha256": true
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/turns/turn-01/events.jsonl",
+      "copy_relative_path": "sources/014-EXP25-M05-events.jsonl",
+      "sha256": "60268ba3f43cfa72930e9d7edaebf8e620b861fe6b2ada246d6713585c90adfb",
+      "bytes": 141341,
+      "sealed_source_sha256": "60268ba3f43cfa72930e9d7edaebf8e620b861fe6b2ada246d6713585c90adfb",
+      "matches_sealed_source_sha256": true
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/expansion-oracle.json",
+      "copy_relative_path": "sources/014-EXP25-M05-oracle.json",
+      "sha256": "e502a54a963574e99a06f6c786874072caf100542db37fe3ab38b8ecd2a95b5d",
+      "bytes": 17572,
+      "sealed_source_sha256": "e502a54a963574e99a06f6c786874072caf100542db37fe3ab38b8ecd2a95b5d",
+      "matches_sealed_source_sha256": true
+    },
+    {
+      "source_absolute_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/broker/state/transactions/tx1-gkdwppjhr1x9p5bmcwth/preview.json",
+      "copy_relative_path": "sources/014-EXP25-M05-preview.json",
+      "sha256": "49924a3655c8c0d4e809908d04b0916a51a7ab58eccb755addb789923de34bff",
+      "bytes": 26870,
+      "sealed_source_sha256": "49924a3655c8c0d4e809908d04b0916a51a7ab58eccb755addb789923de34bff",
+      "matches_sealed_source_sha256": true
+    }
+  ],
+  "proof_offsets": {
+    "before": {
+      "source_copy": "sources/expansion-plan.json",
+      "json_pointer": "/before",
+      "byte_offset": 144,
+      "byte_length": 2677,
+      "value_bytes_sha256": "6ac31bff86f53384db2302400bf87a4aab74284f2cdeb60ace5b261a6bc4bf53"
+    },
+    "primary_role": {
+      "source_copy": "sources/preview.json",
+      "json_pointer": "/artifact/prepared_operation/resolved_roles/target/row",
+      "byte_offset": 5999,
+      "byte_length": 274,
+      "value_bytes_sha256": "3acdac5d3cf149636a97e1b6047314da30adbc81989dff7d706e7090e88adf2a"
+    },
+    "prepared": {
+      "source_copy": "sources/preview.json",
+      "json_pointer": "/artifact/prepared_operation",
+      "byte_offset": 513,
+      "byte_length": 8076,
+      "value_bytes_sha256": "f65308673a4f2e74bcba69014d89dff7ce60a0b8a45d7976cebff7e9cff03405"
+    },
+    "descriptor": {
+      "source_copy": "sources/preview.json",
+      "json_pointer": "/artifact/prepared_operation/verification_plan/descriptor",
+      "byte_offset": 7727,
+      "byte_length": 127,
+      "value_bytes_sha256": "d73d7bd997802898f038c22468f43bd9284e12b1f81de704e83281b18bbe263d"
+    },
+    "preview_receipt": {
+      "source_copy": "sources/codex-events.jsonl",
+      "zero_based_index": 22,
+      "physical_line": 23,
+      "byte_offset": 114859,
+      "byte_length": 10512,
+      "line_sha256": "bc78c0492fb64bc290be8ce453f371075d11bc8a652e7468e40fc666cd830d19",
+      "json_pointer": "/item/aggregated_output"
+    },
+    "witness": {
+      "source_copy": "sources/codex-events.jsonl",
+      "zero_based_index": 23,
+      "physical_line": 24,
+      "byte_offset": 125371,
+      "byte_length": 445,
+      "line_sha256": "d8a3e8f1a06e3f6d938e771255d4964a76820c078c68e0e19bf77b33ccaa177f",
+      "json_pointer": "/item/text"
+    },
+    "execute_start": {
+      "source_copy": "sources/codex-events.jsonl",
+      "zero_based_index": 24,
+      "physical_line": 25,
+      "byte_offset": 125816,
+      "byte_length": 503,
+      "line_sha256": "73c601f2b9e147df0064ed944ee4c0b6631fbb76c1bb93be4b4759244de12896",
+      "json_pointer": "/item/command"
+    },
+    "execute_receipt": {
+      "source_copy": "sources/codex-events.jsonl",
+      "zero_based_index": 25,
+      "physical_line": 26,
+      "byte_offset": 126319,
+      "byte_length": 7638,
+      "line_sha256": "66f1e33061beb76277b7897efd216e6f88c54f3166cf6afe691a4903a2436169",
+      "json_pointer": "/item/aggregated_output"
+    },
+    "verify_receipt": {
+      "source_copy": "sources/codex-events.jsonl",
+      "zero_based_index": 27,
+      "physical_line": 28,
+      "byte_offset": 134459,
+      "byte_length": 7558,
+      "line_sha256": "939ff53cfebcefbe6918493741efdc48215352bcf2cf805266a0a2e3108cd7d4",
+      "json_pointer": "/item/aggregated_output"
+    },
+    "durable_policy": {
+      "source_copy": "sources/transaction-events.jsonl",
+      "zero_based_index": 1,
+      "physical_line": 2,
+      "byte_offset": 370,
+      "byte_length": 563,
+      "line_sha256": "52dc6b6b8807aa7f1c2ab21fe80c7964e76912c96b5243c0d0a50b61d0f324dc",
+      "json_pointer": "/details"
+    },
+    "business_assertions": {
+      "source_copy": "sources/expansion-oracle.json",
+      "json_pointer": "/assertions",
+      "byte_offset": 3953,
+      "byte_length": 235,
+      "value_bytes_sha256": "7d36ed0893ae87a5652f59b74b1737f91b7397e1fcd41a6c689fc155768d11ed"
+    },
+    "permit": {
+      "source_copy": "sources/expansion-oracle.json",
+      "json_pointer": "/permit",
+      "byte_offset": 7219,
+      "byte_length": 289,
+      "value_bytes_sha256": "0677dd66eba9a6ce2b7be70c337418f5a07e1ac4066cfa1548da9afc56dbcaae"
+    },
+    "011-EXP25-C08": {
+      "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+      "json_pointer": "/cases/1",
+      "original_source_hashes": {
+        "candidate": "db2299c",
+        "events_sha256": "70aa6f3b4052132d4df61915bbd1f673665122759068925b548dbfed3e0afd19",
+        "preview_file_sha256": "edbb2b66b4ef0699fceca2241e8fd6aaa38ae5164d402c94db0c67c15add7a0e",
+        "oracle_file_sha256": "f8221f1aa528194f91efed222825cd9abac0e82be1702300f3cecca7d1daf3cc",
+        "phases": [
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-d9bc6a562c511cca541f318fa2eccea5 --task-authority da1-2b5bd2538e6781b6e87020dbd2746dc8c68225c4 --expected-revision 4'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 24,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-nf3z2nwp14getdgn0wka'",
+            "phase": "execute"
+          }
+        ]
+      },
+      "full_original_copies": [
+        "sources/011-EXP25-C08-events.jsonl",
+        "sources/011-EXP25-C08-oracle.json",
+        "sources/011-EXP25-C08-preview.json"
+      ],
+      "preview_receipt": {
+        "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+        "json_pointer": "/cases/1/events/1/item/aggregated_output",
+        "transaction_id": "tx1-nf3z2nwp14getdgn0wka",
+        "artifact_hash": "79c97c2fdfa1cbd7015dc43d052fa42af079ef82370d47aab8ccf9612f572470",
+        "byte_offset": 78615,
+        "byte_length": 11884,
+        "value_bytes_sha256": "c3f5a076aadf88268152a994539e8154b7fe16982c4280da02ecaf03e6a5d44f"
+      },
+      "before": {
+        "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+        "json_pointer": "/cases/1/before",
+        "byte_offset": 73542,
+        "byte_length": 4331,
+        "value_bytes_sha256": "a4a0ba08bf3836d38beae42195995f46b90c01f0e51634fd068848dcaab96fcc"
+      },
+      "prepared": {
+        "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+        "json_pointer": "/cases/1/artifact/prepared_operation",
+        "byte_offset": 47925,
+        "byte_length": 7892,
+        "value_bytes_sha256": "f8a37bb2d7642b23f82b6c374dd136acab91065604c62052683a6e88210ed217"
+      },
+      "byte_offset": 47181,
+      "byte_length": 45620,
+      "value_bytes_sha256": "35e47f9a3319c7769ae7ffcc53bbd865ad69c1476ed7e1932718806a551dcb0d"
+    },
+    "014-EXP25-M05": {
+      "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+      "json_pointer": "/cases/3",
+      "original_source_hashes": {
+        "candidate": "db2299c",
+        "events_sha256": "60268ba3f43cfa72930e9d7edaebf8e620b861fe6b2ada246d6713585c90adfb",
+        "preview_file_sha256": "49924a3655c8c0d4e809908d04b0916a51a7ab58eccb755addb789923de34bff",
+        "oracle_file_sha256": "e502a54a963574e99a06f6c786874072caf100542db37fe3ab38b8ecd2a95b5d",
+        "phases": [
+          {
+            "event_index": 24,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-1eb3d71477d94552f499d3b751494a8c --task-authority da1-321174f1173a31772a6f3fa0344c58ccd74afa27 --expected-revision 6'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 26,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-db2299c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-gkdwppjhr1x9p5bmcwth'",
+            "phase": "execute"
+          }
+        ]
+      },
+      "full_original_copies": [
+        "sources/014-EXP25-M05-events.jsonl",
+        "sources/014-EXP25-M05-oracle.json",
+        "sources/014-EXP25-M05-preview.json"
+      ],
+      "preview_receipt": {
+        "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+        "json_pointer": "/cases/3/events/1/item/aggregated_output",
+        "transaction_id": "tx1-gkdwppjhr1x9p5bmcwth",
+        "artifact_hash": "8ac7b5bc827b22623f1f793d7410ad8521e56320fa2ad0c637c9c8161bf8fad8",
+        "byte_offset": 190199,
+        "byte_length": 11382,
+        "value_bytes_sha256": "be6dac4582363f75de80a2d595ae3490dae20871a59513cda020c03d758e2d16"
+      },
+      "before": {
+        "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+        "json_pointer": "/cases/3/before",
+        "byte_offset": 185914,
+        "byte_length": 3535,
+        "value_bytes_sha256": "588e1a7f8bbb975c3e49d3988f0be1dd1cc448dbd39743fca4e56a9a6f0a1589"
+      },
+      "prepared": {
+        "source_copy": "sources/expansion-current-role-notices-db2299c.json",
+        "json_pointer": "/cases/3/artifact/prepared_operation",
+        "byte_offset": 144310,
+        "byte_length": 24277,
+        "value_bytes_sha256": "9add30c27c3ca2925a6d82d613c312e3d582f4bac43f74c25b593c5fadf72374"
+      },
+      "byte_offset": 143566,
+      "byte_length": 60295,
+      "value_bytes_sha256": "9ef8fec0aa350b96fed161015d6d17c313dd97a923fc1189a2e6598ebf7d9a8f"
+    }
+  },
+  "freeze_policy": "No code, issues, expectations or source copies edited after SHA256SUMS freeze. Historical root copied read-only and retains original FAIL; any later erratum must be a new separate artifact.",
+  "synthetic_stage_definitions": {
+    "synthetic_second_preview": {
+      "kind": "synthetic_schedule_marker",
+      "meaning": "A second accepted Preview occurrence after the complete notice; a control-stage condition, not a recorded historical event or real receipt. Do not mutate/reseal/claim a second historical transaction.",
+      "expected_stage_boundary": "Prior plan/notice state reset; formal archive rejects more than one accepted Preview."
+    }
+  }
+}

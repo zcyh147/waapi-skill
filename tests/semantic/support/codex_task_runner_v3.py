@@ -4,11 +4,25 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
+import re
 import shutil
+import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
+
+from tests.semantic.support.codex_attenuation_notice import (
+    ATTENUATION_API, attenuation_notice_context, attenuation_notice_effect, normalize_attested_preview_target,
+    prospective_preview_execution,
+)
+from tests.semantic.support.codex_notice_language import authorization_claim, negated_foreign_owner, notice_count, planned_change_noun, prospective_action_prefix, prospective_intent, role_terms
+from tests.semantic.support.codex_notice_claims import (
+    NoticeClaim, NoticeRoleContext, PlannedEffectReferent, StagedNoticeEvidence, additional_action_qualifier, ancillary_claims, append_placement_claim, baseline_read_claim, deictic_effect_claim,
+    effect_descriptor_value_claim, effect_kind_label, exclusion_claim, execution_operation_claim, historical_creation, matched_display_claim, notice_clauses,
+    owner_inheritance, preview_operation_claim, preview_status_claim, prospective_role_owner, primary_role_atom, staged_operation_adoption, uncertain_action_qualifier,
+)
 
 from tests.semantic.support.codex_business_oracle_plan_v3 import (
     BUSINESS_ORACLE_PLAN_FILE,
@@ -49,6 +63,7 @@ from tests.semantic.support.codex_harness import (
     prepare_workspace_skill_install,
     recoverable_preprocess_attempt_indexes,
     semantic_task_developer_instructions,
+    parse_jsonl_events,
 )
 from tests.semantic.support.codex_prompt_provenance_v3 import (
     PROMPT_MATERIALIZATION_RECEIPT_CONTRACT,
@@ -164,6 +179,1736 @@ class V3TaskRun:
 
 
 TurnObserver = Callable[[int, CodexRunResult, GatewayBrokerEvidence], None]
+
+
+def _expansion_effect_groups(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> tuple[tuple[str, ...], ...]:
+    """Build notice obligations from the already approved immutable request.
+
+    This recognizes the expansion's closed operation families, not arbitrary
+    prose or native API requests. Unknown/missing effect data fails closed.
+    """
+    request = artifact.get("request", {})
+    if not isinstance(request, Mapping):
+        return ()
+    arguments = request.get("arguments", {})
+    operation = request.get("operation")
+    if not isinstance(arguments, Mapping):
+        return ()
+    identities: dict[str, tuple[str, ...]] = {}
+
+    def index_rows(value: Any) -> None:
+        if isinstance(value, Mapping):
+            if isinstance(value.get("id"), str):
+                names = tuple(value[key] for key in ("name", "path") if isinstance(value.get(key), str) and value[key])
+                if names:
+                    identities[value["id"].casefold()] = names
+            for child in value.values():
+                index_rows(child)
+        elif isinstance(value, list):
+            for child in value:
+                index_rows(child)
+
+    index_rows(before)
+    groups: list[tuple[str, ...]] = []
+
+    def target(selector: Any) -> None:
+        value = selector.get("value") if isinstance(selector, Mapping) else selector
+        if isinstance(value, str):
+            names = identities.get(value.casefold())
+            groups.append(names or (value,))
+
+    def properties(rows: Any) -> None:
+        for row in rows if isinstance(rows, list) else []:
+            if isinstance(row, Mapping) and row.get("name") == "Volume" and type(row.get("value")) in {int, float}:
+                groups.extend((("volume", "音量", "增益"), (format(row["value"], "g"),)))
+
+    if operation == "audio.import":
+        groups.append(("import", "replace", "reimport", "create", "update", "导入", "替换", "重导", "创建", "建立", "新增", "更新"))
+        defaults = arguments.get("defaults", {})
+        for item in arguments.get("imports", []):
+            row = {**defaults, **item}
+            path = row.get("object_path")
+            if not isinstance(path, str):
+                return ()
+            name = re.sub(r"<[^>]+>", "", path).rsplit("\\", 1)[-1]
+            groups.append((name, path))
+            language = row.get("import_language")
+            if language and language != "SFX":
+                groups.append((language, "日语", "日文") if language == "Japanese" else (language,))
+            properties(row.get("properties"))
+    elif operation == "object.setRTPC":
+        target(arguments.get("object"))
+        target(arguments.get("control_input"))
+        groups.extend((("rtpc", "曲线", "curve"), ("volume", "音量", "增益"),
+                       ("update", "replace", "set", "change", "更新", "替换", "修改", "设置", "改成")))
+    elif operation == "object.createPlugin":
+        target(arguments.get("target"))
+        plugin = arguments.get("plugin", {})
+        groups.extend(((str(plugin.get("name", "")),),
+                       ("effect", "plugin", "效果", "插件"),
+                       ("add", "create", "insert", "添加", "创建", "新增", "插入")))
+    elif operation == "object.setReference":
+        target(arguments.get("object"))
+        target(arguments.get("target"))
+        groups.extend((("trigger", "触发器"),
+                       ("retarget", "change", "set", "replace", "指向", "改为", "修改", "替换", "设置")))
+    elif operation == "waapi.call" and arguments.get("api") == "ak.wwise.core.object.setAttenuationCurve":
+        groups.append(("curve", "曲线"))
+    else:
+        return ()
+    return tuple(groups) if groups and all(all(term for term in group) for group in groups) else ()
+
+
+_PLUGIN_CREATION_WORDS = ("新增", "添加", "插入", "创建", "追加", "add", "create", "append")
+
+
+def _bound_context_notice(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Resolve a type pronoun only through matching sealed and independent roles."""
+    request, prepared = artifact.get("request", {}), artifact.get("prepared_operation", {})
+    if not isinstance(request, Mapping) or not isinstance(prepared, Mapping):
+        return None
+    args, state, plan = request.get("arguments", {}), prepared.get("pre_state", {}), prepared.get("verification_plan", {})
+    if not all(isinstance(value, Mapping) for value in (args, state, plan)):
+        return None
+    operation, version = request.get("operation"), request.get("version")
+    if (prepared.get("operation") != operation or prepared.get("version") != version
+            or version not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}):
+        return None
+    def identity(row: Any, observed: Any) -> bool:
+        return (isinstance(row, Mapping) and isinstance(observed, Mapping)
+                and isinstance(row.get("id"), str)
+                and all(isinstance(row.get(key), str) for key in ("name", "type", "path"))
+                and re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", row["id"]) is not None
+                and all(row.get(key) == observed.get(key) for key in ("id", "name", "type", "path")))
+    if operation == "object.createPlugin":
+        source, observed = state.get("target"), before.get("owner")
+        guard, plugin = state.get("plugin_creation_guard", {}), args.get("plugin", {})
+        if not isinstance(guard, Mapping) or not isinstance(plugin, Mapping) or not identity(source, observed):
+            return None
+        descriptor = plan.get("descriptor")
+        if (source["type"] != "Sound" or args.get("target") != {"kind": "id", "value": source["id"]}
+                or plan.get("kind") != "object-plugin-created" or plan.get("target_id") != source["id"]
+                or plan.get("target_type") != "Sound" or plan.get("version") != version
+                or guard.get("target_id") != source["id"] or guard.get("target_type") != "Sound"
+                or guard.get("version") != version or guard.get("descriptor") != descriptor
+                or not isinstance(descriptor, Mapping) or descriptor.get("kind") != "effect"
+                or type(descriptor.get("class_id")) is not int or descriptor["class_id"] <= 0
+                or any(descriptor.get(key) != value for key, value in plugin.items())):
+            return None
+        placement = plan.get("placement", {})
+        if (not isinstance(placement, Mapping) or placement.get("create_only") is not True
+                or placement.get("replace_existing_allowed") is not False):
+            return None
+        if version == "2022.1":
+            references, entries = plan.get("pre_effect_references"), before.get("entries")
+            slot = placement.get("effect_slot")
+            if (placement.get("kind") != "fixed_effect_reference" or slot not in {"@Effect0", "@Effect1", "@Effect2", "@Effect3"}
+                    or placement.get("collection") != slot or placement.get("requires_proven_empty_slot") is not True
+                    or not isinstance(references, Mapping) or set(references) != {"@Effect0", "@Effect1", "@Effect2", "@Effect3"}
+                    or references.get(slot) is not None or not isinstance(entries, list)):
+                return None
+            occupied = {key: value for key, value in references.items() if value is not None}
+            observed_refs = {}
+            for entry in entries:
+                if not isinstance(entry, Mapping) or entry.get("slot") not in {"0", "1", "2", "3"} or not isinstance(entry.get("effect"), Mapping):
+                    return None
+                field = "@Effect" + entry["slot"]
+                if field in observed_refs:
+                    return None
+                observed_refs[field] = entry["effect"].get("id")
+            if occupied != observed_refs:
+                return None
+        elif placement.get("kind") != "effect_slot_append" or placement.get("list_mode") != "append":
+            return None
+        groups = [(source["id"], source["name"], source["path"], "该 sound", "this sound"),
+                  (descriptor.get("name", ""),), ("effect", "效果", "插件"), _PLUGIN_CREATION_WORDS]
+        if descriptor.get("notes"):
+            groups.append((descriptor["notes"],))
+        protected_entries = before.get("entries")
+        protected_count = (len(protected_entries) if isinstance(protected_entries, list)
+            and all(isinstance(entry, Mapping) and isinstance(entry.get("effect"), Mapping)
+                and isinstance(entry["effect"].get("id"), str) for entry in protected_entries) else None)
+        return {"groups": groups, "ids": (source["id"],), "protected": ("volume", "音量", "路由", "output bus", "原效果", "existing effect"),
+                "action": "|".join(_PLUGIN_CREATION_WORDS), "kind": "plugin", "source_type": "sound", "source_id": source["id"],
+                "source_names": (source["name"], source["path"]), "notes": descriptor.get("notes", ""),
+                "protected_effect_count": protected_count, "descriptor": descriptor,
+                "append_after_existing": version != "2022.1" or int(slot[-1]) > max((int(field[-1]) for field in occupied), default=-1)}
+    if operation == "object.setReference":
+        source, target = state.get("object"), state.get("target")
+        observed, expected = before.get("stinger"), before.get("target")
+        if not identity(source, observed) or not identity(target, expected):
+            return None
+        owner, siblings = before.get("owner", {}), before.get("siblings")
+        if (source["type"] != "MusicStinger" or target["type"] != "Trigger"
+                or args.get("object") != {"kind": "id", "value": source["id"]}
+                or args.get("target") != {"kind": "id", "value": target["id"]} or args.get("reference") != "Trigger"
+                or plan.get("kind") != "same-guid-reference" or plan.get("object_id") != source["id"]
+                or plan.get("field") != "Trigger" or plan.get("expected_target_id") != target["id"]
+                or plan.get("expected_clear") is not False or not isinstance(owner, Mapping)
+                or not isinstance(siblings, list) or sum(isinstance(row, Mapping) and row.get("id") == source["id"] for row in siblings) != 1
+                or not isinstance(owner.get("@Stingers"), list)
+                or sum(isinstance(row, Mapping) and row.get("id") == source["id"] for row in owner["@Stingers"]) != 1):
+            return None
+        old_reference = observed.get("@Trigger")
+        field_before = state.get("field_before", {})
+        if (not isinstance(old_reference, Mapping) or not isinstance(field_before, Mapping)
+                or not isinstance(old_reference.get("id"), str)
+                or re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", old_reference["id"]) is None
+                or field_before.get("field") != "Trigger" or not isinstance(field_before.get("value"), Mapping)
+                or any(field_before["value"].get(key) != old_reference.get(key) for key in ("id", "name"))):
+            old_reference = None  # A display path never proves the old target.
+        return {"groups": [(source["id"], source["path"], "该 musicstinger", "该 stinger", "this musicstinger"),
+                           (target["id"], target["name"], target["path"]), ("trigger", "触发器"),
+                           ("改动", "更新", "修改", "改为", "设为", "指向", "update", "change", "retarget")],
+                "ids": (source["id"], target["id"]), "protected": ("segment", "音乐段", "容器", "container"),
+                "action": r"改动|更新|修改|改为|设为|指向|update|change|retarget", "kind": "reference", "source_type": "(?:music)?stinger", "source_id": source["id"],
+                "source_names": (source["name"], source["path"]), "old_reference": old_reference,
+                "parent": owner,
+                "segment": observed.get("@Segment") if isinstance(before.get("segment"), Mapping)
+                    and before["segment"].get("type") == "MusicSegment"
+                    and isinstance(before["segment"].get("id"), str)
+                    and re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", before["segment"]["id"]) is not None
+                    and isinstance(observed.get("@Segment"), Mapping)
+                    and all(observed["@Segment"].get(key) == before["segment"].get(key) for key in ("id", "name")) else None}
+    return None
+
+
+def _bound_owner_anchor(text: str, context: Mapping[str, Any]) -> bool:
+    if any(term and term.casefold() in text for term in context["groups"][0]):
+        return True
+    # The descriptor resolves through sealed roles, never through a shortened
+    # GUID. Its trailing grammar must not introduce a different named owner.
+    types = "|".join(re.escape(term) for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger"))
+    return (re.search(rf"(?:已核对|指定|目标|该|此)(?:的)?\s*(?:{types}|对象)(?![a-z0-9_])\s*(?=[，,。；;：:]|\{{|上|下|的|已|仍|一致|加|$)", text) is not None
+            or re.search(rf"目标(?:已)?(?:核实|确认)为指定\s*guid\s*对应的\s*{context['source_type']}\b", text) is not None
+            or context["kind"] == "plugin" and re.search(r"(?:^|[。\n])\s*已确认这就是请求中的声音(?=[。\n]|$)", text) is not None)
+
+
+def _bound_explicit_owners_agree(prefix: str, claim: str, context: Mapping[str, Any], *, source_referent: bool = False) -> bool:
+    """Check owner-bearing grammar; omitted owners do not add an identity."""
+    owners = []
+    omitted_owner = False
+    source_prefix = re.sub(r"\s*的\s*(?:trigger|触发器)\s*(?:引用)?\s*$", "", prefix)
+    prospective = prospective_action_prefix(source_prefix)
+    if prospective is not None:
+        if prospective.state == "invalid":
+            return False
+        if prospective.recipient is None:
+            omitted_owner = True
+        else:
+            owners.append(prospective.recipient.strip())
+    prepositions = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", source_prefix))
+    if prospective is None and prepositions:
+        owner = source_prefix[prepositions[-1].end():].strip()
+        # Complete legacy Preview noun carriers retain their existing referent
+        # path. They are not bare/scoped modal action prefixes and do not gain
+        # a new omitted-recipient exception through component classification.
+        if not owner and re.fullmatch(r"\s*(?:其本次)?预览(?:即将|将|会)\s*", source_prefix):
+            omitted_owner = True
+        else:
+            owners.append(owner)
+    if context["kind"] == "plugin":
+        following = re.search(r"(?:\b(?:on|to)\s+|到\s*)(.+?)\s*$", claim)
+        if following:
+            owners.append(following.group(1))
+    else:
+        possessive = re.search(r"^(?:改动|更新|修改|改为|设为|指向|update|change|retarget)\s*(.+?)\s*的\s*(?:trigger|触发器)", claim)
+        if possessive:
+            owners.append(possessive.group(1))
+    # Inheritance is only the fallback for a genuinely omitted owner. Every
+    # supplied prefix and claim-side operand still reaches the same checks.
+    if omitted_owner and not owners:
+        return source_referent
+    for owner in owners:
+        # Existing exact trailing operation modifier; all other residual text
+        # remains part of the identity and fails the closed role check.
+        owner = re.sub(r"[，,]\s*(?:仅|只)$", "", owner).strip()
+        # Location is a relationship of the same owner, not another identity.
+        owner = re.sub(r"(?:的)?效果链(?:末尾|尾部)?$|(?:上|下)$", "", owner).strip()
+        if source_referent and owner in {"其", "它", "该对象", "此对象"}:
+            continue
+        role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
+            "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
+            reference_change=context["kind"] == "reference", parent=context.get("parent"))
+        if primary_role_atom(owner, role_context):
+            continue
+        qualifiers = role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")
+        owner = re.sub(rf"^(?:{'|'.join(re.escape(term) for term in qualifiers)})(?:对象)?\s+", "", owner)
+        if owner in {context["source_id"].casefold(), *(value.casefold() for value in context["source_names"] if value)}:
+            continue
+        types = "|".join(re.escape(term) for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger"))
+        if re.fullmatch(rf"(?:该|此|目标|this|target)(?:的)?\s*(?:{types}|对象|object)", owner):
+            continue
+        descriptor = re.fullmatch(rf"(?:已核对|指定)(?:的)?\s*{context['source_type']}\b\s*(\{{[^{{}}]+\}})?", owner)
+        if descriptor:
+            # The abbreviation can contradict a sealed identity, but cannot
+            # prove one. The unique sealed descriptor supplies that proof.
+            token = descriptor.group(1)
+            if token is None or token == context["source_id"].casefold():
+                continue
+            shortened = re.fullmatch(r"\{([0-9a-f-]{4,})\.\.\.\}", token)
+            if shortened and context["source_id"][1:].casefold().startswith(shortened.group(1)):
+                continue
+        return False
+    return True
+
+
+_NOTICE_MUTATIONS = (r"新增|添加|插入|创建|追加|写入|改动|更新|修改|改为|改成|设为|指向|变更|删除|移除|替换|设置|清空|(?<=给)加|加(?=一个)|"
+                     r"\b(?:add|create|append|update|change|retarget|delete|remove|replace|set|modify|edit|alter|insert|clear)\b")
+
+
+def _notice_mutation_is_noun(action: str, prefix: str, suffix: str, *, reference_change: bool = False,
+                             operation_actions: str | None = None) -> bool:
+    """Only complete request/authorization and execute-summary noun roles."""
+    if planned_change_noun(action, prefix, suffix, reference_change=reference_change, operation_actions=operation_actions) is not None:
+        return True
+    if action not in {"修改", "变更", "改动"}:
+        return False
+    return bool((re.match(r"请求(?=[，,]|$)", suffix) and re.search(r"(?:这次|本次|明确的|针对).*?$", prefix))
+        or (re.match(r"(?:[，,]|$)", suffix) and re.search(r"执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", prefix))
+        or (re.match(r"的(?:独立)?授权(?=[，,]|$)", suffix) and re.search(r"(?:针对|获得|取得)(?:(?:这|此)(?:一)?项|本次)$", prefix))
+        or (re.match(r"提供(?:独立|持久)?(?:策略)?授权(?=[，,]|$)", suffix) and re.search(r"为(?:(?:这|此)(?:一)?项|本次)$", prefix)))
+
+
+def _plugin_description_is_noun(action: str, prefix: str, suffix: str) -> bool:
+    """An operation-description noun must describe this create-only effect lane."""
+    creation = "|".join(re.escape(word) for word in _PLUGIN_CREATION_WORDS)
+    changes = r"(?:修改|变更|改动)"
+    if action in _PLUGIN_CREATION_WORDS:
+        if (re.search(r"执行(?:(?:这|此)(?:一)?项|本次)$", prefix)
+                and re.match(r"(?:[，,]|$)", suffix)):
+            return True
+        return bool(re.search(r"(?:采用|使用)的是$", prefix)
+                    and re.match(rf"(?:效果器|effect)的{changes}(?=[，,]|$)", suffix))
+    return bool(action in {"修改", "变更", "改动"}
+                and re.search(rf"(?:{creation})(?:效果器|effect)的$", prefix)
+                and re.match(r"(?:[，,]|$)", suffix))
+
+
+def _noun_owner_prefix(prefix: str) -> str:
+    """Remove only noun-frame tails, retaining any explicit owner subject."""
+    creation = "|".join(re.escape(word) for word in _PLUGIN_CREATION_WORDS)
+    prefix = re.sub(rf"(?:{creation})(?:效果器|effect)的$", "", prefix)
+    prefix = re.sub(r"(?:采用|使用)的是$", "", prefix)
+    prefix = re.sub(r"(?:我)?(?:现在)?(?:按(?:该)?授权)?执行(?:(?:这|此)(?:一)?项|本次)(?:单字段|单一引用|单一)?$", "", prefix)
+    prefix = re.sub(r"(?:获得|取得|针对|为)(?:(?:这|此)(?:一)?项|本次)$", "", prefix)
+    prefix = re.sub(r"(?:本次|这次|明确的)$", "", prefix)
+    prefix = re.sub(r"(?:现在)?(?:我)?(?:将|会)$", "", prefix)
+    return prefix
+
+
+def _note_owner_prefix_agrees(prefix: str, context: Mapping[str, Any], creation_position: int) -> bool:
+    """Retain every explicit owner span before applying local coordination."""
+    new_targets = {context["groups"][1][0].casefold(), "该效果器", "此效果器", "新效果器"}
+    for segment in re.finditer(r"[^，,并;；]+", prefix):
+        text = segment.group()
+        action = re.search(_NOTICE_MUTATIONS, text)
+        owner_text = text[:action.start()] if action else text
+        operators = tuple(re.finditer(r"向|(?<!现)在|将|把|对(?=\s|该|指定|已)", owner_text))
+        for index, operator in enumerate(operators):
+            end = operators[index + 1].start() if index + 1 < len(operators) else len(owner_text)
+            owner = owner_text[operator.end():end].strip()
+            if not owner:  # A nested '将在' supplies one owner, not two.
+                continue
+            owner = re.sub(r"(?:上|下)$", "", owner).strip()
+            if owner in new_targets:
+                continue
+            if (segment.start() + operator.start() >= creation_position
+                    or not _bound_explicit_owners_agree("在 " + owner, "", context)):
+                return False
+    return True
+
+
+def _plugin_kind_claims_agree(text: str, name: str, *, notes: str) -> bool:
+    """Explicit creation nouns must denote Effect, not another native kind.
+
+    Wwise-prefixed labels describe a plugin display class, not a native
+    object kind. This language check does not map display names to class IDs.
+    Omitted nouns inherit the already sealed Effect descriptor.
+    """
+    value = re.escape(name.casefold())
+    creation = "|".join(re.escape(word) for word in _PLUGIN_CREATION_WORDS)
+    patterns = (
+        rf"新增项(?:是|为)\s*([^:：，,。；;\n]+)[:：]\s*{value}(?![a-z0-9_])",
+        rf"(?:{creation})(?:一个|一项)?\s*([^，,。；;\n]+)[，,]\s*名为\s*{value}(?![a-z0-9_])",
+        rf"{value}\s*的\s*([^，,。；;\n]+)(?=[，,。；;]|$)",
+        rf"(?:{creation})(?!项|[:：])(?:一个|一项)?\s*([^，,。；;\n]+?)\s+{value}(?![a-z0-9_])",
+        rf"效果链将多一个\s*([^，,。；;\n]+)[，,]\s*名称\s*{value}(?![a-z0-9_])",
+        rf"{value}[，,]\s*类型为\s*([^，,。；;\n]+)",
+    )
+    for opening in re.finditer(rf"{value}\s*[（(]", text):
+        kind = re.match(r"([^()（）]+)[)）]", text[opening.end():])
+        if kind is None or not effect_kind_label(kind.group(1).strip()):
+            return False  # A parenthesized kind claim must be complete and Effect-like.
+        tail = re.split(r"[，,。；;\n]", text[opening.end() + kind.end():], maxsplit=1)[0]
+        continuation = effect_descriptor_value_claim(NoticeClaim("unclassified", 0, len(tail), tail), name=name.casefold(), notes=notes)
+        if continuation.role == "invalid":
+            return False  # A valid parenthesis cannot hide a second field/kind claim.
+    for pattern in patterns:
+        for claim in re.finditer(pattern, text):
+            label = claim.group(1).strip()
+            if label == "名为":
+                continue  # A name introducer does not declare a native kind.
+            label = re.sub(r"\s*名为$", "", label).strip()
+            if effect_kind_label(label):
+                continue
+            return False
+    return True
+
+
+def _reference_scope_evidence(text: str, context: Mapping[str, Any]) -> tuple[tuple[NoticeClaim, ...], bool]:
+    """Compose a sole-reference Preview from independently attested roles.
+
+    A display label refers only to the stored old reference, never the source
+    object's name or diagnostic path. Each role stays separate and cannot
+    supply the edit unless the exact source, old value, new value and scope
+    all agree with the same immutable reference operation.
+    """
+    if context["kind"] != "reference":
+        return (), False
+    claims = []
+    seen = set()
+    old = context.get("old_reference")
+    role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
+        "path": context["source_names"][-1], "type": "MusicStinger"}, reference_change=True, parent=context.get("parent"))
+    assignment_seen = False
+    for clause in notice_clauses(text):
+        prefix = r"\s*(?:(?:并|且|同时|另外)\s*)?"
+        source = re.fullmatch(prefix + r"(?:预览已生成[:：])?目标对象确认为\s*(.+?)\s*", clause.text)
+        current = re.fullmatch(prefix + r"当前显示为\s*(.+?)\s*", clause.text)
+        target = re.fullmatch(prefix + r"新的引用目标已核对为\s*(.+?)\s*", clause.text)
+        scope = re.fullmatch(prefix + r"预览(?:只|仅)包含(?:这|此)(?:一)?项(?:trigger|触发器)引用(?:修改|变更|改动)\s*", clause.text)
+        assignment = re.fullmatch(prefix + r"(?:预览已完成[:：])?(?:只|仅)(?:将|把)(.+?)的(?:trigger|触发器)(?:引用)?从\s*(.+?)\s*改为\s*(.+?)\s*", clause.text)
+        segment = re.fullmatch(prefix + r"关联音乐段保持为\s*(.+?)\s*", clause.text)
+        role = None
+        valid = False
+        if assignment:
+            role = "prospective-reference"
+            valid = (primary_role_atom(assignment.group(1), role_context) and isinstance(old, Mapping)
+                     and assignment.group(2).strip() in {str(old.get(key, "")).casefold() for key in ("id", "name") if old.get(key)}
+                     and assignment.group(3).strip() in {value.casefold() for value in context["groups"][1] if value})
+            assignment_seen = assignment_seen or valid
+        elif segment:
+            role = "preserved-segment"
+            value = context.get("segment")
+            valid = isinstance(value, Mapping) and segment.group(1) in {str(value.get(key, "")).casefold() for key in ("id", "name")}
+        elif source:
+            role = "reference-source"
+            valid = source.group(1) in role_terms("MusicStinger")
+        elif current:
+            role = "current-reference"
+            valid = isinstance(old, Mapping) and isinstance(old.get("name"), str) and bool(old["name"]) and current.group(1) == old["name"].casefold()
+        elif target:
+            role = "reference-target"
+            valid = target.group(1) in {value.casefold() for value in context["groups"][1]}
+        elif scope:
+            role = "prospective-reference"
+            valid = True
+        elif (re.match(prefix + r"(?:预览已生成[:：])?(?:目标对象(?:未|不|可能)?确认|当前(?:未|不|可能)?显示|新的引用目标)", clause.text)
+              or (re.match(prefix + r"预览(?:只|仅|不|未|可能)包含", clause.text)
+                  and re.search(r"(?:trigger|触发器)\s*引用", clause.text))):
+            # A recognized role with unsupported polarity or incomplete
+            # grammar cannot disappear behind an earlier affirmative fact.
+            role = "unresolved-reference"
+        if role:
+            claims.append(clause._replace(role=role if valid else "invalid", diagnostic="" if valid else "contradictory-reference-role"))
+            if valid:
+                seen.add(role)
+    return tuple(claims), assignment_seen or {"reference-source", "current-reference", "reference-target", "prospective-reference"}.issubset(seen)
+
+
+def _bound_context_effect(text: str, context: Mapping[str, Any], *, staged: PlannedEffectReferent | None = None,
+                          require_adoption: bool = True) -> bool:
+    if staged is not None and (context["kind"] != "plugin" or staged.owner_id != context["source_id"]
+            or staged.name != context["groups"][1][0].casefold()
+            or staged.native_class_id != context["descriptor"]["class_id"]
+            or staged.display_label is not None and not effect_kind_label(staged.display_label)):
+        return False
+    text = re.sub(r"`([^`\n]+)`", r"\1", text)
+    reference_claims, reference_effect = _reference_scope_evidence(text, context)
+    if any(claim.role == "invalid" for claim in reference_claims):
+        return False
+    role_context = NoticeRoleContext({"id": context["source_id"], "name": context["source_names"][0],
+        "path": context["source_names"][-1], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"},
+        protected_effect_count=context.get("protected_effect_count"), reference_change=context["kind"] == "reference",
+        parent=context.get("parent"), operation_actions=context["action"])
+    inherited = owner_inheritance(text, role_context)
+    if inherited is None:
+        return False
+    owner_terms = (context["source_id"].casefold(), *(name.casefold() for name in context["source_names"]),
+        *(prefix + term for prefix in ("该", "此", "目标", "指定") for term in role_terms("Sound" if context["kind"] == "plugin" else "MusicStinger")), "该对象", "此对象", "目标对象", "指定对象")
+    if not prospective_intent(text, require_affirmative=False, owners=owner_terms, operation_actions=context["action"], reference_change=context["kind"] == "reference"):
+        return False
+    normalized = normalize_attested_preview_target(text, {"id": context["source_id"],
+        "name": context["source_names"][0], "type": "Sound" if context["kind"] == "plugin" else "MusicStinger"})
+    if normalized is None:
+        return False
+    text, attested = normalized
+    if attested and context["kind"] == "plugin":
+        # Only the immediately following owned Preview gains this referent.
+        # Retain its complete effect and every remaining clause for validation.
+        sentences = re.split(r"([。\n])", text)
+        if not prospective_preview_execution(text):
+            return False
+        sentences[2] = re.sub(r"^\s*预览将(?=新增|添加|插入|创建|追加)",
+            "预览将在 " + context["source_id"].casefold() + " 上", sentences[2], count=1)
+        text = "".join(sentences)
+    ids = tuple(re.finditer(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text))
+    if any(match.group() not in {value.casefold() for value in context["ids"]}
+           and not any(claim.role in {"prospective-reference", "preserved-segment"}
+                       and claim.start <= match.start() and match.end() <= claim.end
+                       for claim in reference_claims) for match in ids):
+        return False
+    for abbreviation in re.finditer(r"\{([^{}]*\.\.\.)\}", text):
+        prefix = abbreviation.group(1)[:-3]
+        if (re.fullmatch(r"[0-9a-f-]{4,}", prefix) is None
+                or not context["source_id"][1:].casefold().startswith(prefix)):
+            return False
+    if context["kind"] == "plugin":
+        if not _plugin_kind_claims_agree(text, context["groups"][1][0], notes=context["notes"].casefold()):
+            return False
+        for note in re.findall(r"备注(?:为|是)?\s*[“\"]([^”\"]*)[”\"]", text):
+            if note != context["notes"].casefold():
+                return False
+    for source_claim in re.finditer(r"目标(?:已)?(?:核实|确认)为\s*([^。；;\n]+)", text):
+        value = source_claim.group(1).strip()
+        if (value not in {context["source_id"].casefold(), *(name.casefold() for name in context["source_names"])}
+                and re.fullmatch(rf"指定\s*guid\s*对应的\s*{context['source_type']}", value) is None):
+            return False
+    value_pattern = rf"(?<![a-z0-9_]){re.escape(context['groups'][1][0].casefold())}(?![a-z0-9_])"
+    if context["kind"] == "plugin" and staged is None and re.search(value_pattern, text) is None:
+        return False
+    explicit_prospective_owner = any(prospective_role_owner(text[max(text.rfind('。', 0, action.start()), text.rfind('\n', 0, action.start())) + 1:action.start()], role_context)
+        for action in re.finditer(context["action"], text))
+    if staged is None and (not (_bound_owner_anchor(text, context) or explicit_prospective_owner or inherited or reference_effect) or not all(any(term and term.casefold() in text for term in group) for group in context["groups"][1:] if context["kind"] != "plugin" or group not in {context["groups"][2], context["groups"][3]})):
+        return False
+    affirmative = staged is not None or reference_effect
+    concrete_plugin_plan = False
+    adoption = False
+    source_referent = False
+    pending_note_owner = None
+    matched_displays = set()
+    planned_effect = staged
+    clause_cursor = 0
+    for clause in re.split(r"[。；;\n]|\bbut\b|但", text):
+        local_claims = notice_clauses(clause)
+        ancillary = ancillary_claims(clause, role_context)
+        if any(claim.role == "invalid" for claim in ancillary):
+            return False
+        for claim in ancillary:
+            if claim.role in {"authorization", "preview-status"} and not _bound_explicit_owners_agree(claim.value.strip().rstrip("，,").strip(), "", context):
+                return False
+        preview_status = preview_status_claim(local_claims[0], reference_change=context["kind"] == "reference", operation_actions=context["action"]) if local_claims else None
+        authorization = authorization_claim(local_claims[0].text if preview_status is not None
+            and preview_status.role == "preview-status" else clause, reference_change=context["kind"] == "reference", operation_actions=context["action"])
+        if authorization.state == "invalid":
+            return False
+        if authorization.state == "ancillary":
+            if not _bound_explicit_owners_agree(authorization.owner_prefix.strip().rstrip("，,").strip(), "", context):
+                return False
+        anchored = _bound_owner_anchor(clause, context)
+        clause_start = text.find(clause, clause_cursor)
+        clause_cursor = clause_start + len(clause)
+        substantive_start = clause_start + len(clause) - len(clause.lstrip())
+        adjacent_owner = any(clause_start <= start < clause_start + len(clause) for start, end in inherited)
+        explicit_anchor = anchored or any(prospective_role_owner(clause[:action.start()], role_context) for action in re.finditer(context["action"], clause))
+        anchored = explicit_anchor or adjacent_owner
+        source_referent = source_referent or anchored
+        if source_referent and (re.search(r"(?:在|向)(?:其|它|该对象|此对象)(?:的)?效果链(?:末尾|尾部)?", clause)
+                or re.match(r"\s*(?:其本次预览|预览将|拟创建)", clause)):
+            anchored = True
+            explicit_anchor = True
+        if context["kind"] == "plugin" and (anchored or source_referent):
+            state = re.search(r"(?:预览(?:的)?新增项是|预览显示[:：].*?效果链将多一个)", clause)
+            if state and re.search(value_pattern, clause) and context["notes"].casefold() in clause:
+                subject = re.match(r"\s*预览显示[:：](.+?)的效果链将多一个", clause)
+                if subject and not _bound_explicit_owners_agree("在 " + subject.group(1), "", context, source_referent=source_referent):
+                    return False
+                noun_owner = re.match(r"\s*预览(?:的)?新增项是\s*(.+?)的\s*", clause)
+                if noun_owner and not _bound_explicit_owners_agree("在 " + noun_owner.group(1), "", context, source_referent=source_referent):
+                    return False
+                affirmative = True
+        actions = tuple(re.finditer(_NOTICE_MUTATIONS, clause))
+        if preview_status is not None and preview_status.role == "preview-status":
+            if not _bound_explicit_owners_agree(preview_status.value, "", context):
+                return False
+        coordinated_authorizations = []
+        if preview_status is not None and preview_status.role == "preview-status":
+            # Only a fully classified preceding status permits local record
+            # composition. Broader owner proof is retained above; unknown
+            # coordinated text is left for ordinary action validation.
+            for local_claim in local_claims[1:]:
+                record = authorization_claim(local_claim.text, reference_change=context["kind"] == "reference", operation_actions=context["action"])
+                if record.state == "invalid":
+                    return False
+                if record.state == "ancillary":
+                    if not _bound_explicit_owners_agree(record.owner_prefix.strip().rstrip("，,").strip(), "", context):
+                        return False
+                    coordinated_authorizations.append((local_claim.start + record.start, local_claim.start + record.end))
+        if context["kind"] == "plugin":
+            for local_claim in local_claims:
+                display = matched_display_claim(local_claim, role_context)
+                if display.role == "invalid":
+                    return False
+                if display.role == "matched-display":
+                    matched_displays.add(display.value)
+                    if len(matched_displays) > 1:
+                        return False
+        read_summary = baseline_read_claim(local_claims[0], role_context) if local_claims else None
+        if read_summary is not None and read_summary.role == "invalid":
+            return False
+        operation_intro = (preview_operation_claim(local_claims[0], context["action"])
+            if local_claims and context["kind"] == "plugin" else None)
+        placement = (append_placement_claim(local_claims[0], context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"), context=role_context)
+            if local_claims and context["kind"] == "plugin" else None)
+        if placement is not None and placement.role == "invalid":
+            return False
+        exclusions = tuple(exclusion_claim(local) for local in local_claims)
+        if context["kind"] == "plugin":
+            creations = tuple(re.finditer(context["action"], clause))
+            for local in local_claims:
+                if staged is None and (not creations or local.start <= creations[0].start()):
+                    continue  # The primary operation frame owns its own grammar.
+                if any(local.start <= creation.start() < local.end for creation in creations):
+                    continue
+                if any(claim.role in {"owner-attestation", "authorization", "preview-status", "read-summary", "matched-display"}
+                       and claim.start <= local.start and local.end <= claim.end for claim in ancillary):
+                    continue
+                descriptor_placement = append_placement_claim(local, context["action"], after_existing=context["append_after_existing"], existing_count=context.get("protected_effect_count"), context=role_context)
+                if descriptor_placement.role == "invalid":
+                    return False
+                if descriptor_placement.role == "placement-modifier":
+                    continue
+                descriptor_claim = effect_descriptor_value_claim(local, name=context["groups"][1][0].casefold(), notes=context["notes"].casefold())
+                if descriptor_claim.role == "invalid":
+                    return False
+        execution_summary = (execution_operation_claim(local_claims[0], context["action"])
+            if local_claims and context["kind"] == "plugin" else None)
+        execution_summaries = tuple(execution_operation_claim(local, context["action"])
+            for local in local_claims) if context["kind"] == "plugin" else ()
+        if staged is not None:
+            for local in local_claims:
+                adopted = staged_operation_adoption(local, context["action"], staged)
+                if adopted.role == "invalid":
+                    return False
+                if adopted.role == "execution-summary":
+                    execution_summary = adopted
+                    adoption = True
+        if context["kind"] == "plugin":
+            for local in local_claims:
+                deictic = deictic_effect_claim(local, context["action"], planned_effect)
+                if deictic.role == "invalid":
+                    return False
+                if deictic.role == "execution-summary":
+                    if (planned_effect.owner_id != context["source_id"] or planned_effect.name != context["groups"][1][0].casefold()
+                            or planned_effect.native_class_id != context["descriptor"]["class_id"]):
+                        return False
+                    execution_summaries += (deictic,)
+        prior_note_owner, pending_note_owner = pending_note_owner, None
+        if context["kind"] == "plugin" and not actions and re.fullmatch(r"\s*(?:在|向|对)\s*.+?(?:上|下)?\s*", clause):
+            new_target = context["groups"][1][0].casefold()
+            frame_context = {**context, "source_names": (*context["source_names"], new_target, "该效果器", "此效果器", "新效果器")}
+            if not _bound_explicit_owners_agree(clause, "", frame_context):
+                return False
+            pending_note_owner = clause
+        creation_position = -1
+        sole_assignment = False
+        for index, action in enumerate(actions):
+            if sole_assignment:
+                continue  # The complete exact assignment was validated below.
+            absolute_action = clause_start + action.start()
+            action_adjacent_owner = any(start <= absolute_action < end for start, end in inherited)
+            action_clause = next((local for local in local_claims if local.start <= action.start() < local.end), None)
+            local_owner = prospective_role_owner(clause[action_clause.start:action.start()], role_context) if action_clause else False
+            action_anchored = explicit_anchor or local_owner or action_adjacent_owner
+            if any(claim.role == "prospective-reference" and claim.start <= absolute_action and clause_start + action.end() <= claim.end for claim in reference_claims):
+                continue
+            if any(claim.role in {"authorization", "preview-status", "execution-status", "read-summary", "matched-display", "verification-basis"} and claim.start <= action.start() and action.end() <= claim.end for claim in ancillary):
+                continue
+            if any(claim.role == "exclusion" and claim.start <= action.start() and action.end() <= claim.end for claim in exclusions):
+                continue
+            if context["kind"] == "reference" and action.group() == "写入":
+                scope = re.fullmatch(r"\s*(?:预览已完成[:：])?唯一写入项是(.+)\s*", clause)
+                assignment = re.fullmatch(r"将(.+?)的(?:trigger|触发器)从\s*(.+?)\s*改为\s*(.+?)", scope.group(1)) if scope else None
+                old = context.get("old_reference")
+                if assignment and isinstance(old, Mapping) and isinstance(old.get("id"), str) and isinstance(old.get("name"), str):
+                    if (not primary_role_atom(assignment.group(1), role_context)
+                            or assignment.group(2).strip() not in {old["id"].casefold(), old["name"].casefold()}
+                            or assignment.group(3).strip() not in {value.casefold() for value in context["groups"][1]}):
+                        return False
+                    affirmative = True
+                    sole_assignment = True
+                    continue
+            if any(start <= action.start() and action.end() <= end for start, end in coordinated_authorizations):
+                continue
+            if (preview_status is not None and preview_status.role == "preview-status"
+                    and preview_status.start <= action.start() < preview_status.end):
+                continue  # Preview bookkeeping is never the expected effect.
+            if (read_summary is not None and read_summary.role == "read-summary"
+                    and read_summary.start <= action.start() < read_summary.end):
+                continue  # A validated read-state noun is not another edit.
+            if authorization.state == "ancillary" and authorization.start <= action.start() and action.end() <= authorization.end:
+                continue
+            if operation_intro is not None and operation_intro.role == "prospective-operation" and action.end() <= operation_intro.end:
+                continue  # Only the intro noun is consumed; its effect remains.
+            if (execution_summary is not None and execution_summary.role == "execution-summary"
+                    and execution_summary.start <= action.start() < execution_summary.end):
+                if not affirmative:
+                    return False
+                continue  # The already proven operation is the summary referent.
+            if any(summary.role == "execution-summary" and summary.start <= action.start() < summary.end
+                   for summary in execution_summaries):
+                if not affirmative:
+                    return False
+                continue
+            local_effect = next((local for local in local_claims if local.start <= action.start() < local.end), None)
+            # One descriptor may state its name/target in a following comma
+            # component. Preserve that existing projection; only exclusion
+            # polarity and protected-field checks use the local edit span.
+            claim = clause[action.start():actions[index + 1].start() if index + 1 < len(actions) else len(clause)]
+            noun_provider = planned_change_noun(action.group(), clause[:action.start()], clause[action.end():].strip(), reference_change=context["kind"] == "reference", operation_actions=context["action"])
+            if noun_provider is not None and noun_provider.role in {"invalid-provider", "curve-range"}:
+                return False
+            effect_anchor = any(term and term.casefold() in claim for term in context["groups"][2])
+            if context["kind"] == "plugin" and re.search(value_pattern, claim):
+                effect_anchor = True
+            if context["kind"] == "reference" and re.search(r"(?:trigger|触发器)\s*(?:引用)?\s*$", clause[:action.start()]):
+                effect_anchor = True
+            approved_value = (re.search(value_pattern, claim) is not None if context["kind"] == "plugin"
+                else any(term and term.casefold() in claim for term in context["groups"][1]))
+            expected = re.fullmatch(context["action"], action.group()) is not None or context["kind"] == "plugin" and action.group() == "加"
+            if context["kind"] == "plugin" and expected and approved_value and historical_creation(clause[:action.start()]):
+                return False
+            polarity_prefix = clause[local_effect.start if local_effect else 0:action.start()]
+            coordinators = tuple(re.finditer(r"并|且|同时|另外", polarity_prefix))
+            if coordinators:
+                before_coordinator = polarity_prefix[:coordinators[-1].start()]
+                # A preceding predicate marks a new coordinated action. With
+                # no earlier predicate, 同时/另外 remains an adverb governed
+                # by the same local negation (不会同时修改).
+                if re.search(_NOTICE_MUTATIONS, before_coordinator) or re.search(r"(?:未|不|没有)包含", before_coordinator):
+                    polarity_prefix = polarity_prefix[coordinators[-1].start():]
+            negated = _notice_qualifier_is_negated(polarity_prefix)
+            if negated:
+                foreign_preservation = negated_foreign_owner(re.sub(r"^\s*另外", "", polarity_prefix), owner_terms)
+                contradiction_scope = action_anchored or context["kind"] == "plugin" and approved_value
+                if expected and contradiction_scope and not foreign_preservation and effect_anchor and (approved_value
+                        or re.search(r"目标|名为|为|\bto\b", claim) is None):
+                    return False
+                continue
+            # Verification and the execute-summary noun do not author another
+            # change. They cannot certify the expected effect by themselves.
+            prefix = clause[:action.start()]
+            suffix = clause[action.end():].strip()
+            noun = (_notice_mutation_is_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference", operation_actions=context["action"])
+                or (context["kind"] == "plugin" and action.group() == "新增" and re.search(r"预览的$", prefix) and re.match(r"项是", suffix))
+                or (context["kind"] == "plugin" and _plugin_description_is_noun(action.group(), prefix, suffix))
+                or (action.group() == "变更" and (re.match(r"(?:只将|范围|内容|仅是|是)", suffix)
+                    or re.search(r"执行(?:这项|本次)(?:单字段|单一引用)?$", prefix)))
+                or (action.group() == "设置" and re.search(r"其他\s*$", prefix) and re.match(r"和对象不在", suffix))
+                or re.search(r"(?:核验(?:结果确认)?|verify|验收)\s*$", prefix)
+                or (context["kind"] == "reference" and re.search(r"执行.*引用$", prefix) and action.group() == "更新"))
+            note_write = False
+            noun_frame = planned_change_noun(action.group(), prefix, suffix, reference_change=context["kind"] == "reference", operation_actions=context["action"]) if noun else None
+            owner_prefix = noun_frame.owner_prefix if noun_frame else _noun_owner_prefix(prefix) if noun else prefix
+            if (operation_intro is not None and operation_intro.role == "prospective-operation"
+                    and operation_intro.end == action.start()):
+                owner_prefix = ""
+            if not noun:
+                for start, end in inherited:
+                    if start <= clause_start + action.start() < end:
+                        owner_prefix = prefix[max(0, start - clause_start):]
+            if placement is not None and placement.role == "placement-intro" and placement.end == action.start():
+                owner_prefix = ""
+            if action.group() == "写入":
+                # The create-only descriptor owns this note; a coordinated
+                # write may describe that same field, never arbitrary fields
+                # or another object. It cannot supply the primary effect.
+                note = re.fullmatch(r"备注\s*[“\"]([^”\"]*)[”\"]", suffix)
+                full_owner_prefix = (prior_note_owner + ";" if prior_note_owner else "") + prefix
+                full_creation_position = creation_position + (len(prior_note_owner) + 1 if prior_note_owner else 0) if creation_position >= 0 else -1
+                if not _note_owner_prefix_agrees(full_owner_prefix, context, full_creation_position):
+                    return False
+                qualifier = re.split(r"[，,]|并", prefix)[-1].strip()
+                note_write = (context["kind"] == "plugin" and affirmative and note is not None
+                    and note.group(1) == context["notes"].casefold()
+                    and qualifier in {"", "该效果器的", "为新效果器", context["groups"][1][0].casefold() + "的"})
+                if not note_write:
+                    return False
+                owner_prefix = qualifier
+            prospective_prefix = prospective_action_prefix(owner_prefix)
+            owner_authority = (action_adjacent_owner if prospective_prefix is not None
+                and prospective_prefix.recipient is None else source_referent)
+            if not _bound_explicit_owners_agree(owner_prefix, claim, context, source_referent=owner_authority):
+                return False
+            if noun or note_write:
+                continue
+            if (context["kind"] == "plugin" and concrete_plugin_plan and expected and approved_value
+                    and additional_action_qualifier(polarity_prefix, suffix)):
+                return False  # One approved descriptor cannot certify a second append.
+            if context["kind"] == "plugin" and expected and approved_value and uncertain_action_qualifier(polarity_prefix):
+                return False  # Later execution prose cannot make this plan definite.
+            if any(term in (local_effect.text if local_effect else claim) for term in context["protected"]):
+                return False
+            if not expected or not effect_anchor or not approved_value:
+                return False
+            if expected and action_anchored:
+                affirmative = True
+                if context["kind"] == "plugin":
+                    concrete_plugin_plan = True
+                    creation_position = action.start()
+                    quoted_notes = re.findall(r'备注(?:为|是)?\s*[“"]([^”"]*)[”"]', clause)
+                    if not context["notes"] or context["notes"].casefold() in quoted_notes:
+                        planned_effect = PlannedEffectReferent(context["groups"][1][0].casefold(), context["source_id"],
+                            context["descriptor"]["class_id"], next(iter(matched_displays)) if matched_displays else None)
+    return affirmative and (staged is None or not require_adoption or adoption)
+
+
+def _staged_claim_state(text: str, context: Mapping[str, Any], candidate: StagedNoticeEvidence) -> NoticeClaim:
+    """Validate one intervening message without requiring another effect plan.
+
+    The attested descriptor supplies only the already-established value role.
+    All owner, value, polarity and affirmative-action checks still run; absence
+    of a new effect or execution claim is compatible neutral progress.
+    """
+    compatible = _bound_context_effect(text, context, staged=candidate.referent, require_adoption=False)
+    return NoticeClaim("compatible" if compatible else "contradiction", 0, len(text), text,
+                       "" if compatible else "intervening-plan-contradiction")
+
+
+def _rtpc_notice_context(artifact: Mapping[str, Any], before: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    """Attest one existing Volume association before inheriting its identity.
+
+    The immutable request, prepared snapshot/verification plan and independent
+    baseline must agree. No identity is inferred from free-form tool prose.
+    """
+    request = artifact.get("request", {})
+    prepared = artifact.get("prepared_operation", {})
+    if not isinstance(request, Mapping) or not isinstance(prepared, Mapping):
+        return None
+    args = request.get("arguments", {})
+    plan = prepared.get("verification_plan", {})
+    state = prepared.get("pre_state", {})
+    if not all(isinstance(value, Mapping) for value in (request, prepared, args, plan, state)):
+        return None
+    def guid(value: Any) -> bool:
+        return isinstance(value, str) and re.fullmatch(r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", value) is not None
+    owner, control, association = (plan.get(key) for key in ("object_id", "control_input_id", "existing_rtpc_id"))
+    if (not all(guid(value) for value in (owner, control, association))
+            or request.get("operation") != prepared.get("operation") or prepared.get("operation") != "object.setRTPC"
+            or request.get("version") not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            or request.get("version") != prepared.get("version") or plan.get("version") != request.get("version")
+            or plan.get("kind") != "object-rtpc-state" or plan.get("action") != "update"
+            or args.get("object") != {"kind": "id", "value": owner}
+            or args.get("control_input") != {"kind": "id", "value": control}
+            or args.get("property") != "Volume" or plan.get("property") != "Volume"
+            or args.get("mode") != "add_or_replace" or "notes" in args
+            or plan.get("notes_supplied") is not False or plan.get("expected_notes") is not None):
+        return None
+    old_owner, controls, rtpcs = before.get("owner"), before.get("controls"), before.get("rtpcs")
+    snapshot = state.get("rtpc_snapshot", {})
+    if (not isinstance(old_owner, Mapping) or old_owner.get("id") != owner
+            or any(not isinstance(old_owner.get(key), str) or not old_owner[key]
+                   for key in ("name", "type", "path"))
+            or not isinstance(controls, list) or not isinstance(rtpcs, Mapping)
+            or not isinstance(snapshot, Mapping) or snapshot.get("object_id") != owner):
+        return None
+    matched = [row for row in controls if isinstance(row, Mapping) and row.get("id") == control]
+    if len(matched) != 1:
+        return None
+    for baseline, row in ((old_owner, state.get("object")), (matched[0], state.get("control_input"))):
+        if not isinstance(row, Mapping) or any(row.get(key) != baseline.get(key) for key in ("id", "name", "type", "path")):
+            return None
+    rows = snapshot.get("rows")
+    plan_rows = plan.get("before_rows")
+    if (not isinstance(plan_rows, list) or any(not isinstance(row, Mapping) or not guid(row.get("id")) for row in plan_rows)
+            or len({row["id"] for row in plan_rows}) != len(plan_rows)):
+        return None
+    if (not isinstance(rows, list) or any(not isinstance(row, Mapping) or not guid(row.get("id")) for row in rows)
+            or len({row["id"] for row in rows}) != len(rows)
+            or {row["id"]: row for row in rows} != dict(rtpcs)
+            or {row["id"]: row for row in plan_rows} != dict(rtpcs)):
+        return None
+    volume = [row for row in rows if row.get("@PropertyName") == "Volume"]
+    if (len(volume) != 1 or volume[0].get("id") != association
+            or not isinstance(volume[0].get("@ControlInput"), Mapping)
+            or volume[0]["@ControlInput"].get("id") != control):
+        return None
+    def points(value: Any) -> list[tuple[float, float]] | None:
+        if not isinstance(value, list) or not value:
+            return None
+        result = []
+        for point in value:
+            if (not isinstance(point, Mapping) or set(point) != {"x", "y", "shape"}
+                    or point["shape"] != "Linear" or any(type(point[key]) not in {int, float}
+                    or not math.isfinite(point[key]) for key in ("x", "y"))):
+                return None
+            result.append((point["x"], point["y"]))
+        return result if all(a[0] < b[0] for a, b in zip(result, result[1:])) else None
+    curve = volume[0].get("@Curve", {})
+    old = points(curve.get("points")) if isinstance(curve, Mapping) else None
+    new = points(args.get("points"))
+    if old is None or new is None or plan.get("points") != args.get("points") or old == new:
+        return None
+    delta = [point for point in new if point not in old]
+    foreign_names = {row["@PropertyName"] for row in rows
+                     if isinstance(row.get("@PropertyName"), str) and row["@PropertyName"] != "Volume"}
+    foreign_names.update(row[key] for row in controls if isinstance(row, Mapping) and row.get("id") != control
+                         for key in ("name", "path") if isinstance(row.get(key), str) and row[key])
+    return {"ids": (owner, control, association), "owner": old_owner, "old": old, "new": new, "delta": delta,
+            "foreign_names": tuple(sorted(foreign_names)),
+            "control_names": tuple(matched[0][key] for key in ("name", "path")
+                                   if isinstance(matched[0].get(key), str) and matched[0][key]),
+            "same_domain": [p[0] for p in old] == [p[0] for p in new],
+            "notes": volume[0].get("notes", "")}
+
+
+def _notice_qualifier_is_negated(qualifier: str) -> bool:
+    return re.search(r"不|未|非|没有|(?<![a-z])(?:not|never|without|non)(?![a-z])|n't", qualifier) is not None
+
+
+def _affirmative_linear_interpolation(effect_clause: str) -> bool:
+    """Require the requested shape, with polarity scoped to this effect."""
+    mentions = tuple(re.finditer(r"线性|(?<![a-z])linear(?![a-z])", effect_clause))
+    for mention in mentions:
+        # A qualifier may contain an intervening predicate ("不保持线性",
+        # "not keep linear"). Any negator in that local qualifier makes the
+        # requested affirmative shape unclear; do not guess its scope.
+        qualifier = re.split(r"[，,、。；;\n]", effect_clause[:mention.start()])[-1]
+        if _notice_qualifier_is_negated(qualifier):
+            return False
+    return bool(mentions)
+
+
+def _rtpc_volume_point_claims(text: str) -> list[tuple[float, float]] | None:
+    """Parse every numeric coordinate claim for the attested Volume role."""
+    number = r"[+-]?\d+(?:\.\d+)?"
+    points = []
+    for candidate in re.finditer(r"[（(]([^()（）]*[,，][^()（）]*)[)）]", text.replace("\u2212", "-")):
+        body = candidate.group(1)
+        if re.match(rf"\s*{number}", body) is None:
+            continue
+        point = re.fullmatch(rf"\s*({number})\s*[,，]\s*({number})(?:\s*db)?\s*", body)
+        if point is None:
+            return None
+        points.append((float(point.group(1)), float(point.group(2))))
+    return points
+
+
+def _rtpc_midpoint_value(text: str) -> tuple[float | tuple[float, float], int] | None:
+    """Read one complete midpoint value, never a parentheses-only exception."""
+    number = r"[+-]?\d+(?:\.\d+)?"
+    boundary = r"(?=\s*(?:[,，、。；;]|$))"
+    pair = re.match(rf"[（(]\s*({number})\s*[,，]\s*({number})(?:\s*db)?\s*[)）]{boundary}", text)
+    if pair:
+        value = (float(pair.group(1)), float(pair.group(2)))
+        return (value, pair.end()) if all(math.isfinite(item) for item in value) else None
+    scalar = re.match(rf"[（(]\s*({number})(?:\s*db)?\s*[)）]{boundary}|({number})(?:\s*db)?{boundary}", text)
+    if scalar:
+        value = float(scalar.group(1) or scalar.group(2))
+        return (value, scalar.end()) if math.isfinite(value) else None
+    return None
+
+
+def _rtpc_visible_shape_plan(text: str, context: Mapping[str, Any]) -> bool | None:
+    """Return the latest relevant plan's validity, or None for unrelated prose."""
+    if not (("curve" in text or "曲线" in text) and ("点" in text or "points" in text)
+            and (any(term in text for term in ("volume", "音量", "增益"))
+                 or any(name.casefold() in text for name in context["control_names"]))):
+        return None
+    number = r"[+-]?\d+(?:\.\d+)?"
+    stated_points = _rtpc_volume_point_claims(text)
+    if stated_points is None:
+        return False
+    arrow_points = [(float(x), float(y)) for x, y in re.findall(
+        rf"({number})\s*→\s*({number})", text.replace("\u2212", "-"))]
+    if arrow_points:
+        if stated_points:
+            return False
+        stated_points = arrow_points
+    stated_ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
+    counts = re.findall(r"([一二两三四五六七八九]|\d+)\s*(?:个)?(?:控制)?点|(?<!\w)(\d+)\s*points", text)
+    count_matches = all((cn or en) in {"三", "3"} for cn, en in counts)
+    return (all(value in {key.casefold() for key in context["ids"]} for value in stated_ids)
+            and len(context["new"]) == 3 and (not stated_points or stated_points == context["new"])
+            and any(term in text for term in ("volume", "音量", "增益"))
+            and any(name.casefold() in text for name in context["control_names"])
+            and count_matches and (bool(stated_points) or re.search(r"三(?:个)?(?:控制)?点|(?<!\d)3\s*points|three points", text) is not None)
+            and _affirmative_linear_interpolation(text))
+
+
+def _rtpc_coherent_actions(text: str, context: Mapping[str, Any]) -> bool:
+    """Account for every edit in a midpoint history/delta/full-result story."""
+    affirmative = False
+    for clause in re.split(r"[。；;\n]", text):
+        for action in re.finditer(_NOTICE_MUTATIONS, clause):
+            prefix, suffix = clause[:action.start()], clause[action.end():].strip()
+            qualifier = re.split(r"[，,、]", prefix)[-1]
+            if _notice_mutation_is_noun(action.group(), prefix, suffix):
+                continue
+            if _notice_qualifier_is_negated(qualifier):
+                # A refusal to edit the requested curve contradicts its final
+                # result claim. Preservation of identity/notes or a sibling
+                # remains distinct from declining this attested target edit.
+                preservation = re.fullmatch(r"(?:关系)?(?:身份|备注)(?:(?:与|和|及)(?:身份|备注))*", suffix) is not None
+                target = (re.search(r"rtpc|volume|音量|(?:该|这条|目标)(?:关系|曲线)|中点|中间点", suffix) is not None
+                          or any(name.casefold() in suffix for name in context["control_names"]))
+                if target and not preservation:
+                    return False
+                continue
+            if action.group() not in {"改为", "改成", "设为"}:
+                return False
+            value = _rtpc_midpoint_value(suffix)
+            if value is None or value[0] not in (context["new"][1], context["new"][1][1]):
+                return False
+            history = re.fullmatch(r"(?:当前|现有)(?:中点|中间点)(?:是|为)\s*(.+?)\s*[,，]\s*(?:将|会)", prefix.strip())
+            direct = re.fullmatch(r"(?:仅|只|将|把|会|现在|\s)*(?:中点|中间点)", prefix.strip())
+            if not (history or direct):
+                return False
+            if history and (
+                    _rtpc_midpoint_value(history.group(1)) is None
+                    or _rtpc_midpoint_value(history.group(1))[0] != context["old"][1]):
+                return False
+            affirmative = True
+    return affirmative
+
+
+def _rtpc_endpoint_preservation_polarity(clause: NoticeClaim) -> NoticeClaim:
+    """A complete local preservation predicate carries its own polarity."""
+    predicate = re.search(r"保持(?:原样|不变|原值)?|\bunchanged\b|\bretain(?:ed)?\b", clause.text)
+    if predicate is None or clause.text[predicate.end():].strip():
+        return clause
+    qualifier = clause.text[:predicate.start()]
+    if _notice_qualifier_is_negated(qualifier) or uncertain_action_qualifier(qualifier):
+        return clause._replace(role="invalid", diagnostic="nonaffirmative-endpoint-preservation")
+    return clause._replace(role="retained-endpoints")
+
+
+def _rtpc_retained_endpoint_claim(text: str) -> NoticeClaim | None:
+    """Preservation belongs to the endpoint clause or its coordinated list.
+
+    Coordinate commas do not split a claim. A later separate shape assertion
+    cannot supply a missing or denied endpoint predicate.
+    """
+    for clause in notice_clauses(text):
+        if re.match(r"\s*端点\s*[（(]", clause.text) is None:
+            continue
+        claim = _rtpc_endpoint_preservation_polarity(clause)
+        return claim if claim.role == "retained-endpoints" else None
+    return None
+
+
+def _rtpc_owned_endpoint_claims(text: str, context: Mapping[str, Any]) -> tuple[NoticeClaim, ...]:
+    """Bind endpoint claims locally to the certified current Volume relation.
+
+    Foreign subjects and scheduling prose never inherit this relation merely
+    because an earlier sentence named it. No preservation statement is required.
+    """
+    exact_relation = re.escape(context["ids"][2].casefold())
+    relation = r"(?:曲线|关系|curve|association|relationship)"
+    quantity_relation = rf"(?:(?:本次|当前|这次)\s*)?(?:volume|voice volume|音量|增益)\s*(?:rtpc\s*)?{relation}"
+    definite_relation = rf"(?:本次|当前|这次|该|此|这条|目标){relation}"
+    subject = rf"(?:(?:{quantity_relation}|{definite_relation}|{exact_relation})\s*(?:的)?\s*)?"
+    claims = []
+    for clause in notice_clauses(text):
+        noun = re.match(rf"\s*{subject}(?:两端(?:点)?|端点|首尾点|endpoints)\s*", clause.text)
+        if noun is None:
+            continue
+        # Polarity starts after the bound subject/noun, retaining original spans.
+        predicate = clause._replace(start=clause.start + noun.end(), text=clause.text[noun.end():])
+        claims.append(_rtpc_endpoint_preservation_polarity(predicate))
+    return tuple(claims)
+
+
+def _rtpc_ancillary_claims(text: str, context: Mapping[str, Any]) -> tuple[NoticeClaim, ...]:
+    """Retain the adapter's attested association role separately from Sound.
+
+    Only its complete affirmative GUID comparison is nonwriting bookkeeping.
+    It never supplies a primary owner, curve values or association certification.
+    The existing context already proves one Volume association independently.
+    """
+    claims = []
+    guid = r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}"
+    role = rf"(?:目标|该|这条)(?:关系|关联)\s*guid(?:\s+({guid}))?"
+    supplied = rf"(?:用户|你)提供的(?:\s*guid(?:\s+({guid}))?)?"
+    for claim in ancillary_claims(text, NoticeRoleContext(context["owner"])):
+        if claim.role == "invalid" and claim.diagnostic == "unclosed-primary-identity-comparison":
+            local = re.sub(r"^\s*预览已(?:核对|确认)[:：]\s*", "", claim.text)
+            frame = re.fullmatch(rf"\s*{role}\s*与\s*{supplied}\s*一致\s*", local)
+            if frame and all(value is None or value == context["ids"][2].casefold() for value in frame.groups()):
+                claim = claim._replace(role="association-identity-comparison", diagnostic="")
+        claims.append(claim)
+    return tuple(claims)
+
+
+def _rtpc_preview_actions_accounted(text: str, context: Mapping[str, Any],
+                                   concrete_actions: Sequence[NoticeClaim] = ()) -> bool:
+    """Keep each affirmative edit outside validated action/noun spans visible."""
+    ancillary = _rtpc_ancillary_claims(text, context)
+    if any(claim.role == "invalid" for claim in ancillary):
+        return False
+    neutral_roles = {"owner-attestation", "authorization", "preview-status", "execution-status",
+                     "read-summary", "matched-display", "verification-basis"}
+    for clause in notice_clauses(text):
+        if re.fullmatch(r"(?:新增|移除)关系计数为(?:零|0)", clause.text.strip()):
+            continue
+        for mutation in re.finditer(_NOTICE_MUTATIONS, clause.text):
+            start, end = clause.start + mutation.start(), clause.start + mutation.end()
+            if any(claim.start <= start and end <= claim.end for claim in concrete_actions):
+                continue  # Only the proven verb span; never its entire sentence.
+            if any(claim.role in neutral_roles and claim.start <= start and end <= claim.end for claim in ancillary):
+                continue
+            prefix, suffix = clause.text[:mutation.start()], clause.text[mutation.end():]
+            qualifier = re.split(r"[，,、]", prefix)[-1]
+            if _notice_qualifier_is_negated(qualifier) or _notice_mutation_is_noun(mutation.group(), prefix, suffix):
+                continue
+            if (re.search(r"(?:中点|中间点|midpoint|middle point)\s*$", qualifier) is None
+                    or mutation.group() not in {"改为", "改成", "设为", "set", "change"}):
+                return False
+    return True
+
+
+def _rtpc_notice_effect(text: str, context: Mapping[str, Any], *, earlier_points: bool, earlier_shape: bool = False) -> tuple[bool, bool]:
+    """Recognize a full curve or accurate point delta in the attested context."""
+    # The immutable Preview noun is not a negated edit qualifier.
+    text = re.sub(r"`([^`\n]+)`", r"\1", text).replace("不可变预览", "预览")
+    if any(claim.role == "invalid" for claim in _rtpc_ancillary_claims(text, context)):
+        return False, False
+    numeric = text.replace("\u2212", "-")
+    if _rtpc_volume_point_claims(numeric) is None:
+        return False, False
+    ids = re.findall(r"\{[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\}", text)
+    if any(value not in {key.casefold() for key in context["ids"]} for value in ids):
+        return False, False
+    # A negated change preserves the field. Polarity is local to a clause;
+    # an English coordinated verb may share it, but a later clause cannot.
+    protected = r"(?:备注|身份|其他控制曲线|notes|identity|pitch|time)"
+    changes = re.compile(rf"(?:修改|更新|删除|改变|\b(?:change|update|delete|remove)\b)\s*(?:这条关系的|该\s*\w+\s*的\s*)?{protected}|{protected}\s*(?:改为|改成|更新为|修改为)")
+    for clause in re.split(r"[。；;,，.\n]|\bbut\b|但", text):
+        previous_end = 0
+        negated = False
+        for change in changes.finditer(clause):
+            prefix = clause[:change.start()]
+            local_negation = re.search(r"(?:不(?:会|再|要)?|\b(?:not|never)|n't)\s*$", prefix) is not None
+            shared_negation = (negated and previous_end > 0
+                               and re.fullmatch(r"\s*(?:and|or)\s*", clause[previous_end:change.start()]) is not None)
+            negated = local_negation or shared_negation
+            if not negated:
+                return False, False
+            previous_end = change.end()
+    number = r"[+-]?\d+(?:\.\d+)?"
+    def pairs(part: str) -> list[tuple[float, float]]:
+        return _rtpc_volume_point_claims(part) or []
+    full = False
+    effect = False
+    clauses = re.split(r"[。；;\n]", numeric)
+    whole_target = (context["ids"][2].casefold() in text or
+                    (any(term in text for term in ("volume", "音量", "增益"))
+                     and any(term in text for term in ("curve", "曲线", "关系", "association", "relationship"))))
+    same_target_clauses = [clause for clause in clauses if not any(
+        re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", clause)
+        for name in context["foreign_names"])
+        and not (re.search(r"(?:其他|另一条|other|sibling).*?(?:曲线|curve|关系|association|relationship)", clause)
+                 and not re.search(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause))]
+    retention = "\n".join(same_target_clauses)
+    # A remainder already matching the sealed goal implies preservation only
+    # when that exact remainder was unchanged in the approved request.
+    rest_already_matches = (len(context["new"]) == 3 and len(context["delta"]) == 1
+        and context["same_domain"] and re.search(r"其余(?:两|2)点|remaining (?:two|2) points", retention) is not None
+        and any(term in retention for term in ("符合目标", "match the target")))
+    shape_clauses = "\n".join(clause for clause in same_target_clauses if "linear" in clause or "线性" in clause)
+    notice_shape = _affirmative_linear_interpolation(shape_clauses) if shape_clauses else earlier_shape
+    # Cardinalities describe the whole curve only inside a local shape/count
+    # frame. A time of day elsewhere in the notice is not a curve claim.
+    cardinal = r"[0-9零一二两三四五六七八九十]+"
+    for clause in notice_clauses(numeric):
+        if any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", clause.text)
+               for name in context["foreign_names"]):
+            continue
+        for count in re.finditer(rf"(?P<count>{cardinal})\s*(?:点|points)\s*(?=linear|线性)", clause.text):
+            if notice_count(count.group("count")) != len(context["new"]):
+                return False, False
+        for count in re.finditer(rf"(?:曲线|curve)\s*(?:共|有|包含|has|contains)\s*(?P<count>{cardinal})\s*(?:点|points)", clause.text):
+            if notice_count(count.group("count")) != len(context["new"]):
+                return False, False
+    def requested_shape(part: str) -> bool:
+        return notice_shape and (not ("linear" in part or "线性" in part)
+                                 or _affirmative_linear_interpolation(part))
+    old, new = context["old"], context["new"]
+    if (len(old) >= 2 and len(new) >= 2 and old[0] == new[0] and old[-1] == new[-1]
+            and any(claim.role == "invalid" for claim in _rtpc_owned_endpoint_claims(numeric, context))):
+        return False, False
+    explicit_retained_endpoints = False
+    for remainder in same_target_clauses:
+        if re.search(r"两端(?:点)?\s*仍为", remainder):
+            if len(old) != 3 or len(new) != 3 or pairs(remainder) != [new[0], new[2]] or old[0] != new[0] or old[2] != new[2]:
+                return False, False
+            explicit_retained_endpoints = True
+    middle_edit = (len(old) == len(new) == 3 and context["same_domain"]
+                   and old[0] == new[0] and old[2] == new[2] and context["delta"] == [new[1]])
+    complete_current_curve = False
+    current_midpoint_seen = False
+    coherent_final = False
+    for final_clause in clauses:
+        if re.search(r"(?:提交后|修改后|更新后|最终)(?:的)?曲线(?:为|是)", final_clause):
+            if re.match(r"\s*(?:提交后|修改后|更新后|最终)(?:的)?曲线(?:为|是)", final_clause) is None:
+                return False, False
+            if pairs(final_clause) != new or not requested_shape(final_clause):
+                return False, False
+            coherent_final = True
+    coherent_final = coherent_final and middle_edit
+    if coherent_final and not _rtpc_coherent_actions(numeric, context):
+        return False, False
+    # Preview inheritance covers only the sealed midpoint edit. Every other
+    # affirmative mutation remains a contradiction, even without an owner label.
+    sibling_names = [name for name in context["foreign_names"] if "\\" not in name]
+    preview_actions_accounted = _rtpc_preview_actions_accounted(numeric, context)
+    concrete_actions = []
+    retained_middle_seen = False
+    clause_cursor = 0
+    for clause_index, clause in enumerate(clauses):
+        clause_start = numeric.find(clause, clause_cursor)
+        clause_cursor = clause_start + len(clause)
+        point_reference = "该点" in clause
+        if point_reference and middle_edit:
+            prefix = "\n".join(clauses[:clause_index]) + clause.split("该点", 1)[0]
+            antecedents = pairs(prefix)
+            if antecedents == [old[1]] and re.search(r"中点|中间点|midpoint|middle point", prefix):
+                clause = clause.replace("该点", "中点")
+            else:
+                return False, False
+        scalar_middles = tuple(re.finditer(
+            rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*(?P<old>{number})(?:\s*db)?\s*)?"
+            rf"(?:改为|改成|设为|设置为|(?:will be )?set to|change to)\s*(?P<new>{number})(?:\s*db)?(?=\s*(?:[,，、。；;]|$))", clause))
+        # Detect the requested edit role before interpreting its value. An
+        # unknown value/unit is a malformed affirmative claim, not no claim.
+        intents = tuple(re.finditer(
+            r"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*(?P<origin>.*?)\s*)?"
+            r"(?P<edit>改为|改成|设为|设置为|(?:will be )?set to|change to)", clause))
+        if intents and (len(context["old"]) != 3 or len(context["new"]) != 3):
+            return False, False
+        preserved_claims = set()
+        preserved_actions = set()
+        for intent in intents:
+            qualifier = re.split(r"[，,、]", clause[:intent.start()])[-1]
+            negated = _notice_qualifier_is_negated(qualifier)
+            parsed = next((claim for claim in scalar_middles if claim.start() == intent.start()), None)
+            value_claim = _rtpc_midpoint_value(clause[intent.end():].lstrip())
+            claimed_value = value_claim[0] if value_claim else None
+            if negated:
+                if claimed_value in (context["new"][1][1], context["new"][1]):
+                    return False, False
+                preserved_claims.add(intent.start())
+                preserved_actions.add(intent.start("edit"))
+            elif value_claim is None:
+                return False, False
+            elif parsed is None:
+                if claimed_value != context["new"][1]:
+                    return False, False
+                origin = intent.group("origin")
+                if origin is not None:
+                    origin = origin.strip()
+                    before_value = _rtpc_midpoint_value(origin)
+                    if (before_value is None or before_value[1] != len(origin)
+                            or before_value[0] not in (context["old"][1][1], context["old"][1])):
+                        return False, False
+        scalar_middles = tuple(claim for claim in scalar_middles if claim.start() not in preserved_claims)
+        for history in re.finditer(r"(?:当前|现有|current)\s*(?:中点|中间点|midpoint|middle point)\s*(?:为|是|is)\s*", clause):
+            if len(context["old"]) != 3:
+                return False, False
+            value = _rtpc_midpoint_value(clause[history.end():].lstrip())
+            if value is None or value[0] not in (context["old"][1][1], context["old"][1]):
+                return False, False
+            current_midpoint_seen = True
+        target_clause = (any(term in clause for term in ("volume", "音量", "增益"))
+                         and any(term in clause for term in ("curve", "曲线", "rtpc"))) or whole_target
+        historical = (any(term in clause for term in ("现有", "当前", "现状", "existing", "current"))
+                      or re.search(r"(?:中点|中间点|midpoint|middle point)\s*(?:从|from)", clause) is not None)
+        primary_history = clause in same_target_clauses and re.search(r"目标关系|现有关联|当前.*(?:曲线|节点)|current.*curve", clause) is not None
+        if (target_clause or scalar_middles or primary_history) and historical:
+            # Validate claimed history before either tuple or scalar dispatch.
+            previous = pairs(re.split(r"改为|改成|更新为|修改为|设为|设置为|update|replace|change|set", clause)[0])
+            if any(point not in context["old"] for point in previous):
+                return False, False
+            if clause in same_target_clauses and previous == old:
+                complete_current_curve = True
+        if scalar_middles:
+            if len(context["new"]) != 3:
+                return False, False
+            if any(float(claim.group("new")) != context["new"][1][1]
+                   or (claim.group("old") is not None and float(claim.group("old")) != context["old"][1][1])
+                   or _notice_qualifier_is_negated(re.split(r"[，,、]", clause[:claim.start()])[-1])
+                   or any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
+                                    re.split(r"[，,、]", clause[:claim.start()])[-1])
+                          for name in context["foreign_names"])
+                   for claim in scalar_middles):
+                return False, False
+            scalar_middle = scalar_middles[-1]
+            old, new = context["old"], context["new"]
+            following = clause[scalar_middle.end():]
+            # A complete, attested before-state plus a prospective *only*
+            # middle-Y edit proves the retained remainder without duplicating
+            # its coordinates. This is not a one-point replacement curve.
+            prefix = re.split(r"[，,、]", clause[:scalar_middle.start()])[-1]
+            introduction = r"(?:预览|确认|即将|现在|我|会|将|仅|只|把|\s)*"
+            association = rf"(?:volume|voice volume|音量|增益)(?:\s*/\s*(?:{'|'.join(re.escape(name.casefold()) for name in context['control_names'])}))?\s*(?:曲线|curve)的?"
+            prospective_remainder = (complete_current_curve and middle_edit
+                and (re.search(r"只|仅|\bonly\b", prefix) is not None
+                     or (re.search(r"(?:另外|其余)(?:两|2)点", following) is not None
+                         and re.search(r"保持(?:原样|不变)|unchanged", following) is not None))
+                and re.fullmatch(rf"{introduction}(?:{association}|(?:该|目标)(?:现有)?关系的)?", prefix) is not None
+                and not pairs(following) and requested_shape(following))
+            # This point role has one meaning only in an attested three-point
+            # curve whose sole change is the middle y value. Endpoints must
+            # be stated, not inferred from a generic preservation claim.
+            inherited_endpoints = (point_reference and earlier_points and not pairs(following)
+                                   and re.search(r"保留(?:两端点|首尾点)", following) is not None)
+            preview_remainder = (preview_actions_accounted and middle_edit and earlier_points and earlier_shape and current_midpoint_seen
+                and re.fullmatch(r"(?:现在)?按(?:不可变)?预览(?:把|将)(?:(?:该|同一|原)(?:关系)?的)?", prefix.strip()) is not None
+                and any(name.casefold() in text for name in context["control_names"])
+                and whole_target and not pairs(numeric) and bool(sibling_names)
+                and isinstance(context["notes"], str)
+                and re.search(r"保留(?:同一|原)(?:关系)?身份(?:与|和|及)备注", retention) is not None
+                and any(all(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])", sibling)
+                            for name in sibling_names)
+                        and re.search(r"不在本次改动范围|保持原样|不(?:会)?修改", sibling) is not None
+                        for sibling in clauses if sibling not in same_target_clauses)
+                and requested_shape(following))
+            if preview_remainder:
+                # A quoted before-state note must still agree with the sealed
+                # relationship; preservation cannot rescue a false history.
+                note_claims = re.findall(r"备注为[“\"]([^”\"]*)[”\"]", text)
+                if any(note != context["notes"].casefold() for note in note_claims):
+                    return False, False
+            if (len(old) != 3 or len(new) != 3 or not context["same_domain"]
+                    or old[0] != new[0] or old[2] != new[2]
+                    or context["delta"] != [new[1]] or old[1][1] == new[1][1]
+                    or float(scalar_middle.group("new")) != new[1][1]
+                    or not (preview_remainder or prospective_remainder or inherited_endpoints or (pairs(following) == [new[0], new[2]]
+                        and any(term in following for term in ("保持", "unchanged", "retain"))
+                        and any(term in following for term in ("不变", "原值", "unchanged"))))
+                    or not (requested_shape(following) if (preview_remainder or prospective_remainder) else _affirmative_linear_interpolation(following))):
+                return False, False
+            effect = True
+            continue
+        if not target_clause:
+            continue
+        for action in re.finditer(r"更新为|替换为|修改为|改为|改成|设为|设置为|update|replace|change|set", clause):
+            if action.start() in preserved_actions:
+                continue
+            following = clause[action.end():]
+            stated = pairs(following)
+            if stated and any(re.search(rf"(?<![a-z0-9_]){re.escape(name.casefold())}(?![a-z0-9_])",
+                                       clause[:action.start()]) for name in context["foreign_names"]):
+                return False, False
+            # A changed-point explanation followed by the exact full result is
+            # two compatible claims, not four authored curve points. Require
+            # the closed middle-y role and this exact sequence; never dedup.
+            direct_middle_claim = re.search(
+                rf"(?:中点|中间点|midpoint|middle point)\s*(?:(?:从|from)\s*[（(]\s*{number}\s*[,，]\s*{number}(?:\s*db)?\s*[)）])?\s*$",
+                clause[:action.start()]) is not None
+            coherent_middle = re.fullmatch(
+                rf".*?(?:当前|现有)(?:中点|中间点)(?:是|为)\s*[（(]\s*{number}\s*[,，]\s*{number}(?:\s*db)?\s*[)）]\s*[,，]\s*(?:将|会)",
+                clause[:action.start()]) is not None
+            if coherent_middle and pairs(clause[:action.start()]) != [old[1]]:
+                return False, False
+            first_pair = re.search(rf"[（(]\s*{number}\s*[,，]\s*{number}\s*[)）]", following)
+            separate_result = (first_pair is not None and re.match(
+                r"\s*[,，]\s*(?:曲线点(?:为|是)|curve points(?: are| will be)?)\s*[（(]",
+                following[first_pair.end():]) is not None)
+            if middle_edit and direct_middle_claim and separate_result and stated == context["delta"] + new:
+                stated = new
+            retained_middle = (middle_edit and direct_middle_claim and pairs(clause[:action.start()]) == [old[1]]
+                and stated == [new[1], new[0], new[2]]
+                and _rtpc_retained_endpoint_claim(following) is not None
+                and (not shape_clauses or notice_shape)
+                and _affirmative_linear_interpolation(following))
+            if stated == context["new"] and requested_shape(following):
+                full = effect = True
+            elif retained_middle:
+                effect = True  # The exact midpoint delta plus ordered unchanged endpoints.
+                retained_middle_seen = True
+                concrete_actions.append(NoticeClaim("curve-edit", clause_start + action.start(),
+                    clause_start + action.end(), action.group()))
+            elif (stated == context["delta"] and stated and context["same_domain"]
+                  and (rest_already_matches or explicit_retained_endpoints or (middle_edit and coherent_final and coherent_middle) or (middle_edit and direct_middle_claim and complete_current_curve) or
+                       (any(term in retention for term in ("两端", "其余点", "endpoints", "other points"))
+                        and any(term in retention for term in ("保持", "不变", "unchanged"))))
+                  and requested_shape(following)):
+                effect = True
+            elif (not stated and earlier_points and any(term in following for term in (
+                    "指定", "上述", "前述", "requested", "specified", "above"))
+                  and _affirmative_linear_interpolation(following)):
+                effect = True
+            elif stated:
+                return False, False
+    if retained_middle_seen and not _rtpc_preview_actions_accounted(numeric, context, concrete_actions):
+        return False, False
+    return effect or coherent_final, full or coherent_final
+
+
+def expansion_preview_notice(result: Any, command_records: Sequence[Any], *,
+                             version: str, execute_expected: bool,
+                             preview_artifact: Mapping[str, Any],
+                             before_snapshot: Mapping[str, Any]) -> bool:
+    """Require a reviewable expected effect after Preview and before Execute.
+
+    A reference to an earlier visible expected result is sufficient only if
+    that result itself meets the sealed request's concrete effect obligations.
+    Generic progress, a bare Preview mention, and tool output are not notices.
+    """
+    groups = _expansion_effect_groups(preview_artifact, before_snapshot)
+    if not groups:
+        return False
+    prepared_rtpc = (preview_artifact.get("request", {}).get("operation") == "object.setRTPC"
+                     and "prepared_operation" in preview_artifact)
+    rtpc_context = _rtpc_notice_context(preview_artifact, before_snapshot) if prepared_rtpc else None
+    if prepared_rtpc and rtpc_context is None:
+        return False
+    attenuation_operation = (preview_artifact.get("request", {}).get("operation") == "waapi.call"
+        and preview_artifact.get("request", {}).get("arguments", {}).get("api") == ATTENUATION_API)
+    attenuation_context = attenuation_notice_context(preview_artifact, before_snapshot, version) if attenuation_operation else None
+    if attenuation_operation and attenuation_context is None:
+        return False
+    context_operation = preview_artifact.get("request", {}).get("operation") in {"object.createPlugin", "object.setReference"}
+    bound_context = _bound_context_notice(preview_artifact, before_snapshot) if context_operation and "prepared_operation" in preview_artifact else None
+    if context_operation and "prepared_operation" in preview_artifact and bound_context is None:
+        return False
+    earlier_points = False
+    earlier_shape = False
+    notice_messages: list[str] = []
+    commands = {}
+    for record in command_records:
+        argv = normalized_gateway_command_argv(record.argv, expected_wwise_version=version)
+        if len(argv) >= 4:
+            commands[record.command] = argv[3]
+    preview_seen = False
+    notice_seen = False
+    earlier_effect = False
+    artifact_digest = hashlib.sha256(json.dumps(preview_artifact, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")).hexdigest()
+    candidate: StagedNoticeEvidence | None = None
+    competing_candidate = False
+    sealed_candidate: StagedNoticeEvidence | None = None
+    for event_index, event in enumerate(parse_jsonl_events(result.stdout)):
+        item = event.get("item")
+        if not isinstance(item, Mapping):
+            continue
+        command = commands.get(item.get("command"))
+        if item.get("type") == "command_execution" and command == "execute":
+            return notice_seen if execute_expected else False
+        if event.get("type") != "item.completed":
+            continue
+        if item.get("type") == "command_execution" and command == "preview-from-draft":
+            preview_seen = True
+            notice_messages.clear()
+            notice_seen = False
+            sealed_candidate = candidate if not competing_candidate else None
+        elif item.get("type") == "agent_message":
+            text = str(item.get("text", "")).casefold()
+            def mentions(term: str) -> bool:
+                if re.fullmatch(r"-?\d+(?:\.\d+)?", term):
+                    return any(float(value) == float(term) for value in
+                               re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\d.])", text.replace("\u2212", "-")))
+                return term.casefold() in text
+            effect = all(any(mentions(term) for term in group) for group in groups)
+            if attenuation_context is not None:
+                if preview_seen:
+                    notice_messages.append(text)
+                effect = attenuation_notice_effect("\n".join(notice_messages) if preview_seen else text, attenuation_context)
+                if preview_seen:
+                    notice_seen = effect
+            if bound_context is not None:
+                if preview_seen:
+                    notice_messages.append(text)
+                staged = sealed_candidate.referent if sealed_candidate is not None and sealed_candidate.artifact_digest == artifact_digest else None
+                effect = _bound_context_effect("\n".join(notice_messages) if preview_seen else text, bound_context)
+                if not effect and preview_seen and staged is not None:
+                    effect = _bound_context_effect("\n".join(notice_messages), bound_context, staged=staged)
+                if not preview_seen and bound_context["kind"] == "plugin":
+                    if effect:
+                        role = NoticeRoleContext({"id": bound_context["source_id"], "name": bound_context["source_names"][0],
+                            "path": bound_context["source_names"][-1], "type": "Sound"})
+                        labels = {claim.value for claim in (matched_display_claim(clause, role) for clause in notice_clauses(text))
+                            if claim.role == "matched-display"}
+                        proposed = StagedNoticeEvidence(artifact_digest, event_index,
+                            PlannedEffectReferent(bound_context["groups"][1][0].casefold(), bound_context["source_id"],
+                                bound_context["descriptor"]["class_id"], next(iter(labels)) if len(labels) == 1 else None))
+                        if candidate is not None and candidate.referent != proposed.referent:
+                            competing_candidate = True
+                        candidate = proposed
+                    elif candidate is not None and _staged_claim_state(text, bound_context, candidate).role == "contradiction":
+                        # A subsequent active competing plan must not leave a
+                        # previous successful descriptor sticky. Neutral tool
+                        # output never enters this Agent-only ledger.
+                        competing_candidate = True
+                if preview_seen:
+                    notice_seen = effect
+            if rtpc_context is not None:
+                if preview_seen:
+                    notice_messages.append(text)
+                notice_text = "\n".join(notice_messages) if preview_seen else text
+                effect, full_points = _rtpc_notice_effect(notice_text, rtpc_context,
+                    earlier_points=earlier_points, earlier_shape=earlier_shape)
+                earlier_points = earlier_points or full_points
+                if not preview_seen:
+                    shape_plan = _rtpc_visible_shape_plan(text, rtpc_context)
+                    if shape_plan is not None:
+                        earlier_shape = shape_plan
+                        number = r"[+-]?\d+(?:\.\d+)?"
+                        arrow = [(float(x), float(y)) for x, y in re.findall(
+                            rf"({number})\s*→\s*({number})", text.replace("\u2212", "-"))]
+                        if arrow:
+                            earlier_points = shape_plan and arrow == rtpc_context["new"]
+                if preview_seen:
+                    # Re-evaluate the complete notice so later contradictions
+                    # cannot hide behind an earlier successful fragment.
+                    notice_seen = effect
+            reference = attenuation_context is None and rtpc_context is None and bound_context is None and earlier_effect and any(term in text for term in (
+                "expected result above", "expected changes above", "changes described above",
+                "result just described", "plan above", "上述预期", "上面的预期", "刚才说明的", "上述变更", "按以上方案"))
+            if preview_seen and (effect or reference):
+                notice_seen = True
+            earlier_effect = earlier_effect or effect
+    return notice_seen and not execute_expected
+
+
+def run_expansion_codex_task(
+    *, unit: Any, prepared: Any, task_root: Path, options: Any,
+    runner_environment: Mapping[str, str], scoped_paths: Mapping[str, str],
+    reconcile_after_failure: Callable[[], Mapping[str, Any]],
+) -> Mapping[str, Any]:
+    """Use the existing fresh task/Broker with the opt-in outcome policy.
+
+    Unlike frozen recipe profiles, accepted Gateway calls are reconciled to
+    authenticated records rather than an exact hidden command count. Independent
+    case oracles and the same isolation/no-bypass facts remain hard gates.
+    """
+    from tests.semantic.support.codex_expansion_broker_policy import ExpansionBrokerPolicy
+    from wwise_waapi.transactions import TransactionStore
+    from tests.semantic.support.codex_expansion_policy import CumulativeAgentBudget, canonical_digest, classify_expansion_outcome
+
+    root = Path(task_root)
+    if root.exists():
+        raise V3TaskRunnerError("expansion requires a fresh task evidence directory")
+    root.mkdir(parents=True)
+    workspace = root / "agent-workspace"
+    skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
+    policy = ExpansionBrokerPolicy(prepared=prepared, version=unit.version,
+                                    skill_source=options.skill_source, scoped_paths=scoped_paths)
+    budget = CumulativeAgentBudget()
+    prompts = (prepared.prompt,)
+    if prepared.policy == "ask_before_changes":
+        prompts += ("这一步预览没问题，按当前预览执行并核验结果。",)
+    plan = {
+        "contract": "waapi-skill.integration-expansion-task-plan/v1",
+        "unit_id": unit.unit_id, "version": unit.version, "policy": prepared.policy,
+        "operation": prepared.operation, "request_schema_uri": prepared.request_schema_uri,
+        "accepted_verification_states": sorted(prepared.accepted_verification_states),
+        "prompts": list(prompts), "before": prepared.before,
+        "required_assertions": sorted(prepared.required_assertions),
+        "read_scope_sha256": policy.reads.scope.digest,
+        "read_scope": {key: sorted(value) if isinstance(value, frozenset) else value
+                       for key, value in asdict(policy.reads.scope).items()},
+        "oracle_parameters": dict(prepared.archive_oracle_parameters),
+        "preview_parameters": dict(prepared.archive_preview_parameters),
+        "inputs_sha256": options.campaign_inputs_sha256,
+        "platform_name": os.name,
+        "skill_source": str(options.skill_source.resolve()),
+        "trusted_python": str(Path(sys.executable).resolve()),
+        "windows_powershell_core_host": (asdict(options.windows_powershell_core_host)
+                                         if options.windows_powershell_core_host else None),
+        "scoped_paths": dict(scoped_paths),
+        "agent_budget": {"hard_seconds": 600, "slow_seconds": 420},
+        "model": options.model, "reasoning_effort": options.reasoning_effort,
+        "service_tier": options.service_tier,
+    }
+    from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as notice_contract, CASES as notice_cases
+    if unit.unit_id.rsplit("-", 1)[-1] in notice_cases:
+        from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_runtime_identity
+        plan["notice_adjudication"] = {"configuration": reviewer_configuration(notice_contract),
+            "runtime": reviewer_runtime_identity(options)}
+    _write_json(root / "expansion-plan.json", {**plan, "sha256": canonical_digest(plan)})
+    allowed_subcommands = (
+        "status", "operations", "operation-schema", "request-schema", "query-schema", "query-object", "metadata",
+        "draft-start", "draft-bind-object", "draft-discover-fields", "draft-discover-types",
+        "draft-inspect", "draft-check", "draft-business-configure", "draft-declare-import-batch",
+        "draft-declare-rtpc", "draft-declare-new", "draft-declare-existing", "draft-declare-field-change", "draft-declare-core-plan",
+        "draft-revise-declaration", "draft-remove-declaration", "draft-add-media",
+        "preview-from-draft", "transaction-show", "confirm", "execute", "verify",
+    )
+    config = CodexHarnessConfig(
+        workspace=workspace, skill_source=options.skill_source, codex_binary=options.codex_binary,
+        auth_json=options.auth_json, model=options.model, reasoning_effort=options.reasoning_effort,
+        service_tier=options.service_tier, timeout_seconds=600,
+        windows_powershell_core_host=options.windows_powershell_core_host,
+        expected_gateway_subcommands=allowed_subcommands, expected_wwise_version=unit.version,
+        sandbox_mode="workspace-write", allow_output_write=False, network_access=True,
+        developer_instructions=semantic_task_developer_instructions(
+            options.skill_source / "scripts" / "run.py", task_skill_source=skill_install,
+            expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+            expansion_modification_policy=prepared.policy,
+        ),
+    )
+    broker = CodexGatewayBroker(
+        skill_source=options.skill_source, invocation_skill_source=skill_install,
+        expected_steps=(), expected_wwise_version=unit.version,
+        project_modification_policy=prepared.policy, runner_environment=runner_environment,
+        working_root=root / "broker", transport="tcp", runner_timeout_seconds=120,
+        expansion_outcome_policy=policy,
+    )
+    cumulative_argvs: list[tuple[str, ...]] = []
+    cumulative_command_records: list[CodexCommandRecord] = []
+    turn_rows: list[dict[str, Any]] = []
+    allowed_references = {"SKILL.md", "references/waapi-operate.md", "references/waapi-query.md",
+                          "references/waapi-setup.md", "references/waapi-coverage.md"}
+    thread_id = ""
+    failure: Exception | None = None
+    infrastructure: Mapping[str, Any] | None = None
+    try:
+        with broker:
+            with CodexCliTask(config, extra_env=broker.model_environment_overrides(),
+                              agent_case_budget=budget) as task:
+                for index, prompt in enumerate(prompts, start=1):
+                    policy.begin_turn(index, prompt)
+                    output_dir = root / "turns" / f"turn-{index:02d}"
+                    elapsed_before = budget.elapsed_seconds
+                    try:
+                        result = (task.run_initial(prompt, output_dir=output_dir) if index == 1 else
+                                  task.run_followup(prompt, output_dir=output_dir))
+                    except CodexInfrastructureError as exc:
+                        infrastructure = asdict(exc.failure)
+                        thread_id = task.thread_id
+                        reconciliation = broker.reconcile(cumulative_argvs, require_complete=False)
+                        grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
+                            reconciliation, {"completed_turn": False}, (str(exc),))
+                        _archive_turn(output_dir, prompt=prompt, result=exc.result, grade=grade)
+                        raise
+                    thread_id = task.thread_id
+                    cumulative_argvs.extend(_gateway_candidate_argvs(
+                        result, skill_source=options.skill_source, alternate_skill_sources=(skill_install,),
+                        expected_wwise_version=unit.version))
+                    reconciliation = broker.reconcile(cumulative_argvs, require_complete=False)
+                    facts = result.command_facts
+                    references = tuple(facts.skill_read_files)
+                    records = facts.command_records
+                    effective_count = len(records) - len(recoverable_preprocess_attempt_indexes(records))
+                    command_rows = _gateway_candidate_records(result, skill_source=options.skill_source,
+                                                              alternate_skill_sources=(skill_install,),
+                                                              expected_wwise_version=unit.version)
+                    cumulative_command_records.extend(command_rows)
+                    reconciliation = _bind_gateway_prefix_reconciliation(
+                        reconciliation, command_records=cumulative_command_records,
+                        broker_evidence=broker.evidence(),
+                        windows_powershell_core_host=task.windows_powershell_core_host,
+                        allow_expansion_read_interleaving=True,
+                    )
+                    gates = {
+                        "memory_isolated": result.isolation_audit.passed and not result.prompt_audit.has_memory,
+                        "completed_turn": result.exit_status == 0 and not result.timed_out and result.session_audit.passed,
+                        "one_target_skill": result.prompt_audit.passed,
+                        "no_collaboration": result.collab_call_count == 0,
+                        "only_packaged_references": (len(references) <= 12 and set(references).issubset(allowed_references)
+                                                      and (index != 1 or bool(references) and references[0] == "SKILL.md")),
+                        "only_authenticated_gateway_and_skill_reads": (
+                            effective_count == len(command_rows) + len(facts.allowed_read_commands)
+                            and not facts.non_gateway_unexpected_commands),
+                        "no_discovery_or_direct_waapi": not facts.discovery_commands and not facts.direct_waapi_client_commands,
+                        "no_write_like_commands": not facts.write_like_commands,
+                        "source_and_workspace_unchanged": (result.file_change_count == 0 and result.skill_tree_unchanged
+                            and not result.created_source_files and not result.modified_source_files and not result.deleted_source_files),
+                        "broker_provenance": reconciliation.passed,
+                        "policy_checkpoint": (policy.transaction.state == "previewed"
+                            if prepared.policy == "ask_before_changes" and index == 1 else policy.complete),
+                        "visible_preview_notice": (index != 1 or expansion_preview_notice(
+                            result, command_rows, version=unit.version,
+                            execute_expected=prepared.policy == "allow_changes",
+                            preview_artifact=(TransactionStore(broker.state_directory).load_preview(
+                                policy.transaction_id).artifact if policy.transaction_id else {}),
+                            before_snapshot=prepared.before)),
+                        "final_response_present": bool(result.final_response.strip()),
+                        "cumulative_agent_budget": budget.elapsed_seconds <= budget.hard_seconds,
+                    }
+                    if index == 1 and "notice_adjudication" in plan:
+                        from tests.semantic.support.codex_expansion_notice_adjudication import grade_expansion_notice
+                        notice = grade_expansion_notice(result, command_rows, version=unit.version,
+                            case_id=unit.unit_id.rsplit("-", 1)[-1],
+                            preview_parameters=prepared.archive_preview_parameters,
+                            execute_expected=prepared.policy == "allow_changes",
+                            preview_artifact=(TransactionStore(broker.state_directory).load_preview(
+                                policy.transaction_id).artifact if policy.transaction_id else {}),
+                            before_snapshot=prepared.before, transaction_id=policy.transaction_id or "",
+                            user_prompt=prompt, broker_records=broker.evidence().records, read_admission=policy.reads,
+                            other_gates={key: value for key, value in gates.items()
+                                if key != "visible_preview_notice"}, root=output_dir, options=options)
+                        gates["visible_preview_notice"] = notice["passed"]
+                    grade = V3TurnGrade(index, _sha256_text(prompt), len(broker.evidence().records),
+                                        reconciliation, gates, tuple(key for key, passed in gates.items() if not passed))
+                    _archive_turn(output_dir, prompt=prompt, result=result, grade=grade)
+                    turn_rows.append({"index": index, "gates": gates,
+                                      "agent_seconds": budget.elapsed_seconds - elapsed_before,
+                                      **({"notice_invocation_binding_sha256": notice["invocation_binding_sha256"]}
+                                         if index == 1 and "notice_adjudication" in plan else {})})
+                    if not grade.passed:
+                        raise V3TaskRunnerError("expansion turn failed: " + ", ".join(grade.errors), thread_id=thread_id)
+                broker.seal_expansion_outcome()
+                final_reconciliation = broker.reconcile(cumulative_argvs)
+                if not final_reconciliation.passed:
+                    raise V3TaskRunnerError("expansion final Broker reconciliation failed", thread_id=thread_id)
+    except Exception as exc:
+        failure = exc
+    finally:
+        if failure is not None:
+            # Both contexts have exited: the Broker must reap its runner before
+            # independent reads can observe project state. Never retry execute.
+            if getattr(broker, "_started", False):
+                policy.oracle_evidence["reconciliation"] = {
+                    "status": "error", "child_reaped": False, "subprocesses_reaped": False,
+                    "seconds": 30, "read_seconds": 10, "elapsed_seconds": 0.0,
+                    "error": {"type": "BrokerCleanupUnproven", "message": "Broker runner teardown did not complete"},
+                }
+            else:
+                try:
+                    policy.oracle_evidence["reconciliation"] = dict(reconcile_after_failure())
+                except Exception as exc:
+                    policy.oracle_evidence["reconciliation"] = {
+                        "status": "error", "child_reaped": False, "subprocesses_reaped": False,
+                        "seconds": 30, "read_seconds": 10, "elapsed_seconds": 0.0,
+                        "error": {"type": type(exc).__name__, "message": str(exc).encode("utf-8")[:2048].decode("utf-8", "ignore")},
+                    }
+        if failure is not None and len(budget.turn_measurements) > len(turn_rows):
+            turn_rows.append({"index": len(turn_rows) + 1, "gates": {}, "incomplete": True,
+                              "agent_seconds": budget.turn_measurements[-1]["elapsed_seconds"]})
+        _write_json(root / "expansion-broker.json", broker.evidence().as_dict(include_output=True))
+        _write_json(root / "expansion-oracle.json", policy.oracle_evidence)
+        _write_json(root / "expansion-agent-budget.json", {
+            "hard_seconds": budget.hard_seconds, "slow_seconds": budget.slow_seconds,
+            "elapsed_seconds": budget.elapsed_seconds, "slow": budget.slow, "turns": turn_rows,
+            "measurement_scope": "CodexCliTask._record_turn including prompt audit and fresh/resume CLI",
+            "turn_measurements": budget.turn_measurements,
+        })
+        passed = failure is None and policy.complete and broker.evidence().passed
+        journal = (TransactionStore(broker.state_directory).read_events(policy.transaction_id)
+                   if policy.transaction_id else ())
+        status = classify_expansion_outcome(passed=passed,
+            records=broker.evidence().as_dict(include_output=True).get("records", ()), events=journal,
+            infrastructure=infrastructure)
+        reconciliation_receipt = policy.oracle_evidence.get("reconciliation")
+        if reconciliation_receipt and (reconciliation_receipt.get("child_reaped") is not True
+                or reconciliation_receipt.get("subprocesses_reaped") is not True):
+            status = "BLOCKED"
+        outcome = {
+            "contract": "waapi-skill.integration-expansion-task-result/v1",
+            "unit_id": unit.unit_id, "version": unit.version, "thread_id": thread_id,
+            "passed": passed, "status": status, "infrastructure": infrastructure,
+            "error": None if failure is None else f"{type(failure).__name__}: {failure}",
+            "terminal_state": policy.transaction.state,
+            "assertions": dict(policy.assertions), "required_assertions": sorted(prepared.required_assertions),
+            "gateway_verification_state": policy.transaction.gateway_verification_state,
+            "agent_seconds": budget.elapsed_seconds, "slow": budget.slow,
+            "plan_sha256": canonical_digest(plan), "turns": turn_rows,
+        }
+        _write_json(root / "expansion-task-result.json", outcome)
+    return outcome
 
 
 def run_v3_codex_task(
@@ -1363,6 +3108,7 @@ def _bind_gateway_prefix_reconciliation(
     prefix_errors: Sequence[str] = (),
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     platform_name: str | None = None,
+    allow_expansion_read_interleaving: bool = False,
 ) -> GatewayBrokerReconciliation:
     """Add exact response-derived command binding to argv reconciliation."""
 
@@ -1371,6 +3117,7 @@ def _bind_gateway_prefix_reconciliation(
         broker_evidence.accepted_records,
         platform_name=platform_name,
         windows_powershell_core_host=windows_powershell_core_host,
+        allow_expansion_read_interleaving=allow_expansion_read_interleaving and raw_reconciliation.passed,
     )
     return GatewayBrokerReconciliation(
         passed=(

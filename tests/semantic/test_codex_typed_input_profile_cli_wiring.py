@@ -23,11 +23,15 @@ def _dependencies(tmp_path: Path) -> list[str]:
     auth.write_text("{}", encoding="utf-8")
     codex = tmp_path / "codex"
     codex.write_text("synthetic", encoding="utf-8")
+    live_config = tmp_path / "live-environment.json"
+    live_config.write_text("{}", encoding="utf-8")
     return [
         "--codex-binary",
         str(codex),
         "--auth-json",
         str(auth),
+        "--live-config",
+        str(live_config),
     ]
 
 
@@ -86,6 +90,9 @@ def test_campaign_uses_same_profile_and_disables_same_root_retry(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(matrix, "resolve_codex_binary", lambda value: Path(value))
+    missing_default_config = tmp_path / "missing-default-live-environment.json"
+    monkeypatch.setattr(matrix, "DEFAULT_LIVE_CONFIG", missing_default_config)
+    assert not missing_default_config.exists()
     options = campaign.parse_args(
         [
             "--profile",
@@ -97,6 +104,7 @@ def test_campaign_uses_same_profile_and_disables_same_root_retry(
     )
 
     assert options.profile == PROFILE_ID
+    assert options.live_config == (tmp_path / "live-environment.json").resolve()
     assert options.suite_path == matrix.DEFAULT_TYPED_INPUT_SUITE.resolve()
     assert options.max_pre_action_retries == 0
     assert (options.model, options.reasoning_effort, options.service_tier) == (
@@ -117,6 +125,7 @@ def test_campaign_uses_same_profile_and_disables_same_root_retry(
         ]
     )
     assert selected.case_ids == ("TYP22-GENERIC-OBJECT-QUERY",)
+    assert selected.live_config == options.live_config
 
     with pytest.raises(SystemExit):
         campaign.parse_args(

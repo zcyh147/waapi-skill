@@ -1,0 +1,278 @@
+{
+  "source_candidate": "122eb09",
+  "projection": "Actual wording and order; authenticated Preview/Execute commands normalized to subcommands for the test seam. Original FAILs are unchanged.",
+  "cases": [
+    {
+      "unit": "EXP25-C01",
+      "events_sha256": "ea262e04ad8639cc2e88925d81b498ef4846796285c80044ee9d46de9007f854",
+      "execute_expected": false,
+      "preview_artifact": {
+        "request": {
+          "arguments": {
+            "import_operation": "useExisting",
+            "imports": [
+              {
+                "audio_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-EXP25-C01/owned/assets/replacement/C01_line.wav",
+                "import_language": "Japanese",
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C01_Voices\\Line_01",
+                "object_type": "Sound Voice"
+              }
+            ]
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "audio.import",
+          "version": "2025.1"
+        }
+      },
+      "before_snapshot": {
+        "objects": []
+      },
+      "events": [
+        {
+          "source_event_index": 18,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "source_event_index": 19,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "source_event_index": 20,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "waapi-skill 已加载。WAAPI 端口是 31474，Wwise 适配版本为 2025.1。\n\n当前项目修改策略是 `ask_before_changes`；可用策略为 `read_only`、`ask_before_changes` 和 `allow_changes`。\n\n已核对目标是现有的 `Line_01` Voice Sound。预览只将日文 Japanese 关联的素材更新为 `C01_line.wav`，沿用现有声音对象；英文素材及语言关联、音量、输出总线和事件播放目标都不在变更范围内，备用对象也未选中。\n\n**目前尚未执行任何修改。** 请确认是否按此预览执行；确认后我会核对并报告 Japanese 和 English 实际关联的素材。"
+          }
+        }
+      ]
+    },
+    {
+      "unit": "EXP25-C06",
+      "events_sha256": "bcfe961ac4b26253c34063f687c742942f50900132e031b209b350204bbab483",
+      "execute_expected": true,
+      "preview_artifact": {
+        "request": {
+          "arguments": {
+            "control_input": {
+              "kind": "id",
+              "value": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}"
+            },
+            "mode": "add_or_replace",
+            "object": {
+              "kind": "id",
+              "value": "{1C0245F5-A905-4BA9-9D1D-48461CA7C3AC}"
+            },
+            "points": [
+              {
+                "shape": "Linear",
+                "x": 0,
+                "y": -48
+              },
+              {
+                "shape": "Linear",
+                "x": 50,
+                "y": -6
+              },
+              {
+                "shape": "Linear",
+                "x": 100,
+                "y": 0
+              }
+            ],
+            "property": "Volume"
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "object.setRTPC",
+          "version": "2025.1"
+        }
+      },
+      "before_snapshot": {
+        "objects": [
+          {
+            "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "name": "Rain_Intensity",
+            "path": "\\Game Parameters\\Ambience\\Rain_Intensity"
+          },
+          {
+            "id": "{1C0245F5-A905-4BA9-9D1D-48461CA7C3AC}",
+            "name": "Expansion_EXP25-C06_Bed"
+          },
+          {
+            "id": "{1C0245F5-A905-4BA9-9D1D-48461CA7C3AC}",
+            "name": "Expansion_EXP25-C06_Bed",
+            "path": "\\Containers\\Default Work Unit\\Expansion_EXP25-C06_Bed"
+          },
+          {
+            "id": "{CA0B90AA-8A1F-43AE-ACDD-387803814573}",
+            "name": "Rain_Intensity"
+          }
+        ]
+      },
+      "events": [
+        {
+          "source_event_index": 2,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "我会先按要求读取 WAAPI 技能说明，再核对这条现有控制关系及曲线，执行指定修改并核验结果。"
+          }
+        },
+        {
+          "source_event_index": 9,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "当前配置的 Wwise 适配版本为 2025.1，策略允许执行变更；可用策略还包括 `read_only` 与 `ask_before_changes`。我已找到专用的 RTPC 曲线修改操作，接下来会按它返回的实时字段与命令继续。"
+          }
+        },
+        {
+          "source_event_index": 24,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "已将声明限定为这条声音上的 `Voice Volume` 控制曲线，三点为 `(0,-48)`、`(50,-6)`、`(100,0)`，形状均为线性；没有提供新备注字段。实时校验通过，我现在生成执行预览，并会依据预览核对修改范围后继续。"
+          }
+        },
+        {
+          "source_event_index": 25,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "source_event_index": 26,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "source_event_index": 27,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        },
+        {
+          "source_event_index": 28,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        },
+        {
+          "source_event_index": 31,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "已完成并由 Gateway 的操作级回读验证：音量曲线为 `(0,-48)`、`(50,-6)`、`(100,0)`，各段线性；7 项验证断言全部通过。预览记录的变更前状态显示，原控制关系备注为“Preserve volume association”，另有一条 Pitch 曲线。\n\n核验摘要没有列出每项回读的具体值，因此我无法仅凭可见结果单独确认执行后关系身份和备注逐项未变，也无法逐项确认素材与路由未变；Gateway 报告的验证结果为通过。\n\nWAAPI 技能已加载。当前 Wwise 适配版本为 2025.1，端口为 31443。当前策略为 `allow_changes`；可用策略还有 `read_only` 和 `ask_before_changes`。"
+          }
+        }
+      ]
+    },
+    {
+      "unit": "EXP25-M01",
+      "events_sha256": "b597a06dc65fe27fac3b26ab8cadecccc828b57295743ae173f01bf5cc636d80",
+      "execute_expected": true,
+      "preview_artifact": {
+        "request": {
+          "arguments": {
+            "imports": [
+              {
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported",
+                "object_type": "MusicSegment"
+              },
+              {
+                "audio_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP25-M01/owned/assets/music/Quiet.wav",
+                "import_language": "SFX",
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Quiet",
+                "object_type": "MusicTrack",
+                "properties": [
+                  {
+                    "name": "Volume",
+                    "value": -6.0
+                  }
+                ]
+              },
+              {
+                "audio_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-pilot-122eb09-luna-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP25-M01/owned/assets/music/Full.wav",
+                "import_language": "SFX",
+                "object_path": "\\Containers\\Default Work Unit\\Expansion_EXP25-M01_Music\\<Music Segment>Imported\\<Music Track>Full",
+                "object_type": "MusicTrack"
+              }
+            ]
+          },
+          "contract": "waapi-skill.operation-request/v1",
+          "operation": "audio.import",
+          "version": "2025.1"
+        }
+      },
+      "before_snapshot": {
+        "objects": []
+      },
+      "events": [
+        {
+          "source_event_index": 2,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "我先按要求读取 WAAPI 技能说明和操作参考，然后核对当前项目状态、准备一次批量导入并执行核验。"
+          }
+        },
+        {
+          "source_event_index": 19,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "source_event_index": 20,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "preview-from-draft"
+          }
+        },
+        {
+          "source_event_index": 21,
+          "type": "item.started",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        },
+        {
+          "source_event_index": 22,
+          "type": "item.completed",
+          "item": {
+            "type": "command_execution",
+            "command": "execute"
+          }
+        },
+        {
+          "source_event_index": 25,
+          "type": "item.completed",
+          "item": {
+            "type": "agent_message",
+            "text": "本轮使用 waapi-skill；WAAPI 端口为 31597，Wwise 适配版本为 2025.1（实时检测）。\n\n当前修改策略为 `allow_changes`；可用策略为 `read_only`、`ask_before_changes` 和 `allow_changes`。\n\n已完成一次批量导入，并通过 Wwise 回读核验：\n\n- `Imported` 音乐段下已建立 `Quiet` 和 `Full` 两条 Music Track。\n- `Quiet` 使用 `Quiet.wav`，Track 音量为 **-6 dB**。\n- `Full` 使用 `Full.wav`，Track 音量保持默认 **0 dB**。\n- 未设置片段或源音量、播放列表、Transition 或 Stinger；已有 `Keep` 及父级其他内容保持不变。"
+          }
+        }
+      ]
+    }
+  ]
+}

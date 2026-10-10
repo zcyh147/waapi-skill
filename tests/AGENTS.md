@@ -2,6 +2,10 @@
 
 Use `ci/test.sh` to run project test modes with consistent environment setup. See `tests/TEST_INVENTORY.md` for the human test inventory.
 
+For Fresh batch planning, failure classification, grader repairs and rerun scope,
+follow [business acceptance](semantic/TEST_ACCEPTANCE.md). It owns current
+coordination policy; dated campaign records retain their original verdicts.
+
 Repository development tests run through Poetry behind `ci/test.sh`. Do not
 install or run those developer dependencies from `skills/waapi-skill/.venv`.
 That Skill-local environment is reserved for the packaged Skill runtime and
@@ -399,11 +403,15 @@ report Principal `RunLevel=Limited`, while exported XML must report
 `<RunLevel>LeastPrivilege</RunLevel>` element, so absence of that optional XML
 tag is not a failed Limited attestation.
 
-On native Windows, a Gateway-owned v2 `model_command` must use the fixed
-backslash task-local runner spelling. Do not emit the POSIX spelling and rely on
-Broker path normalization: Fresh Agents otherwise reconstruct the familiar
-Windows spelling instead of copying the continuation verbatim, and exact
-continuation provenance is lost even when the resulting argv is equivalent.
+New native-Windows candidates emit the fixed task-local Python runner
+`./.agents/skills/waapi-skill/scripts/run.py`; the leading `./` distinguishes
+its owning shell from the POSIX bootstrap. Gateway-owned absolute Python runner
+locators use `Path.as_posix()` on both hosts. Only generated runner locators
+change: business paths and generic argv codecs retain their exact values.
+Accept the one disclosed spelling, never normalize a model's altered relative
+path. This supersedes the historical backslash-generation rule after C08
+reproduced JSON double escaping despite decoded-copy guidance. Old evidence
+remains bound to its frozen candidate; do not replay it under this policy.
 Continuation grading must unwrap the attested host frame through the shared
 command-record helper; never assume every recorded command is a three-token
 POSIX `shell -lc <script>` wrapper when grading native Windows evidence.
@@ -513,9 +521,10 @@ failure queue: let the current full root finish, then run only the queued units
 in fresh targeted roots and replay each passing root with identical
 `--resume --verify-only`. Combine those roots only as explicitly labelled
 same-candidate cumulative evidence; never call them a single-root PASS. Run a
-new full root only after the candidate, suite, harness, immutable options, or an
-explicit single-root acceptance criterion makes the earlier completed units
-insufficient. A failed root always stays frozen without verify-only replay.
+new full root only when the changed execution/oracle behavior or an explicit
+single-root acceptance criterion makes earlier evidence insufficient; use the
+[proportional rerun rules](semantic/TEST_ACCEPTANCE.md#3-prove-the-affected-chain-and-rerun-proportionally)
+to determine scope. A failed root always stays frozen without verify-only replay.
 
 ### Multi-Draft Broker flow identity
 

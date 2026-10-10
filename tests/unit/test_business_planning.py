@@ -479,7 +479,7 @@ def test_business_plan_accepts_only_exact_gateway_task_local_posix_continuation(
         assert caught.value.repair["error_code"] == "BUSINESS_CONTINUATION_INVALID"
         return
     result = compile_plan().preview.detail["continuation"]
-    assert result["full_argv"][1] == str(runner)
+    assert result["full_argv"][1] == runner.as_posix()
     assert result["shell_command"] == (
         "python .agents/skills/waapi-skill/scripts/run.py gateway.py "
         "preview-from-draft od1-test --expected-revision 7"

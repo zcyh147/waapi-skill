@@ -214,6 +214,7 @@ from wwise_waapi.operation_registry import (  # noqa: E402  # pyright: ignore[re
     operation_business_contract,
     build_undo_group_execution_plan,
     describe_operation,
+    existing_reference_source_business_kind,
     list_operation_specs,
     operation_input_mode,
     operation_uses_business_declaration,
@@ -287,6 +288,7 @@ from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: igno
     core_business_catalog_rows,
     core_business_contract_data,
     core_business_operations,
+    core_business_role_live_type,
     core_business_versions,
 )
 from wwise_waapi.core_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -776,12 +778,12 @@ ADVANCED_QUERY_SCHEMA_CONTRACT = (
 )
 METADATA_CURVE_ROLES: Mapping[str, str] = {
     "volume-dry": "VolumeDryUsage",
-    "game-defined-aux-send-volume": "VolumeAuxGameDef",
-    "user-defined-aux-send-volume": "VolumeAuxUserDef",
-    "low-pass-filter": "LowPassFilter",
-    "high-pass-filter": "HighPassFilter",
-    "spread": "Spread",
-    "focus": "Focus",
+    "game-defined-aux-send-volume": "VolumeWetGameUsage",
+    "user-defined-aux-send-volume": "VolumeWetUserUsage",
+    "low-pass-filter": "LowPassFilterUsage",
+    "high-pass-filter": "HighPassFilterUsage",
+    "spread": "SpreadUsage",
+    "focus": "FocusUsage",
 }
 PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS = (
     "pipelineID",
@@ -1977,7 +1979,9 @@ def build_parser() -> argparse.ArgumentParser:
         dest="business_view",
         help=(
             "Select one Gateway-owned diagnostic view; the Gateway owns its "
-            "complete native projection and stable business result keys"
+            "complete projection and one exact-object bound. Do not combine "
+            "--include, --include-field, --relationship, --predicate, or "
+            "--max-results; use a separate exact-object query for extra fields"
         ),
     )
     query_object.add_argument(
@@ -6856,6 +6860,54 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         }
         for command in capability.fixed_commands
     ]
+    if capability.uri == "ak.wwise.core.object.getAttenuationCurve":
+        # This existing fixed read requires business values. Disclose the
+        # complete CLI input forms without exposing native curveType tokens.
+        commands[0].update({
+            "required_inputs": ["object", "curve_role"],
+            "optional_inputs": ["platform"],
+            "input_forms": {
+                "object": {
+                    "exactly_one_of": ["exact_id", "path_segments"],
+                    "exact_id": {
+                        "arguments": ["--exact-id", "<canonical-object-guid>"],
+                        "format": "canonical GUID with braces from a bounded object read",
+                    },
+                    "path_segments": {
+                        "arguments": ["--path-segment", "<literal-hierarchy-name>"],
+                        "repeat": True,
+                        "minimum_items": 1,
+                        "maximum_items": MAX_BUSINESS_OBJECT_PATH_SEGMENTS,
+                        "maximum_item_utf8_bytes": MAX_BUSINESS_NAME_BYTES,
+                        "maximum_path_utf8_bytes": MAX_BUSINESS_PATH_BYTES,
+                        "trimmed": True,
+                        "control_free": True,
+                        "forbidden_characters": ["\\", "/", '"', "<", ">"],
+                        "order": "one literal object hierarchy name per level",
+                    },
+                },
+                "curve_role": {
+                    "arguments": ["--curve-role", "<curve-role>"],
+                    "choices": list(METADATA_CURVE_ROLES),
+                },
+                "platform": {
+                    "arguments": ["--platform", "<exact-platform-name>"],
+                    "maximum_characters": MAX_METADATA_PLATFORM_NAME_CHARS,
+                    "trimmed": True,
+                    "control_free": True,
+                    "meaning": "Exact project-platform name; omit for the default platform",
+                },
+            },
+            "command_templates": [
+                ["metadata", "attenuation", "--exact-id", "<canonical-object-guid>", "--curve-role", "<curve-role>"],
+                ["metadata", "attenuation", "--path-segment", "<literal-hierarchy-name>", "--curve-role", "<curve-role>"],
+            ],
+            "template_instruction": (
+                "Static input templates: fill one object selector and one disclosed curve role; "
+                "repeat --path-segment in hierarchy order for a path, and optionally append "
+                "--platform <exact-platform-name>. These are not exact-copy typed continuations."
+            ),
+        })
     return {
         "contract": "waapi-skill.fixed-command-route/v1",
         "ok": True,
@@ -7963,7 +8015,7 @@ def _dynamic_disclosure_copy_commands(value: Any) -> Any:
             if not isinstance(shape, str) or argv is None:
                 continue
             copy_by_shape[shape] = operation_draft_copy_command(
-                ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+                ["python", GATEWAY_RUNNER_PATH.as_posix(), "gateway.py", *argv]
             )
         if copy_by_shape:
             projected["copy_command_by_shape"] = copy_by_shape
@@ -7971,7 +8023,7 @@ def _dynamic_disclosure_copy_commands(value: Any) -> Any:
     argv = concrete_disclosure_argv(value.get("argv"))
     if argv is not None:
         projected["copy_command"] = operation_draft_copy_command(
-            ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+            ["python", GATEWAY_RUNNER_PATH.as_posix(), "gateway.py", *argv]
         )
     return projected
 
@@ -8306,7 +8358,19 @@ def query_business_schema_payload(
         "relationships": list(QUERY_BUSINESS_RELATIONSHIPS),
         "views": {
             "sound-routing-diagnostics": {
-                "source": "one exact Sound path or GUID",
+                "source": (
+                    "one exact Sound GUID (--exact-id) OR one exact Sound path "
+                    "built from repeated literal --path-segment names"
+                ),
+                "exact_object_bound": 1,
+                "cannot_combine_with": [
+                    "--include", "--include-field", "--relationship", "--predicate", "--max-results",
+                ],
+                "additional_fields": {
+                    "route": "a separate query-object for the same exact GUID or object path",
+                    "omit_options": ["--view"],
+                    "field_options": ["--include", "--include-field"],
+                },
                 "automatic_outputs": [
                     "override-output",
                     "active-source",
@@ -9592,7 +9656,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     {
                         "name": spec.name,
                         "summary": spec.summary,
-                        "next_command": ["operation-schema", spec.name],
                     }
                 )
                 continue
@@ -9796,6 +9859,39 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 },
             },
         }
+        if not args.detail:
+            route_defaults = {
+                "supported_versions": list(versions),
+                "host_surface": "wwise-console",
+            }
+            payload["request_schema_routes"] = [
+                {
+                    key: value
+                    for key, value in row.items()
+                    if not (
+                        (key in route_defaults and value == route_defaults[key])
+                        or (
+                            key == "next_command"
+                            and value == ["request-schema", row["api"]]
+                        )
+                    )
+                }
+                for row in request_schema_routes
+            ]
+            payload["operation_schema_command_template"] = [
+                "operation-schema", "<name>",
+            ]
+            payload["request_schema_route_defaults"] = route_defaults
+            payload["directory_reading"] = (
+                "Request rows inherit omitted supported_versions and host_surface "
+                "from request_schema_route_defaults; explicit row fields override. "
+                "For schema discovery only, use a row's next_command if present; "
+                "otherwise instantiate the static schema-command templates: "
+                "operation_schema_command_template replaces only <name> with the "
+                "selected name; request_schema_command_template replaces only <api> "
+                "with the selected api. These directory templates are not typed "
+                "continuations: copy typed continuations exactly as instructed."
+            )
         return payload
     if args.command == "operation-schema":
         if args.operation == "waapi.call":
@@ -12021,7 +12117,7 @@ def dispatch_business_core_plan(
             raw,
             accepted={"platform_name_list", "language_name_list"},
         )
-    if args.curve_point:
+    if args.curve_point or field_types.get("points") == "attenuation_curve_points":
         if field_types.get("points") != "attenuation_curve_points":
             raise GatewayInputError("Curve points are unavailable for this Core operation")
         points: list[dict[str, Any]] = []
@@ -17377,6 +17473,16 @@ def dispatch_business_object_binding(
             details={"required_fields": ["id", "name", "type", "path"]},
             error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
         )
+    role_live_type = (
+        core_business_role_live_type(binding.record.operation, detected_version, args.role)
+        if adapter.family == "core-project-object" else None
+    )
+    if role_live_type is not None and identity.object_type != role_live_type:
+        raise GatewayResultShapeError(
+            "Live business object class does not match its Gateway-owned role.",
+            details={"role": args.role, "expected_type": role_live_type, "actual_type": identity.object_type},
+            error_code="BUSINESS_OBJECT_BINDING_MISMATCH",
+        )
     compatible_business_kinds = semantic_kinds_for_live_type(
         str(row["type"]),
         version=detected_version,
@@ -17446,7 +17552,27 @@ def dispatch_business_object_binding(
             else None
         )
     )
-    if (
+    if role_live_type is not None:
+        # The contract role and exact live class provide the comparison noun;
+        # no user label or global SemanticKind/create-kind table is involved.
+        business_kind = args.role
+        business_kind_candidates = (args.role,)
+        business_kind_source = "closed_role_live_type"
+    elif binding.record.operation == "object.setReference" and args.role is None:
+        # This adapter's first bound object is the existing field owner. Later
+        # reference targets do not inherit its operation-local comparison role.
+        raw_session = binding.record.composition.get("business_session")
+        source_unbound = raw_session is None or not BusinessDeclarationSession.from_dict(
+            raw_session
+        ).handles.as_dict()["objects"]
+        source_kind = (existing_reference_source_business_kind(
+            binding.record.operation, detected_version, str(row["type"])
+        ) if source_unbound else None)
+        if source_kind is not None:
+            business_kind = source_kind
+            business_kind_candidates = (source_kind,)
+            business_kind_source = "named_reference_source_live_type"
+    elif (
         business_kind is None
         and isinstance(args.role, str)
         and closed_selector.expected_type is not None
@@ -21945,7 +22071,7 @@ def _query_mutation_selection(
                 "copy_command": operation_draft_copy_command(
                     [
                         "python",
-                        str(GATEWAY_RUNNER_PATH),
+                        GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "query-object",
                         "--exact-id",
@@ -23406,7 +23532,7 @@ def transaction_next_command(
     normalized = [str(value) for value in gateway_argv]
     full_argv = [
         "python",
-        str(GATEWAY_RUNNER_PATH),
+        GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
     ]
     if state_dir is not None:
@@ -23642,7 +23768,7 @@ def _compact_object_set_update_continuation(
             )
     inspect_argv = [
         "python",
-        str(GATEWAY_RUNNER_PATH),
+        GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
         "draft-inspect",
         draft_id,
@@ -23830,7 +23956,7 @@ def _business_next_action_binding(
     authority = task_authority or "<task-authority-from-draft-start>"
     base = [
         "python",
-        str(GATEWAY_RUNNER_PATH),
+        GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
     ]
     binding = [
@@ -26509,10 +26635,12 @@ def _business_next_action_binding(
                     "maximum": AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
                 },
                 "row_completeness": (
-                    "each_row_must_include_its_media_every_known_requested_field_"
+                    "each_row_must_include_every_known_requested_field_"
                     "switch_assignment_and_event_in_the_same_command; partial_"
-                    "rows_are_forbidden"
+                    "rows_are_forbidden; media_bearing_rows_include_their_media; "
+                    "structure_only_rows_omit_media_and_language"
                 ),
+                "row_requirements": business_contract["row_requirements"],
                 "dependency_closure": dependency_closure,
                 "repeat_with_next_response_revision": True,
                 "check_only_after": (
@@ -26809,7 +26937,7 @@ def _operation_draft_root_array_next_item_disclosure(
                 copy_command_by_shape[shape] = operation_draft_copy_command(
                     [
                         "python",
-                        str(GATEWAY_RUNNER_PATH),
+                        GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "request-array-item",
                         operation,
@@ -27498,7 +27626,7 @@ def operation_draft_payload(
                 )
             check_argv = [
                 "python",
-                str(GATEWAY_RUNNER_PATH),
+                GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-check",
                 record.draft_id,
@@ -27529,6 +27657,7 @@ def operation_draft_payload(
                     "row_order",
                     "rows_per_command",
                     "row_completeness",
+                    "row_requirements",
                     "dependency_closure",
                 )
             }
@@ -27642,7 +27771,7 @@ def operation_draft_payload(
                 )
             check_argv = [
                 "python",
-                str(GATEWAY_RUNNER_PATH),
+                GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-check",
                 record.draft_id,
@@ -27890,7 +28019,7 @@ def operation_draft_payload(
                 {
                     "fixed_full_argv_template": [
                         "python",
-                        str(GATEWAY_RUNNER_PATH),
+                        GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "preview-from-draft",
                         record.draft_id,
@@ -27910,7 +28039,7 @@ def operation_draft_payload(
         else:
             draft_apply_prefix = [
                 "python",
-                str(GATEWAY_RUNNER_PATH),
+                GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-apply",
                 record.draft_id,
@@ -27977,7 +28106,7 @@ def operation_draft_payload(
             ):
                 completion_argv = [
                     "python",
-                    str(GATEWAY_RUNNER_PATH),
+                    GATEWAY_RUNNER_PATH.as_posix(),
                     "gateway.py",
                     "draft-check",
                     record.draft_id,

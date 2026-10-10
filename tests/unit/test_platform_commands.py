@@ -217,3 +217,18 @@ def test_windows_continuation_executes_exact_argv_through_cmd_shell(
 
     assert completed.returncode == 0, completed.stderr
     assert json.loads(output.read_text(encoding="utf-8")) == expected
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='native Python runner locator')
+def test_native_python_opens_forward_runner_locator_without_rewriting_data(tmp_path: Path) -> None:
+    runner = tmp_path / "Skill & 雪" / "scripts" / "run.py"
+    runner.parent.mkdir(parents=True)
+    runner.write_text('import json,sys; print(json.dumps(sys.argv[1:]))', encoding='utf-8')
+    values = [r'\Actor-Mixer Hierarchy\雪', "quote' & $env:TEMP", '']
+    result = subprocess.run(
+        [sys.executable, runner.as_posix(), *values],
+        shell=False, capture_output=True, text=True, encoding='utf-8',
+        timeout=30, check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == values

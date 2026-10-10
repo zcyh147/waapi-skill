@@ -1,0 +1,140 @@
+{
+  "contract": "waapi-skill.expansion-modal-optional-component-delta/v1",
+  "date": "2026-10-08",
+  "issue": 147,
+  "base": "8e430c94c45a94c9c2bf20b7d02b3f2911c29d70",
+  "functional_candidate": "e85fc311b150b9cf7977ea1fa372dd8f0435c5f3",
+  "public_seam": "expansion_preview_notice with copied immutable preview/before inputs",
+  "repair": "Failed-composition recognition now selects a declared finite current/incompatible head with either an existing modal or recipient marker, matching the validator modal-or-marker alternatives. Optional modal presence/validity is no longer a prerequisite for retaining malformed scope. Full valid recipient operands remain opaque; legacy Preview carriers and all positive grammar remain unchanged.",
+  "freeze": {
+    "fixture": "tests/fixtures/semantic/expansion-modal-optional-component-delta-20261008.json",
+    "sha256": "98e2c8316e7c29c573afd7f804cf35404e596d38f0caa841d05bdcf732db8c79",
+    "count": 9,
+    "independent_review_samples": {
+      "path": "/tmp/waapi-expansion-modal-review/spec-final-probes.json",
+      "sha256": "683703c050e0b0721ff82c9cd18d273752d042c785080c64a302156367f700bd"
+    }
+  },
+  "validation": {
+    "lane": "Focused developer ci/test.sh --mode nonlive; not a complete Non-live gate",
+    "interpreter": "/Users/xiye/Library/Caches/pypoetry/virtualenvs/non-package-mode-nsP1lGog-py3.11/bin/python",
+    "runs": {
+      "red": {
+        "tests": 9,
+        "failures": 4,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 5,
+        "direct_exit": 1,
+        "junit_seconds": 0.157,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/red.log": "f912671f88c24516365ad371511207a9a03f2220f43a99dc2eb86402dd2f0847",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/red.xml": "4b516286d32277260d45eb19927e40732e0d31cb0f816b96fc399cd606ed2625"
+        }
+      },
+      "green": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 9,
+        "direct_exit": 0,
+        "junit_seconds": 0.14,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/green.log": "36b7935b19dc0159283bae04e5a3337e87f2b0ede76007ea569007ccc170d612",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/green.xml": "7e5d94e485f378a8931de0f4d11716cd7fd486d4e066f723ba67ce593dd30062"
+        }
+      },
+      "focused-final": {
+        "tests": 3851,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "passed": 3851,
+        "direct_exit": 0,
+        "junit_seconds": 7.509,
+        "evidence": {
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-final.log": "ab87b85ccce4f9f45219a923ac2206202d56d8876eedf2bf982246dfadfa2a7b",
+          "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-final.xml": "c32ac954e365411965e6d9d9db9e2971b4ec630c035dfc0de1edf082192a4597"
+        }
+      }
+    },
+    "argv": [
+      "ci/test.sh",
+      "--mode",
+      "nonlive",
+      "--",
+      "tests/semantic/test_codex_ancillary_role_notices.py",
+      "tests/semantic/test_codex_attenuation_notice.py",
+      "tests/semantic/test_codex_baseline_purpose_notices.py",
+      "tests/semantic/test_codex_composed_notices.py",
+      "tests/semantic/test_codex_coordinated_attestation_notices.py",
+      "tests/semantic/test_codex_current_role_notices.py",
+      "tests/semantic/test_codex_guid_comparison_notices.py",
+      "tests/semantic/test_codex_independent_composed_notices.py",
+      "tests/semantic/test_codex_independent_staged_notices.py",
+      "tests/semantic/test_codex_notice_noun_components_review.py",
+      "tests/semantic/test_codex_notice_role_context_withheld.py",
+      "tests/semantic/test_codex_noun_span_notices.py",
+      "tests/semantic/test_codex_operation_noun_notices.py",
+      "tests/semantic/test_codex_planned_effect_entity_notices.py",
+      "tests/semantic/test_codex_preview_baseline_placement_notices.py",
+      "tests/semantic/test_codex_purpose_composition_notices.py",
+      "tests/semantic/test_codex_staged_notices.py",
+      "tests/semantic/test_codex_target_plan_family_notices.py",
+      "tests/semantic/test_codex_target_preflight_notices.py",
+      "tests/semantic/test_codex_verification_basis_notices.py",
+      "tests/semantic/test_codex_expansion_task_runner.py",
+      "tests/semantic/test_codex_baseline_purpose_components_review.py",
+      "tests/semantic/test_codex_effect_coordination_withheld.py",
+      "tests/semantic/test_codex_preview_components_review.py",
+      "tests/semantic/test_codex_target_preflight_components_review.py",
+      "tests/semantic/test_codex_task_runner_v3.py",
+      "tests/semantic/test_codex_guid_span_review.py",
+      "tests/semantic/test_codex_guid_incomplete_review.py",
+      "tests/semantic/test_codex_guid_incomplete_operands_review.py",
+      "tests/semantic/test_codex_guid_opaque_qualifier_review.py",
+      "tests/semantic/test_codex_modal_prefix_notices.py",
+      "tests/semantic/test_codex_modal_review_notices.py",
+      "tests/semantic/test_codex_modal_scope_head_delta.py",
+      "tests/semantic/test_codex_modal_optional_component_delta.py",
+      "-q",
+      "-ra",
+      "--junitxml=/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-final.xml"
+    ],
+    "final_retained": 3842,
+    "delta": 9,
+    "final_passed": 3851
+  },
+  "preservation": {
+    "unchanged": 82,
+    "all_prior_reports_fixtures_tests_unchanged": true
+  },
+  "source_hashes": {
+    "tests/semantic/support/codex_notice_language.py": "6d900d834e84038e13f4395f7e9d861449ebebd839ab218947cada7acc67e965",
+    "tests/semantic/test_codex_modal_optional_component_delta.py": "1bef9215f711401008adc411bd65057e7981e371c7391406a4352433e19d27a1",
+    "tests/fixtures/semantic/expansion-modal-optional-component-delta-20261008.json": "98e2c8316e7c29c573afd7f804cf35404e596d38f0caa841d05bdcf732db8c79"
+  },
+  "evidence_root": "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008",
+  "evidence_hashes": {
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/delta-freeze.json": "d6cdd0d64cb92f7bcfa703c26d4ae72ec82602f7c8543bedeb87c6ef5e5a6f5f",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-argv.json": "24b5b2d26ea54f551e72da8a932870cb1ca84bffe9d1077fec8111d6a8429f4e",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/red.log": "f912671f88c24516365ad371511207a9a03f2220f43a99dc2eb86402dd2f0847",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-final.log": "ab87b85ccce4f9f45219a923ac2206202d56d8876eedf2bf982246dfadfa2a7b",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/green.log": "36b7935b19dc0159283bae04e5a3337e87f2b0ede76007ea569007ccc170d612",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-final.xml": "c32ac954e365411965e6d9d9db9e2971b4ec630c035dfc0de1edf082192a4597",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/focused-exit.json": "697ada11144d30ff61588f4d75c6d90900019cf1af308780510cfaf47b51dc63",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/green.xml": "7e5d94e485f378a8931de0f4d11716cd7fd486d4e066f723ba67ce593dd30062",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/preservation-freeze.json": "c0332b3b5f3b8704729da4c3e5a17ea4aa7fc85728d712f8757fa073b7302c31",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/runs.json": "3aa2db6d645a6e6114e977e2ba028dd24e9cdfe9fc6e8f2bb1991d75b65aa6ff",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/preservation-final.json": "0857d92ede6ce90533a1b7f3231ea5690fcfe0c5d549b122bd08336f512a7bd6",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/evidence/waapi-test-remediation/expansion-modal-optional-component-delta-20261008/red.xml": "4b516286d32277260d45eb19927e40732e0d31cb0f816b96fc399cd606ed2625"
+  },
+  "limits": [
+    "8e430c9 and all predecessor reports/fixtures/tests remain immutable evidence",
+    "Independent rereview, applicable complete gates and new Fresh proof pending at coordinator",
+    "#147 stays open; #122 owns final 13-positive-plus-boundary acceptance",
+    "No broad Program/Non-live, live, Fresh, replay/resume/regrade/verify-only, integration/push/PR/issue edits or descendants",
+    "No Skill/suite/oracle/runtime/config/project edits, prior expectation changes, new temporal synonyms, positive grammar expansion or global substring ban"
+  ]
+}

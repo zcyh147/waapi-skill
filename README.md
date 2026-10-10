@@ -1,9 +1,25 @@
 [English](./README.md) · [简体中文](./README.zh-CN.md)
 
+<div align="center">
+
 # WAAPI Skill
 
-Control Wwise Authoring with natural language—without asking an AI agent to
-write WAAPI payloads by hand.
+**Control Wwise Authoring with natural language.**
+
+Without asking an AI agent to write WAAPI payloads by hand.
+
+[![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows-0078D4?style=flat-square)](#requirements)
+[![Wwise](https://img.shields.io/badge/Wwise-2021.1–2025.1-5965E0?style=flat-square)](#supported-versions)
+[![Python](https://img.shields.io/badge/Python-3.11–3.13-00897B?style=flat-square)](#requirements)
+[![MIT](https://img.shields.io/badge/License-MIT-64748B?style=flat-square)](./LICENSE)
+
+### [Download Latest](https://github.com/zcyh147/waapi-skill/releases/latest)
+
+[Install](#install) · [Quick start](#quick-start) · [Coverage](./skills/waapi-skill/references/waapi-coverage.md) · [Report an issue](https://github.com/zcyh147/waapi-skill/issues)
+
+</div>
+
+---
 
 WAAPI Skill is a local Agent Skill with a packaged, version-aware
 Gateway. You describe the result you want; the Agent selects the right
@@ -17,9 +33,6 @@ agent that can load a Skill directory and run local scripts.
 
 - **Natural-language Wwise workflows** — ask for outcomes instead of API
   names, object types, GUIDs, paths, or JSON payloads.
-- **Broad Authoring coverage** — query and edit objects, import or reimport
-  audio, manage Events and Switch assignments, generate SoundBanks, use
-  Profiler/runtime operations, subscribe to events, and more.
 - **Five Wwise release lines** — version-specific contracts for `2021.1`,
   `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 - **Safe project changes** — every mutation goes through an immutable Preview,
@@ -57,13 +70,10 @@ capabilities return an explicit boundary instead of guessing.
 | `2024.1` | Yes |
 | `2025.1` | Yes |
 
-Two host profiles are available:
-
-- **WwiseConsole** for the reflected command-line surface
-- **Wwise Authoring UI** for the same core surface plus supported UI commands
-
-The Gateway detects the connected host automatically. Authoring-only commands
-do not pretend to work through WwiseConsole.
+Connect to either **Wwise Authoring** or **WwiseConsole**; the Gateway detects
+the host automatically. Reading the current selection, controlling the UI,
+and monitoring UI events require Authoring. Available operations depend on
+the connected host and Wwise version.
 
 ## Requirements
 
@@ -153,7 +163,8 @@ reflected resources, and loads detailed guidance only when the current task
 needs it. This keeps the experience Skill-like while giving it the stable tool
 boundary normally expected from a well-designed MCP integration.
 
-## Direct Gateway access (optional)
+<details>
+<summary>Development and diagnostics: direct Gateway access</summary>
 
 The Agent normally operates the Gateway on your behalf. For development,
 diagnostics, or external automation, it can also be invoked directly from a
@@ -167,6 +178,8 @@ python skills/waapi-skill/scripts/run.py gateway.py status
 The first invocation automatically prepares the Skill-local Python environment.
 If Windows exposes Python as `py`, use that command instead of `python`.
 
+</details>
+
 ## Scope and validation
 
 The project covers the complete reviewed public surface of its packaged
@@ -177,8 +190,15 @@ The repository includes program tests, live read-only tests, destructive
 sandbox tests, and fresh-agent semantic tests on macOS and Windows. Exact route
 counts, version boundaries, and evidence are kept outside this user overview:
 
+The October expansion adds seven business workflows on Wwise 2022.1/2025.1.
+All 13 positive outcomes now have cumulative business-acceptance evidence on
+macOS and native Windows, plus a separate 2022.1 capability boundary. This is
+not a single-candidate, all-green automated matrix: the inventory records exact
+candidates, raw verdicts, wording-only discrepancies, and remaining test limits.
+
 - [Detailed coverage](./skills/waapi-skill/references/waapi-coverage.md)
 - [Test inventory and evidence](./tests/TEST_INVENTORY.md)
+- [Developer notice regressions](./tests/semantic/README.md#developer-notice-regressions)
 - [Skill contract](./skills/waapi-skill/SKILL.md)
 
 ## Skill or MCP?
@@ -187,3 +207,14 @@ Use this project when you want a local, version-aware Agent Skill with no
 always-on server and tightly packaged behavior. Choose a Wwise MCP server when
 your client specifically requires MCP-native interoperability or a persistent
 service boundary.
+
+## Feedback
+
+Found a problem? [Open an issue](https://github.com/zcyh147/waapi-skill/issues)
+with your Wwise version, operating system, Agent client, reproduction steps,
+and error message. Remove sensitive project information before sharing logs
+or conversation excerpts.
+
+## License
+
+[MIT](./LICENSE)

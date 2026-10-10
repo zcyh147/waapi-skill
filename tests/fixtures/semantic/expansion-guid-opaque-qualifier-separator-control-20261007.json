@@ -1,0 +1,11 @@
+{
+  "cases": [
+    {
+      "id": "foreign-opaque-qualifier-standalone-comparator-with-verbal-coordination",
+      "family": "effect",
+      "notice": "已核对目标声音，OtherObject 的 GUID {not-a-guid}} 与你提供的并与日志归档，并已记录修改前状态。将向目标声音追加 Wwise Gain 效果器 `Expansion_EXP25-C09_NewGain`，备注为“Expansion C09 appended gain”，不另设插件参数或平台值；执行后会对照原状态核验现有效果器的身份、绑定和顺序。\n\n目前尚未修改工程。此次具体变更已取得 `allow_changes` 策略下的独立持久授权，现在执行并核验。",
+      "expected_gate": false,
+      "reason": "The existing standalone comparator remains invalid even beside verbal coordination; 并与 must not suppress classification of the entire component."
+    }
+  ]
+}

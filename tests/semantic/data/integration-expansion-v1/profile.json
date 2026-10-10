@@ -1,0 +1,17 @@
+{
+  "contract": "waapi-skill.integration-expansion-profile/v1",
+  "profile_id": "integration_expansion_v1",
+  "versions": ["2022.1", "2025.1"],
+  "cases": ["C01", "C03", "C06", "C08", "C09", "M01", "M05"],
+  "ask_cases": ["C01", "C03"],
+  "capability_boundaries": [{"case_id": "M05", "version": "2022.1"}],
+  "agent_budget": {"hard_seconds": 600, "slow_seconds": 420},
+  "model_configurations": [
+    {"model": "gpt-6-luna", "reasoning_effort": "high", "service_tier": "default"},
+    {"model": "gpt-6.1-sol", "reasoning_effort": "medium", "service_tier": "default"},
+    {"model": "gpt-6.1-sol", "reasoning_effort": "high", "service_tier": "default"},
+    {"model": "gpt-6-luna", "reasoning_effort": "medium", "service_tier": "default"}
+  ],
+  "pilot_cases": ["C01", "M01", "C06"],
+  "outcome_policy": "waapi-skill.integration-expansion-outcome-policy/v1"
+}

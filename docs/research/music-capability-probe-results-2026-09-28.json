@@ -1,0 +1,1389 @@
+{
+  "scope": "read-only public music capability probes; not Agent or business mutation acceptance",
+  "evidence_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl",
+  "records": {
+    "2025.1": {
+      "record_sha256": "36aed1113faaea69309cda0e08f178261093467853606490d8a1215b5a50328d",
+      "candidate": "3781167d9c42058fa2bad06bdd6a6a37b118725a",
+      "categories": [
+        {
+          "category": "music-expansion-public-field-Playlist Root",
+          "expected_projection": "references",
+          "expected_token": "PlaylistRoot",
+          "expected_value_kind": "reference",
+          "field": "Playlist Root",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}",
+                "name": "Stealth",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth",
+                "references": {
+                  "PlaylistRoot": {
+                    "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+                  }
+                },
+                "type": "MusicPlaylistContainer"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}",
+                "name": "Stealth",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth",
+                "references": {
+                  "PlaylistRoot": {
+                    "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+                  }
+                },
+                "type": "MusicPlaylistContainer"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}",
+          "observed_value": {
+            "id": "{15F37D81-B510-4B20-8B71-CDAADA2820BE}"
+          },
+          "reference_scope": "target_identity_only_not_nested_state_or_curve_points",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-No. of Loops",
+          "expected_projection": "properties",
+          "expected_token": "LoopCount",
+          "expected_value_kind": "integer",
+          "field": "No. of Loops",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "properties": {
+                  "LoopCount": 1
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "properties": {
+                  "LoopCount": 1
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+          "observed_value": 1,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Segment",
+          "expected_projection": "references",
+          "expected_token": "Segment",
+          "expected_value_kind": "reference",
+          "field": "Segment",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "references": {
+                  "Segment": {
+                    "id": "{EBAFEE65-F685-49C0-9171-F2ECB0D3D3A8}",
+                    "name": "Stealth_Seg_01"
+                  }
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "references": {
+                  "Segment": {
+                    "id": "{EBAFEE65-F685-49C0-9171-F2ECB0D3D3A8}",
+                    "name": "Stealth_Seg_01"
+                  }
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+          "observed_value": {
+            "id": "{EBAFEE65-F685-49C0-9171-F2ECB0D3D3A8}",
+            "name": "Stealth_Seg_01"
+          },
+          "reference_scope": "target_identity_only_not_nested_state_or_curve_points",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Play Source Post-exit",
+          "expected_projection": "properties",
+          "expected_token": "PlaySourcePostExit",
+          "expected_value_kind": "boolean",
+          "field": "Play Source Post-exit",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlaySourcePostExit": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlaySourcePostExit": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+          "observed_value": true,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Play Destination Pre-entry",
+          "expected_projection": "properties",
+          "expected_token": "PlayDestinationPreEntry",
+          "expected_value_kind": "boolean",
+          "field": "Play Destination Pre-entry",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlayDestinationPreEntry": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlayDestinationPreEntry": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+          "observed_value": true,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Exit Source At",
+          "expected_projection": "properties",
+          "expected_token": "ExitSourceAt",
+          "expected_value_kind": "integer",
+          "field": "Exit Source At",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "ExitSourceAt": 7
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "ExitSourceAt": 7
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+          "observed_value": 7,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Curve",
+          "expected_projection": "references",
+          "expected_token": "Curve",
+          "expected_value_kind": "reference",
+          "field": "Curve",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "Curve": {
+                    "@Flags": 3,
+                    "id": "{4FFAC1E0-B18B-4A72-A3E2-E4DC7FB25F57}",
+                    "points": [
+                      {
+                        "shape": "Log3",
+                        "x": 0.0,
+                        "y": -96.3
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "Curve": {
+                    "@Flags": 3,
+                    "id": "{4FFAC1E0-B18B-4A72-A3E2-E4DC7FB25F57}",
+                    "points": [
+                      {
+                        "shape": "Log3",
+                        "x": 0.0,
+                        "y": -96.3
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+          "observed_value": {
+            "@Flags": 3,
+            "id": "{4FFAC1E0-B18B-4A72-A3E2-E4DC7FB25F57}",
+            "points": [
+              {
+                "shape": "Log3",
+                "x": 0.0,
+                "y": -96.3
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 0.0
+              }
+            ]
+          },
+          "reference_scope": "target_identity_only_not_nested_state_or_curve_points",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Control Input",
+          "expected_projection": "references",
+          "expected_token": "ControlInput",
+          "expected_value_kind": "reference",
+          "field": "Control Input",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "ControlInput": {
+                    "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+                    "name": "Stealth_Factor"
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "ControlInput": {
+                    "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+                    "name": "Stealth_Factor"
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+          "observed_value": {
+            "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+            "name": "Stealth_Factor"
+          },
+          "reference_scope": "target_identity_only_not_nested_state_or_curve_points",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Property",
+          "expected_projection": "properties",
+          "expected_token": "PropertyName",
+          "expected_value_kind": "string",
+          "field": "Property",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "properties": {
+                  "PropertyName": "Volume"
+                },
+                "type": "RTPC"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "properties": {
+                  "PropertyName": "Volume"
+                },
+                "type": "RTPC"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+          "observed_value": "Volume",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-switch-public-collection-Arguments",
+          "coverage_scope": "complete_collection_identity_read_not_complete_path_mapping_or_order",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{147D74E6-BCCD-4F41-80F9-EAE3ABF79D0A}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[MusicArgumentsSlot: (Music_Global)]",
+                "type": "PluginInnerObject"
+              },
+              {
+                "id": "{56D7643F-6929-4007-9F41-7AB76D9EAB44}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[MusicArgumentsSlot: (Music_inGame)]",
+                "type": "PluginInnerObject"
+              }
+            ],
+            "command": "query-object",
+            "count": 2,
+            "limit_reached": false,
+            "objects": [
+              {
+                "id": "{147D74E6-BCCD-4F41-80F9-EAE3ABF79D0A}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[MusicArgumentsSlot: (Music_Global)]",
+                "type": "PluginInnerObject"
+              },
+              {
+                "id": "{56D7643F-6929-4007-9F41-7AB76D9EAB44}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[MusicArgumentsSlot: (Music_inGame)]",
+                "type": "PluginInnerObject"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "gateway-appended-take",
+              "value": 16
+            },
+            "status": "ok"
+          },
+          "observed_count": 2,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_public_collection_not_path_configuration_acceptance"
+        },
+        {
+          "category": "music-switch-public-collection-Entries",
+          "coverage_scope": "complete_collection_identity_read_not_complete_path_mapping_or_order",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{BB6519A2-1173-4569-B1F6-57305FEBB759}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.* (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{903A30EC-F1F4-49FF-9CBC-99B89539598B}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.None (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{7AE5D86A-30A6-4AC9-A909-C57953EE03BE}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.c_Fight (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{4F98CAE7-F96A-4C18-8733-15A31CF40AC1}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.b_Stress (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{8158C5B6-73BB-4B5D-B02D-C7FD6A642A49}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.a_Stealth (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{8CA7ACF4-E9F8-4F67-9FCE-FC12E323BEAC}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.c_Fight (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{C8085861-F375-48ED-94FB-AA4B39DB8B64}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.b_Stress (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{F66C5F2D-E01E-43CD-BE5A-16F5F20E97A6}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.a_Stealth (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{1F7BC8C1-AEC9-40B7-BBA2-1FE12C4B346F}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[Menu.* (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              }
+            ],
+            "command": "query-object",
+            "count": 9,
+            "limit_reached": false,
+            "objects": [
+              {
+                "id": "{BB6519A2-1173-4569-B1F6-57305FEBB759}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.* (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{903A30EC-F1F4-49FF-9CBC-99B89539598B}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.None (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{7AE5D86A-30A6-4AC9-A909-C57953EE03BE}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.c_Fight (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{4F98CAE7-F96A-4C18-8733-15A31CF40AC1}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.b_Stress (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{8158C5B6-73BB-4B5D-B02D-C7FD6A642A49}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[InGame.a_Stealth (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{8CA7ACF4-E9F8-4F67-9FCE-FC12E323BEAC}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.c_Fight (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{C8085861-F375-48ED-94FB-AA4B39DB8B64}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.b_Stress (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{F66C5F2D-E01E-43CD-BE5A-16F5F20E97A6}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[*.a_Stealth (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              },
+              {
+                "id": "{1F7BC8C1-AEC9-40B7-BBA2-1FE12C4B346F}",
+                "name": "",
+                "path": "\\Containers\\Music\\Music\\02_In-Game Music\\[Menu.* (MultiSwitchEntry)]",
+                "type": "MultiSwitchEntry"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "gateway-appended-take",
+              "value": 16
+            },
+            "status": "ok"
+          },
+          "observed_count": 9,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_public_collection_not_path_configuration_acceptance"
+        },
+        {
+          "category": "authoring-ui",
+          "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+          "status": "blocked",
+          "verifier_strength": "host_unavailable"
+        }
+      ],
+      "contract": "waapi-skill.host-category-evidence/v3",
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "invocation": {
+        "finished_at_unix_ns": 1790531419148625000,
+        "node_outcomes": [
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}-Playlist Root-references-PlaylistRoot-reference]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-properties-LoopCount-integer]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-Segment-references-Segment-reference]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-properties-PlaySourcePostExit-boolean]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Destination Pre-entry-properties-PlayDestinationPreEntry-boolean]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Exit Source At-properties-ExitSourceAt-integer]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Curve-references-Curve-reference]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Control Input-references-ControlInput-reference]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Property-properties-PropertyName-string]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Arguments]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Entries]",
+            "outcome": "PASS"
+          }
+        ],
+        "outcome": "PASS",
+        "phase": "final",
+        "selected_test_nodeids": [
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}-Playlist Root-references-PlaylistRoot-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-properties-LoopCount-integer]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-Segment-references-Segment-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-properties-PlaySourcePostExit-boolean]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Destination Pre-entry-properties-PlayDestinationPreEntry-boolean]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Exit Source At-properties-ExitSourceAt-integer]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Curve-references-Curve-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Control Input-references-ControlInput-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Property-properties-PropertyName-string]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Arguments]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Entries]"
+        ],
+        "started_at_unix_ns": 1790531414483420000
+      },
+      "platform": "macos",
+      "recorded_at_unix": 1790531419,
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-dd8c2847dc3c45cda0c468fd62d45f09",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-dd8c2847dc3c45cda0c468fd62d45f09"
+      },
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "transactions": [],
+      "version": "2025.1"
+    },
+    "2022.1": {
+      "record_sha256": "c83fcc804a77ee9f95ff91252ee6440d04880c23db4305dae374eee1bdcbb19b",
+      "candidate": "3781167d9c42058fa2bad06bdd6a6a37b118725a",
+      "categories": [
+        {
+          "category": "music-expansion-public-field-Playlist Root",
+          "expected_projection": "references",
+          "expected_token": "PlaylistRoot",
+          "expected_value_kind": "reference",
+          "field": "Playlist Root",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": {
+              "metadata_authority": "live-waapi",
+              "repair": "refine each --include-field meaning until one live field matches",
+              "unresolved": [
+                {
+                  "candidate_names": [
+                    "BelowThresholdBehavior",
+                    "VirtualVoiceQueueBehavior"
+                  ],
+                  "meaning": "Playlist Root"
+                }
+              ]
+            },
+            "command": "query-object",
+            "ok": true,
+            "status": "needs_clarification"
+          },
+          "object_id": "{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}",
+          "stage": "query_result",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-No. of Loops",
+          "expected_projection": "properties",
+          "expected_token": "LoopCount",
+          "expected_value_kind": "integer",
+          "field": "No. of Loops",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "properties": {
+                  "LoopCount": 1
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "properties": {
+                  "LoopCount": 1
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+          "observed_value": 1,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Segment",
+          "expected_projection": "references",
+          "expected_token": "Segment",
+          "expected_value_kind": "reference",
+          "field": "Segment",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "properties": {
+                  "PlaylistItemType": 1
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+                "name": "",
+                "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+                "properties": {
+                  "PlaylistItemType": 1
+                },
+                "type": "MusicPlaylistItem"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+          "stage": "requested_field_projection",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Play Source Post-exit",
+          "expected_projection": "properties",
+          "expected_token": "PlaySourcePostExit",
+          "expected_value_kind": "boolean",
+          "field": "Play Source Post-exit",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlaySourcePostExit": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlaySourcePostExit": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+          "observed_value": true,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Play Destination Pre-entry",
+          "expected_projection": "properties",
+          "expected_token": "PlayDestinationPreEntry",
+          "expected_value_kind": "boolean",
+          "field": "Play Destination Pre-entry",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlayDestinationPreEntry": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "PlayDestinationPreEntry": true
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+          "observed_value": true,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Exit Source At",
+          "expected_projection": "properties",
+          "expected_token": "ExitSourceAt",
+          "expected_value_kind": "integer",
+          "field": "Exit Source At",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "ExitSourceAt": 7
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+                "name": "Transition",
+                "path": "Root\\Transition",
+                "properties": {
+                  "ExitSourceAt": 7
+                },
+                "type": "MusicTransition"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+          "observed_value": 7,
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Curve",
+          "expected_projection": "references",
+          "expected_token": "Curve",
+          "expected_value_kind": "reference",
+          "field": "Curve",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Interactive Music Hierarchy\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "Curve": {
+                    "@Flags": 3,
+                    "id": "{4FFAC1E0-B18B-4A72-A3E2-E4DC7FB25F57}",
+                    "points": [
+                      {
+                        "shape": "Log3",
+                        "x": 0.0,
+                        "y": -96.3
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Interactive Music Hierarchy\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "Curve": {
+                    "@Flags": 3,
+                    "id": "{4FFAC1E0-B18B-4A72-A3E2-E4DC7FB25F57}",
+                    "points": [
+                      {
+                        "shape": "Log3",
+                        "x": 0.0,
+                        "y": -96.3
+                      },
+                      {
+                        "shape": "Linear",
+                        "x": 100.0,
+                        "y": 0.0
+                      }
+                    ]
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+          "observed_value": {
+            "@Flags": 3,
+            "id": "{4FFAC1E0-B18B-4A72-A3E2-E4DC7FB25F57}",
+            "points": [
+              {
+                "shape": "Log3",
+                "x": 0.0,
+                "y": -96.3
+              },
+              {
+                "shape": "Linear",
+                "x": 100.0,
+                "y": 0.0
+              }
+            ]
+          },
+          "reference_scope": "target_identity_only_not_nested_state_or_curve_points",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Control Input",
+          "expected_projection": "references",
+          "expected_token": "ControlInput",
+          "expected_value_kind": "reference",
+          "field": "Control Input",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Interactive Music Hierarchy\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "ControlInput": {
+                    "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+                    "name": "Stealth_Factor"
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Interactive Music Hierarchy\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "references": {
+                  "ControlInput": {
+                    "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+                    "name": "Stealth_Factor"
+                  }
+                },
+                "type": "RTPC"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+          "observed_value": {
+            "id": "{B784B340-F048-4EA8-BDE8-6F4066F82CD1}",
+            "name": "Stealth_Factor"
+          },
+          "reference_scope": "target_identity_only_not_nested_state_or_curve_points",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-expansion-public-field-Property",
+          "expected_projection": "properties",
+          "expected_token": "PropertyName",
+          "expected_value_kind": "string",
+          "field": "Property",
+          "gateway_exit_code": 0,
+          "gateway_result": {
+            "agent_result": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Interactive Music Hierarchy\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "properties": {
+                  "PropertyName": "Volume"
+                },
+                "type": "RTPC"
+              }
+            ],
+            "command": "query-object",
+            "count": 1,
+            "objects": [
+              {
+                "id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+                "name": "",
+                "path": "\\Interactive Music Hierarchy\\Music\\01_In-Game Music\\Stealth\\Stealth_Seg_01\\Stealth_Ambient\\[RTPC: Voice Volume, Stealth_Factor]",
+                "properties": {
+                  "PropertyName": "Volume"
+                },
+                "type": "RTPC"
+              }
+            ],
+            "ok": true,
+            "query_bound": {
+              "mode": "exact-object"
+            },
+            "status": "ok"
+          },
+          "object_id": "{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}",
+          "observed_value": "Volume",
+          "stage": "complete",
+          "status": "PASS",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_typed_public_field_not_complete_business_oracle"
+        },
+        {
+          "category": "music-switch-public-collection-Arguments",
+          "gateway_exit_code": 2,
+          "gateway_result": {
+            "agent_result": null,
+            "call": {
+              "api": "ak.wwise.core.object.get",
+              "error_code": "WaapiRequestFailed",
+              "evidence_path": "/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/pytest-of-xiye/pytest-22/gateway-workflows-2022-10/dispatcher-evidence/1790531564190869000-8eb8ddee700e40cf9bcd07c75ba459a3-ak_wwise_core_object_get.json",
+              "message": "ApplicationError(error=<ak.wwise.query.invalid_query>, args=[], kwargs={'message': 'Unknown property Arguments (61)', 'details': {'procedureUri': 'ak.wwise.core.object.get'}}, enc_algo=None, callee=None, callee_authid=None, callee_authrole=None, forward_for=None)"
+            },
+            "command": "query-object",
+            "count": null,
+            "limit_reached": null,
+            "objects": null,
+            "ok": false,
+            "query_bound": {
+              "mode": "gateway-appended-take",
+              "value": 16
+            },
+            "status": "error"
+          },
+          "stage": "query_result",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_public_collection_not_path_configuration_acceptance"
+        },
+        {
+          "category": "music-switch-public-collection-Entries",
+          "gateway_exit_code": 2,
+          "gateway_result": {
+            "agent_result": null,
+            "call": {
+              "api": "ak.wwise.core.object.get",
+              "error_code": "WaapiRequestFailed",
+              "evidence_path": "/private/var/folders/0g/wcnvwhx96wqd99gqw8t8hy040000gn/T/pytest-of-xiye/pytest-22/gateway-workflows-2022-10/dispatcher-evidence/1790531564221836000-07e4492effe14f27898a7f14e38ca2b7-ak_wwise_core_object_get.json",
+              "message": "ApplicationError(error=<ak.wwise.query.invalid_query>, args=[], kwargs={'message': 'Unknown property Entries (61)', 'details': {'procedureUri': 'ak.wwise.core.object.get'}}, enc_algo=None, callee=None, callee_authid=None, callee_authrole=None, forward_for=None)"
+            },
+            "command": "query-object",
+            "count": null,
+            "limit_reached": null,
+            "objects": null,
+            "ok": false,
+            "query_bound": {
+              "mode": "gateway-appended-take",
+              "value": 16
+            },
+            "status": "error"
+          },
+          "stage": "query_result",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "read_only_public_collection_not_path_configuration_acceptance"
+        },
+        {
+          "category": "authoring-ui",
+          "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+          "status": "blocked",
+          "verifier_strength": "host_unavailable"
+        }
+      ],
+      "contract": "waapi-skill.host-category-evidence/v3",
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "invocation": {
+        "finished_at_unix_ns": 1790531564636075000,
+        "node_outcomes": [
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}-Playlist Root-references-PlaylistRoot-reference]",
+            "outcome": "FAIL"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-properties-LoopCount-integer]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-Segment-references-Segment-reference]",
+            "outcome": "FAIL"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-properties-PlaySourcePostExit-boolean]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Destination Pre-entry-properties-PlayDestinationPreEntry-boolean]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Exit Source At-properties-ExitSourceAt-integer]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Curve-references-Curve-reference]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Control Input-references-ControlInput-reference]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Property-properties-PropertyName-string]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Arguments]",
+            "outcome": "FAIL"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Entries]",
+            "outcome": "FAIL"
+          }
+        ],
+        "outcome": "FAIL",
+        "phase": "final",
+        "selected_test_nodeids": [
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{492A2BCA-08ED-4ED9-BDA3-B4D876D2D830}-Playlist Root-references-PlaylistRoot-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-properties-LoopCount-integer]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-Segment-references-Segment-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-properties-PlaySourcePostExit-boolean]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Destination Pre-entry-properties-PlayDestinationPreEntry-boolean]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Exit Source At-properties-ExitSourceAt-integer]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Curve-references-Curve-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Control Input-references-ControlInput-reference]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_expansion_public_field_read[{764CAA28-CA72-4B8D-B0BB-151FABE8DA93}-Property-properties-PropertyName-string]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Arguments]",
+          "tests/destructive/test_music_expansion_capabilities.py::test_music_switch_public_collection_read[Entries]"
+        ],
+        "started_at_unix_ns": 1790531555409207000
+      },
+      "platform": "macos",
+      "recorded_at_unix": 1790531564,
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-2e291d28c1174178b21764ffab86c55a",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-2e291d28c1174178b21764ffab86c55a"
+      },
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "transactions": [],
+      "version": "2022.1"
+    }
+  },
+  "projection_note": "Compact derived record; original immutable JSONL record hashes above identify the full evidence. No verdict was changed."
+}

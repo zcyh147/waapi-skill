@@ -1,0 +1,434 @@
+{
+  "scope": "scoped existing-object maintenance; no full playlist or Transition configuration credit",
+  "evidence_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/full-typed-input/macos-category-evidence.jsonl",
+  "records": [
+    {
+      "record_sha256": "ed0d0a2ec75127adce97a8dc7f72ceea7e5599e86953d3e297b4443e9c657184",
+      "candidate": "6601ab1bddc5a842afaf0951a58ac51603ce7b21",
+      "categories": [
+        {
+          "before": {
+            "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+            "name": "",
+            "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+            "properties": {
+              "LoopCount": 1
+            },
+            "type": "MusicPlaylistItem"
+          },
+          "category": "music-existing-scalar-LoopCount",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "before": {
+            "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+            "name": "Transition",
+            "path": "Root\\Transition",
+            "properties": {
+              "ExitSourceAt": 7,
+              "PlayDestinationPreEntry": true,
+              "PlaySourcePostExit": true
+            },
+            "type": "MusicTransition"
+          },
+          "category": "music-existing-scalar-PlaySourcePostExit",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "category": "authoring-ui",
+          "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+          "status": "blocked",
+          "verifier_strength": "host_unavailable"
+        }
+      ],
+      "contract": "waapi-skill.host-category-evidence/v3",
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "invocation": {
+        "finished_at_unix_ns": 1790531886477112000,
+        "node_outcomes": [
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-LoopCount-2-preserved0]",
+            "outcome": "FAIL"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]",
+            "outcome": "FAIL"
+          }
+        ],
+        "outcome": "FAIL",
+        "phase": "final",
+        "selected_test_nodeids": [
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-LoopCount-2-preserved0]",
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]"
+        ],
+        "started_at_unix_ns": 1790531877582794000
+      },
+      "platform": "macos",
+      "recorded_at_unix": 1790531886,
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-e13c9babd61a48f68e952110017eebcc",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-e13c9babd61a48f68e952110017eebcc"
+      },
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "transactions": [],
+      "version": "2025.1"
+    },
+    {
+      "record_sha256": "07cd10c0b67ae1b09b37c2136f91205ba75b76660dd6a2b3c3ad89cc5e18ddcf",
+      "candidate": "6601ab1bddc5a842afaf0951a58ac51603ce7b21",
+      "categories": [
+        {
+          "after": {
+            "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+            "name": "",
+            "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+            "properties": {
+              "LoopCount": 2
+            },
+            "type": "MusicPlaylistItem"
+          },
+          "before": {
+            "id": "{DE090E27-2F5C-436F-A239-D02F8D5016B2}",
+            "name": "",
+            "path": "[1. Sequence Continuous Group]\\[1. Stealth_Seg_01]",
+            "properties": {
+              "LoopCount": 1
+            },
+            "type": "MusicPlaylistItem"
+          },
+          "category": "music-existing-scalar-LoopCount",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "PASS",
+          "transaction_ids": [
+            "tx1-xe7p85v89rz472fz8y47"
+          ],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "before": {
+            "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+            "name": "Transition",
+            "path": "Root\\Transition",
+            "properties": {
+              "ExitSourceAt": 7,
+              "PlayDestinationPreEntry": true,
+              "PlaySourcePostExit": true
+            },
+            "type": "MusicTransition"
+          },
+          "category": "music-existing-scalar-PlaySourcePostExit",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "category": "authoring-ui",
+          "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+          "status": "blocked",
+          "verifier_strength": "host_unavailable"
+        }
+      ],
+      "contract": "waapi-skill.host-category-evidence/v3",
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "invocation": {
+        "finished_at_unix_ns": 1790531912014380000,
+        "node_outcomes": [
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-LoopCount-2-preserved0]",
+            "outcome": "PASS"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]",
+            "outcome": "FAIL"
+          }
+        ],
+        "outcome": "FAIL",
+        "phase": "final",
+        "selected_test_nodeids": [
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-LoopCount-2-preserved0]",
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]"
+        ],
+        "started_at_unix_ns": 1790531904290605000
+      },
+      "platform": "macos",
+      "recorded_at_unix": 1790531912,
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-c7d3610badb147e4a349b8cdc83c7cfb",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-c7d3610badb147e4a349b8cdc83c7cfb"
+      },
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "transactions": [
+        {
+          "artifact_hash": "e092d93db2d03305e9fed64a76aa02fb358ae7287b6e4cc6242a3d8c1237178b",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-xe7p85v89rz472fz8y47"
+        }
+      ],
+      "version": "2022.1"
+    },
+    {
+      "record_sha256": "d3f89466954bbc4f8bc4f0a77c75b5dd4f214287c634b61618f1cfa0ab54fdce",
+      "candidate": "4231c52ed929c2924c2430f1f27224cbda5f0d7e",
+      "categories": [
+        {
+          "category": "music-existing-scalar-LoopCount",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "FAIL",
+          "transaction_ids": [],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "after": {
+            "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+            "name": "Transition",
+            "path": "Root\\Transition",
+            "properties": {
+              "ExitSourceAt": 7,
+              "PlayDestinationPreEntry": true,
+              "PlaySourcePostExit": false
+            },
+            "type": "MusicTransition"
+          },
+          "before": {
+            "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+            "name": "Transition",
+            "path": "Root\\Transition",
+            "properties": {
+              "ExitSourceAt": 7,
+              "PlayDestinationPreEntry": true,
+              "PlaySourcePostExit": true
+            },
+            "type": "MusicTransition"
+          },
+          "category": "music-existing-scalar-PlaySourcePostExit",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "PASS",
+          "transaction_ids": [
+            "tx1-dgzncgcx1w03d7kymesg"
+          ],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "category": "authoring-ui",
+          "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+          "status": "blocked",
+          "verifier_strength": "host_unavailable"
+        }
+      ],
+      "contract": "waapi-skill.host-category-evidence/v3",
+      "host": {
+        "display_name": "WwiseConsole",
+        "is_command_line": true,
+        "version": {
+          "build": 9143,
+          "displayName": "v2025.1.7",
+          "major": 1,
+          "minor": 7,
+          "nickname": "",
+          "schema": 133,
+          "year": 2025
+        }
+      },
+      "invocation": {
+        "finished_at_unix_ns": 1790532311866533000,
+        "node_outcomes": [
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-LoopCount-2-preserved0]",
+            "outcome": "FAIL"
+          },
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]",
+            "outcome": "PASS"
+          }
+        ],
+        "outcome": "FAIL",
+        "phase": "final",
+        "selected_test_nodeids": [
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{DE090E27-2F5C-436F-A239-D02F8D5016B2}-No. of Loops-LoopCount-2-preserved0]",
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]"
+        ],
+        "started_at_unix_ns": 1790532302738720000
+      },
+      "platform": "macos",
+      "recorded_at_unix": 1790532311,
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-facc3dedff0941b9bb01920186edf008",
+        "residual_processes": [],
+        "sandbox": "quarantined",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-facc3dedff0941b9bb01920186edf008"
+      },
+      "source": {
+        "hash_after": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "hash_before": "9052fe4d1fe4d193d98af7c989821b1697e93f7fd33728dbd18c16a4e5aef584",
+        "mtime_after_ns": 1785701407051832215,
+        "mtime_before_ns": 1785701407051832215,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+        "tree_metadata_after": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381",
+        "tree_metadata_before": "b075eac0e727c84271d81f1b4068ae984caa371edc4c5426ebb5c3c77e471381"
+      },
+      "transactions": [
+        {
+          "artifact_hash": "de54c011785d012922940d8067471e8971b8d2c0d62449d9dca5244cbe88b929",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-dgzncgcx1w03d7kymesg"
+        }
+      ],
+      "version": "2025.1"
+    },
+    {
+      "record_sha256": "c08db5a7141a449bd5ea6db883542eee4120adf114261680fb910c1265734c32",
+      "candidate": "4231c52ed929c2924c2430f1f27224cbda5f0d7e",
+      "categories": [
+        {
+          "after": {
+            "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+            "name": "Transition",
+            "path": "Root\\Transition",
+            "properties": {
+              "ExitSourceAt": 7,
+              "PlayDestinationPreEntry": true,
+              "PlaySourcePostExit": false
+            },
+            "type": "MusicTransition"
+          },
+          "before": {
+            "id": "{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}",
+            "name": "Transition",
+            "path": "Root\\Transition",
+            "properties": {
+              "ExitSourceAt": 7,
+              "PlayDestinationPreEntry": true,
+              "PlaySourcePostExit": true
+            },
+            "type": "MusicTransition"
+          },
+          "category": "music-existing-scalar-PlaySourcePostExit",
+          "scope": "existing_scalar_only_not_playlist_order_or_full_transition",
+          "status": "PASS",
+          "transaction_ids": [
+            "tx1-bkz4nv1varmhcj4ez8ks"
+          ],
+          "verifier_strength": "public_preview_execute_verify_and_independent_exact_field_read"
+        },
+        {
+          "category": "authoring-ui",
+          "reason": "configured matching host is WwiseConsole, not Wwise Authoring",
+          "status": "blocked",
+          "verifier_strength": "host_unavailable"
+        }
+      ],
+      "contract": "waapi-skill.host-category-evidence/v3",
+      "host": {
+        "display_name": "Wwise",
+        "is_command_line": true,
+        "version": {
+          "build": 8584,
+          "displayName": "v2022.1.19",
+          "major": 1,
+          "minor": 19,
+          "nickname": "",
+          "schema": 110,
+          "year": 2022
+        }
+      },
+      "invocation": {
+        "finished_at_unix_ns": 1790532404254657000,
+        "node_outcomes": [
+          {
+            "nodeid": "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]",
+            "outcome": "PASS"
+          }
+        ],
+        "outcome": "PASS",
+        "phase": "final",
+        "selected_test_nodeids": [
+          "tests/destructive/test_music_expansion_maintenance.py::test_music_existing_scalar_maintenance[{B24173D4-7534-4C19-ACE0-F1F1B0EBD535}-Play Source Post-exit-PlaySourcePostExit-False-preserved1]"
+        ],
+        "started_at_unix_ns": 1790532394992777000
+      },
+      "platform": "macos",
+      "recorded_at_unix": 1790532404,
+      "residual_state": {
+        "process_cleanup": "cleaned",
+        "quarantine_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-8389f3d1ac9447c18475bab5a21b49e7",
+        "residual_processes": [],
+        "sandbox": "deleted",
+        "sandbox_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/.waapi-skill-state/evidence/wwise-waapi-live-sandbox-coverage/sample-project-8389f3d1ac9447c18475bab5a21b49e7"
+      },
+      "source": {
+        "hash_after": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "hash_before": "fbc080432115e775f98b929c46d1a48390ee29e9e82c90778fff51e1f1f38964",
+        "mtime_after_ns": 1784481351210981789,
+        "mtime_before_ns": 1784481351210981789,
+        "project": "/Users/xiye/Documents/Git/waapi-skills/tests/_org/2022.1/SampleProject.wproj",
+        "tree_metadata_after": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4",
+        "tree_metadata_before": "462926a7e830de4926713234586b3132cb994a68ffff8398f498c01a341a62b4"
+      },
+      "transactions": [
+        {
+          "artifact_hash": "8044120b7ce628d492800f7c8dfddb0206f873f0fafbb317b32e1251a2947111",
+          "event_sequence": 6,
+          "state": "verified",
+          "transaction_id": "tx1-bkz4nv1varmhcj4ez8ks"
+        }
+      ],
+      "version": "2022.1"
+    }
+  ]
+}

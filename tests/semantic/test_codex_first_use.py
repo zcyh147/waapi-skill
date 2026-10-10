@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 
 import pytest
@@ -25,7 +25,7 @@ INTRO = (
 
 
 def test_both_initial_prompts_are_bare_invocations() -> None:
-    skill = Path("/demo/.agents/skills/waapi-skill")
+    skill = PurePosixPath("/demo/.agents/skills/waapi-skill")
     assert welcome.initial_prompt("bare-slash", skill) == "/waapi-skill"
     assert welcome.initial_prompt("bare-link", skill) == (
         "[$waapi-skill](/demo/.agents/skills/waapi-skill/SKILL.md)"

@@ -1,0 +1,504 @@
+{
+  "context_fixture": "expansion-composed-notices-87f9dc8.json",
+  "context_file_sha256": "85312947d24b046eb9b4169bc7b66e77fb0483b47d30583818962ba2fe60318b",
+  "scope": "Independent closed business-role contrasts; no production-derived expectation or historical regrading.",
+  "contexts": [
+    {
+      "case": "006-EXP22-C09",
+      "artifact_sha256": "c6ea22cea40d9a2d929636ff89e86b94a62218aeddaf1b515ac354690691a47a",
+      "before_sha256": "1f1e2c314d38992321884d828fc5910b76e866911e3fd552c2302c8a8438ace4",
+      "events_sha256": "b8c7bd691d4b6d92cea59c15ffcd07d1b38b310c2773eb3e432b82c19b77f5b3",
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "605bf8e06ae562a8bbdbc7ee4c7746d51a637ecddfa624acbb2c270931965f1a",
+        "preview_file_sha256": "5ff12a9e249cab06b31500cdcd14ee320347c964c3af1994c401dcf8125d73c3",
+        "oracle_file_sha256": "7c2053d14fd57002e997221d2ce1a80bc3165777073a7d56ad2dba8ff968cab5",
+        "phases": [
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP22-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-d704e924716005cd769a8e42af18a9bc --task-authority da1-54c495ddf8e82c5591f4ce6eb0ae5335484cb7dd --expected-revision 5'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 24,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP22-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-n9bc5h6ak4ngv4wpd4ay'",
+            "phase": "execute"
+          }
+        ]
+      }
+    },
+    {
+      "case": "011-EXP25-C08",
+      "artifact_sha256": "cad3951516030f3d60c3f5cce312bc6a26850b4478810f49bfc0a1bcabc7a634",
+      "before_sha256": "868080603b160b726fa80adc6021ce2f3560d217ab954f5a2696a5dd1d0a02e8",
+      "events_sha256": "e642c8688023c603a333ce4e849682a184a6a10d31d982d41d03fe1683fba164",
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "c44440cc80c349a85427fbc3dc5f416158083115161239089b2dad09e7ed4c87",
+        "preview_file_sha256": "90f84373b18fc87a6c755f1264c1824370db25384e7b03c7ffbea90a4a4d3a80",
+        "oracle_file_sha256": "bd9cf843c5408b8b2bc46af4a447f42e3204ad4bc4de1031d357ed4ae4ce11e3",
+        "phases": [
+          {
+            "event_index": 20,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-eb5fa09ba9f5e4d814af76733b824355 --task-authority da1-21030abb1b96cdf78edf1533dd145b1569238bf9 --expected-revision 4'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/011-EXP25-C08/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-zzszghq11cejrz4rqjfq'",
+            "phase": "execute"
+          }
+        ]
+      }
+    },
+    {
+      "case": "012-EXP25-C09",
+      "artifact_sha256": "4fae38d97d8d22937ae855f8f051900323eb02362c222e3678b13cc0070f584d",
+      "before_sha256": "3b8427fd3e111067aaabe755aefec431398f9c5f3a670883371df48f24cfbb4e",
+      "events_sha256": "354854ccc365bc110c338ba94f57e0fa6d877b6791e7f6fe2ad8e63a5dc4cccf",
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "c16a47173a16fc1c78888c2520a1f31f433394df94962e995f054573523f9279",
+        "preview_file_sha256": "2aa61c3c2cdde70ad8b7bde52592151bf10d4863ba522fb2b63caff8f900bb56",
+        "oracle_file_sha256": "f534a755ae3ccf61114e6c43f7a5a7ce9d7a77de335090131325f4645ff041e1",
+        "phases": [
+          {
+            "event_index": 22,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/012-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-0cc6d0b5c5f7fe2aabbef182aa81e18c --task-authority da1-c6fb34ed21ee27cc289aaeeed8ad40485f8ff51c --expected-revision 5'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 24,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/012-EXP25-C09/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-zrgme5mbm6gr7p29zyqw'",
+            "phase": "execute"
+          }
+        ]
+      }
+    },
+    {
+      "case": "014-EXP25-M05",
+      "artifact_sha256": "05eb9fe5b3675f41e747435bbda9f6f9dedec12ea3c9542261cde65d7e78de8a",
+      "before_sha256": "45c8f4ef07579be5477246b155f728712c1767c626dc03a6e1f932660d893e80",
+      "events_sha256": "90cab54e72fa88a962c86d12b7d8f81a914b4ac6e937294e59c3dd5157430138",
+      "source": {
+        "candidate": "87f9dc8",
+        "events_sha256": "a6eb670cf281fb7de9d9f6755017c2a1ebea762127db429a1d4eac5ddf7c0f2f",
+        "preview_file_sha256": "06840ff533b8566165529321afbc78ba55da337ffce85f259dd89b13edbd3b2a",
+        "oracle_file_sha256": "27598695b26ff6feb68c6aafbcc1b03dbd24113a626c378f409f19c226591d5c",
+        "phases": [
+          {
+            "event_index": 25,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py preview-from-draft od1-e248517bc225bc074d97f31823b93dc8 --task-authority da1-8284d8e7d75e4ea66152670c06b9f5db3288263b --expected-revision 6'",
+            "phase": "preview-from-draft"
+          },
+          {
+            "event_index": 27,
+            "raw_command": "/bin/bash -lc 'python /Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-87f9dc8-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/014-EXP25-M05/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py gateway.py execute tx1-vfrnr1pwdehgrgt66q4a'",
+            "phase": "execute"
+          }
+        ]
+      }
+    }
+  ],
+  "recipes": [
+    {
+      "id": "006-EXP22-C09-exact",
+      "case": "006-EXP22-C09",
+      "expected": true
+    },
+    {
+      "id": "011-EXP25-C08-exact",
+      "case": "011-EXP25-C08",
+      "expected": true
+    },
+    {
+      "id": "012-EXP25-C09-exact",
+      "case": "012-EXP25-C09",
+      "expected": true
+    },
+    {
+      "id": "014-EXP25-M05-exact",
+      "case": "014-EXP25-M05",
+      "expected": true
+    },
+    {
+      "id": "passive-components-active-contrast",
+      "case": "006-EXP22-C09",
+      "expected": true,
+      "replace": [
+        [
+          "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。",
+          "已核对目标声音并记录修改前状态。"
+        ],
+        [
+          "即将追加",
+          "即将追加 Wwise Gain 效果器"
+        ]
+      ]
+    },
+    {
+      "id": "scope-modification-noun-contrast",
+      "case": "011-EXP25-C08",
+      "expected": true,
+      "replace": [
+        [
+          "此次写入仅涉及这一条曲线",
+          "此次修改范围仅包含这一条曲线"
+        ]
+      ]
+    },
+    {
+      "id": "placement-owned-chain-contrast",
+      "case": "012-EXP25-C09",
+      "expected": true,
+      "replace": [
+        [
+          "将于现有效果器之后追加",
+          "将在该声音的效果链末尾追加"
+        ],
+        [
+          "现在执行追加并读取结果核验",
+          "现在执行追加，随后核验结果"
+        ]
+      ]
+    },
+    {
+      "id": "exclusion-separate-clause-contrast",
+      "case": "014-EXP25-M05",
+      "expected": true,
+      "replace": [
+        [
+          "，未包含音乐段",
+          "；未包含音乐段"
+        ]
+      ]
+    },
+    {
+      "id": "passive-foreign-owner",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "replace": [
+        [
+          "目标声音已绑定",
+          "OtherSound 已绑定"
+        ]
+      ]
+    },
+    {
+      "id": "passive-compound-owner",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "replace": [
+        [
+          "目标声音已绑定",
+          "目标声音和 OtherSound 已绑定"
+        ]
+      ]
+    },
+    {
+      "id": "passive-wrong-kind",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "replace": [
+        [
+          "Wwise Gain 类型已从实时目录确认",
+          "Sound 类型已从实时目录确认"
+        ]
+      ]
+    },
+    {
+      "id": "passive-policy-contradiction",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "append": "当前策略为 read_only。"
+    },
+    {
+      "id": "curve-wrong-value",
+      "case": "011-EXP25-C08",
+      "expected": false,
+      "replace": [
+        [
+          "(50.0, -12)",
+          "(50.0, -60)"
+        ]
+      ]
+    },
+    {
+      "id": "curve-multiple-target-scope",
+      "case": "011-EXP25-C08",
+      "expected": false,
+      "replace": [
+        [
+          "此次写入仅涉及这一条曲线",
+          "此次写入涉及这一条曲线及 OtherAttenuation 的曲线"
+        ]
+      ]
+    },
+    {
+      "id": "curve-extra-write",
+      "case": "011-EXP25-C08",
+      "expected": false,
+      "append": "同时修改 Pitch 为 12。"
+    },
+    {
+      "id": "curve-refusal",
+      "case": "011-EXP25-C08",
+      "expected": false,
+      "append": "我不会执行本次修改。"
+    },
+    {
+      "id": "wrong-append-placement",
+      "case": "012-EXP25-C09",
+      "expected": false,
+      "replace": [
+        [
+          "现有效果器之后",
+          "现有效果器之前"
+        ]
+      ]
+    },
+    {
+      "id": "placement-competing-addition",
+      "case": "012-EXP25-C09",
+      "expected": false,
+      "append": "同时追加 Wwise Gain 效果器 OtherGain。"
+    },
+    {
+      "id": "placement-interposed-subject",
+      "case": "012-EXP25-C09",
+      "expected": false,
+      "replace": [
+        [
+          "。将于现有效果器之后",
+          "。目标是 OtherSound。将于现有效果器之后"
+        ]
+      ]
+    },
+    {
+      "id": "placement-stale-plan",
+      "case": "012-EXP25-C09",
+      "expected": false,
+      "phase": "artifact_name_changed"
+    },
+    {
+      "id": "reference-wrong-value",
+      "case": "014-EXP25-M05",
+      "expected": false,
+      "replace": [
+        [
+          "Trigger 改为 Backup_Team_Arrives",
+          "Trigger 改为 Bonus"
+        ]
+      ]
+    },
+    {
+      "id": "reference-exclusion-extra-affirmative",
+      "case": "014-EXP25-M05",
+      "expected": false,
+      "append": "同时修改关联音乐段的 NumSegmentAdvance 为 2。"
+    },
+    {
+      "id": "reference-foreign-owner",
+      "case": "014-EXP25-M05",
+      "expected": false,
+      "replace": [
+        [
+          "指定 Stinger",
+          "OtherStinger"
+        ]
+      ]
+    },
+    {
+      "id": "reference-late-notice",
+      "case": "014-EXP25-M05",
+      "expected": false,
+      "phase": "late_notice"
+    },
+    {
+      "id": "passive-placement-read-composition-positive",
+      "case": "006-EXP22-C09",
+      "expected": true,
+      "replace": [
+        [
+          "即将追加",
+          "将于现有效果器之后追加"
+        ],
+        [
+          "现在执行，随后核验",
+          "现在执行追加并读取结果核验，随后核验"
+        ]
+      ]
+    },
+    {
+      "id": "passive-placement-read-composition-negative",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "replace": [
+        [
+          "即将追加",
+          "将于现有效果器之后追加"
+        ],
+        [
+          "现在执行，随后核验",
+          "现在执行追加并读取结果核验，随后核验"
+        ],
+        [
+          "现有效果器之后",
+          "现有效果器之前"
+        ]
+      ]
+    },
+    {
+      "id": "passive-neutral-order-positive",
+      "case": "006-EXP22-C09",
+      "expected": true,
+      "replace": [
+        [
+          "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。",
+          "目标声音已绑定，修改前状态已记录，Wwise Gain 类型已从实时目录确认。"
+        ]
+      ]
+    },
+    {
+      "id": "passive-neutral-order-negative",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "replace": [
+        [
+          "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。",
+          "目标声音已绑定，修改前状态已记录，Wwise Gain 类型已从实时目录确认。"
+        ],
+        [
+          "Wwise Gain 类型已从实时目录确认",
+          "MusicSegment 类型已从实时目录确认"
+        ]
+      ]
+    },
+    {
+      "id": "passive-owner-immediate-effect-ancillary-later-positive",
+      "case": "006-EXP22-C09",
+      "expected": true,
+      "replace": [
+        [
+          "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。",
+          "目标声音已绑定。"
+        ],
+        [
+          "；不提交额外插件参数或平台值。",
+          "；不提交额外插件参数或平台值。Wwise Gain 类型已从实时目录确认，修改前状态已记录。"
+        ]
+      ]
+    },
+    {
+      "id": "passive-owner-immediate-effect-ancillary-later-negative",
+      "case": "006-EXP22-C09",
+      "expected": false,
+      "replace": [
+        [
+          "目标声音已绑定，Wwise Gain 类型已从实时目录确认，修改前状态已记录。",
+          "目标声音已绑定。"
+        ],
+        [
+          "；不提交额外插件参数或平台值。",
+          "；不提交额外插件参数或平台值。Wwise Gain 类型已从实时目录确认，修改前状态已记录。"
+        ],
+        [
+          "目标声音已绑定。",
+          "目标声音已绑定。目标是 OtherSound。"
+        ]
+      ]
+    },
+    {
+      "id": "curve-scope-auth-order-positive",
+      "case": "011-EXP25-C08",
+      "expected": true,
+      "replace": [
+        [
+          "本次修改已按 allow_changes 策略取得独立授权。",
+          ""
+        ],
+        [
+          "此次写入仅涉及这一条曲线；",
+          "此次写入仅涉及这一条曲线。\n\n本次修改已按 allow_changes 策略取得独立授权；"
+        ]
+      ]
+    },
+    {
+      "id": "curve-scope-auth-order-negative",
+      "case": "011-EXP25-C08",
+      "expected": false,
+      "replace": [
+        [
+          "本次修改已按 allow_changes 策略取得独立授权。",
+          ""
+        ],
+        [
+          "此次写入仅涉及这一条曲线；",
+          "此次写入仅涉及这一条曲线。\n\n本次修改已按 allow_changes 策略取得独立授权；"
+        ],
+        [
+          "本次修改已按 allow_changes 策略取得独立授权",
+          "本次修改已按 read_only 策略取得独立授权"
+        ]
+      ]
+    },
+    {
+      "id": "curve-current-preview-auth-composition-positive",
+      "case": "011-EXP25-C08",
+      "expected": true,
+      "replace": [
+        [
+          "本次修改已按 allow_changes 策略取得独立授权。",
+          "预览已取得 allow_changes 策略的独立持久授权。"
+        ]
+      ]
+    },
+    {
+      "id": "curve-current-preview-auth-composition-negative",
+      "case": "011-EXP25-C08",
+      "expected": false,
+      "replace": [
+        [
+          "本次修改已按 allow_changes 策略取得独立授权。",
+          "预览已取得 allow_changes 策略的独立持久授权。"
+        ],
+        [
+          "此次写入仅涉及这一条曲线",
+          "此次写入还涉及 Pitch 字段"
+        ]
+      ]
+    },
+    {
+      "id": "protected-exclusion-before-reference-positive",
+      "case": "014-EXP25-M05",
+      "expected": true,
+      "replace": [
+        [
+          "预览已生成：仅将指定 Stinger 的 Trigger 改为 Backup_Team_Arrives，未包含音乐段、容器或其他设置的修改。",
+          "未包含音乐段、容器或其他设置的修改。\n\n预览已生成：仅将指定 Stinger 的 Trigger 改为 Backup_Team_Arrives。"
+        ]
+      ]
+    },
+    {
+      "id": "protected-exclusion-before-reference-negative",
+      "case": "014-EXP25-M05",
+      "expected": false,
+      "replace": [
+        [
+          "预览已生成：仅将指定 Stinger 的 Trigger 改为 Backup_Team_Arrives，未包含音乐段、容器或其他设置的修改。",
+          "未包含音乐段、容器或其他设置的修改。\n\n预览已生成：仅将指定 Stinger 的 Trigger 改为 Backup_Team_Arrives。"
+        ],
+        [
+          "未包含音乐段、容器或其他设置的修改",
+          "同时修改关联音乐段的 NumSegmentAdvance 为 2"
+        ]
+      ]
+    }
+  ],
+  "revision": {
+    "from": "expansion-independent-composition-87f9dc8.json",
+    "reason": "Independent six component-composition pairs; r1 corpus and first partial audit preserved unchanged.",
+    "new_positive_count": 6,
+    "new_negative_count": 6
+  }
+}

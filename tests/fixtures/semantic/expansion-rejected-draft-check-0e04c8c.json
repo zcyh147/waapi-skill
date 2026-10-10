@@ -1,0 +1,254 @@
+{
+  "scope": "Selected original rejected-check witness; derivative tests replace only task-local identities, version and owned paths, never rewrite source archive or grant native PASS",
+  "candidate": "0e04c8c",
+  "unit": "EXP22-M01",
+  "source_sha256": {
+    "expansion-broker.json": "4bd5b33da46f8ce8750e041ff56d9560609a3b578eed21c04dfa123cfe20010c",
+    "expansion-oracle.json": "ebccd319ed7fcb93b97b7e41847ad88fdf572e88c630554b8e9b8e81f02ccd1a",
+    "expansion-plan.json": "a4dae434a05fd1bfbf39a3f81bf5b53c9cbe44712f759e862fbc13d4458ce1bd",
+    "stored_record": "2c46b9a5e7016115a8cae90aa2ba43118f95d2a590170f3825487386f3c8b2ac"
+  },
+  "accepted_commands": [
+    "operations",
+    "operation-schema",
+    "draft-start",
+    "draft-bind-object",
+    "draft-declare-import-batch"
+  ],
+  "declaration_argv": [
+    "draft-declare-import-batch",
+    "od1-aea9a990ee2d46bff655b2b2e3e8d615",
+    "--task-authority",
+    "da1-5bc000b29ecd4f151cae610285fa8ff4b2dd9783",
+    "--expected-revision",
+    "2",
+    "--row-order",
+    "imported",
+    "quiet",
+    "full",
+    "--new-row",
+    "imported",
+    "boh1-64322300ce74dec93411072988559ea4",
+    "Imported",
+    "music-segment",
+    "--new-row",
+    "quiet",
+    "imported",
+    "Quiet",
+    "music-track",
+    "--field",
+    "quiet",
+    "volume_db",
+    "-6",
+    "--new-row",
+    "full",
+    "imported",
+    "Full",
+    "music-track",
+    "--media-directory",
+    "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01/owned/assets/music",
+    "--media-file",
+    "quiet",
+    "Quiet.wav",
+    "--media-file",
+    "full",
+    "Full.wav"
+  ],
+  "rejected_record": {
+    "accepted": false,
+    "allowed_exit_codes": [],
+    "argv_sha256": "515087aca519ec906f7d22309aeb9a2513ca3288b9063205f558784d0af67008",
+    "authenticated": true,
+    "duration_seconds": 0.0,
+    "exit_code": 126,
+    "finished_at_unix": 1790988999.902086,
+    "finished_at_unix_ns": 1790988999902086000,
+    "gateway_arguments": [
+      "draft-check",
+      "od1-aea9a990ee2d46bff655b2b2e3e8d615",
+      "--task-authority",
+      "da1-5bc000b29ecd4f151cae6102858b4dd9783",
+      "--expected-revision",
+      "3"
+    ],
+    "model_argv": [
+      "python",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+      "gateway.py",
+      "draft-check",
+      "od1-aea9a990ee2d46bff655b2b2e3e8d615",
+      "--task-authority",
+      "da1-5bc000b29ecd4f151cae6102858b4dd9783",
+      "--expected-revision",
+      "3"
+    ],
+    "normalized_model_argv": [
+      "python",
+      "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01/evidence/codex-task/agent-workspace/.agents/skills/waapi-skill/scripts/run.py",
+      "gateway.py",
+      "draft-check",
+      "od1-aea9a990ee2d46bff655b2b2e3e8d615",
+      "--task-authority",
+      "da1-5bc000b29ecd4f151cae6102858b4dd9783",
+      "--expected-revision",
+      "3"
+    ],
+    "payload": null,
+    "payload_error": "",
+    "payload_sha256": "",
+    "raw_argv_sha256": "515087aca519ec906f7d22309aeb9a2513ca3288b9063205f558784d0af67008",
+    "rejection": "expansion policy rejected command: Draft identity, authority or revision is stale",
+    "runner_command_sha256": "",
+    "runner_exit_code": null,
+    "semantic_argv_sha256": "",
+    "sequence": 6,
+    "started_at_unix": 1790988999.902086,
+    "started_at_unix_ns": 1790988999902086000,
+    "stderr": "Gateway broker rejected command: expansion policy rejected command: Draft identity, authority or revision is stale\n",
+    "stdout": "",
+    "step_name": null,
+    "subscription_ack": null,
+    "succeeded": false
+  },
+  "before": {
+    "children": [
+      {
+        "id": "{E722043F-8B33-4600-85FB-FCBA6DB59956}",
+        "name": "Keep",
+        "parent": {
+          "id": "{CF6D8ED9-DFC7-490B-BD1C-74A987C7CCD4}",
+          "name": "Expansion_EXP22-M01_Music"
+        },
+        "path": "\\Interactive Music Hierarchy\\Default Work Unit\\Expansion_EXP22-M01_Music\\Keep",
+        "type": "MusicSegment"
+      }
+    ],
+    "parent": {
+      "id": "{CF6D8ED9-DFC7-490B-BD1C-74A987C7CCD4}",
+      "name": "Expansion_EXP22-M01_Music",
+      "notes": "",
+      "parent": {
+        "id": "{E3C1094C-1D80-4F6B-8634-B4A3DD482D34}",
+        "name": "Default Work Unit"
+      },
+      "path": "\\Interactive Music Hierarchy\\Default Work Unit\\Expansion_EXP22-M01_Music",
+      "type": "MusicPlaylistContainer"
+    },
+    "protected": {
+      "id": "{E722043F-8B33-4600-85FB-FCBA6DB59956}",
+      "name": "Keep",
+      "notes": "",
+      "parent": {
+        "id": "{CF6D8ED9-DFC7-490B-BD1C-74A987C7CCD4}",
+        "name": "Expansion_EXP22-M01_Music"
+      },
+      "path": "\\Interactive Music Hierarchy\\Default Work Unit\\Expansion_EXP22-M01_Music\\Keep",
+      "type": "MusicSegment"
+    },
+    "segment": null,
+    "tracks": {}
+  },
+  "native_stored_facts": {
+    "state": "editable",
+    "revision": 3,
+    "audit_events": [
+      {
+        "event_type": "started",
+        "revision": 1
+      },
+      {
+        "event_type": "handles.bound",
+        "revision": 2
+      },
+      {
+        "event_type": "declaration.batch-added",
+        "revision": 3
+      }
+    ],
+    "check": null,
+    "seal": null,
+    "session_revision": 3,
+    "declarations": [
+      {
+        "contract": "waapi-skill.business-declaration/v1",
+        "declaration_id": "imported",
+        "fields": {},
+        "result_handle": "bnh1-1e88f2cf1ca02a1cb8b5173c48682893",
+        "target": {
+          "form": "new-descendant",
+          "kind": "music-segment",
+          "name": "Imported",
+          "parent_handle": "boh1-64322300ce74dec93411072988559ea4"
+        }
+      },
+      {
+        "contract": "waapi-skill.business-declaration/v1",
+        "declaration_id": "quiet",
+        "fields": {
+          "media_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01/owned/assets/music/Quiet.wav",
+          "volume_db": -6.0
+        },
+        "result_handle": "bnh1-c3f101872c6bc4e42aeb7a3b53e5febe",
+        "target": {
+          "form": "new-descendant",
+          "kind": "music-track",
+          "name": "Quiet",
+          "parent_handle": "bnh1-1e88f2cf1ca02a1cb8b5173c48682893"
+        }
+      },
+      {
+        "contract": "waapi-skill.business-declaration/v1",
+        "declaration_id": "full",
+        "fields": {
+          "media_file": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01/owned/assets/music/Full.wav"
+        },
+        "result_handle": "bnh1-bbb9345e8352dbb3d60e16666486d71a",
+        "target": {
+          "form": "new-descendant",
+          "kind": "music-track",
+          "name": "Full",
+          "parent_handle": "bnh1-1e88f2cf1ca02a1cb8b5173c48682893"
+        }
+      }
+    ]
+  },
+  "native_project_binding": {
+    "summary": {
+      "api": "ak.wwise.core.getProjectInfo",
+      "category": "core",
+      "dry_run": false,
+      "error_code": null,
+      "evidence_path": "/Users/xiye/.codex/worktrees/music-capability-probes/waapi-skills/skills/waapi-skill-workspace/expansion-acceptance-0e04c8c-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/007-EXP22-M01/evidence/codex-task/broker/evidence/1790988979416791000-a5fa40006ac34bb894ad1f7fbb298c44-ak_wwise_core_getProjectInfo.json",
+      "item_type": "function",
+      "message": "ok",
+      "ok": true,
+      "risk_level": "low",
+      "timeout": 9.97423179098405,
+      "version": "2022.1"
+    },
+    "result": {
+      "id": "{16164796-C6E6-491A-8799-C42A33110A84}",
+      "path": "Y:\\.codex\\worktrees\\music-capability-probes\\waapi-skills\\skills\\waapi-skill-workspace\\expansion-acceptance-0e04c8c-sol-high-r1-cli1592\\attempts\\attempt-000001\\runs\\heavy-v3\\matrix\\scenarios\\007-EXP22-M01\\owned\\sandbox-root\\sample-project-759f27567e3e4cfdbcedd2178b58ac97\\SampleProject.wproj"
+    },
+    "file_sha256": "f3c6f49cc4371f7501ac82acfcf166861fad36a72f1ea7833d1500844b3b3c02"
+  },
+  "provenance": {
+    "exact_native_fields": [
+      "rejected_record",
+      "declaration_argv",
+      "accepted_commands",
+      "before",
+      "native_stored_facts",
+      "native_project_binding",
+      "source_sha256"
+    ],
+    "regenerated_test_data": [
+      "accepted prefix receipt bodies and command/event/fact digests",
+      "production Draft ID/task authority/handles/store/audit timestamps for parameterized2022.1 and2025.1",
+      "owned media paths and dummy bytes",
+      "Gateway project binding evidence with fake project identity",
+      "negative result/session/lifecycle scaffolding reused from existing archive tests"
+    ],
+    "credit": "Derivative program-only full archive proof; native root remains BLOCKED and is never rewritten or regraded"
+  }
+}

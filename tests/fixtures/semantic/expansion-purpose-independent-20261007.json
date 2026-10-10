@@ -1,0 +1,168 @@
+{
+  "contract": "waapi-skill.diagnostic-independent-purpose-contrasts/v1",
+  "status": "frozen pre-implementation expectations; no new execution/acceptance claim",
+  "functional_candidate": "0b6af50d10cf2fe85f2fbdde5407c936fac69fd0",
+  "fixture_file": "fixture.json",
+  "fixture_sha256": "1ddfe39754f4ee50fae43817c39641b064dde7f1d4e0a6f27e7fea7df0e33ee1",
+  "criterion_basis": {
+    "READ_PURPOSE": "#147 closed role/prospective-effect contract plus codex_notice_claims._without_verification_purpose118–125 and baseline_read_role133–156: complete optional record plus read purpose carries no write, authority, phase or verification credit; 保持性 names preservation checking rather than a mutation.",
+    "OPTIONAL": "Current ancillary repair report says complete alternative notices may omit optional preservation prose; endpoint delta report distinguishes omission from explicit owned contradiction; optional bookkeeping/policy/verification gives no proof.",
+    "OWNED_DELTA": "#147 and AGENTS require exact owned definite prospective delta matching sealed identity/descriptor; no extra edit or contradictory owner/value is allowed. Complete read records must not consume ownership; an explicit sealed owner is independently sufficient.",
+    "TIMING": "expansion_preview_notice requires notice after the relevant immutable Preview and before Execute start; second Preview clears prior notice.",
+    "ADDITIONAL": "codex_notice_claims.additional_action_qualifier577–590 specifies explicit second ordinal or paired 再…一次 as additional write. A discourse coordinator does not change ordinal cardinality; fullmatch incompleteness is implementation behavior, not expected semantics.",
+    "RESTATEMENT": "Same docstring577–582 explicitly permits discourse coordinators and bare 再 to restate the same plan. Prior frozen44 expectation erratum retains this criterion; bare 再 controls cannot be relabeled additional writes."
+  },
+  "scope": "Source-grounded expected semantics written independently of parser outcomes; complete ordinary notices except separately listed phase counterfactuals. No native evidence change. Existing3023/frozen58/prior44 unchanged.",
+  "bare_again_expectation_erratum": "Initial diagnostic label extra-append was incorrectly assumed additional; criterion RESTATEMENT intentionally admits bare 再 and remains unchanged.",
+  "cases": [
+    {
+      "id": "P01",
+      "label": "actual-witness",
+      "expected": true,
+      "text": "已核对目标声音身份，并记录修改前状态用于保持性核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "READ_PURPOSE"
+    },
+    {
+      "id": "P02",
+      "label": "forward-save+purpose-check",
+      "expected": true,
+      "text": "已核对目标声音身份，并保存修改前状态供保持性检查。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "READ_PURPOSE"
+    },
+    {
+      "id": "P03",
+      "label": "reverse-record+purpose-verify",
+      "expected": true,
+      "text": "已核对目标声音身份，修改前状态已记录以便保持性验证。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "READ_PURPOSE"
+    },
+    {
+      "id": "P04",
+      "label": "preflight+temporal-purpose",
+      "expected": true,
+      "text": "已核对目标声音身份，预检已记录修改前状态用于执行后保持性核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "READ_PURPOSE"
+    },
+    {
+      "id": "P05",
+      "label": "preview-establish+later-purpose",
+      "expected": true,
+      "text": "已核对目标声音身份，预览已建立修改前状态供后续保持性检查。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "READ_PURPOSE"
+    },
+    {
+      "id": "P06",
+      "label": "bare-record+coordinated-purpose",
+      "expected": true,
+      "text": "已核对目标声音身份，记录修改前状态以便随后保持性验证。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "READ_PURPOSE"
+    },
+    {
+      "id": "P07",
+      "label": "purpose-omitted",
+      "expected": true,
+      "text": "已核对目标声音身份，并记录修改前状态。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "OPTIONAL"
+    },
+    {
+      "id": "P08",
+      "label": "all-optional-omitted",
+      "expected": true,
+      "text": "已核对目标声音身份。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n现在执行追加。",
+      "criterion": "OPTIONAL"
+    },
+    {
+      "id": "P09",
+      "label": "explicit-owner-raw",
+      "expected": true,
+      "text": "已核对目标声音身份，并记录修改前状态用于保持性核验。将在 {3FA83731-8013-426F-9E85-E55C11EF3C7A} 上追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "OWNED_DELTA"
+    },
+    {
+      "id": "P10",
+      "label": "raw-record-after-effect-explicit-owner",
+      "expected": true,
+      "text": "已核对目标声音身份。将在 {3FA83731-8013-426F-9E85-E55C11EF3C7A} 上追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。并记录修改前状态用于保持性核验。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "OWNED_DELTA"
+    },
+    {
+      "id": "P11",
+      "label": "purpose-residual-real-write",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验并修改音量。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "OWNED_DELTA"
+    },
+    {
+      "id": "P12",
+      "label": "purpose-residual-unowned-write",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验并清空另一对象。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "OWNED_DELTA"
+    },
+    {
+      "id": "P13",
+      "label": "strict-control:wrong-owner",
+      "expected": false,
+      "text": "已核对其他声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "OWNED_DELTA"
+    },
+    {
+      "id": "P14",
+      "label": "strict-control:false-protected-count",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。并记录修改前状态：当前已有三个效果器。",
+      "criterion": "OWNED_DELTA"
+    },
+    {
+      "id": "P15",
+      "label": "late-supported-notice",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "TIMING",
+      "event_edit": "swap notice with Execute start"
+    },
+    {
+      "id": "P16",
+      "label": "second-preview-after-notice",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "TIMING",
+      "event_edit": "insert second Preview completion after notice and before Execute start"
+    },
+    {
+      "id": "P17",
+      "label": "explicit-second-ordinal",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。第二次追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "ADDITIONAL"
+    },
+    {
+      "id": "P18",
+      "label": "explicit-coordinated-second-ordinal",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。同时第二次追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "ADDITIONAL"
+    },
+    {
+      "id": "P19",
+      "label": "conjunction-second-ordinal",
+      "expected": false,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。并第二次追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "ADDITIONAL"
+    },
+    {
+      "id": "P20",
+      "label": "bare-again-same-plan",
+      "expected": true,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。再追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "RESTATEMENT"
+    },
+    {
+      "id": "P21",
+      "label": "coordinated-bare-again-same-plan",
+      "expected": true,
+      "text": "已核对目标声音身份，并记录修改前状态用于核验。将追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain，备注为“Expansion C09 appended gain”，不另设插件参数或平台值。\n\n已取得 allow_changes 策略的独立授权，当前尚未修改工程。同时再追加 Wwise Gain 效果器 Expansion_EXP25-C09_NewGain。现在执行追加，随后核验现有两个效果器的身份、slot 绑定、配置及顺序，以及声音的音量、备注和父级是否保持。",
+      "criterion": "RESTATEMENT"
+    }
+  ]
+}

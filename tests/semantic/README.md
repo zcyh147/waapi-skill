@@ -1,5 +1,9 @@
 # Fresh Codex semantic validation
 
+Before planning a batch, triaging a failure or choosing reruns, read
+[business acceptance and bounded test work](TEST_ACCEPTANCE.md). It separates
+business outcomes from raw grader verdicts and includes the Windows impact plan.
+
 The formal agent-behavior gate is the resumable fresh Codex campaign in
 `tests/semantic/run_codex_skill_campaign.py`. It delegates execution to the
 existing matrix runner in `tests/semantic/run_codex_skill_matrix.py`, tests the
@@ -560,6 +564,7 @@ The separately approved V3 executable profiles are:
 | `typed_input_cross_version_25` | 25 | 39 | Fixed representative typed-input profile: five fresh tasks per Wwise version, no same-root retries, and one public Gateway continuation at each step |
 | `deep_business_cross_version_19` | 19 | 21 | #60 release profile: one reviewed packaged-Skill task for every migration family from #54/#56/#57 across all five versions; mixed proportional real-Wwise and production-Gateway Preview evidence |
 | `integration` | 12 | 36 | Six cross-operation workflows on Wwise 2022.1 and 2025.1; 20 previewed transactions and no additional per-API coverage credit |
+| `integration_expansion_v1` | 13 | 17 | Seven additional workflows on Wwise 2022.1/2025.1, with 13 transactions and a separate runner-only M05/2022 capability boundary |
 | `modification_policy_9` | 9 | 15 | Three isolated repetitions of each canonical project-modification policy on one reviewed object.create business case |
 | `switch_assignment_business_1` | 1 | 1 | Preview-only routing proof for one independent Switch assignment through three opaque business-object handles and Gateway-owned native materialization |
 | `core_business_1` | 1 | 1 | Preview-only routing proof that a zero-input Core mutation follows `request-schema` into one Gateway-owned Core business plan and immutable Preview |
@@ -572,6 +577,51 @@ The separately approved V3 executable profiles are:
 The two older six-task integration profile IDs remain internal compatibility
 entrypoints for their exact sealed roots. They are deliberately absent from the
 public profile table.
+
+The expansion profile is defined by
+`tests/semantic/data/integration-expansion-v1/profile.json`. It covers localized
+reimport (C01), same-basename media mapping (C03), existing RTPC maintenance
+(C06), attenuation (C08), appended effects (C09), music import (M01), and an
+existing Stinger reference (M05). C01/C03 use `ask_before_changes`; the other
+cases use `allow_changes`. M05/2022 has no Agent turn or business PASS: the
+trusted runner must reproduce and preserve its specific public-interface
+boundary. The totals above describe selection size, not new per-API coverage.
+The [release validation summary](../TEST_INVENTORY.md#110-release-validation-2026-10-10)
+records cumulative business acceptance on both hosts, exact candidates and raw
+verdicts; it does not claim a final-candidate all-green automated matrix.
+
+Independent before/after project and media observations decide outcomes.
+Unordered independent edits may vary, while meaningful curve order, exact
+targets, preservation, authorization, and execute-once rules remain enforced.
+The cumulative Agent budget is 600 seconds per case, with a slow flag above
+420 seconds; preparation, Wwise startup, oracle work, and cleanup are separate.
+Failed roots remain frozen. Finish the selected batch, consolidate confirmed
+repairs, and rerun failed or directly affected units in new roots. Apply
+[the current business-acceptance policy](TEST_ACCEPTANCE.md) when deciding
+whether a further full selection is necessary. Only originally all-PASS roots
+receive identical verify-only; a wording note does not justify replaying a FAIL
+root or repeating an already proven business outcome.
+
+The initial [model pilot](../../docs/research/integration-expansion-model-selection-2026-10-02.json)
+is completed historical evidence, not a pending release prerequisite. Later
+acceptance uses explicitly sealed executor/reviewer configurations; native
+Windows closure used `gpt-6.1-sol`, high reasoning and the default service tier.
+Historical profiles retain their original pins. A changed model or reasoning
+setting requires a new root and does not reinterpret earlier results.
+
+For an explicitly selected new expansion attempt, after its prerequisites pass:
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile integration_expansion_v1 --version 2025.1 \
+  --case-id C08 \
+  --model gpt-6.1-sol --reasoning-effort high --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/expansion-c08-new-candidate
+```
+
+Public callers need no custom `--suite`. Real execution stays sequential and
+uses the existing formal campaign and sandbox lifecycle. This example is not
+an instruction to repeat completed release acceptance.
 
 From the repository root, run each profile into a distinct campaign directory.
 Use the Skill-local Python so the runner-owned live fixture has the same pinned
@@ -900,6 +950,42 @@ Authoring evidence passed capture, execute, register, and unregister on Windows
 no behavior credit.
 
 ## CI-safe focused checks
+
+### Developer notice regressions
+
+For quick notice, fake task-runner and fake archive feedback during development:
+
+```bash
+ci/test.sh --mode notice-fast -- -q -ra
+```
+
+This Poetry-backed command uses the explicit selection in
+[`ci/notice-fast-test-nodes.txt`](../../ci/notice-fast-test-nodes.txt), forces non-live
+flags, and starts no model, Wwise or network client. Use `--collect-only` to
+inspect selected tests; approved adjudication regressions can be added to the
+same manifest. Extra test paths and collection overrides are rejected, and an
+empty selection or failing test returns a failure status. `--mode focused`
+remains the real Wwise matrix alias.
+
+A quick result is development feedback only. Run complete Non-live and the
+required final acceptance on the reviewed, frozen combined candidate; results
+from an earlier candidate do not replace those gates.
+
+Developer and Fresh campaign launchers emit a compact `test-readiness` JSON
+record with status, reason, and phase duration before expensive test dispatch.
+Selected real lanes check versioned paths, project version, sealed fixture/media
+payloads when a fixture manifest exists, and conflicts scoped to the selected
+source/sandbox. On macOS, real lanes also exclude other active real lanes
+across roots because Audiokinetic wrappers share the Wwise2019x64 bottle.
+Custom installed SampleProjects do not need a repository manifest. Complete
+Non-live checks the five static fixture payloads and scoped gate conflicts,
+including explicit repository/tests/unit root selections. Known fixture files
+and dependent nodes check their applicable version only; focused fake selections
+remain independent of unrelated fixtures. Program,
+Non-live, and notice-fast do not require live configuration;
+archive verify-only retains its existing evidence checks without current live
+readiness. A blocked result requires an explicit prerequisite repair and retry:
+readiness never installs, hydrates, edits configuration, or terminates Wwise.
 
 ### Bare Skill first use
 

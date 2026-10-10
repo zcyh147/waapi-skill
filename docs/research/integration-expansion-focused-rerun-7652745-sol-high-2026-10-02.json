@@ -1,0 +1,219 @@
+{
+  "contract": "waapi-skill.integration-expansion-run-report/v1",
+  "candidate": "765274512766fab47dea47b83a962c9f2b82c778",
+  "candidate_identity_limit": "Coordinator confirmed both worktrees at this revision with clean tracked files before launch; archived component digests remain authoritative.",
+  "date": "2026-10-02",
+  "host": "macOS",
+  "root": "expansion-focused3-7652745-sol-high-r1-cli1592",
+  "status": "complete-failed-frozen",
+  "options": {
+    "profile": "integration_expansion_v1",
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "service_tier": "default",
+    "versions": [
+      "2022.1",
+      "2025.1"
+    ],
+    "cases": [
+      "EXP22-C08",
+      "EXP22-C09",
+      "EXP25-C08",
+      "EXP22-M05"
+    ],
+    "agent_budget_seconds": 600.0,
+    "slow_threshold_seconds": 420,
+    "wwise_readiness_seconds": 180.0,
+    "max_pre_action_retries": 0,
+    "codex_binary": "codex-cli 0.159.2",
+    "codex_sha256": "16593cc2f422d5f398a8e40f550ebbaf1245392528957be342c295920a300704"
+  },
+  "frozen_candidate_digests": {
+    "skill_tree_sha256": "5986566302c8c27c39b3e9b22a51aecd11ecf2c6798557f205108ab3293a5491",
+    "semantic_harness_tree_sha256": "898914525fb846c7ded1b1821ef263a7a2194e15ab4a8ba9ac49b746f2182364",
+    "destructive_support_tree_sha256": "5fdf2c5e52937a20707251bc7c06af29e585509b412017a268992ecae75ae05b"
+  },
+  "development_gates": {
+    "program": {
+      "passed": 6258,
+      "skipped": 2,
+      "seconds": 302.2,
+      "exit_code": 0,
+      "log_sha256": "17b6bad555edcb7e75515ec350d6f4536fa3f6d5bec0a5afbef7218bfe07663b",
+      "scope": "Unchanged 492c30a packaged Skill and Program-input component evidence; not a new Program run at 7652745."
+    },
+    "nonlive": {
+      "passed": 13990,
+      "skipped": 119,
+      "deselected": 27,
+      "seconds": 870.64,
+      "exit_code": 0,
+      "log_sha256": "87a5351646229e2abeacff8049517b2c832b8cdc5c29e3e77e306d658f0fc019",
+      "junit_sha256": "bc9ae5ad008ddbf35116b817c1053b0aad955f592557244ad8c80fdc9f3e472f",
+      "scope": "Unchanged a41d337 component evidence; not a new complete Non-live run for configuration-only successor 7652745."
+    },
+    "scope": "Configuration-focused proof plus unchanged a41d337 Non-live/492c30a Program components; no new full-suite claim and no native-Windows credit.",
+    "focused": {
+      "passed": 1472,
+      "seconds": 2.25,
+      "exit_code": 0,
+      "log_sha256": "c461a672a8ba3705da66c757efb47acf38137199681045c0b4e0fdf99d013f0b",
+      "junit_sha256": "6eeb6fc99d2d6aa331cc47b88da25dcdf4f583701d5d4c55f2cb57b2b232e262"
+    }
+  },
+  "result": {
+    "selected_units": 4,
+    "attempted_units": 4,
+    "agent_pass": 0,
+    "matrix_agent_fail": 3,
+    "canonical_agent_fail": 3,
+    "canonical_blocked": 0,
+    "boundary_proven": 1,
+    "pending": 0,
+    "stopped_early": false,
+    "stop_reason": null,
+    "attempt_count": 1,
+    "child_exit_code": 1,
+    "launcher_exit_code": 1,
+    "launcher_exit_evidence": "Terminal exit 1 and bootout reported by root; sealed child-result and campaign output independently show returncode 1.",
+    "unloaded": true,
+    "unloaded_evidence": "Root reports LaunchAgent bootout; independent scoped ps is empty.",
+    "scoped_processes_remaining": 0,
+    "verify_only_run": false,
+    "regrading": false,
+    "launcher_runs": 1
+  },
+  "units": [
+    {
+      "id": "EXP22-M05",
+      "status": "BOUNDARY_PROVEN",
+      "agent_pass_credit": false
+    },
+    {
+      "id": "EXP22-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 134.5454132910818,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "formal_after_available": true,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "required_business_assertions_total": 5,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "Formal notice-only FAIL despite all five independent business assertions passing; Gateway result_schema_checked remains the weaker boundary.",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "declaration_role": "attenuation_handle",
+      "schema_declaration_role": "attenuation_handle"
+    },
+    {
+      "id": "EXP22-C09",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 43.70805816585198,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "unprepared",
+      "gateway_verification_state": null,
+      "formal_after_available": false,
+      "business_assertions_passed": 0,
+      "business_assertions_total": 0,
+      "required_business_assertions_total": 6,
+      "goal_preview_count": 0,
+      "goal_execute_count": 0,
+      "goal_verify_count": 0,
+      "cause": "Safe unprepared stop after successful operations catalog: Agent claimed incomplete tool results. Captured output completeness does not establish model-facing presentation completeness; truncation cause remains unresolved.",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "presentation_limit": {
+        "operations_exit_code": 0,
+        "captured_aggregated_output_characters": 16978,
+        "original_tool_output_budget_available": false,
+        "model_facing_truncation_metadata_available": false,
+        "rollout_or_session_artifact_available": false,
+        "disposable_codex_homes_removed": true,
+        "false_truncation_proven": false
+      }
+    },
+    {
+      "id": "EXP25-C08",
+      "matrix_status": "FAIL",
+      "canonical_status": "FAIL",
+      "agent_seconds": 298.3171208749991,
+      "turns": 1,
+      "slow": false,
+      "terminal_state": "verified",
+      "gateway_verification_state": "result_schema_checked",
+      "formal_after_available": true,
+      "business_assertions_passed": 5,
+      "business_assertions_total": 5,
+      "required_business_assertions_total": 5,
+      "goal_preview_count": 1,
+      "goal_execute_count": 1,
+      "goal_verify_count": 1,
+      "cause": "Formal notice-only FAIL despite all five independent business assertions passing; Gateway result_schema_checked remains the weaker boundary.",
+      "declaration_role": "attenuation_handle",
+      "schema_declaration_role": "attenuation_handle",
+      "read_only_reconciliation_completed": true,
+      "reconciliation_child_scope_reaped": true,
+      "post_terminal_reads": {
+        "count": 19,
+        "command_counts": {
+          "request-schema": 1,
+          "metadata": 14,
+          "query-schema": 1,
+          "query-object": 3
+        },
+        "all_exit_zero": true,
+        "agent_stated_purpose": "Continue actual curve and protected-object current-state readback after schema-only verification.",
+        "boundary_conflict": "waapi-operate.md:11 says terminal verify ends transaction with no extra proof query/filesystem call. ExpansionBrokerPolicy.prepare admits scoped reads before checking complete; expansion spec:129 allows bounded in-scope reasonable reads without exact-count penalties. Existing grading formally reports only notice failure; no new failure or PASS is assigned by this audit.",
+        "workflow_scope": "Same business-goal proof continuation, not a new independently requested business goal; distinction needs policy reconciliation."
+      }
+    }
+  ],
+  "integrity": {
+    "artifact_count": 582,
+    "artifact_bytes": 24814215,
+    "metadata_seals": 8,
+    "manifest_sha256": "ddc79ceeeb9f754fe16171d51ae1d75f87dd908eb2e32a35468a4e9c9c4abb93",
+    "all_artifact_hashes_sizes_and_executable_flags_match": true,
+    "all_metadata_sidecar_hashes_match": true,
+    "source_full_hashes_and_project_mtimes_unchanged": 4,
+    "passing_projects_removed": 0,
+    "failed_projects_quarantined": 3,
+    "boundary_projects_quarantined": 1,
+    "retained_process_metadata_count": 4,
+    "retained_process_metadata": {
+      "cleanup_result": "cleaned",
+      "process_exited": true,
+      "residual_processes": []
+    },
+    "all_three_codex_sessions_exit_zero_and_complete": true,
+    "terminal_scoped_processes_empty": true,
+    "never_reuse": true,
+    "no_verify": true,
+    "all_three_failure_reconciliations_reaped": true
+  },
+  "usage": {
+    "cache_write_input_tokens": 0,
+    "cached_input_tokens": 2139392,
+    "input_tokens": 2285596,
+    "output_tokens": 7071,
+    "uncached_input_tokens": 146204,
+    "agent_seconds": 476.57059233193286,
+    "agent_turns": 3,
+    "slow_units": 0,
+    "goal_execute_count": 2,
+    "goal_verify_count": 2,
+    "reasoning_output_tokens_included": 1551,
+    "usd_cost": null
+  },
+  "disclosure149_evidence_limit": "EXP25-C08 freshly consumes getter request-schema and all seven closed metadata attenuation curve roles on target/Horns, with bounded native read results; this is specific getter-disclosure/metadata-input component evidence. Its formal Agent FAIL remains FAIL and grants no final business acceptance. EXP22-C08 does not consume the getter disclosure.",
+  "remaining": "All three formal Agent FAILs remain frozen with no replay/regrading. Notice repair, C09 presentation-budget diagnosis, and post-terminal read-policy reconciliation remain. New-candidate validation and final complete thirteen-Agent-unit batch plus separate boundary and identical successful-root verify-only remain pending. No Windows acceptance.",
+  "model_evidence_limit": "Separate Sol6.1high failed-only root; no general model-ranking claim and no historical Medium/Luna FAIL promotion."
+}

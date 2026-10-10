@@ -1,0 +1,542 @@
+{
+  "contract": "waapi-skill.expansion-notice-adjudication/v2",
+  "case_id": "C08",
+  "version": "2022.1",
+  "transaction_id": "tx1-f6tj7qbjatbzpm2py94q",
+  "preview_sha256": "356ef2676658332703c0cd3237a4083972d42a478b693d698b3b5383fe8ee931",
+  "pre_execution_timeline_sha256": "6a9693e9671ae1d0034391ad8725024d09d874effc324d5c72fc6ae34d9d0d2e",
+  "preview_event_position": 20,
+  "execute_event_position": 22,
+  "user_prompt": "请把衰减对象 \\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation（{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}）的干声音量曲线改为自定义线性曲线，距离与分贝三个点为 (0.0,0)、(50.0,-12)、(100.0,-48)。只改这一条曲线，其余六条曲线及对象身份、备注都保持不变；声音 \\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C08_AttenuatedSound（{FC0EA5BB-AE9E-412C-8CF9-44E27FAE22D0}）的衰减引用、音量和路由保持不变，原衰减 \\Attenuations\\Ambience\\Horns（{D7B7A627-3D4A-4921-842E-0A38A2DB2492}）也不要修改。这是要实际完成的修改，请核对当前状态、告知变更并完成执行和核验；按已保存的允许修改策略取得本次独立授权。请报告实际曲线数据，不评价听感。",
+  "visible_messages": [
+    {
+      "event_position": 8,
+      "text": "已加载 waapi-skill，已配置 WAAPI 端口 31060，Wwise 适配版本为 2022.1。\n\n当前已保存策略为 allow_changes；可用模式为 read_only、ask_before_changes 和 allow_changes。我会核对当前数据，只修改指定衰减对象的干声音量曲线，并按该策略取得本次独立授权后执行和核验。\n"
+    },
+    {
+      "event_position": 21,
+      "text": "已核对目标名称和类型，变更范围已确认为仅将 Expansion_EXP22-C08_Attenuation 的干声音量曲线设为 Custom，三点为 (0.0, 0)、(50.0, -12)、(100.0, -48)，形状均为 Linear。本次独立授权已按 allow_changes 策略取得，现在执行修改，随后读取实际曲线数据核验。\n"
+    }
+  ],
+  "before_snapshot": {
+    "attenuation": {
+      "id": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+      "name": "Expansion_EXP22-C08_Attenuation",
+      "type": "Attenuation",
+      "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+      "parent": {
+        "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+        "name": "Default Work Unit"
+      },
+      "notes": ""
+    },
+    "curves": {
+      "volume-dry": {
+        "use": "Custom",
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0.0,
+            "y": 0.0
+          },
+          {
+            "shape": "Linear",
+            "x": 100.0,
+            "y": 4.71844785465692e-16
+          }
+        ]
+      },
+      "game-defined-aux-send-volume": {
+        "use": "UseVolumeDry",
+        "points": []
+      },
+      "user-defined-aux-send-volume": {
+        "use": "UseVolumeDry",
+        "points": []
+      },
+      "low-pass-filter": {
+        "use": "None",
+        "points": []
+      },
+      "high-pass-filter": {
+        "use": "None",
+        "points": []
+      },
+      "spread": {
+        "use": "Custom",
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0.0,
+            "y": 50.34965
+          },
+          {
+            "shape": "Linear",
+            "x": 100.0,
+            "y": 0.0
+          }
+        ]
+      },
+      "focus": {
+        "use": "None",
+        "points": []
+      }
+    },
+    "users": {
+      "{FC0EA5BB-AE9E-412C-8CF9-44E27FAE22D0}": {
+        "id": "{FC0EA5BB-AE9E-412C-8CF9-44E27FAE22D0}",
+        "name": "Expansion_EXP22-C08_AttenuatedSound",
+        "type": "Sound",
+        "path": "\\Actor-Mixer Hierarchy\\Default Work Unit\\Expansion_EXP22-C08_AttenuatedSound",
+        "parent": {
+          "id": "{B7237E6E-5972-4B02-A4C9-267862F2241B}",
+          "name": "Default Work Unit"
+        },
+        "notes": "",
+        "volume_db": -3.0,
+        "output_bus": {
+          "id": "{1514A4D8-1DA6-412A-A17E-75CA0C2149F3}",
+          "name": "Master Audio Bus"
+        },
+        "references": {
+          "Attenuation": {
+            "id": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+            "name": "Expansion_EXP22-C08_Attenuation"
+          }
+        }
+      }
+    },
+    "source": {
+      "object": {
+        "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+        "name": "Horns",
+        "type": "Attenuation",
+        "path": "\\Attenuations\\Ambience\\Horns",
+        "parent": {
+          "id": "{77ED99BF-A13C-437D-AAC6-63B399AA2E8C}",
+          "name": "Ambience"
+        },
+        "notes": ""
+      },
+      "curves": {
+        "volume-dry": {
+          "use": "Custom",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 4.71844785465692e-16
+            }
+          ]
+        },
+        "game-defined-aux-send-volume": {
+          "use": "UseVolumeDry",
+          "points": []
+        },
+        "user-defined-aux-send-volume": {
+          "use": "UseVolumeDry",
+          "points": []
+        },
+        "low-pass-filter": {
+          "use": "None",
+          "points": []
+        },
+        "high-pass-filter": {
+          "use": "None",
+          "points": []
+        },
+        "spread": {
+          "use": "Custom",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 50.34965
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": 0.0
+            }
+          ]
+        },
+        "focus": {
+          "use": "None",
+          "points": []
+        }
+      }
+    }
+  },
+  "immutable_request": {
+    "arguments": {
+      "api": "ak.wwise.core.object.setAttenuationCurve",
+      "args": {
+        "curveType": "VolumeDryUsage",
+        "object": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0.0,
+            "y": 0.0
+          },
+          {
+            "shape": "Linear",
+            "x": 50.0,
+            "y": -12.0
+          },
+          {
+            "shape": "Linear",
+            "x": 100.0,
+            "y": -48.0
+          }
+        ],
+        "use": "Custom"
+      },
+      "options": {}
+    },
+    "contract": "waapi-skill.operation-request/v1",
+    "operation": "waapi.call",
+    "version": "2022.1"
+  },
+  "prepared_operation": {
+    "cleanup": {
+      "api": "ak.wwise.core.object.setAttenuationCurve",
+      "automatic_cleanup": false,
+      "automatic_retry": false,
+      "binding": {
+        "kind": "none",
+        "materialized": true
+      },
+      "cleanup_requirement": "not_required",
+      "companion_request": null,
+      "contract": "waapi-skill.transaction-cleanup-spec/v1",
+      "lifecycle_action": "none",
+      "lifecycle_strategy": "not_required",
+      "spec_sha256": "24a629c7667f97c2b277d2750c48a92330917885e9f0d32dcceb511974c7f4a6",
+      "warnings": []
+    },
+    "contract": "waapi-skill.prepared-operation/v1",
+    "dispatch": {
+      "args": {
+        "curveType": "VolumeDryUsage",
+        "object": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0.0,
+            "y": 0.0
+          },
+          {
+            "shape": "Linear",
+            "x": 50.0,
+            "y": -12.0
+          },
+          {
+            "shape": "Linear",
+            "x": 100.0,
+            "y": -48.0
+          }
+        ],
+        "use": "Custom"
+      },
+      "options": {},
+      "uri": "ak.wwise.core.object.setAttenuationCurve"
+    },
+    "operation": "waapi.call",
+    "pre_state": {
+      "execution_contract": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "io_audit": null,
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "request_validation": {
+          "required_families": [],
+          "required_fields": [
+            "object",
+            "curveType",
+            "use",
+            "points"
+          ],
+          "section": "request",
+          "unresolved_refs": [
+            "#/definitions/objectArg",
+            "#/definitions/pointsDefinition"
+          ],
+          "uri": "ak.wwise.core.object.setAttenuationCurve",
+          "validated_nodes": 6,
+          "version": "2022.1"
+        },
+        "request_validation_strength": "partial_reflected_schema",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.core.object.setAttenuationCurve",
+        "verification_strategy": "result_schema",
+        "version": "2022.1"
+      }
+    },
+    "preflight_reads": [],
+    "raw_dispatch_allowed": false,
+    "request": {
+      "arguments": {
+        "api": "ak.wwise.core.object.setAttenuationCurve",
+        "args": {
+          "curveType": "VolumeDryUsage",
+          "object": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "shape": "Linear",
+              "x": 50.0,
+              "y": -12.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": -48.0
+            }
+          ],
+          "use": "Custom"
+        },
+        "options": {}
+      },
+      "contract": "waapi-skill.operation-request/v1",
+      "operation": "waapi.call",
+      "version": "2022.1"
+    },
+    "resolved_roles": {},
+    "semantic_preview": {
+      "envelope": {
+        "args": {
+          "curveType": "VolumeDryUsage",
+          "object": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+          "points": [
+            {
+              "shape": "Linear",
+              "x": 0.0,
+              "y": 0.0
+            },
+            {
+              "shape": "Linear",
+              "x": 50.0,
+              "y": -12.0
+            },
+            {
+              "shape": "Linear",
+              "x": 100.0,
+              "y": -48.0
+            }
+          ],
+          "use": "Custom"
+        },
+        "metadata": {
+          "execution_contract": {
+            "accepted_authorization_modes": [
+              "explicit_confirmation",
+              "policy_authorization"
+            ],
+            "companion_uris": [],
+            "contract": "waapi-skill.public-execution-contract/v2",
+            "effect": "project_mutation",
+            "excluded_reason": null,
+            "executable": true,
+            "gateway_commands": [
+              "request-schema"
+            ],
+            "io_audit": null,
+            "item_type": "function",
+            "lifecycle_strategy": "none",
+            "post_execution_project_guard_policy": "revalidate",
+            "program_case": "transaction-result-schema",
+            "project_guard_mode": "invariant",
+            "request_validation": {
+              "required_families": [],
+              "required_fields": [
+                "object",
+                "curveType",
+                "use",
+                "points"
+              ],
+              "section": "request",
+              "unresolved_refs": [
+                "#/definitions/objectArg",
+                "#/definitions/pointsDefinition"
+              ],
+              "uri": "ak.wwise.core.object.setAttenuationCurve",
+              "validated_nodes": 6,
+              "version": "2022.1"
+            },
+            "request_validation_strength": "partial_reflected_schema",
+            "requires_authorization": true,
+            "result_limit_bytes": 1048576,
+            "route": "transaction",
+            "timeout_seconds": 30.0,
+            "uri": "ak.wwise.core.object.setAttenuationCurve",
+            "verification_strategy": "result_schema",
+            "version": "2022.1"
+          },
+          "model_authored_code": false
+        },
+        "options": {},
+        "uri": "ak.wwise.core.object.setAttenuationCurve"
+      },
+      "evidence_plan": [],
+      "raw_dispatch_allowed": false,
+      "readback_plan": [],
+      "requires_destructive_gate": true,
+      "source_note_family": "public-execution-contract",
+      "version": "2022.1"
+    },
+    "verification_plan": {
+      "kind": "result-schema",
+      "strategy": "result_schema",
+      "uri": "ak.wwise.core.object.setAttenuationCurve",
+      "version": "2022.1"
+    },
+    "version": "2022.1",
+    "warnings": []
+  },
+  "attested_roles": {
+    "target": {
+      "id": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+      "name": "Expansion_EXP22-C08_Attenuation",
+      "type": "Attenuation",
+      "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+      "parent": {
+        "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+        "name": "Default Work Unit"
+      },
+      "notes": ""
+    },
+    "curve": {
+      "identity": {
+        "id": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+        "name": "Expansion_EXP22-C08_Attenuation",
+        "type": "Attenuation",
+        "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation",
+        "parent": {
+          "id": "{D8FE7EF3-C569-49C6-B9D0-B6ACD3C5C9C4}",
+          "name": "Default Work Unit"
+        },
+        "notes": ""
+      },
+      "kind": "volume-dry",
+      "source": "custom",
+      "points": [
+        {
+          "shape": "Linear",
+          "x": 0.0,
+          "y": 0.0
+        },
+        {
+          "shape": "Linear",
+          "x": 50.0,
+          "y": -12.0
+        },
+        {
+          "shape": "Linear",
+          "x": 100.0,
+          "y": -48.0
+        }
+      ],
+      "before_curve": {
+        "use": "Custom",
+        "points": [
+          {
+            "shape": "Linear",
+            "x": 0.0,
+            "y": 0.0
+          },
+          {
+            "shape": "Linear",
+            "x": 100.0,
+            "y": 4.71844785465692e-16
+          }
+        ]
+      }
+    },
+    "preserved_source": {
+      "id": "{D7B7A627-3D4A-4921-842E-0A38A2DB2492}",
+      "name": "Horns",
+      "type": "Attenuation",
+      "path": "\\Attenuations\\Ambience\\Horns",
+      "parent": {
+        "id": "{77ED99BF-A13C-437D-AAC6-63B399AA2E8C}",
+        "name": "Ambience"
+      },
+      "notes": ""
+    },
+    "units": {
+      "x": "distance in the sealed project domain",
+      "y": "decibels"
+    },
+    "preserve": [
+      "other curves",
+      "source Attenuation",
+      "users and references"
+    ],
+    "gateway_verification": "result_schema"
+  },
+  "notice_obligations": {
+    "preserve": [
+      "other curves",
+      "source Attenuation",
+      "users and references"
+    ],
+    "action": "update-selected-attenuation-curve",
+    "target": {
+      "id": "{1F699AA5-D8B6-453F-9CB5-BD1D2323956A}",
+      "name": "Expansion_EXP22-C08_Attenuation",
+      "type": "Attenuation",
+      "path": "\\Attenuations\\Default Work Unit\\Expansion_EXP22-C08_Attenuation"
+    },
+    "curve_kind": "volume-dry",
+    "curve_source": "custom",
+    "points": [
+      {
+        "shape": "Linear",
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "shape": "Linear",
+        "x": 50.0,
+        "y": -12.0
+      },
+      {
+        "shape": "Linear",
+        "x": 100.0,
+        "y": -48.0
+      }
+    ],
+    "axis_meaning": {
+      "x": "distance in the sealed project domain",
+      "y": "decibels"
+    },
+    "gateway_verification": "result_schema"
+  }
+}

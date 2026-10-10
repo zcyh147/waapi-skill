@@ -1,0 +1,26 @@
+{
+  "scope": "pre-execution inputs only; no judgments, outcomes or after-state; historical roots immutable",
+  "rows": [
+    {
+      "case": "C03",
+      "source": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-full-8550bdd-sol-high-r2-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP22-C03/evidence/codex-task/turns/turn-01/notice-decision.json",
+      "source_sha256": "ff3b2ab0c7f535d1a761a66219da9541ac6ef4357a4cf408380385feb19055c0",
+      "copied_input": "C03-pre-execution-input.json",
+      "copied_input_sha256": "417498fd7f756d18aafbfb1c0ff497408c360c929f5fe8c567984436bcdfa69e"
+    },
+    {
+      "case": "C06",
+      "source": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/003-EXP25-C06/evidence/codex-task/turns/turn-01/notice-decision.json",
+      "source_sha256": "755289425b1ae9e1f41f74b40d719e0eb5d30248de7cdc6c1193cfca8320d944",
+      "copied_input": "C06-pre-execution-input.json",
+      "copied_input_sha256": "66105120e6036b31b7b6fca5059101760efe86d3be5469aa27e2cc6afa6d0f73"
+    },
+    {
+      "case": "M01",
+      "source": "/Users/xiye/.codex/worktrees/expansion-frozen-campaign/waapi-skills/skills/waapi-skill-workspace/expansion-initial25-8550bdd-sol-high-r1-cli1592/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/006-EXP25-M01/evidence/codex-task/turns/turn-01/notice-decision.json",
+      "source_sha256": "3cc89eb6b3c255ff37ece1f2eb161048cb9d795ee13c280e0d2b0a272cbe3614",
+      "copied_input": "M01-pre-execution-input.json",
+      "copied_input_sha256": "95cc7e32c72aabf36eeb4eadaad386c833aa6c35684fed04456eb914cc26a368"
+    }
+  ]
+}

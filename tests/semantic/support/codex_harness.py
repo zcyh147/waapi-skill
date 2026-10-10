@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import ctypes
 import hashlib
 import json
@@ -16,7 +17,7 @@ import sys
 import tempfile
 import time
 from contextlib import ExitStack, contextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable, Iterator, Mapping, Sequence
 
@@ -45,10 +46,18 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 DEFAULT_REASONING_EFFORT = "medium"
 DEFAULT_SERVICE_TIER = "priority"
 DEFAULT_TIMEOUT_SECONDS = 180.0
+SEMANTIC_DEVELOPER_MAX_BYTES = 3072
 WINDOWS_UTF8_CODE_PAGE = 65001
+WINDOWS_UTF8_READ_PREFIX = (
+    r"& $env:SystemRoot\System32\chcp.com 65001 >$null && "
+    r"& $PSHOME\pwsh.exe -NoProfile -Command "
+)
+WINDOWS_READ_LANGUAGE_GUARD = (
+    "if($ExecutionContext.SessionState.LanguageMode -eq 'FullLanguage')"
+    "{$ExecutionContext.SessionState.LanguageMode='ConstrainedLanguage'}; "
+)
 SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
-    "First read SKILL.md once, standalone. "
-    "Read now; no pre-read reply/questions. "
+    "First read SKILL.md once, standalone; no pre-read reply/questions. "
     "copy source_field/fixed_argv_prefix_copy verbatim; keep quotes/runner; never reconstruct; "
     "opaque IDs/handles/tokens/digests. draft-apply: 1 argv/fact; batch=6; "
     "final=remaining; all facts. Rows obey returned max. "
@@ -73,8 +82,8 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
     "POSIX path: single-quote; keep backslashes; one arg/child. "
     "Files absolute; no traversal. "
     "timeout_ms>=30000; use shell_tool_timeout_ms; scalars first. "
-    "Draft same turn; no progress reply. "
-    "draft-check!=Preview. Preview-now: finish schema/metadata/Preview now; "
+    "Draft same turn; Preview: announce edits before Execute. "
+    "draft-check!=Preview. Finish schema/metadata/Preview now; "
     "only execution waits for confirmation. next_command unless "
     "requires_later_user_message. Omit workdir/cwd."
 )
@@ -82,6 +91,7 @@ SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS = (
 
 def semantic_skill_bootstrap_developer_instructions(
     runner_path: str | Path,
+    *, expansion_modification_policy: str | None = None,
 ) -> str:
     """Bind typed-profile model guidance to one exact packaged runner prefix."""
 
@@ -104,12 +114,34 @@ def semantic_skill_bootstrap_developer_instructions(
         raise CodexHarnessError(
             "semantic Skill runner path must be absolute in its owning path flavor"
         )
+    bootstrap = SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+    if expansion_modification_policy is not None:
+        policy_instructions = {
+            "ask_before_changes": "ask_before_changes: Preview now; Execute waits for later explicit user confirmation. ",
+            "allow_changes": "allow_changes: announce edits; Execute only with distinct durable policy authorization. ",
+            "read_only": "read_only: no project changes. ",
+        }
+        if expansion_modification_policy not in policy_instructions:
+            raise CodexHarnessError("expansion modification policy is invalid")
+        bootstrap = bootstrap.replace(
+            "Finish schema/metadata/Preview now; only execution waits for confirmation. ",
+            policy_instructions[expansion_modification_policy],
+        )
     return (
-        SEMANTIC_SKILL_BOOTSTRAP_DEVELOPER_INSTRUCTIONS
+        bootstrap
         + " No next_command: only "
         + command_prefix
         + "; append disclosed argv verbatim."
     )
+
+
+def _windows_skill_read_command(relative: str) -> str:
+    if relative not in _ALLOWED_SKILL_READS:
+        raise CodexHarnessError("Windows Skill read path is not closed")
+    relative_windows = relative.replace("/", "\\")
+    inner = (WINDOWS_READ_LANGUAGE_GUARD + "Get-Content -Raw -Encoding UTF8 "
+             + f"'.agents\\skills\\waapi-skill\\{relative_windows}'")
+    return WINDOWS_UTF8_READ_PREFIX + "'" + inner.replace("'", "''") + "'"
 
 
 def semantic_task_developer_instructions(
@@ -118,6 +150,7 @@ def semantic_task_developer_instructions(
     task_skill_source: str | Path,
     expected_skill_reads: Sequence[Sequence[str]],
     base_developer_instructions: str | None = None,
+    expansion_modification_policy: str | None = None,
 ) -> str:
     """Seal exact host-native Skill reads into one formal task instruction."""
 
@@ -154,11 +187,7 @@ def semantic_task_developer_instructions(
         commands: list[str] = []
         for relative in reads:
             if is_windows:
-                relative_windows = relative.replace("/", "\\")
-                commands.append(
-                    "Get-Content -Raw -Encoding UTF8 "
-                    f"'.agents\\skills\\waapi-skill\\{relative_windows}'"
-                )
+                commands.append(_windows_skill_read_command(relative))
             else:
                 path = PurePosixPath(".agents/skills/waapi-skill").joinpath(
                     *PurePosixPath(relative).parts
@@ -170,7 +199,11 @@ def semantic_task_developer_instructions(
             + " then ".join(f"[{command}]" for command in commands)
         )
 
-    candidate_base = semantic_skill_bootstrap_developer_instructions(runner_path)
+    if expansion_modification_policy is not None and base_developer_instructions is not None:
+        raise CodexHarnessError("expansion instructions cannot override a custom base")
+    candidate_base = semantic_skill_bootstrap_developer_instructions(
+        runner_path, expansion_modification_policy=expansion_modification_policy,
+    )
     base = (
         candidate_base
         if base_developer_instructions is None
@@ -184,16 +217,18 @@ def semantic_task_developer_instructions(
             if is_windows
             else TASK_LOCAL_RUNNER_POSIX
         )
-        base = semantic_skill_bootstrap_developer_instructions(task_runner)
+        base = semantic_skill_bootstrap_developer_instructions(
+            task_runner, expansion_modification_policy=expansion_modification_policy,
+        )
     instructions = (
         base
         + " Reads: "
         + "; ".join(turn_rows)
         + ". Exact turn; no early/late/extra reads."
     )
-    if len(instructions.encode("utf-8")) > 2048:
+    if len(instructions.encode("utf-8")) > SEMANTIC_DEVELOPER_MAX_BYTES:
         raise CodexHarnessError(
-            "semantic task developer instructions exceed the 2048-byte limit"
+            f"semantic task developer instructions exceed the {SEMANTIC_DEVELOPER_MAX_BYTES}-byte limit"
         )
     return instructions
 
@@ -221,6 +256,11 @@ POWERSHELL_CORE_NATIVE_ARGUMENT_MODES = frozenset({"Standard", "Windows"})
 WORKSPACE_SKILL_EXCLUDED_NAMES = frozenset(
     {".venv", "__pycache__", ".pytest_cache", ".DS_Store", ".coverage"}
 )
+_WORKSPACE_GIT_HEAD = b"ref: refs/heads/main\n"
+_WORKSPACE_GIT_CONFIG = (
+    b"[core]\n\trepositoryformatversion = 0\n\tbare = false\n"
+)
+_WORKSPACE_GIT_DIRECTORIES = ("objects", "refs")
 MEMORY_MARKERS = (
     "MEMORY_SUMMARY",
     "## Memory",
@@ -1336,7 +1376,7 @@ def workspace_skill_install_path(workspace: Path) -> Path:
 
 
 def _prepare_workspace_repository_boundary(workspace: Path) -> None:
-    """Stop Codex from inheriting skills and instructions from an outer repo."""
+    """Create a minimal valid Git worktree boundary without invoking Git."""
 
     workspace.mkdir(parents=True, exist_ok=True)
     existing = tuple(workspace.iterdir())
@@ -1344,7 +1384,12 @@ def _prepare_workspace_repository_boundary(workspace: Path) -> None:
         raise CodexHarnessError(
             "Agent workspace must be empty before its repository boundary is prepared"
         )
-    (workspace / ".git").mkdir()
+    boundary = workspace / ".git"
+    boundary.mkdir()
+    (boundary / "HEAD").write_bytes(_WORKSPACE_GIT_HEAD)
+    (boundary / "config").write_bytes(_WORKSPACE_GIT_CONFIG)
+    for name in _WORKSPACE_GIT_DIRECTORIES:
+        (boundary / name).mkdir()
 
 
 def _verify_workspace_repository_boundary(workspace: Path) -> None:
@@ -1359,8 +1404,55 @@ def _verify_workspace_repository_boundary(workspace: Path) -> None:
     boundary = workspace / ".git"
     if is_link_or_junction(boundary) or not boundary.is_dir():
         raise CodexHarnessError("Agent workspace repository boundary is not a real directory")
-    if tuple(boundary.iterdir()):
-        raise CodexHarnessError("Agent workspace repository boundary must remain empty")
+    expected_entries = ("HEAD", "config", *_WORKSPACE_GIT_DIRECTORIES)
+    if tuple(sorted(path.name for path in boundary.iterdir())) != tuple(
+        sorted(expected_entries)
+    ):
+        raise CodexHarnessError(
+            "Agent workspace repository boundary has unexpected Git metadata"
+        )
+    expected_files = {"HEAD": _WORKSPACE_GIT_HEAD, "config": _WORKSPACE_GIT_CONFIG}
+    for name, expected_bytes in expected_files.items():
+        path = boundary / name
+        if is_link_or_junction(path):
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata is linked: {name}"
+            )
+        try:
+            info = path.stat()
+        except OSError as exc:
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata is unavailable: {name}"
+            ) from exc
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_nlink != 1
+            or info.st_size != len(expected_bytes)
+        ):
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata shape changed: {name}"
+            )
+        try:
+            with path.open("rb") as metadata_file:
+                content = metadata_file.read(len(expected_bytes) + 1)
+        except OSError as exc:
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata is unreadable: {name}"
+            ) from exc
+        if content != expected_bytes:
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary metadata changed: {name}"
+            )
+    for name in _WORKSPACE_GIT_DIRECTORIES:
+        path = boundary / name
+        if is_link_or_junction(path) or not path.is_dir():
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary directory is invalid: {name}"
+            )
+        if tuple(path.iterdir()):
+            raise CodexHarnessError(
+                f"Agent workspace repository boundary directory is not empty: {name}"
+            )
 
 
 def prepare_workspace_skill_install(
@@ -1758,11 +1850,11 @@ class CodexHarnessConfig:
         if self.developer_instructions and (
             self.developer_instructions != self.developer_instructions.strip()
             or "\x00" in self.developer_instructions
-            or len(self.developer_instructions.encode("utf-8")) > 2048
+            or len(self.developer_instructions.encode("utf-8")) > SEMANTIC_DEVELOPER_MAX_BYTES
         ):
             raise ValueError(
                 "CodexHarnessConfig.developer_instructions must be trimmed, NUL-free, "
-                "and at most 2048 UTF-8 bytes"
+                f"and at most {SEMANTIC_DEVELOPER_MAX_BYTES} UTF-8 bytes"
             )
         commands = tuple(expectation.command for expectation in self.expected_gateway_errors)
         if len(commands) != len(set(commands)):
@@ -1891,15 +1983,21 @@ class CodexCliHarness:
             windows_powershell_core_host=self._windows_powershell_core_host,
         )
 
-    def audit_prompt(self, prompt: str, *, env: Mapping[str, str]) -> CodexPromptAudit:
+    def audit_prompt(self, prompt: str, *, env: Mapping[str, str],
+                     timeout_seconds: float | None = None) -> CodexPromptAudit:
         command = build_prompt_audit_command(self.config, prompt=prompt)
         completed: ProcessResult | None = None
+        deadline = None if timeout_seconds is None else time.monotonic() + timeout_seconds
         for attempt in range(1, PROMPT_AUDIT_MAX_ATTEMPTS + 1):
+            remaining = PROMPT_AUDIT_TIMEOUT_SECONDS if deadline is None else min(
+                PROMPT_AUDIT_TIMEOUT_SECONDS, deadline - time.monotonic())
+            if remaining <= 0:
+                raise CodexHarnessError("cumulative Agent budget exhausted during prompt audit")
             completed = run_process(
                 command,
                 cwd=self.config.workspace,
                 env=env,
-                timeout=PROMPT_AUDIT_TIMEOUT_SECONDS,
+                timeout=remaining,
             )
             if completed.exit_status == 0:
                 break
@@ -1938,7 +2036,13 @@ class CodexCliTask:
         config: CodexHarnessConfig,
         *,
         extra_env: Mapping[str, str] | None = None,
+        agent_case_budget: Any | None = None,
     ) -> None:
+        if agent_case_budget is not None:
+            from tests.semantic.support.codex_expansion_policy import CumulativeAgentBudget
+            if not isinstance(agent_case_budget, CumulativeAgentBudget):
+                raise TypeError("agent_case_budget must be CumulativeAgentBudget")
+        self.agent_case_budget = agent_case_budget
         self.config = config
         self._harness = CodexCliHarness(config)
         self._extra_env = dict(extra_env or {})
@@ -2066,8 +2170,12 @@ class CodexCliTask:
         output_dir: Path,
         command: Sequence[str],
     ) -> CodexRunResult:
+        budget = self.agent_case_budget
+        remaining = budget.start_turn(time.monotonic()) if budget is not None else None
         try:
-            result = self._run_turn(prompt, output_dir=output_dir, command=command)
+            result = (self._run_turn(prompt, output_dir=output_dir, command=command)
+                      if remaining is None else self._run_turn(
+                          prompt, output_dir=output_dir, command=command, timeout_seconds=remaining))
         except CodexInfrastructureError as exc:
             self._turn_results.append(exc.result)
             self._failed = True
@@ -2075,6 +2183,9 @@ class CodexCliTask:
         except BaseException:
             self._failed = True
             raise
+        finally:
+            if budget is not None:
+                budget.finish_turn(time.monotonic())
         self._turn_results.append(result)
         return result
 
@@ -2084,7 +2195,9 @@ class CodexCliTask:
         *,
         output_dir: Path,
         command: Sequence[str],
+        timeout_seconds: float | None = None,
     ) -> CodexRunResult:
+        budget_started = time.monotonic()
         execution_env = self._execution_env
         execution_environment = self._execution_environment
         if execution_env is None or execution_environment is None:
@@ -2114,7 +2227,11 @@ class CodexCliTask:
                 raise CodexHarnessError(
                     f"Prompt audit environment is not pristine: {prompt_environment}"
                 )
-            audit = self._harness.audit_prompt(prompt, env=audit_env)
+            audit_harness = (self._harness if timeout_seconds is None else
+                             CodexCliHarness(replace(self.config, timeout_seconds=timeout_seconds)))
+            audit = (audit_harness.audit_prompt(prompt, env=audit_env) if timeout_seconds is None
+                     else audit_harness.audit_prompt(prompt, env=audit_env,
+                         timeout_seconds=max(0.0, timeout_seconds - (time.monotonic() - budget_started))))
             if not audit.passed:
                 raise CodexHarnessError(f"Codex prompt isolation audit failed: {audit}")
         if snapshot_workspace(self.config.workspace) != before_workspace:
@@ -2129,11 +2246,15 @@ class CodexCliTask:
         ) != skill_tree_sha256_before:
             raise CodexHarnessError("codex debug prompt-input modified the target Skill tree")
 
+        remaining = (self.config.timeout_seconds if timeout_seconds is None else
+                     timeout_seconds - (time.monotonic() - budget_started))
+        if remaining <= 0:
+            raise CodexHarnessError("cumulative Agent budget exhausted during prompt audit")
         completed = run_process(
             command,
             cwd=self.config.workspace,
             env=execution_env,
-            timeout=self.config.timeout_seconds,
+            timeout=remaining,
         )
         return _finalize_codex_run(
             config=self.config,
@@ -2157,6 +2278,26 @@ class ProcessResult:
     stderr: str
     duration_seconds: float
     timed_out: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class BoundedProcessResult(ProcessResult):
+    """Bounded exact bytes, with decoding failure distinct from process exit."""
+    stdout_base64: str | None = None
+    stderr_base64: str | None = None
+    output_decoding_error: str | None = None
+    process_exit_status: int | None = None
+    stdin_sha256: str | None = None
+    stdin_bytes_count: int | None = None
+
+    def __post_init__(self) -> None:
+        # Text-only fake subprocess adapters have an unambiguous UTF-8 stream.
+        # The real bounded drain always supplies its retained original bytes.
+        for key, text in (("stdout_base64", self.stdout), ("stderr_base64", self.stderr)):
+            if getattr(self, key) is None:
+                object.__setattr__(self, key, base64.b64encode(text.encode("utf-8")).decode("ascii"))
+        if self.process_exit_status is None:
+            object.__setattr__(self, "process_exit_status", self.exit_status)
 
 
 def _finalize_codex_run(
@@ -2259,23 +2400,45 @@ def run_process(
     cwd: Path,
     env: Mapping[str, str],
     timeout: float,
+    max_output_bytes: int | None = None,
+    input_bytes: bytes | None = None,
 ) -> ProcessResult:
     """Run a process in its own group so timeouts also stop internal agents."""
 
+    if max_output_bytes is not None and (type(max_output_bytes) is not int or max_output_bytes <= 0):
+        raise ValueError("max_output_bytes must be a positive integer")
+    if input_bytes is not None and (
+        not isinstance(input_bytes, bytes) or len(input_bytes) > 131072 or max_output_bytes is None
+    ):
+        raise ValueError("input_bytes requires bounded output and at most 131072 bytes")
     started = time.monotonic()
     process_group_options = subprocess_process_group_options()
-    process = subprocess.Popen(
-        [str(part) for part in command],
-        cwd=str(cwd),
-        env=dict(env),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="strict",
-        **process_group_options,
-    )
+    # A private, seekable input avoids blocking pipe writes before output draining.
+    # The child inherits the handle; closing our copy never truncates its input.
+    with ExitStack() as stack:
+        input_handle = subprocess.DEVNULL
+        if input_bytes is not None:
+            input_handle = stack.enter_context(tempfile.TemporaryFile())
+            input_handle.write(input_bytes)
+            input_handle.seek(0)
+        process = subprocess.Popen(
+            [str(part) for part in command],
+            cwd=str(cwd),
+            env=dict(env),
+            stdin=input_handle,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=max_output_bytes is None,
+            encoding="utf-8" if max_output_bytes is None else None,
+            errors="strict" if max_output_bytes is None else None,
+            **process_group_options,
+        )
+    if max_output_bytes is not None:
+        result = _bounded_process_output(process, started=started, timeout=timeout, maximum=max_output_bytes)
+        if input_bytes is not None:
+            result = replace(result, stdin_sha256=hashlib.sha256(input_bytes).hexdigest(),
+                stdin_bytes_count=len(input_bytes))
+        return result
     try:
         stdout, stderr = process.communicate(timeout=timeout)
         return ProcessResult(
@@ -2313,6 +2476,63 @@ def run_process(
             except BaseException:
                 pass
         raise
+
+
+def _bounded_process_output(process: Any, *, started: float, timeout: float, maximum: int) -> ProcessResult:
+    """Drain both pipes while sharing one byte ceiling; reap the same process group."""
+    import threading
+    buffers = [bytearray(), bytearray()]
+    lock = threading.Lock()
+    exceeded = threading.Event()
+
+    def drain(stream: Any, buffer: bytearray) -> None:
+        try:
+            while chunk := stream.read(4096):
+                with lock:
+                    available = maximum - sum(len(value) for value in buffers)
+                    buffer.extend(chunk[:available])
+                    if len(chunk) > available:
+                        exceeded.set()
+        finally:
+            stream.close()
+
+    readers = [threading.Thread(target=drain, args=(stream, buffer), daemon=True)
+        for stream, buffer in zip((process.stdout, process.stderr), buffers)]
+    for reader in readers:
+        reader.start()
+    expired = False
+    try:
+        while process.poll() is None:
+            expired = time.monotonic() - started >= timeout
+            if expired or exceeded.is_set():
+                break
+            exceeded.wait(min(0.02, max(0.0, timeout - (time.monotonic() - started))))
+    finally:
+        if process.poll() is None:
+            try:
+                terminate_process_group(process)
+                process.wait(timeout=2)
+            except BaseException:
+                kill_process_group(process)
+                process.wait(timeout=WINDOWS_HARD_REAP_SECONDS)
+        for reader in readers:
+            reader.join(timeout=2)
+        if any(reader.is_alive() for reader in readers):
+            kill_process_group(process)
+            raise CodexHarnessError("bounded subprocess pipes did not close after reaping")
+    decoded = []
+    errors = []
+    for label, raw in zip(("stdout", "stderr"), buffers):
+        try:
+            decoded.append(raw.decode("utf-8", "strict"))
+        except UnicodeDecodeError as exc:
+            decoded.append("")  # Damaged text must never be repaired into evidence.
+            errors.append(f"{label}: invalid UTF-8 at byte {exc.start} ({exc.reason})")
+    return BoundedProcessResult(exit_status=124 if expired else 125 if exceeded.is_set() else 126 if errors else int(process.returncode),
+        stdout=decoded[0], stderr=decoded[1], output_decoding_error="; ".join(errors) if errors else None,
+        stdout_base64=base64.b64encode(buffers[0]).decode("ascii"),
+        stderr_base64=base64.b64encode(buffers[1]).decode("ascii"), process_exit_status=int(process.returncode),
+        duration_seconds=round(time.monotonic() - started, 6), timed_out=expired)
 
 
 def terminate_and_reap_process(
@@ -2433,6 +2653,11 @@ def taskkill_process_tree(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            # taskkill emits localized console diagnostics, not UTF-8 Agent
+            # evidence. Its return code and the observed process exit remain
+            # authoritative even if a diagnostic contains undecodable bytes.
+            encoding="oem" if os.name == "nt" else "utf-8",
+            errors="replace",
             timeout=15.0,
             check=False,
         )
@@ -2832,6 +3057,8 @@ def build_prompt_audit_command(config: CodexHarnessConfig, *, prompt: str) -> li
         str(config.codex_binary),
         "--disable",
         "memories",
+        "--disable",
+        "apps",
     ]
     command.extend(_disabled_user_skill_config_argv(config.disabled_user_skill_paths))
     command.extend(_developer_instructions_config_argv(config.developer_instructions))
@@ -2925,6 +3152,8 @@ def _build_exec_prefix(
             f"sandbox_workspace_write.network_access={'true' if config.network_access else 'false'}",
             "--disable",
             "memories",
+            "--disable",
+            "apps",
             "--ignore-user-config",
             "--json",
             "--sandbox",
@@ -2949,6 +3178,7 @@ def audit_prompt_input_payload(
     *,
     target_skill_source: Path | None = None,
     system_skill_root: Path | None = None,
+    system_skill_root_is_archived: bool = False,
     expected_developer_instructions: str = "",
 ) -> CodexPromptAudit:
     serialized = json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -2965,6 +3195,7 @@ def audit_prompt_input_payload(
         if is_codex_system_skill(
             resolved_locator,
             system_skill_root=system_skill_root,
+            system_skill_root_is_archived=system_skill_root_is_archived,
         ):
             system_skills.append((name, locator))
             continue
@@ -3157,11 +3388,24 @@ def local_locator_contains_parts(
     )
 
 
-def is_codex_system_skill(locator: str, *, system_skill_root: Path | None = None) -> bool:
+def is_codex_system_skill(locator: str, *, system_skill_root: Path | None = None,
+                          system_skill_root_is_archived: bool = False) -> bool:
     if not locator:
         return False
-    candidate = Path(locator).expanduser()
+    candidate = Path(locator) if system_skill_root_is_archived else Path(locator).expanduser()
     if system_skill_root is not None:
+        if system_skill_root_is_archived:
+            # Sealed disposable roots no longer exist. Compare their absolute,
+            # traversal-free host identities without consulting the filesystem.
+            root = Path(system_skill_root)
+            if (not root.is_absolute() or not candidate.is_absolute()
+                    or '..' in root.parts or '..' in candidate.parts):
+                return False
+            try:
+                relative = candidate.relative_to(root)
+            except ValueError:
+                return False
+            return len(relative.parts) >= 2 and relative.name.lower() == 'skill.md'
         root = system_skill_root.expanduser().resolve(strict=False)
         try:
             relative = candidate.resolve(strict=False).relative_to(root)
@@ -3564,6 +3808,80 @@ def _business_draft_continuation_candidates(
     return found_contract, tuple(sorted(candidates))
 
 
+def _expansion_pending_preview_execute(payload: Any, record: Any, command: Any, *, platform_name: str) -> bool:
+    """Only an authenticated policy Preview can defer its selected Execute."""
+    if not isinstance(payload, Mapping):
+        return False
+    authorization, continuation = payload.get("authorization"), payload.get("next_command")
+    return (
+        payload.get("ok") is True
+        and payload.get("command") == "preview-from-draft"
+        and payload.get("state") == "policy_authorized"
+        and isinstance(payload.get("transaction_id"), str)
+        and isinstance(authorization, Mapping)
+        and authorization.get("mode") == "policy_authorization"
+        and authorization.get("policy") == "allow_changes"
+        and authorization.get("explicit_confirmation") is False
+        and isinstance(continuation, Mapping)
+        and continuation.get("gateway_argv") == ["execute", payload["transaction_id"]]
+        and not continuation.get("requires_later_user_message")
+        and not continuation.get("requires_explicit_user_confirmation")
+        and _selected_gateway_continuation(continuation, platform_name=platform_name) is not None
+        and all(_record_field(record, key) is True for key in ("authenticated", "accepted", "succeeded"))
+        and _record_field(record, "exit_code") == _record_field(record, "runner_exit_code") == 0
+        and _command_output_matches_payload(command, payload)
+    )
+
+
+def _expansion_same_json(left: Any, right: Any) -> bool:
+    """Immutable JSON equality keeps booleans distinct from numeric values."""
+    try:
+        return json.dumps(left, sort_keys=True, separators=(",", ":"), allow_nan=False) == json.dumps(
+            right, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError):
+        return False
+
+
+def _expansion_unchanged_transaction_snapshot(origin: Any, record: Any, command: Any) -> bool:
+    """A read-only snapshot cannot replace the pending Preview binding."""
+    payload = _record_field(record, "payload")
+    if not isinstance(origin, Mapping) or not isinstance(payload, Mapping):
+        return False
+    authorization, snapshot_authorization = origin.get("authorization"), payload.get("authorization")
+    integrity = payload.get("response_integrity")
+    arguments = _record_field(record, "gateway_arguments")
+    if not isinstance(arguments, (list, tuple)) or not all(isinstance(value, str) for value in arguments):
+        return False
+    immutable_keys = ("transaction_id", "artifact_hash", "state", "event_count", "events", "preview_summary", "next_command")
+    return (
+        all(_record_field(record, key) is True for key in ("authenticated", "accepted", "succeeded"))
+        and _record_field(record, "exit_code") == _record_field(record, "runner_exit_code") == 0
+        and tuple(arguments) in (
+            ("transaction-show", origin.get("transaction_id")),
+            ("transaction-show", origin.get("transaction_id"), "--summary-only"))
+        and payload.get("ok") is True
+        and payload.get("command") == "transaction-show"
+        and payload.get("limit_reached") is not True
+        and ("response_integrity" not in payload or isinstance(integrity, Mapping)
+             and integrity.get("complete") is True and integrity.get("truncated") is False)
+        and isinstance(origin.get("artifact_hash"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", origin["artifact_hash"]) is not None
+        and _expansion_same_json({key: payload.get(key) for key in immutable_keys},
+                                 {key: origin.get(key) for key in immutable_keys})
+        and origin.get("state") == "policy_authorized"
+        and isinstance(origin.get("event_count"), int)
+        and isinstance(origin.get("events"), list)
+        and origin["event_count"] == len(origin["events"])
+        and isinstance(origin.get("preview_summary"), Mapping)
+        and isinstance(authorization, Mapping)
+        and isinstance(snapshot_authorization, Mapping)
+        and set(snapshot_authorization) in (set(authorization), set(authorization) | {"current_policy"})
+        and _expansion_same_json({key: snapshot_authorization.get(key) for key in authorization}, authorization)
+        and snapshot_authorization.get("current_policy", "allow_changes") == "allow_changes"
+        and _command_output_matches_payload(command, payload)
+    )
+
+
 def gateway_continuation_binding_errors(
     command_records: Sequence[CodexCommandRecord | Mapping[str, Any]],
     broker_records: Sequence[Any],
@@ -3571,6 +3889,7 @@ def gateway_continuation_binding_errors(
     platform_name: str | None = None,
     windows_powershell_core_host: WindowsPowerShellCoreHost | None = None,
     allow_compound_checked_child_handoff: bool = False,
+    allow_expansion_read_interleaving: bool = False,
 ) -> tuple[str, ...]:
     """Bind every response-derived continuation to its exact selected bytes.
 
@@ -3589,6 +3908,10 @@ def gateway_continuation_binding_errors(
 
     active_platform = os.name if platform_name is None else platform_name
     errors: list[str] = []
+    pending_business_index: int | None = None
+    pending_preview_execute = False
+    if allow_expansion_read_interleaving and len(command_records) != len(broker_records):
+        return ("expansion continuation command/receipt count mismatch",)
     compound_parent_candidates: tuple[tuple[str, str], ...] = ()
     compound_child_bindings: set[tuple[str, str]] = set()
     if allow_compound_checked_child_handoff:
@@ -3628,6 +3951,53 @@ def gateway_continuation_binding_errors(
     for index in range(1, len(broker_records)):
         prior_broker = broker_records[index - 1]
         prior_payload = _record_field(prior_broker, "payload")
+        prior_index = index - 1
+        if allow_expansion_read_interleaving:
+            # Only the expansion caller enables this after positional Broker
+            # reconciliation. Accepted reads have passed its bounded public
+            # admission policy; they do not consume or replace a Draft copy.
+            if pending_business_index is None and isinstance(prior_payload, Mapping):
+                is_business, _ = _business_draft_continuation_candidates(prior_payload, platform_name=active_platform)
+                if _expansion_pending_preview_execute(prior_payload, prior_broker,
+                        command_records[prior_index], platform_name=active_platform):
+                    pending_business_index = prior_index
+                    pending_preview_execute = True
+                elif is_business and "next_command" not in prior_payload:
+                    pending_business_index = prior_index
+                    pending_preview_execute = False
+            if pending_business_index is not None:
+                current = broker_records[index]
+                arguments = _record_field(current, "gateway_arguments", ())
+                if not isinstance(arguments, (list, tuple)) or not all(isinstance(value, str) for value in arguments):
+                    errors.append(f"command {index + 1}: interleaved command lacks valid Gateway argv evidence")
+                    continue
+                if pending_preview_execute and arguments and arguments[0] == "transaction-show":
+                    origin = _record_field(broker_records[pending_business_index], "payload")
+                    if _expansion_unchanged_transaction_snapshot(origin, current, command_records[index]):
+                        continue
+                    errors.append(f"command {index + 1}: transaction snapshot changed the pending Preview binding")
+                    continue
+                if arguments and arguments[0] in {"status", "operations", "query-schema", "operation-schema",
+                                                   "request-schema", "query-object", "metadata"}:
+                    payload = _record_field(current, "payload")
+                    if (all(_record_field(current, key) is True for key in ("authenticated", "accepted", "succeeded"))
+                            and _record_field(current, "exit_code") == _record_field(current, "runner_exit_code") == 0
+                            and isinstance(payload, Mapping) and payload.get("command") == arguments[0]
+                            and (not pending_preview_execute or (
+                                payload.get("ok") is True and payload.get("limit_reached") is not True
+                                and ("response_integrity" not in payload or (
+                                    isinstance(payload["response_integrity"], Mapping)
+                                    and payload["response_integrity"].get("complete") is True
+                                    and payload["response_integrity"].get("truncated") is False))))
+                            and _command_output_matches_payload(command_records[index], payload)):
+                        continue
+                    errors.append(f"command {index + 1}: interleaved read lacks authenticated successful evidence")
+                    continue
+                prior_index = pending_business_index
+                prior_broker = broker_records[prior_index]
+                prior_payload = _record_field(prior_broker, "payload")
+                pending_business_index = None
+                pending_preview_execute = False
         if not isinstance(prior_payload, Mapping):
             continue
         business_contract, business_candidates = (
@@ -3644,7 +4014,7 @@ def gateway_continuation_binding_errors(
                 f"command {command_number}: Gateway continuation raw evidence is missing"
             )
             continue
-        prior_command = command_records[index - 1]
+        prior_command = command_records[prior_index]
         current_command = command_records[index]
         if not _command_output_matches_payload(prior_command, prior_payload):
             errors.append(
@@ -3804,6 +4174,13 @@ def gateway_continuation_binding_errors(
                 f"command {command_number}: Gateway continuation was not copied "
                 "from its selected source field"
             )
+    if allow_expansion_read_interleaving and (
+        pending_preview_execute
+        or broker_records and _expansion_pending_preview_execute(
+            _record_field(broker_records[-1], "payload"), broker_records[-1], command_records[-1],
+            platform_name=active_platform)
+    ):
+        errors.append("pending policy Preview Execute continuation was not consumed")
     return tuple(errors)
 
 
@@ -4168,6 +4545,20 @@ def _parse_windows_powershell_core_command_wrapper(
     if executable != expected_executable:
         return (), True, "PowerShell Core wrapper executable is not the attested host"
     script = outer_argv[3]
+    if script.startswith(WINDOWS_UTF8_READ_PREFIX):
+        # The native code-page command must succeed before a fresh instance
+        # of the same attested pwsh reads the file. The child preserves CLM,
+        # and tightens FullLanguage to CLM; no language restriction is lifted.
+        try:
+            nested = _split_literal_powershell_argv(script[len(WINDOWS_UTF8_READ_PREFIX):])
+            if len(nested) != 1 or not nested[0].startswith(WINDOWS_READ_LANGUAGE_GUARD):
+                return (), True, "UTF-8 read relay requires its exact language guard"
+            argv = _split_literal_powershell_argv(nested[0][len(WINDOWS_READ_LANGUAGE_GUARD):])
+        except ValueError as exc:
+            return (), True, str(exc)
+        if len(argv) != 5 or argv[:4] != ("Get-Content", "-Raw", "-Encoding", "UTF8"):
+            return (), True, "UTF-8 prefix requires one exact Skill file read"
+        return argv, False, ""
     if script.startswith("powershell.exe "):
         try:
             return decode_windows_powershell_argv(script), False, ""
@@ -5276,6 +5667,7 @@ __all__ = [
     "CodexRunResult",
     "CodexSessionAudit",
     "ProcessResult",
+    "BoundedProcessResult",
     "WindowsPowerShellCoreHost",
     "WORKSPACE_SKILL_EXCLUDED_NAMES",
     "assert_detached_workspace_skill_copy",
