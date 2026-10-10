@@ -111,3 +111,30 @@ discovery evidence then passed a targeted C09 and identical audit. Producer
 normalization and valid failed-discovery/refinement histories also needed
 regressions. Late phase-timing work was deferred. These observations support
 earlier attribution and smaller repairs, not weaker business or safety checks.
+
+## Windows and release follow-up (2026-10-10)
+
+The release closeout adds four lessons without reopening completed acceptance:
+
+- **Repeated command-copy failure needs a code-level response.** The decoded-copy
+  prompt alone reproduced C08's doubled separators. Gateway-generated runner
+  spelling then passed the affected native workflows with exact-copy checks
+  intact. The [research and repair record](../../docs/research/windows-agent-command-escaping-2026-10-10.md)
+  owns the evidence and limits; this is implemented, not a general promise that
+  models always copy commands correctly.
+- **Prove native transport before spending on Fresh cases.** UTF-8, argv length,
+  PowerShell relay behavior and process cleanup need cheap native checks.
+  [Portability repairs](../../docs/research/windows-expansion-portability-2026-10-10.md)
+  and [bounded reviewer stdin](../../docs/research/windows-reviewer-stdin-2026-10-10.md)
+  have focused regressions. Wine success alone is not native-Windows proof.
+- **Use one remote execution owner.** SSH-controlled InteractiveToken/Limited
+  Scheduled Tasks and durable result files worked without Desktop thread
+  messaging. Ownership and scoped cleanup are documented in the stdin repair
+  record; a new reusable orchestration service is not claimed or required.
+- **Reconcile publication documents before tagging.** Compare the release diff
+  with both READMEs, their Scope and validation links, the test inventory and
+  release notes. Remove stale pending claims, distinguish runtime fixes from
+  test-only work, and preserve raw verdicts, candidate boundaries and deferred
+  work. Verify the install bundle against the merged commit and its uploaded
+  checksum. This is a documented manual checklist, not an automated CI gate;
+  completed release tags and assets remain unchanged by later documentation work.
