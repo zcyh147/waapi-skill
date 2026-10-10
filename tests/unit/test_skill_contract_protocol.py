@@ -12,7 +12,7 @@ QUERY = (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8
 SETUP = (SKILL_ROOT / "references" / "waapi-setup.md").read_text(encoding="utf-8")
 OPERATE = (SKILL_ROOT / "references" / "waapi-operate.md").read_text(encoding="utf-8")
 COVERAGE = (SKILL_ROOT / "references" / "waapi-coverage.md").read_text(encoding="utf-8")
-DOMAIN_CONTEXT = (REPO_ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+DOMAIN_CONTEXT = (REPO_ROOT / "GLOSSARY.md").read_text(encoding="utf-8")
 COMPOSER_ADR = (
     REPO_ROOT / "docs" / "adr" / "0001-gateway-owned-operation-composition.md"
 ).read_text(encoding="utf-8")

@@ -134,7 +134,7 @@ metadata, not a hash or prior-version copy, to validate a new mapping.
 ## Action Fade Time / Delay: confirmed gap versus missing evidence
 
 The domain already promises stable unit-bearing fields
-([CONTEXT](../../CONTEXT.md#L29)). `COMMON_BUSINESS_FIELDS` lists
+([GLOSSARY](../../GLOSSARY.md#L29)). `COMMON_BUSINESS_FIELDS` lists
 `fade_time_ms` and `delay_ms`, and the common validator accepts finite,
 nonnegative millisecond numbers
 ([declarations](../../skills/waapi-skill/wwise_waapi/business_declarations.py#L82),
