@@ -403,11 +403,15 @@ report Principal `RunLevel=Limited`, while exported XML must report
 `<RunLevel>LeastPrivilege</RunLevel>` element, so absence of that optional XML
 tag is not a failed Limited attestation.
 
-On native Windows, a Gateway-owned v2 `model_command` must use the fixed
-backslash task-local runner spelling. Do not emit the POSIX spelling and rely on
-Broker path normalization: Fresh Agents otherwise reconstruct the familiar
-Windows spelling instead of copying the continuation verbatim, and exact
-continuation provenance is lost even when the resulting argv is equivalent.
+New native-Windows candidates emit the fixed task-local Python runner
+`./.agents/skills/waapi-skill/scripts/run.py`; the leading `./` distinguishes
+its owning shell from the POSIX bootstrap. Gateway-owned absolute Python runner
+locators use `Path.as_posix()` on both hosts. Only generated runner locators
+change: business paths and generic argv codecs retain their exact values.
+Accept the one disclosed spelling, never normalize a model's altered relative
+path. This supersedes the historical backslash-generation rule after C08
+reproduced JSON double escaping despite decoded-copy guidance. Old evidence
+remains bound to its frozen candidate; do not replay it under this policy.
 Continuation grading must unwrap the attested host frame through the shared
 command-record helper; never assume every recorded command is a three-token
 POSIX `shell -lc <script>` wrapper when grading native Windows evidence.

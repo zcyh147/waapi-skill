@@ -125,3 +125,65 @@ change to the Skill entry, all 76 Skill contract/protocol checks passed. Those
 selections overlap and do not establish model reliability. Native Windows
 Fresh C06/2022 and C08/2022/2025 acceptance is the next required evidence;
 no new semantic PASS is claimed by this note.
+
+## Prompt-only result and bounded runner migration
+
+Frozen `791ece941159560cfa410809bd3fd382b63cc5fb`, native-Windows root
+`iwin-expansion-791ece94-target3-r1`, did not establish a reliable prompt fix:
+
+- EXP22-C06 reached `verified`, passed all seven independent business assertions
+  and all eleven command-copy/provenance checks. Its raw FAIL concerns only
+  ancillary notice wording (`visible_preview_notice`, reviewer
+  `review_required`, no reviewer error). Business PASS with a nonblocking note;
+  that phrase does not justify a repair or another attempt.
+- EXP22-C08 again doubled each backslash in the disclosed relative runner.
+  Broker call 5 rejected it before preparation; no mutation occurred. The
+  earlier absolute bind command was also overescaped. This is an Agent command
+  transcription failure, not evidence that Gateway generated the doubled value.
+- EXP25-C08 was not attempted after the batch stopped. The root remains frozen
+  without verify-only. Both source-project full hashes/mtimes stayed unchanged;
+  the owned Scheduled Task and archived launcher copy were removed, with no
+  residual process. `coordinator-checkpoint.json` records the closeout.
+
+The next repair changes generated **Python runner locators**, rather than
+accepting malformed commands. Gateway emits its owned absolute runner via
+`Path.as_posix()` in both diagnostic argv and corresponding command envelopes.
+The Broker applies the same canonical spelling to its owned absolute task
+runner and emits `./.agents/skills/waapi-skill/scripts/run.py` for the closed
+Windows task-local form. Its leading `./` distinguishes Windows bootstrap from
+POSIX; using identical constants would select the wrong shell branch.
+
+No arbitrary model path is rewritten. Existing relative-runner admission still
+requires the one exact spelling; doubled, mixed, traversing and alternative
+relative forms remain rejected. Generic command codecs, business/Wwise paths,
+state-directory values, authority tokens, Preview/authorization, execute-once
+and verification are unchanged. The encoded audit envelope remains absolute
+and agrees with its full argv. This deliberately supersedes the old Windows
+backslash-generation policy in `tests/AGENTS.md`. Frozen evidence retains its
+original source/contract binding and is not reinterpreted by the new policy.
+This removes the runner's JSON backslash ambiguity; it cannot guarantee that a
+model never rewrites a command or mishandles a different business value.
+
+Focused validation (separate, overlapping selections; do not sum):
+
+- The new drive/UNC serialization regression first failed twice, then passed
+  with the other continuation checks (12 passed). UNC is serialization evidence,
+  not a live network-share execution claim.
+- macOS affected five-file selection: 1312 passed, 20 platform skips, one stale
+  Windows-bootstrap expectation. After updating that fixture, affected command
+  checks passed 110 / 5 skipped; additional planning/typed checks passed 99.
+- Native Windows transport/continuation selection: 129 passed, 2 POSIX skips,
+  one stale generated-runner assertion. The follow-up passed that assertion and
+  94 other checks, exposing five instances of the same stale planning assertion;
+  the corrected planning selection then passed all 30.
+- Native proofs include JSON-decoded command -> profile-free attested pwsh ->
+  PS1 relay -> authenticated Broker -> Python, for absolute and task-local
+  runners. Appended Unicode, apostrophes, empty values and Wwise backslashes are
+  preserved exactly. A separate real Python process opens the forward-slash
+  runner locator. Existing hostile-JSON transport checks also pass.
+
+Fresh acceptance is still required for the changed renderer. Select only
+EXP22-C06, EXP22-C08 and EXP25-C08 in a new frozen root; C06 is included because
+this code change affects its command path, not because of the ancillary notice.
+M05 and the other completed business units stay closed. No complete Program or
+Non-live pass is claimed from these focused checks.

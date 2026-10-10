@@ -626,7 +626,7 @@ def test_object_create_archive_typed_disclosure_is_not_public(
         gateway.operation_draft_copy_command(
             [
                 "python",
-                str(gateway.GATEWAY_RUNNER_PATH),
+                gateway.GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 *sibling_argv,
             ]

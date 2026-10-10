@@ -27,7 +27,8 @@ TYPED_ARRAY_ITEM_CHOICES_CONTRACT = (
     "waapi-skill.typed-array-item-choices/v1"
 )
 TASK_LOCAL_RUNNER_POSIX = ".agents/skills/waapi-skill/scripts/run.py"
-TASK_LOCAL_RUNNER_WINDOWS = r".agents\skills\waapi-skill\scripts\run.py"
+# Distinct fixed spelling also binds the owning Windows shell in bootstrap.
+TASK_LOCAL_RUNNER_WINDOWS = "./.agents/skills/waapi-skill/scripts/run.py"
 
 
 def task_local_runner_matches_normalized(

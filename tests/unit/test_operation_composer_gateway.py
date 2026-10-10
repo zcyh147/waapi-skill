@@ -611,7 +611,7 @@ def _archive_test_object_set_typed_actions_build_one_target_scalar_fact_offline(
     assert target["draft"]["revision"] == 2
     draft_apply_prefix = [
         "python",
-        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        waapi_gateway.GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
         "draft-apply",
         draft_id,
@@ -976,7 +976,7 @@ def _archive_test_choose_response_discloses_the_selected_branch_constant_before_
             },
             "fixed_full_argv": [
                 "python",
-                str(waapi_gateway.GATEWAY_RUNNER_PATH),
+                waapi_gateway.GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-apply",
                 started["draft"]["draft_id"],
@@ -1483,7 +1483,7 @@ def _archive_test_compact_draft_action_returns_only_delta_and_exact_next_prefix(
     }
     assert draft["next_action_binding"]["fixed_argv_prefix"] == [
         "python",
-        str(waapi_gateway.GATEWAY_RUNNER_PATH),
+        waapi_gateway.GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
         "draft-apply",
         draft_id,

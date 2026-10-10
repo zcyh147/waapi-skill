@@ -8015,7 +8015,7 @@ def _dynamic_disclosure_copy_commands(value: Any) -> Any:
             if not isinstance(shape, str) or argv is None:
                 continue
             copy_by_shape[shape] = operation_draft_copy_command(
-                ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+                ["python", GATEWAY_RUNNER_PATH.as_posix(), "gateway.py", *argv]
             )
         if copy_by_shape:
             projected["copy_command_by_shape"] = copy_by_shape
@@ -8023,7 +8023,7 @@ def _dynamic_disclosure_copy_commands(value: Any) -> Any:
     argv = concrete_disclosure_argv(value.get("argv"))
     if argv is not None:
         projected["copy_command"] = operation_draft_copy_command(
-            ["python", str(GATEWAY_RUNNER_PATH), "gateway.py", *argv]
+            ["python", GATEWAY_RUNNER_PATH.as_posix(), "gateway.py", *argv]
         )
     return projected
 
@@ -22071,7 +22071,7 @@ def _query_mutation_selection(
                 "copy_command": operation_draft_copy_command(
                     [
                         "python",
-                        str(GATEWAY_RUNNER_PATH),
+                        GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "query-object",
                         "--exact-id",
@@ -23532,7 +23532,7 @@ def transaction_next_command(
     normalized = [str(value) for value in gateway_argv]
     full_argv = [
         "python",
-        str(GATEWAY_RUNNER_PATH),
+        GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
     ]
     if state_dir is not None:
@@ -23768,7 +23768,7 @@ def _compact_object_set_update_continuation(
             )
     inspect_argv = [
         "python",
-        str(GATEWAY_RUNNER_PATH),
+        GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
         "draft-inspect",
         draft_id,
@@ -23956,7 +23956,7 @@ def _business_next_action_binding(
     authority = task_authority or "<task-authority-from-draft-start>"
     base = [
         "python",
-        str(GATEWAY_RUNNER_PATH),
+        GATEWAY_RUNNER_PATH.as_posix(),
         "gateway.py",
     ]
     binding = [
@@ -26937,7 +26937,7 @@ def _operation_draft_root_array_next_item_disclosure(
                 copy_command_by_shape[shape] = operation_draft_copy_command(
                     [
                         "python",
-                        str(GATEWAY_RUNNER_PATH),
+                        GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "request-array-item",
                         operation,
@@ -27626,7 +27626,7 @@ def operation_draft_payload(
                 )
             check_argv = [
                 "python",
-                str(GATEWAY_RUNNER_PATH),
+                GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-check",
                 record.draft_id,
@@ -27771,7 +27771,7 @@ def operation_draft_payload(
                 )
             check_argv = [
                 "python",
-                str(GATEWAY_RUNNER_PATH),
+                GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-check",
                 record.draft_id,
@@ -28019,7 +28019,7 @@ def operation_draft_payload(
                 {
                     "fixed_full_argv_template": [
                         "python",
-                        str(GATEWAY_RUNNER_PATH),
+                        GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "preview-from-draft",
                         record.draft_id,
@@ -28039,7 +28039,7 @@ def operation_draft_payload(
         else:
             draft_apply_prefix = [
                 "python",
-                str(GATEWAY_RUNNER_PATH),
+                GATEWAY_RUNNER_PATH.as_posix(),
                 "gateway.py",
                 "draft-apply",
                 record.draft_id,
@@ -28106,7 +28106,7 @@ def operation_draft_payload(
             ):
                 completion_argv = [
                     "python",
-                    str(GATEWAY_RUNNER_PATH),
+                    GATEWAY_RUNNER_PATH.as_posix(),
                     "gateway.py",
                     "draft-check",
                     record.draft_id,

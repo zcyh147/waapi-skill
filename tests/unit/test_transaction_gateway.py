@@ -103,7 +103,7 @@ def expected_transaction_next_command(
     normalized = [str(value) for value in gateway_argv]
     full_argv = [
         "python",
-        str(SCRIPT_PATH.with_name("run.py")),
+        SCRIPT_PATH.with_name("run.py").as_posix(),
         "gateway.py",
     ]
     if state_dir is not None:
@@ -176,7 +176,7 @@ def test_transaction_next_command_preserves_explicit_state_dir_in_copy_envelope(
     ]
     assert continuation["full_argv"][:5] == [
         "python",
-        str(SCRIPT_PATH.with_name("run.py")),
+        SCRIPT_PATH.with_name("run.py").as_posix(),
         "gateway.py",
         "--state-dir",
         str(state_dir),
@@ -2360,7 +2360,7 @@ def test_transaction_next_command_uses_short_task_local_posix_runner(
         ["execute", "tx1-task-local"],
     )
 
-    assert payload["full_argv"][1] == str(runner)
+    assert payload["full_argv"][1] == runner.as_posix()
     assert payload["shell_command"] == (
         "python .agents/skills/waapi-skill/scripts/run.py "
         "gateway.py execute tx1-task-local"
@@ -2368,6 +2368,26 @@ def test_transaction_next_command_uses_short_task_local_posix_runner(
     selected = shlex.split(payload["shell_command"])
     assert (tmp_path / selected[1]).resolve() == runner.resolve()
     assert payload["copy_instruction"]["source_field"] == "shell_command"
+
+
+@pytest.mark.parametrize("runner", (
+    PureWindowsPath(r"C:\Skill & 雪\scripts\run.py"),
+    PureWindowsPath(r"\\server\share\Skill\scripts\run.py"),
+))
+def test_windows_generated_runner_has_no_json_separator_ambiguity(
+    runner: PureWindowsPath, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(waapi_gateway, "os", type("WindowsOS", (), {"name": "nt"})())
+    monkeypatch.setattr(waapi_gateway, "GATEWAY_RUNNER_PATH", runner)
+    business_value = r"\Actor-Mixer Hierarchy\Default Work Unit"
+    payload = waapi_gateway.transaction_next_command(
+        "status", ["status", business_value],
+    )
+    wire = json.loads(json.dumps(payload))
+    expected = ("python", runner.as_posix(), "gateway.py", "status", business_value)
+    assert decode_windows_model_argv(wire["model_command"]) == expected
+    assert decode_windows_powershell_argv(wire["shell_command"]) == expected
+    assert tuple(wire["full_argv"]) == expected
 
 
 def test_transaction_next_command_adds_one_short_copy_source_on_windows(
@@ -2394,7 +2414,7 @@ def test_transaction_next_command_adds_one_short_copy_source_on_windows(
     )
     assert payload["model_shell_family"] == WINDOWS_MODEL_COMMAND_FAMILY
     assert payload["model_command"] == (
-        "python 'C:\\WAAPI Skill\\scripts\\run.py' 'gateway.py' "
+        "python 'C:/WAAPI Skill/scripts/run.py' 'gateway.py' "
         "'execute' 'tx1-windows'"
     )
     assert decode_windows_model_argv(payload["model_command"]) == tuple(
@@ -2420,7 +2440,7 @@ def test_transaction_next_command_adds_one_short_copy_source_on_windows(
     )
 
     serialized = json.dumps(payload, ensure_ascii=False)
-    assert r"C:\\WAAPI Skill\\scripts\\run.py" in serialized
+    assert "C:/WAAPI Skill/scripts/run.py" in serialized
     decoded_payload = json.loads(serialized)
     assert decode_windows_model_argv(decoded_payload["model_command"]) == tuple(
         decoded_payload["full_argv"]

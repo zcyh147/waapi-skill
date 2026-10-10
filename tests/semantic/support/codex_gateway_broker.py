@@ -8221,7 +8221,7 @@ def _project_next_command_runner(
     gateway_argv = value.get("gateway_argv")
     full_argv = value.get("full_argv")
     instruction = value.get("copy_instruction")
-    expected_candidate = str(candidate_runner.resolve(strict=True))
+    expected_candidate = candidate_runner.resolve(strict=True).as_posix()
     if (
         value.get("contract") != TRANSACTION_NEXT_COMMAND_CONTRACT
         or value.get("copy_exactly") is not True
@@ -8299,7 +8299,7 @@ def _project_next_command_runner(
 
     projected_argv = [
         "python",
-        str(invocation_runner),
+        invocation_runner.as_posix(),
         "gateway.py",
         *gateway_argv,
     ]
@@ -8394,7 +8394,7 @@ def _project_operation_draft_runner(
 ) -> dict[str, Any]:
     """Project closed Draft argv bindings onto the detached task Skill path."""
 
-    expected_candidate = str(candidate_runner.resolve(strict=True))
+    expected_candidate = candidate_runner.resolve(strict=True).as_posix()
 
     def project_disclosure_commands(nested: Any) -> Any:
         if isinstance(nested, list):
@@ -8488,7 +8488,7 @@ def _project_operation_draft_runner(
                 projected_copies[shape] = _draft_copy_command(
                     [
                         "python",
-                        str(invocation_runner),
+                        invocation_runner.as_posix(),
                         "gateway.py",
                         *candidate_argv[3:],
                     ],
@@ -8555,7 +8555,7 @@ def _project_operation_draft_runner(
             projected["copy_command"] = _draft_copy_command(
                 [
                     "python",
-                    str(invocation_runner),
+                    invocation_runner.as_posix(),
                     "gateway.py",
                     *gateway_argv,
                 ],
@@ -8584,7 +8584,7 @@ def _project_operation_draft_runner(
                 "runner"
             )
         projected_prefix = [*prefix]
-        projected_prefix[1] = str(invocation_runner)
+        projected_prefix[1] = invocation_runner.as_posix()
         projected[prefix_key] = projected_prefix
         if copy_key is not None:
             if mapping.get(copy_key) != _draft_copy_command(
@@ -8631,7 +8631,7 @@ def _project_operation_draft_runner(
                     projected_count += 1
                     return [
                         "python",
-                        str(invocation_runner),
+                        invocation_runner.as_posix(),
                         "gateway.py",
                         *nested[3:],
                     ]
@@ -8685,7 +8685,7 @@ def _project_operation_draft_runner(
                             if compact_copy_only and platform_name == "nt"
                             else TASK_LOCAL_RUNNER_POSIX
                             if compact_copy_only
-                            else str(invocation_runner)
+                            else invocation_runner.as_posix()
                         ),
                         "gateway.py",
                         *source_argv[3:],
@@ -8726,7 +8726,7 @@ def _project_operation_draft_runner(
                     if compact_copy_only and platform_name == "nt"
                     else TASK_LOCAL_RUNNER_POSIX
                     if compact_copy_only
-                    else str(invocation_runner)
+                    else invocation_runner.as_posix()
                 )
                 projected["fixed_argv_prefix_copy"] = _draft_copy_command(
                     [

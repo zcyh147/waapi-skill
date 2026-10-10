@@ -2767,7 +2767,7 @@ def test_formal_task_instructions_bind_exact_windows_skill_read_schedule() -> No
         r"''.agents\skills\waapi-skill\SKILL.md''"
     ) in instructions
     assert (
-        "python '.agents\\skills\\waapi-skill\\scripts\\run.py' "
+        "python './.agents/skills/waapi-skill/scripts/run.py' "
         "'gateway.py'"
     ) in instructions
     assert "No next_command: only" in instructions
