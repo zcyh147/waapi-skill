@@ -585,38 +585,43 @@ reimport (C01), same-basename media mapping (C03), existing RTPC maintenance
 existing Stinger reference (M05). C01/C03 use `ask_before_changes`; the other
 cases use `allow_changes`. M05/2022 has no Agent turn or business PASS: the
 trusted runner must reproduce and preserve its specific public-interface
-boundary. The totals above describe the planned full selection, not completed
-acceptance or new per-API coverage.
+boundary. The totals above describe selection size, not new per-API coverage.
+The [release validation summary](../TEST_INVENTORY.md#110-release-validation-2026-10-10)
+records cumulative business acceptance on both hosts, exact candidates and raw
+verdicts; it does not claim a final-candidate all-green automated matrix.
 
 Independent before/after project and media observations decide outcomes.
 Unordered independent edits may vary, while meaningful curve order, exact
 targets, preservation, authorization, and execute-once rules remain enforced.
 The cumulative Agent budget is 600 seconds per case, with a slow flag above
 420 seconds; preparation, Wwise startup, oracle work, and cleanup are separate.
-Failed roots remain frozen. Finish a full batch, consolidate repairs, rerun
-failed cases in new roots, then run the final complete selection and identical
-verify-only audit on one frozen candidate.
+Failed roots remain frozen. Finish the selected batch, consolidate confirmed
+repairs, and rerun failed or directly affected units in new roots. Apply
+[the current business-acceptance policy](TEST_ACCEPTANCE.md) when deciding
+whether a further full selection is necessary. Only originally all-PASS roots
+receive identical verify-only; a wording note does not justify replaying a FAIL
+root or repeating an already proven business outcome.
 
-The expansion's model-selection pilot compares GPT-6 Luna high with
-GPT-6.1 Sol medium on C01/M01/C06 in 2025.1: three Fresh tasks per model,
-with the default service tier. Luna medium is a conditional follow-up after
-Luna high proves reliable. No formal model choice or new acceptance is implied
-by the profile's defaults; historical profiles keep their original pins.
+The initial [model pilot](../../docs/research/integration-expansion-model-selection-2026-10-02.json)
+is completed historical evidence, not a pending release prerequisite. Later
+acceptance uses explicitly sealed executor/reviewer configurations; native
+Windows closure used `gpt-6.1-sol`, high reasoning and the default service tier.
+Historical profiles retain their original pins. A changed model or reasoning
+setting requires a new root and does not reinterpret earlier results.
 
-Use a new explicit root for each model configuration. For example, after the
-fixture and program prerequisites pass, the Luna half of the pilot is:
+For an explicitly selected new expansion attempt, after its prerequisites pass:
 
 ```bash
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
   --profile integration_expansion_v1 --version 2025.1 \
-  --case-id C01 --case-id M01 --case-id C06 \
-  --model gpt-6-luna --reasoning-effort high --service-tier default \
-  --campaign-root skills/waapi-skill-workspace/expansion-pilot-luna-new-candidate
+  --case-id C08 \
+  --model gpt-6.1-sol --reasoning-effort high --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/expansion-c08-new-candidate
 ```
 
-Use `--model gpt-6.1-sol --reasoning-effort medium` and a different root for the
-Sol half. Public callers need no custom `--suite`. Real execution stays
-sequential and uses the existing formal campaign and sandbox lifecycle.
+Public callers need no custom `--suite`. Real execution stays sequential and
+uses the existing formal campaign and sandbox lifecycle. This example is not
+an instruction to repeat completed release acceptance.
 
 From the repository root, run each profile into a distinct campaign directory.
 Use the Skill-local Python so the runner-owned live fixture has the same pinned

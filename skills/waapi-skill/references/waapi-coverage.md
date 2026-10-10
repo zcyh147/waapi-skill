@@ -222,6 +222,15 @@ hops, request/preview-local identity/property-metadata cache reuse, and
 deduplicated bounded multi-ID prepared-role revalidation. They do not prove
 native syntax acceptance by a real Wwise process.
 
+The October 2026 integration expansion adds seven workflow families on Wwise
+2022.1/2025.1. All 13 positive business outcomes have cumulative acceptance on
+macOS and native Windows; EXP22-M05 remains a separate capability boundary.
+These are outcome-based, candidate-scoped results, not new route counts or a
+single-candidate all-green matrix. Original failures, nonblocking notice
+assessments and developer-test limits remain in the
+[test inventory](../../../tests/TEST_INVENTORY.md#110-release-validation-2026-10-10).
+Full music authoring and audible playback are not established by this expansion.
+
 The completed, memory-off `h80-release-c38` Codex Terra campaign ran 80
 real-Wwise business scenarios for the 16 approved heavy APIs: 70 on 2022.1,
 five on 2024.1, and five on 2025.1. All 80 passed with sandbox cleanup and

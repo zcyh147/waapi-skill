@@ -190,9 +190,11 @@ The repository includes program tests, live read-only tests, destructive
 sandbox tests, and fresh-agent semantic tests on macOS and Windows. Exact route
 counts, version boundaries, and evidence are kept outside this user overview:
 
-The October integration expansion has completed its macOS program and non-live
-gates, copied-project preparation, and scoped music/RTPC Gateway checks. Its
-new-model Fresh Agent pilot and final integration acceptance remain pending.
+The October expansion adds seven business workflows on Wwise 2022.1/2025.1.
+All 13 positive outcomes now have cumulative business-acceptance evidence on
+macOS and native Windows, plus a separate 2022.1 capability boundary. This is
+not a single-candidate, all-green automated matrix: the inventory records exact
+candidates, raw verdicts, wording-only discrepancies, and remaining test limits.
 
 - [Detailed coverage](./skills/waapi-skill/references/waapi-coverage.md)
 - [Test inventory and evidence](./tests/TEST_INVENTORY.md)

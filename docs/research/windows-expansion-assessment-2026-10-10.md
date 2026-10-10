@@ -1,5 +1,10 @@
 # Native Windows expansion assessment — 2026-10-10
 
+This is the frozen first-pass assessment. The later
+[runner repair closeout](windows-agent-command-escaping-2026-10-10.md#native-windows-acceptance-closeout)
+proves both previously incomplete C08 business outcomes; original verdicts and
+the first-pass table below remain unchanged.
+
 All 13 positive units were attempted once on frozen candidate
 `7b4e1164a59f7aff1c17b0771610d49e5760a15e`, across four sequential roots.
 The separate M05/2022 capability boundary was also proven. Original verdicts:

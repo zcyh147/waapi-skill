@@ -5,6 +5,40 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 1.1.0 release validation (2026-10-10)
+
+The seven-workflow `integration_expansion_v1` selection has cumulative business
+acceptance for all 13 positive units on both macOS and native Windows, plus the
+separate EXP22-M05 capability boundary. This combines explicitly identified
+candidates/roots; it is not a single-candidate or single-root automated 13/13.
+
+- **macOS:** the [completion record](../docs/research/integration-expansion-acceptance-2026-10-09.md)
+  records all 13 business outcomes, the raw full-root 12 PASS / 1 notice FAIL,
+  and the later targeted C09 PASS with identical verify-only. The latest full
+  macOS Non-live result remains the dated `5562104` entry below.
+- **Windows baseline:** the [assessment](../docs/research/windows-expansion-assessment-2026-10-10.md)
+  retains `7b4e1164`'s raw 9 PASS / 4 FAIL across four roots: 11 business
+  completions and two C08 operations rejected before execution. M05's valid
+  unnamed-object discovery defect was repaired and program-tested; its already
+  proven business result was accepted without another Fresh attempt.
+- **Windows repair:** [targeted acceptance](../docs/research/windows-agent-command-escaping-2026-10-10.md#native-windows-acceptance-closeout)
+  on `56339bb1` completed C06/2022 and C08/2022/2025 with all independent
+  business checks and all 55 command reconciliations passing. Raw results are
+  2 PASS / 1 ancillary-progress-notice FAIL. The latter remains frozen without
+  verify-only. All source hashes/mtimes were unchanged, passing sandboxes were
+  removed, failed evidence retained, and scoped processes/jobs cleared.
+- **Windows developer limits:** the [portability report](../docs/research/windows-expansion-portability-2026-10-10.md)
+  records the original failed full collection and focused repairs. No new
+  all-green full native-Windows Non-live run is claimed; one retired-Composer
+  transport fixture remains a documented nonblocking failure. Focused selections
+  overlap and are not summed into a new total.
+
+This is reliability and workflow validation, not additional reflected-API or
+exhaustive parameter coverage. Full Playlist/Transition authoring, audible
+playback acceptance and detailed expansion phase timing are not delivered by
+this evidence. [Business acceptance](semantic/TEST_ACCEPTANCE.md) governs new
+rerun decisions; historical verdicts stay unchanged.
+
 ## Runner modes and strict real behavior
 
 ### 2026-10-09 Expansion completion under targeted business acceptance

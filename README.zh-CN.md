@@ -176,8 +176,14 @@ python skills/waapi-skill/scripts/run.py gateway.py status
 Fresh Agent 语义测试。精确路由数量、版本边界和完整证据放在独立文档中，不再堆在
 用户首页：
 
+十月扩充新增七类业务工作流，覆盖 Wwise 2022.1/2025.1。13 项正向业务结果现已在
+macOS 与原生 Windows 上累计完成验收，另有独立的 2022.1 能力边界检查。这不代表
+同一候选版本的整批自动判定全部通过：测试清单保留了各次候选、原始判定、仅涉及表述
+的差异，以及尚未覆盖或完成的验证。
+
 - [详细覆盖范围](./skills/waapi-skill/references/waapi-coverage.md)
 - [测试清单与证据](./tests/TEST_INVENTORY.md)
+- [开发者告知回归检查](./tests/semantic/README.md#developer-notice-regressions)
 - [Skill 合同](./skills/waapi-skill/SKILL.md)
 
 ## Skill 还是 MCP？
