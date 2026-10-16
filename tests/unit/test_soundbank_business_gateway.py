@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -118,9 +120,9 @@ def _env(tmp_path: Path) -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2025.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -253,7 +255,7 @@ def test_every_soundbank_schema_exposes_only_the_business_plan(
 ) -> None:
     code, payload = gateway.execute_gateway(
         ["--version", version, "operation-schema", operation],
-        env={**_env(tmp_path), "WWISE_VERSION": version},
+        env=set_gateway_config(_env(tmp_path), wwise_version=version),
         client_factory=lambda url: pytest.fail(f"schema connected to {url}"),
     )
 

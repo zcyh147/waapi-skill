@@ -2,6 +2,7 @@
 # Blank lines and comments are ignored; test nodes must stay below tests/unit.
 
 tests/unit/test_gateway_session_context.py
+tests/unit/test_gateway_connection_binding.py
 tests/unit/test_public_route_coverage_contract.py
 tests/unit/test_public_route_program_matrix.py
 tests/unit/test_stable_read_adapters.py
@@ -201,3 +202,6 @@ tests/unit/test_typed_authoring_ui_input.py
 tests/unit/test_single_typed_input_cutover.py
 tests/unit/test_authoring_core_gateway.py
 tests/unit/test_host_ui_debug_business_adapter.py
+
+tests/unit/test_plugin_shareset_gateway.py
+tests/unit/test_persistent_project_cleanup_gateway.py

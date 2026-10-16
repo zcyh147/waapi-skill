@@ -17615,3 +17615,56 @@ def test_native_windows_forward_runner_preserves_prefix_and_business_arguments(
         assert record.model_argv == ('python', runner, 'gateway.py', 'status', *business)
         assert record.succeeded
         assert record.normalized_model_argv[1] == str(invocation / 'scripts' / 'run.py')
+
+
+def test_continuation_broker_reuses_the_initial_saved_connection(tmp_path):
+    skill = make_fake_skill(tmp_path)
+    environment = {"WWISE_WAAPI_HOST": "localhost", "WWISE_WAAPI_PORT": "41234"}
+    with CodexGatewayBroker(skill_source=skill, expected_steps=(ExpectedGatewayStep("read", "status", ()),), expected_wwise_version="2025.1",
+                            runner_environment=environment, working_root=tmp_path / "first") as first:
+        config = first.config_path
+        state = first.state_directory
+        saved = json.loads(config.read_text())
+        assert saved["waapi_host"] == "localhost"
+        assert saved["waapi_port"] == 41234
+    before = config.read_bytes()
+    with CodexGatewayBroker(skill_source=skill, expected_steps=(ExpectedGatewayStep("read", "status", ()),), expected_wwise_version="2025.1",
+                            runner_environment=environment, existing_state_directory=state,
+                            working_root=tmp_path / "next") as continuation:
+        assert continuation.config_path == config
+        assert config.read_bytes() == before
+
+
+def test_current_broker_provisions_connection_through_public_config_set(tmp_path):
+    skill = make_fake_skill(tmp_path)
+    (skill / "wwise_waapi").mkdir()
+    (skill / "scripts/run.py").write_text('''import json, os, pathlib, sys
+assert sys.argv[1:3] == ["gateway.py", "config-set"]
+values = dict(zip(sys.argv[3::2], sys.argv[4::2]))
+config = {"wwise_version": values["--wwise-version"], "waapi_host": values["--waapi-host"],
+          "waapi_port": int(values["--waapi-port"]), "project_modification_policy": values["--project-modification-policy"]}
+path = pathlib.Path(os.environ["WAAPI_SKILL_CONFIG_PATH"])
+path.write_text(json.dumps(config))
+path.with_suffix(".invocation").write_text(json.dumps(sys.argv[1:]))
+print(json.dumps({"ok": True, "command": "config-set", "effective": config}))
+''', encoding="utf-8")
+    with CodexGatewayBroker(skill_source=skill, expected_steps=(ExpectedGatewayStep("read", "status", ()),),
+                            expected_wwise_version="2025.1", runner_environment={**os.environ,
+                                "WWISE_WAAPI_HOST": "127.0.0.1", "WWISE_WAAPI_PORT": "41234"},
+                            working_root=tmp_path / "broker") as broker:
+        assert broker.config_path.with_suffix(".invocation").is_file()
+        receipt = json.loads((broker.evidence_directory / "config-provisioning.json").read_text())
+        assert receipt["exit_code"] == 0
+        assert receipt["payload"]["command"] == "config-set"
+        assert json.loads(broker.config_path.read_text())["waapi_port"] == 41234
+
+
+def test_current_broker_does_not_strip_a_live_connection_version_override(tmp_path):
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(skill_source=skill,
+                            expected_steps=(ExpectedGatewayStep("read", "status", ()),),
+                            expected_wwise_version="2025.1", working_root=tmp_path / "broker") as broker:
+        result = run_model_command(broker, ["--version", "2025.1", "status"])
+        assert result.returncode != 0
+        assert "offline" in result.stderr.lower()
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()

@@ -28,7 +28,7 @@ def _checked_object_child(
     start_arguments = (
         (
             "--state-dir", str(state_dir),
-            "--version", "2022.1",
+
             "draft-start", operation,
         )
         if parent is None
@@ -103,7 +103,7 @@ def test_parent_owned_compound_child_returns_handoff_and_cannot_preview(
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
@@ -203,7 +203,7 @@ def test_compound_undo_rejects_checked_child_not_owned_by_parent(
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
@@ -231,7 +231,7 @@ def test_public_compound_undo_snapshots_checked_business_children_into_one_previ
     code, started = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, started
@@ -336,7 +336,7 @@ def test_compound_undo_rejects_unchecked_or_stale_child_before_parent_write(
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
@@ -382,14 +382,14 @@ def test_compound_undo_repair_preserves_hostile_business_values_exactly(
     code, unchecked = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "object.setNotes",
     )
     assert code == 0, unchecked
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
@@ -475,7 +475,7 @@ def test_compound_undo_rejects_two_children_that_own_the_same_final_outcome(
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
@@ -557,7 +557,7 @@ def test_compound_undo_rejects_child_changed_after_check_before_parent_snapshot(
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
@@ -628,7 +628,7 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
     code, parent = offline_execute(
         tmp_path,
         "--state-dir", str(state_dir),
-        "--version", "2022.1",
+
         "draft-start", "waapi.undoGroup",
     )
     assert code == 0, parent
