@@ -7294,6 +7294,12 @@ def _apply_reference_activation_dependencies(
     activation_names: list[str] = []
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
+        # Wwise marks the positioning override switch with its own override
+        # descriptor. It is the terminal switch, not another activation edge.
+        if (metadata.name == "OverridePositioning" and metadata.type.casefold() == "bool"
+                and dependency == {"type": "override", "action": "Enable",
+                                   "property": "OverridePositioning", "context": "Self"}):
+            continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
         if (dependency.get("value") is False
