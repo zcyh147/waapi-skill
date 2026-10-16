@@ -1,28 +1,30 @@
-# 02：所有正常操作只使用配置连接
+# 02: Use configuration-only connections throughout Gateway workflows
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#165](https://github.com/zcyh147/waapi-skill/issues/165)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** 用户设置一次配置，所有只读和写操作使用该配置；已有 Draft/事务不因 CLI 参数丢失而切换工程。
+A user configures the endpoint and expected version once; every public read and mutation uses that configuration, and existing Drafts/transactions cannot silently change projects.
 
-**Blocked by：** 无
+## Acceptance criteria
 
-## 验收条件
+- [ ] Remove ordinary online host/port/version flags and connection-environment overrides. Keep config-set and explicitly offline version browsing. Apply to Draft, inline, zero-input, query and Topic paths.
+- [ ] Explain independent configuration selection: copying a Skill directory alone does not isolate the existing user-level configuration.
+- [ ] Persist initial endpoint/version binding in the Draft; bind live project GUID and version/build on first live use, then carry identity through immutable Preview and transaction records.
+- [ ] Compare current configuration with stored binding before business dispatch. Configuration, actual version or project changes must fail explicitly, without silent fallback.
+- [ ] Cover CLI restarts, old records lacking bindings, all continuations and migration of test launchers/harnesses to isolated config files.
+- [ ] Update public help, schema, Skill guidance and relevant architecture/configuration rules. Implement and program-test all five supported versions.
 
-- [ ] 取消普通在线业务的 host/port/version 临时 flags 与连接环境覆盖；保留 config-set 与离线版本浏览。
-- [ ] 独立副本明确关联独立配置，不误认为目录复制会隔离默认用户配置。
-- [ ] 草稿硬盘记录选定连接，首次 live 绑定版本/build/项目 GUID，Preview/事务继续保存；无 Draft 路由也走统一配置。
-- [ ] 每步先比较配置与已存绑定；配置变化、实际版本/项目变化均在业务派发前拒绝，不静默回退。
-- [ ] 覆盖重启 CLI、config 变更、旧状态缺字段及所有 continuation；维护测试启动器改用隔离配置。
-- [ ] 更新公开 schema/help/Skill 与受影响的配置指导，不靠 Agent export 环境变量。
+## Blocked by
 
-## 验证
+None
 
-Gateway 端到端 fake tests 覆盖五版本和 Windows 命令形态；沙盒读取证明正确连接，不访问另一个用户工程。F1–F4 共用新配置路径，不另加 Fresh。
+## Validation
 
-## 执行约束
+Public Gateway end-to-end fake tests across five versions, including Windows command forms. A coordinated sandbox read validates the actual connection; never contact another user project. F1–F4 reuse this route, with no extra Fresh.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.

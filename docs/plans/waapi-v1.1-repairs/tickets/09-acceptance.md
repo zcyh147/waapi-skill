@@ -1,29 +1,32 @@
-# 09：集中验收并交付准确覆盖结论
+# 09: Validate the integrated candidate and reconcile coverage claims
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#172](https://github.com/zcyh147/waapi-skill/issues/172)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** 在同一冻结候选上完成程序、相关真实 Wwise 及四个 Mac Fresh 工作流，并明确交付范围。
+Deliver one frozen candidate with program tests, affected real-Wwise evidence and four Mac-only Fresh workflows, accurately stating remaining gaps.
 
-**Blocked by：** 01,02,03,04,05,06,07,08
+## Acceptance criteria
 
-## 验收条件
+- [ ] Complete the fixed five-version Program gate and full Non-live gate. Run real Wwise tests sequentially using existing sandbox lifecycle; missing prerequisites never count as PASS.
+- [ ] Reuse the formal harness for F1 property listing/paging/configuration, F2 continued work after a query miss, F3 GameParameter creation/configuration, F4 standalone ShareSet creation. First batch: each workflow once, Mac only, not multiplied by versions.
+- [ ] Before spending Fresh quota, freeze candidate/version/model/options and enumerate user turns and transactions; prove deterministic prerequisites and plugin license availability first.
+- [ ] Implement and program-test all 2021.1–2025.1 lanes. Real execution evidence covers affected native branches; never infer all-version live support from fake tests or a Mac run.
+- [ ] No Windows Fresh in this scope, no native-Windows acceptance claim. Do not treat Wine and native Windows behavior as identical.
+- [ ] Finish ordinary failures in a frozen batch before repair; stop on systemic sandbox/evidence faults. Additional Fresh runs or reruns require a stated rationale/count and user approval; no automatic full matrix.
+- [ ] Reconcile the audit ledger against final code, preserve raw verdicts and separately report independent business outcomes. Only completed runs may update README/test counts.
+- [ ] Complete Standards and Spec code review; fix actionable findings before final handoff. Report all unimplemented audit discoveries without claiming full closure.
 
-- [ ] 固定五版本 Program、完整 Non-live 完成；真实 Wwise 用沙盒顺序执行，缺前提不算 PASS。
-- [ ] 复用正式 harness 形成 F1 属性/分页/配置、F2 查询失败后继续、F3 GameParameter 创建配置、F4 ShareSet 创建四项 Mac 工作流，各首轮一次。
-- [ ] 花费前固定候选/版本/模型/选项/回合与事务数，先证明所需插件许可可用和程序前提。
-- [ ] Windows 不跑 Fresh，不宣称 native Windows 已验收；不推定 Wine 行为等于 Windows。
-- [ ] 普通失败完成冻结批次再修；额外 Fresh 或重跑先报告理由/数量并获批准，不启动全量矩阵。
-- [ ] 复核审计账本与最终实现，保留 raw verdict，业务结果与判定分别报告；不改写旧失败。
-- [ ] 交付代码/范围/验证/未解决漏项，README 与测试计数只引用实际完成运行。
+## Blocked by
 
-## 验证
+#164, #165, #166, #167, #168, #169, #170, #171
 
-此票负责组合 gate、现有 code-review 的标准/规格审查及预算受控的 Fresh，不重复逐票已充分完成的无关 live 场景。
+## Validation
 
-## 执行约束
+Combined gates and focused real evidence, followed by four budgeted Fresh workflows. Avoid redundant live work already proven by unchanged per-ticket evidence.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.
