@@ -1393,7 +1393,27 @@ def test_object_set_discovers_two_business_field_meanings_in_one_revision(
     )
     assert "fixed_full_argv" not in json.dumps(continuation)
     assert "draft-inspect" in continuation["more_actions"]["copy_command"]
-    assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 7_000
+    assert continuation["field_discovery"]["available_via"] == "more_actions"
+    # Compact continuation must not remove live metadata needed for selection.
+    for result in discovered["meaning_results"]:
+        metadata = result["candidates"][0]["metadata"]
+        assert metadata["type"] == "Real64"
+        assert metadata["supports"] == {"unlink": True}
+        assert metadata["display"]["name"] == result["meaning"]
+    inspect_code, inspected = _offline(
+        tmp_path, "draft-inspect", draft_id, "--task-authority", authority,
+    )
+    assert inspect_code == 0, inspected
+    more_discovery = inspected["draft"]["next_action_binding"]["field_discovery"]
+    assert "draft-discover-fields" in more_discovery["fixed_argv_prefix_copy"]
+    assert set(more_discovery["scope_decision"]) == {
+        "existing_object", "stable_new_kind", "discovered_new_type",
+    }
+    assert "exact_detail_and_handle" in more_discovery["selection_modes"]
+    assert len(json.dumps(discovered, separators=(",", ":")).encode("utf-8")) < 7_000, {
+        "top_level_bytes": {key: len(json.dumps(value, separators=(",", ":")).encode("utf-8")) for key, value in discovered.items()},
+        "continuation_bytes": {key: len(json.dumps(value, separators=(",", ":")).encode("utf-8")) for key, value in continuation.items()},
+    }
     fade_handle = discovered["meaning_results"][0]["candidates"][0]["handle"]
     delay_handle = discovered["meaning_results"][1]["candidates"][0]["handle"]
     declared_code, declared = _offline(
