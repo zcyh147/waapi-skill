@@ -401,6 +401,8 @@ INTEGRATION_WORKFLOWS_V1_PROFILE_ID = "integration_workflows_cross_version_6"
 INTEGRATION_WORKFLOWS_V2_PROFILE_ID = "integration_workflows_v2_cross_version_6"
 INTEGRATION_PROFILE_ID = "integration"
 EXPANSION_PROFILE_ID = "integration_expansion_v1"
+REPAIR_PROFILE_ID = "waapi_v11_repairs_4"
+DEFAULT_REPAIR_SUITE = REPO_ROOT / "tests/semantic/data/waapi-v11-repairs/profile.json"
 DEFAULT_EXPANSION_SUITE = REPO_ROOT / "tests" / "semantic" / "data" / "integration-expansion-v1" / "profile.json"
 
 
@@ -635,6 +637,7 @@ EXECUTABLE_V3_PROFILE_IDS = frozenset(
     {
         HEAVY_V3_PROFILE_ID,
         EXPANSION_PROFILE_ID,
+        REPAIR_PROFILE_ID,
         MODIFICATION_POLICY_V3_PROFILE_ID,
         COMPOUND_HEAVY_V1_PROFILE_ID,
         TYPED_INPUT_PROFILE_ID,
@@ -753,6 +756,13 @@ def validate_expansion_cli(*, suite: Path, case_ids: Sequence[str], versions: Se
     load_expansion_profile(suite, unit_ids=case_ids, versions=versions)
 
 
+def validate_repair_cli(*, suite, case_ids, versions, model, reasoning_effort, service_tier, timeout_seconds):
+    from tests.semantic.support.codex_repair_profile import load_repair_profile
+    if (model, reasoning_effort, service_tier, timeout_seconds) != ("gpt-5.6-terra", "medium", "default", 600.0):
+        raise ValueError("repair profile fixes Terra/medium/default and 600 seconds per task")
+    load_repair_profile(suite, unit_ids=case_ids, versions=versions)
+
+
 def canonicalize_integration_case_ids(values: Sequence[str]) -> tuple[str, ...]:
     """Adapt the core unit canonicalizer to the CLI's case-id vocabulary."""
 
@@ -859,6 +869,9 @@ HeavyV3DependencyPreflight = Callable[[], Mapping[str, Any]]
 def load_heavy_v3_units(options: RunnerOptions) -> tuple[Any, ...]:
     """Load and filter the reviewed V3 bundle without importing live runners."""
 
+    if options.profile == REPAIR_PROFILE_ID:
+        from tests.semantic.support.codex_repair_profile import load_repair_profile
+        return load_repair_profile(options.suite_path, unit_ids=options.case_ids, versions=options.versions).units
     if options.profile == EXPANSION_PROFILE_ID:
         from tests.semantic.support.codex_expansion_profile import load_expansion_profile
         profile = load_expansion_profile(options.suite_path, unit_ids=options.case_ids, versions=options.versions)
@@ -1203,6 +1216,7 @@ def run_heavy_v3_matrix(
                 DEEP_INTERFACE_MVP_PROFILE_ID,
                 AUDIO_IMPORT_BUSINESS_PROFILE_ID,
                 EXPANSION_PROFILE_ID,
+        REPAIR_PROFILE_ID,
             }:
                 thread_id = getattr(outcome, "thread_id", None)
                 outcome_status = getattr(outcome, "status", None)
@@ -1254,7 +1268,7 @@ def run_heavy_v3_matrix(
             f"api={unit_row['api']} reason={reason or '-'}"
         )
         must_stop = (not archive_ok or not expansion_case_isolated(record)
-                     if options.profile == EXPANSION_PROFILE_ID
+                     if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}
                      else status in {"BLOCKED", "INDETERMINATE"})
         if must_stop:
             stop_reason = f"{status.lower()}:{scenario_id}"
@@ -1361,7 +1375,7 @@ def run_heavy_v3_unit(
             ),
         }
     )
-    if options.profile == EXPANSION_PROFILE_ID:
+    if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
         from tests.semantic.support.codex_expansion_runtime import ExpansionRunnerOptions, run_expansion_unit
         if not options.campaign_inputs_sha256:
             raise HeavyV3RunnerUnavailableError("expansion execution requires the immutable campaign input digest; use the campaign entrypoint")
@@ -1669,7 +1683,7 @@ def _heavy_v3_run_config(
         "sequential_wwise_lifecycles": True,
         "semantic_fail_policy": "continue",
         "blocked_or_indeterminate_policy": ("continue_only_after_proven_isolation"
-            if options.profile == EXPANSION_PROFILE_ID else "stop"),
+            if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} else "stop"),
         "skill_source": str(options.skill_source),
         "suite_path": str(options.suite_path),
         "live_config": str(options.live_config),
@@ -1752,7 +1766,7 @@ def _heavy_v3_summary(
         "stopped_early": bool(stop_reason),
         "all_selected_passed": all_selected_passed,
         "run_errors": list(run_errors),
-        **({"expansion_accounting": expansion_accounting(unit_rows, records)} if profile == EXPANSION_PROFILE_ID else {}),
+        **({"expansion_accounting": expansion_accounting(unit_rows, records)} if profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} else {}),
         "case_records": [
             {
                 key: record.get(key)
@@ -4222,6 +4236,7 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
     )
     parser.add_argument("--sealed-campaign-inputs-sha256", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    is_repair = args.profile == REPAIR_PROFILE_ID
     is_expansion = args.profile == EXPANSION_PROFILE_ID
     if args.reasoning_effort is None:
         args.reasoning_effort = "high" if is_expansion and args.model in {None, "gpt-6-luna"} else "medium"
@@ -4254,10 +4269,11 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             else DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
-    if is_expansion and args.timeout is None:
+    if (is_expansion or is_repair) and args.timeout is None:
         timeout_seconds = 600.0
     is_terra_v3 = (
-        is_policy_v3
+        is_repair
+        or is_policy_v3
         or is_typed_input
         or is_deep_business_acceptance
         or is_deep_interface_mvp
@@ -4412,6 +4428,13 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
             else DEFAULT_ITERATION_ROOT
         )
     )
+    if is_repair:
+        suite = args.suite or str(DEFAULT_REPAIR_SUITE)
+        try:
+            validate_repair_cli(suite=Path(suite), case_ids=case_ids, versions=args.version, model=model,
+                reasoning_effort=args.reasoning_effort, service_tier=service_tier, timeout_seconds=timeout_seconds)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
     if is_expansion:
         suite = args.suite or str(DEFAULT_EXPANSION_SUITE)
         if not args.iteration_root or args.overwrite:

@@ -1693,14 +1693,18 @@ def run_expansion_codex_task(
     root.mkdir(parents=True)
     workspace = root / "agent-workspace"
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
-    policy = ExpansionBrokerPolicy(prepared=prepared, version=unit.version,
+    repair = unit.unit_id.startswith("REPAIR25-")
+    if repair:
+        from tests.semantic.support.codex_repair_broker_policy import RepairBrokerPolicy
+    policy_type = RepairBrokerPolicy if repair else ExpansionBrokerPolicy
+    policy = policy_type(prepared=prepared, version=unit.version,
                                     skill_source=options.skill_source, scoped_paths=scoped_paths)
     budget = CumulativeAgentBudget()
     prompts = (prepared.prompt,)
     if prepared.policy == "ask_before_changes":
         prompts += ("这一步预览没问题，按当前预览执行并核验结果。",)
     plan = {
-        "contract": "waapi-skill.integration-expansion-task-plan/v1",
+        "contract": "waapi-skill.repair-task-plan/v1" if repair else "waapi-skill.integration-expansion-task-plan/v1",
         "unit_id": unit.unit_id, "version": unit.version, "policy": prepared.policy,
         "operation": prepared.operation, "request_schema_uri": prepared.request_schema_uri,
         "accepted_verification_states": sorted(prepared.accepted_verification_states),
@@ -1749,6 +1753,8 @@ def run_expansion_codex_task(
             expansion_modification_policy=prepared.policy,
         ),
     )
+    if repair:
+        from tests.semantic.support.codex_repair_cases import repair_notice
     broker = CodexGatewayBroker(
         skill_source=options.skill_source, invocation_skill_source=skill_install,
         expected_steps=(), expected_wwise_version=unit.version,
@@ -1783,6 +1789,8 @@ def run_expansion_codex_task(
                             reconciliation, {"completed_turn": False}, (str(exc),))
                         _archive_turn(output_dir, prompt=prompt, result=exc.result, grade=grade)
                         raise
+                    if repair:
+                        policy.finish_read()
                     thread_id = task.thread_id
                     cumulative_argvs.extend(_gateway_candidate_argvs(
                         result, skill_source=options.skill_source, alternate_skill_sources=(skill_install,),
@@ -1819,7 +1827,7 @@ def run_expansion_codex_task(
                         "broker_provenance": reconciliation.passed,
                         "policy_checkpoint": (policy.transaction.state == "previewed"
                             if prepared.policy == "ask_before_changes" and index == 1 else policy.complete),
-                        "visible_preview_notice": (index != 1 or expansion_preview_notice(
+                        "visible_preview_notice": (index != 1 or (repair and prepared.policy == "read_only") or (repair_notice if repair else expansion_preview_notice)(
                             result, command_rows, version=unit.version,
                             execute_expected=prepared.policy == "allow_changes",
                             preview_artifact=(TransactionStore(broker.state_directory).load_preview(
@@ -1897,7 +1905,7 @@ def run_expansion_codex_task(
                 or reconciliation_receipt.get("subprocesses_reaped") is not True):
             status = "BLOCKED"
         outcome = {
-            "contract": "waapi-skill.integration-expansion-task-result/v1",
+            "contract": "waapi-skill.repair-task-result/v1" if repair else "waapi-skill.integration-expansion-task-result/v1",
             "unit_id": unit.unit_id, "version": unit.version, "thread_id": thread_id,
             "passed": passed, "status": status, "infrastructure": infrastructure,
             "error": None if failure is None else f"{type(failure).__name__}: {failure}",
