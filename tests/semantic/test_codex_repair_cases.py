@@ -26,14 +26,14 @@ def test_preflight_uses_complete_paged_inventory_and_exact_detail_without_write(
     assert all(args[:2] in (["metadata", "list"], ["metadata", "detail"]) for args in calls)
 
 
-@pytest.mark.parametrize("fault", ["unknown_unit", "seconds", "range", "name", "default"])
+@pytest.mark.parametrize("fault", ["malformed_unit", "empty_unit", "range", "name", "default"])
 def test_no_guessed_predelay_value_or_units(fault):
     detail = deepcopy(DETAIL)
     metadata = detail["agent_result"]["metadata"]
-    if fault == "unknown_unit":
-        metadata["unit"] = {"status": "unknown", "value": None}
-    elif fault == "seconds":
-        metadata["unit"]["value"] = "Seconds"
+    if fault == "malformed_unit":
+        metadata["unit"] = {"status": "known", "value": None}
+    elif fault == "empty_unit":
+        metadata["unit"]["value"] = ""
     elif fault == "range":
         metadata["restriction"]["max"] = 20
     elif fault == "name":
@@ -52,3 +52,9 @@ def test_refinement_requires_ordered_complete_miss_and_unique_matching_result():
     assert not read_refinement_proven([empty, found], target_id="other")
     found["payload"]["limit_reached"] = True
     assert not read_refinement_proven([empty, found], target_id="target")
+
+
+def test_unknown_native_units_are_preserved_without_invention():
+    detail = deepcopy(DETAIL)
+    detail["agent_result"]["metadata"]["unit"] = {"status": "unknown", "value": None}
+    assert require_predelay_metadata(detail)["unit"] == {"status": "unknown", "value": None}

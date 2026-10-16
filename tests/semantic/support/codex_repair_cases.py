@@ -23,15 +23,14 @@ F3_ASSERTIONS = F4_ASSERTIONS = STATE_ASSERTIONS
 def require_predelay_metadata(detail):
     metadata = detail.get("agent_result", {}).get("metadata", {})
     restriction = metadata.get("restriction", {})
-    ui = metadata.get("ui", {})
     unit = metadata.get("unit", {})
     if (metadata.get("name") != "PreDelay" or metadata.get("type") not in {"Real32", "Real64"}
             or type(metadata.get("default")) not in {int, float} or not math.isfinite(metadata["default"])
             or any(type(restriction.get(key)) not in {int, float} or not math.isfinite(restriction[key]) for key in ("min", "max"))
             or not restriction["min"] <= 24 <= restriction["max"]
-            or unit.get("status") != "known"
-            or str(unit.get("value")).casefold() not in {"milliseconds", "millisecond", "time_ms", "ms"}):
-        raise CaseBoundaryError("PreDelay=24 milliseconds requires exact live numeric range/default/unit attestation")
+            or not (unit == {"status": "unknown", "value": None}
+                    or unit.get("status") == "known" and isinstance(unit.get("value"), str) and bool(unit["value"]))):
+        raise CaseBoundaryError("PreDelay=24 requires exact live numeric range/default and explicit unit availability")
     return dict(metadata)
 
 

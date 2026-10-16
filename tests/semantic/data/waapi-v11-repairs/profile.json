@@ -13,7 +13,7 @@
       "policy": "allow_changes",
       "operation": "object.setProperty",
       "version": "2025.1",
-      "prompt": "For the existing Wwise RoomVerb effect at {plugin_path}, show me its available properties in a small first page, fetch the next page, and inspect the exact pre-delay property including its range and default. Then set its pre-delay to {pre_delay} milliseconds and verify the result. Keep its other settings and all other objects unchanged.",
+      "prompt": "For the existing Wwise RoomVerb effect at {plugin_path}, show me its available properties in a small first page, fetch the next page, and inspect the exact pre-delay property including its range, default and whether its units are disclosed. Then set its pre-delay to {pre_delay} and verify the result. Keep its other settings and all other objects unchanged.",
       "fixture": {
         "plugin_name": "Repair_Metadata_Room",
         "plugin_type": "Wwise RoomVerb",
