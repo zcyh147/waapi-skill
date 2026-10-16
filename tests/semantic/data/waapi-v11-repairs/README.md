@@ -42,9 +42,10 @@ wording. The first batch uses the new same-call creation implementation and its
 one-transaction budget; a required staged fallback is a blocked prerequisite,
 not authorization to spend another transaction or turn.
 
-The new deterministic notice gate checks that the Agent supplies text after
-Preview and before Execute. It is an interaction-order check, not a language
-accuracy reviewer. Preserve raw automated verdicts. Report independent state,
+The new deterministic notice gate requires the target and concrete effect values after
+Preview and before Execute, or an explicit reference to an earlier concrete plan.
+It checks interaction order and effect evidence; it is not a language accuracy
+reviewer. Preserve raw automated verdicts. Report independent state,
 authorization/isolation, and any material final-answer or notice discrepancies
 separately under TEST_ACCEPTANCE.md; do not relabel failed historical evidence.
 

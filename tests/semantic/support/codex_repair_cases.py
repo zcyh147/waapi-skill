@@ -170,8 +170,39 @@ def repair_notice(result, command_records, *, version, execute_expected, preview
         argv = normalized_gateway_command_argv(record.argv, expected_wwise_version=version)
         if len(argv) >= 4:
             commands[record.command] = argv[3]
+    request = preview_artifact.get("request", {})
+    arguments = request.get("arguments", {})
+    operation = request.get("operation")
+    numbers = set()
+    if operation == "object.create":
+        groups = [(arguments.get("name", ""),)]
+        numbers = {float(row["value"]) for row in arguments.get("properties", [])
+                   if row.get("name") in {"Min", "Max", "InitialValue"} and type(row.get("value")) in {int, float}}
+        if numbers != {-12.0, 36.0, 7.0}:
+            return False
+    elif operation == "object.setProperty":
+        target = arguments.get("object", {}).get("value")
+        row = before_snapshot.get("objects", {}).get(target, {})
+        groups = [(row.get("name", ""), target or ""), ("predelay", "pre-delay", "pre delay")]
+        numbers = {24.0}
+    elif operation == "object.createPlugin":
+        plugin = arguments.get("plugin", {})
+        groups = [(plugin.get("name", ""),), ("roomverb", str(plugin.get("class_id", ""))), ("shareset", "share set")]
+    else:
+        return False
+    if any(not any(value for value in group) for group in groups):
+        return False
+
+    def numeric_values(text):
+        return {float(value) for value in re.findall(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?!\d|\.\d)", text.replace("−", "-"))}
+
+    def concrete_effect(text):
+        folded = text.casefold()
+        return (all(any(value and value.casefold() in folded for value in group) for group in groups)
+                and numbers.issubset(numeric_values(text)))
+
     preview_seen = False
-    text = ""
+    text, earlier = "", ""
     for line in result.stdout.splitlines():
         try:
             event = json.loads(line)
@@ -184,10 +215,16 @@ def repair_notice(result, command_records, *, version, execute_expected, preview
         if command == "preview-from-draft":
             preview_seen, text = True, ""
         elif command == "execute":
-            return preview_seen and bool(text.strip())
-        elif preview_seen and item.get("type") == "agent_message":
-            text += item.get("text", "")
-    return preview_seen and bool(text.strip()) and not execute_expected
+            reference = any(term in text.casefold() for term in
+                ("plan above", "as described", "as planned", "changes above", "previewed changes"))
+            return preview_seen and (concrete_effect(text) or
+                reference and concrete_effect(earlier) and numeric_values(text).issubset(numbers))
+        elif item.get("type") == "agent_message":
+            if preview_seen:
+                text += "\n" + item.get("text", "")
+            else:
+                earlier += "\n" + item.get("text", "")
+    return preview_seen and concrete_effect(text) and not execute_expected
 
 
 def prepare_repair_case(ctx, *, unit, direct, runtime):
