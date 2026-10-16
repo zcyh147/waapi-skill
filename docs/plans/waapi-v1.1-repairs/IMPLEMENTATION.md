@@ -35,7 +35,8 @@ claimed. User projects, including Lyra, are outside the test scope.
   remains; test sandbox disposal belongs only to the test lifecycle.
 - #172: formal four-workflow Fresh profile, authenticated evidence, native oracles,
   notice checks and archive verification implemented. Actual Fresh acceptance is
-  still pending; no Agent workflow has run yet.
+  still pending: F1 ran once and was blocked by the test Broker before any Agent
+  write; F2–F4 have not run.
 
 ## Completed validation
 
@@ -62,29 +63,26 @@ removed their passing sandbox, and left no scoped Wwise processes. Failed probe
 roots remain preserved. See the native acceptance and research reports for exact
 candidate/version evidence; these are component tests, not Fresh acceptance.
 
-## Fresh startup incident and remaining work
+## Fresh incidents and remaining work
 
-The first campaign root, `imac-v11-repairs-first4-r1`, stopped before launching
-Codex or Wwise: the matrix parser accepted sealed campaign digests only for the
-older expansion profile. Campaign exit was 3, child exit 2. All four approved
-Agent workflows remain unspent. The original root is frozen; its exact artifact
-hashes are recorded in
-`tests/semantic/data/waapi-v11-repairs/startup-incident-first4-r1.json`.
+The first root stopped before Agent startup. The second ran F1 once but the
+Broker rejected a valid unchanged Draft revision during property listing. No
+Agent Preview or Execute occurred. Both roots remain frozen. Repairs are merged
+at `121ab54f`; related regressions and follow-up review passed. See the
+[acceptance checkpoint](../../research/waapi-v11-repairs-acceptance-2026-10-17.md)
+for raw verdicts, exact candidates, usage, component evidence and limitations.
 
-Commit `75d5a47b` permits the repair child while retaining digest validation,
-profile restrictions and full-four selection. Its regression exercises actual
-campaign-produced argv through matrix main. Before the actual four-workflow
-batch, deterministic native fixture preparation is being checked without Codex.
-A new frozen candidate/root will be used for the still-unspent first batch.
-
-Remaining: complete fixture validation and four Fresh workflows, assess business
-outcomes without rewriting raw verdicts, run identical verify-only only for an
-all-PASS root, finish acceptance documentation, update the PR, preserve remaining
-ignored evidence, and archive managed worktrees. Do not merge the PR to main.
+One F1 rerun plus the three unattempted workflows remains. The additional one
+Agent attempt requires user approval; no additional Fresh is authorized yet.
+After that decision, complete the agreed acceptance, update the draft PR,
+retain the frozen evidence. All ten managed worktrees are archived. Do not merge
+PR #173 to main or mark incomplete Fresh acceptance as passing.
 
 ## Evidence retention
 
 Previously relocated component evidence is byte-inventoried in
 `.waapi-skill-state/repair-evidence/relocation-manifest.json`. That manifest is
-immutable. Additional evidence must receive a separate preservation record.
-Original failed/blocked roots are never deleted merely to make the run look clean.
+immutable. Additional evidence receives separate preservation records.
+All ten completed worktrees have been archived after the final verified evidence
+copy. Failed/blocked roots are never
+deleted merely to make the run look clean.

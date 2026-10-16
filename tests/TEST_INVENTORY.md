@@ -5,6 +5,19 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-17 v1.1 repair checkpoint
+
+Candidate `e8ca72d3` passed Program **6942 / 3 skipped** and Non-live
+**18009 / 127 skipped / 34 deselected**, both exit 0. Later test-framework
+repairs received focused validation, not relabeled full-gate runs. Native
+component tests cover all five GameParameter/dependency lanes and supported
+2022.1–2025.1 standalone ShareSet lanes, with an explicit 2021.1 boundary.
+Fresh acceptance is incomplete: one F1 attempt stopped on a Broker defect before
+any Agent-initiated write; F2–F4 remain unattempted. See the
+[dated acceptance checkpoint](../docs/research/waapi-v11-repairs-acceptance-2026-10-17.md)
+for exact candidate boundaries, raw verdicts, retained evidence and review.
+No native-Windows acceptance is claimed.
+
 ## 1.1.0 release validation (2026-10-10)
 
 The seven-workflow `integration_expansion_v1` selection has cumulative business

@@ -1,0 +1,59 @@
+{
+  "program": {
+    "candidate": "e8ca72d3710a94ea2067ad484ae7fdc74587e0d4",
+    "host": "macOS",
+    "mode": "program",
+    "command": [
+      "ci/test.sh",
+      "--mode",
+      "program",
+      "--",
+      "-q",
+      "-ra"
+    ],
+    "exit_code": 0,
+    "passed": 6942,
+    "skipped": 3,
+    "seconds": 460.09,
+    "source_clean_after": true,
+    "log_sha256": "b6feeefa9627d937a6877f0e71af4edd69938363d2d7001c92061a690c8403f8",
+    "skip_scope": [
+      "native Windows shell proof",
+      "native Python runner locator",
+      "NTFS junction behavior requires Windows"
+    ],
+    "windows_acceptance": false
+  },
+  "nonlive": {
+    "candidate": "e8ca72d3710a94ea2067ad484ae7fdc74587e0d4",
+    "host": "macOS",
+    "mode": "nonlive",
+    "command": [
+      "ci/test.sh",
+      "--mode",
+      "nonlive",
+      "--",
+      "-q",
+      "-ra"
+    ],
+    "exit_code": 0,
+    "passed": 18009,
+    "skipped": 127,
+    "deselected": 34,
+    "seconds": 1270.59,
+    "source_clean_after": true,
+    "log_sha256": "f5318703780232bbebc20740ae0c7b060f3c2cb307ce4eb96066eb8d9bda6986",
+    "windows_acceptance": false,
+    "skip_scope": "See complete log: live/destructive lanes, native Windows checks and absent optional historical evidence are not PASS credit."
+  },
+  "status": "fresh_acceptance_incomplete",
+  "integration_repair_candidate": "121ab54fdd8caf1ad036674f68e68e7833f319f4",
+  "fresh_actual_attempts": 1,
+  "fresh_unattempted": [
+    "F2",
+    "F3",
+    "F4"
+  ],
+  "additional_f1_attempt_requires_approval": true,
+  "windows_acceptance": false
+}
