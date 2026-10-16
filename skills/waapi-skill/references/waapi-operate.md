@@ -8,11 +8,11 @@ Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncatio
 - POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
 - Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
 - For complete structured failures, follow the Skill Recovery rule and the returned receipt. A corrected read or discovery does not need another permission prompt.
-- The one complete terminal `verify` result ends the transaction; see Terminal states.
+- Terminal `verify` ends the transaction.
 
 ## Choose the phase and first Gateway command
 
-An existing transaction continuation always outranks operation selection.
+Existing transactions outrank operation selection.
 
 ### Existing transaction
 
@@ -22,13 +22,13 @@ Use its transaction id; an artifact hash is not a lookup key. The visible Previe
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 ```
 
-Do not call `operations`, `operation-schema`, or `request-schema` first. Without complete JSON, stop.
+Skip schema/catalog discovery. Incomplete JSON stops.
 
 ### New transaction
 
-For a prior-query subset, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name/type/path. These bounded read-only checks precede the transaction contract and never replace schema/metadata.
+For a prior-query subset, exact-ID read every selected GUID and match name/type/path before the transaction contract; schema/metadata remain required.
 
-A prior exact diagnostic identity is not a selected subset: reuse its GUID; do not query it again. Gateway binding revalidates it.
+Reuse a prior exact diagnostic GUID; Gateway revalidates it.
 
 A new natural-language change starts with one compact `operations` lookup; only its returned route selects the first transaction contract. An exact user operation/URI skips it.
 
@@ -42,7 +42,7 @@ A new natural-language change starts with one compact `operations` lookup; only 
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | An exact user-supplied native URI without a named route | `request-schema <uri>` and its sole continuation; never infer a URI from natural-language intent |
 
-Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The business Adapter owns object paths, native types, metadata scopes, enums, order, batching, and Preview change intent. Complete paths use `by_path_segments`; GUIDs use `by_id`; for an exact reflected URI with a complete caller path, keep it as one `path` selector.
+Follow the sole `input_mode`, including Draft steps. Gateway owns native paths/types/metadata/enums/order/batching and Preview. Use `by_path_segments` or `by_id`; an exact reflected-URI contract keeps a complete caller path as one `path` selector.
 
 For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`; Gateway owns native construction. Configure defaults only when requested.
 
@@ -54,13 +54,13 @@ Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direc
 
 ## Choose by business outcome
 
-Select the operation whose postcondition and verifier match the request; `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`.
+Follow `operation.selection_guidance` and `interface.selection_guidance` for matching postconditions/verifiers. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`.
 
 An exact CamelCase Wwise Authoring command ID such as `SaveProject` is not a native URI. It directly selects `operation-schema ui.commands.execute`; screen capture directly selects `operation-schema ui.captureScreen`. Both skip `operations`, and command-ID routing overrides generic connected-project save intent. If a larger request already required the catalog, `operations.routing_precedence` preserves the same choice.
 
 Ordinary save wording such as `save the current project` or `保存当前工程` selects `request-schema ak.wwise.core.project.save`; never infer or translate that wording into `SaveProject`. Only the user's exact literal CamelCase command ID selects the UI-command route.
 
-When media import is primary, use one `audio.import` to replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. New target-container hierarchy and same-row Event/Switch outcomes remain in that transaction; never probe `object.create` or a separate assignment first. From 2023.1, `object.set` may carry media only when import is subordinate to broader existing-target work.
+Primary media import uses one `audio.import`, including new Sounds/containers and same-row Event/Switch outcomes; no preliminary `object.set`, `object.create`, or assignment. From 2023.1, `object.set` carries media only within broader existing-target work.
 
 Existing-root status alone does not select `object.set`. One existing object's single rename, notes, scalar-property, or reference edit uses its dedicated operation; these fixed single-edit routes skip `operations`. Broad `object.set` is only for one larger atomic outcome: several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root edit plus a new subtree, or insertion into a named existing descendant. After any required selected-subset identity gate, that batch starts with `operation-schema object.set`. For a batch, bind every target first. Use disclosed fixed fields directly; discover other fields for each exact target and copy the selected handles into `declare_existing_batch`. Plug-in, RTPC, and platform-link changes keep their dedicated operations. An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants. Single-edit, plug-in, RTPC, and platform-link operations take precedence; `object.create` owns new structure when those `object.set` conditions are absent.
 

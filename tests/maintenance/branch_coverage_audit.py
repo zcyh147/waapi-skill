@@ -77,7 +77,7 @@ def route_key(version, kind, uri):
     return f"{version}|{kind}|{uri}"
 
 
-def build_inventory(root=ROOT, *, surface=None):
+def build_inventory(root=ROOT, *, surface=None, native_policy=None):
     """Reconcile reflection identity before linking branches to public routes.
 
     ``surface`` is an optional independently supplied execution partition for
@@ -159,12 +159,19 @@ def build_inventory(root=ROOT, *, surface=None):
     for version, source, document, schema in sorted(definitions):
         for row in schema_branches(schema):
             branch_rows.append(branch_record(version, source, document, None, row))
-    return {"contract": "waapi-skill.branch-audit/v1", "sources": sources,
+    inventory = {"contract": "waapi-skill.branch-audit/v2", "sources": sources,
             "routes": route_rows, "branches": branch_rows,
             "business_branches": load(root / "docs/branch-coverage-business-baseline.json")["rows"],
             "evidence_defaults": {"implementation": "unknown", "program": "unknown", "real": "unknown", "agent": "unknown"},
             "summary": {"routes": len(route_rows), "branches": len(branch_rows),
                         "branch_kinds": dict(sorted(Counter(r["kind"] for r in branch_rows).items()))}}
+    import sys
+    sys.path.insert(0, str(root))
+    from tests.maintenance.branch_audit_mapping import enrich_inventory
+    enrich_inventory(inventory, root, public, schemas,
+                     native_policy if native_policy is not None else load(root / "skills/waapi-skill/resources/native_surface_policy.json"),
+                     digest=digest)
+    return inventory
 
 
 def branch_record(version, source, subject, route, row):
@@ -183,7 +190,13 @@ def check_inventory(inventory, root=ROOT):
     for key, label in (("sources", "source inventory"), ("routes", "route ledger"),
                        ("branches", "branch ledger"), ("business_branches", "business ledger"),
                        ("summary", "summary"), ("evidence_defaults", "evidence defaults"),
-                       ("contract", "contract")):
+                       ("contract", "contract"), ("source_index", "source index"),
+                       ("contract_index", "current contracts"), ("mappings", "selector mappings"),
+                       ("residual_groups", "residual groups"),
+                       ("reviewed_snapshot_seal", "reviewed seal"),
+                       ("current_business_branches", "current business reconciliation"),
+                       ("policy_rule_index", "policy rule index"),
+                       ("family_findings", "family findings")):
         if inventory.get(key) != expected[key]:
             errors.append(label + " differs")
     return errors

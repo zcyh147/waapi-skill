@@ -109,10 +109,10 @@ def test_dynamic_draft_guidance_distinguishes_complete_json_from_incomplete_cons
 
 
 def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transactions() -> None:
-    assert "any successful gateway payload contains `agent_result`" in SKILL
-    assert "This rule applies to fixed reads as well as transactions" in SKILL
-    assert "Do not reconstruct its fields from the prompt, `normalized`" in SKILL
-    assert "do not run another command after receiving it" in SKILL
+    assert "exactly `agent_result` and stop" in SKILL
+    assert "For successful fixed reads or transactions" in SKILL
+    assert "Never reconstruct fields" in SKILL
+    assert "or run another command" in SKILL
     assert "Use live `metadata types`" in QUERY
     assert "projection and bound are fixed" in QUERY
 
@@ -123,7 +123,7 @@ def test_media_pool_reference_classification_uses_one_closed_versioned_query() -
     )[0]
     section_flat = " ".join(section.split())
     command = (
-        "gateway.py --version 2025.1 query-object "
+        "gateway.py query-object "
         "--max-results 1000 --match-original-file-path "
         "'<first-complete-returned-Path>' --match-original-file-path "
         "'<second-complete-returned-Path>'"
@@ -179,12 +179,12 @@ def test_media_pool_reference_classification_documents_terminal_result_and_bound
 
 def test_portable_loading_reuses_complete_content_and_keeps_shell_calls_separate() -> None:
     compact = " ".join(SKILL.split())
-    assert "complete Skill instructions supplied by the agent environment" in compact
-    assert "If they are not already loaded" in compact
-    assert "before running a Gateway command" in compact
+    assert "Read the supplied `SKILL.md` completely" in compact
+    assert "unless already loaded" in compact
+    assert "before Gateway use" in compact
     assert "Reuse complete instructions already visible in the conversation" in compact
     assert "Shell reads are standalone" in compact
-    assert "Keep Gateway calls separate" in compact
+    assert "Separate Gateway calls" in compact
     assert "A missing or truncated read stops the workflow" in compact
     assert "actual execution environment, not the connected Wwise version" in compact
 
@@ -223,7 +223,7 @@ def test_exact_identity_query_is_complete_in_entry_file() -> None:
     assert "use `--detail` only for explicit compile/dispatch diagnostics" in SKILL
     assert "do not read the query reference before or after it" in SKILL
     assert "Conditional read for a query not fully covered" in SKILL
-    assert "The fixed identity projection is always present" in QUERY
+    assert "Identity fields are always" in QUERY
 
 
 def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> None:
@@ -369,8 +369,8 @@ def test_broad_query_subset_mutations_require_exact_id_readback() -> None:
 
 
 def test_query_only_diagnosis_never_preloads_the_future_operate_lane() -> None:
-    assert "A diagnosis-only turn reads only `waapi-query.md`" in SKILL
-    assert "must not preload `waapi-operate.md`" in SKILL
+    assert "Diagnosis-only reads `waapi-query.md`" in SKILL
+    assert "never `waapi-operate.md`" in SKILL
 
 
 def test_query_reference_discloses_compact_success_and_explicit_detail() -> None:
@@ -488,7 +488,7 @@ def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> Non
 def test_nested_boolean_query_uses_the_bounded_advanced_contract() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
-        "offline version-aware schema command",
+        "Offline schema",
         "Advanced native WAQL fallback",
         "--advanced-waql",
         "Gateway fixes read-only `ak.wwise.core.object.get`",
@@ -734,9 +734,9 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert QUERY.count("WAAPI_QUERY_REFERENCE_END") == 1
     assert QUERY.rstrip().endswith(marker)
     assert marker not in QUERY[: QUERY.rfind(marker)]
-    assert "unique terminal sentinel required by `SKILL.md`" in query_flat
-    assert "no truncation or omission marker" in query_flat
-    assert "do not reread a range or invoke the Gateway" in query_flat
+    assert "Require the final sentinel and complete read per `SKILL.md`" in query_flat
+    assert "otherwise stop" in query_flat
+    assert "A missing or truncated read stops the workflow" in SKILL
     assert "`WAAPI_QUERY_REFERENCE_END`" in SKILL
     assert "`WAAPI_OPERATE_REFERENCE_END`" in SKILL
     assert "sentinel must be the final visible line" in " ".join(SKILL.split())
@@ -748,7 +748,7 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
     assert "repeat `--meaning` for one to eight" in query_flat
     assert "Gateway owns detail level, search bounds, projection" in query_flat
     for phrase in (
-        "Gateway owns native field bindings",
+        "Gateway owns native bindings, filters, and projection",
         "Success rows are objects in the array",
         "Complete `no_match` is a bounded miss",
         "Honor dependencies when authorized, otherwise clarify",
@@ -764,9 +764,9 @@ def test_query_reference_has_a_deterministic_end_and_separate_alarm_hops() -> No
 
 def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     compact = " ".join(OPERATE.split())
-    assert "An existing transaction continuation always outranks operation selection" in OPERATE
+    assert "Existing transactions outrank operation selection" in OPERATE
     assert "transaction-show <transaction-id> --summary-only" in OPERATE
-    assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in OPERATE
+    assert "Skip schema/catalog discovery" in OPERATE
     assert "| `audio.import` | `operation-schema audio.import`" in OPERATE
     assert "discover dynamic fields through returned Draft commands" in OPERATE
     assert "submit only disclosed high-level fields" in OPERATE
@@ -777,8 +777,8 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
         "pre-Preview same-name-root type/path only"
     ) < compact.index("Then `operation-schema`, business Draft")
     assert "selected-subset identity gate" in OPERATE
-    assert "exact-ID read back every selected" in OPERATE
-    assert "These bounded read-only checks precede the transaction contract" in OPERATE
+    assert "exact-ID read every selected" in OPERATE
+    assert "before the transaction contract; schema/metadata remain required" in OPERATE
     assert "first transaction contract" in OPERATE
     assert (
         "A new natural-language change starts with one compact `operations` "
@@ -791,7 +791,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "A named operation using only closed schema fields and side effects" in OPERATE
     assert "its named `operation-schema` directly" in OPERATE
     assert "including both import operations" not in OPERATE
-    assert "business Adapter owns object paths, native types, metadata scopes" in OPERATE
+    assert "Gateway owns native paths/types/metadata/enums/order/batching" in OPERATE
     assert "`draft-check` revalidates them" in OPERATE
     assert "Run the returned discovery once" in OPERATE
     assert "Gateway validates restrictions and activates proven dependencies" in OPERATE
@@ -809,9 +809,9 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
         "request-schema <exact-user-supplied-reflected-function-uri>"
         in SKILL
     )
-    assert "No schema-to-preview shortcut" in compact
+    assert "including Draft steps" in compact
     assert "gateway.py operation-schema <operation-name>" not in OPERATE
-    assert "Follow the schema's sole `input_mode`" in OPERATE
+    assert "Follow the sole `input_mode`" in OPERATE
     assert "For `composer`, run only its returned start and action argv" in OPERATE
     assert "For `business_declaration`, run `draft-start`" in OPERATE
     assert "Bind exact owners, parents, and references" in OPERATE
@@ -820,10 +820,10 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
     assert "Corrections reuse the draft" in OPERATE
     assert "preserving `--expected-revision` and `--apply`" in OPERATE
     assert "there is no `lua.executeFile` operation" in OPERATE
-    assert "keep it as one `path` selector" in OPERATE
-    assert "Preview change intent" in OPERATE
+    assert "keeps a complete caller path as one `path` selector" in OPERATE
+    assert "and Preview" in OPERATE
     assert "Configure defaults only when requested" in OPERATE
-    assert "Follow the schema's sole `input_mode`" in OPERATE
+    assert "Follow the sole `input_mode`" in OPERATE
     assert "Unknown fields fail" in OPERATE
     assert "there is no caller-authored request document" in OPERATE
     assert "Public mutation identities are closed" in OPERATE
@@ -836,7 +836,7 @@ def test_operate_first_command_branches_are_disjoint_and_schema_owned() -> None:
 def test_operate_business_selection_and_execution_domains_remain_explicit() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
-        "Select the operation whose postcondition and verifier match",
+        "matching postconditions/verifiers",
         "`operation.selection_guidance`",
         "`interface.selection_guidance`",
         "Directly described media rows",
@@ -868,18 +868,15 @@ def test_operate_business_selection_and_execution_domains_remain_explicit() -> N
     assert "never Preview a Compound Undo child independently" in OPERATE
     assert "`checked_child_argument`" in OPERATE
     assert "Batch size never establishes file-workflow intent" in compact
-    assert "When media import is primary" in compact
-    assert "replace media on existing Sounds" in compact
-    assert "create a Sound in the same batch" in compact
-    assert "`object.set` is never a preliminary schema for that outcome" in compact
-    assert "New target-container hierarchy and same-row Event/Switch outcomes" in compact
-    assert "use one `audio.import`" in compact
+    assert "Primary media import" in compact
+    assert "Primary media import uses one `audio.import`" in compact
+    assert "including new Sounds/containers" in compact
+    assert "no preliminary `object.set`" in compact
+    assert "including new Sounds/containers and same-row Event/Switch outcomes" in compact
+    assert "uses one `audio.import`" in compact
     assert "structure-only descendant" in compact
-    assert (
-        "never probe `object.create` or a separate assignment first"
-        in compact
-    )
-    assert "`object.set` may carry media only when import is subordinate" in compact
+    assert "no preliminary `object.set`, `object.create`, or assignment" in compact
+    assert "`object.set` carries media only within broader existing-target work" in compact
     assert "independent Switch assignment between existing objects" in compact
     assert "same-row import side effect" in compact
     assert (
@@ -1001,8 +998,8 @@ def test_natural_language_cli_soundbank_generation_uses_gateway_route_catalog() 
 def test_operate_metadata_and_import_prose_only_rules_are_preserved() -> None:
     compact = " ".join(OPERATE.split())
     for phrase in (
-        "A rejected or nonzero Gateway invocation is also a hard stop",
-        "`fallback_detail_scan.status` is `partial`",
+        "A corrected read or discovery does not need another permission prompt.",
+        "List reads do not change the Draft revision",
         "Run the returned discovery once with short English Wwise UI/technical meanings",
         "Copy one returned opaque handle per requested field",
         "bind only user-requested custom properties/references",
@@ -1089,7 +1086,7 @@ def test_operate_policy_and_gateway_owned_continuation_are_closed() -> None:
         assert policy in OPERATE
     assert "omit `--state-dir`" in OPERATE
     assert "Gateway owns the external runtime state root" in OPERATE
-    assert "Gateway owns a deterministic external runtime-state default" in SKILL
+    assert "Omit `--state-dir` unless a trusted absolute override" in SKILL
     assert "A rejected or incomplete preview is a hard same-turn boundary" in OPERATE
     assert (
         "Never ask for confirmation while typed composition or Preview creation "
@@ -1133,8 +1130,8 @@ def test_operate_terminal_states_migration_and_cleanup_are_fail_closed() -> None
         "`indeterminate`",
     ):
         assert state in OPERATE
-    assert "Do not verify, retry, call another Gateway route" in compact
-    assert "A later diagnosis needs a new user request" in compact
+    assert "never verify or replay the original write" in compact
+    assert "independent read-only diagnosis within the existing task" in compact
     assert "`ak.wwise.cli.migrate` ends at complete `execute`" in compact
     assert "run no later Agent tools/reads" in compact
     assert "caller-owned harness outside the Skill sequence" in compact
@@ -1161,9 +1158,9 @@ def test_media_pool_reference_orders_field_discovery_before_the_bound_read() -> 
 
 
 def test_soundbank_generation_notifications_remain_query_only() -> None:
-    assert "Classify the requested action, not background wording" in SKILL
-    assert "listen for, wait for, or report a SoundBank generation notification" in SKILL
-    assert "It never authorizes `soundbank.generate`" in SKILL
+    assert "SoundBank generation notifications are query-only" in SKILL
+    assert "no `soundbank.generate`, operation-schema lookup, or mutation" in SKILL
+    assert "no `soundbank.generate`" in SKILL
 
 
 def test_soundbank_topic_selection_distinguishes_per_result_from_cycle_notice() -> None:
@@ -1223,7 +1220,7 @@ def test_one_time_onboarding_is_global_natural_and_does_not_add_a_gateway_call()
     for phrase in (
         "When the visible conversation lacks an introduction",
         "Only `/waapi-skill` or a Skill link: run one offline `config-show`",
-        "complete Skill instructions supplied by the agent environment",
+        "Read the supplied `SKILL.md` completely",
         "Reuse complete instructions already visible in the conversation",
         "The next reply",
         "`session_context.one_time_introduction.facts` together",
@@ -1306,4 +1303,4 @@ def test_discovery_budget_and_guid_copy_instruction_preserve_public_boundaries(t
     assert 'For discovery/schema, use supported `max_output_tokens=20000`' in SKILL
     assert "capped at the tool's documented maximum" in SKILL
     assert 'If no complete JSON is visible, stop' in SKILL
-    assert 'do not retry the Gateway command' in SKILL
+    assert 'A shell failure without complete JSON remains a stop' in SKILL
