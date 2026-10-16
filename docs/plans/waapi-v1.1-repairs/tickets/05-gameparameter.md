@@ -1,27 +1,29 @@
-# 05：完成 GameParameter 创建与范围配置
+# 05: Complete GameParameter creation with range and default configuration
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#168](https://github.com/zcyh147/waapi-skill/issues/168)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** 用户请求创建参数并配置最小值、最大值、默认值时，公开流程能完成且不要求绑定尚不存在的对象。
+Creating a GameParameter with minimum, maximum and default values has an executable public workflow without asking for an object that does not yet exist.
 
-**Blocked by：** 03
+## Acceptance criteria
 
-## 验收条件
+- [ ] First use the established deterministic sandbox test lifecycle to establish whether same-call creation/configuration is supported and under which dependency conditions.
+- [ ] If supported, implement new-object dependency validation; otherwise expose explicit phases, each with its own Preview, authorization and verification.
+- [ ] Return an actionable successor for dependent class-field failures instead of merely suggesting another search term.
+- [ ] Report partial creation/configuration accurately, avoid duplicate objects on continuation, and never append undisclosed writes after Preview.
+- [ ] Independently read back range/default values; preserve existing-object configuration. Cover all five versions, including native differences and explicit boundaries.
 
-- [ ] 先用现有确定性沙盒测试验证 Wwise 能否同次创建/配置及相关依赖条件，记录结果。
-- [ ] 支持同次完成时实现新对象条件验证；否则明确分阶段，并为每个修改保留独立 Preview/授权/验证。
-- [ ] 依赖字段错误给出实际可执行后继，不以参数搜索替代对象范围检查。
-- [ ] 部分成功报告已创建/未配置，继续时不会重复创建，错误后不隐藏追加写入。
-- [ ] 默认值和上下限有独立读回，原先成功的对象范围配置仍可用。
+## Blocked by
 
-## 验证
+#166
 
-Gateway fake tests 验证原 FIELD_OBJECT_SCOPE_REQUIRED 模式、分阶段失败和三模式；2025.1 确定性 live 测试。最终 F3。
+## Validation
 
-## 执行约束
+Gateway fake tests for FIELD_OBJECT_SCOPE_REQUIRED, partial failure and all three modification policies. Coordinated deterministic live evidence; final F3.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.
