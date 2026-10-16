@@ -105,3 +105,32 @@ It exercises public generator/checker inputs and outputs without runtime mocks.
 The generator itself is offline and has no Wwise imports or network client.
 Full combined Program/Non-live gates remain the integration owner's release
 step; these focused tests grant no Wwise or Agent behavior credit.
+
+## Bounded next audit pass
+
+This deliverable completes reusable enumeration and drift detection, **not the
+full mapping review requested by #164**. Do not close that issue from this
+ledger. The next pass should work by contract family, not manually review every
+occurrence:
+
+1. Join existing `native_surface_policy.json` selector mappings and versioned
+   business registries to matching native pointers. Reuse exact identical
+   schema/contract digests across versions; retain version-specific exceptions.
+   Validate a representative positive and a removed-selector negative through
+   the actual Gateway before assigning reviewed mappings to the family.
+2. Prioritize the plugin graph family after #169 and the creation/property
+   families after #167/#168. Record placement, target type and mode independently
+   of the schema mapping. Attach exact new tests and real evidence when available;
+   preserve the historical baseline as history.
+3. Group residual unmapped branches by public contract and native schema digest,
+   separate deliberate documented safety/host/version boundaries from missing
+   mappings, and propose a bounded follow-up for each large unresolved family.
+   Reference expansion and the ten legacy implicit-child occurrences are a
+   small independent structural follow-up. No new functional ban is justified
+   by absence of evidence.
+
+The committed full ledger is intentionally reproducible diagnostic evidence:
+it retains occurrence provenance and exact drift comparison. It can later be
+replaced by a reviewed content-addressed schema table without changing the
+public checker semantics; doing so is an artifact-size optimization, not
+coverage progress.
