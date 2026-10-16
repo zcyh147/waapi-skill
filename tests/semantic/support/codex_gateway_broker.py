@@ -9300,6 +9300,7 @@ class CodexGatewayBroker:
             for name, request in (offline_replay_preview_requests or {}).items()
         }
         self._runner_environment = dict(os.environ if runner_environment is None else runner_environment)
+        self._connection_setup_environment = dict(runner_environment or {})
 
         if transport not in {"auto", "unix", "tcp"}:
             raise ValueError("transport must be auto, unix, or tcp")
@@ -9685,21 +9686,57 @@ class CodexGatewayBroker:
                     self._state_directory,
                     label="existing_state_directory",
                 )
-            self._config_path.write_text(
-                json.dumps(
-                    {
-                        "wwise_version": self.expected_wwise_version or None,
-                        "waapi_host": "127.0.0.1",
-                        "waapi_port": None,
-                        "project_modification_policy": self.project_modification_policy,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                    sort_keys=True,
+            # The endpoint is trusted lifecycle metadata, not a model override.
+            # Once persisted it is the sole Gateway connection authority.
+            configuration = {
+                "wwise_version": self.expected_wwise_version or None,
+                "waapi_host": self._connection_setup_environment.get("WWISE_WAAPI_HOST", "127.0.0.1"),
+                "waapi_port": (int(self._connection_setup_environment["WWISE_WAAPI_PORT"])
+                               if self._connection_setup_environment.get("WWISE_WAAPI_PORT") else None),
+                "project_modification_policy": self.project_modification_policy,
+            }
+            if self._existing_state_directory is not None:
+                previous_config = self._state_directory.parent / "config" / "config.json"
+                if previous_config.is_symlink():
+                    raise GatewayBrokerError("continuation config must not be a symlink")
+                if previous_config.is_file():
+                    previous = json.loads(previous_config.read_text(encoding="utf-8"))
+                    for field in ("wwise_version", "waapi_host", "waapi_port"):
+                        if previous.get(field) != configuration[field]:
+                            raise GatewayBrokerError("continuation connection configuration changed")
+                    self._config_path = previous_config
+            if (self.skill_source / "wwise_waapi").is_dir() and configuration["waapi_port"] is not None and configuration["wwise_version"] is not None and not self._offline_replay_preview_requests:
+                from tests.semantic.support.codex_expansion_reconciliation import run_owned_gateway
+
+                config_argv = [str(self.trusted_python), str(self.runner_path), "gateway.py", "config-set",
+                               "--wwise-version", configuration["wwise_version"],
+                               "--waapi-host", configuration["waapi_host"],
+                               "--waapi-port", str(configuration["waapi_port"]),
+                               "--project-modification-policy", self.project_modification_policy]
+                config_env = dict(self._runner_environment)
+                _remove_environment_names(config_env, _BROKER_ENV_NAMES, platform_name=self.platform_name)
+                config_env.update({CONFIG_PATH_ENV: str(self._config_path),
+                                   "PYTHONIOENCODING": "utf-8:strict", "PYTHONDONTWRITEBYTECODE": "1"})
+                completed = run_owned_gateway(config_argv, environment=config_env,
+                                              cwd=self.runner_cwd, timeout_seconds=30)
+                if len(completed.stdout.encode("utf-8")) > 65_536:
+                    raise GatewayBrokerError("configuration provisioning receipt exceeds its bound")
+                payload = json.loads(completed.stdout)
+                receipt = {"argv": config_argv, "exit_code": completed.returncode, "payload": payload}
+                (self._evidence_directory / "config-provisioning.json").write_text(
+                    json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+                if completed.returncode != 0 or payload.get("ok") is not True:
+                    raise GatewayBrokerError("public configuration provisioning failed")
+                saved = json.loads(self._config_path.read_text(encoding="utf-8"))
+                if any(saved.get(field) != value for field, value in configuration.items()):
+                    raise GatewayBrokerError("public configuration provisioning readback differs")
+            else:
+                # Synthetic runner fixtures and offline archive/catalog readers
+                # have no live provisioning route. They receive no live credit.
+                self._config_path.write_text(
+                    json.dumps(configuration, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                    encoding="utf-8",
                 )
-                + "\n",
-                encoding="utf-8",
-            )
 
             self._token = secrets.token_urlsafe(32)
             self._bind_socket(root)
@@ -12877,6 +12914,11 @@ class CodexGatewayBroker:
                 version_selector_seen = True
                 supplied_version = first.split("=", 1)[1]
                 actual_values = actual_values[1:]
+            if version_selector_seen and step.subcommand not in {
+                "capabilities", "describe", "operations", "operation-schema", "request-schema",
+                "request-map-container", "request-array-item", "topic-schema", "query-schema", "object-types",
+            } and not self._offline_replay_preview_requests:
+                raise GatewayInvocationError("version selectors are only available for offline catalog/schema browsing")
             if version_selector_seen and supplied_version != self.expected_wwise_version:
                 raise GatewayInvocationError(
                     "model version selector must match the runner-owned session version "
@@ -14075,14 +14117,15 @@ class CodexGatewayBroker:
                 validate_transaction_show_confirmation_payload(payload)
             if (expansion_read or expansion_preparation) and exit_code == 2:
                 from tests.semantic.support.codex_expansion_policy import (
-                    is_public_query_timeout_failure,
+                    is_public_query_timeout_failure, is_public_recoverable_query_failure,
                 )
                 public_query_timeout = (
                     expansion_read and step.subcommand == "query-object"
                     and is_public_query_timeout_failure(payload)
                 )
+                recoverable_query = expansion_read and is_public_recoverable_query_failure(payload)
                 if (payload.get("ok") is not False
-                        or (not public_query_timeout and (
+                        or (not public_query_timeout and not recoverable_query and (
                             not isinstance(payload.get("error_code"), str)
                             or (step.subcommand == "query-object" and "call" in payload)))
                         or payload.get("command") != step.subcommand):
@@ -14090,7 +14133,7 @@ class CodexGatewayBroker:
                 # A deadline failure is not a repairable input rejection. Keep
                 # the read receipt intact and stop infrastructure without
                 # changing the already verified transaction's own state.
-                terminal_indeterminate = public_query_timeout
+                terminal_indeterminate = public_query_timeout and not recoverable_query
             elif step.terminal_execute:
                 _validate_terminal_execute_payload(payload, exit_code=exit_code)
             elif step.allowed_exit_codes == (0, 2):

@@ -27,6 +27,7 @@ GATEWAY_RUNNER_PATH = SKILL_ROOT / "scripts" / "run.py"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
+from wwise_waapi.recovery import recovery_receipt
 from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CapabilityCatalog,
     CapabilityNotFoundError,
@@ -3402,9 +3403,22 @@ def _execute_gateway_unconstrained(
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
+    dispatch_started = False
 
     def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         enriched = dict(payload)
+        try:
+            recovery_policy = load_gateway_config(source_env).config.project_modification_policy
+        except Exception:
+            recovery_policy = "unavailable"
+        recovery = recovery_receipt(enriched, policy=recovery_policy, dispatch_started=dispatch_started)
+        if recovery is not None:
+            if "agent_result" in enriched:
+                agent_result = enriched.pop("agent_result")
+                enriched["recovery"] = recovery
+                enriched["agent_result"] = agent_result
+            else:
+                enriched["recovery"] = recovery
         if args.command == "stream-topic":
             gateway_contract = enriched.get("contract")
             enriched["contract"] = TOPIC_STREAM_RECORD_CONTRACT
@@ -3544,6 +3558,7 @@ def _execute_gateway_unconstrained(
                 dispatcher.manifest_store = AuthoringUiRuntimeManifestStore(
                     dispatcher.manifest_store
                 )
+            dispatch_started = True
             payload = dispatch_command(
                 args,
                 env=source_env,
@@ -20534,6 +20549,30 @@ def _dispatch_transaction_command_with_execution_lease(
                 verified=verification.business_state_verified,
                 cleanup=payload["cleanup"],
             )
+            if transaction_request.get("operation") == "object.create":
+                execution_payload = execution_result.get("result")
+                root_id = execution_payload.get("id") if isinstance(execution_payload, Mapping) else None
+                identities: list[dict[str, Any]] = []
+                for readback in verification.readbacks:
+                    result = readback.get("result")
+                    rows = result.get("return") if isinstance(result, Mapping) else None
+                    if not isinstance(rows, list):
+                        continue
+                    for row in rows:
+                        if not isinstance(row, Mapping) or row.get("id") != root_id:
+                            continue
+                        identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                        if (_canonical_guid(identity["id"])
+                                and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
+                                and identity not in identities):
+                            identities.append(identity)
+                agent_result["business_result"] = {
+                    "contract": "waapi-skill.verified-created-root/v1",
+                    "identity_status": "verified" if len(identities) == 1 else "unavailable",
+                    "verified_root": identities[0] if len(identities) == 1 else None,
+                    "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+                    "repeat_creation": False,
+                }
             transaction_arguments = transaction_request.get("arguments")
             transaction_api = (
                 transaction_arguments.get("api")
@@ -25978,7 +26017,7 @@ def _business_next_action_binding(
                     "--declaration-id",
                     "plugin",
                     "--object-handle",
-                    "<bound-plugin-owner-handle>",
+                    "<bound-plugin-target-handle>",
                     "--field",
                     "plugin_role",
                     "<source-or-effect>",
@@ -25988,6 +26027,7 @@ def _business_next_action_binding(
                     "--field",
                     "plugin_type_handle",
                     "<selected-plugin-type-handle>",
+                    "[--field plugin_placement owner|shareset]",
                     "[--field notes <exact-user-notes>]",
                     "[--field platform <exact-user-platform>]",
                     "[--field language <exact-source-language>]",
@@ -29473,6 +29513,10 @@ def metadata_cache_lookup(
             return None
         if uri == CACHE_GET_PROPERTY_INFO_URI:
             if set(args) == {"classId", "property"}:
+                # These class facts can authorize new GameParameter values.
+                # Every discovery/check/Preview must consult current metadata.
+                if args["property"] in {"Min", "Max", "BindToBuiltInParam"}:
+                    return None
                 return MetadataCacheLookup.property_info(
                     class_id=args["classId"],
                     property_name=args["property"],

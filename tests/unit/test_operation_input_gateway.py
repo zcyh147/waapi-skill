@@ -147,9 +147,9 @@ def gateway_env(
     config_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": policy,
             }
         ),
@@ -428,8 +428,7 @@ def test_object_graph_declaration_rejects_audio_only_switch_value(
         tmp_path,
         "--state-dir",
         str(state_dir),
-        "--version",
-        "2022.1",
+
         "draft-start",
         "object.create",
     )
@@ -892,8 +891,7 @@ def test_object_set_name_draft_start_returns_only_business_continuation(
         tmp_path,
         "--state-dir",
         str(tmp_path / "state"),
-        "--version",
-        "2022.1",
+
         "draft-start",
         "object.setName",
     )
@@ -918,8 +916,7 @@ def test_object_set_business_draft_binds_unnamed_direct_child(
         tmp_path,
         "--state-dir",
         str(state_dir),
-        "--version",
-        "2022.1",
+
         "draft-start",
         "object.set",
     )
@@ -982,8 +979,7 @@ def test_object_set_business_draft_binds_event_action_from_event_path(
         tmp_path,
         "--state-dir",
         str(state_dir),
-        "--version",
-        "2022.1",
+
         "draft-start",
         "object.set",
     )
@@ -1053,8 +1049,7 @@ def test_object_set_name_business_draft_binds_declares_and_materializes(
         tmp_path,
         "--state-dir",
         str(state_dir),
-        "--version",
-        "2022.1",
+
         "draft-start",
         "object.setName",
     )
@@ -1250,8 +1245,7 @@ def test_every_object_lifecycle_adapter_reaches_immutable_preview_with_its_verif
         tmp_path,
         "--state-dir",
         str(state_dir),
-        "--version",
-        "2022.1",
+
         "draft-start",
         operation,
     )
@@ -1411,8 +1405,7 @@ def test_object_lifecycle_draft_check_rejects_stale_bound_identity(
         tmp_path,
         "--state-dir",
         str(state_dir),
-        "--version",
-        "2022.1",
+
         "draft-start",
         "object.setNotes",
     )

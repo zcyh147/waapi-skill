@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import json
 from pathlib import Path
 from typing import Any
@@ -8,6 +10,7 @@ import pytest
 
 from tests.unit.test_transaction_gateway import (
     FakeClient,
+    gateway_env,
     confirm,
     execute,
     live_info,
@@ -174,10 +177,9 @@ def test_remote_lua_preview_fails_before_project_or_local_source_proof(
     client = FakeClient(
         {"ak.wwise.core.getInfo": [live_info(year=2025)]}
     )
+    set_gateway_config(gateway_env(tmp_path, version="2025.1"), waapi_host="wwise-studio")
     exit_code, payload = execute(
         [
-            "--host",
-            "wwise-studio",
             "legacy-preview",
             "--request-json",
             json.dumps(_request(operation, arguments, version="2025.1")),
@@ -234,10 +236,9 @@ def test_confirmed_lua_transaction_cannot_switch_to_remote_execute(
         {"ak.wwise.core.getInfo": [live_info(year=2025)]}
     )
 
+    set_gateway_config(gateway_env(tmp_path, version="2025.1"), waapi_host="192.0.2.10")
     exit_code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             "execute",
             transaction["transaction_id"],
         ],
@@ -248,12 +249,10 @@ def test_confirmed_lua_transaction_cannot_switch_to_remote_execute(
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["error_code"] == "GatewayInputError"
+    assert "configuration changed" in payload["message"]
     assert payload["command"] == "execute"
-    assert payload["executed"] is False
-    assert [row[0] for row in remote_client.calls] == [
-        "ak.wwise.core.getInfo"
-    ]
+    assert remote_client.calls == []
 
 
 def test_cli_lua_file_runs_once_then_finishes_at_result_schema_only(

@@ -395,9 +395,9 @@ def gateway_env(tmp_path: Path) -> dict[str, str]:
     config_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2022.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),

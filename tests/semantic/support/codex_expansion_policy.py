@@ -88,6 +88,47 @@ def is_public_query_timeout_failure(payload: Mapping[str, object]) -> bool:
     return True
 
 
+def is_public_recoverable_query_failure(payload: Mapping[str, object]) -> bool:
+    """Current recovery receipts may refine a read; old verdicts stay unchanged."""
+    recovery, call = payload.get("recovery"), payload.get("call")
+    if not isinstance(recovery, Mapping) or not isinstance(call, Mapping):
+        return False
+    required = {
+        "contract": "waapi-skill.recovery/v1", "stage": "read_failure",
+        "project_write_outcome": "no_project_write_in_this_invocation",
+        "read_only_continuation_allowed": True, "cleanup_complete": True,
+        "additional_read_permission_required": False,
+        "scope": "existing_authorized_task_only", "original_write_replay_allowed": False,
+    }
+    if any(recovery.get(key) != value or type(recovery.get(key)) is not type(value)
+           for key, value in required.items()):
+        return False
+    if recovery.get("modification_policy") not in _POLICIES:
+        return False
+    policy = recovery["modification_policy"]
+    if (recovery.get("next_change") != {"read_only": "blocked", "ask_before_changes": "preview_then_explicit_confirmation",
+                                       "allow_changes": "preview_then_policy_authorization"}[policy]
+            or type(recovery.get("max_reconnect_attempts")) is not int or recovery["max_reconnect_attempts"] != 1
+            or recovery.get("service_start_requires_existing_task_authorization") is not True
+            or not isinstance(recovery.get("actions"), list)
+            or recovery["actions"] != ["refine_read", "page_discovery", "inspect_configuration", "reconnect_once"]):
+        return False
+    if (payload.get("contract") != "waapi-skill.gateway-result/v1"
+            or payload.get("command") != "query-object" or payload.get("ok") is not False
+            or payload.get("status") != "error" or payload.get("executed") is True
+            or any(key not in payload or payload[key] is not None for key in ("count", "objects", "agent_result"))
+            or call.get("api") != "ak.wwise.core.object.get" or call.get("item_type") != "function"
+            or call.get("ok") is not False or call.get("result") is not None
+            or not isinstance(call.get("error_code"), str) or not call["error_code"]
+            or call.get("version") not in {"2021.1", "2022.1", "2023.1", "2024.1", "2025.1"}
+            or call.get("version") != payload.get("detected_version")):
+        return False
+    for details in (payload.get("details"), call.get("details")):
+        if isinstance(details, Mapping) and (details.get("cleanup_failure") is not None or details.get("cleanup_pending") is True):
+            return False
+    return True
+
+
 def canonical_digest(value: object) -> str:
     return hashlib.sha256(json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
@@ -290,11 +331,12 @@ class BoundedExpansionReads:
             raise ExpansionPolicyError("read receipt exceeds byte ceiling")
         if payload.get("command") != self._pending[0]:
             raise ExpansionPolicyError("read receipt does not match the admitted command")
-        if (is_public_query_timeout_failure(payload)
+        if (is_public_query_timeout_failure(payload) or is_public_recoverable_query_failure(payload)
                 or (payload.get("ok") is False and isinstance(payload.get("error_code"), str))
                 or (payload.get("ok") is True and payload.get("status") == "needs_clarification")):
             # Failed reads never prove business state. Input rejection may be
-            # repaired; the Broker stops dispatch after a deadline failure.
+            # repaired; only a current cleanup-complete recovery receipt can
+            # keep a failed dispatched read open for bounded refinement.
             self.failed_receipts.append((self._pending, canonical_digest(payload)))
             self._pending = None
             return False

@@ -23,7 +23,7 @@ LANES = [(v, u) for v in ("2024.1", "2025.1") for u in sorted(COMMON_URIS)] + [
 @pytest.mark.parametrize("version", ("2024.1", "2025.1"))
 def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path, version):
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     def no_client(_):
         pytest.fail("catalog and request schema must stay offline")
     code, catalog = gateway.execute_gateway(["operations"], env=env, client_factory=no_client)
@@ -44,7 +44,7 @@ def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 def test_every_catalog_schema_link_resolves_or_discloses_a_reviewed_boundary(tmp_path, version):
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     def no_client(_):
         pytest.fail("schema discovery must not connect")
     code, catalog = gateway.execute_gateway(["operations"], env=env, client_factory=no_client)
@@ -115,7 +115,7 @@ def test_new_authoring_resource_is_digest_bound_and_accepts_crlf(tmp_path, versi
     ({"files": None}, False), ({"files": [42]}, False)])
 def test_selected_files_uses_disclosed_zero_input_and_validates_result(tmp_path, result, valid):
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     code, schema = gateway.execute_gateway(
         ["request-schema", "ak.wwise.ui.getSelectedFiles"], env=env,
         client_factory=lambda _: pytest.fail("schema must be offline"),
@@ -131,7 +131,7 @@ def test_selected_files_uses_disclosed_zero_input_and_validates_result(tmp_path,
 
 def test_selected_files_rejects_console_before_dispatch(tmp_path):
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     _, schema = gateway.execute_gateway(["request-schema", "ak.wwise.ui.getSelectedFiles"], env=env)
     client = FakeClient({"ak.wwise.core.getInfo": live_info(year=2025, command_line=True)})
     code, payload = gateway.execute_gateway(schema["continuation"]["gateway_argv"],

@@ -1145,12 +1145,18 @@ def bind_live_field(
     enabled_dependency_fields = (
         dependency_fields if field_kind == "property" else ()
     )
+    class_default_evidence = None
+    if enabled_dependency_fields and scope_kind == "class":
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        if class_default_evidence is not None:
+            enabled_dependency_fields = ()
     if enabled_dependency_fields and scope_kind != "object":
         raise _error(
             "FIELD_OBJECT_SCOPE_REQUIRED",
             field=token,
             dependency_fields=enabled_dependency_fields,
-            action="resolve the exact target object before checking this dependent field",
+            new_object_workflow=_dependent_new_object_workflow(token),
+            action="For a new object, complete and verify creation without this field, then configure the verified GUID through a separate property Preview; creation alone does not complete configuration",
         )
     if enabled_dependency_fields:
         enabled_platform = (
@@ -1186,6 +1192,7 @@ def bind_live_field(
             "scope_kind": scope_kind,
             "scope_value": normalized_scope,
             "metadata": info.as_dict(),
+            **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
         }
     )
     try:
@@ -1275,13 +1282,19 @@ def revalidate_live_field(
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
     )
+    class_default_evidence = None
+    if enabled_dependency_fields and field.scope_kind == "class":
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        if class_default_evidence is not None:
+            enabled_dependency_fields = ()
     if enabled_dependency_fields and field.scope_kind != "object":
         raise _error(
             "FIELD_OBJECT_SCOPE_REQUIRED",
             field=field.token,
             rejected_handle=field.handle,
             dependency_fields=enabled_dependency_fields,
-            action="resolve an exact target object and issue a new field handle",
+            new_object_workflow=_dependent_new_object_workflow(field.token),
+            action="Use the verified created GUID to rediscover this field in object scope and configure it through a separate property Preview; never repeat completed creation",
         )
     if enabled_dependency_fields:
         enabled_platform = (
@@ -1319,6 +1332,7 @@ def revalidate_live_field(
             "scope_kind": field.scope_kind,
             "scope_value": field.scope_value,
             "metadata": info.as_dict(),
+            **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
         }
     )
     return registry.resolve_field(
@@ -1713,6 +1727,37 @@ def _restrictions_from_live_metadata(
         if allowed:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
+
+
+def _new_class_field_evidence(registry, info, live_scope, read_call):
+    from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
+    names = {row["name"] for row in registry.as_dict()["types"]
+             if row["class_id"] == live_scope.get("classId")}
+    if len(names) != 1:
+        return None
+    try:
+        return game_parameter_default_evidence(
+            class_name=next(iter(names)), info=info, scope=live_scope, read_call=read_call,
+        )
+    except NewObjectDefaultError:
+        return None
+
+
+def _dependent_new_object_workflow(meaning: str) -> dict[str, Any]:
+    """Explain the existing staged path without granting mutation authority."""
+    return {
+        "creation": "complete_current_creation_without_unbound_dependent_fields",
+        "creation_verification": "required_before_configuration",
+        "configuration_operation": "object.setProperty",
+        "configuration_identity": "verified_created_object_GUID",
+        "configuration_meaning": meaning,
+        "field_selection": "rediscover_in_object_scope_and_copy_Field_Handle",
+        "authorization": "each_Preview_uses_current_modification_policy",
+        "creation_is_not_configuration_completion": True,
+        "repeat_creation_after_success": False,
+        "configuration_failure": "report_created_but_not_fully_configured_and_reuse_verified_GUID",
+        "native_same_call_support": "not_determined_by_this_class_scope_boundary",
+    }
 
 
 def _dependency_field_tokens(
