@@ -7,6 +7,7 @@ exact target and reading live ``getPropertyInfo`` metadata.
 The Wwise object model differs materially by version:
 
 * Source plug-ins are new ``Source`` children of a Sound/Voice target.
+* Independent Effect ShareSets are ``Effect`` children of an Effects Work Unit.
 * Wwise 2022.1 Effect plug-ins occupy the first proven-empty fixed
   ``@Effect0`` through ``@Effect3`` reference.
 * Wwise 2023.1 and later append one ``EffectSlot`` to ``@Effects`` and create
@@ -35,6 +36,11 @@ MAX_PLUGIN_NOTES_LENGTH = 64 * 1024
 MAX_PLUGIN_FIELD_NAME_LENGTH = 128
 PLUGIN_KINDS = frozenset({"source", "effect"})
 SOURCE_TARGET_TYPES = frozenset({"Sound", "Voice"})
+EFFECT_TARGET_TYPES = frozenset({
+    "Sound", "Voice", "ActorMixer", "PropertyContainer", "RandomSequenceContainer",
+    "SwitchContainer", "BlendContainer", "MusicSegment", "MusicTrack",
+    "MusicSwitchContainer", "MusicPlaylistContainer", "Bus", "AuxBus",
+})
 WWISE_2022_EFFECT_FIELDS = ("@Effect0", "@Effect1", "@Effect2", "@Effect3")
 PLUGIN_VERIFICATION_FIELDS = (
     "id",
@@ -68,6 +74,7 @@ PLUGIN_REAL64_ABS_TOLERANCE = 1e-12
 _PLUGIN_REQUEST_FIELDS = frozenset(
     {
         "kind",
+        "placement",
         "name",
         "class_id",
         "notes",
@@ -178,6 +185,7 @@ class PluginCreationDescriptor:
     platform: str | None
     language: str | None
     properties: tuple[PluginProperty, ...]
+    placement: str = "owner"
 
     @property
     def object_type(self) -> str:
@@ -190,6 +198,8 @@ class PluginCreationDescriptor:
             "class_id": self.class_id,
             "properties": [item.as_dict() for item in self.properties],
         }
+        if self.placement != "owner":
+            result["placement"] = self.placement
         if self.notes is not None:
             result["notes"] = self.notes
         if self.platform is not None:
@@ -238,7 +248,7 @@ class PluginVerificationEvidence:
     type: str
     class_id: int
     parent_id: str
-    owner_id: str
+    owner_id: str | None
     readback_view: Mapping[str, Any]
     requested_state: Mapping[str, Any]
     placement: Mapping[str, Any]
@@ -250,7 +260,7 @@ class PluginVerificationEvidence:
             "type": self.type,
             "classId": self.class_id,
             "parent": self.parent_id,
-            "owner": self.owner_id,
+            **({"owner": self.owner_id} if self.owner_id is not None else {}),
             "readback_view": _json_copy(self.readback_view),
             "requested_state": _json_copy(self.requested_state),
             "placement": _json_copy(self.placement),
@@ -338,6 +348,11 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
             "INVALID_ARGUMENT",
             "language is accepted only for Source plug-in creation.",
         )
+    placement = payload.get("placement", "owner")
+    if placement not in {"owner", "shareset"} or (placement == "shareset" and kind != "effect"):
+        raise PluginOperationContractError(
+            "INVALID_PLUGIN_PLACEMENT", "Choose owner placement, or shareset for an Effect plug-in."
+        )
     properties = _normalize_properties(payload.get("properties", []))
     return PluginCreationDescriptor(
         kind=str(kind),
@@ -347,6 +362,7 @@ def normalize_plugin_creation(payload: Any) -> PluginCreationDescriptor:
         platform=platform,
         language=language,
         properties=properties,
+        placement=placement,
     )
 
 
@@ -373,7 +389,7 @@ def plugin_verification_fields(
 ) -> tuple[str, ...]:
     """Return the exact object.get fields required for this descriptor."""
 
-    fields = list(PLUGIN_VERIFICATION_FIELDS)
+    fields = [field for field in PLUGIN_VERIFICATION_FIELDS if descriptor.placement != "shareset" or field != "owner"]
     if descriptor.notes is not None:
         fields.append("notes")
     if descriptor.language is not None:
@@ -463,6 +479,24 @@ def validate_plugin_property_metadata(
     return tuple(validated)
 
 
+def validate_plugin_target(
+    descriptor: PluginCreationDescriptor, *, target_type: str, target_path: str | None = None,
+) -> None:
+    if descriptor.placement == "shareset":
+        if target_type != "WorkUnit" or not isinstance(target_path, str) or not target_path.startswith("\\Effects\\"):
+            raise PluginOperationContractError(
+                "INVALID_SHARESET_TARGET", "An Effect ShareSet requires a Work Unit beneath the Effects hierarchy.",
+                details={"target_type": target_type, "target_path": target_path},
+            )
+    elif descriptor.kind == "effect" and target_type not in EFFECT_TARGET_TYPES:
+        raise PluginOperationContractError(
+            "INVALID_EFFECT_TARGET", "Owner-local Effects require a compatible audio object; use shareset placement for an Effects Work Unit.",
+            details={"target_type": target_type, "allowed": sorted(EFFECT_TARGET_TYPES)},
+        )
+    elif descriptor.kind == "source" and target_type not in SOURCE_TARGET_TYPES:
+        raise PluginOperationContractError("INVALID_SOURCE_TARGET", "Source plug-ins require a Sound or Voice target.")
+
+
 def build_plugin_creation_plan(
     *,
     version: str,
@@ -471,6 +505,7 @@ def build_plugin_creation_plan(
     request: Mapping[str, Any] | PluginCreationDescriptor,
     property_metadata: Sequence[Mapping[str, Any]] | None = None,
     effect_slots_2022: Mapping[str, Any] | None = None,
+    target_path: str | None = None,
 ) -> PluginCreationPlan:
     """Build one version-correct object.set plan after live metadata validation."""
 
@@ -495,11 +530,12 @@ def build_plugin_creation_plan(
         if isinstance(request, PluginCreationDescriptor)
         else normalize_plugin_creation(request)
     )
+    validate_plugin_target(descriptor, target_type=target_type, target_path=target_path)
     validated = validate_plugin_property_metadata(descriptor, property_metadata)
     plugin_object = _materialize_plugin_object(descriptor, validated)
 
-    if descriptor.kind == "source":
-        if target_type not in SOURCE_TARGET_TYPES:
+    if descriptor.kind == "source" or descriptor.placement == "shareset":
+        if descriptor.kind == "source" and target_type not in SOURCE_TARGET_TYPES:
             raise PluginOperationContractError(
                 "INVALID_SOURCE_TARGET",
                 "Source plug-ins may be created only as children of a live "
@@ -520,7 +556,7 @@ def build_plugin_creation_plan(
             "children": [plugin_object],
         }
         placement: dict[str, Any] = {
-            "kind": "source_child",
+            "kind": "effect_shareset_child" if descriptor.placement == "shareset" else "source_child",
             "collection": "children",
             "create_only": True,
             "on_name_conflict": "fail",
@@ -586,6 +622,8 @@ def build_plugin_creation_plan(
             item.as_dict() for item in validated
         ],
     }
+    if descriptor.placement == "shareset":
+        expected_plugin.pop("owner")
     if descriptor.notes is not None:
         expected_plugin["notes"] = descriptor.notes
     if descriptor.language is not None:
@@ -697,9 +735,10 @@ def verify_created_plugin_row(
     )
     expected_fields = plugin_verification_fields(descriptor)
     actual_fields = tuple(row)
-    effect_owner_only = descriptor.kind == "effect" and "parent" not in row
+    shareset = descriptor.placement == "shareset"
+    effect_owner_only = descriptor.kind == "effect" and not shareset and "parent" not in row
     allowed_missing_fields = (
-        {"owner"} if descriptor.kind == "source" else {"parent"}
+        set() if shareset else {"owner"} if descriptor.kind == "source" else {"parent"}
     )
     if (
         set(actual_fields) - set(expected_fields)
@@ -721,7 +760,7 @@ def verify_created_plugin_row(
         row.get("owner") if effect_owner_only else row.get("parent"),
         field="plugin.parent",
     )
-    owner_id = _closed_object_reference_id(
+    owner_id = None if shareset else _closed_object_reference_id(
         row.get("owner", row.get("parent")),
         field="plugin.owner",
     )
@@ -782,13 +821,16 @@ def verify_created_plugin_row(
         "parent": parent_id,
         "owner": owner_id,
     }
+    if shareset:
+        expected.pop("owner")
+        actual.pop("owner")
     matches = (
         actual["name"] == expected["name"]
         and actual["type"] == expected["type"]
         and type(actual["classId"]) is int
         and actual["classId"] == expected["classId"]
         and _same_guid(parent_id, expected_parent_id)
-        and _same_guid(owner_id, expected_plugin_owner)
+        and (shareset or _same_guid(owner_id, expected_plugin_owner))
     )
     if not matches:
         raise PluginOperationContractError(
@@ -1006,6 +1048,11 @@ def _verify_plugin_placement(
             "INVALID_VERIFICATION_INPUT",
             "placement_evidence must be an object.",
         )
+    if descriptor.placement == "shareset":
+        _require_exact_mapping_fields(placement_evidence, frozenset({"kind"}), field="placement_evidence")
+        if placement_evidence.get("kind") != "effect_shareset_child" or not _same_guid(expected_parent_id, expected_owner_id):
+            raise PluginOperationContractError("PLUGIN_PLACEMENT_MISMATCH", "ShareSet verification requires its exact Effects Work Unit parent.")
+        return {"kind": "effect_shareset_child", "parent_id": expected_parent_id}
     if descriptor.kind == "source":
         _require_exact_mapping_fields(
             placement_evidence,
