@@ -163,3 +163,32 @@ def test_historical_draft_without_connection_binding_requires_recreation(tmp_pat
     assert code == 2
     assert "predates" in result["message"]
     assert "recreate" in result["message"]
+
+
+def test_live_version_mismatch_stops_before_business_reads(tmp_path):
+    env = configured_env(tmp_path, version="2022.1")
+    client = BindingClient("2025.1")
+    code, result = waapi_gateway.execute_gateway(["status"], env=env, client_factory=lambda _: client)
+    assert code == 2
+    assert "2022.1" in result["message"] and "2025.1" in result["message"]
+    assert client.object_reads == 0
+
+
+def test_historical_transaction_without_configuration_requires_new_preview(tmp_path):
+    from wwise_waapi.transactions import TransactionStore, new_transaction_id
+
+    env = configured_env(tmp_path)
+    env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
+    code, schema = waapi_gateway.execute_gateway(["request-schema", "ak.wwise.core.project.save"], env=env)
+    assert code == 0, schema
+    code, preview = waapi_gateway.execute_gateway(schema["continuation"]["gateway_argv"], env=env, client_factory=lambda _: BindingClient("2022.1"))
+    assert code == 0, preview
+    code, shown = waapi_gateway.execute_gateway(["transaction-show", preview["transaction_id"]], env=env)
+    assert code == 0, shown
+    legacy_artifact = dict(shown["artifact"])
+    legacy_artifact.pop("connection_configuration")
+    legacy_id = new_transaction_id()
+    TransactionStore(tmp_path / "state").create_preview(legacy_id, legacy_artifact)
+    code, result = waapi_gateway.execute_gateway(["transaction-show", legacy_id], env=env)
+    assert code == 2
+    assert "predates" in result["message"] and "recreate" in result["message"]
