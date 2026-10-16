@@ -3989,6 +3989,9 @@ def test_public_gateway_legacy_json_preview_preserves_canonical_ingress_evidence
     prepared = artifact["prepared_operation"]
     assert artifact["request"] == raw_request
     assert prepared["request"] == raw_request
+    # The approved persistent-project policy replaces disposable-project cleanup.
+    assert prepared["cleanup"]["kind"] == "retain-project-and-outputs"
+    assert prepared["cleanup"]["automatic_cleanup"] is False
     assert {
         name: waapi_gateway.canonical_sha256(prepared[name])
         for name in (
@@ -4005,7 +4008,7 @@ def test_public_gateway_legacy_json_preview_preserves_canonical_ingress_evidence
         "resolved_roles": "47338924af9577e18c63efd4be0b0cdaa61e641c06e201ad86f749225e1ede16",
         "pre_state": "f0a2bc467715f31ed8a368bc47571331166ee6137dac1c6fb9730b7cfdf656f5",
         "verification_plan": "1d3f23aafa5c99092c9454e85545de2333365ea7f89d710bd5753117a043fe21",
-        "cleanup": "f934bcfbbee2f0e6c1914e74b14b4b4277a16b493db78d23c2f0dcaee133cb66",
+        "cleanup": "ff0db47b85a2c1a969eae25d3ae48d803d423909c5b53c87281efa34f9ba0903",
     }
     assert artifact["project_guard"] == waapi_gateway.build_project_guard(
         endpoint=payload["endpoint"],
@@ -4408,6 +4411,13 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
         "verified": True,
         "request": create_request(),
         "cleanup": verified["cleanup"],
+        "business_result": {
+            "contract": "waapi-skill.verified-created-root/v1",
+            "identity_status": "verified",
+            "verified_root": {key: created_row()[key] for key in ("id", "name", "type", "path")},
+            "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+            "repeat_creation": False,
+        },
     }
     readback = next(call for call in verify_client.calls if call[0] == "ak.wwise.core.object.get")
     assert readback[1] == {"from": {"id": [CREATED_GUID]}}
