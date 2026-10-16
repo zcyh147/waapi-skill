@@ -63,3 +63,44 @@ def test_schema_type_unions_and_unfamiliar_nested_keywords_cannot_disappear():
         "type": ["string", "null"], "futureBranch": {"enum": ["new"]}})}
     assert branches["/type/1"]["value"] == "null"
     assert branches["/futureBranch"]["kind"] == "unreviewed_keyword"
+
+
+def test_audit_joins_selector_policy_without_inventing_branch_execution_credit():
+    from tests.maintenance.branch_coverage_audit import build_inventory
+    inventory = build_inventory()
+    assert inventory["summary"]["declared_selector_dispositions"] == 484
+    branch = next(row for row in inventory["branches"] if row["route"] == "2025.1|function|ak.wwise.core.object.setReference" and row["pointer"] == "/argsSchema/properties/reference")
+    mapping = inventory["mappings"][branch["mapping"]]
+    assert mapping["basis"] == "native_surface_policy_selector"
+    assert mapping["program_result"] == "not_established_by_source_mapping"
+    route = next(row for row in inventory["routes"] if row["id"] == branch["route"])
+    assert route["compiler"] != "unknown"
+    assert route["public_contracts"]
+
+
+def test_checker_rejects_lost_enum_union_and_policy_mapping_evidence():
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import build_inventory, check_inventory
+    inventory = build_inventory()
+    for kind in ('enum_value', 'type_variant'):
+        changed = deepcopy(inventory)
+        branch = next(row for row in changed['branches'] if row['kind'] == kind)
+        changed['branches'].remove(branch)
+        assert 'branch ledger differs' in check_inventory(changed)
+    changed = deepcopy(inventory)
+    del changed['mappings'][next(iter(changed['mappings']))]
+    assert 'selector mappings differs' in check_inventory(changed)
+    assert inventory['current_business_branches'] != inventory['business_branches']
+    assert all(row['residual_group'] in inventory['residual_groups'] for row in inventory['branches'])
+
+
+def test_generator_rejects_policy_with_a_missing_selector():
+    import json
+    import pytest
+    from tests.maintenance.branch_coverage_audit import ROOT, build_inventory
+    policy = json.loads((ROOT / 'skills/waapi-skill/resources/native_surface_policy.json').read_text())
+    classifications = policy['rules'][0]['scopes'][0]['classifications']
+    selectors = next(value for value in classifications.values() if value)
+    selectors.pop()
+    with pytest.raises(ValueError):
+        build_inventory(native_policy=policy)
