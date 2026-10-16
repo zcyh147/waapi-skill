@@ -182,6 +182,7 @@ def test_retired_media_pool_draft_cannot_continue_through_an_old_state_record(
     started = gateway.OperationDraftStore(state_dir).start(
         operation=MEDIA_POOL_GET_URI,
         version="2025.1",
+        connection_binding={"configuration": gateway.selected_connection_binding(_env(tmp_path))},
         schema_digest=gateway.operation_draft_schema_digest(
             MEDIA_POOL_GET_URI,
             "2025.1",

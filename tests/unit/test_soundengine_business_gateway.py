@@ -748,8 +748,6 @@ def _execute_and_verify_soundengine(
     snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
     code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            version,
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -1195,8 +1193,6 @@ def test_stop_playing_revalidates_handle_at_execute_and_never_reuses_it(
     snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
     code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -1249,8 +1245,6 @@ def test_post_event_zero_result_is_a_bounded_failure_without_playing_handle(
     snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
     code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            version,
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -2612,8 +2606,6 @@ def test_post_event_stops_before_dispatch_when_bound_event_drifts(
     snapshot = TransactionStore(state_dir).load_snapshot(transaction_id)
     code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
             "--state-dir",
             str(state_dir),
             "confirm",
