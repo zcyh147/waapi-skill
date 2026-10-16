@@ -21,13 +21,9 @@ Without asking an AI agent to write WAAPI payloads by hand.
 
 ---
 
-WAAPI Skill is a local Agent Skill with a packaged, version-aware
-Gateway. You describe the result you want; the Agent selects the right
-operation and supplies a small set of business values, while the Gateway builds
-the exact WAAPI request, previews changes, and verifies the result.
+WAAPI Skill is a local Agent Skill with a packaged, version-aware Gateway. You describe the result you want; the Agent selects the right operation and supplies a small set of business values, while the Gateway builds the exact WAAPI request, previews changes, and verifies the result.
 
-It runs locally, does not require an always-on MCP server, and works with any
-agent that can load a Skill directory and run local scripts.
+It runs locally, does not require an always-on MCP server, and works with any agent that can load a Skill directory and run local scripts.
 
 ## Highlights
 
@@ -193,9 +189,7 @@ The project covers the complete reviewed public surface of its packaged
 WwiseConsole and Authoring profiles. Coverage is version-aware and does not
 turn unsafe native fields or unsupported hosts into fake support.
 
-The repository includes program tests, live read-only tests, destructive
-sandbox tests, and fresh-agent semantic tests on macOS and Windows. Exact route
-counts, version boundaries, and evidence are kept outside this user overview:
+The repository includes program tests, live read-only tests, destructive sandbox tests, and fresh-agent semantic tests on macOS and Windows. Exact route counts, version boundaries, and evidence are kept outside this user overview:
 
 The October expansion adds seven business workflows on Wwise 2022.1/2025.1.
 All 13 positive outcomes now have cumulative business-acceptance evidence on
@@ -210,10 +204,7 @@ candidates, raw verdicts, wording-only discrepancies, and remaining test limits.
 
 ## Skill or MCP?
 
-Use this project when you want a local, version-aware Agent Skill with no
-always-on server and tightly packaged behavior. Choose a Wwise MCP server when
-your client specifically requires MCP-native interoperability or a persistent
-service boundary.
+Use this project when you want a local, version-aware Agent Skill with no always-on server and tightly packaged behavior. Choose a Wwise MCP server when your client specifically requires MCP-native interoperability or a persistent service boundary.
 
 ## Feedback
 
