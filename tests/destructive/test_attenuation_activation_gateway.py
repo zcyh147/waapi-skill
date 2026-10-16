@@ -59,6 +59,24 @@ def create_object(gateway, kind, name, hierarchy):
 
 
 def test_attenuation_activation_public_gateway_native():
+    _run_attenuation_native(false_routing=False)
+
+
+def test_attenuation_activation_false_routing_public_gateway_native():
+    assert os.environ["WWISE_VERSION"] == "2025.1"
+    _run_attenuation_native(false_routing=True)
+
+
+def set_property(gateway, source, name, value):
+    draft = PublicDraft(gateway, "object.setProperty")
+    target = draft.bind(source)
+    field = draft.field(target, name)
+    draft.step("draft-declare-field-change", "--object-handle", target,
+               "--field-handle", field, "--business-value", json.dumps(value))
+    draft.finish()
+
+
+def _run_attenuation_native(*, false_routing):
     version = os.environ["WWISE_VERSION"]
     root = Path(os.environ["WAAPI_ATTENUATION_PROBE_ROOT"]).resolve()
     private_home = root / "owned" / "wwise-user-home" if sys.platform == "darwin" else None
@@ -72,7 +90,8 @@ def test_attenuation_activation_public_gateway_native():
     runtime = actor = None
     status, reason = "FAIL", "public attenuation test did not complete"
     evidence = {"kind": "public-gateway-attenuation", "version": version,
-                "agent_semantic_pass": False, "gateway_receipts": [], "objects": []}
+                "agent_semantic_pass": False, "false_routing_variant": false_routing,
+                "gateway_receipts": [], "objects": []}
     try:
         runtime = lifecycle.start()
         actor = OwnedDirectWaapiCall(host=runtime.host, port=runtime.port)
@@ -85,7 +104,16 @@ def test_attenuation_activation_public_gateway_native():
         for kind in ("Sound", "RandomSequenceContainer"):
             source = create_object(gateway, kind, "WAAPI_" + kind,
                                    "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy")
+            if false_routing and kind == "Sound":
+                # Three explicit, separately verified fixture transactions make
+                # both activation requirements missing before the tested call.
+                set_property(gateway, source, "OverridePositioning", True)
+                set_property(gateway, source, "ListenerRelativeRouting", False)
+                set_property(gateway, source, "OverridePositioning", False)
             before = actor("ak.wwise.core.object.get", {"from": {"id": [source]}}, {"return": fields})["return"][0]
+            if false_routing and kind == "Sound":
+                assert before["ListenerRelativeRouting"] is False
+                assert before["OverridePositioning"] is False
             metadata = {field: actor("ak.wwise.core.object.getPropertyInfo", {"object": source, "property": field}, {})
                         for field in ("Attenuation", "ListenerRelativeRouting", "OverridePositioning")}
             record = {"kind": kind, "before": before, "metadata": metadata}
@@ -94,12 +122,7 @@ def test_attenuation_activation_public_gateway_native():
                 for name in ("OverridePositioning", "ListenerRelativeRouting"):
                     if before[name] is True:
                         continue
-                    draft = PublicDraft(gateway, "object.setProperty")
-                    target = draft.bind(source)
-                    field = draft.field(target, name)
-                    draft.step("draft-declare-field-change", "--object-handle", target,
-                               "--field-handle", field, "--business-value", "true")
-                    draft.finish()
+                    set_property(gateway, source, name, True)
             draft = PublicDraft(gateway, "object.setReference" if version == "2021.1" else "object.set")
             target, reference = draft.bind(source), draft.bind(attenuation)
             field = draft.field(target, "Attenuation")
