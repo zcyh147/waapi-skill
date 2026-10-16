@@ -4446,9 +4446,9 @@ def parse_args(argv: Sequence[str] | None) -> RunnerOptions:
         except (ValueError, OSError) as exc:
             parser.error(str(exc))
     if args.sealed_campaign_inputs_sha256 is not None and (
-        not is_expansion or re.fullmatch(r"[0-9a-f]{64}", args.sealed_campaign_inputs_sha256) is None
+        not (is_expansion or is_repair) or re.fullmatch(r"[0-9a-f]{64}", args.sealed_campaign_inputs_sha256) is None
     ):
-        parser.error("sealed campaign digest is available only to the expansion campaign child")
+        parser.error("sealed campaign digest requires an expansion or repair campaign child and 64 lowercase hex characters")
     try:
         codex_binary = resolve_codex_binary(args.codex_binary)
         windows_powershell_core_host = _parse_sealed_windows_powershell_core_host(

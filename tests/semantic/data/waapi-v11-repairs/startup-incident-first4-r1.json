@@ -1,0 +1,20 @@
+{
+  "campaign_root": "imac-v11-repairs-first4-r1",
+  "candidate": "e8ca72d3",
+  "classification": "pre-Agent startup prerequisite failure; no semantic PASS credit",
+  "campaign_exit": 3,
+  "matrix_exit": 2,
+  "error": "sealed campaign digest is available only to the expansion campaign child",
+  "executed_session_ids": [],
+  "agent_workflows_consumed": 0,
+  "matrix_directory_created": false,
+  "files_sha256": {
+    "attempts/attempt-000001/runs/heavy-v3/child-request.json": "4f9e6b4255cba7db66a438e279a25f0fc2897783bd6a9a2871c8a01d645fb48e",
+    "attempts/attempt-000001/runs/heavy-v3/child-result.json": "bb1a3ca23d64bfa334c7da1ec6c61a2c1e78f17d2821beb14ae23763e81031cd",
+    "attempts/attempt-000001/runs/heavy-v3/classification.json": "08440e9777c2631a0f6ae390bab638a5a36e4b0167acfc67ae6d65cea237804f",
+    "attempts/attempt-000001/runs/heavy-v3/stderr.txt": "0078621168398fe64795ac59b0c1fbecaeb10c71eff2e8fe6169d1c0949b7ce7",
+    "attempts/attempt-000001/runs/heavy-v3/stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "process_observation": "Root operator confirmed no Agent or Wwise launch and no surviving Codex child; campaign process 32158 exited.",
+  "preservation": "Original blocked root retained unchanged; retry requires a new frozen candidate and root."
+}
