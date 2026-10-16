@@ -36,11 +36,9 @@ class FieldTask:
             for index, value in enumerate((FIRST, SECOND))
         }
         config = path / "config.json"
-        config.write_text(json.dumps({"wwise_version": None, "waapi_port": None,
+        config.write_text(json.dumps({"wwise_version": version, "waapi_port": 31337, "waapi_host": "127.0.0.1",
                                       "project_modification_policy": "ask_before_changes"}))
-        self.env = {"WAAPI_SKILL_CONFIG_PATH": str(config),
-                    "WWISE_VERSION": version, "WWISE_WAAPI_HOST": "127.0.0.1",
-                    "WWISE_WAAPI_PORT": "31337"}
+        self.env = {"WAAPI_SKILL_CONFIG_PATH": str(config)}
         self.project_file = path / "project" / "Fixture.wproj"
         self.project_file.parent.mkdir()
         self.project_file.write_text("<Project />")

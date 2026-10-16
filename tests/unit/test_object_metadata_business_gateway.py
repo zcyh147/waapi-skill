@@ -7,6 +7,8 @@ from collections import deque
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+import pytest
+
 from wwise_waapi.operation_composer import operation_composer_digest
 from wwise_waapi.operation_drafts import OperationDraftStore
 from wwise_waapi.business_declarations import business_repair
@@ -61,9 +63,9 @@ def _env(tmp_path: Path) -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2022.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -71,9 +73,6 @@ def _env(tmp_path: Path) -> dict[str, str]:
     )
     return {
         "WAAPI_SKILL_CONFIG_PATH": str(config),
-        "WWISE_WAAPI_HOST": "127.0.0.1",
-        "WWISE_WAAPI_PORT": "31337",
-        "WWISE_VERSION": "2022.1",
     }
 
 
@@ -116,8 +115,9 @@ def _offline(tmp_path: Path, *argv: str) -> tuple[int, dict[str, Any]]:
     )
 
 
+@pytest.mark.parametrize("discovery_mode", ["meaning", "selection"])
 def test_property_draft_discovers_opaque_field_and_materializes_business_value(
-    tmp_path: Path,
+    tmp_path: Path, discovery_mode: str,
 ) -> None:
     start_code, started = _offline(tmp_path, "draft-start", "object.setProperty")
     assert start_code == 0, started
@@ -172,6 +172,24 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
     assert "declaration" not in next_action
     assert "--token" not in json.dumps(next_action)
 
+    choice = ["--meaning", "volume"]
+    if discovery_mode == "selection":
+        list_client = FakeClient({
+            "ak.wwise.core.getInfo": [_info()],
+            "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+            "ak.wwise.core.object.getPropertyAndReferenceNames": [{"return": ["Volume", "OutputBus"]}],
+        })
+        code, listed = waapi_gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), "draft-discover-fields", draft_id,
+             "--task-authority", authority, "--expected-revision", "2",
+             "--object-handle", object_handle, "--list"],
+            env=_env(tmp_path), client_factory=lambda _url: list_client,
+        )
+        assert code == 0, json.dumps(listed, indent=2)
+        assert listed["draft"]["revision"] == 2
+        selection = next(row["selection"] for row in listed["agent_result"]["fields"] if row["name"] == "Volume")
+        choice = ["--selection", selection]
+
     discover_client = FakeClient(
         {
             "ak.wwise.core.getInfo": [_info()],
@@ -198,6 +216,9 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
             ],
         }
     )
+    if discovery_mode == "selection":
+        for uri in ("ak.wwise.core.object.getPropertyAndReferenceNames", "ak.wwise.core.object.getPropertyInfo"):
+            discover_client.responses[uri].append(discover_client.responses[uri][0])
     discover_code, discovered = waapi_gateway.execute_gateway(
         [
             "--state-dir",
@@ -210,8 +231,7 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
             "2",
             "--object-handle",
             object_handle,
-            "--meaning",
-            "volume",
+            *choice,
             "--platform",
             "Windows",
         ],
@@ -226,7 +246,7 @@ def test_property_draft_discovers_opaque_field_and_materializes_business_value(
     assert discovered["candidate_count"] == 1
     assert discovered["meaning_count"] == 1
     assert discovered["selection_required"] is False
-    assert discovered["meaning_results"][0]["meaning"] == "volume"
+    assert discovered["meaning_results"][0]["meaning"] == ("volume" if discovery_mode == "meaning" else "Volume")
     assert discovered["meaning_results"][0]["candidate_count"] == 1
     candidate = discovered["field_candidates"][0]
     assert discovered["meaning_results"][0]["candidates"] == [candidate]

@@ -46,7 +46,7 @@ Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The busine
 
 For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`; Gateway owns native construction. Configure defaults only when requested.
 
-Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
+Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. For dynamic fields, the returned `draft-discover-fields` scope also accepts `--list` (and returned `--page`) or `--selection` from that Draft/scope list; exact selection reads details and binds a Field Handle. `--meaning` remains an auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
