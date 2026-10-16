@@ -2001,6 +2001,8 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
+            "list",
+            "detail",
             "discover",
             "property-state",
             "attenuation",
@@ -2048,6 +2050,9 @@ def build_parser() -> argparse.ArgumentParser:
             "discovers the exact live field metadata"
         ),
     )
+    metadata.add_argument("--page")
+    metadata.add_argument("--page-size", type=int, default=20)
+    metadata.add_argument("--selection")
     metadata.add_argument("--platform")
     metadata.add_argument(
         "--curve-role",
@@ -3069,11 +3074,15 @@ def build_parser() -> argparse.ArgumentParser:
     discovery_scope.add_argument("--object-handle")
     discovery_scope.add_argument("--type-handle")
     discovery_scope.add_argument("--semantic-kind")
-    draft_discover_fields.add_argument(
+    field_mode = draft_discover_fields.add_mutually_exclusive_group(required=True)
+    field_mode.add_argument("--list", action="store_true", dest="list_fields")
+    field_mode.add_argument("--selection")
+    draft_discover_fields.add_argument("--page")
+    draft_discover_fields.add_argument("--page-size", type=int, default=20)
+    field_mode.add_argument(
         "--meaning",
         action="append",
         dest="meanings",
-        required=True,
         metavar="SEARCH_PHRASE",
     )
     draft_discover_fields.add_argument("--platform")
@@ -5748,7 +5757,17 @@ def preflight_metadata_input(
                 f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
             )
 
-    if args.operation == "discover":
+    if args.operation in {"list", "detail"}:
+        if meanings or args.platform or args.curve_role:
+            raise GatewayInputError("metadata list/detail accepts only a scope and pagination/selection")
+        if not 1 <= args.page_size <= 64:
+            raise GatewayInputError("metadata --page-size must be 1..64")
+        if (args.operation == "detail") != (args.selection is not None) or (args.selection and args.page):
+            raise GatewayInputError("metadata detail requires --selection; metadata list accepts --page")
+    elif args.page or args.selection or args.page_size != 20:
+        raise GatewayInputError("metadata pagination/selection requires list or detail")
+
+    if args.operation in {"discover", "list", "detail"}:
         if sum(
             value is not None
             for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id)
@@ -14156,7 +14175,7 @@ def dispatch_command(
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
-        if args.operation in {"discover", "property-state"}:
+        if args.operation in {"discover", "property-state", "list", "detail"}:
             custom_kind_clarification = _bind_custom_kind_from_live_types(
                 args,
                 connection=connection,
@@ -14209,6 +14228,17 @@ def dispatch_command(
                 project=project,
                 state_dir=state_dir,
             )
+            if args.operation in {"list", "detail"}:
+                from wwise_waapi.metadata_discovery import browse_metadata
+                result = browse_metadata(
+                    read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                    context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
+                    object_type=args.object_type, class_id=args.class_id, object=args.object,
+                    page_size=args.page_size, page=args.page, selection=args.selection,
+                )
+                return {"ok": True, "status": "ok", **common, "operation": args.operation,
+                        "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls),
+                        "agent_result": result}
             discovery = discover_metadata(
                 read_call=read_call,
                 queries=tuple(args.queries),
@@ -17824,8 +17854,8 @@ def dispatch_business_field_discovery(
 ) -> dict[str, Any]:
     """Bind bounded live candidates without accepting a model-authored token."""
 
-    meanings = tuple(args.meanings)
-    if (
+    meanings = tuple(args.meanings or ())
+    if not (args.list_fields or args.selection) and (
         not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
         or any(
             not isinstance(value, str)
@@ -17916,6 +17946,24 @@ def dispatch_business_field_discovery(
         project=binding.project,
         state_dir=binding.state_dir,
     )
+    if args.page and not args.list_fields:
+        raise GatewayInputError("--page requires --list")
+    if args.list_fields or args.selection:
+        from wwise_waapi.metadata_discovery import browse_metadata
+        browsed = browse_metadata(
+            read_call=binding.read_call,
+            context={"draft": args.draft_id, "context": session.context.as_binding_dict(),
+                     "endpoint": dict(common["endpoint"]), "live_info": dict(live_info)},
+            **discovery_scope, page_size=args.page_size, page=args.page, selection=args.selection,
+        )
+        if args.list_fields:
+            payload = operation_draft_payload(args.command, binding.record, offline=False,
+                state_dir=args.state_dir, task_authority=args.task_authority)
+            payload.update({"endpoint": dict(common["endpoint"]), "detected_version": detected_version,
+                            "agent_result": browsed})
+            return payload
+        meanings = (browsed["metadata"]["name"],)
+        read_call = binding.read_call
     discovery = discover_metadata(
         read_call=read_call,
         queries=meanings,
@@ -17923,6 +17971,7 @@ def dispatch_business_field_discovery(
         limit=MAX_METADATA_DISCOVERY_LIMIT,
     )
     eligible: list[Mapping[str, Any]] = []
+    incompatible: list[dict[str, Any]] = []
     for candidate in discovery.candidates:
         kind = candidate.get("kind")
         metadata = candidate.get("metadata")
@@ -17976,6 +18025,14 @@ def dispatch_business_field_discovery(
             )
         if accepted:
             eligible.append(candidate)
+        else:
+            incompatible.append({
+                "field": candidate.get("name"),
+                "reason": ("RTPC requires a numeric property with live RTPC support"
+                           if binding.record.operation == "object.setRTPC"
+                           else "Live field kind/type/support is incompatible with this operation"),
+                "operation": binding.record.operation,
+            })
     missing_meanings = [
         meaning
         for meaning in meanings
@@ -18000,6 +18057,7 @@ def dispatch_business_field_discovery(
                     for meaning in missing_meanings
                 ],
                 "candidate_count_scope": "returned_compatible_live_fields",
+                "rejected_candidates": incompatible[:8],
                 "fallback_detail_scan": dict(discovery.fallback_detail_scan),
                 "recovery": "Refine the missing discovery meaning for this bound object; no declaration was changed.",
             },
@@ -18046,10 +18104,13 @@ def dispatch_business_field_discovery(
                     {
                         "error_code": exc.error_code,
                         "field_kind": candidate.get("kind"),
+                        "field": candidate.get("name"),
+                        "reason": str(exc)[:512],
+                        "details": exc.details,
                     }
                 )
         if not captured:
-            raise rejected_errors[0]
+            raise BusinessFieldInputError("Selected live fields could not be bound", details={"rejected_candidates": rejected[:8], "draft_changed": False})
         captured_tokens = {bound.token for bound in captured}
         if any(
             not any(
@@ -18064,7 +18125,7 @@ def dispatch_business_field_discovery(
             )
             for meaning in meanings
         ):
-            raise rejected_errors[0]
+            raise BusinessFieldInputError("Selected live fields could not be bound", details={"rejected_candidates": rejected[:8], "draft_changed": False})
         return current.with_handle_registry(handles)
 
     schema_digest = operation_draft_schema_digest(
@@ -18090,6 +18151,7 @@ def dispatch_business_field_discovery(
         for candidate in eligible
     }
     from wwise_waapi.business_fields import field_value_input
+    from wwise_waapi.metadata_discovery import metadata_unit
 
     field_candidates: list[dict[str, Any]] = []
     for bound in captured:
@@ -18111,6 +18173,8 @@ def dispatch_business_field_discovery(
                 "value_type": bound.value_type,
                 "platform": bound.platform,
                 "restrictions": dict(bound.restrictions),
+                "metadata": dict(browsed["metadata"] if args.selection else metadata),
+                "unit": metadata_unit(metadata),
                 "value_input": field_value_input(session, bound),
                 "matched_meanings": list(candidate.get("matched_queries", [])),
             }
@@ -18153,7 +18217,8 @@ def dispatch_business_field_discovery(
             "candidate_count": len(field_candidates),
             "meaning_results": meaning_results,
             "meaning_count": len(meaning_results),
-            "rejected_candidate_count": len(rejected),
+            "rejected_candidate_count": len(rejected) + len(incompatible),
+            "rejected_candidates": [*incompatible, *rejected][:8],
             "selection_required": selection_required,
             "selection_rule": (
                 "copy_exactly_one_candidate.handle_per_requested_meaning"
@@ -23764,6 +23829,23 @@ def operation_draft_exact_copy_binding(
     }
 
 
+def _add_field_browsing(value: Any) -> None:
+    if isinstance(value, dict):
+        prefix = value.get("fixed_argv_prefix", ())
+        if "draft-discover-fields" in prefix or "draft-discover-fields" in str(value.get("fixed_argv_prefix_copy", "")):
+            value["selection_modes"] = {
+                "list": "replace --meaning with --list; optional --page-size 1..64 and returned --page",
+                "exact_detail_and_handle": "replace --meaning with --selection copied from this Draft/scope list",
+                "search": "--meaning is auxiliary lexical discovery",
+                "selection_authority": "read-only until normal Field Handle validation; never a mutation authorization",
+            }
+        for child in tuple(value.values()):
+            _add_field_browsing(child)
+    elif isinstance(value, list):
+        for child in value:
+            _add_field_browsing(child)
+
+
 def _compact_business_binding_continuation(value: Any) -> Any:
     """Remove repeated argv arrays while preserving every copy-ready route."""
 
@@ -27614,6 +27696,7 @@ def operation_draft_payload(
             record,
             task_authority=task_authority,
         )
+        _add_field_browsing(next_action_binding)
         adapter = business_adapter(record.operation)
         audio_import_declaration_receipt = (
             record.operation == "audio.import"

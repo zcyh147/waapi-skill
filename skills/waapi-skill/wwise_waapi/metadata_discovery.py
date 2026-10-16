@@ -269,8 +269,11 @@ def discover_metadata(
     )
     names = _read_names(read_call, live_scope_args)
 
+    def exact_label(value: str) -> str:
+        return "".join(char for char in value.casefold() if char.isalnum())
+
     initial_rankings = {
-        query: _rank_names(query, names)
+        query: (tuple((name, 1000) for name in names if name.casefold() == query.casefold()) or _rank_names(query, names))
         for query in normalized_queries
     }
     initial_detail_names = _select_detail_pool(
@@ -317,6 +320,11 @@ def discover_metadata(
             score = _candidate_score(query, name=name, info=info)
             if score > 0:
                 ranked.append((name, score))
+        exact = [item for item in ranked if exact_label(item[0]) == exact_label(query)
+                 or (isinstance(info_by_name[item[0]].display.get("name"), str)
+                     and exact_label(info_by_name[item[0]].display["name"]) == exact_label(query))]
+        if len(exact) == 1:
+            ranked = exact
         enriched_rankings[query] = tuple(
             sorted(ranked, key=lambda item: (-item[1], item[0].casefold(), item[0]))
         )
@@ -1412,3 +1420,82 @@ __all__ = [
     "MetadataDiscoveryResult",
     "discover_metadata",
 ]
+
+
+def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
+                    object_type: str | None = None, class_id: int | None = None,
+                    object: str | int | None = None, page_size: int = 20,
+                    page: str | None = None, selection: str | None = None) -> dict[str, Any]:
+    """Read an inventory page or exact detail using a read-only scoped locator.
+
+    Locators are content addressed, not mutation capabilities. They bind the
+    live inventory snapshot, scope and session; Field Handles are minted only
+    by the normal Draft validation path. No token contains a native field name.
+    """
+    import hashlib
+    import time
+
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or not 1 <= page_size <= 64:
+        raise MetadataDiscoveryError("INVALID_METADATA_PAGE_SIZE", "page size must be 1..64")
+    if page is not None and selection is not None:
+        raise MetadataDiscoveryError("INVALID_METADATA_SELECTION", "Choose a page or one detail selection")
+    scope, scope_args = _resolve_scope(read_call, object_type=object_type, class_id=class_id, object=object)
+    names = _read_names(read_call, scope_args)
+    snapshot = hashlib.sha256(canonical_json_bytes({"context": context, "scope": scope, "names": names})).hexdigest()
+    now = int(time.time())
+    issued = now
+    offset = 0
+    def locator(kind: str, index: int) -> str:
+        digest = hashlib.sha256(canonical_json_bytes([kind, snapshot, issued, index])).hexdigest()
+        return f"{kind}.{issued}.{index}.{digest}"
+    token = selection or page
+    if token is not None:
+        try:
+            kind, stamp, position, digest = token.split(".")
+            issued, offset = int(stamp), int(position)
+            expected_kind = "mf1" if selection is not None else "mp1"
+            valid = kind == expected_kind and token == locator(kind, offset) and 0 <= offset < len(names)
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        if not valid:
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Metadata selection is invalid or its object/class, version, project, session or inventory snapshot changed; list this scope again.")
+        if issued > now or now - issued > 900:
+            raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Metadata selection expired; list this scope again.")
+    if selection is not None:
+        name = names[offset]
+        try:
+            info = _read_property_info(read_call, scope_args, name)
+            metadata = info.as_dict()
+            metadata["unit"] = metadata_unit(metadata)
+            metadata["availability"] = {key: "known" if key in info.raw else "unknown"
+                                        for key in ("type", "default", "restriction", "dependencies", "supports", "ui")}
+            payload = {"selection": selection, "scope": scope, "metadata": metadata, "mutation_authority": False}
+            _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
+            return payload
+        except MetadataDiscoveryError as exc:
+            if exc.error_code in {"LIVE_METADATA_LIMIT_EXCEEDED", "DISCOVERY_RESULT_LIMIT_EXCEEDED"}:
+                raise MetadataDiscoveryError("METADATA_DETAIL_TOO_LARGE", "The selected field detail exceeds the bounded detail response; no detail was truncated.", details={"field": name, "selection": selection, "scope": scope, "cause": exc.as_dict(), "repair": "Inspect another listed field; this exact field requires a separately supported larger-detail reader."}) from exc
+            raise
+    end = min(offset + page_size, len(names))
+    while True:
+        result = {"contract": "waapi-skill.metadata-page/v1", "scope": scope,
+                  "snapshot": snapshot, "snapshot_kind": "live-property-reference-inventory",
+                  "fields": [{"name": names[i], "selection": locator("mf1", i)} for i in range(offset, end)],
+                  "total_count": len(names), "offset": offset, "remaining_count": len(names) - end,
+                  "complete": end == len(names), "next_page": locator("mp1", end) if end < len(names) else None,
+                  "expires_at": issued + 900, "mutation_authority": False}
+        try:
+            _require_result_size(result, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
+            return result
+        except MetadataDiscoveryError as exc:
+            if exc.error_code != "DISCOVERY_RESULT_LIMIT_EXCEEDED" or end <= offset + 1:
+                raise
+            end -= 1
+
+
+def metadata_unit(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Preserve the reflected UI unit category; never infer units from names."""
+    ui = metadata.get("ui")
+    unit = ui.get("dataMeaning") if isinstance(ui, Mapping) else None
+    return {"status": "unknown" if unit in {None, "None"} else "known",
+            "value": None if unit in {None, "None"} else unit}

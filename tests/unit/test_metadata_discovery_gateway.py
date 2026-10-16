@@ -92,9 +92,9 @@ def _gateway_env(
     config_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -102,9 +102,6 @@ def _gateway_env(
     )
     env = {
         "WAAPI_SKILL_CONFIG_PATH": str(config_path),
-        "WWISE_WAAPI_HOST": "127.0.0.1",
-        "WWISE_WAAPI_PORT": "31337",
-        "WWISE_VERSION": version,
         "WWISE_EVIDENCE_DIR": str(tmp_path / "evidence"),
     }
     if state_dir is not None:
@@ -1308,3 +1305,47 @@ def test_attenuation_cli_parser_rejects_ambiguous_unknown_and_native_inputs(
             client_factory=lambda _url: pytest.fail("parser rejection must precede connection"),
         )
     assert rejected.value.code == 2
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("scope", [("--exact-id", OBJECT_GUID), ("--kind", "sound")])
+def test_metadata_lists_all_fields_then_reads_exact_selection(tmp_path: Path, version: str, scope: tuple[str, str]) -> None:
+    names = tuple(f"Parameter{i:03}" for i in range(45))
+    env = _gateway_env(tmp_path, version=version)
+    def run(*argv: str):
+        client = FakeClient(_metadata_responses(tmp_path, version=version, names=names))
+        return waapi_gateway.execute_gateway(
+            ["metadata", *argv, *scope], env=env,
+            client_factory=lambda _url: client,
+        )
+    code, first = run("list", "--page-size", "20")
+    assert code == 0, first
+    page = first["agent_result"]
+    assert page["total_count"] == 45
+    assert page["remaining_count"] == 25
+    rows = list(page["fields"])
+    while page["next_page"]:
+        code, result = run("list", "--page-size", "20", "--page", page["next_page"])
+        assert code == 0, result
+        page = result["agent_result"]
+        rows.extend(page["fields"])
+    assert [row["name"] for row in rows] == list(names)
+    assert page["complete"] is True
+    code, detail = run("detail", "--selection", rows[0]["selection"])
+    assert code == 0, detail
+    assert detail["agent_result"]["metadata"]["name"] == "Parameter000"
+    assert detail["agent_result"]["metadata"]["unit"] == {"status": "unknown", "value": None}
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_exact_metadata_meaning_ignores_bulky_near_matches(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version, names=("Volume", "VolumeExtra"))
+    responses[GET_PROPERTY_INFO_URI] = lambda args, options: (
+        {"name": args["property"], "type": "Real32", "display": {"name": "x" * 39720}}
+        if args["property"] == "VolumeExtra" else _property_info("Volume")
+    )
+    client = FakeClient(responses)
+    code, payload = waapi_gateway.execute_gateway(
+        ["metadata", "discover", "--exact-id", OBJECT_GUID, "--meaning", "Volume"],
+        env=_gateway_env(tmp_path, version=version), client_factory=lambda _url: client,
+    )
+    assert code == 0, payload
+    assert [row["name"] for row in payload["agent_result"]["candidates"]] == ["Volume"]
