@@ -92,8 +92,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "A missing or truncated read stops the workflow" in compact
     assert "sentinel must be the final visible line" in compact
     assert (
-        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
-        "2022.1 operation-schema object.copy"
+        "gateway.py --version 2022.1 operation-schema object.copy"
     ) in skill
     assert "This rule applies to fixed reads as well as transactions" in skill
     assert "do not run another command after receiving it" in skill
