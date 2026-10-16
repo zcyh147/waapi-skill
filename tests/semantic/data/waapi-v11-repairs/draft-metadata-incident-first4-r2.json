@@ -1,0 +1,53 @@
+{
+  "evidence_kind": "frozen_agent_attempt_systemic_broker_failure",
+  "candidate": "063eb5198b432188f265529687f738783cbc783c",
+  "campaign_root": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-first4-r2",
+  "affected_unit": "REPAIR25-F1",
+  "consumed_agent_workflows": 1,
+  "pending_agent_workflows": 3,
+  "agent_seconds": 29.7508,
+  "usage": {
+    "input_tokens": 183892,
+    "cached_input_tokens": 160768,
+    "output_tokens": 2082
+  },
+  "error": "Draft response revision does not follow the reviewed transition",
+  "agent_preview_count": 0,
+  "agent_execute_count": 0,
+  "fresh_semantic_pass": false,
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "errors": [
+      "scenario:V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint, visible_preview_notice"
+    ],
+    "final_status": "FAIL",
+    "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-first4-r2/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/quarantine.json",
+    "requested_status": "FAIL",
+    "sandbox_retained": true,
+    "scenario_id": "REPAIR25-F1",
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_mtime_after_ns": 1785701407051832215,
+    "source_mtime_before_ns": 1785701407051832215,
+    "version": "2025.1"
+  },
+  "files_sha256": {
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/expansion-task-result.json": "2e87135e15057fb1cdf5c42eaa4621afd70e921c182383575300899b8e45eac9",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/expansion-broker.json": "4de3e625c43d80a5c383aba2e459b4d4159cef98c5501f0f52fbad967e6c949c",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/turns/turn-01/events.jsonl": "08074d8470dfe15f15686f03315f3ab978d91950b787a24ccebd2b7cb83c68a9",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/lifecycle.json": "4cce85502de1c4cbc38b6ffc0e28620fffd25e3aa7fc59338e3561da96d16bf6"
+  },
+  "preservation": "Original failed root and quarantine retained unchanged; no verify-only upgrade or Fresh retry performed by this repair."
+}

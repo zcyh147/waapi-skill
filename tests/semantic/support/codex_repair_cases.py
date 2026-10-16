@@ -110,27 +110,60 @@ def read_refinement_proven(receipts, *, target_id, expected):
 
 
 def metadata_chain_proven(receipts):
-    previous = None
-    seen = set()
-    continued = False
+    chains = {}
     for row in receipts:
-        if row.get("command") != "metadata":
-            continue
+        command = row.get("command")
         args = row.get("arguments", [])
-        result = row.get("payload", {}).get("agent_result", {})
-        if args[:1] == ["list"]:
-            if "--page" in args and previous and args[args.index("--page") + 1] == previous:
-                continued = True
-            previous = result.get("next_page")
+        payload = row.get("payload", {})
+        if payload.get("ok") is not True:
+            continue
+        result = payload.get("agent_result", {})
+        def option(name):
+            return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else None
+        if command == "draft-discover-fields":
+            scope = tuple((flag, option(flag)) for flag in ("--object-handle", "--type-handle", "--kind") if option(flag))
+            if not args or not scope:
+                continue
+            key = (command, args[0], scope)
+            mode = "list" if "--list" in args else "detail" if option("--selection") else None
+        elif command == "metadata":
+            scope = tuple((flag, option(flag)) for flag in ("--object-id", "--custom-kind", "--kind") if option(flag))
+            key = (command, scope)
+            mode = args[0] if args else None
+        else:
+            continue
+        if mode == "list":
+            previous = chains.get(key)
+            page = option("--page")
+            if page:
+                if previous is None or page != previous["next"]:
+                    chains.pop(key, None)
+                    continue
+                chain = previous
+                chain["continued"] = True
+            else:
+                chain = {"next": None, "continued": False, "selections": set()}
+                chains[key] = chain
+            chain["next"] = result.get("next_page")
             for field in result.get("fields", []):
-                if field.get("name") == "PreDelay":
-                    seen.add(field.get("selection"))
-        elif args[:1] == ["detail"] and continued and result.get("selection") in seen:
-            try:
-                require_predelay_metadata(row["payload"])
-                return True
-            except CaseBoundaryError:
-                pass
+                if field.get("name") == "PreDelay" and isinstance(field.get("selection"), str):
+                    chain["selections"].add(field["selection"])
+        elif mode == "detail":
+            chain = chains.get(key)
+            selection = option("--selection")
+            if not chain or not chain["continued"] or selection not in chain["selections"]:
+                continue
+            if command == "metadata":
+                details = [payload] if result.get("selection") == selection else []
+            else:
+                candidates = payload.get("field_candidates", [])
+                details = [{"agent_result": {"metadata": candidates[0].get("metadata", {})}}] if len(candidates) == 1 else []
+            for detail in details:
+                try:
+                    require_predelay_metadata(detail)
+                    return True
+                except CaseBoundaryError:
+                    pass
     return False
 
 

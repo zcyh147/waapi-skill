@@ -14484,7 +14484,9 @@ class CodexGatewayBroker:
                 "Draft response is missing its prior revision binding"
             )
         expected_revision = int(previous_draft["revision"])
-        if step.subcommand != "draft-inspect":
+        # Browsing pages returns the current Draft; exact selection binds a field handle.
+        browse_only = step.subcommand == "draft-discover-fields" and "--list" in step.arguments
+        if step.subcommand != "draft-inspect" and not browse_only:
             typed_actions = (
                 _draft_typed_actions(step.arguments[-1])
                 if step.subcommand == "draft-apply" and step.arguments

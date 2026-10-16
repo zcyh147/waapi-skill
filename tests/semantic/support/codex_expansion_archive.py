@@ -568,6 +568,10 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
                              "mutation binding exceeds the sealed object scope")
             draft = payload.get("draft") if isinstance(payload, dict) else None
             if isinstance(draft, dict):
+                if plan.get("contract") == "waapi-skill.repair-task-plan/v1" and command == "draft-discover-fields":
+                    delta = 0 if "--list" in argv else 1
+                    _require(draft.get("draft_id") == draft_id and type(draft.get("revision")) is int
+                        and draft["revision"] == revision + delta, "repair metadata revision transition mismatch")
                 if command == "draft-start":
                     draft_id, authority = draft["draft_id"], payload["task_authority"]
                 revision = draft["revision"]

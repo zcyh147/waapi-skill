@@ -36,7 +36,7 @@ class RepairBrokerPolicy(ExpansionBrokerPolicy):
 
     def observe(self, step, payload, *, state_directory):
         super().observe(step, payload, state_directory=state_directory)
-        if step.subcommand in {"query-object", "metadata"}:
+        if step.subcommand in {"query-object", "metadata", "draft-discover-fields"}:
             self.read_receipts.append({"command": step.subcommand, "arguments": list(step.arguments), "payload": payload})
 
     def finish_read(self):
