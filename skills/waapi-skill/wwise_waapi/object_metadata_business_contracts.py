@@ -91,6 +91,13 @@ def object_metadata_business_contract_data(
             "result": "copy_one_gateway_returned_field_handle",
             "ambiguous_result": "choose_one_bounded_candidate_handle_or_refine_meaning",
         },
+        **({"activation_prerequisites": {
+            "read_and_guard": "live_same_object_Boolean_dependency_closure",
+            "when_unsatisfied": "separately_preview_each_required_object.setProperty_using_a_live_Field_Handle",
+            "then": "create_a_fresh_reference_Preview_after_verified_prerequisites",
+            "atomic_batch_alternative": "object.set" if version != "2021.1" else None,
+            "hidden_followup_writes": False,
+        }} if operation == "object.setReference" else {}),
         "declaration": {
             "subcommand": "draft-declare-field-change",
             "required_fields": list(declaration["required_fields"]),
