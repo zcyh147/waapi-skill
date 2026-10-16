@@ -1,0 +1,158 @@
+{
+  "evidence_kind": "native_fixture_preparation_only",
+  "candidate": "c6119274",
+  "platform": "darwin",
+  "version": "2025.1",
+  "test": "tests/destructive/test_repair_metadata_preflight.py::test_repair_formal_fixture_preparation_without_agent",
+  "result": {
+    "passed": 4,
+    "deselected": 33,
+    "seconds": 54.94,
+    "exit_code": 0
+  },
+  "scope": "Formal runtime, fixture factory, scoped reads and ScenarioLifecycle; Codex task seam replaced by fixture assertions. No Fresh acceptance credit.",
+  "source_project": "/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills/tests/_org/2025.1/SampleProject.wproj",
+  "original_evidence_root": "/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills/.waapi-skill-state/evidence/repair-fixtures-c6119274-r1",
+  "outcomes": [
+    {
+      "case_id": "F1",
+      "outcome_path": "/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills/.waapi-skill-state/evidence/repair-fixtures-c6119274-r1/F1/outcome.json",
+      "outcome_sha256": "426c7302832e684e95f17253d0918acbe305aa535fb7a3df04efa3d16942bb7f",
+      "agent_started": false,
+      "semantic_acceptance": false,
+      "thread_id": null,
+      "trusted_oracle_closed": true,
+      "lifecycle": {
+        "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+        "scenario_id": "REPAIR25-F1",
+        "version": "2025.1",
+        "requested_status": "PASS",
+        "final_status": "PASS",
+        "sandbox_retained": false,
+        "source_hash_before": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_hash_after": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_mtime_before_ns": 1792176469219518550,
+        "source_mtime_after_ns": 1792176469219518550,
+        "errors": [],
+        "quarantine_path": null
+      }
+    },
+    {
+      "case_id": "F2",
+      "outcome_path": "/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills/.waapi-skill-state/evidence/repair-fixtures-c6119274-r1/F2/outcome.json",
+      "outcome_sha256": "0162d7fde36a2025e0609946c6a7c6d95cd995db8018b9f4e559484f44095276",
+      "agent_started": false,
+      "semantic_acceptance": false,
+      "thread_id": null,
+      "trusted_oracle_closed": true,
+      "lifecycle": {
+        "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+        "scenario_id": "REPAIR25-F2",
+        "version": "2025.1",
+        "requested_status": "PASS",
+        "final_status": "PASS",
+        "sandbox_retained": false,
+        "source_hash_before": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_hash_after": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_mtime_before_ns": 1792176469219518550,
+        "source_mtime_after_ns": 1792176469219518550,
+        "errors": [],
+        "quarantine_path": null
+      }
+    },
+    {
+      "case_id": "F3",
+      "outcome_path": "/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills/.waapi-skill-state/evidence/repair-fixtures-c6119274-r1/F3/outcome.json",
+      "outcome_sha256": "9d7eb1b9752f6fce4148652961e9cd8011d84b332a4d1d87589371e8ee8717eb",
+      "agent_started": false,
+      "semantic_acceptance": false,
+      "thread_id": null,
+      "trusted_oracle_closed": true,
+      "lifecycle": {
+        "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+        "scenario_id": "REPAIR25-F3",
+        "version": "2025.1",
+        "requested_status": "PASS",
+        "final_status": "PASS",
+        "sandbox_retained": false,
+        "source_hash_before": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_hash_after": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_mtime_before_ns": 1792176469219518550,
+        "source_mtime_after_ns": 1792176469219518550,
+        "errors": [],
+        "quarantine_path": null
+      }
+    },
+    {
+      "case_id": "F4",
+      "outcome_path": "/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills/.waapi-skill-state/evidence/repair-fixtures-c6119274-r1/F4/outcome.json",
+      "outcome_sha256": "d8a0857a3affa1c6379924818adb529950f4ea518b42b52f5287b3ab77c3796a",
+      "agent_started": false,
+      "semantic_acceptance": false,
+      "thread_id": null,
+      "trusted_oracle_closed": true,
+      "lifecycle": {
+        "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+        "scenario_id": "REPAIR25-F4",
+        "version": "2025.1",
+        "requested_status": "PASS",
+        "final_status": "PASS",
+        "sandbox_retained": false,
+        "source_hash_before": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_hash_after": {
+          "algorithm": "sha256",
+          "strategy": "full",
+          "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+          "file_count": 83,
+          "bytes_hashed": 3943065
+        },
+        "source_mtime_before_ns": 1792176469219518550,
+        "source_mtime_after_ns": 1792176469219518550,
+        "errors": [],
+        "quarantine_path": null
+      }
+    }
+  ]
+}
