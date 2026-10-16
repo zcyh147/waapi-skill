@@ -27,7 +27,7 @@ GATEWAY_RUNNER_PATH = SKILL_ROOT / "scripts" / "run.py"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-from wwise_waapi.recovery import recovery_receipt
+from wwise_waapi.recovery import PREWRITE_GUARD_REJECTION, recovery_receipt
 from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CapabilityCatalog,
     CapabilityNotFoundError,
@@ -3403,7 +3403,7 @@ def _execute_gateway_unconstrained(
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
-    dispatch_started = False
+    command_routing_started = False
 
     def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         enriched = dict(payload)
@@ -3411,7 +3411,7 @@ def _execute_gateway_unconstrained(
             recovery_policy = load_gateway_config(source_env).config.project_modification_policy
         except Exception:
             recovery_policy = "unavailable"
-        recovery = recovery_receipt(enriched, policy=recovery_policy, dispatch_started=dispatch_started)
+        recovery = recovery_receipt(enriched, policy=recovery_policy, command_routing_started=command_routing_started)
         if recovery is not None:
             if "agent_result" in enriched:
                 agent_result = enriched.pop("agent_result")
@@ -3558,7 +3558,7 @@ def _execute_gateway_unconstrained(
                 dispatcher.manifest_store = AuthoringUiRuntimeManifestStore(
                     dispatcher.manifest_store
                 )
-            dispatch_started = True
+            command_routing_started = True
             payload = dispatch_command(
                 args,
                 env=source_env,
@@ -3774,6 +3774,15 @@ def constrain_live_gateway_result(
     for key in ("executed", "verified", "automatic_retry"):
         if isinstance(payload.get(key), bool):
             result[key] = payload[key]
+    recovery = payload.get("recovery")
+    if (payload.get("write_dispatch") == PREWRITE_GUARD_REJECTION
+            and isinstance(recovery, Mapping)
+            and recovery.get("stage") == "pre_dispatch_rejection"
+            and gateway_json_document_size(recovery) <= 4096):
+        # Keep bounded proof that this rejection preceded any write, even when
+        # bulky guard diagnostics must be replaced by a result-ceiling error.
+        result["write_dispatch"] = dict(PREWRITE_GUARD_REJECTION)
+        result["recovery"] = dict(recovery)
     return 2, result
 
 
@@ -19497,6 +19506,7 @@ def _dispatch_transaction_command_with_execution_lease(
             return {
                 "ok": False,
                 "status": "repreview_required",
+                "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                 **common,
                 "transaction_id": transaction_id,
                 "state": repreview.state.value,
@@ -19547,6 +19557,7 @@ def _dispatch_transaction_command_with_execution_lease(
             return {
                 "ok": False,
                 "status": "repreview_required",
+                "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                 **common,
                 "transaction_id": transaction_id,
                 "state": repreview.state.value,
@@ -19568,6 +19579,7 @@ def _dispatch_transaction_command_with_execution_lease(
             return {
                 "ok": False,
                 "status": "repreview_required",
+                "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                 **common,
                 "transaction_id": transaction_id,
                 "state": repreview.state.value,
@@ -19909,6 +19921,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -19981,6 +19994,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -20058,6 +20072,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -20114,6 +20129,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -20165,6 +20181,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
