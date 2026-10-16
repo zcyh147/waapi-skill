@@ -11,25 +11,21 @@ description: >-
 
 # WAAPI Skill
 
-Use the packaged Gateway to operate Wwise. The Agent selects the requested
-outcome and supplies business values; the Gateway owns version-specific
-parameters, validation, execution, and verification.
+Supply business values to the packaged Gateway; it owns version-specific
+validation, execution, and verification.
 
 Versions: `2021.1`, `2022.1`, `2023.1`, `2024.1`, and `2025.1`.
 
 ## Loading and paths
 
-Use the complete Skill instructions supplied by the agent environment.
-If they are not already loaded, read `SKILL.md` from the supplied location
-before running a Gateway command. If that location or complete content is
-unavailable, stop instead of searching for another installation.
+Read the supplied `SKILL.md` completely before Gateway use unless already loaded.
+Missing location or incomplete content stops; never search another installation.
 
-The Skill root is the directory containing that `SKILL.md`. Resolve `scripts/`
-and `references/` relative to this root, not the working directory or an assumed
-installation path. Use the absolute path to `scripts/run.py` for Gateway calls.
+The directory containing `SKILL.md` is the Skill root. Resolve `scripts/` and
+`references/` there; call the absolute `scripts/run.py`.
 
-Read only the reference needed for the current task, once, completely and as
-UTF-8 text. Reuse complete instructions already visible in the conversation.
+Read the current task reference once, completely as UTF-8.
+Reuse complete instructions already visible in the conversation.
 Use the environment's file-reading tool or a compatible shell. Shell reads
 are standalone: POSIX may use `cat '<absolute-file>'`; native Windows uses
 PowerShell Core, for example `Get-Content -Raw -Encoding UTF8 '<absolute-file>'`.
@@ -38,8 +34,8 @@ or the spelling of a path. A missing or truncated read stops the workflow.
 For query/operate references, the matching `WAAPI_QUERY_REFERENCE_END` or
 `WAAPI_OPERATE_REFERENCE_END` sentinel must be the final visible line.
 
-Keep Gateway calls separate. Copy decoded JSON command values exactly.
-Windows: keep backslashes literal; serialize only outer tool-call JSON.
+Separate Gateway calls; copy decoded JSON commands exactly. Windows: keep
+backslashes literal; serialize only outer tool-call JSON.
 
 ## One-time conversation introduction
 
@@ -71,7 +67,7 @@ facts, not later Skill invocations. Send machine answers separately.
 
 ## Fixed gateway commands
 
-Examples below are relative to the supplied Skill root; use its absolute `scripts/run.py` when executing them.
+Examples are Skill-root-relative; execute the absolute `scripts/run.py`.
 
 ```bash
 python scripts/run.py gateway.py status
@@ -89,7 +85,7 @@ python scripts/run.py gateway.py request-schema <exact-user-supplied-reflected-f
 python scripts/run.py gateway.py query-object --path-segment '<root>' --path-segment '<child>'
 python scripts/run.py gateway.py query-object --kind sound-sfx --include volume-db --max-results 100
 python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]
-python scripts/run.py gateway.py --version <supported-version> query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>
+python scripts/run.py gateway.py query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>
 python scripts/run.py gateway.py metadata types
 python scripts/run.py gateway.py topic-schema <topic-uri>
 python scripts/run.py gateway.py wait-topic <topic-uri> <binding-and-facts-from-topic-schema>
@@ -144,10 +140,9 @@ For `mutation_selection`, run nothing now. If the user later selects candidates 
 Generic `call` is forbidden; obey `QUERY_OBJECT_REQUIRED`,
 `FIXED_COMMAND_REQUIRED`, and `WAIT_TOPIC_REQUIRED`.
 
-When any successful gateway payload contains `agent_result` and the user wants
-a machine-readable answer, compact-serialize exactly that object and stop;
-Do not reconstruct its fields from the prompt, `normalized`, summaries, or evidence; do not run another command after receiving it. Add `WAAPI_RESULT_JSON=` when requested.
-This rule applies to fixed reads as well as transactions. Normal
+For successful fixed reads or transactions, machine-readable answers compact-serialize
+exactly `agent_result` and stop. Never reconstruct fields or run another command;
+add `WAAPI_RESULT_JSON=` when requested. Normal
 query answers use default business fields. Keep the introduction separate. Use
 `query-object --detail` only for explicit user requests or compile/dispatch diagnosis;
 never rerun solely for detail.
@@ -164,9 +159,9 @@ Read: `references/waapi-setup.md`
 
 Use query for selection, object/hierarchy/property/project reads, discovery, and topics.
 
-Classify the requested action, not background wording. A request to listen for, wait for, or report a SoundBank generation notification is query-only. It never authorizes `soundbank.generate`, an operation-schema lookup, or mutation.
+SoundBank generation notifications are query-only: no `soundbank.generate`, operation-schema lookup, or mutation.
 
-A diagnosis-only turn reads only `waapi-query.md`; it must not preload `waapi-operate.md`.
+Diagnosis-only reads `waapi-query.md`, never `waapi-operate.md`.
 
 Classify the complete read-only task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
 
@@ -187,7 +182,7 @@ Apply the latest `session_context` policy and copy the returned Preview exactly.
 - `ask_before_changes`: create the executable Preview without asking first, summarize it, state nothing changed, ask to proceed, and end the turn. Even when the same request names later independent changes, run no more Gateway commands in that turn.
 - `allow_changes`: an unambiguous actual change may return `policy_authorized`; name its root/major children, execute once from `next_command.copy_instruction.source_field`, then verify. Preview/plan/explain requests stop at the non-executable Preview.
 
-Normal prose covers only objects, changes, results, risks, and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands. Keep exact `agent_result` machine-readable.
+In prose, describe objects, changes, results, and risks. Hide API names, Draft/transaction internals, ids, hashes, tokens, states, and commands; preserve machine `agent_result`.
 
 `read_only` still permits reads. A packaged `effect: read` function may use the transaction lane for bounded schema/result validation without `--apply`; never reclassify a mutation from wording. The original user message supplies authority and the Gateway decides whether `--apply` is present. Ambiguity stops. Never auto-authorize `debug.restartWaapiServers`, `debug.testAssert`, or `debug.testCrash`.
 
@@ -195,7 +190,7 @@ Choose the transaction phase before choosing a command. An existing transaction 
 
 For a new change, use its named operation or exact-URI `request-schema` and follow one continuation. For `core-business/v1`, the exact returned continuation owns the read shape. Bind returned object/Field Handles and submit one complete Core plan; never type native tokens, enums, GUID arrays, curve/edge objects, or request fragments. Execute once; `verify` is terminal authority. Incompleteness stops. Complete failures and `indeterminate` use the Recovery rule; the original write is never replayed. `ak.wwise.cli.migrate` stops after execute. Never invoke internal planners/builders or construct raw requests.
 
-For user-ordered independent transactions, preserve order and scope. In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external runtime-state default. Never probe `WAAPI_SKILL_STATE_DIR`; pass `--state-dir` only when a trusted absolute override was explicitly supplied, and reuse it unchanged.
+Preserve user-ordered transaction order/scope. Omit `--state-dir` unless a trusted absolute override was explicitly supplied; reuse it unchanged. Never probe `WAAPI_SKILL_STATE_DIR`.
 
 Fast route from this entry file:
 
@@ -203,12 +198,6 @@ Fast route from this entry file:
 - For structure-only changes, one existing object's single rename/notes/property/reference edit uses its dedicated operation. `object.set` is for broader atomic existing-target work; `object.create` is for a new root or descendants below one unchanged same-name root.
 - Primary media import uses one `audio.import`; business declarations own hierarchy and Event/Switch outcomes. Never probe `object.create` or a separate assignment first. On Wwise 2023.1+, use `object.set` when import is subordinate to a broader existing-target mutation. Caller tables use `audio.importTabDelimited`.
 - The operate reference owns version-specific typed request mappings and all remaining operation rules. Follow that reference literally after its one complete read.
-
-Conditional read for a closed transaction: `references/waapi-operate.md`
-
-## Runner and packaged runtime
-
-Loads versioned manifest, semantic, WAQL, and deferred resources. Use `describe <uri> --full-schema` only when needed. `waapi-coverage.md` owns counts/evidence, never live proof.
 
 ## Recovery
 

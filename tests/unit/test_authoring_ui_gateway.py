@@ -181,6 +181,7 @@ def execute(
     version: str,
     state_dir: Path | None = None,
     client: FakeClient | None = None,
+    host: str | None = None,
 ) -> tuple[int, dict[str, Any]]:
     args = list(argv)
     if state_dir is not None:
@@ -191,9 +192,15 @@ def execute(
             raise AssertionError(f"offline command connected to {url}")
         return client
 
+    env = gateway_env(tmp_path, version=version, state_dir=state_dir)
+    if host is not None:
+        config_path = Path(env["WAAPI_SKILL_CONFIG_PATH"])
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        config["waapi_host"] = host
+        config_path.write_text(json.dumps(config), encoding="utf-8")
     return gateway.execute_gateway(
         args,
-        env=gateway_env(tmp_path, version=version, state_dir=state_dir),
+        env=env,
         client_factory=factory,
     )
 
@@ -1396,8 +1403,6 @@ def test_remote_ui_execute_files_fail_before_project_or_file_proof(
     client = FakeClient({GET_INFO_URI: [live_info(year=2025)]})
     code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             "legacy-preview",
             "--request-json",
             json.dumps(
@@ -1415,6 +1420,7 @@ def test_remote_ui_execute_files_fail_before_project_or_file_proof(
         version="2025.1",
         state_dir=tmp_path / "state",
         client=client,
+        host="192.0.2.10",
     )
 
     assert code == 2
@@ -1466,8 +1472,6 @@ def test_confirmed_ui_file_transaction_cannot_switch_to_remote_execute(
     remote_client = FakeClient({GET_INFO_URI: [live_info(year=2025)]})
     code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             "execute",
             transaction["transaction_id"],
         ],
@@ -1475,13 +1479,14 @@ def test_confirmed_ui_file_transaction_cannot_switch_to_remote_execute(
         version="2025.1",
         state_dir=state_dir,
         client=remote_client,
+        host="192.0.2.10",
     )
 
     assert code == 2
-    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["error_code"] == "GatewayInputError"
+    assert "configuration changed after Preview" in payload["message"]
     assert payload["command"] == "execute"
-    assert payload["executed"] is False
-    assert [row[0] for row in remote_client.calls] == [GET_INFO_URI]
+    assert remote_client.calls == []
 
 
 @pytest.mark.parametrize(
@@ -1495,8 +1500,6 @@ def test_remote_ui_program_descriptors_fail_before_project_or_executable_proof(
     client = FakeClient({GET_INFO_URI: [live_info()]})
     code, payload = execute(
         [
-            "--host",
-            "wwise-studio",
             "legacy-preview",
             "--request-json",
             json.dumps(
@@ -1523,6 +1526,7 @@ def test_remote_ui_program_descriptors_fail_before_project_or_executable_proof(
         version="2024.1",
         state_dir=tmp_path / "state",
         client=client,
+        host="wwise-studio",
     )
 
     assert code == 2
@@ -1593,8 +1597,6 @@ def test_confirmed_ui_program_transaction_cannot_switch_to_remote_execute(
     remote_client = FakeClient({GET_INFO_URI: [live_info()]})
     code, payload = execute(
         [
-            "--host",
-            "wwise-studio",
             "execute",
             transaction["transaction_id"],
         ],
@@ -1602,12 +1604,14 @@ def test_confirmed_ui_program_transaction_cannot_switch_to_remote_execute(
         version="2024.1",
         state_dir=state_dir,
         client=remote_client,
+        host="wwise-studio",
     )
 
     assert code == 2
-    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["error_code"] == "GatewayInputError"
+    assert "configuration changed after Preview" in payload["message"]
     assert payload["command"] == "execute"
-    assert [row[0] for row in remote_client.calls] == [GET_INFO_URI]
+    assert remote_client.calls == []
 
 
 @pytest.mark.parametrize(
