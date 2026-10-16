@@ -133,17 +133,19 @@ def _json_default(value: Any) -> Any:
     return f"<{type(value).__name__}>"
 
 
-def _gateway_command_contract(command_spec: str) -> dict[str, Any]:
+def _gateway_command_contract(
+    command_spec: str, *, parser: argparse.ArgumentParser | None = None
+) -> dict[str, Any]:
     """Project one fixed command's actual argparse fields deterministically."""
 
     tokens = command_spec.split()
-    parser = _gateway_subparsers().get(tokens[0])
+    parser = parser if parser is not None else _gateway_subparsers().get(tokens[0])
     if parser is None:
         raise RuntimeError(f"unknown fixed Gateway command {command_spec!r}")
     fixed_positionals = iter(tokens[1:])
     parameters: list[dict[str, Any]] = []
     for action in _parser_actions(parser):
-        if action.dest == "help":
+        if action.dest == "help" or isinstance(action, argparse._SubParsersAction):
             continue
         if not action.option_strings:
             fixed_value = next(fixed_positionals, None)
@@ -215,8 +217,8 @@ def _gateway_parser_contract_rows() -> list[dict[str, Any]]:
     """Return the authoritative schema projection for every public command."""
 
     return [
-        _gateway_command_contract(command)
-        for command in sorted(_gateway_subparsers())
+        _gateway_command_contract("<root>", parser=_gateway_module().build_parser()),
+        *(_gateway_command_contract(command) for command in sorted(_gateway_subparsers())),
     ]
 
 
@@ -1644,7 +1646,7 @@ def render_interface_depth_inventory(inventory: Mapping[str, Any]) -> str:
     lines.extend(
         [
             "",
-            "Generated tests seal the native surface digest, every operation/version contract, and every public continuation. A new lane, field, version delta, or continuation therefore fails until this review policy and generated inventory are intentionally updated.",
+            "Generated tests seal the native surface digest, every operation/version contract, root and subcommand parser options, and declared public continuation command contracts. Dynamic phase-response behavior still requires focused Gateway tests. A changed sealed lane, field, version delta, or command contract fails until this review policy and generated inventory are intentionally updated.",
             "",
         ]
     )

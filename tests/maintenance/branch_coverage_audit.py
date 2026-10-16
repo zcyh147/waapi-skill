@@ -198,7 +198,8 @@ def check_inventory(inventory, root=ROOT):
                        ("reviewed_snapshot_seal", "reviewed seal"),
                        ("current_business_branches", "current business reconciliation"),
                        ("policy_rule_index", "policy rule index"),
-                       ("family_findings", "family findings")):
+                       ("family_findings", "family findings"),
+                       ("schema_occurrences", "schema occurrences")):
         if inventory.get(key) != expected[key]:
             errors.append(label + " differs")
     return errors
