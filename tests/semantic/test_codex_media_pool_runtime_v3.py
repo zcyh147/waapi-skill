@@ -162,9 +162,8 @@ def _assert_public_media_mapping_is_documented() -> None:
     text = " ".join(QUERY_REFERENCE.read_text(encoding="utf-8").split())
     for required in (
         "Use `request-schema` for each URI and follow only its typed continuation",
-        "Follow the returned business declaration",
-        "Gateway owns native field bindings, filter objects, and the return projection",
-        "Agent supplies only disclosed business values",
+        "Supply disclosed database, field, condition, output, and limit values",
+        "Gateway owns native bindings, filters, and projection",
         "For case-sensitive matching use the disclosed post-filter",
         "never perform this join in model-authored code",
     ):

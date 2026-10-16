@@ -10,7 +10,7 @@ def doc_text(*relative_paths: str) -> str:
     return "\n".join((SKILL_ROOT / path).read_text(encoding="utf-8") for path in relative_paths)
 
 
-def test_skill_contract_documents_fixed_runner_and_versioned_runtime() -> None:
+def test_skill_contract_documents_fixed_runner_and_supported_versions() -> None:
     text = doc_text("SKILL.md")
 
     for command in (
@@ -21,7 +21,8 @@ def test_skill_contract_documents_fixed_runner_and_versioned_runtime() -> None:
         "python scripts/run.py gateway.py metadata types",
     ):
         assert command in text
-    assert "versioned manifest, semantic, WAQL, and deferred resources" in text
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        assert f"`{version}`" in text
 
 
 def test_skill_contract_documents_gateway_inputs_outputs_and_failure_boundary() -> None:
@@ -47,11 +48,11 @@ def test_skill_contract_resolves_references_from_the_supplied_installation() -> 
     text = doc_text("SKILL.md")
 
     compact = " ".join(text.split())
-    assert "The Skill root is the directory containing that `SKILL.md`" in compact
-    assert "`references/` relative to this root, not the working directory" in compact
+    assert "The directory containing `SKILL.md` is the Skill root" in compact
+    assert "Resolve `scripts/` and `references/` there" in compact
     assert "Get-Content -Raw -Encoding UTF8 '<absolute-file>'" in text
     assert ".agents\\skills\\waapi-skill\\references" not in text
-    assert "Use the absolute path to `scripts/run.py` for Gateway calls" in compact
+    assert "call the absolute `scripts/run.py`" in compact
 
 
 def test_skill_contract_requires_confirmation_before_retargeting_invalid_parent() -> None:
@@ -74,6 +75,6 @@ def test_operate_contract_preserves_posix_wwise_path_backslashes() -> None:
 def test_operate_contract_binds_single_object_metadata_to_the_exact_owner() -> None:
     text = doc_text("references/waapi-operate.md")
 
-    assert "GUIDs use `by_id`" in text
+    assert "Use `by_path_segments` or `by_id`" in text
     assert "Bind the exact existing owner" in text
     assert "fixes the metadata scope inside the Draft" in text
