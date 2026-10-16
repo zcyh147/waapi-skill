@@ -251,7 +251,7 @@ def test_post_detection_failure_keeps_live_endpoint_and_adapter_version(tmp_path
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["selected"],
-        env=configured_env(tmp_path, version=None, host="localhost", port=31337),
+        env=configured_env(tmp_path, version="2023.1", host="localhost", port=31337),
         client_factory=lambda url: client,
     )
 
@@ -274,7 +274,7 @@ def test_post_detection_failure_keeps_live_endpoint_and_adapter_version(tmp_path
     ]
 
 
-def test_explicit_gateway_flags_override_saved_session_context_without_connecting(tmp_path: Path) -> None:
+def test_offline_version_selection_preserves_configured_endpoint_without_connecting(tmp_path: Path) -> None:
     called = False
 
     def fail_if_connected(url: str) -> FakeClient:
@@ -284,10 +284,6 @@ def test_explicit_gateway_flags_override_saved_session_context_without_connectin
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "--host",
-            "localhost",
-            "--port",
-            "31337",
             "--version",
             "2024.1",
             "query-schema",
@@ -300,8 +296,8 @@ def test_explicit_gateway_flags_override_saved_session_context_without_connectin
     assert called is False
     assert payload["session_context"] == expected_context(
         version="2024.1",
-        host="localhost",
-        port=31337,
+        host="127.0.0.1",
+        port=8080,
     )
 
 

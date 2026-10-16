@@ -109,9 +109,17 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 assert str(sandbox.sandbox_project) in lifecycle.command
                 assert str(sandbox.source_project) not in lifecycle.command
 
+                config_path = evidence_dir.parent / "gateway-config.json"
+                config_path.parent.mkdir(parents=True, exist_ok=True)
+                env = {**env, "WAAPI_SKILL_CONFIG_PATH": str(config_path)}
+                configured_code, configured = GATEWAY.execute_gateway(
+                    ["config-set", "--wwise-version", version,
+                     "--waapi-host", lifecycle.host, "--waapi-port", str(lifecycle.port),
+                     "--project-modification-policy", "read_only"], env=env,
+                )
+                assert configured_code == 0, configured
+
                 common = _gateway_prefix(
-                    port=lifecycle.port,
-                    version=version,
                     evidence_dir=evidence_dir,
                 )
                 gateway_matrix_started = time.monotonic()
@@ -178,8 +186,6 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
                 _assert_reflection_functions(functions)
 
                 topic_timeout_common = _gateway_prefix(
-                    port=lifecycle.port,
-                    version=version,
                     evidence_dir=evidence_dir,
                     timeout=0.5,
                 )
@@ -722,18 +728,10 @@ def test_gateway_read_only_matrix_runs_once_against_copied_sandbox() -> None:
 
 def _gateway_prefix(
     *,
-    port: int,
-    version: str,
     evidence_dir: Path,
     timeout: float = 10.0,
 ) -> tuple[str, ...]:
     return (
-        "--host",
-        "127.0.0.1",
-        "--port",
-        str(port),
-        "--version",
-        version,
         "--timeout",
         f"{timeout:g}",
         "--evidence-dir",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -152,9 +154,9 @@ def _env(tmp_path: Path) -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2022.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -1030,7 +1032,7 @@ def test_audio_import_batch_chunks_are_atomic_cumulative_and_compact(
 def test_music_import_batch_accepts_omitted_language_without_native_dispatch(
     tmp_path: Path, version: str,
 ) -> None:
-    env = {**_env(tmp_path), "WWISE_VERSION": version}
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
     state_args = ["--state-dir", str(tmp_path / "state")]
     def offline(*argv):
         return waapi_gateway.execute_gateway(

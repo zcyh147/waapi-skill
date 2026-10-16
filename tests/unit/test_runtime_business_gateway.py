@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -97,9 +99,9 @@ def _env(tmp_path: Path, *, version: str = "2025.1") -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -197,14 +199,13 @@ def test_every_runtime_control_lane_exposes_one_business_draft_and_blocks_typed(
     assert payload["continuation"]["subcommand"] == "draft-start"
     bypass_code, bypass = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "typed-call",
             operation,
             "--schema-digest",
             "0" * 64,
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda url: pytest.fail(f"typed bypass connected to {url}"),
     )
     assert bypass_code == 2
@@ -339,8 +340,7 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
@@ -348,7 +348,7 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
             "--max-results",
             "2",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -391,8 +391,7 @@ def test_log_get_rejects_out_of_bounds_result_limit_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
@@ -400,7 +399,7 @@ def test_log_get_rejects_out_of_bounds_result_limit_before_connection(
             "--max-results",
             limit,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"invalid input connected to {url}"),
     )
 
@@ -411,14 +410,13 @@ def test_log_get_rejects_out_of_bounds_result_limit_before_connection(
 def test_log_get_rejects_native_channel_token_before_connection(tmp_path: Path) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
             "soundbankGenerate",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"native token connected to {url}"),
     )
 
@@ -431,14 +429,13 @@ def test_log_get_rejects_later_log_view_on_older_wwise_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
             "source-control",
         ],
-        env=_env(tmp_path, version="2022.1"),
+        env=set_gateway_config(_env(tmp_path, version="2022.1"), wwise_version="2022.1"),
         client_factory=lambda url: pytest.fail(f"version mismatch connected to {url}"),
     )
 
@@ -449,14 +446,13 @@ def test_log_get_rejects_later_log_view_on_older_wwise_before_connection(
 def test_log_get_blocks_retired_typed_call_before_connection(tmp_path: Path) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "typed-call",
             LOG_GET_URI,
             "--schema-digest",
             "0" * 64,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"typed bypass connected to {url}"),
     )
 
@@ -468,14 +464,13 @@ def test_log_get_blocks_retired_draft_before_state_or_connection(tmp_path: Path)
     state_dir = tmp_path / "state"
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             LOG_GET_URI,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"typed draft connected to {url}"),
     )
 
@@ -555,8 +550,7 @@ def test_profiler_voice_read_derives_native_time_projection_and_handle(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             GET_VOICES_URI,
             "--profiler-position",
@@ -568,7 +562,7 @@ def test_profiler_voice_read_derives_native_time_projection_and_handle(
             "--max-results",
             "1",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -632,14 +626,13 @@ def test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             GET_CURSOR_TIME_URI,
             "--profiler-cursor",
             "user-cursor",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -693,14 +686,13 @@ def test_profiler_cursor_invalid_live_shape_preserves_bounded_diagnostics(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             GET_CURSOR_TIME_URI,
             "--profiler-cursor",
             "user-cursor",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -717,8 +709,7 @@ def test_profiler_voice_read_rejects_invented_handle_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             GET_VOICES_URI,
             "--profiler-position",
@@ -726,7 +717,7 @@ def test_profiler_voice_read_rejects_invented_handle_before_connection(
             "--voice-instance-handle",
             "42",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"invalid handle connected to {url}"),
     )
 
@@ -789,8 +780,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "core-call",
@@ -798,7 +788,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
             "--transport-handle",
             transport_handle,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -857,8 +847,7 @@ def test_transport_state_rejects_handle_store_inside_live_project(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "core-call",
@@ -866,7 +855,7 @@ def test_transport_state_rejects_handle_store_inside_live_project(
             "--transport-handle",
             transport_handle,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -880,14 +869,13 @@ def test_transport_state_rejects_invented_native_id_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             TRANSPORT_GET_STATE_URI,
             "--transport-handle",
             "74",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"native transport connected to {url}"),
     )
 
@@ -921,14 +909,13 @@ def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "core-call",
             TRANSPORT_GET_STATE_URI,
             "--transport-handle",
             "trh1-" + "61" * 16,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -981,11 +968,11 @@ def test_transport_state_rejects_well_formed_but_non_live_handle_before_state_ca
 
     code, payload = gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "core-call", TRANSPORT_GET_STATE_URI,
             "--transport-handle", transport_handle,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -1029,14 +1016,13 @@ def test_profiler_cursor_control_draft_starts_with_one_closed_declaration(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
             PROFILER_MOVE_CURSOR_URI,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
 
@@ -1159,14 +1145,13 @@ def test_remote_and_transport_control_return_authoring_boundary_before_project_r
     state_dir = tmp_path / operation
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path, version="2022.1"),
+        env=set_gateway_config(_env(tmp_path, version="2022.1"), wwise_version="2022.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -1193,8 +1178,7 @@ def test_remote_and_transport_control_return_authoring_boundary_before_project_r
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+
             "--state-dir",
             str(state_dir),
             "draft-declare-runtime-control-plan",
@@ -1204,7 +1188,7 @@ def test_remote_and_transport_control_return_authoring_boundary_before_project_r
             "--expected-revision",
             str(started["draft"]["revision"]),
         ],
-        env=_env(tmp_path, version="2022.1"),
+        env=set_gateway_config(_env(tmp_path, version="2022.1"), wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
 
@@ -1239,14 +1223,13 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
     client = _RuntimeControlDraftClient(tmp_path)
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -1255,8 +1238,7 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
 
     code, declared = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-declare-runtime-control-plan",
@@ -1267,15 +1249,14 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
             str(started["draft"]["revision"]),
             *declaration,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, declared
 
     code, checked = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -1285,15 +1266,14 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
             "--expected-revision",
             str(declared["draft"]["revision"]),
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, checked
 
     code, previewed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -1303,7 +1283,7 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
             "--expected-revision",
             str(checked["draft"]["revision"]),
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
@@ -1342,11 +1322,11 @@ def _seal_runtime_control_preview(
         )
     code, started = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-start", operation,
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -1354,38 +1334,38 @@ def _seal_runtime_control_preview(
     authority = started["task_authority"]
     code, declared = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-declare-runtime-control-plan", draft_id,
             "--task-authority", authority,
             "--expected-revision", str(started["draft"]["revision"]),
             *declaration_values,
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-check", draft_id,
             "--task-authority", authority,
             "--expected-revision", str(declared["draft"]["revision"]),
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, checked
     code, previewed = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "preview-from-draft", draft_id,
             "--task-authority", authority,
             "--expected-revision", str(checked["draft"]["revision"]),
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
@@ -1596,8 +1576,8 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
     state_dir = tmp_path / "state-bound-runtime"
     client = _RuntimeControlDraftClient(tmp_path, version=version)
     code, started = gateway.execute_gateway(
-        ["--version", version, "--state-dir", str(state_dir), "draft-start", operation],
-        env=_env(tmp_path, version=version),
+        [ "--state-dir", str(state_dir), "draft-start", operation],
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -1606,7 +1586,7 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
     assert started["draft"]["next_action_binding"]["object_binding"]["next_role"] == role
     code, bound = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-bind-object", draft_id,
             "--task-authority", authority,
@@ -1614,13 +1594,13 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
             "--role", role,
             "--object-id", object_id,
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, bound
     code, declared = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-declare-runtime-control-plan", draft_id,
             "--task-authority", authority,
@@ -1628,31 +1608,31 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
             handle_flag, bound["bound_object"]["handle"],
             *extra,
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-check", draft_id,
             "--task-authority", authority,
             "--expected-revision", str(declared["draft"]["revision"]),
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, checked
     code, previewed = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "preview-from-draft", draft_id,
             "--task-authority", authority,
             "--expected-revision", str(checked["draft"]["revision"]),
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
@@ -1749,21 +1729,21 @@ def test_runtime_control_invalid_or_half_filled_intent_returns_repair_before_pre
     state_dir = tmp_path / "state-invalid-runtime"
     client = _RuntimeControlDraftClient(tmp_path, version=version)
     code, started = gateway.execute_gateway(
-        ["--version", version, "--state-dir", str(state_dir), "draft-start", operation],
-        env=_env(tmp_path, version=version),
+        [ "--state-dir", str(state_dir), "draft-start", operation],
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
     code, rejected = gateway.execute_gateway(
         [
-            "--version", version,
+
             "--state-dir", str(state_dir),
             "draft-declare-runtime-control-plan", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", str(started["draft"]["revision"]),
             *declaration,
         ],
-        env=_env(tmp_path, version=version),
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda _url: client,
     )
 

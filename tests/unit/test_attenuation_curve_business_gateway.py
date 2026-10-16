@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import json
 
 import pytest
@@ -41,8 +43,8 @@ def test_public_curve_schema_discloses_versioned_choices_and_point_constraints(t
 
 def _bound_curve(tmp_path, version):
     env = _env(tmp_path)
-    env.update(WWISE_VERSION=version, WWISE_WAAPI_HOST="127.0.0.1", WWISE_WAAPI_PORT="31337")
-    prefix = ["--version", version, "--state-dir", str(tmp_path / "state")]
+    set_gateway_config(env, wwise_version=version, waapi_host="127.0.0.1", waapi_port=31337)
+    prefix = ["--state-dir", str(tmp_path / "state")]
     code, started = gateway.execute_gateway([*prefix, "draft-start", URI], env=env,
         client_factory=lambda _: pytest.fail("offline start connected"))
     assert code == 0, started

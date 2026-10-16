@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -84,9 +86,9 @@ def _env(tmp_path: Path) -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2025.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -274,8 +276,8 @@ def test_project_save_core_plan_closes_business_draft_without_dispatch(
         }
     )
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
 
     exit_code, payload = gateway.execute_gateway(
         [
@@ -408,8 +410,8 @@ def test_core_call_resolves_two_exact_objects_and_dispatches_one_bounded_diff(
         }
     )
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
 
     exit_code, payload = gateway.execute_gateway(
         [
@@ -482,8 +484,8 @@ def test_core_call_accepts_real_wwise_unnamed_identity(
         }
     )
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
 
     exit_code, payload = gateway.execute_gateway(
         [
@@ -559,8 +561,8 @@ def test_core_call_dispatches_single_object_relationship_reads(
         }
     )
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
 
     exit_code, payload = gateway.execute_gateway(
         ["core-call", operation, "--object-id", SOURCE_ID],
@@ -608,8 +610,8 @@ def test_core_call_discovers_is_linked_field_from_business_meaning(
         }
     )
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
 
     exit_code, payload = gateway.execute_gateway(
         [
@@ -640,8 +642,8 @@ def test_core_mutation_check_rejects_bound_object_drift_before_dispatch(
 ) -> None:
     state_dir = tmp_path / "state"
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
     start_code, started = gateway.execute_gateway(
         ["--state-dir", str(state_dir), "draft-start", "ak.wwise.core.audio.mute"],
         env=env,
@@ -769,8 +771,8 @@ def test_audio_convert_core_plan_accepts_bound_objects_names_and_exact_io_root(
     io_root = tmp_path / "convert-output"
     io_root.mkdir()
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
     operation = "ak.wwise.core.audio.convert"
     start_code, started = gateway.execute_gateway(
         ["--state-dir", str(state_dir), "draft-start", operation],
@@ -881,8 +883,8 @@ def test_randomizer_core_plan_discovers_field_by_meaning_then_closes_values(
 ) -> None:
     state_dir = tmp_path / "state"
     env = _env(tmp_path)
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
     operation = "ak.wwise.core.object.setRandomizer"
     start_code, started = gateway.execute_gateway(
         ["--state-dir", str(state_dir), "draft-start", operation],
@@ -1027,9 +1029,9 @@ ATTENUATION_ROW = {
 
 def _core_role_binding_case(tmp_path: Path, version: str, *, operation: str = ATTENUATION_URI):
     env = _env(tmp_path)
-    env["WWISE_VERSION"] = version
-    env["WWISE_WAAPI_HOST"] = "127.0.0.1"
-    env["WWISE_WAAPI_PORT"] = "31337"
+    set_gateway_config(env, wwise_version=version)
+    set_gateway_config(env, waapi_host="127.0.0.1")
+    set_gateway_config(env, waapi_port=int("31337"))
     state_dir = tmp_path / "state"
     code, started = gateway.execute_gateway(
         ["--state-dir", str(state_dir), "draft-start", operation], env=env,
@@ -1145,7 +1147,7 @@ def test_attenuation_live_class_is_not_a_global_business_or_creatable_kind(versi
 @pytest.mark.parametrize("version", ("2020.1", "2026.1"))
 def test_attenuation_role_contract_is_unavailable_outside_pinned_versions(version, tmp_path):
     env = _env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     code, rejected = gateway.execute_gateway(["draft-start", ATTENUATION_URI], env=env,
         client_factory=lambda _url: pytest.fail("unsupported version must fail offline"))
     assert code == 2, rejected

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -76,9 +78,9 @@ def _env(tmp_path: Path, version: str = "2025.1") -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -643,7 +645,7 @@ def test_gateway_builds_rtpc_curve_from_bound_business_facts(
     original_env, original_info = _env, _info
 
     def version_env(path: Path) -> dict[str, str]:
-        return {**original_env(path), "WWISE_VERSION": version}
+        return set_gateway_config(original_env(path), wwise_version=version)
 
     def version_info() -> dict[str, Any]:
         value = original_info()

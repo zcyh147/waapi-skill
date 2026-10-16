@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 from pathlib import Path
@@ -75,8 +77,8 @@ def test_debug_host_controls_disclose_one_zero_value_business_entry(
 
         reflected = gateway.request_contract(version, api)
         direct_code, direct = gateway.execute_gateway(
-            ["--version", version, "typed-zero-call", api, "--schema-digest", reflected.schema_digest, "--apply"],
-            env=_env(tmp_path, version),
+            [ "typed-zero-call", api, "--schema-digest", reflected.schema_digest, "--apply"],
+            env=set_gateway_config(_env(tmp_path, version), wwise_version=version),
             client_factory=lambda url: pytest.fail(f"typed-zero connected to {url}"),
         )
         assert direct_code == 2, direct
