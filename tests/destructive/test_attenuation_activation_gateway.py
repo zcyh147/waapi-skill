@@ -83,7 +83,8 @@ def test_attenuation_activation_public_gateway_native():
         attenuation = create_object(gateway, "Attenuation", "WAAPI_Near", "Attenuations")
         fields = ["id", "name", "type", "path", "Attenuation", "ListenerRelativeRouting", "OverridePositioning", "Volume", "notes"]
         for kind in ("Sound", "RandomSequenceContainer"):
-            source = create_object(gateway, kind, "WAAPI_" + kind, "Actor-Mixer Hierarchy")
+            source = create_object(gateway, kind, "WAAPI_" + kind,
+                                   "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy")
             before = actor("ak.wwise.core.object.get", {"from": {"id": [source]}}, {"return": fields})["return"][0]
             metadata = {field: actor("ak.wwise.core.object.getPropertyInfo", {"object": source, "property": field}, {})
                         for field in ("Attenuation", "ListenerRelativeRouting", "OverridePositioning")}
