@@ -28,7 +28,8 @@ def generated_discoveries():
             'selection_rule': 'copy_exactly_one_candidate.handle_per_requested_meaning'})]
 
 
-def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path, monkeypatch):
+@pytest.mark.parametrize('unit_category', [None, 'Decibels'])
+def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path, monkeypatch, unit_category):
     from tests.unit.test_object_metadata_business_gateway import (
         waapi_gateway, _offline, _env, _info, _project, OBJECT_ID, FakeClient)
     from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
@@ -49,6 +50,8 @@ def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path
     assert code == 0, bound
     metadata = {'name': 'VolumeGain', 'type': 'Real32', 'display': {'name': 'Volume gain'},
         'restriction': {'type': 'range', 'min': -96.0, 'max': 24.0}}
+    if unit_category is not None:
+        metadata['ui'] = {'dataMeaning': unit_category}
     client = FakeClient({'ak.wwise.core.getInfo': [_info()], 'ak.wwise.core.getProjectInfo': [_project(producer)],
         'ak.wwise.core.object.getPropertyAndReferenceNames': [{'return': ['VolumeGain']}] * 2,
         'ak.wwise.core.object.getPropertyInfo': [metadata] * 2})
@@ -71,6 +74,7 @@ def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path
     fact = receipt['input']['pre_execution_draft_discoveries']['discoveries'][-1]
     assert fact['meanings'] == ['Volume  gain']
     assert fact['candidates'][0]['matched_meanings'] == ['Volume gain']
+    assert 'metadata' not in fact['candidates'][0] and 'unit' not in fact['candidates'][0]
     monkeypatch.setattr(review, 'run_process', lambda *a, **k: (_ for _ in ()).throw(AssertionError('model replay')))
     assert verify_expansion_task_archive(root, expected_unit_id=unit,
         expected_version='2025.1', expected_inputs_sha256='a' * 64)['archive_valid'] is True
@@ -488,7 +492,9 @@ def test_unnamed_stinger_real_binding_reaches_reviewer_and_readonly_archive(tmp_
     from tests.semantic.support import codex_c09_notice_adjudication as review
     producer = tmp_path / 'producer'
     producer.mkdir()
-    env = {**_env(producer), 'WWISE_VERSION': '2025.1'}
+    env = _env(producer)
+    code, configured = waapi_gateway.execute_gateway(['config-set', '--wwise-version', '2025.1'], env=env)
+    assert code == 0, configured
     common = ['--state-dir', str(producer / 'state')]
     code, started = waapi_gateway.execute_gateway([*common, 'draft-start', 'object.setReference'], env=env,
         client_factory=lambda _: pytest.fail('offline start connected'))
@@ -547,3 +553,27 @@ def test_unnamed_bound_scope_still_rejects_invalid_identity(field_context, name,
     reseal(context, 1)
     reseal(context, 2)
     assert decide(context)['outcome'] == 'material_reject'
+
+
+@pytest.mark.parametrize('damage', ['candidate-extra', 'metadata-extra', 'metadata-shape', 'metadata-size',
+                                  'unit-extra', 'unit-number', 'unit-mismatch', 'unit-missing'])
+def test_metadata_extension_remains_bounded_and_closed(field_context, damage):
+    from wwise_waapi.builders.metadata import parse_get_property_info_result
+    context = field_context
+    payload = context[2]['broker_records'][2]['payload']
+    row = payload['meaning_results'][0]['candidates'][0]
+    row['metadata'] = parse_get_property_info_result({'name': 'Gain', 'type': 'Real32'}).as_dict()
+    row['unit'] = {'status': 'unknown', 'value': None}
+    if damage == 'candidate-extra': row['new_authority'] = 'not-disclosed'
+    elif damage == 'metadata-extra': row['metadata']['unknown'] = True
+    elif damage == 'metadata-shape': row['metadata']['supports'] = []
+    elif damage == 'metadata-size': row['metadata']['display']['name'] = 'x' * 40000
+    elif damage == 'unit-extra': row['unit']['assumed'] = True
+    elif damage == 'unit-number': row['metadata']['ui']['dataMeaning'] = 3
+    elif damage == 'unit-mismatch': row['unit'] = {'status': 'known', 'value': 'Decibels'}
+    elif damage == 'unit-missing': row.pop('unit')
+    payload['field_candidates'] = [row.copy()]
+    reseal(context, 2)
+    decision = decide(context)
+    assert decision['outcome'] == 'material_reject'
+    assert 'input' not in decision

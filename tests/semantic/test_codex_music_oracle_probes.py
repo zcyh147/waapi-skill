@@ -172,8 +172,8 @@ def test_probe_accepts_actual_public_gateway_bound_projection(tmp_path, route, e
 
 @pytest.mark.parametrize('version', ('2022.1', '2025.1'))
 @pytest.mark.parametrize('field', ('FadeTime', 'FadeOffset'))
-@pytest.mark.parametrize('ambiguous', (False, True))
-def test_transition_property_state_plan_passes_public_preflight_and_live_metadata(tmp_path, version, field, ambiguous):
+@pytest.mark.parametrize('exact', (False, True))
+def test_transition_property_state_plan_passes_public_preflight_and_live_metadata(tmp_path, version, field, exact):
     from tests.unit.test_metadata_discovery_gateway import (
         FakeClient, _gateway_env, _metadata_responses, waapi_gateway, IS_PROPERTY_ENABLED_URI,
     )
@@ -185,8 +185,8 @@ def test_transition_property_state_plan_passes_public_preflight_and_live_metadat
     command = commands[('FadeTime', 'FadeOffset').index(field)]
     meaning = 'time' if field == 'FadeTime' else 'offset'
     assert command == ('metadata', 'property-state', '--exact-id', FADE, '--meaning', meaning, '--platform', 'Mac')
-    if ambiguous:
-        # Keep the original broad request as a truthful ambiguity control.
+    if exact:
+        # An exact field token narrows before fuzzy display-label matches.
         command = (*command[:5], field, *command[6:])
     responses = _metadata_responses(tmp_path, version=version, names=('FadeTime', 'FadeOffset', 'FadeCurve', 'FadeType'))
     responses[IS_PROPERTY_ENABLED_URI] = {'return': True}
@@ -195,17 +195,8 @@ def test_transition_property_state_plan_passes_public_preflight_and_live_metadat
         client_factory=lambda _url: client)
     assert code == 0, payload
     assert client.calls  # Actual public preflight reached only the injected fake.
-    if ambiguous:
-        assert payload['status'] == 'needs_clarification'
-        assert payload['agent_result']['meaning'] == field
-        assert payload['agent_result']['candidate_count'] == 4
-        assert {row['field'] for row in payload['agent_result']['candidates']} == {'FadeTime', 'FadeOffset', 'FadeCurve', 'FadeType'}
-        assert IS_PROPERTY_ENABLED_URI not in [call[0] for call in client.calls]
-        result = run_music_read_plan([command], lambda _: (code, payload))
-        assert result['receipts'][0]['finding'] == 'needs_clarification'
-    else:
-        assert payload['agent_result'] == {'meaning': meaning, 'platform': 'Mac', 'enabled': True}
-        assert client.calls[-1] == (IS_PROPERTY_ENABLED_URI, {'object': FADE, 'platform': 'Mac', 'property': field}, {})
+    assert payload['agent_result'] == {'meaning': field if exact else meaning, 'platform': 'Mac', 'enabled': True}
+    assert client.calls[-1] == (IS_PROPERTY_ENABLED_URI, {'object': FADE, 'platform': 'Mac', 'property': field}, {})
 
 
 @pytest.mark.parametrize('damage', ('missing', 'duplicate', 'entity', 'oversized', 'too_many'))

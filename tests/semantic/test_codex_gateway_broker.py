@@ -10460,7 +10460,7 @@ def test_broker_rejects_non_exact_or_arbitrary_nonzero_structured_error(
     "selector",
     ((), ("--version", "2022.1"), ("--wwise-version=2022.1",)),
 )
-def test_broker_accepts_canonical_step_global_timeout_before_wait_topic(
+def test_wait_topic_accepts_timeout_but_rejects_online_version_selector(
     tmp_path: Path,
     selector: tuple[str, ...],
 ) -> None:
@@ -10497,6 +10497,13 @@ def test_broker_accepts_canonical_step_global_timeout_before_wait_topic(
         transport="tcp",
     ) as broker:
         result = run_model_command(broker, arguments)
+        if selector:
+            assert result.returncode == 126
+            assert "offline catalog/schema" in result.stderr
+            assert broker.evidence().terminal_state == "FAILED"
+            assert broker.evidence().records[0].accepted is False
+            assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+            return
         assert result.returncode == 0, result.stderr
 
         evidence = broker.evidence()
@@ -11083,7 +11090,7 @@ def test_authenticated_rejection_is_terminal_and_never_executes_later_command(tm
         (),
     ),
 )
-def test_matching_optional_model_version_selector_is_sanitized_before_runner(
+def test_online_model_version_selector_is_rejected_before_runner(
     tmp_path: Path,
     selector: tuple[str, ...],
 ) -> None:
@@ -11092,12 +11099,19 @@ def test_matching_optional_model_version_selector_is_sanitized_before_runner(
         skill_source=skill,
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         expected_wwise_version="2022.1",
-        runner_environment={**os.environ, "WWISE_VERSION": "2022.1"},
+        runner_environment=os.environ,
         transport="tcp",
     ) as broker:
         arguments = [*selector, "status"]
         result = run_model_command(broker, arguments)
 
+        if selector:
+            assert result.returncode == 126
+            assert "offline catalog/schema" in result.stderr
+            assert broker.evidence().terminal_state == "FAILED"
+            assert broker.evidence().records[0].accepted is False
+            assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+            return
         assert result.returncode == 0, result.stderr
         evidence = broker.evidence()
         assert evidence.passed is True
@@ -11117,7 +11131,7 @@ def test_matching_optional_model_version_selector_is_sanitized_before_runner(
         ("--wwise-version=2022.1",),
     ),
 )
-def test_runner_level_version_selector_is_canonicalized_and_sanitized(
+def test_runner_level_online_version_selector_is_rejected_before_runner(
     tmp_path: Path,
     selector: tuple[str, ...],
 ) -> None:
@@ -11126,7 +11140,7 @@ def test_runner_level_version_selector_is_canonicalized_and_sanitized(
         skill_source=skill,
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         expected_wwise_version="2022.1",
-        runner_environment={**os.environ, "WWISE_VERSION": "2022.1"},
+        runner_environment=os.environ,
         transport="tcp",
     ) as broker:
         raw = ["python", str(broker.runner_path), *selector, "gateway.py", "status"]
@@ -11144,17 +11158,12 @@ def test_runner_level_version_selector_is_canonicalized_and_sanitized(
             check=False,
         )
 
-        assert result.returncode == 0, result.stderr
+        assert result.returncode == 126
+        assert "offline catalog/schema" in result.stderr
         evidence = broker.evidence()
-        assert evidence.passed is True
-        record = evidence.records[0]
-        assert record.model_argv[1:] == tuple(raw[1:])
-        canonical = ("python", str(broker.runner_path), "gateway.py", *selector, "status")
-        assert record.normalized_model_argv == canonical
-        assert record.gateway_arguments == (*selector, "status")
-        calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(encoding="utf-8").splitlines()
-        assert json.loads(calls[0]) == ["gateway.py", "status"]
-        assert broker.reconcile((raw,)).passed is True
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.records[0].accepted is False
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
 
 @pytest.mark.parametrize(
@@ -17668,3 +17677,27 @@ def test_current_broker_does_not_strip_a_live_connection_version_override(tmp_pa
         assert result.returncode != 0
         assert "offline" in result.stderr.lower()
         assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+@pytest.mark.parametrize("selector", [("--version", "2022.1"), ("--version=2022.1",),
+                                      ("--wwise-version", "2022.1"), ("--wwise-version=2022.1",)])
+@pytest.mark.parametrize("placement", ["gateway", "runner"])
+def test_offline_catalog_version_selector_remains_authenticated_and_permitted(tmp_path, selector, placement):
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(skill_source=skill,
+            expected_steps=(ExpectedGatewayStep("query-schema", "query-schema"),),
+            expected_wwise_version="2022.1", transport="tcp") as broker:
+        tail = ["gateway.py", *selector, "query-schema"] if placement == "gateway" else [*selector, "gateway.py", "query-schema"]
+        raw = ["python", str(broker.runner_path), *tail]
+        environment = broker.model_environment(os.environ)
+        result = run_model_argv(raw, environment=environment,
+            windows_interpreter=Path(environment[SHIM_TRUSTED_PYTHON_ENV]) if os.name == "nt" else None,
+            windows_command_directory=broker.shim_directory, capture_output=True, text=True, check=False)
+        assert result.returncode == 0, result.stderr
+        evidence = broker.evidence()
+        assert evidence.passed is True
+        assert evidence.records[0].accepted is True
+        assert evidence.records[0].gateway_arguments == (*selector, "query-schema")
+        calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(encoding="utf-8").splitlines()
+        assert json.loads(calls[0]) == ["gateway.py", "query-schema"]
+        assert broker.reconcile((raw,)).passed is True
