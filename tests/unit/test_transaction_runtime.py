@@ -242,15 +242,12 @@ def test_transaction_preview_ingress_preserves_the_legacy_json_artifact_contract
         "expected_notes": "after",
     }
     assert prepared["cleanup"] == {
-        "kind": "restore-pre-state",
-        "snapshot": {
-            "id": GUID,
-            "name": "Target",
-            "type": "Sound",
-            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Target",
-            "parent": {"id": "{parent}"},
-            "notes": "before",
-        },
+        "kind": "retain-project-and-outputs",
+        "project_policy": "retain",
+        "output_policy": "retain",
+        "automatic_cleanup": False,
+        "automatic_retry": False,
+        "automatic_rollback": False,
     }
     assert artifact["project_guard"] == project_guard()
     assert artifact["runtime_guard"] == build_runtime_guard(SKILL_ROOT, "2022.1")

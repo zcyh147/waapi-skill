@@ -436,7 +436,14 @@ def test_gateway_outer_exception_normalization_contains_broken_string_hook(tmp_p
     assert exit_code == 2
     assert payload["error_code"] == "ERROR_NORMALIZATION_FAILED"
     assert payload["message"] == "The underlying error could not be normalized safely"
-    assert len(json.dumps(payload).encode("utf-8")) < 1536
+    # Preserve the original error budget, plus a separately bounded recovery receipt.
+    recovery = payload["recovery"]
+    core = {key: value for key, value in payload.items() if key != "recovery"}
+    assert len(json.dumps(core).encode("utf-8")) < 1536
+    assert len(json.dumps(recovery).encode("utf-8")) < 1024
+    assert len(json.dumps(payload).encode("utf-8")) < 2560
+    assert recovery["project_write_outcome"] == "no_project_write_in_this_invocation"
+    assert recovery["original_write_replay_allowed"] is False
 
 
 def test_gateway_outer_exception_normalization_contains_broken_as_dict_hook(tmp_path: Path) -> None:
@@ -461,7 +468,14 @@ def test_gateway_outer_exception_normalization_contains_broken_as_dict_hook(tmp_
     assert payload["error_code"] == "HOSTILE_STRUCTURED_ERROR"
     assert payload["message"] == "safe primary message"
     assert payload["details"] is None
-    assert len(json.dumps(payload).encode("utf-8")) < 1536
+    # Preserve the original error budget, plus a separately bounded recovery receipt.
+    recovery = payload["recovery"]
+    core = {key: value for key, value in payload.items() if key != "recovery"}
+    assert len(json.dumps(core).encode("utf-8")) < 1536
+    assert len(json.dumps(recovery).encode("utf-8")) < 1024
+    assert len(json.dumps(payload).encode("utf-8")) < 2560
+    assert recovery["project_write_outcome"] == "no_project_write_in_this_invocation"
+    assert recovery["original_write_replay_allowed"] is False
 
 
 def test_status_uses_project_object_query_for_2021_1(tmp_path: Path) -> None:
