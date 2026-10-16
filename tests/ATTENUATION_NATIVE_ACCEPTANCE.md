@@ -82,3 +82,28 @@ none was deleted to obtain a passing result. The repair recognizes only the
 observed exact UI visibility and Boolean positioning-terminal descriptors;
 unknown activation conditions, conflicting values, and ordinary dependency
 cycles remain fail-closed.
+
+## Targeted native false-routing branch
+
+The subsequent frozen candidate `813c993f` passed
+`test_attenuation_activation_false_routing_public_gateway_native` on Wwise
+2025.1: **1 passed, 33 deselected**, exit 0, 60.50 seconds. The new root is
+`attenuation-false-routing-813c993f-2025-r1`, under the same retained local
+`.waapi-skill-state` directory, with the same three evidence filenames listed
+above. This is additional 2025.1 branch evidence, not five-version native
+false-routing coverage.
+
+Three separately previewed, confirmed, executed, and verified public fixture
+property changes set the Sound's override true, listener routing false, and
+override false. Independent pre-state readback then proved both prerequisite
+booleans false. Its tested single `object.set` association Preview disclosed
+both derived true values, and independent post-state readback proved both true
+and the exact attenuation reference. The RandomSequenceContainer retained its
+initially true listener routing and disclosed only the missing override change.
+Both objects preserved their unrelated Volume/notes and identity fields.
+
+The lifecycle reported PASS with no errors, identical full source hashes and
+source project mtimes, and `sandbox_retained=false`. The final process check
+found no Wwise.exe or WwiseConsole.exe process. This run used the same private
+HOME and owned-prefix pattern through the existing ScenarioLifecycle. No Fresh
+Agent or native-Windows acceptance is claimed.
