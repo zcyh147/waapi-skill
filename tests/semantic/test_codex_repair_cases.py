@@ -58,3 +58,13 @@ def test_unknown_native_units_are_preserved_without_invention():
     detail = deepcopy(DETAIL)
     detail["agent_result"]["metadata"]["unit"] = {"status": "unknown", "value": None}
     assert require_predelay_metadata(detail)["unit"] == {"status": "unknown", "value": None}
+
+
+def test_actual_native_metadata_keeps_unknown_units_and_attested_domain():
+    import json
+    from pathlib import Path
+    evidence = json.loads((Path(__file__).parent / "data/waapi-v11-repairs/metadata-preflight-2025.1.json").read_text())
+    metadata = require_predelay_metadata({"agent_result": {"metadata": evidence["metadata"]}})
+    assert metadata["default"] == 25
+    assert metadata["restriction"] == {"type": "range", "min": 0.0, "max": 1000.0}
+    assert metadata["unit"] == {"status": "unknown", "value": None}

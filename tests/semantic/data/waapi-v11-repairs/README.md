@@ -82,3 +82,23 @@ SampleProject mtime remains `1792176469219518550` ns. The WPROJ/WWU-only hash
 and full tree metadata digest also match their captured before-state.
 The source worktree for these ignored local artifacts is
 `/Users/xiye/.codex/worktrees/waapi-repair-fresh/waapi-skills`.
+
+The corrected exact-k preflight passed on `24859781`: 1 passed / 32 deselected,
+three metadata pages and exact detail, zero project mutations and zero Agent
+calls. Root `repair-predelay-24859781-r2` records lifecycle PASS, no errors,
+unchanged full source hash/mtime and removed passing sandbox. The final process
+check found no Wwise process. `metadata-preflight-2025.1.json` retains the exact
+native metadata and source protection facts; it is not runtime authority.
+
+After all merges, review and gates, the coordinator may start the approved
+first batch from the repository root with this command (not run during preparation):
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile waapi_v11_repairs_4 --version 2025.1 \
+  --model gpt-5.6-terra --reasoning-effort medium --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/imac-v11-repairs-first4-r1
+```
+
+The campaign root must be new. Do not append `--resume`, select extra cases, or
+start a second batch under this preparation authorization.
