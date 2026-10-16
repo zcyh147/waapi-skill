@@ -1,0 +1,85 @@
+{
+  "repository": "zcyh147/waapi-skill",
+  "tickets": {
+    "01": {
+      "number": 164,
+      "id": 5888899173,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/164",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/01-audit.md",
+      "blocked_by": []
+    },
+    "02": {
+      "number": 165,
+      "id": 5888899833,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/165",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/02-connection.md",
+      "blocked_by": []
+    },
+    "03": {
+      "number": 166,
+      "id": 5888900504,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/166",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/03-metadata.md",
+      "blocked_by": []
+    },
+    "04": {
+      "number": 167,
+      "id": 5888901228,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/167",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/04-dependencies.md",
+      "blocked_by": []
+    },
+    "05": {
+      "number": 168,
+      "id": 5888901915,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/168",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/05-gameparameter.md",
+      "blocked_by": [
+        166
+      ]
+    },
+    "06": {
+      "number": 169,
+      "id": 5888902534,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/169",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/06-shareset.md",
+      "blocked_by": []
+    },
+    "07": {
+      "number": 170,
+      "id": 5888903236,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/170",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/07-recovery.md",
+      "blocked_by": []
+    },
+    "08": {
+      "number": 171,
+      "id": 5888903747,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/171",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/08-cleanup.md",
+      "blocked_by": []
+    },
+    "09": {
+      "number": 172,
+      "id": 5888904449,
+      "url": "https://github.com/zcyh147/waapi-skill/issues/172",
+      "file": "docs/plans/waapi-v1.1-repairs/tickets/09-acceptance.md",
+      "blocked_by": [
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171
+      ]
+    }
+  },
+  "spec": {
+    "number": 163,
+    "id": 5888898715,
+    "url": "https://github.com/zcyh147/waapi-skill/issues/163"
+  },
+  "relationships": "published"
+}
