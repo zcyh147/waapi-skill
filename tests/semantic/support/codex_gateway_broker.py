@@ -14117,14 +14117,15 @@ class CodexGatewayBroker:
                 validate_transaction_show_confirmation_payload(payload)
             if (expansion_read or expansion_preparation) and exit_code == 2:
                 from tests.semantic.support.codex_expansion_policy import (
-                    is_public_query_timeout_failure,
+                    is_public_query_timeout_failure, is_public_recoverable_query_failure,
                 )
                 public_query_timeout = (
                     expansion_read and step.subcommand == "query-object"
                     and is_public_query_timeout_failure(payload)
                 )
+                recoverable_query = expansion_read and is_public_recoverable_query_failure(payload)
                 if (payload.get("ok") is not False
-                        or (not public_query_timeout and (
+                        or (not public_query_timeout and not recoverable_query and (
                             not isinstance(payload.get("error_code"), str)
                             or (step.subcommand == "query-object" and "call" in payload)))
                         or payload.get("command") != step.subcommand):
@@ -14132,7 +14133,7 @@ class CodexGatewayBroker:
                 # A deadline failure is not a repairable input rejection. Keep
                 # the read receipt intact and stop infrastructure without
                 # changing the already verified transaction's own state.
-                terminal_indeterminate = public_query_timeout
+                terminal_indeterminate = public_query_timeout and not recoverable_query
             elif step.terminal_execute:
                 _validate_terminal_execute_payload(payload, exit_code=exit_code)
             elif step.allowed_exit_codes == (0, 2):

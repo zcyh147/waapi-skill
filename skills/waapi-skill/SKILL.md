@@ -66,7 +66,7 @@ facts, not later Skill invocations. Send machine answers separately.
 2. Use the supplied Skill root and the loading rules above, including for Wwise CLI and project-migration requests. Do not probe the repository or working directory to locate the Skill.
 3. For common reads below, run the absolute `scripts/run.py` before `ls`, `find`, `rg`, research, or implementation reads.
 4. Live operations and Drafts use only the selected saved connection (`config-show` / `config-set`). Temporary host/port flags and connection environment overrides are not supported. `--version` is only for offline catalog/schema browsing, such as `gateway.py --version 2022.1 operation-schema object.copy`. A copied Skill still shares the user config unless explicitly assigned a separate `WAAPI_SKILL_CONFIG_PATH`. Never hand-edit config or scan unrelated ports/processes.
-5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. For discovery/schema, use supported `max_output_tokens=20000`, capped at the tool's documented maximum. Copy returned GUIDs exactly, including `{}` braces. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. A structured error or shell failure stops the workflow; do not retry the Gateway command.
+5. Treat gateway JSON as authoritative. Every gateway command must leave its complete JSON visible before the next command: never suppress or redirect its output, request a zero/short tool-output budget, or continue from the shell exit code alone. For discovery/schema, use supported `max_output_tokens=20000`, capped at the tool's documented maximum. Copy returned GUIDs exactly, including `{}` braces. Copy returned `shell_tool_timeout_ms` to the outer shell tool call; never add it to the command argv. If no complete JSON is visible, stop. For a complete structured error, follow the Recovery rule below. A shell failure without complete JSON remains a stop.
 6. Read only the current-turn lane; never preload. Read-only work cannot read `waapi-operate.md` before a change request.
 
 ## Fixed gateway commands
@@ -170,7 +170,7 @@ A diagnosis-only turn reads only `waapi-query.md`; it must not preload `waapi-op
 
 Classify the complete read-only task before its first hop. If it needs multiple or relationship hops, fully read `references/waapi-query.md` before any Gateway command; an exact path/GUID first hop does not make the whole task a complete fast route.
 
-For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object` with one literal `--path-segment` per hierarchy level, or `--exact-id '<exact-guid>'`. The Gateway constructs path separators and always returns the four identity fields. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; do not retry a rejected or failed gateway invocation.
+For a complete single-hop exact path/GUID existence or identity lookup, run exactly `query-object` with one literal `--path-segment` per hierarchy level, or `--exact-id '<exact-guid>'`. The Gateway constructs path separators and always returns the four identity fields. Exact `not_found` stays Gateway-owned in compact output; use `--detail` only for explicit compile/dispatch diagnostics. This route is complete: do not read the query reference before or after it; follow its recovery receipt if the task still needs another bounded read.
 
 Conditional read for a query not fully covered by the fixed commands, exact-identity fast route, or exact reflection-call fast route: `references/waapi-query.md`
 
@@ -193,7 +193,7 @@ Normal prose covers only objects, changes, results, risks, and whether anything 
 
 Choose the transaction phase before choosing a command. An existing transaction continuation takes precedence over the named-operation rule; it requires the transaction id, and an artifact hash alone is not a transaction lookup key. For a confirmation, check, or continuation, reuse the already-visible Skill/reference and run `transaction-show <transaction-id> --summary-only` first; skip schema discovery and start with `transaction-show`. Follow only its complete returned continuation and selected `copy_instruction.source_field`; diagnostic `full_argv` is not executable. An incomplete result stops the turn. `awaiting_confirmation` also requires current user authorization and its opaque token; `policy_authorized` has no token. A status or check request stops after `transaction-show`.
 
-For a new change, use its named operation or exact-URI `request-schema` and follow one continuation. For `core-business/v1`, the exact returned continuation owns the read shape. Bind returned object/Field Handles and submit one complete Core plan; never type native tokens, enums, GUID arrays, curve/edge objects, or request fragments. Execute once; `verify` is terminal authority. Rejection, incompleteness, or `indeterminate` stops. `ak.wwise.cli.migrate` stops after execute. Never invoke internal planners/builders or construct raw requests.
+For a new change, use its named operation or exact-URI `request-schema` and follow one continuation. For `core-business/v1`, the exact returned continuation owns the read shape. Bind returned object/Field Handles and submit one complete Core plan; never type native tokens, enums, GUID arrays, curve/edge objects, or request fragments. Execute once; `verify` is terminal authority. Incompleteness stops. Complete failures and `indeterminate` use the Recovery rule; the original write is never replayed. `ak.wwise.cli.migrate` stops after execute. Never invoke internal planners/builders or construct raw requests.
 
 For user-ordered independent transactions, preserve order and scope. In ordinary agent use, omit `--state-dir`: the Gateway owns a deterministic external runtime-state default. Never probe `WAAPI_SKILL_STATE_DIR`; pass `--state-dir` only when a trusted absolute override was explicitly supplied, and reuse it unchanged.
 
@@ -210,12 +210,18 @@ Conditional read for a closed transaction: `references/waapi-operate.md`
 
 Loads versioned manifest, semantic, WAQL, and deferred resources. Use `describe <uri> --full-schema` only when needed. `waapi-coverage.md` owns counts/evidence, never live proof.
 
+## Recovery
+
+Use the complete Gateway `recovery` receipt. When `read_only_continuation_allowed` is true, refine a read, page discovery, inspect saved config, or make at most one bounded reconnect within the existing task without another permission question. Ask only for missing facts or an exact user choice. A service start still needs authority from the existing task; the receipt does not grant it.
+
+Keep `read_only`, `ask_before_changes`, and `allow_changes` unchanged. Any new change follows its normal Preview and authorization. `unknown_write_outcome` permits only independent bounded read-only diagnosis when the receipt allows it; preserve uncertainty and never replay the original write, including through a new Draft. Error wording alone proves neither success nor no change. Unresolved cleanup, missing recovery guidance, incomplete JSON, and explicit host/version/safety boundaries remain stops.
+
 ## Boundaries
 
 - Never invent API maps or disposable logic: no heredoc, inline Python, new `.py`/`.js`/`.sh` helper, direct client construction, alternate runner, or temporary script.
 - Use only packaged commands or returned `request-schema` / `operation-schema` continuations. Mutations always require immutable Preview plus confirmation or policy authorization; `typed-call` cannot bypass routing.
 - Lua uses only exact user source/path. Debug controls execute once. Raw UI hooks/model CLI stay blocked; writes stay below `io_root`.
-- Do not search the repository to recover from a gateway error. Return structured failure or `unsupported_by_skill_interface` unless the user requested Skill development/debugging.
+- Do not search the repository to recover from a gateway error. Use disclosed recovery actions or report the structured `unsupported_by_skill_interface` boundary; repository debugging requires a Skill development/debugging request.
 - Editing is allowed only for Skill development, testing, or debugging—not to complete ordinary Wwise work.
 
 ## Detailed references
