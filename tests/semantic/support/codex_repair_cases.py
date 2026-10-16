@@ -118,16 +118,26 @@ def metadata_chain_proven(receipts):
         if payload.get("ok") is not True:
             continue
         result = payload.get("agent_result", {})
+        def values(name):
+            found = []
+            for index, value in enumerate(args):
+                if value == name and index + 1 < len(args):
+                    found.append(args[index + 1])
+                elif isinstance(value, str) and value.startswith(name + "="):
+                    found.append(value.partition("=")[2])
+            return tuple(found)
         def option(name):
-            return args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else None
+            found = values(name)
+            return found[-1] if found else None
         if command == "draft-discover-fields":
-            scope = tuple((flag, option(flag)) for flag in ("--object-handle", "--type-handle", "--kind") if option(flag))
+            scope = tuple((flag, option(flag)) for flag in ("--object-handle", "--type-handle", "--semantic-kind", "--platform") if option(flag))
             if not args or not scope:
                 continue
             key = (command, args[0], scope)
             mode = "list" if "--list" in args else "detail" if option("--selection") else None
         elif command == "metadata":
-            scope = tuple((flag, option(flag)) for flag in ("--object-id", "--custom-kind", "--kind") if option(flag))
+            scope = tuple((flag, values(flag) if flag == "--path-segment" else option(flag))
+                          for flag in ("--exact-id", "--path-segment", "--custom-kind", "--kind", "--platform") if values(flag))
             key = (command, scope)
             mode = args[0] if args else None
         else:

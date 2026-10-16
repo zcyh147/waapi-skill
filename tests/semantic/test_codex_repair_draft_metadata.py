@@ -8,10 +8,16 @@ from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker, Expe
 from tests.semantic.support.codex_repair_cases import metadata_chain_proven
 
 
-def producer_chain(tmp_path, monkeypatch):
+def producer_chain(tmp_path, monkeypatch, *, equals=False):
     rows = []
     original = FieldTask.run
     def capture(self, *argv):
+        if equals:
+            converted = []
+            iterator = iter(argv)
+            for value in iterator:
+                converted.append(value + "=" + next(iterator) if value in {"--object-handle", "--page", "--selection"} else value)
+            argv = tuple(converted)
         code, payload = original(self, *argv)
         assert code == 0, payload
         rows.append((list(argv), deepcopy(payload)))
@@ -33,9 +39,10 @@ def producer_chain(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("fault", [None, "list_increment", "selection_unchanged"])
 @pytest.mark.parametrize("dynamic", [False, True])
-def test_real_draft_browse_and_selection_revisions_cross_authenticated_broker(tmp_path, monkeypatch, fault, dynamic):
+@pytest.mark.parametrize("equals", [False, True])
+def test_real_draft_browse_and_selection_revisions_cross_authenticated_broker(tmp_path, monkeypatch, fault, dynamic, equals):
     monkeypatch.setattr(gateway, "GATEWAY_RUNNER_PATH", tmp_path / "transport/scripts/run.py")
-    rows = producer_chain(tmp_path, monkeypatch)
+    rows = producer_chain(tmp_path, monkeypatch, equals=equals)
     if fault == "list_increment":
         rows[2][1]["draft"]["revision"] = 3
     elif fault == "selection_unchanged":
@@ -138,3 +145,54 @@ def test_real_metadata_receipts_replay_through_notice_and_archive(tmp_path, monk
     else:
         replay = verify_expansion_task_archive(root, expected_unit_id="REPAIR25-F1", expected_version="2025.1", expected_inputs_sha256=INPUTS)
         assert replay["business_pass"] is True
+
+
+@pytest.mark.parametrize("scope_kind", ["exact-id", "path-segment"])
+@pytest.mark.parametrize("equals", [False, True])
+@pytest.mark.parametrize("cross_scope", [False, True])
+def test_standalone_metadata_preserves_exact_object_scope(tmp_path, monkeypatch, scope_kind, equals, cross_scope):
+    from tests.unit.test_field_interface_closure_gateway import SECOND
+    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
+    task.metadata = {"Other": {"name": "Other", "type": "Real32", "default": 0},
+        "PreDelay": {"name": "PreDelay", "type": "Real32", "default": 25,
+                     "restriction": {"type": "range", "min": 0, "max": 1000}}}
+    segments = ("Events", "Default Work Unit", "Event0", "[Play]")
+    other_segments = ("Events", "Default Work Unit", "Event1", "[Play]")
+    original_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith("object.get") and "path" in (args or {}).get("from", {}):
+            return {"return": [row for row in task.objects.values() if row["path"] in args["from"]["path"]]}
+        return original_call(uri, args, options)
+    monkeypatch.setattr(task, "call", call)
+    def scope(other=False):
+        values = (SECOND if other else FIRST,) if scope_kind == "exact-id" else (other_segments if other else segments)
+        return [token for value in values for token in (["--" + scope_kind + "=" + value] if equals else ["--" + scope_kind, value])]
+    def option(flag, value):
+        return [flag + "=" + value] if equals else [flag, value]
+    rows = []
+    def run(mode, *args):
+        argv = ["metadata", mode, *scope(), *args]
+        code, payload = task.run(*argv)
+        assert code == 0, payload
+        rows.append((argv, payload))
+        return payload["agent_result"]
+    page = run("list", "--page-size", "1")
+    page = run("list", "--page-size", "1", *option("--page", page["next_page"]))
+    run("detail", *option("--selection", page["fields"][0]["selection"]))
+    if cross_scope:
+        rows[-1][0][:] = ["metadata", "detail", *scope(True), *option("--selection", page["fields"][0]["selection"])]
+        gateway.build_parser().parse_args(rows[-1][0])
+    assert metadata_chain_proven([{"command": argv[0], "arguments": argv[1:], "payload": payload}
+                                  for argv, payload in rows]) is (not cross_scope)
+
+
+def test_equals_form_draft_metadata_replays_in_archive(tmp_path, monkeypatch):
+    from tests.semantic.test_codex_expansion_archive import _sealed_c08, INPUTS
+    from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive
+    producer = tmp_path / "producer"
+    producer.mkdir()
+    rows = producer_chain(producer, monkeypatch, equals=True)
+    root = tmp_path / "archive"
+    _sealed_c08(root, repair_metadata=rows)
+    replay = verify_expansion_task_archive(root, expected_unit_id="REPAIR25-F1", expected_version="2025.1", expected_inputs_sha256=INPUTS)
+    assert replay["business_pass"] is True
