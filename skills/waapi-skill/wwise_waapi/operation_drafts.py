@@ -17,7 +17,7 @@ import secrets
 import stat
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
@@ -357,6 +357,7 @@ class OperationDraftRecord:
     composition: Mapping[str, Any] | None = None
     check: Mapping[str, Any] | None = None
     seal: Mapping[str, Any] | None = None
+    connection_binding: Mapping[str, Any] | None = None
 
     def as_digest_material_dict(self) -> dict[str, Any]:
         payload = {
@@ -387,6 +388,8 @@ class OperationDraftRecord:
                     "seal": None if self.seal is None else dict(self.seal),
                 }
             )
+        if self.connection_binding is not None:
+            payload["connection_binding"] = dict(self.connection_binding)
         return payload
 
     def as_durable_dict(self) -> dict[str, Any]:
@@ -476,6 +479,7 @@ class OperationDraftStore:
         schema_digest: str,
         composer_digest: str | None = None,
         compound_parent: Mapping[str, Any] | None = None,
+        connection_binding: Mapping[str, Any] | None = None,
         now: datetime | None = None,
     ) -> OperationDraftStart:
         _require_binding(operation, version, schema_digest)
@@ -509,6 +513,7 @@ class OperationDraftStore:
                 task_authority = f"da1-{secrets.token_hex(20)}"
                 record = OperationDraftRecord(
                     draft_id=draft_id,
+                    connection_binding=connection_binding,
                     state=OperationDraftState.EDITABLE,
                     revision=1,
                     operation=operation,
@@ -562,6 +567,38 @@ class OperationDraftStore:
                     task_authority=task_authority,
                 )
         raise OperationDraftError("Could not allocate a unique Operation Draft id.")
+
+    def attest_connection(
+        self, draft_id: str, *, task_authority: str,
+        configuration: Mapping[str, Any], live: Mapping[str, Any],
+    ) -> OperationDraftRecord:
+        """Bind the first live identity atomically without changing business revision."""
+        if not isinstance(draft_id, str) or not _DRAFT_ID_PATTERN.fullmatch(draft_id):
+            raise _not_available()
+        with self._existing_draft_lock(draft_id):
+            loaded = self._inspect_unlocked(
+                draft_id, task_authority=task_authority, now=_utc_datetime(None),
+            )
+            record = loaded.record
+            binding = record.connection_binding
+            if binding is None:
+                raise OperationDraftRecreateRequired(
+                    "Draft predates durable connection binding; recreate it."
+                )
+            if binding.get("configuration") != dict(configuration):
+                raise OperationDraftBindingDrift("Draft connection configuration binding changed.")
+            if "live" in binding:
+                if binding["live"] != dict(live):
+                    raise OperationDraftBindingDrift(
+                        "Live project or Wwise build differs from the durable Draft binding."
+                    )
+                return record
+            updated = replace(record, connection_binding={**binding, "live": dict(live)})
+            self._replace_record(
+                self._record_path(draft_id), updated.as_durable_dict(),
+                expected_previous=loaded,
+            )
+            return updated
 
     def apply_action(
         self,
@@ -683,6 +720,7 @@ class OperationDraftStore:
                 audit.append(event)
                 previous_event_hash = str(event["event_hash"])
             updated = OperationDraftRecord(
+                connection_binding=record.connection_binding,
                 draft_id=record.draft_id,
                 state=record.state,
                 revision=record.revision + len(ordered_actions),
@@ -879,6 +917,7 @@ class OperationDraftStore:
             )
             updated_at = _timestamp(current)
             updated = OperationDraftRecord(
+                connection_binding=record.connection_binding,
                 draft_id=record.draft_id,
                 state=record.state,
                 revision=record.revision + 1,
@@ -1040,6 +1079,7 @@ class OperationDraftStore:
                     details={"limit_bytes": MAX_OPERATION_DRAFT_EVIDENCE_BYTES},
                 )
             updated = OperationDraftRecord(
+                connection_binding=record.connection_binding,
                 draft_id=record.draft_id,
                 state=record.state,
                 revision=record.revision + 1,
@@ -1192,6 +1232,7 @@ class OperationDraftStore:
                 "ttl_seconds": ttl_seconds,
             }
             reserved = OperationDraftRecord(
+                connection_binding=record.connection_binding,
                 draft_id=record.draft_id,
                 state=OperationDraftState.SEAL_RESERVED,
                 revision=record.revision + 1,
@@ -1307,6 +1348,7 @@ class OperationDraftStore:
                 "transaction_state": transaction_state,
             }
             sealed = OperationDraftRecord(
+                connection_binding=record.connection_binding,
                 draft_id=record.draft_id,
                 state=OperationDraftState.SEALED,
                 revision=record.revision + 1,
@@ -1416,6 +1458,7 @@ class OperationDraftStore:
                 )
             cancelled_at = _timestamp(current)
             cancelled = OperationDraftRecord(
+                connection_binding=record.connection_binding,
                 draft_id=record.draft_id,
                 state=OperationDraftState.CANCELLED,
                 revision=record.revision + 1,
@@ -1488,6 +1531,7 @@ class OperationDraftStore:
     @staticmethod
     def _expired_record(record: OperationDraftRecord) -> OperationDraftRecord:
         return OperationDraftRecord(
+            connection_binding=record.connection_binding,
             draft_id=record.draft_id,
             state=OperationDraftState.EXPIRED,
             revision=record.revision + 1,
@@ -2613,6 +2657,10 @@ def _validate_record_envelope(
         expected.update({"check", "composer_digest", "composition", "seal"})
     elif schema_version != LEGACY_OPERATION_DRAFT_SCHEMA_VERSION:
         raise ValueError("draft schema version is invalid")
+    if "connection_binding" in payload:
+        expected.add("connection_binding")
+        if not isinstance(payload["connection_binding"], dict):
+            raise ValueError("draft connection binding is invalid")
     if set(payload) != expected:
         raise ValueError("draft record fields are invalid")
     stored_record_digest = payload["record_digest"]
@@ -2781,6 +2829,7 @@ def _record_from_mapping(
         check = None
         seal = None
     return OperationDraftRecord(
+        connection_binding=payload.get("connection_binding"),
         draft_id=payload["draft_id"],
         state=state,
         revision=revision,

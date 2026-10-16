@@ -175,6 +175,13 @@ python skills/waapi-skill/scripts/run.py gateway.py config-set --wwise-version 2
 python skills/waapi-skill/scripts/run.py gateway.py status
 ```
 
+Live commands and Drafts use the saved connection only. Temporary host/port
+flags and connection environment variables cannot override it; `--version`
+is reserved for offline catalog/schema browsing. To isolate a sandbox or a
+second Skill copy, select a distinct `WAAPI_SKILL_CONFIG_PATH` and configure
+it with `config-set`. Copying the Skill alone still shares the user config.
+
+
 The first invocation automatically prepares the Skill-local Python environment.
 If Windows exposes Python as `py`, use that command instead of `python`.
 

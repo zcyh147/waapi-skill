@@ -35,7 +35,7 @@ Take each exact returned `Path`, sort those strings lexicographically, and pass 
 Invoke one command, repeating only the final candidate option:
 
 ```bash
-python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2025.1 query-object --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
 ```
 
 Do not add predicates, relationships, or extra business outputs. The fixed `id,path,originalFilePath` projection performs the complete join and emits no raw AudioFileSource inventory.
