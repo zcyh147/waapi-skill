@@ -4860,6 +4860,12 @@ def _prepare_object_create(
             ),
         },
     )
+    for spec in node_specs:
+        if spec.get("new_object_default_evidence") and spec.get("preexisting_id"):
+            raise OperationContractError(
+                "NEW_OBJECT_DEPENDENCY_EXISTING_TARGET",
+                "Class defaults cannot authorize fields on an existing object. Bind the existing exact object and select its live Field Handles in a separate Preview.",
+            )
     graph_guard = {
         "kind": "object-create-graph",
         "path_snapshots": path_snapshots,
@@ -6204,6 +6210,12 @@ def _prepare_object_set(
             "partial_success_is_failure": True,
         },
     )
+    for spec in node_specs:
+        if spec.get("new_object_default_evidence") and spec.get("preexisting_id"):
+            raise OperationContractError(
+                "NEW_OBJECT_DEPENDENCY_EXISTING_TARGET",
+                "Class defaults cannot authorize fields on an existing object. Bind the existing exact object and select its live Field Handles in a separate Preview.",
+            )
     graph_guard = {
         "kind": "object-set-batch",
         "path_snapshots": path_snapshots,
@@ -6867,6 +6879,26 @@ def _prepare_object_node_specs(
             spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        if canonical_type == "GameParameter":
+            from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
+            supplied_values = {descriptor.name: descriptor.value for descriptor in node.properties}
+            for property_info in tuple(property_info_by_name.values()):
+                if not property_info.dependencies:
+                    continue
+                try:
+                    evidence = game_parameter_default_evidence(
+                        class_name=canonical_type, info=property_info,
+                        scope={"classId": type_info.class_id}, read_call=read,
+                        supplied_values=supplied_values,
+                    )
+                except NewObjectDefaultError as exc:
+                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_CONFLICT", str(exc),
+                        details={"field": property_info.name, "request_path": node.request_path}) from exc
+                if evidence is None:
+                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_UNSUPPORTED",
+                        "This new GameParameter field has an unreviewed class dependency; create then configure the verified object separately.",
+                        details={"field": property_info.name, "request_path": node.request_path})
+                spec.setdefault("new_object_default_evidence", []).append(evidence)
         for descriptor in node.references:
             info = _read_property_info_cached(
                 read,
@@ -13819,6 +13851,28 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     },
                 ]
             )
+
+    # Class defaults authorize only genuinely new objects. Re-read the exact
+    # metadata sealed at Preview before dispatching their single creation call.
+    if isinstance(pre_state, Mapping):
+        metadata_seen = set()
+        for node_key in ("object_create_nodes", "object_set_nodes"):
+            for node in pre_state.get(node_key, []):
+                for evidence in node.get("new_object_default_evidence", []):
+                    scope = evidence["class_scope"]
+                    for field, expected in evidence["metadata"].items():
+                        key = (scope.get("classId"), field)
+                        if key in metadata_seen:
+                            continue
+                        metadata_seen.add(key)
+                        args = {**scope, "property": field}
+                        result = read_call(GET_PROPERTY_INFO_URI, args, {})
+                        actual = parse_get_property_info_result(result).as_dict()
+                        readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
+                                          "args": args, "options": {}, "result": dict(result)})
+                        assertions.append({"name": f"new object class metadata {field} unchanged",
+                                           "passed": actual == expected,
+                                           "evidence": {"expected": expected, "actual": actual}})
 
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):

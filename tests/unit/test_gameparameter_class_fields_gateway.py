@@ -208,3 +208,107 @@ def test_ambiguous_creation_verification_discloses_no_root_identity(tmp_path: Pa
     assert code == 2 and failed.get("verified") is not True, failed
     assert not failed.get("agent_result")
     assert sum(uri == "ak.wwise.core.object.create" for uri, _, _ in task.calls) == 1
+
+
+class NativeParameterTask(ParameterTask):
+    def __init__(self, path, version):
+        super().__init__(path, version)
+        import json
+        fixture = Path(__file__).parents[1] / "fixtures" / "gameparameter-metadata" / f"{version}.json"
+        self.metadata = json.loads(fixture.read_text(encoding="utf-8"))["metadata"]
+
+    def call(self, uri, args=None, options=None):
+        result = super().call(uri, args, options)
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            return deepcopy(result)
+        if uri == "ak.wwise.core.object.create":
+            self.objects[CREATED]["BindToBuiltInParam"] = self.metadata["BindToBuiltInParam"]["default"]
+            for key, value in args.items():
+                if key.startswith("@"):
+                    self.objects[CREATED][key[1:]] = value
+        return result
+
+    def declare_complete_parameter(self, *, builtin=None):
+        parent = self.bind(FIRST)
+        kind = self.discover_kind("GameParameter")
+        fields = []
+        settings = [("Min", -12), ("Max", 36), ("InitialValue", 7)]
+        if builtin is not None:
+            settings.append(("BindToBuiltInParam", builtin))
+        for meaning, value in settings:
+            code, found = self.step("draft-discover-fields", "--type-handle", kind, "--meaning", meaning)
+            assert code == 0, found
+            fields.extend(["--field-value", found["field_candidates"][0]["handle"], str(value)])
+        code, declared = self.step("draft-declare-new", "--declaration-id", "parameter", "--parent-handle", parent,
+                                   "--name", "WeatherIntensity", "--kind", kind, *fields)
+        assert code == 0, declared
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_live_default_conditions_allow_same_call_creation(tmp_path: Path, version: str):
+    task = NativeParameterTask(tmp_path, version)
+    task.declare_complete_parameter()
+    code, verified = task.transaction("ask_before_changes")
+    assert code == 0, verified
+    assert (task.objects[CREATED]["Min"], task.objects[CREATED]["Max"], task.objects[CREATED]["InitialValue"]) == (-12, 36, 7)
+    writes = [(uri, args) for uri, args, _ in task.calls if uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.setProperty"}]
+    assert len(writes) == 1
+    assert writes[0][0] == "ak.wwise.core.object.create"
+    assert writes[0][1]["@Min"] == -12
+    assert writes[0][1]["@Max"] == 36
+    assert writes[0][1]["@InitialValue"] == 7
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_explicit_sibling_builtin_conflict_rejects_before_preview(tmp_path: Path, version: str):
+    task = NativeParameterTask(tmp_path, version)
+    task.declare_complete_parameter(builtin=1)
+    code, failed = task.step("draft-check")
+    assert code == 2, failed
+    assert "NEW_OBJECT_DEPENDENCY_CONFLICT" in str(failed)
+    assert CREATED not in task.objects
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("phase", ["preview", "execute"])
+def test_new_parameter_default_drift_blocks_without_creation(tmp_path: Path, version: str, phase: str):
+    task = NativeParameterTask(tmp_path, version)
+    task.declare_complete_parameter()
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    if phase == "execute":
+        code, preview = task.step("preview-from-draft")
+        assert code == 0, preview
+        tx = preview["transaction_id"]
+        code, shown = task.run("transaction-show", tx)
+        assert code == 0, shown
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+    task.metadata["BindToBuiltInParam"]["default"] = 1
+    code, rejected = task.step("preview-from-draft") if phase == "preview" else task.run("execute", tx)
+    assert code == 2, rejected
+    assert CREATED not in task.objects
+    assert not any(uri == "ak.wwise.core.object.create" for uri, _, _ in task.calls)
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_explicit_compatible_builtin_preserves_same_call(tmp_path: Path, version: str):
+    task = NativeParameterTask(tmp_path, version)
+    preserved = deepcopy(task.objects[EXISTING])
+    task.declare_complete_parameter(builtin=0)
+    code, verified = task.transaction("ask_before_changes")
+    assert code == 0, verified
+    assert task.objects[CREATED]["BindToBuiltInParam"] == 0
+    assert task.objects[EXISTING] == preserved
+    assert sum(uri == "ak.wwise.core.object.create" for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_unknown_class_condition_keeps_actionable_staged_boundary(tmp_path: Path, version: str):
+    task = NativeParameterTask(tmp_path, version)
+    task.metadata["Min"]["dependencies"][0]["context"] = "Parent"
+    task.bind(FIRST)
+    kind = task.discover_kind("GameParameter")
+    code, rejected = task.step("draft-discover-fields", "--type-handle", kind, "--meaning", "Min")
+    assert code == 2, rejected
+    row = rejected["details"]["rejected_candidates"][0]
+    assert row["error_code"] == "FIELD_OBJECT_SCOPE_REQUIRED"
+    assert row["details"]["new_object_workflow"]["repeat_creation_after_success"] is False

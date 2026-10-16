@@ -1145,6 +1145,11 @@ def bind_live_field(
     enabled_dependency_fields = (
         dependency_fields if field_kind == "property" else ()
     )
+    class_default_evidence = None
+    if enabled_dependency_fields and scope_kind == "class":
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        if class_default_evidence is not None:
+            enabled_dependency_fields = ()
     if enabled_dependency_fields and scope_kind != "object":
         raise _error(
             "FIELD_OBJECT_SCOPE_REQUIRED",
@@ -1187,6 +1192,7 @@ def bind_live_field(
             "scope_kind": scope_kind,
             "scope_value": normalized_scope,
             "metadata": info.as_dict(),
+            **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
         }
     )
     try:
@@ -1276,6 +1282,11 @@ def revalidate_live_field(
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
     )
+    class_default_evidence = None
+    if enabled_dependency_fields and field.scope_kind == "class":
+        class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
+        if class_default_evidence is not None:
+            enabled_dependency_fields = ()
     if enabled_dependency_fields and field.scope_kind != "object":
         raise _error(
             "FIELD_OBJECT_SCOPE_REQUIRED",
@@ -1321,6 +1332,7 @@ def revalidate_live_field(
             "scope_kind": field.scope_kind,
             "scope_value": field.scope_value,
             "metadata": info.as_dict(),
+            **({"new_object_defaults": class_default_evidence} if class_default_evidence is not None else {}),
         }
     )
     return registry.resolve_field(
@@ -1715,6 +1727,20 @@ def _restrictions_from_live_metadata(
         if allowed:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
+
+
+def _new_class_field_evidence(registry, info, live_scope, read_call):
+    from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
+    names = {row["name"] for row in registry.as_dict()["types"]
+             if row["class_id"] == live_scope.get("classId")}
+    if len(names) != 1:
+        return None
+    try:
+        return game_parameter_default_evidence(
+            class_name=next(iter(names)), info=info, scope=live_scope, read_call=read_call,
+        )
+    except NewObjectDefaultError:
+        return None
 
 
 def _dependent_new_object_workflow(meaning: str) -> dict[str, Any]:
