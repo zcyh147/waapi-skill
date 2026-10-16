@@ -1,27 +1,29 @@
-# 07：普通失败后在三种模式内继续
+# 07: Continue recoverable workflows within the selected modification policy
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#170](https://github.com/zcyh147/waapi-skill/issues/170)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** Agent 对无副作用错误可调整查询、翻页或有限重连，用户无需逐次批准；写入不确定不被盲目重放。
+Agents can refine queries, page or reconnect after side-effect-free errors without repeated permission prompts, while uncertain writes are never blindly replayed.
 
-**Blocked by：** 无
+## Acceptance criteria
 
-## 验收条件
+- [ ] Unify Skill/reference instructions and Gateway recovery receipts; remove the blanket stop-after-any-error rule.
+- [ ] Keep read_only, ask_before_changes and allow_changes as permission authorities. Service startup must remain within the existing task authorization.
+- [ ] Distinguish pre-dispatch rejection, read failure, known write outcome and unknown write outcome, and disclose actionable next steps.
+- [ ] Allow independent read-only diagnosis after indeterminate when authorized; never replay the original write or infer success/no change from an error string.
+- [ ] Update semantic judgments so legitimate discovery refinement is accepted; preserve historical raw verdicts. Cover policy behavior on all five versions.
 
-- [ ] 统一 Skill、参考和 Gateway recovery 输出，移除一概错误停止的冲突。
-- [ ] 三种模式继续拥有授权语义，正常只读修正不增加审批；启动服务须在原授权内。
-- [ ] 错误区分派发前拒绝、读失败、确定写入结果和未知写入，提示可执行后继。
-- [ ] indeterminate 可在授权内只读核实，原事务不重放；诊断不制造成功或未修改结论。
-- [ ] 更新既有语义判定，使合理查询修正不被误判为违规重试；保留原历史 verdict。
+## Blocked by
 
-## 验证
+None
 
-三模式 Gateway/fake failure tests 与 harness 判定负例；最终 F2。F1/F3/F4 也检查无额外授权停顿，不增加其他 Fresh。
+## Validation
 
-## 执行约束
+Three-policy Gateway/fake-failure and harness negative tests. Final F2; F1/F3/F4 also observe that needless permission stops are absent. No additional Fresh.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.

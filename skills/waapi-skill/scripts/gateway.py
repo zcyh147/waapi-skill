@@ -1473,13 +1473,11 @@ def build_parser() -> argparse.ArgumentParser:
             "or flushed JSON records for stream-topic."
         ),
     )
-    parser.add_argument("--host", help=f"WAAPI host; defaults to ${ENV_HOST}, then saved config")
-    parser.add_argument("--port", type=int, help=f"WAAPI port; defaults to ${ENV_PORT}, then saved config")
     parser.add_argument(
         "--version",
         "--wwise-version",
         dest="version",
-        help=f"Expected Wwise year.major; defaults to ${ENV_VERSION}, then saved config, then live detection",
+        help="Wwise version for offline catalog/schema browsing only; live operations use config-set values",
     )
     parser.add_argument(
         "--timeout",
@@ -3439,11 +3437,21 @@ def _execute_gateway_unconstrained(
     cleanup_failure: BaseException | None = None
     post_result_cleanup_failed = False
     try:
+        if args.version is not None and args.command not in {
+            "capabilities", "describe", "operations", "operation-schema",
+            "request-schema", "request-map-container", "request-array-item",
+            "topic-schema", "query-schema", "object-types",
+        }:
+            raise GatewayInputError(
+                "--version is only available for offline catalog/schema browsing; "
+                "use config-set --wwise-version for operations."
+            )
         if args.command == "stream-topic" and stream_sink is None:
             raise GatewayInputError(
                 "stream-topic requires a live record sink; use the gateway CLI "
                 "entry point so every streamed record remains observable."
             )
+        require_persisted_connection_binding(args, env=source_env)
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
         elif args.command in {
@@ -4817,7 +4825,7 @@ def preflight_public_route(
     # could otherwise recommend a fixed command or topic wait for an API that
     # this exact Wwise version does not reflect.
     config = load_gateway_config(env).config
-    version = args.version or env.get(ENV_VERSION) or config.wwise_version
+    version = args.version or config.wwise_version
     if version is not None:
         if version not in SUPPORTED_WWISE_VERSION_KEYS:
             raise GatewayInputError(
@@ -9283,6 +9291,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 f"for Wwise {parent.version}"
             )
         started = store.start(
+            connection_binding=parent.connection_binding,
             operation=args.operation,
             version=parent.version,
             schema_digest=operation_draft_schema_digest(
@@ -9333,6 +9342,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             resolve_transaction_state_directory(args, env=env)
         )
         started = store.start(
+            connection_binding={"configuration": selected_connection_binding(env)},
             operation=args.operation,
             version=request_version,
             schema_digest=schema_digest,
@@ -10211,13 +10221,13 @@ def build_gateway_session_context(
             url = candidate_url
 
     if host is None:
-        raw_host = args.host or env.get(ENV_HOST) or effective["waapi_host"] or DEFAULT_HOST
+        raw_host = effective["waapi_host"] or DEFAULT_HOST
         try:
             host = SkillConfig(SKILL_ROOT, waapi_host=str(raw_host)).as_dict()["waapi_host"]
         except ValueError:
             host = None
     if port is None:
-        raw_port: Any = args.port if args.port is not None else env.get(ENV_PORT)
+        raw_port: Any = effective["waapi_port"]
         if raw_port is None:
             raw_port = effective["waapi_port"]
         try:
@@ -10230,7 +10240,7 @@ def build_gateway_session_context(
         url = f"ws://{host}:{port}/waapi"
 
     detected_version = payload.get("detected_version")
-    configured_version = args.version or env.get(ENV_VERSION) or effective["wwise_version"]
+    configured_version = args.version or effective["wwise_version"]
     payload_versions = payload.get("versions")
     command_version = (
         str(payload_versions[0])
@@ -10650,7 +10660,7 @@ def resolve_operation_schema_version(
     """
 
     config = load_gateway_config(env).config
-    version = args.version or env.get(ENV_VERSION) or config.wwise_version
+    version = args.version or config.wwise_version
     if version is None:
         return None
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
@@ -10665,7 +10675,7 @@ def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]
     if bool(getattr(args, "all_versions", False)):
         return tuple(SUPPORTED_WWISE_VERSION_KEYS)
     config = load_gateway_config(env).config
-    version = args.version or env.get(ENV_VERSION) or config.wwise_version or "2022.1"
+    version = args.version or config.wwise_version or "2022.1"
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
         raise GatewayInputError(
             f"Unsupported Wwise version {version!r}; supported versions: {', '.join(SUPPORTED_WWISE_VERSION_KEYS)}"
@@ -10673,19 +10683,82 @@ def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]
     return (str(version),)
 
 
+def selected_connection_binding(env: Mapping[str, str]) -> dict[str, Any]:
+    resolution = load_gateway_config(env)
+    config = resolution.config
+    if config.waapi_port is None or config.wwise_version is None:
+        raise GatewayInputError(
+            "Configure waapi_port and wwise_version with config-set before starting operations."
+        )
+    return {
+        "config_path": str(resolution.external_path),
+        "waapi_host": config.waapi_host,
+        "waapi_port": config.waapi_port,
+        "wwise_version": config.wwise_version,
+    }
+
+
+def require_persisted_connection_binding(
+    args: argparse.Namespace, *, env: Mapping[str, str]
+) -> None:
+    if getattr(args, "draft_id", None) is not None:
+        record = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        ).inspect(args.draft_id, task_authority=args.task_authority)
+        binding = record.connection_binding
+        if binding is None:
+            raise GatewayInputError(
+                "This Draft predates durable connection binding; recreate it using the selected configuration."
+            )
+        if binding.get("configuration") != selected_connection_binding(env):
+            raise GatewayInputError(
+                "Selected connection configuration changed after Draft creation; recreate the Draft."
+            )
+    if getattr(args, "transaction_id", None) is not None:
+        artifact = resolve_transaction_store(args, env=env).load_preview(
+            args.transaction_id
+        ).artifact
+        binding = artifact.get("connection_configuration")
+        if binding is None:
+            raise GatewayInputError(
+                "This transaction predates durable connection binding; recreate its Preview using the selected configuration."
+            )
+        if binding != selected_connection_binding(env):
+            raise GatewayInputError(
+                "Selected connection configuration changed after Preview creation; recreate the Preview."
+            )
+
+
+def attest_draft_live_connection(
+    args: argparse.Namespace, *, env: Mapping[str, str],
+    live_info: Mapping[str, Any], project: Mapping[str, Any] | None,
+) -> Any:
+    if getattr(args, "draft_id", None) is None:
+        return None
+    return OperationDraftStore(
+        resolve_transaction_state_directory(args, env=env)
+    ).attest_connection(
+        args.draft_id, task_authority=args.task_authority,
+        configuration=selected_connection_binding(env),
+        live={
+            "version": dict(require_mapping(live_info.get("version"), "getInfo version")),
+            "project_id": project.get("id") if project is not None else None,
+        },
+    )
+
+
 def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> GatewayConnection:
     config = load_gateway_config(env).config
-    host = args.host or env.get(ENV_HOST) or config.waapi_host or DEFAULT_HOST
+    selected_connection_binding(env)
+    host = config.waapi_host or DEFAULT_HOST
     try:
         host = SkillConfig(SKILL_ROOT, waapi_host=str(host)).as_dict()["waapi_host"]
     except ValueError as exc:
         raise GatewayInputError(str(exc)) from exc
-    raw_port: int | str | None = args.port if args.port is not None else env.get(ENV_PORT)
-    if raw_port is None:
-        raw_port = config.waapi_port
+    raw_port: int | str | None = config.waapi_port
     if raw_port is None:
         raise GatewayInputError(
-            f"WAAPI port is required via --port, ${ENV_PORT}, or saved config; "
+            "WAAPI port is required in the selected config; "
             "use config-show/config-set to inspect or change saved values"
         )
     try:
@@ -10694,7 +10767,7 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
         raise GatewayInputError(f"WAAPI port must be an integer, got {raw_port!r}") from exc
     if not 1 <= port <= 65535:
         raise GatewayInputError(f"WAAPI port must be between 1 and 65535, got {port}")
-    version_hint = args.version or env.get(ENV_VERSION) or config.wwise_version
+    version_hint = config.wwise_version
     if version_hint is not None and version_hint not in SUPPORTED_WWISE_VERSION_KEYS:
         raise GatewayInputError(
             f"Unsupported Wwise version {version_hint!r}; supported versions: "
@@ -15090,6 +15163,12 @@ def dispatch_operation_draft_check(
             live_info=live_info,
         )
         if capability.execution_contract["effect"] == "read":
+            project, _ = current_project(
+                dispatcher, connection=connection, version=detected_version,
+            )
+            attest_draft_live_connection(
+                args, env=env, live_info=live_info, project=project,
+            )
             arguments = require_mapping(
                 request_payload.get("arguments"),
                 "typed Draft request arguments",
@@ -15177,6 +15256,9 @@ def dispatch_operation_draft_check(
         connection=connection,
         version=detected_version,
         allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+    )
+    attest_draft_live_connection(
+        args, env=env, live_info=live_info, project=project,
     )
     if project is not None:
         require_runtime_directory_outside_project(state_dir, project=project)
@@ -17318,6 +17400,9 @@ def _open_business_binding(
         version=detected_version,
         allow_none=allow_no_project,
     )
+    record = attest_draft_live_connection(
+        args, env=env, live_info=live_info, project=project,
+    )
     if project is None:
         if not allow_no_project:  # pragma: no cover - current_project is strict above
             raise GatewayInputError("A live Wwise project is required")
@@ -18788,6 +18873,9 @@ def create_transaction_preview(
         version=detected_version,
         allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
     )
+    attest_draft_live_connection(
+        args, env=env, live_info=live_info, project=project,
+    )
     state_dir = resolve_transaction_state_directory(args, env=env)
     if project is not None:
         require_runtime_directory_outside_project(state_dir, project=project)
@@ -18876,6 +18964,7 @@ def create_transaction_preview(
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
+    artifact["connection_configuration"] = selected_connection_binding(env)
     prepared = require_mapping(
         artifact.get("prepared_operation"),
         "prepared operation",

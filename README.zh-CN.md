@@ -162,6 +162,12 @@ python skills/waapi-skill/scripts/run.py gateway.py config-set --wwise-version 2
 python skills/waapi-skill/scripts/run.py gateway.py status
 ```
 
+在线命令和草稿只使用已保存的连接配置，不接受临时 host/port 参数或连接环境变量
+覆盖；`--version` 仅用于离线目录和 schema 浏览。沙盒或独立 Skill 副本应明确选择
+不同的 `WAAPI_SKILL_CONFIG_PATH`，再通过 `config-set` 配置。仅复制 Skill 目录
+仍会共享用户配置。
+
+
 首次调用会自动准备 Skill 自带的 Python 环境。如果 Windows 中的 Python 命令是
 `py`，将上面的 `python` 替换为 `py` 即可。
 

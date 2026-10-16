@@ -1,27 +1,29 @@
-# 08：从产品输出移除测试工程清理指令
+# 08: Remove disposable-test-project cleanup instructions from product outputs
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#171](https://github.com/zcyh147/waapi-skill/issues/171)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** 正常生成/导入/替换后保留用户工程与产物，只有测试运行器处理自己创建的临时副本。
+Normal authoring operations retain the user project and outputs; the test runner alone cleans or quarantines its disposable fixtures.
 
-**Blocked by：** 无
+## Acceptance criteria
 
-## 验收条件
+- [ ] Remove discard-case-owned-project and seal/never-reuse instructions from normal Gateway results.
+- [ ] Audit Preview, success, failure, indeterminate and legacy projections across generate/import/replace and every other exposed operation, not SoundBank alone.
+- [ ] Preserve required paired resource cleanup while distinguishing it from deleting projects or outputs.
+- [ ] Test lifecycle cleanup remains ownership-based and does not infer project disposability from product receipts.
+- [ ] Preserve historical and failure evidence; classify license prerequisites independently. Cover all five version lanes and result phases.
 
-- [ ] 移除正式结果中的 discard case-owned project、seal/never reuse 等测试指令。
-- [ ] 遍查所有 Preview、成功、失败、indeterminate 和 legacy projection，清理同类残留，不只改 SoundBank。
-- [ ] 必要的配对资源释放仍保留，明确与工程/输出删除分开。
-- [ ] 测试生命周期继续凭资源所有权执行原清理和隔离规则，不依赖产品输出猜测。
-- [ ] 保留历史记录与失败证据；许可证失败独立归因。
+## Blocked by
 
-## 验证
+None
 
-Gateway 输出测试覆盖持久工程各终态、import/replace/generate；测试运行器的资源所有权/清理回归。无需额外 Fresh。
+## Validation
 
-## 执行约束
+Public output tests for persistent projects across terminal states and import/replace/generate; regression tests for test-owned cleanup. No additional Fresh.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.

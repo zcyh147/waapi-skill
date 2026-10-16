@@ -1,27 +1,29 @@
-# 01：审计全分支覆盖与 ShareSet 漏项
+# 01: Audit all public branches and the ShareSet coverage omission
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#164](https://github.com/zcyh147/waapi-skill/issues/164)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** 建立逐版本、逐公开路由、逐业务分支的可追溯覆盖账本，定位旧覆盖结论为何漏掉 ShareSet。
+Build a reproducible five-version branch ledger and establish why standalone ShareSet creation was omitted from earlier coverage claims.
 
-**Blocked by：** 无
+## Acceptance criteria
 
-## 验收条件
+- [ ] Reconcile functions, Topics, schema fields/enums/unions/nested collections and the narrow Authoring overlay for every supported version: 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1.
+- [ ] Add source-backed business combinations: target type, placement, operation mode and version differences. URI presence or structural parity alone is not full business coverage.
+- [ ] For each row record public contract, compiler, preflight boundary, verifier, program/live/Fresh evidence separately, and unknowns. Detect same-count URI substitutions and unmapped branches.
+- [ ] Trace the ShareSet omission through historical inventories, implementation and test evidence; report demonstrated causes, not speculation.
+- [ ] List additional gaps with severity and evidence; do not silently expand this implementation scope or mark missing supported behavior as prohibited. Reconcile the final ledger after repairs.
 
-- [ ] 自动对账全部五版本 functions/topics/schema 分支及窄 Authoring overlay，与公开契约、编译和执行分区关联。
-- [ ] 补充目标类型、创建位置和操作模式等来源明确的业务组合，明确结构对账不能证明业务完整。
-- [ ] 每行分开标示实现、验证器、程序/真实/Agent 证据及未知项；同数量 URI 替换和未映射分支能被检查发现。
-- [ ] 从历史记录追查 ShareSet 被遗漏或误标完成的实际原因，引用证据，不猜测。
-- [ ] 新增漏项按严重性列清单；本轮范围外项目不自动实施。已知修复落地后再对账，审计不宣称全 PASS。
+## Blocked by
 
-## 验证
+None
 
-离线生成和校验；用已知 ShareSet 缺口及移除映射作为负例。无 Fresh。
+## Validation
 
-## 执行约束
+Offline generator/checker and negative controls for the known ShareSet omission and removed mappings. No Fresh.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.
