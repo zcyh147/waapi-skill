@@ -21,6 +21,56 @@ pytestmark = [pytest.mark.live, pytest.mark.destructive]
 
 
 def test_gameparameter_same_call_creation_native_feasibility():
+    _probe(public=False)
+
+
+def test_gameparameter_same_call_creation_public_gateway():
+    _probe(public=True)
+
+
+def _public_creation(runtime, version, evidence):
+    from tests.semantic.support.codex_expansion_runtime import fixture_gateway
+    receipts = evidence.setdefault("gateway_receipts", [])
+    gateway = fixture_gateway(skill_source=Path(__file__).parents[2] / "skills/waapi-skill",
+                              runtime=runtime, version=version, receipts=receipts)
+    gateway(["config-set", "--wwise-version", version, "--waapi-host", runtime.host,
+             "--waapi-port", str(runtime.port), "--project-modification-policy", "ask_before_changes"])
+    started = gateway(["draft-start", "object.create"])
+    draft = started["draft"]
+    authority = started["task_authority"]
+
+    def step(command, *arguments):
+        nonlocal draft
+        reply = gateway([command, draft["draft_id"], "--task-authority", authority,
+                         "--expected-revision", str(draft["revision"]), *arguments])
+        draft = reply.get("draft", draft)
+        return reply
+
+    parent = step("draft-bind-object", "--object-path-segment", "Game Parameters",
+                  "--object-path-segment", "Default Work Unit")["bound_object"]["handle"]
+    kind = step("draft-discover-types", "--role", "object", "--meaning", "GameParameter")["type_candidates"][0]["handle"]
+    fields = []
+    for name, value in (("Min", -12), ("Max", 36), ("InitialValue", 7)):
+        found = step("draft-discover-fields", "--type-handle", kind, "--meaning", name)
+        fields.extend(["--field-value", found["field_candidates"][0]["handle"], str(value)])
+    step("draft-declare-new", "--declaration-id", "parameter", "--parent-handle", parent,
+         "--name", "WAAPI_SameCall_Public", "--kind", kind, *fields)
+    step("draft-check")
+    preview = step("preview-from-draft")
+    tx = preview["transaction_id"]
+    shown = gateway(["transaction-show", tx])
+    gateway(["confirm", tx, "--confirmation-token", shown["confirmation"]["token"]])
+    gateway(["execute", tx])
+    verified = gateway(["verify", tx])
+    assert verified["verified"] is True
+    assert list(verified)[-1] == "agent_result"
+    identity = verified["agent_result"]["business_result"]["verified_root"]
+    assert identity and identity["type"] == "GameParameter"
+    evidence["public_gateway_pass"] = True
+    return identity["id"]
+
+
+def _probe(*, public):
     version = os.environ["WWISE_VERSION"]
     root = Path(os.environ["WAAPI_GAMEPARAMETER_PROBE_ROOT"]).resolve()
     private_home = root / "owned" / "wwise-user-home" if sys.platform == "darwin" else None
@@ -33,7 +83,7 @@ def test_gameparameter_same_call_creation_native_feasibility():
     )
     runtime = actor = None
     status, reason = "FAIL", "probe did not complete"
-    evidence = {"kind": "native-registry-feasibility", "public_gateway_pass": False,
+    evidence = {"kind": "public-gateway" if public else "native-registry-feasibility", "public_gateway_pass": False,
                 "agent_semantic_pass": False, "version": version}
     try:
         runtime = lifecycle.start()
@@ -50,26 +100,29 @@ def test_gameparameter_same_call_creation_native_feasibility():
         metadata.update({name: actor("ak.wwise.core.object.getPropertyInfo", {"classId": class_id, "property": name}, {})
                          for name in sorted(dependency_names) if name not in metadata})
         evidence["class_metadata"] = metadata
-        request = parse_operation_request({
-            "contract": "waapi-skill.operation-request/v1", "version": version,
-            "operation": "object.create", "arguments": {
-                "parent": {"kind": "path", "value": r"\Game Parameters\Default Work Unit"},
-                "type": "GameParameter", "name": "WAAPI_SameCall_Feasibility",
-                "properties": [{"name": "Min", "value": -12.0}, {"name": "Max", "value": 36.0}, {"name": "InitialValue", "value": 7.0}],
-            },
-        })
-        prepared = prepare_operation(request, read_call=actor).as_dict()
-        evidence["prepared"] = prepared
-        dispatch = prepared["dispatch"]
-        result = actor(dispatch["uri"], dispatch["args"], dispatch["options"])
-        evidence["execution_result"] = result
-        verified = verify_prepared_operation(prepared, execution_result={"ok": True, "result": result}, read_call=actor).as_dict()
-        evidence["verification"] = verified
-        created_id = result["id"]
+        if public:
+            created_id = _public_creation(runtime, version, evidence)
+        else:
+            request = parse_operation_request({
+                "contract": "waapi-skill.operation-request/v1", "version": version,
+                "operation": "object.create", "arguments": {
+                    "parent": {"kind": "path", "value": r"\Game Parameters\Default Work Unit"},
+                    "type": "GameParameter", "name": "WAAPI_SameCall_Feasibility",
+                    "properties": [{"name": "Min", "value": -12.0}, {"name": "Max", "value": 36.0}, {"name": "InitialValue", "value": 7.0}],
+                },
+            })
+            prepared = prepare_operation(request, read_call=actor).as_dict()
+            evidence["prepared"] = prepared
+            dispatch = prepared["dispatch"]
+            result = actor(dispatch["uri"], dispatch["args"], dispatch["options"])
+            evidence["execution_result"] = result
+            verified = verify_prepared_operation(prepared, execution_result={"ok": True, "result": result}, read_call=actor).as_dict()
+            evidence["verification"] = verified
+            created_id = result["id"]
+            assert verified["status"] == "verified", verified
         rows = actor("ak.wwise.core.object.get", {"from": {"id": [created_id]}}, {"return": ["id", "name", "type", "path", "Min", "Max", "InitialValue"]})["return"]
         evidence["independent_readback"] = rows
         assert len(rows) == 1 and rows[0]["Min"] == -12 and rows[0]["Max"] == 36 and rows[0]["InitialValue"] == 7
-        assert verified["status"] == "verified", verified
         status, reason = "PASS", "same-call native create and independent range/default readback succeeded"
     except BaseException as exc:
         reason = f"{type(exc).__name__}: {exc}"

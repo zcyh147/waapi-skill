@@ -29513,6 +29513,10 @@ def metadata_cache_lookup(
             return None
         if uri == CACHE_GET_PROPERTY_INFO_URI:
             if set(args) == {"classId", "property"}:
+                # These class facts can authorize new GameParameter values.
+                # Every discovery/check/Preview must consult current metadata.
+                if args["property"] in {"Min", "Max", "BindToBuiltInParam"}:
+                    return None
                 return MetadataCacheLookup.property_info(
                     class_id=args["classId"],
                     property_name=args["property"],
