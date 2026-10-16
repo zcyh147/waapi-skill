@@ -286,11 +286,12 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
+    # Reviewed closure adds exact Boolean conditions and bounded recursive activation.
     assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "8b85af0f82f96125128856aa7d046e776925ce66ef4244dd87d8da0cab36ed68"
+        "07210c0a9f7ca6f9889c92fa69cee39a3279372cec8128823c1395fd5cb40861"
     )
     assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "bfb354132b1a97ddc972b2e24c3f01c2efee78d0be2aac87f99a65390b99652e"
+        "0a35fbdef3e729798483979f9626044c644f9403765d9530681ee854ecc478bc"
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"
