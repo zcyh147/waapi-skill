@@ -2,6 +2,7 @@
 # Blank lines and comments are ignored; test nodes must stay below tests/unit.
 
 tests/unit/test_gateway_session_context.py
+tests/unit/test_gateway_connection_binding.py
 tests/unit/test_public_route_coverage_contract.py
 tests/unit/test_public_route_program_matrix.py
 tests/unit/test_stable_read_adapters.py

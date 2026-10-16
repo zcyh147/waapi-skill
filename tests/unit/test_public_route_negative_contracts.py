@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -198,14 +200,13 @@ def test_soundengine_bounded_reads_reject_malformed_wire_results(
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "core-call",
             api,
             group_flag,
             group_id,
         ],
-        env=_env(tmp_path, version),
+        env=set_gateway_config(_env(tmp_path, version), wwise_version=version),
         client_factory=lambda _url: client,
     )
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import math
@@ -122,7 +124,11 @@ def test_draft_bind_object_rejects_complete_native_path_before_dispatch() -> Non
     assert client_factory_called is False
 
 
-def test_draft_bind_object_rejects_separator_bearing_segment_before_client() -> None:
+def test_draft_bind_object_rejects_separator_bearing_segment_before_client(tmp_path: Path) -> None:
+    env = gateway_env(tmp_path)
+    env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
+    code, started = waapi_gateway.execute_gateway(["draft-start", "object.delete"], env=env)
+    assert code == 0, started
     client_factory_called = False
 
     def client_factory(_url: str) -> FakeClient:
@@ -133,15 +139,15 @@ def test_draft_bind_object_rejects_separator_bearing_segment_before_client() -> 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "draft-bind-object",
-            "od1-" + "1" * 32,
+            started["draft"]["draft_id"],
             "--task-authority",
-            "da1-" + "2" * 40,
+            started["task_authority"],
             "--expected-revision",
             "1",
             "--object-path-segment",
             r"\Actor-Mixer Hierarchy\Default Work Unit\Weapons",
         ],
-        env={},
+        env=env,
         client_factory=client_factory,
     )
 
@@ -351,9 +357,9 @@ def gateway_env(tmp_path: Path) -> dict[str, str]:
         config_path.write_text(
             json.dumps(
                 {
-                    "wwise_version": None,
+                    "wwise_version": "2022.1",
                     "waapi_host": "127.0.0.1",
-                    "waapi_port": None,
+                    "waapi_port": 31337,
                     "project_modification_policy": "ask_before_changes",
                 }
             ),
@@ -468,7 +474,7 @@ def test_status_uses_project_object_query_for_2021_1(tmp_path: Path) -> None:
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2021.1"
+    set_gateway_config(env, wwise_version="2021.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["status"],
@@ -603,7 +609,7 @@ def test_status_2021_requires_exactly_one_identity_bound_project_row(tmp_path: P
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2021.1"
+    set_gateway_config(env, wwise_version="2021.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["status"],
@@ -627,7 +633,7 @@ def test_status_2021_rejects_noncanonical_nonempty_project_id(tmp_path: Path) ->
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2021.1"
+    set_gateway_config(env, wwise_version="2021.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["status"],
@@ -791,7 +797,7 @@ def test_selected_derives_one_fixed_identity_projection(
     )
 
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     exit_code, payload = waapi_gateway.execute_gateway(
         ["selected"],
         env=env,
@@ -1010,7 +1016,7 @@ def test_main_prints_object_set_business_schema_as_bounded_compact_json(
     capsys: Any,
 ) -> None:
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     expected_exit_code, payload = waapi_gateway.execute_gateway(
         ["operation-schema", "object.set"],
         env=env,
@@ -1585,7 +1591,7 @@ def test_saved_version_hint_mismatch_fails_closed(tmp_path: Path) -> None:
     assert client.disconnected is True
 
 
-def test_connection_cli_then_env_then_saved_config_precedence(tmp_path: Path) -> None:
+def test_saved_connection_ignores_ambient_connection_environment(tmp_path: Path) -> None:
     external_path = tmp_path / "config.json"
     external_path.write_text(
         json.dumps(
@@ -1605,30 +1611,8 @@ def test_connection_cli_then_env_then_saved_config_precedence(tmp_path: Path) ->
         "WWISE_VERSION": "2024.1",
     }
 
-    cli_args = waapi_gateway.build_parser().parse_args(
-        ["--host", "cli-host", "--port", "3333", "--version", "2025.1", "status"]
-    )
-    cli = waapi_gateway.resolve_connection(cli_args, env=env)
-    assert (cli.host, cli.port, cli.version_hint) == ("cli-host", 3333, "2025.1")
-
-    alias_args = waapi_gateway.build_parser().parse_args(
-        ["--wwise-version", "2025.1", "status"]
-    )
-    alias = waapi_gateway.resolve_connection(alias_args, env=env)
-    assert (alias.host, alias.port, alias.version_hint) == ("env-host", 2222, "2025.1")
-
-    env_args = waapi_gateway.build_parser().parse_args(["status"])
-    from_env = waapi_gateway.resolve_connection(env_args, env=env)
-    assert (from_env.host, from_env.port, from_env.version_hint) == (
-        "env-host",
-        2222,
-        "2024.1",
-    )
-
-    saved = waapi_gateway.resolve_connection(
-        env_args,
-        env={"WAAPI_SKILL_CONFIG_PATH": str(external_path)},
-    )
+    args = waapi_gateway.build_parser().parse_args(["status"])
+    saved = waapi_gateway.resolve_connection(args, env=env)
     assert (saved.host, saved.port, saved.version_hint) == ("saved-host", 1111, "2023.1")
 
 
@@ -1881,13 +1865,18 @@ def test_legacy_never_policy_normalizes_to_read_only_and_blocks_confirm_without_
     external_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2022.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "never",
             }
         ),
         encoding="utf-8",
+    )
+
+    env = {"WAAPI_SKILL_CONFIG_PATH": str(external_path)}
+    waapi_gateway.TransactionStore(tmp_path / "state").create_preview(
+        "missing-transaction", {"connection_configuration": waapi_gateway.selected_connection_binding(env)}
     )
 
     exit_code, payload = waapi_gateway.execute_gateway(
@@ -2335,7 +2324,7 @@ def test_describe_full_schema_is_explicit_offline_opt_in(tmp_path: Path) -> None
 def test_selected_manifest_absence_is_an_explicit_boundary_for_newer_versions(tmp_path: Path) -> None:
     client = FakeClient({"ak.wwise.core.getInfo": live_info(year=2025, major=1)})
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         ["selected"],
@@ -2814,7 +2803,7 @@ def test_query_object_original_file_reference_match_returns_closed_candidate_rec
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -2948,7 +2937,7 @@ def test_query_object_original_file_reference_match_sorts_and_truncates_details(
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -3015,7 +3004,7 @@ def test_query_object_original_file_reference_match_maximum_shape_stays_below_ga
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     argv = [
         "query-object",
         "--max-results",
@@ -3109,7 +3098,7 @@ def test_query_object_original_file_reference_match_rejects_open_query_combinati
         raise AssertionError(f"invalid closed match input must not connect to {url}")
 
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     exit_code, payload = waapi_gateway.execute_gateway(
         argv,
         env=env,
@@ -3166,7 +3155,7 @@ def test_query_object_original_file_reference_match_rejects_invalid_candidates(
         raise AssertionError(f"invalid candidate must not connect to {url}")
 
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     exit_code, payload = waapi_gateway.execute_gateway(
         argv,
         env=env,
@@ -3226,7 +3215,7 @@ def test_query_object_original_file_reference_match_enforces_candidate_limit(
         raise AssertionError(f"too many candidates must not connect to {url}")
 
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
     exit_code, payload = waapi_gateway.execute_gateway(
         argv,
         env=env,
@@ -3294,7 +3283,7 @@ def test_query_object_original_file_reference_match_rejects_malformed_or_duplica
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -3331,7 +3320,7 @@ def test_query_object_original_file_reference_match_rejects_scan_at_take_limit(
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2025.1"
+    set_gateway_config(env, wwise_version="2025.1")
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -3538,8 +3527,7 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            "--version",
-            "2023.1",
+            
             "query-object",
             "--path-segment",
             "Actor-Mixer Hierarchy",
@@ -3552,7 +3540,7 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
             "--max-results",
             "2",
         ],
-        env=gateway_env(tmp_path),
+        env=set_gateway_config(gateway_env(tmp_path), wwise_version="2023.1"),
         client_factory=lambda url: client,
     )
 
@@ -3690,7 +3678,7 @@ def test_query_object_compiles_semantic_kind_to_native_type_and_predicate(
     )
 
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     exit_code, payload = waapi_gateway.execute_gateway(
         ["query-object", "--kind", kind, "--max-results", "2"],
         env=env,
@@ -3717,7 +3705,7 @@ def test_query_object_advanced_expression_dispatches_through_public_business_pro
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -3760,7 +3748,7 @@ def test_query_object_custom_kind_is_live_bound_before_waql(
         }
     )
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
@@ -4375,7 +4363,7 @@ def test_query_object_compiles_and_renames_business_and_custom_outputs(
     )
 
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     exit_code, payload = waapi_gateway.execute_gateway(
         [
             "query-object",
@@ -5235,7 +5223,7 @@ def test_selection_monitor_uses_authoring_schema_and_rejects_console(
     client = FakeClient({"ak.wwise.core.getInfo": info}, subscription_events={
         topic: [{"objects": []}, {"objects": [{"id": PROJECT_GUID, "name": "Rain"}]}]})
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = version
+    set_gateway_config(env, wwise_version=version)
     records: list[Mapping[str, Any]] = []
     code, terminal = waapi_gateway.execute_gateway(
         ["stream-topic", topic, "--event-count", "2", *_typed_topic_bindings(topic, version)],
@@ -5401,7 +5389,7 @@ def test_soundbank_stream_terminal_repeats_bounded_identity_events_for_agent(
     )
     records: list[Mapping[str, Any]] = []
     env = gateway_env(tmp_path)
-    env["WWISE_VERSION"] = "2024.1"
+    set_gateway_config(env, wwise_version="2024.1")
 
     exit_code, terminal = waapi_gateway.execute_gateway(
         [
@@ -6445,9 +6433,15 @@ def test_successful_mutation_result_survives_baseexception_disconnect_failure(
     monkeypatch.setattr(waapi_gateway, "dispatch_command", completed_mutation)
     client = DisconnectFailureClient({"ak.wwise.core.getInfo": live_info()})
 
+    env = gateway_env(tmp_path)
+    env["WAAPI_SKILL_STATE_DIR"] = str(tmp_path / "state")
+    waapi_gateway.TransactionStore(tmp_path / "state").create_preview(
+        transaction_id, {"connection_configuration": waapi_gateway.selected_connection_binding(env)}
+    )
+
     exit_code, payload = waapi_gateway.execute_gateway(
         ["execute", transaction_id],
-        env=gateway_env(tmp_path),
+        env=env,
         client_factory=lambda url: client,
     )
 

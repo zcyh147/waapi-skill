@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -121,14 +123,13 @@ def test_event_draft_exposes_one_copy_ready_exact_name_binding(
     operation = "ak.soundengine.executeActionOnEvent"
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2022.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
 
@@ -154,9 +155,9 @@ def _env(tmp_path: Path, version: str = "2022.1") -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -363,14 +364,13 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
 
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -383,8 +383,7 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
     client = _SoundEngineDraftClient(tmp_path)
     code, declared = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -396,15 +395,14 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
             "--monitor-message",
             message,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, declared
 
     code, checked = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -414,15 +412,14 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
             "--expected-revision",
             str(declared["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, json.dumps(checked, indent=2, ensure_ascii=False)
 
     code, previewed = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -432,7 +429,7 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
             "--expected-revision",
             str(checked["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
@@ -475,14 +472,13 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
 
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -491,8 +487,7 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
     client = _SoundEngineDraftClient(tmp_path)
     code, declared = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -504,14 +499,13 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
             "--game-object-name",
             "Weather Listener",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -521,14 +515,13 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
             "--expected-revision",
             str(declared["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, json.dumps(checked, indent=2, ensure_ascii=False)
     code, previewed = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -538,7 +531,7 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
             "--expected-revision",
             str(checked["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
@@ -573,14 +566,13 @@ def _preview_soundengine_plan(
 ) -> tuple[dict[str, object], dict[str, object]]:
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -591,8 +583,7 @@ def _preview_soundengine_plan(
     for role, object_id in role_bindings:
         code, bound = gateway.execute_gateway(
             [
-                "--version",
-                version,
+                
                 "--state-dir",
                 str(state_dir),
                 "draft-bind-object",
@@ -606,7 +597,7 @@ def _preview_soundengine_plan(
                 "--object-id",
                 object_id,
             ],
-            env=env,
+            env=set_gateway_config(env, wwise_version=version),
             client_factory=lambda _url: client,
         )
         assert code == 0, bound
@@ -620,8 +611,7 @@ def _preview_soundengine_plan(
     ]
     code, declared = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -632,14 +622,13 @@ def _preview_soundengine_plan(
             str(current["revision"]),
             *declaration,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -649,14 +638,13 @@ def _preview_soundengine_plan(
             "--expected-revision",
             str(declared["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, json.dumps(checked, indent=2, ensure_ascii=False)
     code, previewed = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -666,7 +654,7 @@ def _preview_soundengine_plan(
             "--expected-revision",
             str(checked["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, previewed
@@ -688,14 +676,13 @@ def _declare_soundengine_plan_result(
 ) -> tuple[int, dict[str, object]]:
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -705,8 +692,7 @@ def _declare_soundengine_plan_result(
     for role, object_id in role_bindings:
         code, bound = gateway.execute_gateway(
             [
-                "--version",
-                version,
+                
                 "--state-dir",
                 str(state_dir),
                 "draft-bind-object",
@@ -720,7 +706,7 @@ def _declare_soundengine_plan_result(
                 "--object-id",
                 object_id,
             ],
-            env=env,
+            env=set_gateway_config(env, wwise_version=version),
             client_factory=lambda _url: client,
         )
         assert code == 0, bound
@@ -734,8 +720,7 @@ def _declare_soundengine_plan_result(
     ]
     return gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -746,7 +731,7 @@ def _declare_soundengine_plan_result(
             str(current["revision"]),
             *resolved,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
 
@@ -778,27 +763,25 @@ def _execute_and_verify_soundengine(
     assert code == 0, confirmed
     code, executed = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "execute",
             transaction_id,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, executed
     code, verified = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "verify",
             transaction_id,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, verified
@@ -1228,14 +1211,13 @@ def test_stop_playing_revalidates_handle_at_execute_and_never_reuses_it(
     calls_before = list(client.soundengine_calls)
     code, stopped = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "execute",
             transaction_id,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 2, stopped
@@ -1282,27 +1264,25 @@ def test_post_event_zero_result_is_a_bounded_failure_without_playing_handle(
     assert code == 0, confirmed
     code, executed = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "execute",
             transaction_id,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 0, executed
     code, failed = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "verify",
             transaction_id,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 2, failed
@@ -2333,14 +2313,13 @@ def test_listener_spatialization_rejects_unclosed_channel_descriptors(
     )
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-start",
             "ak.soundengine.setListenerSpatialization",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -2349,8 +2328,7 @@ def test_listener_spatialization_rejects_unclosed_channel_descriptors(
 
     code, rejected = gateway.execute_gateway(
         [
-            "--version",
-            version,
+            
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -2365,7 +2343,7 @@ def test_listener_spatialization_rejects_unclosed_channel_descriptors(
             "enabled",
             *descriptor,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
     assert code == 2, rejected
@@ -2579,15 +2557,14 @@ def test_state_and_switch_reads_use_bounded_business_continuations(
         assert schema["continuation"]["subcommand"] == "core-call"
         code, result = gateway.execute_gateway(
             [
-                "--version",
-                "2022.1",
+                
                 "--state-dir",
                 str(state_dir),
                 "core-call",
                 operation,
                 *declaration,
             ],
-            env=env,
+            env=set_gateway_config(env, wwise_version="2022.1"),
             client_factory=lambda _url: client,
         )
         assert code == 0, result
@@ -2652,14 +2629,13 @@ def test_post_event_stops_before_dispatch_when_bound_event_drifts(
     calls_before = list(client.soundengine_calls)
     code, stopped = gateway.execute_gateway(
         [
-            "--version",
-            "2022.1",
+            
             "--state-dir",
             str(state_dir),
             "execute",
             transaction_id,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2022.1"),
         client_factory=lambda _url: client,
     )
     assert code == 2, stopped

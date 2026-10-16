@@ -730,9 +730,9 @@ def gateway_env(
         config_path.write_text(
             json.dumps(
                 {
-                    "wwise_version": None,
+                    "wwise_version": version,
                     "waapi_host": "127.0.0.1",
-                    "waapi_port": None,
+                    "waapi_port": port,
                     "project_modification_policy": policy,
                 }
             ),

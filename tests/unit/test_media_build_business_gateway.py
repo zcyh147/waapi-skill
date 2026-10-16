@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -91,9 +93,9 @@ def _env(tmp_path: Path, *, version: str = "2025.1") -> dict[str, str]:
     config.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -151,8 +153,8 @@ def test_every_issue_85_lane_has_one_business_schema_and_no_typed_bypass(
     assert schema["business_adapter"]["operation"] == operation
     assert schema["business_adapter"]["version"] == version
     bypass_code, bypass = gateway.execute_gateway(
-        ["--version", version, "typed-call", operation, "--schema-digest", "0" * 64],
-        env=_env(tmp_path, version=version),
+        [ "typed-call", operation, "--schema-digest", "0" * 64],
+        env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
         client_factory=lambda url: pytest.fail(f"typed bypass connected to {url}"),
     )
     assert bypass_code == 2

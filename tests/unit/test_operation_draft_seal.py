@@ -106,9 +106,9 @@ def gateway_env(
     config_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": policy,
             }
         ),
@@ -1090,7 +1090,7 @@ def test_wrong_task_or_revision_cannot_reserve_or_create_a_transaction(
     assert payload["error_code"] == error_code
     assert record_path.read_bytes() == before
     assert not (tmp_path / "state" / "transactions").exists()
-    assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
+    assert [call[0] for call in client.calls] == ([] if authority is not None else ["ak.wwise.core.getInfo"])
 
 
 def test_detected_version_drift_cannot_reserve_or_create_a_transaction(
@@ -1120,7 +1120,8 @@ def test_detected_version_drift_cannot_reserve_or_create_a_transaction(
     )
 
     assert code == 2
-    assert payload["error_code"] == "OPERATION_DRAFT_BINDING_DRIFT"
+    assert payload["error_code"] == "GatewayInputError"
+    assert "requested version is 2022.1" in payload["message"]
     assert record_path.read_bytes() == before
     assert not (tmp_path / "state" / "transactions").exists()
     assert [call[0] for call in client.calls] == ["ak.wwise.core.getInfo"]
@@ -1353,7 +1354,10 @@ def test_business_seal_and_legacy_preview_produce_identical_artifacts(
         legacy_payload["transaction_id"]
     ).artifact
 
-    assert composer_artifact == legacy_artifact
+    assert composer_artifact["connection_configuration"]["config_path"] != legacy_artifact["connection_configuration"]["config_path"]
+    assert {k: v for k, v in composer_artifact.items() if k != "connection_configuration"} == {
+        k: v for k, v in legacy_artifact.items() if k != "connection_configuration"
+    }
     assert composer_payload["artifact_hash"] != legacy_payload["artifact_hash"]
     assert composer_payload["preview_summary"]["request"] == EXPECTED_REQUEST
     assert legacy_payload["preview_summary"]["request"] == EXPECTED_REQUEST
@@ -1421,8 +1425,7 @@ def _archive_test_weather_batch_composer_matches_legacy_preview_exactly(
     composer_root = tmp_path / "composer"
     _code, started = offline_execute(
         composer_root,
-        "--version",
-        version,
+        
         "draft-start",
         "object.set",
     )
@@ -1523,7 +1526,10 @@ def _archive_test_weather_batch_composer_matches_legacy_preview_exactly(
         legacy_payload["transaction_id"]
     ).artifact
 
-    assert composer_artifact == legacy_artifact
+    assert composer_artifact["connection_configuration"]["config_path"] != legacy_artifact["connection_configuration"]["config_path"]
+    assert {k: v for k, v in composer_artifact.items() if k != "connection_configuration"} == {
+        k: v for k, v in legacy_artifact.items() if k != "connection_configuration"
+    }
     assert composer_artifact["request"] == expected_request
     assert composer_payload["artifact_hash"] == legacy_payload["artifact_hash"]
     assert composer_payload["preview_summary"] == legacy_payload["preview_summary"]
@@ -1560,8 +1566,7 @@ def _archive_test_weapons_mixed_batch_composer_matches_legacy_preview_exactly(
     composer_root = tmp_path / "composer"
     _code, started = offline_execute(
         composer_root,
-        "--version",
-        version,
+        
         "draft-start",
         "object.set",
     )
@@ -1695,7 +1700,10 @@ def _archive_test_weapons_mixed_batch_composer_matches_legacy_preview_exactly(
         legacy_payload["transaction_id"]
     ).artifact
 
-    assert composer_artifact == legacy_artifact
+    assert composer_artifact["connection_configuration"]["config_path"] != legacy_artifact["connection_configuration"]["config_path"]
+    assert {k: v for k, v in composer_artifact.items() if k != "connection_configuration"} == {
+        k: v for k, v in legacy_artifact.items() if k != "connection_configuration"
+    }
     assert composer_artifact["request"] == expected_request
     assert composer_payload["artifact_hash"] == legacy_payload["artifact_hash"]
     assert composer_payload["preview_summary"] == legacy_payload["preview_summary"]
