@@ -650,7 +650,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "language" in plugin_schema["optional"]
     assert plugin_schema["properties"]["language"]["minLength"] == 1
     assert any(
-        "never guessed" in item
+        "live discovered Type Handle" in item
         for item in create_plugin["constraints"]
     )
     object_set_rows = specs["object.set"]["argument_contract"]["properties"]["objects"]
@@ -961,6 +961,19 @@ def test_audio_import_operation_schema_discloses_compact_batch_composition_contr
                         ),
                         "explicit_conflict": "rejected",
                     },
+                    "conditional_property_shape": {
+                        "dependency_type": "property",
+                        "action": "Enable",
+                        "context": "Self",
+                        "conditions": "one restriction enum containing one exact Boolean value",
+                        "unknown_or_ambiguous_conditions": "rejected",
+                    },
+                    "closure": {
+                        "maximum_depth": 8,
+                        "maximum_fields": 16,
+                        "duplicates": "deduplicated",
+                        "cycles_or_conflicts": "rejected",
+                    },
                     "scope": "same_object_as_reference",
                 },
             },
@@ -1102,7 +1115,20 @@ def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None
             "explicit_required_value": "accepted_and_deduplicated",
             "explicit_conflict": "rejected",
         },
-        "scope": "same_object_as_reference",
+        "conditional_property_shape": {
+                        "dependency_type": "property",
+                        "action": "Enable",
+                        "context": "Self",
+                        "conditions": "one restriction enum containing one exact Boolean value",
+                        "unknown_or_ambiguous_conditions": "rejected",
+                    },
+                    "closure": {
+                        "maximum_depth": 8,
+                        "maximum_fields": 16,
+                        "duplicates": "deduplicated",
+                        "cycles_or_conflicts": "rejected",
+                    },
+                    "scope": "same_object_as_reference",
     }
     assert dependency["failure_policy"]["phase"] == "before_preview"
     assert dependency["failure_policy"]["action"] == "stop"
