@@ -488,8 +488,6 @@ def test_waapi_schema_is_one_bounded_direct_business_read(tmp_path: Path) -> Non
     client = _HostClient(tmp_path, "2025.1")
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
             "waapi-schema",
             "ak.wwise.core.object.get",
             "--include-examples",
