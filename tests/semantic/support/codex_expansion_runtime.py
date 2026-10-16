@@ -48,7 +48,6 @@ def fixture_gateway(*, skill_source: Path, runtime: Any, version: str, receipts:
         if not arguments or str(arguments[0]).startswith("-"):
             raise CaseBoundaryError("fixture Gateway requires one public command")
         command = [sys.executable, str(skill_source / "scripts" / "run.py"), "gateway.py",
-            "--host", runtime.host, "--port", str(runtime.port), "--version", version,
             "--state-dir", str(runtime.owned_root / "setup-state"), "--timeout", str(min(30, timeout_seconds)), *arguments]
         started = time.monotonic()
         try:
@@ -136,7 +135,9 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
         checks["fixture_gateway_receipts"] = []
         gateway = fixture_gateway(skill_source=options.skill_source, runtime=runtime,
                                   version=unit.version, receipts=checks["fixture_gateway_receipts"])
-        gateway(["config-set", "--project-modification-policy", "ask_before_changes"])
+        gateway(["config-set", "--wwise-version", unit.version,
+                 "--waapi-host", runtime.host, "--waapi-port", str(runtime.port),
+                 "--project-modification-policy", "ask_before_changes"])
         reconciliation_guard = ExpansionReconciliationGuard(version=unit.version, host=runtime.host, port=runtime.port,
             gateway=gateway, trusted_read=expansion_oracle_reader(version=unit.version, read_call=direct))
         context = ExpansionCaseContext(unit.version, unit.unit_id, runtime.sandbox.sandbox_project,

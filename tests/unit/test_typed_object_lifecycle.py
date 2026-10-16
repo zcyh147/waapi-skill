@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import pytest  # pyright: ignore[reportMissingImports]
 
 from collections import deque
@@ -36,7 +38,7 @@ SPEC.loader.exec_module(waapi_gateway)
 def _gateway_env(tmp_path: Path) -> dict[str, str]:
     config = tmp_path / "config.json"
     config.write_text(
-        json.dumps({"wwise_version": None, "waapi_host": "127.0.0.1", "waapi_port": None, "project_modification_policy": "ask_before_changes"}),
+        json.dumps({"wwise_version": "2025.1", "waapi_host": "127.0.0.1", "waapi_port": 31337, "project_modification_policy": "ask_before_changes"}),
         encoding="utf-8",
     )
     return {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_VERSION": "2025.1"}
@@ -539,8 +541,8 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
         if field.path == ("children",) and field.shape == "array"
     )
     start_code, started = waapi_gateway.execute_gateway(
-        ["--version", "2021.1", "draft-start", "object.create"],
-        env=env,
+        [ "draft-start", "object.create"],
+        env=set_gateway_config(env, wwise_version="2021.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
     assert start_code == 0, started
@@ -557,7 +559,7 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
     assert item_code == 0, item
     append_code, appended = waapi_gateway.execute_gateway(
         [
-            "--version", "2021.1", "draft-apply", started["draft"]["draft_id"],
+             "draft-apply", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", "1", "--compact", "--facts",
             "--action", "add_typed_fact", "--fact-action", "append",
@@ -570,7 +572,7 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
             "--field-handle", item["handle"], "--key", "name",
             "--value-type", "string", "--fact-value", "Alert",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2021.1"),
         client_factory=lambda url: pytest.fail(f"draft apply connected to {url}"),
     )
     assert append_code == 0, appended
@@ -587,13 +589,13 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
     assert child_code == 0, child_array
     put_code, put = waapi_gateway.execute_gateway(
         [
-            "--version", "2021.1", "draft-apply", started["draft"]["draft_id"],
+             "draft-apply", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", str(appended["draft"]["revision"]),
             "--compact", "--facts",
             *child_array["continuation"]["deferred_fact"]["argv"],
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2021.1"),
         client_factory=lambda url: pytest.fail(f"parent fact connected to {url}"),
     )
     assert put_code == 0, put
@@ -658,7 +660,7 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
     assert item_code == 0, child_item
     leaf_code, leaf = waapi_gateway.execute_gateway(
         [
-            "--version", "2021.1", "draft-apply", started["draft"]["draft_id"],
+             "draft-apply", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", str(put["draft"]["revision"]),
             "--compact", "--facts",
@@ -670,7 +672,7 @@ def _archive_test_object_create_parent_fact_resumes_the_exact_container_response
             "--field-handle", child_item["handle"], "--key", "name",
             "--value-type", "string", "--fact-value", "Alert_A",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2021.1"),
         client_factory=lambda url: pytest.fail(f"leaf facts connected to {url}"),
     )
     assert leaf_code == 0, leaf
@@ -724,14 +726,13 @@ def _archive_test_public_object_create_draft_start_uses_the_dedicated_typed_cont
     assert schema_code == 0, schema
     code, payload = waapi_gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
             "object.create",
         ],
-        env=_gateway_env(tmp_path),
+        env=set_gateway_config(_gateway_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
     )
 
@@ -747,14 +748,14 @@ def _archive_test_public_object_create_draft_start_uses_the_dedicated_typed_cont
     )
     apply_code, applied = waapi_gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(tmp_path / "state"),
+             "--state-dir", str(tmp_path / "state"),
             "draft-apply", payload["draft"]["draft_id"], "--task-authority",
             payload["task_authority"], "--expected-revision", "1", "--facts",
             "--action", "add_typed_fact", "--fact-action", "set",
             "--field-handle", type_handle, "--value-type", "string",
             "--fact-value", "ActorMixer",
         ],
-        env=_gateway_env(tmp_path),
+        env=set_gateway_config(_gateway_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
     )
     assert apply_code == 0, applied
@@ -783,10 +784,10 @@ def _archive_test_object_create_node_local_disclosures_and_fact_batches_are_exec
     state_dir = tmp_path / "state"
     code, started = waapi_gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-start", "object.create",
         ],
-        env=_gateway_env(tmp_path),
+        env=set_gateway_config(_gateway_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
     )
     assert code == 0, started
@@ -815,7 +816,7 @@ def _archive_test_object_create_node_local_disclosures_and_fact_batches_are_exec
     def apply(facts: tuple[Any, ...]) -> Mapping[str, Any]:
         nonlocal revision
         argv = [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-apply", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", str(revision),
@@ -890,11 +891,11 @@ def _archive_test_object_create_node_local_disclosures_and_fact_batches_are_exec
 
     inspect_code, inspected = waapi_gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-inspect", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
         ],
-        env=_gateway_env(tmp_path),
+        env=set_gateway_config(_gateway_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: (_ for _ in ()).throw(AssertionError(url)),
     )
     assert inspect_code == 0, inspected
