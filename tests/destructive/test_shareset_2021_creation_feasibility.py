@@ -24,7 +24,8 @@ pytestmark = [pytest.mark.live, pytest.mark.destructive]
 
 def test_2021_classic_create_effect_shareset_feasibility():
     version = os.environ["WWISE_VERSION"]
-    assert version == "2021.1"
+    if version != "2021.1":
+        pytest.skip("classic ShareSet feasibility is scoped to 2021.1")
     root_text = os.environ.get("WAAPI_SHARESET_2021_PROBE_ROOT")
     if not root_text:
         pytest.skip("requires a new explicit WAAPI_SHARESET_2021_PROBE_ROOT")
