@@ -180,7 +180,7 @@ from .object_capabilities import (
     object_identity_semantics,
 )
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
-from .transaction_cleanup import build_transaction_cleanup_spec
+from .transaction_cleanup import build_transaction_cleanup_spec, persistent_project_cleanup
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .waql import quote_waql_literal
 
@@ -2087,7 +2087,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
             "a live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight and other requested row fields are rejected",
-            "replaceExisting is irreversible and must be exercised only in a disposable project copy during tests",
+            "replaceExisting is irreversible; replaced objects and media have no automatic restoration",
             "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
         ),
@@ -4896,8 +4896,8 @@ def _prepare_object_create(
     }
     if conflict == "replace":
         cleanup = {
-            "kind": "discard-case-owned-project-copy-after-replace",
-            "description": "The replaced subtree is not reconstructed; discard the case-owned project copy after collecting evidence.",
+            "kind": "retain-project-and-outputs",
+            "description": "Retain the project and replacement; the replaced subtree is not automatically reconstructed.",
             "automatic": False,
             "automatic_retry": False,
             "replace_owned_root_id": replace_owned_root.object if replace_owned_root is not None else None,
@@ -4905,7 +4905,7 @@ def _prepare_object_create(
         }
     else:
         cleanup = {
-            "kind": "delete-returned-root-guid" if conflict in {"fail", "rename"} else "discard-owned-sandbox-after-merge",
+            "kind": "retain-project-and-outputs",
             "automatic": False,
             "automatic_retry": False,
             "source": "execution_result.id",
@@ -6211,7 +6211,7 @@ def _prepare_object_set(
         "nodes": node_specs,
     }
     cleanup = {
-        "kind": "discard-owned-sandbox-or-restore-captured-fields",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
         "partial_success_possible": len(raw_objects) > 1,
@@ -6464,7 +6464,7 @@ def _prepare_object_set_rtpc(
         "before_rows": before_rows,
     }
     cleanup = {
-        "kind": "restore-rtpc-snapshot-or-discard-owned-sandbox",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
         "action": action,
@@ -8954,7 +8954,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         preflight_reads=tuple(reads),
         pre_state={name: dict(value.row) for name, value in roles.items()} | metadata,
         verification_plan=verification,
-        cleanup=cleanup,
+        cleanup=persistent_project_cleanup(cleanup),
         warnings=tuple(warnings),
     )
 
@@ -11763,7 +11763,7 @@ def _prepare_closed_import_plan(
         else None
     )
     cleanup = {
-        "kind": "discard-case-owned-project-copy",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
         "irreversible": import_operation == "replaceExisting",
@@ -12081,11 +12081,11 @@ def _prepare_closed_soundbank_operation(
     if definition_oracle is not None:
         verification["definition_oracle"] = _json_mapping(definition_oracle)
     cleanup = {
-        "kind": "discard-case-owned-project-copy-and-output-root",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
-        "failure_policy": "seal_or_quarantine_failed_sandbox_and_never_reuse",
-        "success_policy": "discard_the_complete_case_owned_sandbox",
+        "failure_policy": "retain_project_and_outputs_for_diagnosis",
+        "success_policy": "retain_project_and_outputs",
         "io_root": io_root,
     }
     return preview, roles, {"soundbank_guard": guard}, verification, cleanup
@@ -12169,7 +12169,7 @@ def _localize_soundbank_project_info(
     *,
     io_root: str,
 ) -> dict[str, Any]:
-    """Bind live ``getProjectInfo`` paths to one caller-owned sandbox.
+    """Bind live ``getProjectInfo`` paths to the selected project.
 
     Wwise running through Wine reports absolute host paths with ``Y:``/``Z:``
     spellings.  Some builds also report project-setting directories relative to

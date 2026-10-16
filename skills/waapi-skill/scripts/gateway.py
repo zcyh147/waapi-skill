@@ -505,6 +505,7 @@ from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[r
 )
 from wwise_waapi.transaction_cleanup import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     transaction_cleanup_payload as _transaction_cleanup_payload,
+    project_persistent_artifact,
 )
 from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
@@ -10029,7 +10030,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     )
                     raise
             else:
-                payload.update({"artifact": preview.artifact, "events": list(events)})
+                artifact_view = project_persistent_artifact(preview.artifact)
+                payload.update({"artifact": artifact_view, "events": list(events)})
+            if project_persistent_artifact(preview.artifact) != preview.artifact:
+                payload["artifact_projection"] = "persistent_project_guidance; artifact_hash_identifies_unchanged_stored_artifact"
             if record.state is TransactionState.AWAITING_CONFIRMATION:
                 confirmation_token = snapshot.confirmation_token
                 if confirmation_token is None:
@@ -28536,7 +28540,7 @@ def transaction_show_summary(
     byte-truncated.
     """
 
-    artifact_map = dict(artifact) if isinstance(artifact, Mapping) else {}
+    artifact_map = project_persistent_artifact(artifact) if isinstance(artifact, Mapping) else {}
     prepared_raw = artifact_map.get("prepared_operation")
     prepared = dict(prepared_raw) if isinstance(prepared_raw, Mapping) else {}
     project_guard_raw = artifact_map.get("project_guard")
