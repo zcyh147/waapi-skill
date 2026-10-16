@@ -93,6 +93,8 @@ class ExpansionOutcome:
 def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> ExpansionOutcome:
     repair = unit.unit_id.startswith("REPAIR25-")
     if repair:
+        if sys.platform != "darwin":
+            raise ValueError("the approved repair first batch is macOS only")
         from tests.semantic.support.codex_repair_cases import prepare_repair_case
         if (options.model, options.reasoning_effort, options.service_tier) != ("gpt-5.6-terra", "medium", "default"):
             raise ValueError("repair model configuration drifted")

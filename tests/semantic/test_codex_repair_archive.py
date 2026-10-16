@@ -26,7 +26,7 @@ def sealed_read_archive(root):
     before = {"objects": {TARGET: {"id": TARGET, **expected}}, "complete": True,
         "source_integrity": {"sha256": "a" * 64, "mtime_ns": 42}, "media": {}}
     scope = ExpansionReadScope(frozenset({TARGET}), frozenset({"ak.wwise.core.object.get"}), owned_project_reads=True)
-    plan.update(contract="waapi-skill.repair-task-plan/v1", unit_id="REPAIR25-F2", policy="read_only",
+    plan.update(model="gpt-5.6-terra", reasoning_effort="medium", service_tier="default", contract="waapi-skill.repair-task-plan/v1", unit_id="REPAIR25-F2", policy="read_only",
         operation="ak.wwise.core.object.get", request_schema_uri=None, prompts=["Inspect the parameter, refining a missed spelling."],
         before=before, required_assertions=sorted(F2_ASSERTIONS),
         read_scope={key: sorted(value) if isinstance(value, frozenset) else value for key, value in asdict(scope).items()},

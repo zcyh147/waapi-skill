@@ -802,6 +802,13 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
             and review["configuration"] == reviewer_configuration(review_contract)
             and isinstance(review["runtime"], dict), "adjudication is outside the pinned workflow contract")
     module, case_id = _case(plan)
+    if repair:
+        _require((plan.get("model"), plan.get("reasoning_effort"), plan.get("service_tier"))
+            == ("gpt-5.6-terra", "medium", "default"), "repair executor settings changed")
+        expected_operation = {"F1": "object.setProperty", "F2": "ak.wwise.core.object.get",
+                              "F3": "object.create", "F4": "object.createPlugin"}[case_id]
+        _require(plan.get("operation") == expected_operation and plan.get("request_schema_uri") is None,
+                 "repair operation differs from the approved case")
     _require((unit_id == f"REPAIR25-{case_id}" and version == "2025.1" if repair else
               unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"})
         and (case_id, version) != ("M05", "2022.1"), "unit is not an Agent case")

@@ -26,7 +26,7 @@ def require_predelay_metadata(detail):
     ui = metadata.get("ui", {})
     unit = metadata.get("unit", {})
     if (metadata.get("name") != "PreDelay" or metadata.get("type") not in {"Real32", "Real64"}
-            or type(metadata.get("default")) not in {int, float}
+            or type(metadata.get("default")) not in {int, float} or not math.isfinite(metadata["default"])
             or any(type(restriction.get(key)) not in {int, float} or not math.isfinite(restriction[key]) for key in ("min", "max"))
             or not restriction["min"] <= 24 <= restriction["max"]
             or unit.get("status") != "known"
