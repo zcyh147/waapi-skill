@@ -101,6 +101,8 @@ def test_indeterminate_write_allows_independent_diagnosis_but_never_replay(tmp_p
     env, client, tx, executed = attempted_write(tmp_path, version, ambiguous=True)
     assert executed["status"] == "indeterminate", executed
     assert executed["recovery"]["stage"] == "unknown_write_outcome"
+    assert "prepare_new_preview" not in executed["recovery"]["actions"]
+    assert "write_dispatch" not in executed
     code, configured = gateway.execute_gateway(["config-set", "--project-modification-policy", policy], env=env)
     assert code == 0, configured
     code, shown = gateway.execute_gateway(["transaction-show", tx], env=env)
@@ -108,6 +110,7 @@ def test_indeterminate_write_allows_independent_diagnosis_but_never_replay(tmp_p
     recovery = shown["recovery"]
     assert recovery["stage"] == "unknown_write_outcome"
     assert recovery["project_write_outcome"] == "unknown"
+    assert "prepare_new_preview" not in recovery["actions"]
     assert recovery["read_only_continuation_allowed"] is True
     assert recovery["original_write_replay_allowed"] is False
     assert recovery["modification_policy"] == policy
@@ -163,3 +166,78 @@ def test_authoring_host_boundary_does_not_offer_a_retry_workaround(tmp_path, ver
     assert result["recovery"]["read_only_continuation_allowed"] is False
     assert result["recovery"]["actions"] == ["report_explicit_boundary"]
     assert client.calls == ["ak.wwise.core.getInfo"]
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("policy", POLICIES)
+@pytest.mark.parametrize("drift,ceiling", (("role", None), ("project", None), ("build", None), ("role", 4096)))
+def test_proven_prewrite_guard_rejection_offers_policy_correct_new_preview(tmp_path, monkeypatch, version, policy, drift, ceiling):
+    from copy import deepcopy
+    from tests.unit.test_metadata_selection_gateway import PropertyTask
+    from tests.unit.test_field_interface_closure_gateway import FIRST
+
+    class DriftingTask(PropertyTask):
+        changed = False
+        def call(self, uri, args=None, options=None):
+            value = deepcopy(super().call(uri, args, options))
+            if self.changed and drift == "build" and uri.endswith("getInfo"):
+                value["version"]["build"] += 1
+            if self.changed and drift == "project":
+                if uri.endswith("getProjectInfo"):
+                    value["id"] = "{99999999-9999-9999-9999-999999999999}"
+                elif uri.endswith("object.get") and "from type Project" in (args or {}).get("waql", ""):
+                    value["return"][0]["id"] = "{99999999-9999-9999-9999-999999999999}"
+            return value
+
+    task = DriftingTask(tmp_path, version, "object.setProperty")
+    task.metadata = {"Volume": {"name": "Volume", "type": "Real32"}}
+    task.objects[FIRST]["@Volume"] = 0
+    target = task.bind(FIRST)
+    field = task.discover(target, "Volume")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "-4")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    artifact = deepcopy(shown["artifact"])
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, configured = task.run("config-set", "--project-modification-policy", policy)
+    assert code == 0, configured
+    task.changed = True
+    if drift == "role":
+        task.objects[FIRST]["path"] += "_moved"
+    call_count = len(task.calls)
+    if ceiling is not None and policy != "read_only":
+        from tests.unit.test_field_interface_closure_gateway import gateway as task_gateway
+        monkeypatch.setattr(task_gateway, "MAX_GATEWAY_RESULT_JSON_BYTES", ceiling)
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    receipt = rejected["recovery"]
+    assert receipt["stage"] == "pre_dispatch_rejection", rejected
+    assert receipt["original_write_replay_allowed"] is False
+    assert receipt["read_only_continuation_allowed"] is True
+    if policy == "read_only":
+        assert len(task.calls) == call_count
+        assert receipt["next_change"] == "blocked"
+        assert "prepare_new_preview" not in receipt["actions"]
+    else:
+        assert rejected["state"] == "repreview_required"
+        assert receipt["project_write_outcome"] == "no_project_write_in_this_invocation"
+        assert "prepare_new_preview" in receipt["actions"]
+        assert rejected["write_dispatch"]["status"] == "not_started"
+        if ceiling is not None:
+            assert rejected["error_code"] == "RESULT_TOO_LARGE"
+            assert task_gateway.gateway_json_document_size(rejected) <= ceiling
+    assert not any(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls)
+    code, after = task.run("transaction-show", tx)
+    assert code == 0, after
+    assert after["artifact"] == artifact
+    code, retry = task.run("execute", tx)
+    assert code == 2, retry
+    assert not any(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls)

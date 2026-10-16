@@ -3,6 +3,11 @@ from collections.abc import Mapping
 from typing import Any
 
 RECOVERY_CONTRACT = "waapi-skill.recovery/v1"
+PREWRITE_GUARD_REJECTION = {
+    "contract": "waapi-skill.write-dispatch-evidence/v1",
+    "status": "not_started",
+    "reason": "confirmed_prewrite_guard_rejection",
+}
 READ_COMMANDS = frozenset({"query-object", "metadata", "status", "selected", "buses",
     "project-default-work-units", "profiler-game-objects", "profiler-voice-contributions",
     "core-call", "debug-wal-tree", "debug-validate-call", "waapi-schema"})
@@ -25,7 +30,7 @@ def cleanup_complete(payload: object, depth: int = 0) -> bool:
 
 
 def recovery_receipt(
-    payload: Mapping[str, Any], *, policy: str, dispatch_started: bool = False
+    payload: Mapping[str, Any], *, policy: str, command_routing_started: bool = False
 ) -> dict[str, Any] | None:
     command = payload.get("command")
     failed = payload.get("ok") is False
@@ -44,7 +49,14 @@ def recovery_receipt(
         actions = ["inspect_transaction", "independent_read_only_diagnosis"]
         if command == "execute" and status == "executed_unverified":
             actions.append("follow_returned_verification")
-    elif failed and not dispatch_started:
+    elif (failed and command == "execute" and state == "repreview_required"
+          and status == "repreview_required"
+          and payload.get("write_dispatch") == PREWRITE_GUARD_REJECTION):
+        stage = "pre_dispatch_rejection"
+        actions = ["inspect_transaction", "independent_read_only_diagnosis"]
+        if policy in {"ask_before_changes", "allow_changes"}:
+            actions.append("prepare_new_preview")
+    elif failed and not command_routing_started:
         stage = "pre_dispatch_rejection"
         if command in {"execute", "verify", "transaction-show", "confirm", "reject"}:
             outcome = "prior_transaction_outcome_not_established_by_this_rejection"
