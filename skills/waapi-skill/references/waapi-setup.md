@@ -5,7 +5,7 @@ Use this reference when the request is primarily about connection, version selec
 ## First connection sequence
 
 1. Run `python scripts/run.py gateway.py status` from the skill directory.
-2. The gateway resolves explicit flags, test/runtime environment variables, and then saved config; do not inspect these sources manually first.
+2. The gateway reads the selected saved host, port, and expected Wwise version. If incomplete, use `config-show` and `config-set` before retrying. Ordinary commands reject temporary connection flags and ignore connection environment overrides.
 3. On success, report the detected live Wwise version, endpoint, project name, and project path requested by the user.
 4. On failure, report the JSON `error_code` and `message`. Do not scan ports, inspect processes, search the repository, or treat saved config as live state.
 
@@ -24,7 +24,7 @@ python scripts/run.py gateway.py config-set --reset
 
 In an automated agent run, use the absolute `scripts/run.py` locator as required by `SKILL.md`. Do not hand-edit a config file. `config-show` reports the effective values, their source, the external path, and whether the checkout-local legacy fallback was used. `config-set` always writes the complete public config atomically to the external path and never writes the legacy file inside the Skill checkout.
 
-The external path is `WAAPI_SKILL_CONFIG_PATH` when explicitly overridden, otherwise `$XDG_CONFIG_HOME/waapi-skill/config.json`, otherwise `$HOME/.config/waapi-skill/config.json`. The override exists for controlled runtimes and tests; normal user config stays outside the installed Skill.
+The external path is `WAAPI_SKILL_CONFIG_PATH` when explicitly overridden, otherwise `$XDG_CONFIG_HOME/waapi-skill/config.json`, otherwise `$HOME/.config/waapi-skill/config.json`. Select a distinct absolute config path for an intentionally independent copy or sandbox, then configure it with `config-set`. Copying the Skill directory alone does not isolate user configuration. Normal user config stays outside the installed Skill.
 
 The saved public config fields are exactly:
 
@@ -69,10 +69,12 @@ closed rather than falling through to another location.
 
 ## Version selection
 
-- Prefer an explicit user-provided Wwise version when exact API behavior matters; pass it with `--version`.
-- Otherwise let the gateway infer the exact supported year-major version from live `ak.wwise.core.getInfo`.
-- A mismatch between an explicit/configured version and the connected Wwise instance must fail closed.
+- Save the user-provided expected version with `config-set --wwise-version`; live operations require a configured version and port.
+- Use root `--version` only for offline catalog/schema inspection; it cannot select the connection used by a Draft or live command.
+- The Gateway compares live `ak.wwise.core.getInfo` with the configured version and rejects mismatches before business dispatch.
 - Persist approved `wwise_version`, `waapi_host`, and `waapi_port` with `config-set` so later runs do not depend on conversation memory. Never write `data/config.json`; it is read-only legacy fallback compatibility when no external config exists.
+
+Drafts persist the selected config path, host, port, and version; their first live step also binds the project GUID and Wwise build. Every continuation compares the selected configuration before proceeding, and live steps recheck project/build. Previews retain the same configuration constraint alongside their existing project/runtime guards. Changed targets and historical state without connection bindings require a new Draft/Preview; the Gateway never silently reuses an old endpoint.
 
 The live host profile is separate from the saved version. The gateway derives
 `wwise-console` versus `wwise-authoring-ui` from the same live
