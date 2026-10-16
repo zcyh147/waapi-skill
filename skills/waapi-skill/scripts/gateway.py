@@ -20534,6 +20534,30 @@ def _dispatch_transaction_command_with_execution_lease(
                 verified=verification.business_state_verified,
                 cleanup=payload["cleanup"],
             )
+            if transaction_request.get("operation") == "object.create":
+                execution_payload = execution_result.get("result")
+                root_id = execution_payload.get("id") if isinstance(execution_payload, Mapping) else None
+                identities: list[dict[str, Any]] = []
+                for readback in verification.readbacks:
+                    result = readback.get("result")
+                    rows = result.get("return") if isinstance(result, Mapping) else None
+                    if not isinstance(rows, list):
+                        continue
+                    for row in rows:
+                        if not isinstance(row, Mapping) or row.get("id") != root_id:
+                            continue
+                        identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                        if (_canonical_guid(identity["id"])
+                                and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
+                                and identity not in identities):
+                            identities.append(identity)
+                agent_result["business_result"] = {
+                    "contract": "waapi-skill.verified-created-root/v1",
+                    "identity_status": "verified" if len(identities) == 1 else "unavailable",
+                    "verified_root": identities[0] if len(identities) == 1 else None,
+                    "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+                    "repeat_creation": False,
+                }
             transaction_arguments = transaction_request.get("arguments")
             transaction_api = (
                 transaction_arguments.get("api")

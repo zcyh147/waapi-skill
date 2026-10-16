@@ -32,6 +32,7 @@ tests/unit/test_metadata_discovery.py
 tests/unit/test_metadata_discovery_gateway.py
 tests/unit/test_metadata_selection_gateway.py
 tests/unit/test_conditional_reference_gateway.py
+tests/unit/test_gameparameter_class_fields_gateway.py
 tests/unit/test_script_helpers.py::test_run_main_returns_standard_interrupt_code_without_wrapper_traceback
 tests/unit/test_script_helpers.py::test_environment_ready_marker_binds_requirements_and_rejects_symlink
 tests/unit/test_script_helpers.py::test_run_bootstrap_repairs_existing_venv_without_ready_marker
