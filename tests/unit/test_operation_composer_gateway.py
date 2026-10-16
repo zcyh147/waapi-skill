@@ -330,10 +330,10 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Reviewed delta: Bus/AuxBus child pairs in object.create and the versioned
-    # localized Voice import constraint. No operation/route was added or removed.
+    # Reviewed delta: explicit owner/ShareSet placement and Boolean reference
+    # dependency closure. Existing operation/version inventory remains unchanged.
     assert canonical_sha256(non_object_set_digests) == (
-        "f15b651a7ec059d1c9604fe138901ab88c258751d1657e245fcdf5fed41b888f"
+        "4f05743e90078e3d3ca52dc525b000b2fe46bbd4376ba9a701f1fddde5ca246f"
     )
     assert {
         version: operation_input_mode("object.set", version)

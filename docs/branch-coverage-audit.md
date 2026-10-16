@@ -64,7 +64,12 @@ source-backed catalog, not an assertion that their Cartesian product was tested.
 ShareSet now has public deterministic native PASS on candidate `df8e0610` for
 2022.1–2025.1, with the lifecycle paths recorded in the current reconciliation.
 This proves the fixture's independent Work Unit child lifecycle, not every plugin
-class or property combination. 2021.1 remains an explicit `object.set` boundary.
+class or property combination. 2021.1 remains an explicit packaged `object.createPlugin` boundary because its
+current backend requires `object.set`. A separate classic `object.create` probe
+rejected the exact live plug-in name with `type is unknown`; that failed attempt
+does not establish universal native impossibility. No alternate canonical type
+token was found in the matching SDK documentation. Alternative native topology
+remains an unresolved follow-up; see [the scoped evidence report](research/shareset-2021-classic-create-feasibility.md).
 GameParameter public same-call creation also passed all five versions on
 candidate `90018ae0`, including independent readback of the created GUID and
 Min/Max/InitialValue. Its earlier registry-level feasibility remains separate
