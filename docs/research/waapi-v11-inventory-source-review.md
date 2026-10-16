@@ -98,3 +98,17 @@ existing producers' `--check` commands returned 0. The branch audit remains
 structurally consistent and behavior coverage remains incomplete; its CLI test
 continues to require exit 2 from `--require-complete`. These maintainer checks
 launch neither Wwise nor Fresh and add no functional execution credit.
+
+## Portable source identities
+
+Review follow-up `19ec7f53` centralizes repository source identities in
+`tests/maintenance/source_identity.py`. Its relative POSIX spelling rejects
+traversal and covers POSIX, Windows drive and UNC inputs without changing
+native evidence provenance. The branch audit seals that helper as a source
+dependency. These synthetic path tests do not establish native-Windows Wwise
+execution. Final regeneration preserves the same runtime contract seals.
+
+After the portability merge, 29 focused source-identity, depth-inventory and
+profile-schema attribution checks passed in 58.51s. Both generator `--check`
+commands again returned 0. Runtime seals and all structural counts above stayed
+unchanged; the refreshed branch ledger adds the portable helper's source seal.

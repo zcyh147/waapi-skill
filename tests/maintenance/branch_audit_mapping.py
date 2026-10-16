@@ -270,6 +270,7 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
                 source(path, symbol or None)
     source("docs/interface-depth-review-policy.json")
     source("tests/maintenance/interface_depth_inventory.py")
+    source("tests/maintenance/source_identity.py")
     source("tests/maintenance/branch_audit_mapping.py")
     source("tests/maintenance/branch_coverage_audit.py")
     inventory.update(source_index=source_index, contract_index=contract_index, mappings=mappings,
