@@ -67,6 +67,8 @@ class AttenuationTask(FieldTask):
 @pytest.mark.parametrize("kind", ["Sound", "RandomSequenceContainer"])
 def test_conditional_attenuation_dependencies_are_previewed_and_verified(tmp_path: Path, version: str, kind: str):
     task = AttenuationTask(tmp_path, version, kind)
+    task.metadata["Attenuation"]["dependencies"].insert(0, {
+        "type": "isMasterBus", "value": False, "action": "Show", "context": "Self"})
     task.declare()
     code, checked = task.step("draft-check")
     assert code == 0, json.dumps(checked)

@@ -32,7 +32,7 @@ class PublicDraft:
 
     def field(self, target, meaning):
         return self.step("draft-discover-fields", "--object-handle", target,
-                         "--meaning", meaning)["field_candidates"][0]["handle"]
+                         "--meaning", meaning)["meaning_results"][0]["candidates"][0]["handle"]
 
     def finish(self):
         self.step("draft-check")
@@ -88,6 +88,8 @@ def test_attenuation_activation_public_gateway_native():
             before = actor("ak.wwise.core.object.get", {"from": {"id": [source]}}, {"return": fields})["return"][0]
             metadata = {field: actor("ak.wwise.core.object.getPropertyInfo", {"object": source, "property": field}, {})
                         for field in ("Attenuation", "ListenerRelativeRouting", "OverridePositioning")}
+            record = {"kind": kind, "before": before, "metadata": metadata}
+            evidence["objects"].append(record)
             if version == "2021.1":
                 for name in ("OverridePositioning", "ListenerRelativeRouting"):
                     if before[name] is True:
@@ -109,8 +111,7 @@ def test_attenuation_activation_public_gateway_native():
                            "--object-handle", target, "--field-value", field, reference)
             preview, verified = draft.finish()
             after = actor("ak.wwise.core.object.get", {"from": {"id": [source]}}, {"return": fields})["return"][0]
-            evidence["objects"].append({"kind": kind, "before": before, "metadata": metadata,
-                                        "preview": preview, "after": after})
+            record.update({"preview": preview, "after": after})
             assert after["Attenuation"]["id"] == attenuation
             assert after["ListenerRelativeRouting"] is True and after["OverridePositioning"] is True
             assert all(after[name] == before[name] for name in ("id", "name", "type", "path", "Volume", "notes"))

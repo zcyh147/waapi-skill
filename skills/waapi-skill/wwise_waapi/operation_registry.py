@@ -7294,6 +7294,12 @@ def _apply_reference_activation_dependencies(
     activation_names: list[str] = []
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
+        # Reflected attenuation metadata also describes UI visibility. This
+        # exact Show rule is not an activation requirement or an implied write.
+        if (dependency.get("value") is False
+                and dependency == {"type": "isMasterBus", "value": False,
+                                   "action": "Show", "context": "Self"}):
+            continue
         fields = set(dependency)
         expected_fields = (_REFERENCE_ACTIVATION_DEPENDENCY_FIELDS | {"conditions"}
                            if dependency.get("type") == "property"
