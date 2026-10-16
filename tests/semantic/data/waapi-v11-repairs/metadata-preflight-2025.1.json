@@ -1,0 +1,89 @@
+{
+  "contract": "waapi-skill.repair-native-metadata-evidence/v1",
+  "version": "2025.1",
+  "build": 9143,
+  "candidate": "24859781",
+  "evidence_root": "skills/waapi-skill-workspace/repair-predelay-24859781-r2",
+  "agent_calls": 0,
+  "project_mutation_count": 0,
+  "metadata": {
+    "name": "PreDelay",
+    "type": "Real32",
+    "default": 25.0,
+    "supports": {
+      "rtpc": "Exclusive",
+      "randomizer": false,
+      "unlink": false
+    },
+    "display": {
+      "name": "Pre Delay",
+      "index": 1336,
+      "group": "Reverb"
+    },
+    "restriction": {
+      "type": "range",
+      "min": 0.0,
+      "max": 1000.0
+    },
+    "dependencies": [],
+    "ui": {
+      "value": {
+        "min": 0.0,
+        "max": 200.0,
+        "decimals": 1,
+        "step": 1.0,
+        "fine": 0.1,
+        "infinity": 0
+      },
+      "displayAs": {
+        "lrMix": false,
+        "musicNote": false,
+        "bitfield": false,
+        "percentage": false
+      },
+      "dataMeaning": "None",
+      "autoUpdate": false
+    },
+    "audioEngineId": 1,
+    "unit": {
+      "status": "unknown",
+      "value": null
+    },
+    "availability": {
+      "type": "known",
+      "default": "known",
+      "restriction": "known",
+      "dependencies": "known",
+      "supports": "known",
+      "ui": "known"
+    }
+  },
+  "scope": {
+    "kind": "object_type",
+    "requested": "Wwise RoomVerb",
+    "resolved": {
+      "classId": 7733251,
+      "name": "Wwise RoomVerb",
+      "type": "Effect"
+    }
+  },
+  "source_hash_before": {
+    "algorithm": "sha256",
+    "bytes_hashed": 3943065,
+    "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+    "file_count": 83,
+    "strategy": "full"
+  },
+  "source_hash_after": {
+    "algorithm": "sha256",
+    "bytes_hashed": 3943065,
+    "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+    "file_count": 83,
+    "strategy": "full"
+  },
+  "source_mtime_before_ns": 1792176469219518550,
+  "source_mtime_after_ns": 1792176469219518550,
+  "final_status": "PASS",
+  "sandbox_retained": false,
+  "errors": []
+}

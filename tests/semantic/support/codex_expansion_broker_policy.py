@@ -37,9 +37,11 @@ class ExpansionBrokerPolicy:
     The Agent never receives this instance or the fixture assertions.
     """
 
+    declarations = _DECLARATIONS
+
     def __init__(self, *, prepared: PreparedExpansionCase, version: str, skill_source: Path,
                  scoped_paths: Mapping[str, str]) -> None:
-        if prepared.operation not in _DECLARATIONS:
+        if prepared.operation not in self.declarations:
             raise ExpansionPolicyError("expansion case has no closed declaration family")
         self.prepared = prepared
         self.version = version
@@ -93,7 +95,7 @@ class ExpansionBrokerPolicy:
         self.preparation_failures: list[Mapping[str, Any]] = []
 
     def repairable_preparation(self, command: str) -> bool:
-        return command in (_DRAFT_READS | _BUSINESS_EDITS | _DECLARATIONS[self.prepared.operation]) and self.transaction.state == "unprepared"
+        return command in (_DRAFT_READS | _BUSINESS_EDITS | self.declarations[self.prepared.operation]) and self.transaction.state == "unprepared"
 
     @property
     def complete(self) -> bool:
@@ -131,7 +133,7 @@ class ExpansionBrokerPolicy:
             if argv != ("draft-start", self.operation) or self.draft_id is not None:
                 raise ExpansionPolicyError("only the sealed operation may start one Draft")
             self.draft_start_name = name
-        elif command in _DRAFT_READS | _BUSINESS_EDITS | _DECLARATIONS[self.prepared.operation] | {"preview-from-draft"}:
+        elif command in _DRAFT_READS | _BUSINESS_EDITS | self.declarations[self.prepared.operation] | {"preview-from-draft"}:
             if (self.transaction.state != "unprepared" or not self.draft_id
                     or getattr(args, "draft_id", None) != self.draft_id
                     or getattr(args, "task_authority", None) != self.authority
