@@ -72,6 +72,11 @@ def test_conditional_attenuation_dependencies_are_previewed_and_verified(tmp_pat
     assert code == 0, json.dumps(checked)
     code, preview = task.step("preview-from-draft")
     assert code == 0, json.dumps(preview)
+    changes = preview["preview_summary"]["derived_changes"]
+    assert {row["field"]: row["value"] for row in changes} == {
+        "ListenerRelativeRouting": True, "OverridePositioning": True}
+    assert all(row["object_id"] == FIRST and "Attenuation" in row["activates_references"] for row in changes)
+    assert list(preview)[-1] == "agent_result"
     tx = preview["transaction_id"]
     code, shown = task.run("transaction-show", tx)
     assert code == 0, shown
@@ -122,6 +127,7 @@ def test_satisfied_activation_is_guarded_without_redundant_property_writes(tmp_p
     assert code == 0, preview
     code, shown = task.run("transaction-show", preview["transaction_id"])
     assert code == 0, shown
+    assert "derived_changes" not in preview["preview_summary"]
     prepared = shown["artifact"]["prepared_operation"]
     row = prepared["dispatch"]["args"]["objects"][0]
     assert "@ListenerRelativeRouting" not in row

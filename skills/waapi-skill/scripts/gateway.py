@@ -28628,6 +28628,27 @@ def transaction_show_summary(
         execution_result=execution_result,
     )
     request = artifact_map.get("request")
+    derived_changes = []
+    verification = prepared.get("verification_plan")
+    if isinstance(verification, Mapping):
+        for node in verification.get("nodes", []):
+            if not isinstance(node, Mapping):
+                continue
+            for field in node.get("properties", []):
+                if not isinstance(field, Mapping) or field.get("derived") is not True:
+                    continue
+                if field.get("already_satisfied") is True:
+                    continue
+                derived_changes.append({
+                    "object_id": node.get("target_id"),
+                    "request_path": node.get("request_path"),
+                    "field": field.get("name"),
+                    "value": field.get("value"),
+                    "activates_references": field.get("activates_references", []),
+                })
+    # Required user notice survives every compact variant; the existing byte
+    # ceiling fails closed if the complete change list cannot fit.
+    derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
 
     # ``transaction-show --summary-only`` predates the bounded projections.
     # Preserve that committed public shape exactly for ordinary transactions;
@@ -28640,6 +28661,7 @@ def transaction_show_summary(
             "contract": artifact_map.get("contract"),
             "request": request,
             "dispatch": prepared.get("dispatch"),
+            **derived_notice,
             "resolved_roles": prepared.get("resolved_roles"),
             "pre_state": prepared.get("pre_state"),
             "verification_plan": prepared.get("verification_plan"),
@@ -28706,6 +28728,7 @@ def transaction_show_summary(
                 "contract": artifact_map.get("contract"),
                 "summary_contract": TRANSACTION_SHOW_SUMMARY_CONTRACT,
                 "detail_level": detail_level,
+                **derived_notice,
                 "request": request,
                 "request_canonical_sha256": request_digest,
                 "dispatch": transaction_dispatch_summary(
