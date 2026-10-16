@@ -88,7 +88,8 @@ def test_create_preview_has_exact_payload_gate_readback_and_cleanup() -> None:
     assert preview.readback_plan[0].args == {
         "waql": 'from object "{parent}" select children where name = "WAAPI_TASK5_Object"'
     }
-    assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "delete-created-object"
+    assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "retain-project-and-outputs"
+    assert preview.envelope.metadata["cleanup_expectation"]["automatic_cleanup"] is False
 
 
 def test_create_readback_preserves_path_separators_and_rejects_unproven_quotes() -> None:

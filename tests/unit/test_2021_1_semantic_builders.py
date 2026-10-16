@@ -79,7 +79,8 @@ def test_2021_object_mutation_preview_is_gated_and_missing_uri_is_unsupported() 
 
     assert_2021_preview(preview, family=BuilderFamily.OBJECT_MUTATION, uri=OBJECT_CREATE_URI, destructive=True)
     assert preview.envelope.metadata["destructive_gate"]["required"] is True
-    assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "delete-created-object"
+    assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "retain-project-and-outputs"
+    assert preview.envelope.metadata["cleanup_expectation"]["automatic_cleanup"] is False
 
     with pytest.raises(SemanticValidationError) as exc:
         builder.paste_properties(source=ObjectIdentity(id=GUID_A), targets=(ObjectIdentity(id=GUID_B),))

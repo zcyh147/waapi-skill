@@ -83,6 +83,10 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
     ``surface`` is an optional independently supplied execution partition for
     maintainer comparisons. It cannot influence reflection enumeration.
     """
+    import sys
+    sys.path.insert(0, str(root))
+    from tests.maintenance.source_identity import repository_source_identity
+
     manifest = root / "skills/waapi-skill/resources/manifest"
     surface = surface if surface is not None else load(manifest / "typed-request-surface.json")
     routes = {}
@@ -94,7 +98,7 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
         for kind, filename, key in (("function", "functions.json", "functions"),
                                     ("topic", "topics.json", "topics")):
             path = folder / filename
-            sources[str(path.relative_to(root))] = digest(load(path))
+            sources[repository_source_identity(path, root)] = digest(load(path))
             for row in load(path)[key]:
                 routes[route_key(version, kind, row["uri"])] = kind
         for filename in ("schemas.json", "authoring-ui-commands-supplement.json",
@@ -103,7 +107,7 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
             if not path.exists():
                 continue
             data = load(path)
-            source = str(path.relative_to(root))
+            source = repository_source_identity(path, root)
             sources[source] = digest(data)
             if filename == "authoring-ui-commands-supplement.json":
                 for kind, key in (("function", "functions"), ("topic", "topics")):
@@ -119,7 +123,7 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
                 schemas.append((version, source, row["uri"], row["schema"]))
         path = folder / "definitions.json"
         data = load(path)
-        source = str(path.relative_to(root))
+        source = repository_source_identity(path, root)
         sources[source] = digest(data)
         for document, schema in data["documents"].items():
             definitions.append((version, source, document, schema))
@@ -165,8 +169,6 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
             "evidence_defaults": {"implementation": "unknown", "program": "unknown", "real": "unknown", "agent": "unknown"},
             "summary": {"routes": len(route_rows), "branches": len(branch_rows),
                         "branch_kinds": dict(sorted(Counter(r["kind"] for r in branch_rows).items()))}}
-    import sys
-    sys.path.insert(0, str(root))
     from tests.maintenance.branch_audit_mapping import enrich_inventory
     enrich_inventory(inventory, root, public, schemas,
                      native_policy if native_policy is not None else load(root / "skills/waapi-skill/resources/native_surface_policy.json"),

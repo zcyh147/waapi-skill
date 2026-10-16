@@ -13,9 +13,12 @@ coordinator explicitly starts the approved first batch.
 | F3 | Existing Game Parameters WorkUnit | New Repair_WindRange, range -12..36, default 7 | allow_changes | 1 | 1 |
 | F4 | Existing Effects WorkUnit | New independent RoomVerb ShareSet Repair_Independent_Room | allow_changes | 1 | 1 |
 
-Mac first batch, nominal Wwise 2025.1: four fresh tasks, four user turns, four
-executor model invocations, three Agent transactions, no model reviewer calls.
-Executor is gpt-5.6-terra, medium reasoning, default service tier. Each task has
+Mac first batch, nominal Wwise 2025.1: four fresh CLI tasks, four user turns, four
+executor CLI runs, three Agent transactions, no model reviewer calls.
+The machine scheduler `model_calls` count denotes executor CLI runs, not API requests. Internal model
+and tool iterations can involve multiple API requests; actual token usage comes
+from the sealed campaign evidence. Executor is gpt-5.6-terra, medium reasoning,
+default service tier. Each task has
 600 cumulative Agent seconds and at most 96 Gateway calls; the batch has at most
 2400 Agent seconds. No automatic retry, case subset, or version multiplication.
 Fixture setup calls and native preflight are deterministic runner work and are
@@ -36,8 +39,11 @@ native readback. Preview admission rejects extra native writes or wrong targets.
 The state oracle compares the complete bounded parent child set, target values,
 source-project full hash/mtime and original media hashes. F1 additionally compares
 all reflected plugin fields. F2 admits only bounded reads and requires an ordered
-complete no-match followed by a unique exact target result; its snapshot must be
-unchanged. F3 verifies the requested final values independently of the Agent's
+complete no-match followed by a unique target result with its exact name, type
+and path. Authenticated target receipts must also expose Min, Max and InitialValue
+with the expected values, either in that result or in bounded subsequent exact-ID
+projections of the same GUID. Runner snapshots do not satisfy this Agent-visible
+read obligation. Its independent snapshot must remain unchanged. F3 verifies the requested final values independently of the Agent's
 wording. The first batch uses the new same-call creation implementation and its
 one-transaction budget; a required staged fallback is a blocked prerequisite,
 not authorization to spend another transaction or turn.

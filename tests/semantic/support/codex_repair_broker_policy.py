@@ -46,6 +46,7 @@ class RepairBrokerPolicy(ExpansionBrokerPolicy):
         self.oracle_evidence["after"] = self.prepared.snapshot()
         self.assertions = dict(self.prepared.verify(self.prepared.before, self.oracle_evidence["after"]))
         self.assertions["read_refinement"] = read_refinement_proven(self.read_receipts,
-            target_id=self.prepared.archive_oracle_parameters["target_id"])
+            target_id=self.prepared.archive_oracle_parameters["target_id"],
+            expected=self.prepared.archive_oracle_parameters["expected"])
         self.oracle_evidence.update(assertions=self.assertions, read_receipts=self.read_receipts)
         self.read_complete = bool(self.assertions) and all(value is True for value in self.assertions.values())

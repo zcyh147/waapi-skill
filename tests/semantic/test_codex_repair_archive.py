@@ -16,7 +16,7 @@ from tests.semantic.support.codex_harness import completed_command_records
 TARGET = "{22222222-2222-2222-2222-222222222222}"
 
 
-def sealed_read_archive(root):
+def sealed_read_archive(root, *, projection="complete"):
     _sealed_c08(root)
     shutil.rmtree(root / "broker/state/transactions")
     plan = json.loads((root / "expansion-plan.json").read_text())
@@ -39,11 +39,26 @@ def sealed_read_archive(root):
     old_events = [json.loads(line) for line in (root / "turns/turn-01/events.jsonl").read_text().splitlines()]
     events = old_events[:4]
     records = []
-    for index, word in enumerate(("Missing", "Repair_Wind"), 1):
+    words = ["Missing", "Repair_Wind"] + (["Min", "Max", "InitialValue"] if projection == "split" else [])
+    for index, word in enumerate(words, 1):
         argv = ["query-object", "--search-text", word, "--max-results", "10"]
-        rows = [] if index == 1 else [{"id": TARGET, **expected}]
+        target = {"id": TARGET, **expected}
+        if projection == "id_only":
+            target = {"id": TARGET}
+        elif projection == "split":
+            target = {key: value for key, value in target.items() if key != "properties"}
+        elif projection == "missing":
+            target = {**target, "properties": {"Min": -12, "Max": 36}}
+        elif projection == "wrong_identity":
+            target = {**target, "path": r"\Game Parameters\Other"}
+        elif projection == "wrong_value":
+            target = {**target, "properties": {**expected["properties"], "InitialValue": 8}}
+        if index > 2:
+            argv = ["query-object", "--exact-id", TARGET, "--include-field", word]
+            target["properties"] = {word: expected["properties"][word]}
+        rows = [] if index == 1 else [target]
         payload = {"ok": True, "command": "query-object", "count": len(rows), "objects": rows,
-                   "query_bound": {"mode": "take", "value": 10}, "limit_reached": False}
+                   "query_bound": {"mode": "exact-object"} if index > 2 else {"mode": "take", "value": 10}, "limit_reached": False}
         runner = str(Path(plan["skill_source"]) / "scripts/run.py")
         model_argv = ["python", runner, "gateway.py", *argv]
         stdout = json.dumps(payload)
@@ -69,7 +84,7 @@ def sealed_read_archive(root):
     _write(root / "expansion-task-result.json", result)
     directory = root / "turns/turn-01"
     grade = json.loads((directory / "turn-grade.json").read_text())
-    grade.update(prompt_sha256=hashlib.sha256(plan["prompts"][0].encode()).hexdigest(), broker_prefix_count=2)
+    grade.update(prompt_sha256=hashlib.sha256(plan["prompts"][0].encode()).hexdigest(), broker_prefix_count=len(records))
     _write(directory / "turn-grade.json", grade)
     facts = json.loads((directory / "codex-facts.json").read_text())
     facts.update(final_response=final, command_facts={"command_records": [asdict(row) for row in completed_command_records(events, platform_name="posix")]})
@@ -79,8 +94,9 @@ def sealed_read_archive(root):
     (directory / "prompt.txt").write_text(plan["prompts"][0] + "\n")
 
 
-def test_read_only_repair_archive_replays_without_inventing_transaction(tmp_path):
-    sealed_read_archive(tmp_path)
+@pytest.mark.parametrize("projection", ["complete", "split"])
+def test_read_only_repair_archive_replays_without_inventing_transaction(tmp_path, projection):
+    sealed_read_archive(tmp_path, projection=projection)
     result = verify_expansion_task_archive(tmp_path, expected_unit_id="REPAIR25-F2", expected_version="2025.1", expected_inputs_sha256=INPUTS)
     assert result["business_pass"] and result["executions"] == 0
 
@@ -104,4 +120,11 @@ def test_repair_archive_rejects_changed_state_missing_refinement_or_extra_write(
         value["records"][0]["payload"]["objects"] = value["records"][1]["payload"]["objects"]
         _write(path, value)
     with pytest.raises(ExpansionArchiveError):
+        verify_expansion_task_archive(tmp_path, expected_unit_id="REPAIR25-F2", expected_version="2025.1", expected_inputs_sha256=INPUTS)
+
+
+@pytest.mark.parametrize("projection", ["id_only", "missing", "wrong_identity", "wrong_value"])
+def test_authenticated_archive_requires_agent_visible_identity_and_all_values(tmp_path, projection):
+    sealed_read_archive(tmp_path, projection=projection)
+    with pytest.raises(ExpansionArchiveError, match="read-only repair oracle replay mismatch"):
         verify_expansion_task_archive(tmp_path, expected_unit_id="REPAIR25-F2", expected_version="2025.1", expected_inputs_sha256=INPUTS)

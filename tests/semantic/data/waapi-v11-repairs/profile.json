@@ -18,7 +18,11 @@
         "plugin_name": "Repair_Metadata_Room",
         "plugin_type": "Wwise RoomVerb",
         "parent_path": "\\Effects\\Default Work Unit",
-        "pre_delay": 24
+        "pre_delay": 24,
+        "parent_segments": [
+          "Effects",
+          "Default Work Unit"
+        ]
       }
     },
     {
@@ -34,7 +38,11 @@
         "parent_path": "\\Game Parameters\\Default Work Unit",
         "min": -12,
         "max": 36,
-        "default": 7
+        "default": 7,
+        "parent_segments": [
+          "Game Parameters",
+          "Default Work Unit"
+        ]
       }
     },
     {
@@ -49,7 +57,11 @@
         "parent_path": "\\Game Parameters\\Default Work Unit",
         "min": -12,
         "max": 36,
-        "default": 7
+        "default": 7,
+        "parent_segments": [
+          "Game Parameters",
+          "Default Work Unit"
+        ]
       }
     },
     {
@@ -61,7 +73,11 @@
       "fixture": {
         "name": "Repair_Independent_Room",
         "plugin_type": "Wwise RoomVerb",
-        "parent_path": "\\Effects\\Default Work Unit"
+        "parent_path": "\\Effects\\Default Work Unit",
+        "parent_segments": [
+          "Effects",
+          "Default Work Unit"
+        ]
       }
     }
   ]
