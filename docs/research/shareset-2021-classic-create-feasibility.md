@@ -96,3 +96,11 @@ SHA-256 of the exact decompressed HTML page bytes:
 | `ak_wwise_core_object_gettypes.html` | `98688037e604f0c15d174218b6e318b2eeaa2f2432775ac39c6e309dc072a67f` |
 | `wwiseobject_effect_wwise_gain.html` | `afc4df1dbde4a55b8afdcadfa27929ffa189dce0af42d7dd37dbbd044df893c4` |
 | `wwiseobject_effect_wwise_roomverb.html` | `fe822d67a6d2538c4567f838f2d03d611c4a553fbe0bc47bf04904c45624816e` |
+
+## Preserved location after worktree cleanup
+
+The byte-identical root is also preserved in the main project at
+`.waapi-skill-state/repair-evidence/waapi-sharesets/.waapi-skill-state/shareset-classic-cc99ea98-2021-r1/`.
+The relocation inventory is `.waapi-skill-state/repair-evidence/relocation-manifest.json`;
+original paths remain provenance. The lifecycle and evidence hashes above remain
+unchanged. The failed sandbox was preserved with the root, not deleted.
