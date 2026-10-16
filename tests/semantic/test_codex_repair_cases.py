@@ -46,12 +46,13 @@ def test_no_guessed_predelay_value_or_units(fault):
 
 def test_refinement_requires_ordered_complete_miss_and_unique_matching_result():
     empty = {"command": "query-object", "payload": {"ok": True, "objects": [], "count": 0, "query_bound": {"mode": "take", "value": 10}}}
-    found = {"command": "query-object", "payload": {"ok": True, "objects": [{"id": "target"}], "count": 1, "query_bound": {"mode": "take", "value": 10}}}
-    assert read_refinement_proven([empty, found], target_id="target")
-    assert not read_refinement_proven([found, empty], target_id="target")
-    assert not read_refinement_proven([empty, found], target_id="other")
+    expected = {"name": "Target", "type": "GameParameter", "path": r"\Game Parameters\Target", "properties": {"Min": -12, "Max": 36, "InitialValue": 7}}
+    found = {"command": "query-object", "payload": {"ok": True, "objects": [{"id": "target", **expected}], "count": 1, "query_bound": {"mode": "take", "value": 10}}}
+    assert read_refinement_proven([empty, found], target_id="target", expected=expected)
+    assert not read_refinement_proven([found, empty], target_id="target", expected=expected)
+    assert not read_refinement_proven([empty, found], target_id="other", expected=expected)
     found["payload"]["limit_reached"] = True
-    assert not read_refinement_proven([empty, found], target_id="target")
+    assert not read_refinement_proven([empty, found], target_id="target", expected=expected)
 
 
 def test_unknown_native_units_are_preserved_without_invention():
@@ -68,3 +69,21 @@ def test_actual_native_metadata_keeps_unknown_units_and_attested_domain():
     assert metadata["default"] == 25
     assert metadata["restriction"] == {"type": "range", "min": 0.0, "max": 1000.0}
     assert metadata["unit"] == {"status": "unknown", "value": None}
+
+
+@pytest.mark.parametrize("followup", ["other_guid", "nonexact", "wrong_value"])
+def test_refinement_cannot_assemble_values_from_another_identity_or_unbound_read(followup):
+    expected = {"name": "Target", "type": "GameParameter", "path": r"\Game Parameters\Target",
+                "properties": {"Min": -12, "Max": 36, "InitialValue": 7}}
+    identity = {key: value for key, value in expected.items() if key != "properties"}
+    miss = {"command": "query-object", "payload": {"ok": True, "count": 0, "objects": [], "query_bound": {"mode": "take", "value": 10}}}
+    found = {"command": "query-object", "payload": {"ok": True, "count": 1, "objects": [{"id": "target", **identity}], "query_bound": {"mode": "take", "value": 10}}}
+    projected = {"command": "query-object", "arguments": ["--exact-id", "target"],
+                 "payload": {"ok": True, "count": 1, "objects": [{"id": "target", **deepcopy(expected)}], "query_bound": {"mode": "exact-object"}}}
+    if followup == "other_guid":
+        projected["payload"]["objects"][0]["id"] = "other"
+    elif followup == "nonexact":
+        projected["arguments"] = ["--search-text", "Target"]
+    else:
+        projected["payload"]["objects"][0]["properties"]["Min"] = -11
+    assert not read_refinement_proven([miss, found, projected], target_id="target", expected=expected)

@@ -47,3 +47,10 @@ def test_unreviewed_profile_changes_fail_closed(tmp_path, change):
     path.write_text(json.dumps(data))
     with pytest.raises(ValueError):
         load_repair_profile(path)
+
+
+def test_fixture_parents_are_stored_as_closed_business_segments():
+    profile = load_repair_profile(PROFILE)
+    assert [unit.parent_segments for unit in profile.units] == [
+        ("Effects", "Default Work Unit"), ("Game Parameters", "Default Work Unit"),
+        ("Game Parameters", "Default Work Unit"), ("Effects", "Default Work Unit")]
