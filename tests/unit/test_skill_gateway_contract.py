@@ -83,7 +83,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "static schema template" in skill
     assert "typed continuations still require exact copying" in skill
     assert "do not read the query reference before or after it" in skill
-    assert "do not retry a rejected or failed gateway invocation" in skill
+    assert "follow its recovery receipt if the task still needs another bounded read" in skill
     assert "Do not run `describe` or `capabilities` first" in skill
     assert "run `request-schema` and follow its sole typed continuation" in skill
     assert "The configured exact Wwise version selects every schema" in (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
@@ -112,10 +112,13 @@ def test_loading_uses_supplied_skill_root_and_allows_complete_host_injection() -
     assert "including for Wwise CLI and project-migration requests" in skill
 
 
-def test_public_skill_stops_on_launch_failure_without_harness_retry_permission() -> None:
+def test_public_skill_distinguishes_structured_recovery_from_incomplete_launch_failure() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    assert "A structured error or shell failure stops the workflow" in skill
-    assert "do not retry the Gateway command" in skill
+    assert "A shell failure without complete JSON remains a stop" in skill
+    assert "read_only_continuation_allowed" in skill
+    assert "without another permission question" in skill
+    assert "never replay the original write" in skill
+    assert "Unresolved cleanup" in skill
     assert "CreateProcessAsUserW" not in skill
 
 
@@ -213,8 +216,8 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     )
     query_flat = " ".join(query_reference.split())
     command = (
-        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
-        "2025.1 query-object --max-results 1000 "
+        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py "
+        "query-object --max-results 1000 "
         "--match-original-file-path '<first-complete-returned-Path>' "
         "--match-original-file-path '<second-complete-returned-Path>'"
     )
@@ -268,7 +271,7 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     assert "`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner" in operate
     assert "copy one handle, never token/scope/type" in operate
     assert "Binding fixes the metadata scope inside the Draft" in operate
-    assert "No match stops; ambiguity needs one behavior question" in operate
+    assert "No match permits bounded discovery refinement; unresolved ambiguity needs one behavior question" in operate
     assert "For business declarations, bind only user-requested custom properties/references" in operate
     assert "common outcomes such as volume, infinite looping, output bus" in operate
     assert "use stable business fields" in operate

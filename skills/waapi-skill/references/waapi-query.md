@@ -9,7 +9,7 @@ Use this for read-only Wwise queries and bounded Topic waits/streams. Require th
 - For an ordinary read without a fixed command or exact URI, run `operations` and copy its returned route. This includes business reads and zero-input reads for the configured version.
 - Broad catalog: use the coverage reference's host-scoped summary, then narrow with filters. `capabilities`/`describe` default to Console; Authoring inspection adds offline `--profile wwise-authoring-ui`. Neither proves live availability. Use `--limit 0` only when every row is explicitly needed and `--detail` only for audits.
 - Known function URI: `request-schema <uri>` and its sole continuation. `describe` is for an explicit capability/schema audit, with the requested offline host profile.
-- `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; connection errors, invalid responses, and rejected continuations also stop the workflow.
+- `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; other complete structured failures follow the Skill Recovery rule and their receipt.
 - The configured exact Wwise version selects every schema. Live work never copies an example `--version`; use it only for a requested offline inspection.
 
 ## Wwise 2025.1 Media Pool
@@ -19,7 +19,7 @@ Use this for read-only Wwise queries and bounded Topic waits/streams. Require th
 Follow the returned business declaration for database selection, field meanings,
 text/number conditions, requested outputs, and result limit. Gateway owns native
 field bindings, filter objects, and the return projection; the Agent supplies
-only disclosed business values. Missing or ambiguous live fields stop the read.
+only disclosed business values. Missing live fields permit scoped discovery refinement; unresolved ambiguity needs an exact choice.
 For case-sensitive matching use the disclosed post-filter; a saturated candidate
 set that cannot prove completeness returns `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
 Preserve returned `Db` and complete `Path` for a later original-file reference
@@ -85,7 +85,7 @@ python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <suppor
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>
 ```
 
-The Gateway fixes read-only `ak.wwise.core.object.get`, projection, final take, timeout, bytes, and grammar. Limits are UTF-8 bytes (not character counts); WAQL is trimmed and single-line, without Query Editor `$`, comments or statement separators, or an unclosed double-quoted string or slash-regex literal. On rejection, report it; never alter-and-retry. There is no generated-code fallback.
+The Gateway fixes read-only `ak.wwise.core.object.get`, projection, final take, timeout, bytes, and grammar. Limits are UTF-8 bytes (not character counts); WAQL is trimmed and single-line, without Query Editor `$`, comments or statement separators, or an unclosed double-quoted string or slash-regex literal. On rejection, report the reason and use the recovery receipt to refine the intended read through the disclosed schema. There is no generated-code fallback.
 
 Final take bounds returned rows, not internal scans; even a one-row result does not prove uniqueness. Never feed an advanced result directly into a mutation. Present candidates, obtain their exact choice, then use the simple `query-object --exact-id` route. A mismatch means the workflow stops for a new choice. Candidate displays keep unaliased identity fields; never alias another advanced expression onto them.
 
@@ -132,7 +132,7 @@ Use offline version-pinned `object-types` first; narrow its bounded result. Use 
 
 `metadata list` lists the actual fields for one existing business scope; follow `next_page` with `--page` until `complete`. Copy a returned `selection` to `metadata detail --selection` with the same scope. Details preserve live type/default/restrictions/dependencies/supports/UI units; unknown units remain unknown. Expired or changed-scope selections require a new list. A single oversized detail returns a named boundary, not a truncated success. These selections do not authorize changes.
 
-`metadata discover` is auxiliary lexical search. It chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss; one `partial` result permits one broader technical retry, then clarify. Honor dependencies when authorized, otherwise clarify.
+`metadata discover` is auxiliary lexical search. It chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss: refine the meaning or use scoped list/detail discovery within the task. A `partial` result permits one broader technical attempt, then clarify unresolved choices. Honor dependencies when authorized, otherwise clarify.
 
 Use fixed reads rather than reflected payloads:
 
