@@ -104,3 +104,21 @@ def test_generator_rejects_policy_with_a_missing_selector():
     selectors.pop()
     with pytest.raises(ValueError):
         build_inventory(native_policy=policy)
+
+
+def test_selector_attribution_requires_matching_profile_schema_occurrence():
+    from copy import deepcopy
+    from tests.maintenance.branch_coverage_audit import build_inventory, check_inventory
+    inventory = build_inventory()
+    assert any(branch['mapping'] in inventory['mappings'] for branch in inventory['branches'])
+    for branch in inventory['branches']:
+        if branch['mapping'] not in inventory['mappings']:
+            continue
+        version, source, uri, _ = branch['id'].split('|', 3)
+        occurrence = '|'.join((version, source, uri))
+        expected = inventory['mappings'][branch['mapping']]['schema_sha256_by_version'][version]
+        assert inventory['schema_occurrences'][occurrence] == expected
+    changed = deepcopy(inventory)
+    occurrence = next(iter(changed['schema_occurrences']))
+    changed['schema_occurrences'][occurrence] = '0' * 64
+    assert 'schema occurrences differs' in check_inventory(changed)

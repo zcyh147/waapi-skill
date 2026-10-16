@@ -49,6 +49,7 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
     sys.path.insert(0, str(root / "skills/waapi-skill"))
     from wwise_waapi.business_adapters import business_adapter, business_adapter_operations
     from wwise_waapi.native_surface_policy import validate_native_surface_policy
+    from wwise_waapi.builders.schema import SemanticSchemaValidator
 
     # This validates selector completeness against the independently packaged
     # reflection, including normalized-equivalence evidence requirements.
@@ -143,8 +144,16 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
         for index, rule in enumerate(policy["rules"])
     }
     mapping_candidates = defaultdict(list)
+    validators = {}
     declared = 0
     for index, rule in enumerate(policy["rules"]):
+        profile_hashes = {}
+        for version in rule["versions"]:
+            key = (version, rule["profile"])
+            if key not in validators:
+                validators[key] = SemanticSchemaValidator(
+                    version=version, authoring_ui_profile=rule["profile"] == "wwise-authoring-ui")
+            profile_hashes[version] = digest(validators[key].schema_for(rule["uri"]))
         for scope_index, scope in enumerate(rule["scopes"]):
             for disposition, selectors in scope["classifications"].items():
                 for selector in selectors:
@@ -158,7 +167,7 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
                     mapping_id = f"policy:{index}:{scope_index}:{selector}"
                     mappings[mapping_id] = {
                         "basis": "native_surface_policy_selector", "disposition": disposition,
-                        "policy_rule": str(index),
+                        "policy_rule": str(index), "schema_sha256_by_version": profile_hashes,
                         "source": f"{POLICY}#/rules/{index}/scopes/{scope_index}/classifications/{disposition}",
                         "selector": selector, "native_pointer": pointer, "profile": rule["profile"],
                         "public_operations": rule["operations"], "fixed_commands": rule["fixed_commands"],
@@ -167,29 +176,39 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
                         "program_result": "not_established_by_source_mapping", "native_result": "not_established_by_source_mapping",
                     }
                     for version in rule["versions"]:
-                        mapping_candidates[f"{version}|function|{rule['uri']}"].append((pointer, mapping_id))
+                        mapping_candidates[f"{version}|function|{rule['uri']}"].append((pointer, mapping_id, profile_hashes[version]))
     inventory["sources"][POLICY] = digest(policy)
     for route in mapping_candidates:
         mapping_candidates[route].sort(key=lambda item: len(item[0]), reverse=True)
 
-    native_shapes = defaultdict(set)
-    for version, _, uri, schema in schemas:
-        native_shapes[(version, uri)].add(digest(schema))
+    schema_occurrences = {
+        "|".join((version, source, uri)): digest(schema)
+        for version, source, uri, schema in schemas
+    }
+    inventory["schema_occurrences"] = schema_occurrences
     residuals = {}
     counts = Counter()
     for branch in inventory["branches"]:
         route = routes.get(branch["route"])
-        mapping = next((mapping_id for pointer, mapping_id in mapping_candidates.get(branch["route"], [])
-                        if branch["pointer"] == pointer or branch["pointer"].startswith(pointer + "/")), None)
+        occurrence = "|".join(branch["id"].split("|", 3)[:3])
+        occurrence_hash = schema_occurrences.get(occurrence)
+        matching_pointers = [
+            (mapping_id, schema_hash)
+            for pointer, mapping_id, schema_hash in mapping_candidates.get(branch["route"], [])
+            if branch["pointer"] == pointer or branch["pointer"].startswith(pointer + "/")
+        ]
+        mapping = next((mapping_id for mapping_id, schema_hash in matching_pointers
+                        if schema_hash == occurrence_hash), None)
         branch["mapping"] = mapping or "no_selector_disposition"
         branch["mapping_relation"] = (
             "selector" if mapping and branch["pointer"] == mappings[mapping]["native_pointer"]
-            else "descendant_scope_only" if mapping else "not_joined"
+            else "descendant_scope_only" if mapping
+            else "profile_schema_mismatch" if matching_pointers else "not_joined"
         )
         counts[branch["mapping_relation"]] += 1
         if route:
             version, _, uri = branch["route"].split("|", 2)
-            family, hashes = route["family"], sorted(native_shapes[(version, uri)])
+            family, hashes = route["family"], [occurrence_hash]
         else:
             family, hashes = "shared-definitions", [branch["schema_sha256"]]
         # Enum and union alternatives never inherit their parent's policy as
@@ -248,6 +267,7 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
                 path, _, symbol = business[field].partition("#")
                 source(path, symbol or None)
     source("docs/interface-depth-review-policy.json")
+    source("tests/maintenance/interface_depth_inventory.py")
     source("tests/maintenance/branch_audit_mapping.py")
     source("tests/maintenance/branch_coverage_audit.py")
     inventory.update(source_index=source_index, contract_index=contract_index, mappings=mappings,

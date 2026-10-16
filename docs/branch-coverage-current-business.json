@@ -24,7 +24,8 @@
         "detail_sha256": "591e2c91840e2a19361e7b6f5e870561124bc0a18b45c3f770476dfac6ba79d4",
         "source_unchanged": true,
         "sandbox_retained": true,
-        "scope": "object.create type equal to exact live getTypes name Wwise Gain rejected with ak.wwise.invalid_arguments: type is unknown; not public Gateway PASS or universal native impossibility"
+        "scope": "object.create type equal to exact live getTypes name Wwise Gain rejected with ak.wwise.invalid_arguments: type is unknown; not public Gateway PASS or universal native impossibility",
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-sharesets/.waapi-skill-state/shareset-classic-cc99ea98-2021-r1/evidence/lifecycle.json"
       },
       "agent_evidence": "not_established",
       "remaining": "2021 packaged object.createPlugin remains unsupported. Exact plugin-name encoding rejected; no canonical alternate create type token in matching SDK pages or reflected schema. Alternative native topology remains unresolved, not a proven native-unavailable capability. See docs/research/shareset-2021-classic-create-feasibility.md."
@@ -81,7 +82,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "lifecycle_sha256": "8a0c117741a8c09efe2862d3621df3c1556140118e03827890b7faf82f61d78a",
         "source_unchanged": true,
-        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields"
+        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields",
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-public-90018ae0-2021-r1/evidence/lifecycle.json"
       },
       "agent_evidence": "not_established",
       "remaining": "Only reviewed same-object BindToBuiltInParam enum dependencies qualify; arbitrary classes, expression grammars, supplied conflicting values and changed metadata require independent boundary evidence.",
@@ -94,7 +96,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "scope": "same-call native create Min=-12 Max=36 InitialValue=7 with class metadata and independent readback; not public Gateway acceptance",
         "lifecycle_sha256": "8a0c117741a8c09efe2862d3621df3c1556140118e03827890b7faf82f61d78a",
-        "source_unchanged": true
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-native-df8e0610-2021-r1/evidence/lifecycle.json"
       }
     },
     {
@@ -108,7 +111,18 @@
       "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation",
       "program_definition": "tests/unit/test_conditional_reference_gateway.py",
       "program_result": "test_definition_only",
-      "native_evidence": null,
+      "native_evidence": {
+        "candidate": "700a8477",
+        "result": "PASS",
+        "kind": "public_gateway_deterministic",
+        "test": "tests/destructive/test_attenuation_activation_gateway.py#test_attenuation_activation_public_gateway_native",
+        "lifecycle": ".waapi-skill-state/attenuation-public-700a8477-2021-r1/evidence/lifecycle.json",
+        "evidence_worktree": "waapi-dependencies",
+        "lifecycle_sha256": "b77ba3d12576f1f0abfee019dafc83dd3b3ba34346a89b3e22d3881620c5bb0a",
+        "scope": "Sound and RandomSequenceContainer Attenuation association with missing OverridePositioning activation; ListenerRelativeRouting already true;2021 separate prerequisite and reference transactions,2022+ atomic object.set",
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-dependencies/.waapi-skill-state/attenuation-public-700a8477-2021-r1/evidence/lifecycle.json"
+      },
       "agent_evidence": "not_established",
       "remaining": "Test cases cover boolean true/false, recursive prerequisites, already-satisfied conditions, unsupported/cyclic/conflicting dependencies; arbitrary metadata expression language not claimed."
     },
@@ -190,7 +204,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "lifecycle_sha256": "4194c60fbd3bc8a7afdedf6eb308d91adfc31c9afdf71480fabfc725678ca8b4",
         "source_unchanged": true,
-        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields"
+        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields",
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-public-90018ae0-2022-r1/evidence/lifecycle.json"
       },
       "agent_evidence": "not_established",
       "remaining": "Only reviewed same-object BindToBuiltInParam enum dependencies qualify; arbitrary classes, expression grammars, supplied conflicting values and changed metadata require independent boundary evidence.",
@@ -203,7 +218,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "scope": "same-call native create Min=-12 Max=36 InitialValue=7 with class metadata and independent readback; not public Gateway acceptance",
         "lifecycle_sha256": "4194c60fbd3bc8a7afdedf6eb308d91adfc31c9afdf71480fabfc725678ca8b4",
-        "source_unchanged": true
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-native-df8e0610-2022-r1/evidence/lifecycle.json"
       }
     },
     {
@@ -217,7 +233,18 @@
       "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation",
       "program_definition": "tests/unit/test_conditional_reference_gateway.py",
       "program_result": "test_definition_only",
-      "native_evidence": null,
+      "native_evidence": {
+        "candidate": "700a8477",
+        "result": "PASS",
+        "kind": "public_gateway_deterministic",
+        "test": "tests/destructive/test_attenuation_activation_gateway.py#test_attenuation_activation_public_gateway_native",
+        "lifecycle": ".waapi-skill-state/attenuation-public-700a8477-2022-r1/evidence/lifecycle.json",
+        "evidence_worktree": "waapi-dependencies",
+        "lifecycle_sha256": "271ea6b21975ac96eb8298f327171255409feaa3d90cff391b892130935b10da",
+        "scope": "Sound and RandomSequenceContainer Attenuation association with missing OverridePositioning activation; ListenerRelativeRouting already true;2021 separate prerequisite and reference transactions,2022+ atomic object.set",
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-dependencies/.waapi-skill-state/attenuation-public-700a8477-2022-r1/evidence/lifecycle.json"
+      },
       "agent_evidence": "not_established",
       "remaining": "Test cases cover boolean true/false, recursive prerequisites, already-satisfied conditions, unsupported/cyclic/conflicting dependencies; arbitrary metadata expression language not claimed."
     },
@@ -299,7 +326,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "lifecycle_sha256": "69e8106c012dcbfadc3aba3314fde8749aed58bfe44ac67ff3079ed3a4e481f3",
         "source_unchanged": true,
-        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields"
+        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields",
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-public-90018ae0-2023-r1/evidence/lifecycle.json"
       },
       "agent_evidence": "not_established",
       "remaining": "Only reviewed same-object BindToBuiltInParam enum dependencies qualify; arbitrary classes, expression grammars, supplied conflicting values and changed metadata require independent boundary evidence.",
@@ -312,7 +340,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "scope": "same-call native create Min=-12 Max=36 InitialValue=7 with class metadata and independent readback; not public Gateway acceptance",
         "lifecycle_sha256": "69e8106c012dcbfadc3aba3314fde8749aed58bfe44ac67ff3079ed3a4e481f3",
-        "source_unchanged": true
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-native-df8e0610-2023-r1/evidence/lifecycle.json"
       }
     },
     {
@@ -326,7 +355,18 @@
       "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation",
       "program_definition": "tests/unit/test_conditional_reference_gateway.py",
       "program_result": "test_definition_only",
-      "native_evidence": null,
+      "native_evidence": {
+        "candidate": "700a8477",
+        "result": "PASS",
+        "kind": "public_gateway_deterministic",
+        "test": "tests/destructive/test_attenuation_activation_gateway.py#test_attenuation_activation_public_gateway_native",
+        "lifecycle": ".waapi-skill-state/attenuation-public-700a8477-2023-r1/evidence/lifecycle.json",
+        "evidence_worktree": "waapi-dependencies",
+        "lifecycle_sha256": "c0f925f711e30adfe03fac470d53cb94506b51b7294f961b2a9a3c78ada05144",
+        "scope": "Sound and RandomSequenceContainer Attenuation association with missing OverridePositioning activation; ListenerRelativeRouting already true;2021 separate prerequisite and reference transactions,2022+ atomic object.set",
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-dependencies/.waapi-skill-state/attenuation-public-700a8477-2023-r1/evidence/lifecycle.json"
+      },
       "agent_evidence": "not_established",
       "remaining": "Test cases cover boolean true/false, recursive prerequisites, already-satisfied conditions, unsupported/cyclic/conflicting dependencies; arbitrary metadata expression language not claimed."
     },
@@ -408,7 +448,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "lifecycle_sha256": "2cdc1050ebb80f004fb94b6c0847b2e8b9b50478dee1d1b942aba1dcf527e6f1",
         "source_unchanged": true,
-        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields"
+        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields",
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-public-90018ae0-2024-r1/evidence/lifecycle.json"
       },
       "agent_evidence": "not_established",
       "remaining": "Only reviewed same-object BindToBuiltInParam enum dependencies qualify; arbitrary classes, expression grammars, supplied conflicting values and changed metadata require independent boundary evidence.",
@@ -421,7 +462,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "scope": "same-call native create Min=-12 Max=36 InitialValue=7 with class metadata and independent readback; not public Gateway acceptance",
         "lifecycle_sha256": "2cdc1050ebb80f004fb94b6c0847b2e8b9b50478dee1d1b942aba1dcf527e6f1",
-        "source_unchanged": true
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-native-df8e0610-2024-r1/evidence/lifecycle.json"
       }
     },
     {
@@ -435,7 +477,18 @@
       "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation",
       "program_definition": "tests/unit/test_conditional_reference_gateway.py",
       "program_result": "test_definition_only",
-      "native_evidence": null,
+      "native_evidence": {
+        "candidate": "700a8477",
+        "result": "PASS",
+        "kind": "public_gateway_deterministic",
+        "test": "tests/destructive/test_attenuation_activation_gateway.py#test_attenuation_activation_public_gateway_native",
+        "lifecycle": ".waapi-skill-state/attenuation-public-700a8477-2024-r1/evidence/lifecycle.json",
+        "evidence_worktree": "waapi-dependencies",
+        "lifecycle_sha256": "3eb0a920479849392ebe83b7c6410e466361e4a7f3110b26f5f81b9e8998a570",
+        "scope": "Sound and RandomSequenceContainer Attenuation association with missing OverridePositioning activation; ListenerRelativeRouting already true;2021 separate prerequisite and reference transactions,2022+ atomic object.set",
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-dependencies/.waapi-skill-state/attenuation-public-700a8477-2024-r1/evidence/lifecycle.json"
+      },
       "agent_evidence": "not_established",
       "remaining": "Test cases cover boolean true/false, recursive prerequisites, already-satisfied conditions, unsupported/cyclic/conflicting dependencies; arbitrary metadata expression language not claimed."
     },
@@ -517,7 +570,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "lifecycle_sha256": "734129068d7fa4137d76cacdcc01aff3a5568bee34fdabb7e7f1f4d401ff59c1",
         "source_unchanged": true,
-        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields"
+        "scope": "public same-call create Min=-12 Max=36 InitialValue=7; exact created GUID independently read back; not arbitrary dependent fields",
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-public-90018ae0-2025-r1/evidence/lifecycle.json"
       },
       "agent_evidence": "not_established",
       "remaining": "Only reviewed same-object BindToBuiltInParam enum dependencies qualify; arbitrary classes, expression grammars, supplied conflicting values and changed metadata require independent boundary evidence.",
@@ -530,7 +584,8 @@
         "evidence_worktree": "waapi-gameparameter",
         "scope": "same-call native create Min=-12 Max=36 InitialValue=7 with class metadata and independent readback; not public Gateway acceptance",
         "lifecycle_sha256": "734129068d7fa4137d76cacdcc01aff3a5568bee34fdabb7e7f1f4d401ff59c1",
-        "source_unchanged": true
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-gameparameter/.waapi-skill-state/gameparameter-native-df8e0610-2025-r3/evidence/lifecycle.json"
       }
     },
     {
@@ -544,9 +599,40 @@
       "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation",
       "program_definition": "tests/unit/test_conditional_reference_gateway.py",
       "program_result": "test_definition_only",
-      "native_evidence": null,
+      "native_evidence": {
+        "candidate": "700a8477",
+        "result": "PASS",
+        "kind": "public_gateway_deterministic",
+        "test": "tests/destructive/test_attenuation_activation_gateway.py#test_attenuation_activation_public_gateway_native",
+        "lifecycle": ".waapi-skill-state/attenuation-public-700a8477-2025-r1/evidence/lifecycle.json",
+        "evidence_worktree": "waapi-dependencies",
+        "lifecycle_sha256": "7bf8160dbb8ad57211965a77ea3f8c81a74c4a22d8f6b728a6bb71a633cb4370",
+        "scope": "Sound and RandomSequenceContainer Attenuation association with missing OverridePositioning activation; ListenerRelativeRouting already true;2021 separate prerequisite and reference transactions,2022+ atomic object.set",
+        "source_unchanged": true,
+        "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-dependencies/.waapi-skill-state/attenuation-public-700a8477-2025-r1/evidence/lifecycle.json"
+      },
       "agent_evidence": "not_established",
-      "remaining": "Test cases cover boolean true/false, recursive prerequisites, already-satisfied conditions, unsupported/cyclic/conflicting dependencies; arbitrary metadata expression language not claimed."
+      "remaining": "Test cases cover boolean true/false, recursive prerequisites, already-satisfied conditions, unsupported/cyclic/conflicting dependencies; arbitrary metadata expression language not claimed.",
+      "additional_native_evidence": [
+        {
+          "candidate": "813c993f",
+          "result": "PASS",
+          "kind": "public_gateway_deterministic",
+          "test": "tests/destructive/test_attenuation_activation_gateway.py#test_attenuation_activation_false_routing_public_gateway_native",
+          "lifecycle": ".waapi-skill-state/attenuation-false-routing-813c993f-2025-r1/evidence/lifecycle.json",
+          "evidence_worktree": "waapi-dependencies",
+          "lifecycle_sha256": "7bf8160dbb8ad57211965a77ea3f8c81a74c4a22d8f6b728a6bb71a633cb4370",
+          "scope": "Sound both routing and override false -> true in same association; native2025 only, not all-five false-routing coverage",
+          "source_unchanged": true,
+          "preserved_lifecycle": ".waapi-skill-state/repair-evidence/waapi-dependencies/.waapi-skill-state/attenuation-false-routing-813c993f-2025-r1/evidence/lifecycle.json"
+        }
+      ]
     }
-  ]
+  ],
+  "evidence_relocation": {
+    "manifest": ".waapi-skill-state/repair-evidence/relocation-manifest.json",
+    "manifest_sha256": "9358a13c25a67db23753a90acf0807737f2d3738e10630f80c123ff160022caf",
+    "original_provenance_retained": true,
+    "generator_requires_local_native_files": false
+  }
 }
