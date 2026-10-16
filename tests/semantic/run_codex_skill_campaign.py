@@ -344,6 +344,7 @@ INTEGRATION_WORKFLOWS_V2_PROFILE_ID = (
 )
 INTEGRATION_PROFILE_ID = matrix.INTEGRATION_PROFILE_ID
 EXPANSION_PROFILE_ID = matrix.EXPANSION_PROFILE_ID
+REPAIR_PROFILE_ID = matrix.REPAIR_PROFILE_ID
 SEMANTIC_BOOTSTRAP_PROFILE_IDS = matrix.SEMANTIC_BOOTSTRAP_PROFILE_IDS
 _INTEGRATION_V1_WORKFLOW_IDS = frozenset(
     {
@@ -1138,7 +1139,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
         raise CampaignConfigError(str(exc)) from exc
     required_units = {str(unit.unit_id): (_heavy_unit_phase(unit),) for unit in units}
     require_skill_local_campaign_interpreter(options.skill_source)
-    if options.profile == EXPANSION_PROFILE_ID and options.verify_only:
+    if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} and options.verify_only:
         return verify_expansion_campaign(options, units=units, required_units=required_units)
     windows_path_budget = None
     if not options.verify_only:
@@ -1199,7 +1200,7 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             write_campaign_marker(root, campaign_id=str(config["campaign_id"]))
 
         manifests = load_verified_attempts(root)
-        if options.profile == EXPANSION_PROFILE_ID and manifests:
+        if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} and manifests:
             replay_expansion_attempts(root, options=validation_options, units=units, manifests=manifests)
         if options.profile == MODIFICATION_POLICY_V3_PROFILE_ID:
             _validate_modification_policy_identity_history(
@@ -1208,12 +1209,12 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
             )
         consolidated = consolidate_units(required_units, manifests)
         write_consolidated(root, consolidated)
-        if options.profile == EXPANSION_PROFILE_ID:
+        if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
             write_expansion_accounting(root, units=units, consolidated=consolidated)
         terminal = heavy_v3_consolidated_exit(
             consolidated,
             freeze_retryable=options.profile
-            in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID, EXPANSION_PROFILE_ID},
+            in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID, EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID},
         )
         if terminal is not None:
             return terminal
@@ -1402,16 +1403,16 @@ def run_heavy_v3_campaign(options: CampaignOptions) -> int:
                 )
             consolidated = consolidate_units(required_units, manifests)
             write_consolidated(root, consolidated)
-            if options.profile == EXPANSION_PROFILE_ID:
+            if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
                 write_expansion_accounting(root, units=units, consolidated=consolidated)
-            if options.profile != EXPANSION_PROFILE_ID:
+            if options.profile not in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
                 print_status(consolidated)
             if interrupts.requested:
                 return EXIT_INTERRUPTED
             terminal = heavy_v3_consolidated_exit(
                 consolidated,
                 freeze_retryable=options.profile
-                in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID, EXPANSION_PROFILE_ID},
+                in {TYPED_INPUT_PROFILE_ID, DEEP_BUSINESS_ACCEPTANCE_PROFILE_ID, EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID},
             )
             return terminal if terminal is not None else EXIT_PENDING
 
@@ -1612,7 +1613,7 @@ def build_heavy_v3_child_argv(
         "--wwise-readiness-timeout",
         str(options.wwise_readiness_timeout_seconds),
     ]
-    if options.profile == EXPANSION_PROFILE_ID:
+    if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
         if not options.campaign_inputs_sha256:
             raise CampaignEvidenceError("expansion child requires the frozen effective input digest")
         argv.extend(("--sealed-campaign-inputs-sha256", options.campaign_inputs_sha256))
@@ -1666,7 +1667,7 @@ def heavy_v3_child_request(
             "memory": "disabled",
             **(
                 {"approval_policy": "never"}
-                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile == EXPANSION_PROFILE_ID
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}
                 else {}
             ),
             "sequential": True,
@@ -2176,7 +2177,7 @@ def build_heavy_v3_suite_fingerprint(
         "path": str(options.suite_path),
         "sha256": sha256_file(options.suite_path),
     }
-    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile == EXPANSION_PROFILE_ID:
+    if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
         dependency_root = options.suite_path.parent
         result.update(
             {
@@ -2384,7 +2385,7 @@ def build_heavy_v3_effective_config(
             "fresh_process_thread_and_task_per_scenario": True,
             **(
                 {"approval_policy": "never"}
-                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile == EXPANSION_PROFILE_ID
+                if options.profile in TERRA_LOCKED_V3_PROFILE_IDS or options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}
                 else {}
             ),
         },
@@ -2406,7 +2407,7 @@ def build_heavy_v3_effective_config(
             "sequential_wwise_lifecycles": True,
             "semantic_fail": "continue_and_preserve_later_case_evidence",
             "blocked_or_indeterminate": ("continue_only_after_proven_isolation"
-                if options.profile == EXPANSION_PROFILE_ID else "stop"),
+                if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} else "stop"),
             "resume": "schedule_pending_and_proven_retryable_units_in_suite_order",
         },
     }
@@ -2877,14 +2878,14 @@ def validate_heavy_v3_child_run(
                 options=options,
             )
         except (CampaignEvidenceError, OSError) as exc:
-            if options.profile == EXPANSION_PROFILE_ID and continuation_possible:
+            if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} and continuation_possible:
                 raise CampaignEvidenceError("expansion continued after untrusted case evidence") from exc
             append_blocked(
                 scenario_id,
                 f"untrusted heavy case evidence: {exc}",
             )
             continue
-        if (options.profile == EXPANSION_PROFILE_ID and continuation_possible
+        if (options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} and continuation_possible
                 and not matrix.expansion_case_isolated(matrix_case)):
             raise CampaignEvidenceError("expansion continued after unproved case isolation")
         status = str(matrix_case["status"])
@@ -3019,7 +3020,7 @@ def _validate_heavy_v3_run_config(
         "sequential_wwise_lifecycles": True,
         "semantic_fail_policy": "continue",
         "blocked_or_indeterminate_policy": ("continue_only_after_proven_isolation"
-            if options.profile == EXPANSION_PROFILE_ID else "stop"),
+            if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} else "stop"),
         "skill_source": str(options.skill_source),
         "suite_path": str(options.suite_path),
         "live_config": str(options.live_config),
@@ -3080,7 +3081,7 @@ def _validate_heavy_v3_summary(
         "run_errors",
         "case_records",
     }
-    if expected_profile == EXPANSION_PROFILE_ID:
+    if expected_profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
         required_keys.add("expansion_accounting")
     if (
         not isinstance(value, Mapping)
@@ -3149,7 +3150,7 @@ def _validate_heavy_v3_summary(
                 "heavy matrix summary unit metadata drifted"
             )
         status = record.get("status")
-        boundary = record.get("evidence_kind") == "capability_boundary" and expected_profile == EXPANSION_PROFILE_ID
+        boundary = record.get("evidence_kind") == "capability_boundary" and expected_profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}
         if status not in matrix.HEAVY_V3_STATUSES and not (boundary and status == "BOUNDARY_PROVEN"):
             raise CampaignEvidenceError("heavy matrix summary has an invalid status")
         if boundary and status == "PASS":
@@ -3186,7 +3187,7 @@ def _validate_heavy_v3_summary(
         and value.get("preflight") == "passed"
         and value.get("completed_at") is not None
     )
-    if expected_profile == EXPANSION_PROFILE_ID and value.get("expansion_accounting") != matrix.expansion_accounting(expected_rows or (), case_records):
+    if expected_profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} and value.get("expansion_accounting") != matrix.expansion_accounting(expected_rows or (), case_records):
         raise CampaignEvidenceError("expansion Agent/boundary accounting disagrees")
     if value.get("all_selected_passed") is not all_pass:
         raise CampaignEvidenceError("heavy matrix all-pass flag disagrees")
@@ -3228,7 +3229,7 @@ def _validate_heavy_v3_summary(
             raise CampaignEvidenceError(
                 "terminal heavy matrix has no passed or blocked live preflight"
             )
-        if expected_profile == EXPANSION_PROFILE_ID:
+        if expected_profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
             if stop_reason is not None:
                 terminal_status = statuses[-1] if statuses else ""
                 terminal_id = attempted[-1] if attempted else ""
@@ -3277,7 +3278,7 @@ def _validate_heavy_v3_summary(
         or not pending
         or stop_reason is not None
         or run_errors
-        or (expected_profile != EXPANSION_PROFILE_ID
+        or (expected_profile not in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}
             and any(status in {"BLOCKED", "INDETERMINATE"} for status in statuses))
     ):
         raise CampaignEvidenceError(
@@ -3410,7 +3411,7 @@ def _validate_heavy_v3_matrix_case(
     if dict(summary_row) != expected_summary:
         raise CampaignEvidenceError("heavy matrix-case differs from summary record")
     status = value.get("status")
-    if (status not in matrix.HEAVY_V3_STATUSES and not (options.profile == EXPANSION_PROFILE_ID and expected_row.get("evidence_kind") == "capability_boundary" and status == "BOUNDARY_PROVEN")) or not isinstance(value.get("reason"), str):
+    if (status not in matrix.HEAVY_V3_STATUSES and not (options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID} and expected_row.get("evidence_kind") == "capability_boundary" and status == "BOUNDARY_PROVEN")) or not isinstance(value.get("reason"), str):
         raise CampaignEvidenceError("heavy matrix-case status/reason is malformed")
     outcome_path = scenario_root / "outcome.json"
     runner_outcome = value.get("runner_outcome")
@@ -3446,7 +3447,7 @@ def _validate_heavy_v3_matrix_case(
         "checks",
         "lifecycle",
     }
-    if options.profile == EXPANSION_PROFILE_ID:
+    if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
         expected_outcome_keys.add("inputs_sha256")
         if outcome.get("inputs_sha256") != options.campaign_inputs_sha256:
             raise CampaignEvidenceError("expansion outcome inputs differ from the frozen campaign")
@@ -3466,7 +3467,7 @@ def _validate_heavy_v3_matrix_case(
     task_root = outcome.get("task_root")
     if task_root is not None and not _path_is_within(Path(task_root), scenario_root):
         raise CampaignEvidenceError("heavy runner task root escapes the scenario root")
-    if options.profile == EXPANSION_PROFILE_ID:
+    if options.profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
         _validate_expansion_outcome(outcome, expected_unit=expected_unit, scenario_root=scenario_root, options=options)
         return
     if status == "PASS":
@@ -15063,7 +15064,7 @@ def _load_strict_regular_text(path: Path, *, limit_bytes: int = 8 * 1024 * 1024)
 
 def _heavy_v3_outcome_contract(runner: str, *, profile: str | None = None) -> str:
     if runner == "project":
-        if profile == EXPANSION_PROFILE_ID:
+        if profile in {EXPANSION_PROFILE_ID, REPAIR_PROFILE_ID}:
             return "waapi-skill.integration-expansion-project-outcome/v1"
         return HEAVY_V3_PROJECT_OUTCOME_CONTRACT
     if runner == "cli":
@@ -15817,6 +15818,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     parser.add_argument("--lock-timeout", type=float, default=10.0)
     parser.add_argument("--max-pre-action-retries", type=int)
     args = parser.parse_args(argv)
+    is_repair = args.profile == REPAIR_PROFILE_ID
     is_expansion = args.profile == EXPANSION_PROFILE_ID
     if args.reasoning_effort is None:
         args.reasoning_effort = "high" if is_expansion and args.model in {None, "gpt-6-luna"} else "medium"
@@ -15843,9 +15845,9 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
             else matrix.DEFAULT_CODEX_TIMEOUT_SECONDS
         )
     )
-    if is_expansion and args.timeout is None:
+    if (is_expansion or is_repair) and args.timeout is None:
         timeout_seconds = 600.0
-    is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS
+    is_terra_v3 = args.profile in TERRA_LOCKED_V3_PROFILE_IDS or is_repair
     if args.verify_only and not args.resume:
         parser.error("--verify-only requires --resume")
     if timeout_seconds <= 0 or args.lock_timeout <= 0:
@@ -15859,7 +15861,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         0
         if args.max_pre_action_retries is None
         and (
-            is_expansion
+            is_expansion or is_repair
             or is_typed_input
             or is_deep_business_acceptance
             or business_agent_profile is not None
@@ -15871,7 +15873,7 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
     if max_pre_action_retries < 0:
         parser.error("--max-pre-action-retries must be zero or greater")
     if (
-        is_expansion
+        is_expansion or is_repair
         or is_typed_input
         or is_deep_business_acceptance
         or business_agent_profile is not None
@@ -15979,6 +15981,13 @@ def parse_args(argv: Sequence[str] | None) -> CampaignOptions:
         if is_terra_v3
         else (matrix.DEFAULT_V3_SUITE if is_executable_v3 else matrix.DEFAULT_SUITE)
     )
+    if is_repair:
+        suite = args.suite or str(matrix.DEFAULT_REPAIR_SUITE)
+        try:
+            matrix.validate_repair_cli(suite=Path(suite), case_ids=case_ids, versions=args.version, model=model,
+                reasoning_effort=args.reasoning_effort, service_tier=service_tier, timeout_seconds=timeout_seconds)
+        except (ValueError, OSError) as exc:
+            parser.error(str(exc))
     if is_expansion:
         suite = args.suite or str(matrix.DEFAULT_EXPANSION_SUITE)
         try:

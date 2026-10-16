@@ -111,6 +111,9 @@ def _finite(value: Any) -> bool:
 
 def _case(plan: Mapping[str, Any]) -> tuple[Any, str]:
     case_id = str(plan["unit_id"]).split("-")[-1]
+    if plan.get("contract") == "waapi-skill.repair-task-plan/v1":
+        _require(case_id in {"F1", "F2", "F3", "F4"}, "unknown repair case")
+        return importlib.import_module("tests.semantic.support.codex_repair_cases"), case_id
     _require(case_id in _CASE_MODULES, "unknown expansion case")
     return importlib.import_module(
         "tests.semantic.support.codex_expansion_" + _CASE_MODULES[case_id] + "_case"), case_id
@@ -484,6 +487,10 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
     records = broker.get("records")
     _require(isinstance(records, list) and len(records) <= 128, "broker receipt count is invalid")
     gate = _scope(plan)
+    declarations = _DECLARATIONS
+    if plan.get("contract") == "waapi-skill.repair-task-plan/v1":
+        from tests.semantic.support.codex_repair_broker_policy import RepairBrokerPolicy
+        declarations = RepairBrokerPolicy.declarations
     draft_id = authority = revision = None
     failed_accepted = False
     expected_operation = plan.get("request_schema_uri") or plan.get("operation")
@@ -538,7 +545,7 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             _require(bool(argv) and payload.get("command") == argv[0], "receipt command mismatch")
         _require(bool(argv), "receipt has no admitted command")
         command = argv[0]
-        _require(command in (_READS | _DRAFT_READS | _BUSINESS_EDITS | _DECLARATIONS.get(plan.get("operation"), frozenset())
+        _require(command in (_READS | _DRAFT_READS | _BUSINESS_EDITS | declarations.get(plan.get("operation"), frozenset())
             | {"draft-start", "preview-from-draft", "transaction-show", "confirm", "execute", "verify"}),
                  "receipt used an unapproved Gateway command")
         semantic = ["runner-owned-version", plan["version"], *argv]
@@ -720,7 +727,9 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 and (index != 1 or bool(references) and references[0] == "SKILL.md")
                 and len(commands) - len(recoverable_preprocess_attempt_indexes(commands))
                     == count - prefix + len(classified.allowed_read_commands), "raw commands violate Skill-only/no-bypass gates")
-            _require(not result["passed"] or index != 1 or (c09_notice if c09_notice is not None else expansion_preview_notice(SimpleNamespace(stdout=events_raw.decode("utf-8")),
+            repair_plan = plan.get("contract") == "waapi-skill.repair-task-plan/v1"
+            from tests.semantic.support.codex_repair_cases import repair_notice
+            _require(not result["passed"] or index != 1 or (repair_plan and plan["policy"] == "read_only") or (c09_notice if c09_notice is not None else (repair_notice if repair_plan else expansion_preview_notice)(SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
                 preview_artifact=_transaction(root, oracle["transaction_id"])[0]["artifact"],
                 before_snapshot=oracle.get("preview_before") or plan["before"])),
@@ -778,7 +787,8 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     digest = plan.pop("sha256", None)
     _require(digest == canonical_digest(plan), "plan digest mismatch")
     _require(plan.get("inputs_sha256") == inputs_sha256, "immutable campaign inputs mismatch")
-    _require(plan.get("contract") == "waapi-skill.integration-expansion-task-plan/v1"
+    repair = plan.get("contract") == "waapi-skill.repair-task-plan/v1"
+    _require(plan.get("contract") in {"waapi-skill.integration-expansion-task-plan/v1", "waapi-skill.repair-task-plan/v1"}
         and plan.get("unit_id") == unit_id and plan.get("version") == version, "task plan identity mismatch")
     if "notice_adjudication" in plan:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, CONTRACT as legacy_notice_contract
@@ -792,9 +802,10 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
             and review["configuration"] == reviewer_configuration(review_contract)
             and isinstance(review["runtime"], dict), "adjudication is outside the pinned workflow contract")
     module, case_id = _case(plan)
-    _require(unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"}
+    _require((unit_id == f"REPAIR25-{case_id}" and version == "2025.1" if repair else
+              unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"})
         and (case_id, version) != ("M05", "2022.1"), "unit is not an Agent case")
-    policy = "ask_before_changes" if case_id in {"C01", "C03"} else "allow_changes"
+    policy = "read_only" if repair and case_id == "F2" else "ask_before_changes" if case_id in {"C01", "C03"} else "allow_changes"
     _require(plan.get("policy") == policy and isinstance(plan.get("prompts"), list)
         and len(plan["prompts"]) == (2 if policy == "ask_before_changes" else 1)
         and all(isinstance(prompt, str) and prompt for prompt in plan["prompts"]), "prompt/policy contract changed")
@@ -931,6 +942,9 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         if oracle.get("after") is not None:
             assertions = getattr(module, "verify_" + case_id.lower())(
                 oracle["before"], oracle["after"], **plan["oracle_parameters"])
+            if repair and case_id == "F1":
+                assertions["metadata_list_page_detail"] = module.metadata_chain_proven([
+                    {"command": row["gateway_arguments"][0], "arguments": row["gateway_arguments"][1:], "payload": row.get("payload", {})} for row in records])
             _require(assertions == oracle.get("assertions") == result.get("assertions")
                 and set(assertions) == required, "independent oracle replay mismatch")
         if result["passed"]:
@@ -944,6 +958,14 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                 and verification_receipts[0]["sequence"] > mutations[0]["sequence"]
                 and verification_receipts[0]["payload"].get("state") == expected_state
                 and all(value is True for value in oracle["assertions"].values()), "business PASS lacks a complete verified effect")
+    elif repair and case_id == "F2":
+        _require(not mutations and all(row["gateway_arguments"][0] in _READS for row in records), "read-only repair includes a mutation")
+        if result["passed"]:
+            assertions = module.verify_f2(oracle["before"], oracle["after"], **plan["oracle_parameters"])
+            assertions["read_refinement"] = module.read_refinement_proven([
+                {"command": row["gateway_arguments"][0], "arguments": row["gateway_arguments"][1:], "payload": row.get("payload", {})} for row in records], target_id=plan["oracle_parameters"]["target_id"])
+            _require(set(assertions) == required and all(value is True for value in assertions.values())
+                and assertions == oracle.get("assertions") == result.get("assertions"), "read-only repair oracle replay mismatch")
     else:
         _require(not result["passed"] and not mutations, "passing/executed archive has no transaction")
     if result["passed"]:
