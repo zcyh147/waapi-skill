@@ -5699,7 +5699,8 @@ def test_soundbank_inclusions_use_internal_prestate_exact_poststate_and_drift_gu
         "options": {},
     }
     assert prepared["verification_plan"]["kind"] == "soundbank-inclusions-exact"
-    assert prepared["cleanup"]["kind"] == "restore-soundbank-inclusions-from-prestate"
+    assert prepared["cleanup"]["kind"] == "retain-project-and-outputs"
+    assert prepared["cleanup"]["automatic_rollback"] is False
 
     normalized_after = {"inclusions": [{"object": {"id": TARGET_GUID}, "filter": ["structures", "media"]}]}
     verified = verify_prepared_operation(

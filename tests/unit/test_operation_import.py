@@ -1174,18 +1174,20 @@ def test_versioned_hierarchy_roots_do_not_cross_lanes(tmp_path: Path) -> None:
     assert new_lane.value.error_code == "INVALID_TARGET"
 
 
-def test_replace_existing_truthfully_requires_disposable_project() -> None:
+def test_import_policies_retain_project_without_claiming_in_place_restore() -> None:
     replace = import_operation_policy("replaceExisting")
     use = import_operation_policy("useExisting")
 
-    assert replace["disposable_project_required"] is True
+    assert "disposable_project_required" not in replace
+    assert replace["cleanup_policy"] == "retain_project_and_imported_media"
     assert replace["pre_execution_drift_check_required"] is True
     assert "confirmation_time_drift_check_required" not in replace
-    assert replace["owned_project_copy_required_for_clean_test"] is True
+    assert "owned_project_copy_required_for_clean_test" not in replace
     assert replace["in_place_restore_supported"] is False
     assert replace["existing_target_postcondition"] == "old_guid_absent_and_new_guid_distinct"
-    assert use["disposable_project_required"] is False
-    assert use["owned_project_copy_required_for_clean_test"] is True
+    assert "disposable_project_required" not in use
+    assert use["cleanup_policy"] == "retain_project_and_imported_media"
+    assert "owned_project_copy_required_for_clean_test" not in use
     assert use["in_place_restore_supported"] is False
     assert use["existing_target_postcondition"] == "guid_preserved_and_media_source_updated"
     assert use["notes_destination_policy"] == (
