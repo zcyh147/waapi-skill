@@ -400,7 +400,7 @@ def normalize_conflict_policy(
     if raw == ObjectConflictPolicy.REPLACE.value and not replace_owned:
         raise ObjectOperationContractError(
             "REPLACE_OWNERSHIP_REQUIRED",
-            "replace is allowed only after the operation layer proves the collided subtree is disposable and request-owned.",
+            "replace is allowed only after the operation layer proves the collided subtree is authorized for replacement and request-owned.",
             details={"policy": raw, "replace_owned": False},
         )
     return raw
@@ -421,7 +421,7 @@ def describe_conflict_policy(value: str | ObjectConflictPolicy) -> ConflictPolic
             requires_collision_snapshot=False,
             requires_owned_collision=False,
             can_delete_preexisting_objects=False,
-            cleanup_boundary="delete only the GUID returned by object.create when one was created",
+            cleanup_boundary="retain the created object; deletion requires a separate requested change",
         )
     if normalized == ObjectConflictPolicy.RENAME.value:
         return ConflictPolicyRequirements(
@@ -430,7 +430,7 @@ def describe_conflict_policy(value: str | ObjectConflictPolicy) -> ConflictPolic
             requires_collision_snapshot=True,
             requires_owned_collision=False,
             can_delete_preexisting_objects=False,
-            cleanup_boundary="delete only the returned renamed GUID; preserve the collided object",
+            cleanup_boundary="retain both the created object and the collided object",
         )
     if normalized == ObjectConflictPolicy.MERGE.value:
         return ConflictPolicyRequirements(
@@ -439,7 +439,7 @@ def describe_conflict_policy(value: str | ObjectConflictPolicy) -> ConflictPolic
             requires_collision_snapshot=True,
             requires_owned_collision=False,
             can_delete_preexisting_objects=False,
-            cleanup_boundary="merged preexisting state has no automatic rollback; use an owned sandbox root",
+            cleanup_boundary="retain merged state; no automatic rollback is available",
         )
     return ConflictPolicyRequirements(
         normalized,
@@ -447,7 +447,7 @@ def describe_conflict_policy(value: str | ObjectConflictPolicy) -> ConflictPolic
         requires_collision_snapshot=True,
         requires_owned_collision=True,
         can_delete_preexisting_objects=True,
-        cleanup_boundary="deleted GUIDs cannot be restored; discard the sandbox or restore a project backup",
+        cleanup_boundary="retain the project and replacement; deleted GUIDs cannot be restored automatically",
     )
 
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ..transaction_cleanup import persistent_project_cleanup
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Sequence
@@ -131,7 +133,7 @@ class ObjectMutationBuilder:
             target_identities={"parent": parent_target_identity},
             readback=_created_object_readback(name=name, parent=resolved_parent.object),
             cleanup={"kind": "delete-created-object", "identity": "created object id from object.create result"},
-            expectation="create one object under the resolved parent; read back created id/name/type/path and delete it during cleanup if still present",
+            expectation="create one object under the resolved parent; read back created id/name/type/path and retain the object",
         )
 
     def set(
@@ -370,7 +372,7 @@ class ObjectMutationBuilder:
             identities={"object": resolved_object.as_dict(), "parent": resolved_parent.as_dict()},
             target_identities={"object": _target_identity_from_resolved(resolved_object), "parent": parent_target_identity},
             readback=(_object_readback(resolved_object.object, f"read back {operation.value} source/created object"),),
-            cleanup={"kind": "delete-or-move-back", "reason": f"caller must clean up or restore the object after {operation.value}"},
+            cleanup={"kind": "delete-or-move-back", "reason": f"retain the object after {operation.value}; reversal requires a separate requested change"},
             expectation=f"{operation.value} exactly one resolved object to an explicit resolved parent and verify readback",
         )
 
@@ -387,6 +389,7 @@ class ObjectMutationBuilder:
         partial_success_risk: bool = False,
         target_identities: Mapping[str, Any] | None = None,
     ) -> SemanticPreview:
+        cleanup = persistent_project_cleanup(cleanup)
         context = BuilderContext(
             BuilderFamily.OBJECT_MUTATION,
             version=self.version,
