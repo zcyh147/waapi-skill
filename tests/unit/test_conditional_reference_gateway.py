@@ -36,6 +36,13 @@ class AttenuationTask(FieldTask):
         if uri == "ak.wwise.core.object.get" and args.get("transform"):
             self.calls.append((uri, args, options))
             return {"return": []}
+        if uri == "ak.wwise.core.object.isPropertyEnabled":
+            self.calls.append((uri, deepcopy(args), options))
+            return {"return": False}
+        if uri == "ak.wwise.core.object.setProperty":
+            self.calls.append((uri, deepcopy(args), options))
+            self.objects[args["object"]][args["property"]] = args["value"]
+            return {}
         if uri == "ak.wwise.core.object.setReference":
             self.calls.append((uri, deepcopy(args), options))
             self.objects[args["object"]][args["reference"]] = {"id": args["value"]}
@@ -67,11 +74,21 @@ class AttenuationTask(FieldTask):
 @pytest.mark.parametrize("kind", ["Sound", "RandomSequenceContainer"])
 def test_conditional_attenuation_dependencies_are_previewed_and_verified(tmp_path: Path, version: str, kind: str):
     task = AttenuationTask(tmp_path, version, kind)
+    task.metadata["Attenuation"]["dependencies"].insert(0, {
+        "type": "isMasterBus", "value": False, "action": "Show", "context": "Self"})
+    override = {"type": "override", "action": "Enable", "property": "OverridePositioning", "context": "Self"}
+    task.metadata["ListenerRelativeRouting"]["dependencies"] = [override]
+    task.metadata["OverridePositioning"]["dependencies"] = [override]
     task.declare()
     code, checked = task.step("draft-check")
     assert code == 0, json.dumps(checked)
     code, preview = task.step("preview-from-draft")
     assert code == 0, json.dumps(preview)
+    changes = preview["preview_summary"]["derived_changes"]
+    assert {row["field"]: row["value"] for row in changes} == {
+        "ListenerRelativeRouting": True, "OverridePositioning": True}
+    assert all(row["object_id"] == FIRST and "Attenuation" in row["activates_references"] for row in changes)
+    assert list(preview)[-1] == "agent_result"
     tx = preview["transaction_id"]
     code, shown = task.run("transaction-show", tx)
     assert code == 0, shown
@@ -122,6 +139,7 @@ def test_satisfied_activation_is_guarded_without_redundant_property_writes(tmp_p
     assert code == 0, preview
     code, shown = task.run("transaction-show", preview["transaction_id"])
     assert code == 0, shown
+    assert "derived_changes" not in preview["preview_summary"]
     prepared = shown["artifact"]["prepared_operation"]
     row = prepared["dispatch"]["args"]["objects"][0]
     assert "@ListenerRelativeRouting" not in row
@@ -217,3 +235,31 @@ def test_exact_false_condition_is_not_guessed_as_true(tmp_path: Path, version: s
     code, shown = task.run("transaction-show", preview["transaction_id"])
     assert code == 0, shown
     assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]["@ListenerRelativeRouting"] is False
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_terminal_override_is_editable_through_separate_property_preview(tmp_path: Path, version: str):
+    task = AttenuationTask(tmp_path, version, operation="object.setProperty")
+    task.metadata["OverridePositioning"]["dependencies"] = [{
+        "type": "override", "action": "Enable", "context": "Self", "property": "OverridePositioning"}]
+    target = task.bind(FIRST)
+    field = task.discover(target, "OverridePositioning")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "true")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["OverridePositioning"] is True
+    assert task.objects[FIRST]["Attenuation"] is None
+    assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls) == 1

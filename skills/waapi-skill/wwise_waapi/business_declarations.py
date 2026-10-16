@@ -1145,6 +1145,8 @@ def bind_live_field(
     enabled_dependency_fields = (
         dependency_fields if field_kind == "property" else ()
     )
+    if scope_kind == "object" and _is_positioning_override_terminal(info):
+        enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and scope_kind == "class":
         class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
@@ -1282,6 +1284,8 @@ def revalidate_live_field(
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
     )
+    if field.scope_kind == "object" and _is_positioning_override_terminal(info):
+        enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and field.scope_kind == "class":
         class_default_evidence = _new_class_field_evidence(registry, info, live_scope, read_call)
@@ -1727,6 +1731,15 @@ def _restrictions_from_live_metadata(
         if allowed:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
+
+
+def _is_positioning_override_terminal(info):
+    # The reflected self override describes the switch being edited. Wwise
+    # reports it disabled while false, but setting this Boolean is precisely
+    # how its separately previewed prerequisite is enabled.
+    marker = {"type": "override", "action": "Enable", "context": "Self", "property": "OverridePositioning"}
+    return (info.name == "OverridePositioning" and info.type.casefold() == "bool"
+            and bool(info.dependencies) and all(row == marker for row in info.dependencies))
 
 
 def _new_class_field_evidence(registry, info, live_scope, read_call):
