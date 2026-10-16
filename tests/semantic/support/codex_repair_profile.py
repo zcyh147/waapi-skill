@@ -27,7 +27,30 @@ _SCHEDULE = (
     ("F3", "allow_changes", "object.create", 1),
     ("F4", "allow_changes", "object.createPlugin", 1),
 )
-_FIXTURES = {'F1': {'plugin_name': 'Repair_Metadata_Room', 'plugin_type': 'Wwise RoomVerb', 'parent_path': '\\Effects\\Default Work Unit', 'pre_delay': 24}, 'F2': {'name': 'Repair_WindVelocity', 'missing_name': 'Repair_WindSpeed', 'type': 'GameParameter', 'parent_path': '\\Game Parameters\\Default Work Unit', 'min': -12, 'max': 36, 'default': 7}, 'F3': {'name': 'Repair_WindRange', 'type': 'GameParameter', 'parent_path': '\\Game Parameters\\Default Work Unit', 'min': -12, 'max': 36, 'default': 7}, 'F4': {'name': 'Repair_Independent_Room', 'plugin_type': 'Wwise RoomVerb', 'parent_path': '\\Effects\\Default Work Unit'}}
+_FIXTURES = {'F1': {'plugin_name': 'Repair_Metadata_Room',
+        'plugin_type': 'Wwise RoomVerb',
+        'parent_path': '\\Effects\\Default Work Unit',
+        'pre_delay': 24,
+        'parent_segments': ['Effects', 'Default Work Unit']},
+ 'F2': {'name': 'Repair_WindVelocity',
+        'missing_name': 'Repair_WindSpeed',
+        'type': 'GameParameter',
+        'parent_path': '\\Game Parameters\\Default Work Unit',
+        'min': -12,
+        'max': 36,
+        'default': 7,
+        'parent_segments': ['Game Parameters', 'Default Work Unit']},
+ 'F3': {'name': 'Repair_WindRange',
+        'type': 'GameParameter',
+        'parent_path': '\\Game Parameters\\Default Work Unit',
+        'min': -12,
+        'max': 36,
+        'default': 7,
+        'parent_segments': ['Game Parameters', 'Default Work Unit']},
+ 'F4': {'name': 'Repair_Independent_Room',
+        'plugin_type': 'Wwise RoomVerb',
+        'parent_path': '\\Effects\\Default Work Unit',
+        'parent_segments': ['Effects', 'Default Work Unit']}}
 _FORBIDDEN = ("gateway.py", "draft-", "config-set", "query-object", "ak.wwise.",
               "--request", "transaction_id", "field_handle", "waapiclient")
 
@@ -51,6 +74,10 @@ class RepairUnit:
     version: str = "2025.1"
     runner_lane: str = "project"
     user_turn_count: int = 1
+
+    @property
+    def parent_segments(self) -> tuple[str, ...]:
+        return tuple(self.fixture["parent_segments"])
 
     @property
     def unit_id(self) -> str:

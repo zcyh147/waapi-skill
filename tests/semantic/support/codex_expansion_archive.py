@@ -970,7 +970,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         if result["passed"]:
             assertions = module.verify_f2(oracle["before"], oracle["after"], **plan["oracle_parameters"])
             assertions["read_refinement"] = module.read_refinement_proven([
-                {"command": row["gateway_arguments"][0], "arguments": row["gateway_arguments"][1:], "payload": row.get("payload", {})} for row in records], target_id=plan["oracle_parameters"]["target_id"])
+                {"command": row["gateway_arguments"][0], "arguments": row["gateway_arguments"][1:], "payload": row.get("payload", {})} for row in records], target_id=plan["oracle_parameters"]["target_id"], expected=plan["oracle_parameters"]["expected"])
             _require(set(assertions) == required and all(value is True for value in assertions.values())
                 and assertions == oracle.get("assertions") == result.get("assertions"), "read-only repair oracle replay mismatch")
     else:

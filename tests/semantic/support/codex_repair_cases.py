@@ -59,8 +59,19 @@ def attest_predelay(gateway):
     return {"pages": pages, "detail": detail, "metadata": metadata}
 
 
-def read_refinement_proven(receipts, *, target_id):
-    miss = False
+def read_refinement_proven(receipts, *, target_id, expected):
+    """Prove Agent-visible identity/values from a bounded authenticated read chain.
+
+    Callers supply only Broker-authenticated receipts. A unique refinement may
+    carry the values itself; later projections must select that same exact GUID.
+    Runner snapshots are deliberately not an input to this receipt proof.
+    """
+    required = expected.get("properties", {})
+    if (set(required) != {"Min", "Max", "InitialValue"} or len(receipts) > 96
+            or any(not isinstance(expected.get(key), str) or not expected[key] for key in ("name", "type", "path"))):
+        return False
+    miss = selected = False
+    observed = {}
     for row in receipts:
         if row.get("command") != "query-object":
             continue
@@ -68,14 +79,34 @@ def read_refinement_proven(receipts, *, target_id):
         objects = result.get("objects")
         bound = result.get("query_bound", {})
         if (result.get("ok") is not True or result.get("limit_reached") is True or not isinstance(objects, list)
-                or result.get("count") != len(objects) or bound.get("mode") not in {"take", "exact-object"}
+                or type(result.get("count")) is not int or result["count"] != len(objects)
+                or bound.get("mode") not in {"take", "exact-object"}
                 or bound.get("mode") == "take" and (type(bound.get("value")) is not int or len(objects) >= bound["value"])):
             continue
         if not objects:
             miss = True
-        elif miss and len(objects) == 1 and objects[0].get("id") == target_id:
-            return True
-    return False
+            continue
+        if not miss or len(objects) != 1 or objects[0].get("id") != target_id:
+            continue
+        target = objects[0]
+        if any(target.get(key) != expected[key] for key in ("name", "type", "path")):
+            return False
+        if selected:
+            args = row.get("arguments", [])
+            exact_ids = [args[index + 1] for index, value in enumerate(args[:-1]) if value == "--exact-id"]
+            exact_ids += [value.partition("=")[2] for value in args if value.startswith("--exact-id=")]
+            if exact_ids != [target_id]:
+                continue
+        selected = True
+        properties = target.get("properties", {})
+        if not isinstance(properties, Mapping):
+            return False
+        for field in required.keys() & properties.keys():
+            value = properties[field]
+            if type(value) not in {int, float} or not math.isfinite(value) or value != required[field]:
+                return False
+            observed[field] = value
+    return selected and observed == required
 
 
 def metadata_chain_proven(receipts):
@@ -232,7 +263,7 @@ def prepare_repair_case(ctx, *, unit, direct, runtime):
     if ctx.version != "2025.1" or unit.case_id not in {"F1", "F2", "F3", "F4"}:
         raise CaseBoundaryError("repair fixture has no reviewed version/case")
     fixture = unit.fixture
-    parent = query_path(ctx, tuple(fixture["parent_path"].strip("\\").split("\\")))
+    parent = query_path(ctx, unit.parent_segments)
     parent_id = parent["id"]
     target_id = None
     class_id = None
@@ -254,7 +285,7 @@ def prepare_repair_case(ctx, *, unit, direct, runtime):
             "--field", "plugin_role", "effect", "--field", "plugin_placement", "shareset",
             "--field", "plugin_name", fixture["plugin_name"], "--field", "plugin_type_handle", kind)
         draft.finish()
-        target_id = query_path(ctx, (*fixture["parent_path"].strip("\\").split("\\"), fixture["plugin_name"]))["id"]
+        target_id = query_path(ctx, (*unit.parent_segments, fixture["plugin_name"]))["id"]
     if unit.case_id == "F2":
         draft = BusinessDraft(ctx, "object.create")
         handle = draft.bind(object_id=parent_id)
@@ -269,7 +300,7 @@ def prepare_repair_case(ctx, *, unit, direct, runtime):
         draft.step("draft-declare-new", "--declaration-id", "fixture", "--parent-handle", handle,
             "--kind", kind, "--name", fixture["name"], *fields)
         draft.finish()
-        target_id = query_path(ctx, (*fixture["parent_path"].strip("\\").split("\\"), fixture["name"]))["id"]
+        target_id = query_path(ctx, (*unit.parent_segments, fixture["name"]))["id"]
     name = fixture.get("name", fixture.get("plugin_name"))
     expected = {"name": name, "path": fixture["parent_path"] + "\\" + name,
                 "type": "Effect" if unit.case_id in {"F1", "F4"} else "GameParameter", "parent": parent_id}

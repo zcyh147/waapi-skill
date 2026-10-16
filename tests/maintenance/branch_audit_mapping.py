@@ -7,6 +7,8 @@ import inspect
 from pathlib import Path
 import sys
 
+from tests.maintenance.source_identity import repository_source_identity
+
 LIB = "skills/waapi-skill/wwise_waapi/"
 POLICY = "skills/waapi-skill/resources/native_surface_policy.json"
 GATEWAY = "skills/waapi-skill/scripts/gateway.py"
@@ -77,7 +79,7 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
         return key
 
     def callable_sources(function):
-        path = str(Path(inspect.getsourcefile(function)).resolve().relative_to(root.resolve()))
+        path = repository_source_identity(Path(inspect.getsourcefile(function)).resolve(), root.resolve())
         refs = [source(path, function.__name__)]
         node = next(item for item in ast.walk(module_trees[path]) if isinstance(item, ast.FunctionDef) and item.name == function.__name__)
         # Adapter wrappers import their operation compiler locally. Record that
