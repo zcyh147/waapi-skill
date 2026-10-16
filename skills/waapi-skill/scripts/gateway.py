@@ -24028,7 +24028,15 @@ def _compact_object_set_update_continuation(
     for key in common_actions:
         if key in value:
             action = value[key]
-            if key == "declare_existing" and isinstance(action, Mapping):
+            if key == "field_discovery" and command == "draft-discover-fields":
+                # The selected handles and metadata are the useful result now.
+                # Further discovery keeps its complete copy-ready routes in the
+                # already disclosed exact draft-inspect continuation.
+                action = {
+                    "available_via": "more_actions",
+                    "use_when": "additional_fields_or_other_scopes_are_needed",
+                }
+            elif key == "declare_existing" and isinstance(action, Mapping):
                 action = {
                     **action,
                     "cardinality": "exactly_one_declaration_per_command",
