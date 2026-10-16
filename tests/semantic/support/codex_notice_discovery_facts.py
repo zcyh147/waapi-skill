@@ -54,6 +54,31 @@ def _type_candidates(payload, meanings, role):
     return projected
 
 
+def _validate_field_metadata_extension(row):
+    present = set(row) & {'metadata', 'unit'}
+    if not present:
+        return  # Historical receipts predate the metadata detail projection.
+    if present != {'metadata', 'unit'}:
+        raise ValueError('field metadata and unit must be paired')
+    from wwise_waapi.builders.metadata import parse_get_property_info_result
+    from wwise_waapi.canonical import canonical_json_bytes
+    from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_INFO_BYTES
+    metadata, unit = row['metadata'], row['unit']
+    keys = {'name', 'type', 'default', 'supports', 'display', 'restriction', 'dependencies', 'ui', 'audioEngineId'}
+    if (not isinstance(metadata, Mapping) or set(metadata) != keys
+            or len(canonical_json_bytes(metadata)) > MAX_METADATA_DISCOVERY_INFO_BYTES):
+        raise ValueError('invalid bounded field metadata')
+    parsed = parse_get_property_info_result(metadata).as_dict()
+    if canonical_digest(parsed) != canonical_digest(metadata):
+        raise ValueError('metadata differs from public normalized shape')
+    meaning = metadata['ui'].get('dataMeaning')
+    if meaning is not None and not isinstance(meaning, str):
+        raise ValueError('invalid metadata unit category')
+    expected = {'status': 'unknown', 'value': None} if meaning in {None, 'None'} else {'status': 'known', 'value': meaning}
+    if not isinstance(unit, Mapping) or dict(unit) != expected:
+        raise ValueError('field unit differs from metadata')
+
+
 def _field_candidates(payload, meanings, platform):
     from wwise_waapi.business_declarations import _normalize_restrictions
     from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_LIMIT, _validate_queries
@@ -75,7 +100,7 @@ def _field_candidates(payload, meanings, platform):
         ids = []
         for row in rows:
             required = {'handle', 'label', 'field_kind', 'value_type', 'platform', 'restrictions', 'value_input'}
-            if (not isinstance(row, Mapping) or not required <= set(row) or set(row) - required - {'matched_meanings'}
+            if (not isinstance(row, Mapping) or not required <= set(row) or set(row) - required - {'matched_meanings', 'metadata', 'unit'}
                     or not isinstance(row['handle'], str) or not re.fullmatch(r'bfh1-[0-9a-f]{32}', row['handle'])
                     or not isinstance(row['label'], str) or not row['label']
                     or row['field_kind'] not in {'property', 'reference'}
@@ -84,6 +109,7 @@ def _field_candidates(payload, meanings, platform):
                     or row['platform'] != platform or not isinstance(row['value_input'], Mapping)
                     or row['value_input'].get('type') != row['value_type']):
                 raise ValueError('invalid typed field candidate')
+            _validate_field_metadata_extension(row)
             restrictions = _normalize_restrictions(row['restrictions'], field_kind=row['field_kind'], value_type=row['value_type'])
             if canonical_digest(restrictions) != canonical_digest(row['restrictions']):
                 raise ValueError('field restrictions differ from normalized public contract')
