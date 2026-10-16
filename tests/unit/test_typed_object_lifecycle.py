@@ -726,7 +726,7 @@ def _archive_test_public_object_create_draft_start_uses_the_dedicated_typed_cont
     assert schema_code == 0, schema
     code, payload = waapi_gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
@@ -816,7 +816,7 @@ def _archive_test_object_create_node_local_disclosures_and_fact_batches_are_exec
     def apply(facts: tuple[Any, ...]) -> Mapping[str, Any]:
         nonlocal revision
         argv = [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-apply", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", str(revision),

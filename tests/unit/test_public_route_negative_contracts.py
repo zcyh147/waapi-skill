@@ -200,7 +200,7 @@ def test_soundengine_bounded_reads_reject_malformed_wire_results(
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            
+
             "core-call",
             api,
             group_flag,

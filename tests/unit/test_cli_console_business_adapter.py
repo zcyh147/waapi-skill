@@ -313,7 +313,7 @@ def test_cli_console_draft_exposes_one_complete_plan_continuation(
     operation = "ak.wwise.cli.generateSoundbank"
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
@@ -500,7 +500,7 @@ def test_cli_console_plan_rejects_collection_above_fixed_ceiling(
     "argv",
     (
         [
-            "--version", "2025.1", "typed-call",
+             "typed-call",
             "ak.wwise.cli.generateSoundbank", "--schema-digest", "stale",
         ],
         [

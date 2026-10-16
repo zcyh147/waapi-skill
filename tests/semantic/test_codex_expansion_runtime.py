@@ -24,7 +24,7 @@ def test_fixture_gateway_uses_separate_packaged_process_and_private_endpoint(mon
     assert gateway(["status"])["ok"]
     command, kwargs = calls[0]
     assert command[1:3] == [str(tmp_path / "skill" / "scripts" / "run.py"), "gateway.py"]
-    assert command[command.index("--port") + 1] == "41234"
+    assert not {"--host", "--port", "--version"}.intersection(command)
     assert kwargs["environment"]["WAAPI_SKILL_CONFIG_PATH"] == str(tmp_path / "setup-config.json")
     assert kwargs["timeout_seconds"] == 45
     assert receipts[0]["argv"] == ["status"]

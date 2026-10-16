@@ -20,7 +20,7 @@ OTHER = "{22222222-2222-2222-2222-222222222222}"
 
 def test_public_fixture_gateway_delegates_to_owned_process_group(tmp_path, monkeypatch):
     config = tmp_path / "config.json"
-    config.write_text("{}", encoding="utf-8")
+    config.write_text(json.dumps({"wwise_version": "2025.1", "waapi_host": "127.0.0.1", "waapi_port": 8090}), encoding="utf-8")
     calls = []
     def owned(command, **kwargs):
         calls.append((command, kwargs))
@@ -37,7 +37,7 @@ def test_public_fixture_gateway_delegates_to_owned_process_group(tmp_path, monke
 
 def test_public_fixture_gateway_preserves_unproved_cleanup_without_retry(tmp_path, monkeypatch):
     config = tmp_path / "config.json"
-    config.write_text("{}", encoding="utf-8")
+    config.write_text(json.dumps({"wwise_version": "2025.1", "waapi_host": "127.0.0.1", "waapi_port": 8090}), encoding="utf-8")
     receipts = []
     calls = []
     def fail(*args, **kwargs):
@@ -172,7 +172,7 @@ def test_public_gateway_uses_the_packaged_runner_and_owned_live_scope(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "config.json"
-    config.write_text("{}", encoding="utf-8")
+    config.write_text(json.dumps({"wwise_version": "2025.1", "waapi_host": "127.0.0.1", "waapi_port": 8090}), encoding="utf-8")
     state = tmp_path / "state"
     receipts = []
     expected = {"ok": True, "endpoint": {"host": "127.0.0.1", "port": 8090},
@@ -181,9 +181,7 @@ def test_public_gateway_uses_the_packaged_runner_and_owned_live_scope(
     def run(command, **kwargs):
         assert command[1] == str(expansion_helpers._GATEWAY_RUNNER)
         assert command[2] == "gateway.py"
-        assert command[command.index("--host") + 1] == "127.0.0.1"
-        assert command[command.index("--port") + 1] == "8090"
-        assert command[command.index("--version") + 1] == "2025.1"
+        assert not {"--host", "--port", "--version"}.intersection(command)
         assert command[command.index("--state-dir") + 1] == str(state)
         assert kwargs["cwd"] == expansion_helpers._GATEWAY_CWD
         assert kwargs["environment"]["WAAPI_SKILL_CONFIG_PATH"] == str(config)
@@ -208,7 +206,7 @@ def test_public_gateway_preserves_structured_failure_and_bounds_process_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "config.json"
-    config.write_text("{}", encoding="utf-8")
+    config.write_text(json.dumps({"wwise_version": "2022.1", "waapi_host": "127.0.0.1", "waapi_port": 8090}), encoding="utf-8")
     receipts = []
     failure = {"ok": False, "status": "failed", "error": {"code": "HOST_TIMEOUT"}}
     monkeypatch.setattr(
@@ -232,7 +230,7 @@ def test_public_gateway_retains_failed_assertion_names_in_oversize_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "config.json"
-    config.write_text("{}", encoding="utf-8")
+    config.write_text(json.dumps({"wwise_version": "2025.1", "waapi_host": "127.0.0.1", "waapi_port": 8090}), encoding="utf-8")
     receipts = []
     failure = {
         "ok": False,
@@ -273,7 +271,7 @@ def test_public_gateway_timeout_is_retained_as_a_bounded_receipt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "config.json"
-    config.write_text("{}", encoding="utf-8")
+    config.write_text(json.dumps({"wwise_version": "2025.1", "waapi_host": "127.0.0.1", "waapi_port": 8090}), encoding="utf-8")
     receipts = []
 
     def run(command, **kwargs):

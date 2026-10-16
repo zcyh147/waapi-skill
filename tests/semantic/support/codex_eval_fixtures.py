@@ -719,12 +719,6 @@ class _TransactionRunner:
         command_args: Sequence[str],
     ) -> Mapping[str, Any]:
         argv = (
-            "--host",
-            self.config.host,
-            "--port",
-            str(self.config.port),
-            "--version",
-            self.config.version,
             "--timeout",
             str(self.config.timeout_seconds),
             "--state-dir",
@@ -1812,6 +1806,20 @@ def create_shared_fixture_bundle(
         binding=packaged_gateway_binding or PackagedGatewayBinding(SKILL_ROOT),
         timeout_seconds=config.timeout_seconds,
     )
+    configuration = {"wwise_version": config.version, "waapi_host": config.host,
+                     "waapi_port": config.port, "project_modification_policy": "ask_before_changes"}
+    if trusted_gateway is None:
+        provisioned = gateway(("config-set", "--wwise-version", config.version,
+                               "--waapi-host", config.host, "--waapi-port", str(config.port),
+                               "--project-modification-policy", "ask_before_changes"), config.runner_env)
+        (config.private_root / "config-provisioning.json").write_text(
+            json.dumps(provisioned, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if provisioned.get("ok") is not True:
+            raise FixtureContractError("public fixture connection provisioning failed")
+    else:
+        # An injected Gateway is a deterministic test fixture, never live credit.
+        Path(config.runner_env["WAAPI_SKILL_CONFIG_PATH"]).write_text(
+            json.dumps(configuration), encoding="utf-8")
     owned_reader: _OwnedDirectReadCall | None = None
     if read_call is None:
         owned_reader = _OwnedDirectReadCall(host=config.host, port=config.port)
@@ -2327,6 +2335,7 @@ def _validate_runtime(
     }
     sanitized_env.update(
         {
+            "WAAPI_SKILL_CONFIG_PATH": str(private / "gateway-config.json"),
             "WWISE_VERSION": version,
             "WWISE_WAAPI_HOST": host,
             "WWISE_WAAPI_PORT": str(port),

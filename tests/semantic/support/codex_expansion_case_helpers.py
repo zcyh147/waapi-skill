@@ -126,6 +126,11 @@ def make_public_gateway(
     if (not config_path.is_absolute() or not state_dir.is_absolute()
             or config_path.is_symlink() or not config_path.is_file()):
         raise CaseBoundaryError("fixture Gateway needs the exact owned config and state paths")
+    configuration = json.loads(config_path.read_text(encoding="utf-8"))
+    if any(configuration.get(key) != value for key, value in {
+        "waapi_host": host, "waapi_port": port, "wwise_version": version,
+    }.items()):
+        raise CaseBoundaryError("fixture Gateway configuration does not match its owned endpoint")
     if _GATEWAY_RUNNER.is_symlink() or not _GATEWAY_RUNNER.is_file():
         raise CaseBoundaryError("packaged public Gateway runner is unavailable")
     if len(receipts) != 0:
@@ -147,9 +152,6 @@ def make_public_gateway(
             sys.executable,
             str(_GATEWAY_RUNNER),
             "gateway.py",
-            "--host", host,
-            "--port", str(port),
-            "--version", version,
             "--timeout", "30",
             "--state-dir", str(state_dir),
             *argv,

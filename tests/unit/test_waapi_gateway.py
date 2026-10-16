@@ -3527,7 +3527,7 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
 
     exit_code, payload = waapi_gateway.execute_gateway(
         [
-            
+
             "query-object",
             "--path-segment",
             "Actor-Mixer Hierarchy",

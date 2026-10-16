@@ -199,7 +199,7 @@ def test_every_runtime_control_lane_exposes_one_business_draft_and_blocks_typed(
     assert payload["continuation"]["subcommand"] == "draft-start"
     bypass_code, bypass = gateway.execute_gateway(
         [
-            
+
             "typed-call",
             operation,
             "--schema-digest",
@@ -340,7 +340,7 @@ def test_log_get_core_call_maps_channel_and_returns_latest_bounded_items(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
@@ -391,7 +391,7 @@ def test_log_get_rejects_out_of_bounds_result_limit_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
@@ -410,7 +410,7 @@ def test_log_get_rejects_out_of_bounds_result_limit_before_connection(
 def test_log_get_rejects_native_channel_token_before_connection(tmp_path: Path) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
@@ -429,7 +429,7 @@ def test_log_get_rejects_later_log_view_on_older_wwise_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             LOG_GET_URI,
             "--log-channel",
@@ -446,7 +446,7 @@ def test_log_get_rejects_later_log_view_on_older_wwise_before_connection(
 def test_log_get_blocks_retired_typed_call_before_connection(tmp_path: Path) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "typed-call",
             LOG_GET_URI,
             "--schema-digest",
@@ -464,7 +464,7 @@ def test_log_get_blocks_retired_draft_before_state_or_connection(tmp_path: Path)
     state_dir = tmp_path / "state"
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -550,7 +550,7 @@ def test_profiler_voice_read_derives_native_time_projection_and_handle(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             GET_VOICES_URI,
             "--profiler-position",
@@ -626,7 +626,7 @@ def test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             GET_CURSOR_TIME_URI,
             "--profiler-cursor",
@@ -686,7 +686,7 @@ def test_profiler_cursor_invalid_live_shape_preserves_bounded_diagnostics(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             GET_CURSOR_TIME_URI,
             "--profiler-cursor",
@@ -709,7 +709,7 @@ def test_profiler_voice_read_rejects_invented_handle_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             GET_VOICES_URI,
             "--profiler-position",
@@ -780,7 +780,7 @@ def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "core-call",
@@ -847,7 +847,7 @@ def test_transport_state_rejects_handle_store_inside_live_project(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "core-call",
@@ -869,7 +869,7 @@ def test_transport_state_rejects_invented_native_id_before_connection(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             TRANSPORT_GET_STATE_URI,
             "--transport-handle",
@@ -909,7 +909,7 @@ def test_transport_state_returns_authoring_boundary_before_transport_dispatch(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "core-call",
             TRANSPORT_GET_STATE_URI,
             "--transport-handle",
@@ -1016,7 +1016,7 @@ def test_profiler_cursor_control_draft_starts_with_one_closed_declaration(
 ) -> None:
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
@@ -1145,7 +1145,7 @@ def test_remote_and_transport_control_return_authoring_boundary_before_project_r
     state_dir = tmp_path / operation
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -1178,7 +1178,7 @@ def test_remote_and_transport_control_return_authoring_boundary_before_project_r
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-runtime-control-plan",
@@ -1223,7 +1223,7 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
     client = _RuntimeControlDraftClient(tmp_path)
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -1238,7 +1238,7 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
 
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-runtime-control-plan",
@@ -1256,7 +1256,7 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
 
     code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -1273,7 +1273,7 @@ def test_profiler_cursor_business_plan_seals_gateway_owned_native_preview(
 
     code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -1322,7 +1322,7 @@ def _seal_runtime_control_preview(
         )
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-start", operation,
         ],
@@ -1334,7 +1334,7 @@ def _seal_runtime_control_preview(
     authority = started["task_authority"]
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-declare-runtime-control-plan", draft_id,
             "--task-authority", authority,
@@ -1347,7 +1347,7 @@ def _seal_runtime_control_preview(
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-check", draft_id,
             "--task-authority", authority,
@@ -1359,7 +1359,7 @@ def _seal_runtime_control_preview(
     assert code == 0, checked
     code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "preview-from-draft", draft_id,
             "--task-authority", authority,
@@ -1586,7 +1586,7 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
     assert started["draft"]["next_action_binding"]["object_binding"]["next_role"] == role
     code, bound = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-bind-object", draft_id,
             "--task-authority", authority,
@@ -1600,7 +1600,7 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
     assert code == 0, bound
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-declare-runtime-control-plan", draft_id,
             "--task-authority", authority,
@@ -1614,7 +1614,7 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-check", draft_id,
             "--task-authority", authority,
@@ -1626,7 +1626,7 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
     assert code == 0, checked
     code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "preview-from-draft", draft_id,
             "--task-authority", authority,
@@ -1736,7 +1736,7 @@ def test_runtime_control_invalid_or_half_filled_intent_returns_repair_before_pre
     assert code == 0, started
     code, rejected = gateway.execute_gateway(
         [
-            
+
             "--state-dir", str(state_dir),
             "draft-declare-runtime-control-plan", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],

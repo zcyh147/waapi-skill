@@ -1425,7 +1425,7 @@ def _archive_test_weather_batch_composer_matches_legacy_preview_exactly(
     composer_root = tmp_path / "composer"
     _code, started = offline_execute(
         composer_root,
-        
+
         "draft-start",
         "object.set",
     )
@@ -1566,7 +1566,7 @@ def _archive_test_weapons_mixed_batch_composer_matches_legacy_preview_exactly(
     composer_root = tmp_path / "composer"
     _code, started = offline_execute(
         composer_root,
-        
+
         "draft-start",
         "object.set",
     )

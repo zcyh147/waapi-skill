@@ -13,3 +13,14 @@ def set_gateway_config(env, **fields):
     configured.update(fields)
     path.write_text(json.dumps(configured), encoding="utf-8")
     return env
+
+
+def bind_fixture_connection(artifact, env):
+    """Give a synthetic current transaction the selected configuration identity."""
+    path = Path(env["WAAPI_SKILL_CONFIG_PATH"])
+    configured = json.loads(path.read_text(encoding="utf-8"))
+    artifact["connection_configuration"] = {
+        "config_path": str(path),
+        **{field: configured[field] for field in ("wwise_version", "waapi_host", "waapi_port")},
+    }
+    return artifact

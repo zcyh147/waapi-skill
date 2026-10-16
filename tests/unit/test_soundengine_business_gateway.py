@@ -123,7 +123,7 @@ def test_event_draft_exposes_one_copy_ready_exact_name_binding(
     operation = "ak.soundengine.executeActionOnEvent"
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
@@ -364,7 +364,7 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
 
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -383,7 +383,7 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
     client = _SoundEngineDraftClient(tmp_path)
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -402,7 +402,7 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
 
     code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -419,7 +419,7 @@ def test_monitor_message_uses_one_business_draft_and_seals_native_preview(
 
     code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -472,7 +472,7 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
 
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -487,7 +487,7 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
     client = _SoundEngineDraftClient(tmp_path)
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -505,7 +505,7 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -521,7 +521,7 @@ def test_register_game_object_derives_native_id_and_binds_cleanup(
     assert code == 0, json.dumps(checked, indent=2, ensure_ascii=False)
     code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -566,7 +566,7 @@ def _preview_soundengine_plan(
 ) -> tuple[dict[str, object], dict[str, object]]:
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -583,7 +583,7 @@ def _preview_soundengine_plan(
     for role, object_id in role_bindings:
         code, bound = gateway.execute_gateway(
             [
-                
+
                 "--state-dir",
                 str(state_dir),
                 "draft-bind-object",
@@ -611,7 +611,7 @@ def _preview_soundengine_plan(
     ]
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -628,7 +628,7 @@ def _preview_soundengine_plan(
     assert code == 0, declared
     code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -644,7 +644,7 @@ def _preview_soundengine_plan(
     assert code == 0, json.dumps(checked, indent=2, ensure_ascii=False)
     code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -676,7 +676,7 @@ def _declare_soundengine_plan_result(
 ) -> tuple[int, dict[str, object]]:
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -692,7 +692,7 @@ def _declare_soundengine_plan_result(
     for role, object_id in role_bindings:
         code, bound = gateway.execute_gateway(
             [
-                
+
                 "--state-dir",
                 str(state_dir),
                 "draft-bind-object",
@@ -720,7 +720,7 @@ def _declare_soundengine_plan_result(
     ]
     return gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -763,7 +763,7 @@ def _execute_and_verify_soundengine(
     assert code == 0, confirmed
     code, executed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "execute",
@@ -775,7 +775,7 @@ def _execute_and_verify_soundengine(
     assert code == 0, executed
     code, verified = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "verify",
@@ -1211,7 +1211,7 @@ def test_stop_playing_revalidates_handle_at_execute_and_never_reuses_it(
     calls_before = list(client.soundengine_calls)
     code, stopped = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "execute",
@@ -1264,7 +1264,7 @@ def test_post_event_zero_result_is_a_bounded_failure_without_playing_handle(
     assert code == 0, confirmed
     code, executed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "execute",
@@ -1276,7 +1276,7 @@ def test_post_event_zero_result_is_a_bounded_failure_without_playing_handle(
     assert code == 0, executed
     code, failed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "verify",
@@ -2313,7 +2313,7 @@ def test_listener_spatialization_rejects_unclosed_channel_descriptors(
     )
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -2328,7 +2328,7 @@ def test_listener_spatialization_rejects_unclosed_channel_descriptors(
 
     code, rejected = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-soundengine-plan",
@@ -2557,7 +2557,7 @@ def test_state_and_switch_reads_use_bounded_business_continuations(
         assert schema["continuation"]["subcommand"] == "core-call"
         code, result = gateway.execute_gateway(
             [
-                
+
                 "--state-dir",
                 str(state_dir),
                 "core-call",
@@ -2629,7 +2629,7 @@ def test_post_event_stops_before_dispatch_when_bound_event_drifts(
     calls_before = list(client.soundengine_calls)
     code, stopped = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "execute",

@@ -237,7 +237,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
     state_dir = tmp_path / "tab-business-state"
     start_code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -251,7 +251,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
 
     missing_role_code, missing_role = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-bind-object",
@@ -271,7 +271,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
 
     bind_code, bound = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-bind-object",
@@ -306,7 +306,7 @@ def test_lua_business_draft_rejects_roleless_object_binding(
     state_dir = tmp_path / "lua-no-object-state"
     start_code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -320,7 +320,7 @@ def test_lua_business_draft_rejects_roleless_object_binding(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-bind-object",
@@ -349,7 +349,7 @@ def test_cli_lua_declaration_rejects_authoring_before_project_read(
     script.write_text("return true\n", encoding="utf-8")
     start_code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -363,7 +363,7 @@ def test_cli_lua_declaration_rejects_authoring_before_project_read(
 
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-artifact-plan",
@@ -412,7 +412,7 @@ def test_lua_continuation_discloses_one_bounded_typed_argument_at_a_time(
     state_dir = tmp_path / "lua-null-continuation"
     code, payload = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -446,7 +446,7 @@ def test_lua_artifact_plan_accepts_repeated_typed_business_arguments(
     script.write_text("return wa_args.count\n", encoding="utf-8")
     start_code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -459,7 +459,7 @@ def test_lua_artifact_plan_accepts_repeated_typed_business_arguments(
 
     declaration_code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-artifact-plan",
@@ -520,7 +520,7 @@ def _preview_public_cli_lua_file(
     script.write_bytes(b"return wa_args.request_id\n")
     start_code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -534,7 +534,7 @@ def _preview_public_cli_lua_file(
     authority = started["task_authority"]
     declaration_code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-artifact-plan",
@@ -570,7 +570,7 @@ def _preview_public_cli_lua_file(
 
     check_code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -586,7 +586,7 @@ def _preview_public_cli_lua_file(
     assert check_code == 0, checked
     preview_code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -630,7 +630,7 @@ def test_public_lua_business_draft_executes_once_and_ends_result_schema_only(
     execution_client = _LuaClient(tmp_path)
     execute_code, executed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "execute",
@@ -646,7 +646,7 @@ def test_public_lua_business_draft_executes_once_and_ends_result_schema_only(
     verify_client = _LuaClient(tmp_path)
     verify_code, verified = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "verify",
@@ -688,7 +688,7 @@ def test_public_lua_business_draft_rejects_source_drift_before_dispatch(
     execution_client = _LuaClient(tmp_path)
     execute_code, rejected = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "execute",

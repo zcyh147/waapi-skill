@@ -127,7 +127,7 @@ def test_public_schema_and_draft_start_share_one_business_operation(
 
     start_code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(tmp_path / f"{operation}-{version}"),
             "draft-start",

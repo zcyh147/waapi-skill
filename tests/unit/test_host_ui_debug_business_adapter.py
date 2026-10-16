@@ -519,7 +519,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     output = (tmp_path / "tone.wav").resolve()
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -535,7 +535,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
 
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -595,7 +595,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     check_client = _HostClient(tmp_path, "2025.1", is_command_line=True)
     check_code, checked = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -614,7 +614,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     preview_client = _HostClient(tmp_path, "2025.1", is_command_line=True)
     preview_code, previewed = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -646,7 +646,7 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
     env = _env(tmp_path, version)
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -660,7 +660,7 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
 
     code, rejected = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -690,7 +690,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     authoring = _HostClient(tmp_path, version, is_command_line=False)
     code, started = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-start",
@@ -702,7 +702,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     assert code == 0, started
     code, declared = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -723,7 +723,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     console = _HostClient(tmp_path, version, is_command_line=True)
     code, rejected = gateway.execute_gateway(
         [
-            
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -746,16 +746,14 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     "argv",
     (
         [
-            "--version",
-            "2025.1",
+
             "typed-call",
             "ak.wwise.debug.generateToneWAV",
             "--schema-digest",
             "stale",
         ],
         [
-            "--version",
-            "2025.1",
+
             "typed-call",
             "ak.wwise.waapi.getSchema",
             "--schema-digest",
