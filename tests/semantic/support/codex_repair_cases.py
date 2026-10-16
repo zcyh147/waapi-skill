@@ -231,7 +231,7 @@ def prepare_repair_case(ctx, *, unit, direct, runtime):
                 raise CaseBoundaryError("fixture GameParameter field is unavailable or ambiguous")
             fields += ["--field-value", candidates[0]["handle"], str(value)]
         draft.step("draft-declare-new", "--declaration-id", "fixture", "--parent-handle", handle,
-            "--type-handle", kind, "--name", fixture["name"], *fields)
+            "--kind", kind, "--name", fixture["name"], *fields)
         draft.finish()
         target_id = query_path(ctx, (*fixture["parent_path"].strip("\\").split("\\"), fixture["name"]))["id"]
     name = fixture.get("name", fixture.get("plugin_name"))
@@ -268,6 +268,8 @@ def prepare_repair_case(ctx, *, unit, direct, runtime):
                 details = read({"from": {"id": [row["id"]]}}, projection + ["@" + key for key in properties])
                 if len(details) != 1 or details[0].get("id") != row["id"]:
                     raise CaseBoundaryError("repair exact target readback is missing")
+                if any("@" + key not in details[0] for key in properties):
+                    raise CaseBoundaryError("independent target property projection is incomplete")
                 if properties:
                     row["properties"] = {key: details[0].get("@" + key) for key in properties}
                 if row["type"] == "Effect":
