@@ -125,6 +125,7 @@ from .operation_plugin import (
     ValidatedPluginProperty,
     build_plugin_creation_plan,
     normalize_plugin_creation,
+    validate_plugin_target,
     plugin_property_metadata_requests,
     plugin_verification_fields,
     validate_plugin_property_metadata,
@@ -695,10 +696,11 @@ _PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
 _PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "required": ["kind", "name", "class_id"],
-    "optional": ["notes", "platform", "language", "properties"],
+    "optional": ["notes", "platform", "language", "properties", "placement"],
     "additionalProperties": False,
     "properties": {
         "kind": {"type": "string", "enum": ["source", "effect"]},
+        "placement": {"type": "string", "enum": ["owner", "shareset"], "default": "owner"},
         "name": {"type": "string", "minLength": 1, "maxLength": 255},
         "class_id": {
             "type": "integer",
@@ -2516,8 +2518,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         OBJECT_SET_URI,
         "object-mutation",
         (
-            "Create one Source or Effect plug-in from an exact classId through "
-            "the version-correct Wwise object topology."
+            "Create one owner-local Source/Effect or standalone Effect ShareSet through "
+            "the version-correct Wwise object topology with a live Type Handle."
         ),
         ("target", "plugin"),
         argument_contract=_object_contract(
@@ -2530,18 +2532,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         identity_arguments=("target",),
         constraints=(
             "target resolves live to exactly one canonical object before preview",
-            "class_id is an exact caller-supplied uint32 and is never guessed from a plug-in display name",
+            "the Gateway resolves the class_id from a live discovered Type Handle",
             "every requested property is validated by classId-scoped live getPropertyInfo metadata",
             "Source plug-ins are create-only children of Sound or Voice targets",
-            "Wwise 2022.1 Effects use the first proven-empty @Effect0 through @Effect3 reference",
-            "Wwise 2023.1 and later Effects append one EffectSlot and verify its @Effect reference",
+            "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
+            "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
+            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         selection_guidance=_selection_guidance(
             use_when=(
-                "The user asks to create one Source or Effect plug-in from an exact supplied classId.",
+                "The user asks to attach a local Source/Effect or create an independent Effect ShareSet from live plug-in discovery.",
             ),
             avoid_when=(
                 "The request is ordinary object creation with no plug-in semantics.",
@@ -5089,6 +5092,30 @@ def _read_plugin_prestate(
     descriptor: PluginCreationDescriptor,
     read: ReadCall,
 ) -> dict[str, Any]:
+    if descriptor.placement == "shareset":
+        catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
+        plugins = [row for row in catalog if row.class_id == descriptor.class_id and row.type.casefold() == "effect"]
+        if len(plugins) != 1:
+            raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected Effect plug-in is no longer available.")
+        args = {"from": {"id": [target_id]}, "transform": [{"select": ["children"]}]}
+        options = {"return": ["id", "name", "type", "parent"]}
+        rows = _rows(read(OBJECT_GET_URI, args, options))
+        normalized = []
+        for row in rows:
+            child_id = _plugin_guid(row.get("id"), field="shareset_child.id")
+            parent_id = _plugin_guid(row.get("parent"), field="shareset_child.parent")
+            if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
+                raise OperationContractError("INVALID_READBACK", "ShareSet children must expose exact names, types, and parent bindings.")
+            if row["name"].casefold() == descriptor.name.casefold():
+                raise OperationContractError("SHARESET_NAME_CONFLICT", "The Effects Work Unit already contains the requested name.")
+            normalized.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
+        normalized.sort(key=lambda row: row["id"].casefold())
+        ids = [row["id"] for row in normalized]
+        if len({value.casefold() for value in ids}) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "ShareSet children contain duplicate identities.")
+        return {"kind": "shareset_children", "uri": OBJECT_GET_URI, "args": args, "options": options,
+                "rows": normalized, "plugin_type": plugins[0].as_dict(), "preexisting_plugin_ids": ids}
+
     if descriptor.kind == "source":
         fields = ("id", "name", "type", "parent")
         args = {
@@ -5277,6 +5304,11 @@ def _prepare_object_create_plugin(
             details={"target": target.as_dict()},
         )
 
+    try:
+        validate_plugin_target(descriptor, target_type=target_type, target_path=target.row.get("path"))
+    except PluginOperationContractError as exc:
+        _raise_plugin_operation_error(exc)
+
     property_metadata: list[dict[str, Any]] = []
     for metadata_request in plugin_property_metadata_requests(descriptor):
         raw_args = metadata_request["args"]
@@ -5303,6 +5335,7 @@ def _prepare_object_create_plugin(
             version=request.version,
             target_id=target.object,
             target_type=target_type,
+            target_path=target.row.get("path"),
             request=descriptor,
             property_metadata=property_metadata or None,
             effect_slots_2022=(
@@ -5335,6 +5368,7 @@ def _prepare_object_create_plugin(
         "version": request.version,
         "target_id": target.object,
         "target_type": target_type,
+        "target_path": target.row.get("path"),
         "descriptor": descriptor.as_dict(),
         "plan": plan_payload,
         "snapshot": plugin_prestate,
@@ -13645,6 +13679,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 version=version,
                 target_id=target_id,
                 target_type=target_type,
+                target_path=plugin_guard.get("target_path"),
                 request=descriptor,
                 property_metadata=actual_metadata or None,
                 effect_slots_2022=(
@@ -15769,9 +15804,9 @@ def verify_prepared_operation(
             "readback_fields",
             "readback_view",
         }
-        if descriptor.kind == "source":
+        if descriptor.kind == "source" or descriptor.placement == "shareset":
             expected_plan_fields = base_plan_fields
-            expected_placement_kind = "source_child"
+            expected_placement_kind = "effect_shareset_child" if descriptor.placement == "shareset" else "source_child"
             placement_shape_matches = (
                 placement.get("collection") == "children"
             )
@@ -15884,10 +15919,10 @@ def verify_prepared_operation(
 
         created_id = result_binding["created_id"]
         expected_parent_id = target_id
-        if expected_placement_kind == "source_child":
+        if expected_placement_kind in {"source_child", "effect_shareset_child"}:
             plugin_id = created_id
             placement_evidence: dict[str, Any] = {
-                "kind": "source_child"
+                "kind": expected_placement_kind
             }
         elif expected_placement_kind == "fixed_effect_reference":
             target_rows = read_object(

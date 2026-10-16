@@ -845,7 +845,7 @@ def _materialize_create_plugin(
         )
     fields = dict(declaration.fields)
     required = {"plugin_name", "plugin_role", "plugin_type_handle"}
-    optional = {"field_values", "language", "notes", "platform"}
+    optional = {"field_values", "language", "notes", "platform", "plugin_placement"}
     missing = sorted(required - set(fields))
     unexpected = sorted(set(fields) - required - optional)
     if missing:
@@ -905,6 +905,8 @@ def _materialize_create_plugin(
         "name": plugin_name,
         "class_id": type_handle.class_id,
     }
+    if "plugin_placement" in fields:
+        plugin["placement"] = fields["plugin_placement"]
     for name in ("notes", "platform"):
         value = fields.get(name)
         if value is not None:
