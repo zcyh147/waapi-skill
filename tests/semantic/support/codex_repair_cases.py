@@ -133,7 +133,7 @@ def approve_repair_preview(artifact, *, case_id, parent_id, expected, target_id=
     prepared = artifact.get("prepared_operation", {})
     dispatch = prepared.get("dispatch", {})
     args = dispatch.get("args", {})
-    if request.get("version") != "2025.1":
+    if request.get("version") != "2025.1" or dispatch.get("options") != {}:
         return False
     if case_id == "F1":
         return (request.get("operation") == "object.setProperty"
@@ -143,11 +143,11 @@ def approve_repair_preview(artifact, *, case_id, parent_id, expected, target_id=
         return (request.get("operation") == "object.create"
             and dispatch.get("uri") == "ak.wwise.core.object.create"
             and args == {"parent": parent_id, "type": "GameParameter", "name": expected["name"],
-                         "onNameConflict": "fail", "@Min": -12, "@Max": 36, "@InitialValue": 7})
+                         "onNameConflict": "fail", "autoAddToSourceControl": False, "@Min": -12, "@Max": 36, "@InitialValue": 7})
     if case_id == "F4":
         return (request.get("operation") == "object.createPlugin"
             and dispatch.get("uri") == "ak.wwise.core.object.set"
-            and args == {"objects": [{"object": parent_id, "onNameConflict": "fail", "children": [
+            and args == {"autoAddToSourceControl": False, "objects": [{"object": parent_id, "onNameConflict": "fail", "children": [
                 {"type": "Effect", "name": expected["name"], "classId": expected["class_id"]}]}]})
     return False
 
