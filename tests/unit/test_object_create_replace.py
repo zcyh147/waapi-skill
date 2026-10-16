@@ -712,7 +712,7 @@ def test_create_rejects_protected_or_unreviewed_parent(
     assert rejected.value.error_code == error_code
 
 
-def test_replace_preview_binds_owned_scope_full_old_subtree_and_discard_only_cleanup() -> None:
+def test_replace_preview_binds_owned_scope_full_old_subtree_and_retains_changes() -> None:
     prepared = _prepare_replace()
 
     # Wwise 2022.1 getTypes reports WObject as the shared base type for these
@@ -742,11 +742,12 @@ def test_replace_preview_binds_owned_scope_full_old_subtree_and_discard_only_cle
         NEW_SOUND_PATH,
     ]
     assert prepared["cleanup"] == {
-        "kind": "discard-case-owned-project-copy-after-replace",
-        "description": "The replaced subtree is not reconstructed; discard the case-owned project copy after collecting evidence.",
-        "automatic": False,
+        "kind": "retain-project-and-outputs",
+        "project_policy": "retain",
+        "output_policy": "retain",
+        "automatic_cleanup": False,
         "automatic_retry": False,
-        "replace_owned_root_id": OWNED_ROOT_ID,
+        "automatic_rollback": False,
         "irreversible_preexisting_changes": True,
     }
 

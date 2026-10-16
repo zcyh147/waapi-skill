@@ -137,3 +137,35 @@ def test_profiler_pairing_remains_required_after_persistent_project_cleanup(tmp_
     assert cleanup["status"] == "not_started"
     assert cleanup["projection"]["companion_request"]["api"] == "ak.wwise.core.profiler.stopCapture"
     assert cleanup["projection"]["cleanup_requirement"] == "required_cleanup"
+
+
+@pytest.mark.parametrize("registered", [True, False])
+def test_ui_registration_cleanup_survives_public_projection_with_artifact_identity(tmp_path, registered):
+    env, store, original_id = legacy_preview(tmp_path)
+    code, original = gateway.execute_gateway(["transaction-show", original_id], env=env)
+    assert code == 0, original
+    cleanup = {
+        "automatic": False,
+        "dispatch": {"uri": "ak.wwise.ui.commands.unregister", "arguments": {"commands": ["example.owned"]}, "options": {}} if registered else None,
+        "kind": "inverse_ui_command_registration" if registered else "none",
+        "reversible": registered,
+        "runtime_preconditions": {"file_proofs": []},
+        "verification": {"kind": "inventory", "expected_membership": "absent"} if registered else None,
+    }
+    if registered:
+        cleanup["relationship_sha256"] = "a" * 64
+    else:
+        cleanup["reason"] = "An unknown registration definition cannot be reconstructed."
+    artifact = original["artifact"]
+    artifact["prepared_operation"]["cleanup"] = cleanup
+    transaction_id = new_transaction_id()
+    store.create_preview(transaction_id, artifact)
+    artifact_hash = store.verify_artifact(transaction_id)
+    code, summary = gateway.execute_gateway(["transaction-show", transaction_id, "--summary-only"], env=env)
+    assert code == 0, summary
+    assert summary["preview_summary"]["cleanup"]["spec"] == cleanup
+    assert summary["preview_summary"]["cleanup"]["status"] == ("not_started" if registered else "not_required")
+    code, full = gateway.execute_gateway(["transaction-show", transaction_id], env=env)
+    assert code == 0, full
+    assert full["artifact"]["prepared_operation"]["cleanup"] == cleanup
+    assert full["artifact_hash"] == artifact_hash == store.verify_artifact(transaction_id)
