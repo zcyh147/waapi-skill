@@ -50,6 +50,8 @@ def _env(tmp_path: Path, version: str = "2025.1") -> dict[str, str]:
         json.dumps(
             {
                 "wwise_version": version,
+                "waapi_host": "127.0.0.1",
+                "waapi_port": 8080,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -57,7 +59,6 @@ def _env(tmp_path: Path, version: str = "2025.1") -> dict[str, str]:
     )
     return {
         "WAAPI_SKILL_CONFIG_PATH": str(config),
-        "WWISE_WAAPI_PORT": "8080",
     }
 
 
@@ -614,8 +615,6 @@ def test_public_lua_business_draft_executes_once_and_ends_result_schema_only(
     store = TransactionStore(state_dir)
     confirm_code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -671,8 +670,6 @@ def test_public_lua_business_draft_rejects_source_drift_before_dispatch(
     store = TransactionStore(state_dir)
     confirm_code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
             "--state-dir",
             str(state_dir),
             "confirm",

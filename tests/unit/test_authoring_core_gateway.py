@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from tests.support.gateway_config import set_gateway_config
 from tests.support.operation_directory import expand_operations_directory_row
 
 from tests.unit.test_waapi_gateway import FakeClient, gateway_env, live_info, waapi_gateway as gateway
