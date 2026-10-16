@@ -130,7 +130,9 @@ python scripts/run.py gateway.py query-object --exact-id '{GUID}' --relationship
 
 Use offline version-pinned `object-types` first; narrow its bounded result. Use live `metadata types` only to re-reflect the running instance; its projection and bound are fixed.
 
-`metadata discover` chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss; one `partial` result permits one broader technical retry, then clarify. Honor dependencies when authorized, otherwise clarify.
+`metadata list` lists the actual fields for one existing business scope; follow `next_page` with `--page` until `complete`. Copy a returned `selection` to `metadata detail --selection` with the same scope. Details preserve live type/default/restrictions/dependencies/supports/UI units; unknown units remain unknown. Expired or changed-scope selections require a new list. A single oversized detail returns a named boundary, not a truncated success. These selections do not authorize changes.
+
+`metadata discover` is auxiliary lexical search. It chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss; one `partial` result permits one broader technical retry, then clarify. Honor dependencies when authorized, otherwise clarify.
 
 Use fixed reads rather than reflected payloads:
 
