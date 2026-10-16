@@ -1,25 +1,23 @@
 # WAAPI query lane
 
-Use this for read-only Wwise queries and bounded Topic waits/streams. Require the unique terminal sentinel required by `SKILL.md` as the final visible line and no truncation or omission marker; otherwise do not reread a range or invoke the Gateway.
+Read-only queries and bounded Topic monitoring. Require the final sentinel and complete read per `SKILL.md`; otherwise stop.
 
 ## Routing and boundaries
 
 - Use only the packaged Gateway. There is no raw-client fallback and do not write Python.
 - Use fixed routes directly: object reads use the business declaration from `query-schema`; Topic facts use `topic-schema`; non-fixed reflected functions use `request-schema <uri>` and its sole continuation. Topic observation never authorizes its publisher.
-- For an ordinary read without a fixed command or exact URI, run `operations` and copy its returned route. This includes business reads and zero-input reads for the configured version.
+- Without a fixed read or exact URI, copy the route from `operations`.
 - Broad catalog: use the coverage reference's host-scoped summary, then narrow with filters. `capabilities`/`describe` default to Console; Authoring inspection adds offline `--profile wwise-authoring-ui`. Neither proves live availability. Use `--limit 0` only when every row is explicitly needed and `--detail` only for audits.
-- Known function URI: `request-schema <uri>` and its sole continuation. `describe` is for an explicit capability/schema audit, with the requested offline host profile.
+- Known URI: `request-schema`; `describe` is for offline schema audits.
 - `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; other complete structured failures follow the Skill Recovery rule and their receipt.
-- The configured exact Wwise version selects every schema. Live work never copies an example `--version`; use it only for a requested offline inspection.
+- Saved configuration selects live schemas; `--version` is offline-only.
 
 ## Wwise 2025.1 Media Pool
 
 `ak.wwise.core.mediaPool.getFields` and `.get` are one closed two-call read. Use `request-schema` for each URI and follow only its typed continuation. Run `request-schema ak.wwise.core.mediaPool.getFields` before `request-schema ak.wwise.core.mediaPool.get`; Do not request the `.get` schema first.
 
-Follow the returned business declaration for database selection, field meanings,
-text/number conditions, requested outputs, and result limit. Gateway owns native
-field bindings, filter objects, and the return projection; the Agent supplies
-only disclosed business values. Missing live fields permit scoped discovery refinement; unresolved ambiguity needs an exact choice.
+Supply disclosed database, field, condition, output, and limit values. Gateway owns
+native bindings, filters, and projection. Missing live fields permit scoped discovery refinement; unresolved ambiguity needs an exact choice.
 For case-sensitive matching use the disclosed post-filter; a saturated candidate
 set that cannot prove completeness returns `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
 Preserve returned `Db` and complete `Path` for a later original-file reference
@@ -32,7 +30,7 @@ This is Wwise `2025.1`-only and follows a successful Media Pool read. Run only f
 
 Take each exact returned `Path`, sort those strings lexicographically, and pass each once. Each path is limited to 1024 UTF-8 bytes and must be drive-absolute, an ordinary UNC path, or POSIX-absolute. Reject relative/traversal/device paths. Do not pre-normalize or de-duplicate: the Gateway normalizes slash spelling and drive/UNC case, keeps POSIX case significant, and rejects normalized candidate collisions.
 
-Invoke one command, repeating only the final candidate option:
+Run once, repeating the candidate option:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
@@ -50,9 +48,9 @@ One Gateway-owned business declaration chooses exactly one source: repeated `--p
 
 Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. Repeated `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
 
-The fixed identity projection is always present: `id,name,type,path`. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
+Identity fields are always `id,name,type,path`. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
 
-The offline version-aware schema command is:
+Offline schema:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-schema
@@ -66,7 +64,7 @@ python scripts/run.py gateway.py query-object --search-text 'ExactName' --predic
 python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate kind-is all-sounds --max-results 24
 ```
 
-Repeated `--predicate` values mean AND and preserve user condition order. A pure-AND mix query includes every supported conjunct before the bound; presentation sorting/grouping happens only after a complete result.
+Preserve predicate order; apply every AND conjunct before the bound. Sort/group presentation only after a complete result.
 
 ### Relationship-guided next hops
 

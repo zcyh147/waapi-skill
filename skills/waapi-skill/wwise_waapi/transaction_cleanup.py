@@ -464,8 +464,16 @@ def persistent_project_cleanup(spec: Mapping[str, Any]) -> dict[str, Any]:
         "reconnect": False, "process_cleanup": False,
     }:
         return dict(spec)
+    # UI registration owns a runtime companion, not an authoring-project undo.
+    # Unknown registration definitions explicitly disclose that no inverse exists.
+    if spec.get("kind") == "none" and set(spec) == {
+        "automatic", "dispatch", "kind", "reason", "reversible",
+        "runtime_preconditions", "verification",
+    } and spec.get("reversible") is False and spec.get("dispatch") is None:
+        return dict(spec)
     if spec.get("contract") == CLEANUP_SPEC_CONTRACT or spec.get("kind") in {
         "same_connection_cancel_on_inner_failure", "end-or-cancel-undo-group",
+        "inverse_ui_command_registration",
     }:
         return dict(spec)
     return {
