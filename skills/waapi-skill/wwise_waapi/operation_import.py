@@ -202,9 +202,7 @@ def import_operation_policy(import_operation: str) -> dict[str, Any]:
             "collision_policy": "exact_target_must_be_absent",
             "existing_target_postcondition": "not_applicable",
             "absent_target_postcondition": "new_unique_guid_at_exact_path",
-            "cleanup_policy": "delete_created_guids_then_discard_owned_project_copy_for_media",
-            "disposable_project_required": False,
-            "owned_project_copy_required_for_clean_test": True,
+            "cleanup_policy": "retain_project_and_imported_media",
             "in_place_restore_supported": False,
         }
     if operation == "useExisting":
@@ -216,18 +214,14 @@ def import_operation_policy(import_operation: str) -> dict[str, Any]:
                 "absent_target_routes_notes_to_created_target"
             ),
             "absent_target_postcondition": "new_unique_guid_at_exact_path",
-            "cleanup_policy": "discard_owned_project_copy_when_existing_media_was_updated",
-            "disposable_project_required": False,
-            "owned_project_copy_required_for_clean_test": True,
+            "cleanup_policy": "retain_project_and_imported_media",
             "in_place_restore_supported": False,
         }
     return common | {
         "collision_policy": "destroy_exact_existing_target_then_create_replacement",
         "existing_target_postcondition": "old_guid_absent_and_new_guid_distinct",
         "absent_target_postcondition": "new_unique_guid_at_exact_path",
-        "cleanup_policy": "discard_owned_project_copy; in_place_restore_is_not_claimed",
-        "disposable_project_required": True,
-        "owned_project_copy_required_for_clean_test": True,
+        "cleanup_policy": "retain_project_and_imported_media",
         "in_place_restore_supported": False,
     }
 
