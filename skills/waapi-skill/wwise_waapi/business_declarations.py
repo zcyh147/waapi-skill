@@ -1150,7 +1150,8 @@ def bind_live_field(
             "FIELD_OBJECT_SCOPE_REQUIRED",
             field=token,
             dependency_fields=enabled_dependency_fields,
-            action="resolve the exact target object before checking this dependent field",
+            new_object_workflow=_dependent_new_object_workflow(token),
+            action="For a new object, complete and verify creation without this field, then configure the verified GUID through a separate property Preview; creation alone does not complete configuration",
         )
     if enabled_dependency_fields:
         enabled_platform = (
@@ -1281,7 +1282,8 @@ def revalidate_live_field(
             field=field.token,
             rejected_handle=field.handle,
             dependency_fields=enabled_dependency_fields,
-            action="resolve an exact target object and issue a new field handle",
+            new_object_workflow=_dependent_new_object_workflow(field.token),
+            action="Use the verified created GUID to rediscover this field in object scope and configure it through a separate property Preview; never repeat completed creation",
         )
     if enabled_dependency_fields:
         enabled_platform = (
@@ -1713,6 +1715,23 @@ def _restrictions_from_live_metadata(
         if allowed:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
+
+
+def _dependent_new_object_workflow(meaning: str) -> dict[str, Any]:
+    """Explain the existing staged path without granting mutation authority."""
+    return {
+        "creation": "complete_current_creation_without_unbound_dependent_fields",
+        "creation_verification": "required_before_configuration",
+        "configuration_operation": "object.setProperty",
+        "configuration_identity": "verified_created_object_GUID",
+        "configuration_meaning": meaning,
+        "field_selection": "rediscover_in_object_scope_and_copy_Field_Handle",
+        "authorization": "each_Preview_uses_current_modification_policy",
+        "creation_is_not_configuration_completion": True,
+        "repeat_creation_after_success": False,
+        "configuration_failure": "report_created_but_not_fully_configured_and_reuse_verified_GUID",
+        "native_same_call_support": "not_determined_by_this_class_scope_boundary",
+    }
 
 
 def _dependency_field_tokens(

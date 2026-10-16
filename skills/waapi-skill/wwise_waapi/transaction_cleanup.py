@@ -457,6 +457,13 @@ def _strict_json_copy(value: Any, *, path: str) -> Any:
 
 def persistent_project_cleanup(spec: Mapping[str, Any]) -> dict[str, Any]:
     """Keep resource pairing separate from retaining ordinary authoring work."""
+    # Terminal host controls deliberately forbid reconnecting or stopping the
+    # host process. These are runtime safety facts, not project cleanup hints.
+    if dict(spec) == {
+        "kind": "none", "automatic": False, "automatic_retry": False,
+        "reconnect": False, "process_cleanup": False,
+    }:
+        return dict(spec)
     if spec.get("contract") == CLEANUP_SPEC_CONTRACT or spec.get("kind") in {
         "same_connection_cancel_on_inner_failure", "end-or-cancel-undo-group",
     }:

@@ -62,6 +62,10 @@ def object_graph_business_contract_data(
                 "target": "bound_object_handle",
                 "plugin_type": "live_discovered_type_handle",
                 "properties": "class_scoped_field_handles",
+                "placement_targets": {
+                    "owner": "compatible audio object; never a Work Unit",
+                    "shareset": "WorkUnit under the Effects hierarchy; Effect plug-ins only",
+                },
             },
             "type_discovery": {
                 "subcommand": "draft-discover-types",
@@ -77,12 +81,19 @@ def object_graph_business_contract_data(
                     "plugin_type_handle",
                 ],
                 "optional_fields": [
+                    "plugin_placement",
                     "field_values",
                     "language",
                     "notes",
                     "platform",
                 ],
+                "placement": {
+                    "owner": "attach a local Source or Effect to a compatible audio object",
+                    "shareset": "create an independent Effect child of an Effects Work Unit",
+                    "default": "owner",
+                },
                 "field_value_types": {
+                    "plugin_placement": "string",
                     "language": "string",
                     "notes": "string",
                     "platform": "string",
