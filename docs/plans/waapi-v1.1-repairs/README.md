@@ -1,6 +1,6 @@
 # WAAPI v1.1 修复：任务入口
 
-状态：用户已确认；规格 [#163](https://github.com/zcyh147/waapi-skill/issues/163) 与九张任务票已发布，尚未开始实现或运行测试。
+状态：用户已确认；规格 [#163](https://github.com/zcyh147/waapi-skill/issues/163) 与九张任务票已发布，已于 2026-10-17 开始实现，任务票已改为英文。实现覆盖 Wwise 2021.1–2025.1，明确验证底层不可用的版本边界。
 
 先读 [规格](SPEC.md)，再看下面的任务拆分。全部测试以公开 Gateway 行为为主；四个 Fresh 工作流只安排 Mac。
 

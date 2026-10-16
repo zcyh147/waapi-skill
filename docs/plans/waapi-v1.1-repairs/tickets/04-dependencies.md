@@ -1,26 +1,28 @@
-# 04：支持衰减引用的条件依赖
+# 04: Support conditional activation dependencies for attenuation references
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#167](https://github.com/zcyh147/waapi-skill/issues/167)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** 用户给 Sound/容器关联衰减，Gateway 将必要定位设置纳入 Preview 并验证结果。
+A user can associate attenuation with a Sound or container, with necessary positioning changes disclosed in Preview and verified after execution.
 
-**Blocked by：** 无
+## Acceptance criteria
 
-## 验收条件
+- [ ] Interpret the observed conditions/property/override dependency semantics; merely accepting additional keys is insufficient.
+- [ ] Deduplicate repeated requirements; avoid needless changes when already satisfied; reject conflicting, cyclic or unknown requirements before dispatch.
+- [ ] Preview identifies both reference and required property changes; independent readback proves both and preservation of unrelated fields.
+- [ ] Exercise the public object.set path for Sound and container targets. Implement applicable behavior in all five versions and explicitly verify native version boundaries.
 
-- [ ] 解析本次 conditions/property/override 依赖，不仅放宽字段白名单。
-- [ ] 已满足依赖不多改；重复项去重；冲突、循环、未知结构在派发前明确拒绝。
-- [ ] 预览列明引用及必要属性变化，执行后读回两者并证明无关属性未变。
-- [ ] 通过公开 object.set 路径完成 Sound 和容器场景，各版本支持状态明确。
+## Blocked by
 
-## 验证
+None
 
-真实故障元数据作为固定测试输入，五版本程序负例；2025.1 沙盒关联与独立读回。无单独 Fresh。
+## Validation
 
-## 执行约束
+Use real incident metadata as fixtures, five-version positive/negative program tests, then coordinated sandbox association and independent readback. No separate Fresh.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.

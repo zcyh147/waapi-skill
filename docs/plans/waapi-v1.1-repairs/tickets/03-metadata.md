@@ -1,28 +1,30 @@
-# 03：列属性、准确查详情并分页
+# 03: List properties, inspect exact details and page bounded results
 
-**规格：** [#163](https://github.com/zcyh147/waapi-skill/issues/163)
+## Parent
 
-**GitHub：** [#166](https://github.com/zcyh147/waapi-skill/issues/166)
+#163
 
-**状态：** ready-for-agent（已发布，尚未开始实现）
+## What to build
 
-**交付：** Agent 直接查看对象或插件属性清单，选择返回的准确属性读取详情并获得修改所需 Field Handle。
+An Agent can list real object/plugin fields, select a returned exact field and inspect it before obtaining a scoped Field Handle for a change.
 
-**Blocked by：** 无
+## Acceptance criteria
 
-## 验收条件
+- [ ] Expose list and exact-detail contracts using Gateway-owned scope/selection identifiers; mutation still uses Field Handles, never raw native requests.
+- [ ] Preserve type, default, constraints, enum choices, dependencies, RTPC support and underlying units. Report missing units as unknown.
+- [ ] Bind pagination to scope/version/metadata snapshot, use stable ordering, and prevent omissions, duplicates or cross-scope continuation; diagnose expiry/drift.
+- [ ] Make meaning search optional. Narrow exact matches before enforcing output bounds. Large details must have controlled reading or an explicit locatable boundary, not silent truncation.
+- [ ] Return bounded per-field rejection reasons; do not present unrelated surviving candidates as the intended field.
+- [ ] Complete the public list-to-selection-to-change-to-verification path for all five versions. Record an explicit ADR if exact selection changes an existing input-boundary decision.
 
-- [ ] 公开列表与准确详情入口，沿用 Gateway-owned scope/选择标识和 Field Handle，不开放 raw 请求。
-- [ ] 保留类型、默认值、约束、枚举、依赖、RTPC 和底层单位；缺失信息明确未知。
-- [ ] 分页绑定作用域/版本/快照，顺序稳定，完整读取无漏无重；作用域变化/过期可诊断。
-- [ ] 搜索成为辅助，精确收窄先于大小检查；大详情有受控读取，不把超限伪装为工具截断。
-- [ ] 返回被拒绝字段的有界原因，不把无关候选冒充成功语义匹配。
-- [ ] 完整公开流程从列表至设置、Preview 和验证可运行；若修改既有 ADR 输入边界则显式记录决策。
+## Blocked by
 
-## 验证
+None
 
-Gateway fake tests + 真实插件属性读回，包含 39720/33809 字节超限故障模式、缺单位、布尔 RTPC 不支持、跨作用域 token 负例。最终 F1。
+## Validation
 
-## 执行约束
+Gateway fake tests and coordinated real plugin readback: reproduce 39720/33809-byte failure patterns, missing units, unsupported boolean RTPC and cross-scope tokens. Final F1.
 
-使用规格中的测试预算和公开 Gateway 边界；运行前重新确认当前候选及仓库指导。不得操作 Lyra 正式工程或重放现场事务。先补可复现行为测试再修实现，完成后报告实际证据及限制。
+## Execution constraints
+
+The user approved implementation on 2026-10-17. All five supported version lanes must be covered; documented native unavailability is an explicit tested boundary, not silent omission. Use the approved public Gateway/FakeClient seams and TDD. Follow repository guidance and the spec budget. Do not modify the Lyra user project or replay its transactions. Report program, real-Wwise and Fresh evidence separately.
