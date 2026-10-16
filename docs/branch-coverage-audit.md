@@ -41,7 +41,8 @@ link those route rows. **That link is not a native-to-public field mapping.**
 The v2 source join now records current registered contract builders and materializers,
 family entrypoints for non-Adapter lanes, and verifier entrypoints. The 45 native
 surface policy rules contribute 484 declared selector dispositions. Exact selector
-occurrences are distinguished from descendant scope attribution. Neither is an
+occurrences are distinguished from descendant scope attribution, and both
+require the occurrence’s full schema digest to match the declared profile. Neither is an
 enum-value correspondence or an execution result. Branch-specific program, real
 and Agent results therefore remain unproven unless a separate evidence row says
 otherwise. Shared `evidence_defaults` applies to
@@ -81,7 +82,9 @@ atomic `object.set` activation from explicit prerequisite transactions for
 `reviewed_snapshot_seal` compares the reviewed depth-policy contract hashes with
 the current parser, operation and continuation contracts using the same hash
 inputs as the depth inventory generator. A stale review remains historical
-attribution and earns no current credit. The integration owner must perform the
+attribution and earns no current credit. The final reconciliation updates the
+reviewed policy from the documented [source review](research/waapi-v11-inventory-source-review.md);
+a current seal still grants no execution credit. The integration owner must perform the
 normal reviewed regeneration after runtime changes stabilize. This audit neither
 rewrites that policy nor bypasses its validator.
 
@@ -92,6 +95,12 @@ are declarations before expansion across versions and duplicate profile
 occurrences, so they are not a coverage percentage. There are 471 current
 registry contract records and 1,331 residual groups. These are generated
 accounting counts, not passing test counts.
+
+Worktree-native records retain original provenance and add `preserved_lifecycle`
+paths under the main project’s `.waapi-skill-state/repair-evidence/`. Those copies
+were checked against both lifecycle hashes and the relocation manifest. The
+generator reads committed evidence metadata, not ignored native files, so
+worktree cleanup does not break reproducibility.
 
 Every unresolved structural occurrence has a `residual_group`. Groups use the
 public family plus the native schema digest; each retains route IDs, kind counts,

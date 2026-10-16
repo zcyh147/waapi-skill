@@ -611,3 +611,22 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
         row["version"] for row in _inventory()["native_lanes"]
     }
+
+
+def test_parser_seal_includes_root_options_and_offline_version_alias():
+    contracts = {row["command"]: row for row in _gateway_parser_contract_rows()}
+    assert "<root>" in contracts
+    parameters = contracts["<root>"]["parameters"]
+    flags = {flag for row in parameters for flag in row["option_strings"]}
+    assert {"--version", "--wwise-version", "--timeout", "--state-dir"} <= flags
+    assert not {"--host", "--port"} & flags
+    version = next(row for row in parameters if row["dest"] == "version")
+    assert set(version["option_strings"]) == {"--version", "--wwise-version"}
+    assert all(row["dest"] != "command" for row in parameters)
+
+
+def test_metadata_pagination_and_selection_values_are_gateway_derived_locators():
+    fields = [field for contract in _inventory()['field_contracts']
+              for field in contract['model_values'] if field['name'] in {'page', 'selection'}]
+    assert fields, 'The current metadata parser must be represented in the field ledger'
+    assert all(field['value_ownership'] == 'gateway_derivation' for field in fields)
