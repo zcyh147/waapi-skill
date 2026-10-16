@@ -7,7 +7,7 @@ Use this reference when the request is primarily about connection, version selec
 1. Run `python scripts/run.py gateway.py status` from the skill directory.
 2. The gateway reads the selected saved host, port, and expected Wwise version. If incomplete, use `config-show` and `config-set` before retrying. Ordinary commands reject temporary connection flags and ignore connection environment overrides.
 3. On success, report the detected live Wwise version, endpoint, project name, and project path requested by the user.
-4. On failure, report the JSON `error_code` and `message`. Do not scan ports, inspect processes, search the repository, or treat saved config as live state.
+4. On a complete structured failure, report its reason and follow `recovery`: inspect/correct known saved values through `config-show`/`config-set`, then make at most one bounded reconnect when allowed. These task-scoped reads and connection corrections do not need another permission prompt. Service startup must already be authorized by the task. Do not scan unrelated ports/processes, search the repository, or treat saved config as live state.
 
 `status` fails closed if a successful `getInfo`/`getProjectInfo` response is not an object, or if the current Project does not expose a canonical braced GUID `id` plus non-empty `name` and `path`. The same three fields bind every transaction preview to one concrete project; a shape-drifted or identity-free Project response is never treated as a valid guard.
 

@@ -7,7 +7,7 @@ Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncatio
 - The only normal change path is the packaged transaction CLI: `scripts/run.py gateway.py`. Do not import builders or planners from inline Python, call `WaapiClient`, or use raw WAAPI/XML/generic call. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
 - Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
-- A rejected or nonzero Gateway invocation is also a hard stop. Only a successful result whose `fallback_detail_scan.status` is `partial` permits the one metadata retry below.
+- For complete structured failures, follow the Skill Recovery rule and the returned receipt. A corrected read or discovery does not need another permission prompt.
 - The one complete terminal `verify` result ends the transaction; see Terminal states.
 
 ## Choose the phase and first Gateway command
@@ -93,13 +93,13 @@ Keep domains distinct: durable Authoring project edits use `ak.wwise.core.*`; ru
 
 Users never supply internal tokens. Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence.
 
-`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. Binding fixes the metadata scope inside the Draft. No match stops; ambiguity needs one behavior question.
+`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. Binding fixes the metadata scope inside the Draft. No match permits bounded discovery refinement; unresolved ambiguity needs one behavior question.
 
 Business Drafts start before exact object/type binding and returned live discovery. Returned type, restrictions and opaque handle alone authorize values. Remaining Composer lanes follow returned metadata-first start preconditions.
 
 1. Bind the exact existing owner or the disclosed new-object type first.
 2. Run the returned discovery once with short English Wwise UI/technical meanings; separate distinct meanings.
-3. Copy one returned opaque handle per requested field; stop/clarify on no-match/ambiguity.
+3. Copy one returned opaque handle per requested field; refine bounded discovery on no-match and clarify unresolved ambiguity.
 4. Submit business values against those handles. Copy returned enum labels or explicitly select a disclosed value; duplicate labels require a distinct choice. Gateway validates restrictions and activates proven dependencies.
 5. `draft-check` revalidates scope, token, dependencies, and value; do not rediscover just to obtain a token.
 
@@ -170,9 +170,9 @@ The confirmation token binds the exact stored Preview. Never reconstruct/substit
 - `verified`: report actual readback and stop.
 - `result_schema_checked`: schema proof only. Explicitly requested actual readback may use disclosed bounded Gateway read-only routes for exact requested targets; otherwise report the boundary and stop. Transaction stays closed: no execute/reverify/retry, filesystem/raw API/code proof. Current values without a before-state baseline do not prove preservation.
 - `verification_deferred`: later verification is safe; never re-execute.
-- `verification_failed`, `repreview_required`, `execution_cancelled`: report and stop; no retry/proof calls.
+- `verification_failed`, `repreview_required`, `execution_cancelled`: report the actual state, then use permitted independent read-only diagnosis. Any later change needs a new Preview under the current policy; never replay the original write.
 - `execution_succeeded_persistence_failed`: preserve uncertainty; never replay.
-- `indeterminate`: Do not verify, retry, call another Gateway route, or use another tool. A later diagnosis needs a new user request.
+- `indeterminate`: retain the unknown outcome. Follow the recovery receipt for independent read-only diagnosis within the existing task; never verify or replay the original write. Diagnosis does not grant new mutation authority.
 
 `ak.wwise.cli.migrate` ends at complete `execute`; run no later Agent tools/reads. Only the caller-owned harness outside the Skill sequence may reopen/prove it. Managed openers may leave cleanup uncertain; never synthesize code. Work Unit reversal and same-connection Undo stay explicit.
 

@@ -245,3 +245,66 @@ def test_query_failure_receipt_byte_ceiling_is_still_enforced(tmp_path):
         assert invoke(value, "query-object", "--exact-id", OWNER)["exit_code"] == 125
         assert value._expansion_reads.failed_receipts == []
         assert not value.evidence().complete
+
+
+@pytest.mark.parametrize("policy", ["read_only", "ask_before_changes", "allow_changes"])
+def test_current_gateway_read_failure_can_refine_without_rewriting_historical_verdicts(tmp_path, policy):
+    from tests.unit.test_gateway_session_context import configured_env, FakeClient, waapi_gateway
+    class FailedRead(FakeClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                raise RuntimeError("read unavailable")
+            return super().call(uri, args, options)
+    client = FailedRead({"ak.wwise.core.getInfo": {"isCommandLine": True, "version": {"year": 2025, "major": 1}}})
+    code, payload = waapi_gateway.execute_gateway(["query-object", "--exact-id", OWNER],
+        env=configured_env(tmp_path / "config-scope", version="2025.1", policy=policy), client_factory=lambda _: client)
+    assert code == 2, payload
+    value = failure_broker(tmp_path, payload)
+    value.runner_path.write_text(
+        "import json, sys\nfrom pathlib import Path\n"
+        f"marker = Path({str(tmp_path / 'attempted')!r})\n"
+        f"failure = {payload!r}\n"
+        "if not marker.exists():\n marker.write_text('read failed'); print(json.dumps(failure)); sys.exit(2)\n"
+        "command=sys.argv[2]\n"
+        "result={'contract':'waapi-skill.gateway-result/v1','ok':True,'command':command}\n"
+        f"if command=='query-object': result.update(objects=[{{'id': {OWNER!r}}}], count=1, query_bound={{'mode':'take','value':1}})\n"
+        "print(json.dumps(result))\n", encoding="utf-8",
+    )
+    with value:
+        failed = invoke(value, "query-object", "--exact-id", OWNER)
+        assert failed["exit_code"] == 2, failed
+        assert value.evidence().terminal_state == "RUNNING"
+        assert value._expansion_reads.receipts == []
+        assert len(value._expansion_reads.failed_receipts) == 1
+        assert invoke(value, "query-object", "--exact-id", OWNER, "--max-results", "1")["exit_code"] == 0
+        assert invoke(value, "status")["exit_code"] == 0
+        assert value.evidence().complete
+        assert len(value._expansion_reads.failed_receipts) == 1
+        assert len(value._expansion_reads.receipts) == 1
+
+
+@pytest.mark.parametrize("change", ["write", "actions", "pending", "scope", "policy", "native_mutation"])
+def test_recovery_label_cannot_authorize_writes_or_hide_cleanup(tmp_path, change):
+    payload = query_timeout_receipt()
+    payload["details"] = None
+    payload["call"]["details"]["cleanup_pending"] = False
+    payload["recovery"] = {
+        "contract": "waapi-skill.recovery/v1", "stage": "read_failure",
+        "project_write_outcome": "no_project_write_in_this_invocation",
+        "read_only_continuation_allowed": True, "cleanup_complete": True,
+        "additional_read_permission_required": False, "scope": "existing_authorized_task_only",
+        "original_write_replay_allowed": False, "modification_policy": "ask_before_changes",
+        "next_change": "preview_then_explicit_confirmation", "max_reconnect_attempts": 1,
+        "service_start_requires_existing_task_authorization": True,
+        "actions": ["refine_read", "page_discovery", "inspect_configuration", "reconnect_once"],
+    }
+    if change == "write": payload["executed"] = True
+    elif change == "actions": payload["recovery"]["actions"] = ["execute"]
+    elif change == "pending": payload["call"]["details"]["cleanup_pending"] = True
+    elif change == "scope": payload["recovery"]["scope"] = "unrestricted"
+    elif change == "policy": payload["recovery"]["next_change"] = "skip_preview"
+    else: payload["call"]["api"] = "ak.wwise.core.object.delete"
+    with failure_broker(tmp_path, payload) as value:
+        assert invoke(value, "query-object", "--exact-id", OWNER)["exit_code"] != 0
+        assert invoke(value, "status")["exit_code"] == 126
+        assert value._expansion_reads.receipts == []

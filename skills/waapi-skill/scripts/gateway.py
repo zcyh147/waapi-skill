@@ -27,6 +27,7 @@ GATEWAY_RUNNER_PATH = SKILL_ROOT / "scripts" / "run.py"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
+from wwise_waapi.recovery import recovery_receipt
 from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CapabilityCatalog,
     CapabilityNotFoundError,
@@ -3402,9 +3403,22 @@ def _execute_gateway_unconstrained(
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
+    dispatch_started = False
 
     def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         enriched = dict(payload)
+        try:
+            recovery_policy = load_gateway_config(source_env).config.project_modification_policy
+        except Exception:
+            recovery_policy = "unavailable"
+        recovery = recovery_receipt(enriched, policy=recovery_policy, dispatch_started=dispatch_started)
+        if recovery is not None:
+            if "agent_result" in enriched:
+                agent_result = enriched.pop("agent_result")
+                enriched["recovery"] = recovery
+                enriched["agent_result"] = agent_result
+            else:
+                enriched["recovery"] = recovery
         if args.command == "stream-topic":
             gateway_contract = enriched.get("contract")
             enriched["contract"] = TOPIC_STREAM_RECORD_CONTRACT
@@ -3544,6 +3558,7 @@ def _execute_gateway_unconstrained(
                 dispatcher.manifest_store = AuthoringUiRuntimeManifestStore(
                     dispatcher.manifest_store
                 )
+            dispatch_started = True
             payload = dispatch_command(
                 args,
                 env=source_env,
