@@ -20,6 +20,7 @@ def test_repair_uses_formal_entrypoints_with_exact_approved_budget(tmp_path, mon
     assert (selected.model, selected.reasoning_effort, selected.service_tier, selected.timeout_seconds) == ("gpt-5.6-terra", "medium", "default", 600)
     units = (campaign.load_heavy_v3_campaign_units if surface == "campaign" else matrix.load_heavy_v3_units)(selected)
     assert [unit.unit_id for unit in units] == ["REPAIR25-F1", "REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"]
+    assert all(len(unit.scenario.prompt_sha256) == 64 for unit in units)
     if surface == "campaign":
         assert selected.max_pre_action_retries == 0
 

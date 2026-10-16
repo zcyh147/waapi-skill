@@ -6,6 +6,7 @@ The profile is separate from all previously sealed integration contracts.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -35,6 +36,7 @@ _FORBIDDEN = ("gateway.py", "draft-", "config-set", "query-object", "ak.wwise.",
 class RepairScenario:
     id: str
     api: str
+    prompt_sha256: str
     versions: tuple[str, ...] = ("2025.1",)
 
 
@@ -58,7 +60,7 @@ class RepairUnit:
     def scenario(self) -> RepairScenario:
         api = ("ak.wwise.core.object.set" if self.case_id == "F4" else
                self.operation if self.operation.startswith("ak.") else "ak.wwise.core." + self.operation)
-        return RepairScenario(self.unit_id, api)
+        return RepairScenario(self.unit_id, api, hashlib.sha256(self.prompt.encode("utf-8")).hexdigest())
 
     @property
     def evidence_kind(self) -> str:
