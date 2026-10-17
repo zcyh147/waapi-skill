@@ -47,8 +47,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 872
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 872
+    assert len(native) == 874
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 874
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -678,3 +678,16 @@ def test_partial_layout_rows_keep_exact_owner_without_inheriting_completed_famil
     assert all(row['disposition'] == 'migration_required' and row['owner_issue'] == 188 for row in rows)
     completed_rows = {identity for family in inventory['completed_family_seals'] for identity in family['rows']}
     assert all(f"{version}|function|{uri}" not in completed_rows for version, uri in expected)
+
+
+def test_active_layout_routes_have_one_exact_unfinished_review_owner():
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    rules = [row for row in policy['native_lane_rules'] if row['id'] == 'authoring-layout-partial']
+    assert len(rules) == 1
+    assert set(rules[0]['match']) == {'uris'}
+    assert set(rules[0]['match']['uris']) == LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS
+    assert rules[0]['disposition'] == 'migration_required'
+    assert rules[0]['owner_issue'] == 188
+    assert 'authoring-layout-partial' not in policy['completed_family_seals']
