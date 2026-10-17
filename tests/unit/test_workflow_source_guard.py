@@ -938,6 +938,10 @@ def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence
 
     class Client(OwnedGraphTask):
         def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getProjectInfo":
+                # Existing large-project native response fixture forces the
+                # real bounded stdout producer to compact verification evidence.
+                return {**super().call(uri, args, options), "directories": {"cache": "x" * 13_000}}
             if uri == "ak.wwise.core.object.create":
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
                 assert args["parent"] == SECOND
