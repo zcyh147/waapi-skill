@@ -345,3 +345,33 @@ control rejects before opening any client or writing; that control and the
 a Gateway resource bound, never a native Wwise restriction. Legitimate deeper
 native arrangements remain an explicit resource gap requiring reviewed support
 or an approved boundary, without automatic branch-completion credit.
+
+The immutable `ccd743dd` depth successor passed 49 focused tests. A subsequent
+near-byte-bound constructor exposed two independent resource defects: compiled
+layout expansion exceeded bounded readback, and an otherwise accepted request
+could exceed the existing 256 KiB Draft seal or 24 KiB terminal reply. Original
+failed runs remain retained. The constructor now separately discloses 112 KiB
+business-value and compiled-layout bounds, a 256 KiB rendered terminal-request
+ceiling, and a narrowly selected 280 KiB terminal envelope derived from the
+existing Draft allowance plus ordinary framing. Small constructors and other
+operations retain 24 KiB. Exact closed-constructor validation selects the larger
+budget; no caller flag, native schema change, global output increase, truncated
+request or rebuilt agent_result is introduced. Declaration/Preview and stored
+execution requests check rendered fit before writes.
+
+Verification compares every requested field and order independently, retains
+full bounded readback and immutable expected state in the journal/Preview, and
+reports digests plus at most sixteen useful mismatch paths instead of repeating
+whole layouts in assertions. Fake roundtrips cover near-bound ASCII, multibyte,
+quote/backslash and scoped-session enrichment; separate controls reject deep
+rendering before writes and oversized business values before a client. These
+resource ceilings remain Gateway gaps, not Wwise limits or completion of larger
+native branches. Downstream Broker/Fresh acceptance of the larger bounded reply,
+full typed state/window/history/reset construction and owned native effects
+remain outstanding under the absolute GUI/Console/Fresh hold.
+
+The coherent constructor-capacity regression passed 85 focused fake tests,
+including the original verification digest, strong/weak tamper and cleanup
+controls, exact profile/native obligations/owner and 231-node Program roster.
+This validates source behavior only; native effects and downstream reception
+remain pending.

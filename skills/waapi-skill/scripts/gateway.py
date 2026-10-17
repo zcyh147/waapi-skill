@@ -48,7 +48,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
 from wwise_waapi.layout_blueprint import validate_blueprint  # noqa: E402
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor, validate_layout_call,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -260,6 +260,7 @@ from wwise_waapi.typed_operations import (  # noqa: E402  # pyright: ignore[repo
 )
 from wwise_waapi.operation_drafts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     OPERATION_DRAFT_CONTRACT,
+    MAX_OPERATION_DRAFT_EVIDENCE_BYTES,
     OperationDraftBindingDrift,
     OperationDraftCheckRequired,
     OperationDraftNotAvailable,
@@ -705,6 +706,12 @@ TRANSACTION_ROLE_VALIDATION_SUMMARY_CONTRACT = (
 # canonical digest that binds the projection to the journal evidence.
 # Projection is intentionally delayed until transport cleanup succeeds.
 TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES = 24 * 1024
+# Closed layout constructors retain their exact sealed request in agent_result.
+# Their exceptional capacity is bounded by the existing Draft seal ceiling plus
+# the ordinary terminal framing allowance, always below the global result cap.
+LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES = (
+    MAX_OPERATION_DRAFT_EVIDENCE_BYTES + TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+)
 TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES = 2 * 1024
 TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES = 12 * 1024
 TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT = (
@@ -13453,7 +13460,8 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
                     splitter_identity=splitter_identity, splitter_request=splitter_request, blueprint=blueprint)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
-        adapter.materialize(candidate)
+        materialized = adapter.materialize(candidate)
+        layout_blueprint_terminal_budget(materialized)
         return candidate
     record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
         expected_revision=args.expected_revision,
@@ -19712,6 +19720,7 @@ def create_transaction_preview(
         request_payload,
         expected_version=detected_version,
     ).as_dict()
+    layout_blueprint_terminal_budget(canonical_request)
     project_guard_mode, target_project_path = transaction_project_guard_spec(
         canonical_request,
         version=detected_version,
@@ -20345,6 +20354,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         request_payload = require_mapping(artifact.get("request"), "transaction request")
+        layout_blueprint_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -21191,6 +21201,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 f"current state is {record.state.value!r}."
             )
         request_payload = require_mapping(artifact.get("request"), "transaction request")
+        layout_blueprint_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -24026,6 +24037,38 @@ def validate_successful_transaction_verify_projection(
     return verification, agent_result, cleanup
 
 
+def layout_blueprint_terminal_budget(request: Any) -> int:
+    """Admit only an exact closed constructor, with prewrite rendered-request fit."""
+    ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    if (not isinstance(request, Mapping)
+            or set(request) != {'contract', 'version', 'operation', 'arguments'}
+            or request.get('contract') != 'waapi-skill.operation-request/v1'
+            or request.get('operation') != 'waapi.call'
+            or request.get('version') not in LAYOUT_VERSIONS):
+        return ordinary
+    arguments = request.get('arguments')
+    if (not isinstance(arguments, Mapping)
+            or set(arguments) != {'api', 'args', 'options', 'layout_binding'}
+            or arguments.get('api') != LAYOUT_SET_URI
+            or not isinstance(arguments.get('layout_binding'), Mapping)
+            or 'layout_blueprint' not in arguments['layout_binding']):
+        return ordinary
+    try:
+        validate_layout_call(request['version'], LAYOUT_SET_URI,
+            arguments['args'], arguments['options'], arguments['layout_binding'])
+    except (ValueError, TypeError, KeyError):
+        return ordinary
+    # Size in its terminal nesting, using the actual pretty UTF-8 stdout encoder;
+    # quotes, backslashes, multibyte text and indentation all count. The remaining
+    # fixed allowance carries result framing, bounded cleanup and digests.
+    observed = gateway_json_document_size({'agent_result': {'request': request}},
+        stop_after_bytes=MAX_OPERATION_DRAFT_EVIDENCE_BYTES)
+    if observed > MAX_OPERATION_DRAFT_EVIDENCE_BYTES:
+        raise GatewayInputError('Layout constructor request exceeds its bounded terminal UTF-8 capacity')
+    return (ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES
+        else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES)
+
+
 def project_successful_transaction_verify_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -24042,16 +24085,16 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
+    stdout_budget = layout_blueprint_terminal_budget(agent_result.get("request"))
     projected = dict(payload)
     projected.pop("agent_result", None)
     projection = {
         "contract": TRANSACTION_VERIFY_SUCCESS_SUMMARY_CONTRACT,
         "detail_level": "full-verification-evidence",
         "fixed_projection_limit_bytes": (
-            TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
-            - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
+            stdout_budget - TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
         ),
-        "stdout_budget_bytes": TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES,
+        "stdout_budget_bytes": stdout_budget,
         "session_context_reserve_bytes": (
             TRANSACTION_VERIFY_SUCCESS_ENVELOPE_RESERVE_BYTES
         ),

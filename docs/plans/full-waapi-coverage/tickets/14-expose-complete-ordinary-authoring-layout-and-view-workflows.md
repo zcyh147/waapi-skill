@@ -130,3 +130,14 @@ changes, floating windows, all eight history lists, view-specific state, splitte
 and tab-panel contradictions, reset omission/empty/list behavior and host-specific
 effect evidence remain owned here. Opaque observed-state reuse does not complete
 new state creation. All acceptance boxes and native requirements remain open.
+
+Constructor resource follow-up (code/fake proof only): compiled expansion, Draft
+seals and exact terminal request rendering now have separate disclosed bounds.
+The closed setLayout blueprint alone may use a bounded 280 KiB verify envelope
+(existing 256 KiB seal allowance plus 24 KiB framing); ordinary operations and
+small constructors retain 24 KiB. Every admitted request must fit its terminal
+request allowance before writes, preserving exact immutable request/agent_result
+and raw journal readback. The current 112 KiB business/compiled constructor
+ceilings and 14-level tree depth are Gateway resource gaps, not native absence.
+Larger legitimate native constructions, downstream Broker/Fresh reply acceptance
+and complete editor/sidebar/window/history/reset semantics stay owned here.

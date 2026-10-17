@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
-from .layout_blueprint import declared_layout_matches
+from .layout_blueprint import declared_layout_matches, declared_layout_mismatches
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
@@ -15958,10 +15958,15 @@ def verify_prepared_operation(
             expected_layout = plan.get('expected_layout')
             check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
                 and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
-                {'expected': expected_layout, 'actual': registered})
+                {'expected_name': expected_layout.get('Layout', {}).get('Name') if isinstance(expected_layout, Mapping) else None,
+                 'actual_name': registered.get('Layout', {}).get('Name')})
             if isinstance(expected_layout, Mapping) and 'StackPanel' in expected_layout.get('Layout', {}):
                 check('Registered layout retains every declared nested field and child order',
-                    declared_layout_matches(expected_layout, registered), {'expected': expected_layout, 'actual': registered})
+                    declared_layout_matches(expected_layout, registered),
+                    {'mismatches': declared_layout_mismatches(expected_layout, registered),
+                     'expected_layout_sha256': canonical_sha256(expected_layout),
+                     'observed_layout_sha256': canonical_sha256(registered),
+                     'comparison': 'all declared fields and exact child order; native default fields may be additional'})
         elif uri == LAYOUT_REMOVE_URI:
             try:
                 absent = require_layout_absence(plan['expected_name'], read=read_call)

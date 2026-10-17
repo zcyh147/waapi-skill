@@ -7,12 +7,22 @@ import re
 from typing import Any, Mapping
 from uuid import uuid4
 
+from .authoring_layout import MAX_LAYOUT_RESULT_BYTES, validate_layout_read_result
+from .canonical import canonical_json_bytes
+
 CONTRACT = 'waapi-skill.layout-blueprint/v1'
 MAX_NODES = 128
 # A serialized stack adds a mapping and child list per level. Leave room for
 # Layout/window wrappers under the existing 32-level bounded read contract.
 MAX_DEPTH = 14
-MAX_BYTES = 256 * 1024
+# Existing Draft seals are capped at 256 KiB and retain both the compiled request
+# and its closed declaration proof. Bound each part to 112 KiB, leaving 32 KiB
+# for identities, connection/project proof and seal framing. These are Gateway
+# resource policies, not native Wwise restrictions.
+MAX_BYTES = 112 * 1024
+MAX_COMPILED_BYTES = 112 * 1024
+DRAFT_SEAL_FRAME_RESERVE_BYTES = 32 * 1024
+READBACK_FRAME_RESERVE_BYTES = MAX_LAYOUT_RESULT_BYTES - MAX_COMPILED_BYTES
 
 
 def blueprint_schema() -> dict[str, Any]:
@@ -33,7 +43,14 @@ def blueprint_schema() -> dict[str, Any]:
             'workspace_name': {**text, 'description': 'Name inside the layout document; distinct from its temporary lookup name. Omission uses the lookup name.'},
             'nodes': {'type': 'array', 'minItems': 1, 'maxItems': MAX_NODES, 'items': {'oneOf': [stack, view]}}},
         'required': ['contract', 'root', 'nodes'],
-        'gateway_bounds': {'maximum_depth': MAX_DEPTH, 'maximum_utf8_bytes': MAX_BYTES}}
+        'gateway_bounds': {'maximum_depth': MAX_DEPTH, 'maximum_business_input_utf8_bytes': MAX_BYTES,
+            'maximum_serialized_layout_utf8_bytes': MAX_COMPILED_BYTES,
+            'maximum_readback_utf8_bytes': MAX_LAYOUT_RESULT_BYTES,
+            'readback_frame_reserve_bytes': READBACK_FRAME_RESERVE_BYTES,
+            'draft_seal_frame_reserve_bytes': DRAFT_SEAL_FRAME_RESERVE_BYTES,
+            'maximum_rendered_terminal_request_utf8_bytes': 256 * 1024,
+            'maximum_terminal_stdout_utf8_bytes': 280 * 1024,
+            'terminal_capacity_scope': 'exact closed setLayout blueprint only; ordinary terminal budget remains 24 KiB'}}
 
 
 def validate_blueprint(value: Any) -> dict[str, Any]:
@@ -115,7 +132,11 @@ def compile_blueprint(blueprint: Any, *, name: str, node_ids: Mapping[str, str])
             if field in node:
                 result[field.title()] = node[field]
         return result
-    return {'Layout': {'Name': checked.get('workspace_name', name), 'StackPanel': emit(checked['root'])}}
+    result = {'Layout': {'Name': checked.get('workspace_name', name), 'StackPanel': emit(checked['root'])}}
+    if len(canonical_json_bytes(result)) > MAX_COMPILED_BYTES:
+        raise ValueError('Compiled layout exceeds the bounded native readback byte ceiling')
+    validate_layout_read_result('contents', result)
+    return result
 
 
 def blueprint_view_types(blueprint: Any) -> list[str]:
@@ -132,3 +153,34 @@ def declared_layout_matches(expected: Any, actual: Any) -> bool:
         return isinstance(actual, list) and len(expected) == len(actual) and all(
             declared_layout_matches(left, right) for left, right in zip(expected, actual))
     return type(expected) is type(actual) and expected == actual
+
+
+def declared_layout_mismatches(expected: Any, actual: Any) -> list[dict[str, str]]:
+    """Describe at most sixteen declared-field mismatches without copying values."""
+    mismatches: list[dict[str, str]] = []
+    def walk(left: Any, right: Any, path: str) -> None:
+        if len(mismatches) >= 16:
+            return
+        if isinstance(left, Mapping):
+            if not isinstance(right, Mapping):
+                mismatches.append({'path': path, 'reason': 'expected object'})
+                return
+            for key, value in left.items():
+                child_path = path + '/' + key.replace('~', '~0').replace('/', '~1')
+                if key not in right:
+                    if len(mismatches) < 16:
+                        mismatches.append({'path': child_path, 'reason': 'declared field missing'})
+                else:
+                    walk(value, right[key], child_path)
+        elif isinstance(left, list):
+            if not isinstance(right, list):
+                mismatches.append({'path': path, 'reason': 'expected ordered array'})
+                return
+            if len(left) != len(right):
+                mismatches.append({'path': path, 'reason': 'declared child count changed'})
+            for index, (left_item, right_item) in enumerate(zip(left, right)):
+                walk(left_item, right_item, path + '/' + str(index))
+        elif type(left) is not type(right) or left != right:
+            mismatches.append({'path': path, 'reason': 'declared value or type changed'})
+    walk(expected, actual, '')
+    return mismatches
