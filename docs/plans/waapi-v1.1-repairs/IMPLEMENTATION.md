@@ -85,6 +85,7 @@ Until that decision, keep PR #173 draft. Do not merge it to main.
 Previously relocated component evidence is byte-inventoried in
 `.waapi-skill-state/repair-evidence/relocation-manifest.json`. That manifest is
 immutable. Additional evidence receives separate preservation records.
-All ten completed worktrees have been archived after the final verified evidence
-copy. Failed/blocked roots are never
+All eleven completed worktrees have been archived after verified evidence
+copies. The final supplement is `supplement-archive-final-8239aba3`; its manifest
+records nine preserved files (12458 bytes). Failed/blocked roots are never
 deleted merely to make the run look clean.

@@ -103,6 +103,9 @@ Reported selections include 239 and 114 passes; 2153 and 119 passes; follow-up
 171 and 22 passes; and 683 passes / 6 native-Windows skips with overlapping
 178, 40 and 122 passing selections. They overlap and are not added into a new
 aggregate. The packaged Skill remains byte-identical to the full-gate candidate.
+The preparation-only exact F2 / ordered F2–F3 selectors (`8239aba3`, merged at
+`60cf0ead`) passed 56 focused tests and independent review. They neither start
+Agent runs nor authorize further budget.
 
 ### Remaining decision
 
@@ -122,8 +125,10 @@ consistency does not establish complete business coverage. See
 [the audit](../branch-coverage-audit.md) and
 [review closeout](waapi-v11-repairs-review-2026-10-17.md).
 
-The original ten completed managed worktrees were archived after evidence preservation.
-A further framework-repair worktree is retained until its final evidence copy.
+All eleven completed managed worktrees were archived after verified evidence
+preservation. The final supplement contains nine files (12458 bytes), including
+four captured test-result summaries and five review reports. These summaries
+are not full stdout logs.
 Original native evidence is indexed under `.waapi-skill-state/repair-evidence/`;
 its first relocation manifest is immutable. Additional fixture and repair
 records use separate supplementary manifests. Original Fresh roots remain in
