@@ -62,3 +62,28 @@ Exact dispatcher receipt SHA-256 (original bytes retained):
 - 2023.1: `d037bc78189e6b5178e1db4b060c1b8d7462360168cf1ee28df81de70aaaf96c`
 - 2024.1: `e55eb3635936b8aeeb0f1a89b6b2d39c881e31f0c2881911bb25ffc7af29dd0a`
 - 2025.1: `09d7ab7073c116420db6ccbc72d2f4040b89139efc409fe7021c318a5dc5374b`
+
+## Source-backed mapping verifier checkpoint
+
+The move-to-single-file verifier now compares complete compact records for each
+source GUID, language ID/name, actual filename and every MediaID attribute. It
+also requires empty Work Unit media lists, the exact project storage-mode setting,
+matching source descriptors and preservation outside those storage fields. An
+already-central input uses its sealed pre-existing mapping. Same-named properties
+on other objects are not elided by the preservation projection. Audio, MIDI and
+plugin-media descriptors use their separate saved fields; generated platform hashes
+are bounded observations, not conversion-correctness proof.
+
+Language ID construction follows `AK::FNVHash32::ComputeLowerCase` in matching
+2021–2025 installed SDK `include/AK/Tools/Common/AkFNVHash.h`: FNV-1 over UTF-8
+bytes with ASCII A–Z folding. That function region has the same normalized-text
+SHA-256 in all five SDKs:
+`6da4651c79424adb232096aae184b8847e1ac2f7835b10fcb52848fbd089a56c`.
+The literal SFX/English native records provide independent known results.
+
+Public controls cover all five versions, audio/MIDI/plugin sources, already-central
+storage, changed owner/media/language/file, duplicates, missing rows, unchanged
+mode, remaining Work Unit IDs and unrelated property changes. The final affected
+selection passed 24 tests in 11.80 seconds. Earlier REDs and focused results remain
+separate. This is program evidence; current native acceptance, transfer back to
+Work Units, refresh semantics and other storage variants remain same-parent work.

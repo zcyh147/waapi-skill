@@ -277,7 +277,11 @@ def prepare_cli_project_effect(uri, args, audit, version):
         mapping_before = prove_artifact_path(mapping, io_root=root, field='media ID mapping', must_exist=False, expect_directory=False)
         if mapping_before['exists']:
             mapping_before = {**mapping_before, 'file_proof': capture_file_proof(mapping,
-                field='media ID mapping', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root)}
+                field='media ID mapping', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root),
+                'observation': _media_mapping_snapshot(mapping, root)}
+            if mapping_before['file_proof'] != mapping_before['observation']['file_proof']:
+                from .operation_soundbank import SoundBankContractError
+                raise SoundBankContractError('FILE_CHANGED', 'Media mapping changed during Preview observation')
         return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
             'mapping_path': mapping, 'mapping_before': mapping_before,
             'project_before': _saved_project_snapshot(path, root, version),
@@ -369,11 +373,27 @@ def inspect_cli_project_effect(effect):
                 or effect['uri'].endswith('updateMediaIdsInSingleFile') and effect['mapping_before']['exists']) and not mapping['exists']:
             raise SoundBankContractError('MISSING_ARTIFACT', 'Requested media ID mapping artifact is missing')
         if mapping['exists']:
-            # The pinned command names this artifact but does not establish its
-            # container format. Unknown bytes cannot prove a native failure.
-            _, proof = _read_bounded_artifact(effect['mapping_path'], effect['io_root'])
-            mapping = {'exists': True, 'file_proof': proof, 'format': 'unestablished'}
+            mapping = _media_mapping_snapshot(effect['mapping_path'], effect['io_root'])
         unresolved = ['central_media_id_mapping_representation']
+        mapping_checks = []
+        if mapping.get('format') == 'wwise-media-ids-xml' and effect['uri'].endswith('moveMediaIdsToSingleFile'):
+            unresolved = sorted(set(old_model['media_mapping_unresolved'] + model['media_mapping_unresolved']))
+            expected = old_model['media_mapping']
+            if old_model['media_storage_mode'] is True:
+                previous = effect['mapping_before'].get('observation', {})
+                if previous.get('format') == 'wwise-media-ids-xml' and source_count == 0:
+                    expected = previous['records']
+                else:
+                    unresolved.append('mixed_or_unestablished_previous_media_storage')
+            mapping_checks = [
+                {'name': 'Central mapping preserves every source, language, filename and media ID',
+                 'passed': mapping['records'] == expected
+                    and mapping['sources'] == old_model['media_sources'] == model['media_sources']},
+                {'name': 'Media IDs moved out of Work Units and project storage mode is enabled',
+                 'passed': model['media_mapping']['count'] == 0
+                    and sum(row['count'] for row in model['media_ids'].values()) == 0
+                    and model['media_storage_mode'] is True},
+            ]
         return {'observations': [{'kind': 'cli-media-id-artifacts', 'mapping_file': mapping,
             'saved_model_files': len(model['files']), 'work_unit_media_id_count_before': source_count,
             'work_unit_media_id_count_after': sum(rows['count'] for rows in model['media_ids'].values()),
@@ -384,7 +404,7 @@ def inspect_cli_project_effect(effect):
                 'passed': model['root_identity'] == old_model['root_identity']
                     and old_model['anchors'] == model['anchors']
                     and {key: row['preserved_model_sha256'] for key, row in model['files'].items()}
-                     == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}],
+                     == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}, *mapping_checks],
             'unresolved': unresolved}
     if effect['uri'] == 'ak.wwise.cli.migrate':
         before = effect['project_before']
@@ -500,6 +520,30 @@ MAX_MODEL_BYTES = 32 * 1024 * 1024
 MAX_MODEL_SNAPSHOT_BYTES = 512 * 1024
 
 
+def _media_mapping_snapshot(path, root):
+    from .console_media_ids import mapping_records, compact_records
+    from .operation_soundbank import SoundBankContractError
+    _, proof = _read_bounded_artifact(path, root)
+    observation = {'exists': True, 'file_proof': proof, 'format': 'unestablished'}
+    try:
+        document, parsed_proof = _read_xml_artifact(path, root, require_wwise_document=False)
+    except SoundBankContractError as exc:
+        if exc.error_code != 'INVALID_PROJECT_ARTIFACT':
+            raise
+        return observation
+    if parsed_proof != proof:
+        raise SoundBankContractError('FILE_CHANGED', 'Media mapping changed while its representation was observed')
+    try:
+        records = mapping_records(document)
+    except ValueError as exc:
+        raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
+    if records is not None:
+        sources = list({row[0]: row[:4] for row in records}.values())
+        observation.update(format='wwise-media-ids-xml', media_count=len(records),
+            records=compact_records(records), sources=compact_records(sources))
+    return observation
+
+
 def _read_bounded_artifact(path, root):
     """Stable, confined byte observation shared by project/file effects."""
     import hashlib
@@ -555,17 +599,19 @@ def _read_xml_artifact(path, root, *, require_wwise_document=True):
         raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
 
 
-def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_media_storage=False):
+def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_media_storage=False, _path=()):
     if excluded_platform is not None and (node.get('Platform') == excluded_platform
             or node.tag == 'Platform' and node.get('Name') == excluded_platform):
         return None
-    if exclude_media_storage and (node.tag == 'MediaIDList'
-            or node.tag == 'Property' and node.get('Name') == 'MediaIDsInSingleFile'):
+    if exclude_media_storage and (node.tag == 'MediaIDList' and _path and _path[-1] in {'AudioFileSource', 'MidiFileSource', 'PluginMediaSource'}
+            or node.tag == 'Property' and node.get('Name') == 'MediaIDsInSingleFile'
+                and _path == ('WwiseDocument', 'ProjectInfo', 'Project', 'PropertyList')):
         return None
     excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
     return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
         (node.text if node.text and node.text.strip() else ''), [value for child in node
-            if (value := _xml_value(child, excluded_platform=excluded_platform, exclude_media_storage=exclude_media_storage)) is not None]]
+            if (value := _xml_value(child, excluded_platform=excluded_platform, exclude_media_storage=exclude_media_storage,
+                _path=(*_path, node.tag))) is not None]]
 
 
 def _project_model_paths(project_path, root):
@@ -610,10 +656,22 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     identity = _project_io_root_identity(root)
     files = _project_model_paths(project_path, root)
     summary = {'files': {}, 'platform_settings': {name: {} for name in selected_platforms}, 'anchors': {}, 'media_ids': {}}
+    media_rows, media_sources, media_unresolved, media_mode = [], [], set(), None
     total_bytes = 0
     for path in sorted(files):
         prove_artifact_path(path, io_root=root, field='project model', must_exist=True, expect_directory=False)
         document, proof = _read_xml_artifact(path, root)
+        if exclude_media_storage:
+            from .console_media_ids import work_unit_records, project_storage_mode
+            rows, descriptors, unresolved = work_unit_records(document)
+            media_rows.extend(rows)
+            media_sources.extend(descriptors)
+            media_unresolved.update(unresolved)
+            if Path(path) == Path(project_path):
+                try:
+                    media_mode = project_storage_mode(document)
+                except ValueError:
+                    media_unresolved.add('project_media_storage_mode')
         total_bytes += proof['size']
         if total_bytes > MAX_MODEL_BYTES:
             raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its total byte observation budget')
@@ -645,6 +703,10 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
     for field in ('anchors', 'media_ids'):
         summary[field] = {relative: {'count': len(rows), 'sha256': digest(sorted(rows, key=repr))}
             for relative, rows in summary[field].items()}
+    if exclude_media_storage:
+        from .console_media_ids import compact_records
+        summary.update(media_mapping=compact_records(media_rows), media_sources=compact_records(media_sources), media_mapping_unresolved=sorted(media_unresolved),
+            media_storage_mode=media_mode)
     for values in summary['platform_settings'].values():
         for rows in values.values():
             rows.sort()

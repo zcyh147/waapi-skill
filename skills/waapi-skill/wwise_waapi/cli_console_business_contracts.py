@@ -744,9 +744,14 @@ def cli_console_business_contract_data(
         }} if operation == 'ak.wwise.cli.migrate' else {}),
         **({'effect_verification': {
             'mapping_file': 'owned_project_name_mediaid_stable_bounded_bytes_if_present',
-            'mapping_container_format': 'unestablished_non_XML_is_not_proven_failure',
+            'mapping_container_format': 'five_version_observed_Wwise_MediaIDs_XML; unknown_container_remains_unverified',
             'work_units': 'bounded_saved_MediaIDList_observation_and_preservation_outside_media_storage',
-            'central_mapping_record_representation': 'unresolved_no_business_acceptance',
+            'central_mapping_record_representation': (
+                'exact_source_GUID_language_ID_and_name_file_and_all_media_ID_attributes; no_remaining_Work_Unit_IDs; exact_project_storage_mode'
+                if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile'
+                else 'parsed_mapping_available; transfer_or_refresh_semantics_still_require_independent_effect_proof'),
+            'source_kinds': ['AudioFileSource', 'MidiFileSource', 'PluginMediaSource'],
+            'generated_platform_hashes': 'bounded_observation_only; not_conversion_correctness_proof',
             'post_terminal_native_calls': 'none',
         }} if operation in {'ak.wwise.cli.moveMediaIdsToSingleFile', 'ak.wwise.cli.moveMediaIdsToWorkUnits',
             'ak.wwise.cli.updateMediaIdsInSingleFile'} else {}),
