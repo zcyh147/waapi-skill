@@ -537,3 +537,167 @@ def test_plugin_prerequisite_effect_is_not_inferred_from_creation_success(tmp_pa
     code, failed = gateway.execute_gateway(["verify", tx], env=env, client_factory=lambda _: client)
     assert code == 2 and failed["verified"] is False, failed
     assert sum(uri.endswith("object.set") for uri, _, _ in client.calls) == 1
+
+
+HIERARCHY_GROUP = "{66666666-6666-6666-6666-666666666666}"
+HIERARCHY_TARGET = "{77777777-7777-7777-7777-777777777777}"
+HIERARCHY_OTHER = "{88888888-8888-8888-8888-888888888888}"
+
+
+class ProspectiveReferenceTask(ClassTask):
+    """Same five-version rule as the sealed existing DefaultSwitch model."""
+    def __init__(self, path, version, *, state=False):
+        super().__init__(path, version, "SwitchContainer")
+        self.objects[FIRST]["path"] = r"\Actor-Mixer Hierarchy\Default Work Unit"
+        group_type, target_type = ("StateGroup", "State") if state else ("SwitchGroup", "Switch")
+        for identity, name in ((HIERARCHY_GROUP, "Surface"), (HIERARCHY_OTHER, "Weather")):
+            self.objects[identity] = {"id": identity, "name": name, "type": group_type,
+                "path": "\\Switches\\Default Work Unit\\" + name, "parent": {"id": FIRST}}
+        self.objects[HIERARCHY_TARGET] = {"id": HIERARCHY_TARGET, "name": "Concrete", "type": target_type,
+            "path": r"\Switches\Default Work Unit\Surface\Concrete", "parent": {"id": HIERARCHY_GROUP}}
+        self.metadata = {
+            "DefaultSwitchOrState": {"name": "DefaultSwitchOrState", "type": "", "default": None,
+                "restriction": {"type": "reference", "restrictions": [
+                    {"childOfReference": "SwitchGroupOrStateGroup"}, {"type": ["Switch", "State"]}]},
+                "dependencies": [{"type": "reference", "action": "Enable", "context": "Self",
+                    "property": "SwitchGroupOrStateGroup", "conditions": [{"referenceIsSet": True}]}]},
+            "SwitchGroupOrStateGroup": {"name": "SwitchGroupOrStateGroup", "type": "", "default": None,
+                "restriction": {"type": "reference", "restrictions": [{"type": ["SwitchGroup", "StateGroup"]}]}},
+        }
+
+    def declare_hierarchy(self, *, reverse=False, expected_code=0):
+        target, group = self.bind(HIERARCHY_TARGET), self.bind(HIERARCHY_GROUP)
+        values = [("DefaultSwitchOrState", target), ("SwitchGroupOrStateGroup", group)]
+        if reverse:
+            values.reverse()
+        return self.declare(expected_code=expected_code, **dict(values))
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_new_reference_hierarchy_accepts_an_explicit_controlling_group(tmp_path, version):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    task.declare_hierarchy()
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("state", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_new_reference_hierarchy_creates_and_verifies_both_explicit_edges(tmp_path, version, state, reverse):
+    task = ProspectiveReferenceTask(tmp_path, version, state=state)
+    preserved = deepcopy(task.objects)
+    task.declare_hierarchy(reverse=reverse)
+    code, verified = task.transaction("ask_before_changes")
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[CREATED]["SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+    assert task.objects[CREATED]["DefaultSwitchOrState"] == HIERARCHY_TARGET
+    assert {key: row for key, row in task.objects.items() if key != CREATED} == preserved
+    writes = [(uri, args) for uri, args, _ in task.calls if uri.endswith(("object.create", "object.set", "setReference", "setProperty"))]
+    assert len(writes) == 1 and writes[0][0].endswith("object.create")
+    assert writes[0][1]["@SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+    assert writes[0][1]["@DefaultSwitchOrState"] == HIERARCHY_TARGET
+    code, rejected = task.run("execute", verified["transaction_id"])
+    assert code == 2
+    assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("fault", ["wrong-parent", "missing-group", "wrong-target-type"])
+def test_new_reference_hierarchy_rejects_invalid_prospective_relationship_without_creation(tmp_path, version, fault):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    if fault == "wrong-parent":
+        task.objects[HIERARCHY_TARGET]["parent"] = {"id": HIERARCHY_OTHER}
+    if fault == "wrong-target-type":
+        task.objects[HIERARCHY_TARGET]["type"] = "Sound"
+    if fault == "missing-group":
+        task.declare(DefaultSwitchOrState=task.bind(HIERARCHY_TARGET))
+    elif fault == "wrong-target-type":
+        rejected = task.declare_hierarchy(expected_code=2)
+        assert rejected["error_code"] == "REFERENCE_TARGET_TYPE_MISMATCH", rejected
+        assert CREATED not in task.objects
+        assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+        return
+    else:
+        task.declare_hierarchy()
+    code, rejected = task.step("draft-check")
+    assert code == 2 and rejected["error_code"] in {"INVALID_REFERENCE_TARGET", "REFERENCE_ACTIVATION_REQUIRED"}, rejected
+    assert CREATED not in task.objects
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("drift", ["target-parent", "selected-metadata", "controller-metadata"])
+def test_new_reference_hierarchy_revalidates_relationship_and_class_metadata_before_creation(tmp_path, version, drift):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    task.declare_hierarchy()
+    tx, _ = preview_and_confirm(task)
+    if drift == "target-parent":
+        task.objects[HIERARCHY_TARGET]["parent"] = {"id": HIERARCHY_OTHER}
+    else:
+        name = "DefaultSwitchOrState" if drift == "selected-metadata" else "SwitchGroupOrStateGroup"
+        task.metadata[name]["restriction"]["restrictions"].append("notNull")
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert CREATED not in task.objects
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("fault", ["default-reference", "group-reference", "target-parent"])
+def test_new_reference_hierarchy_never_verifies_ignored_fields_or_changed_target_parent(tmp_path, version, fault):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    task.declare_hierarchy()
+    tx, _ = preview_and_confirm(task)
+    original = task.call
+    def call(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri.endswith("object.create"):
+            if fault == "target-parent":
+                task.objects[HIERARCHY_TARGET]["parent"] = {"id": HIERARCHY_OTHER}
+            else:
+                name = "DefaultSwitchOrState" if fault == "default-reference" else "SwitchGroupOrStateGroup"
+                task.objects[CREATED][name] = None  # Native accepted the request but ignored this field.
+        return result
+    task.call = call
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, failed = task.run("verify", tx)
+    assert code == 2 and failed.get("verified") is not True, failed
+    assert not failed.get("agent_result")
+    assert failed["creation_result"]["identity_status"] == "verified"
+    assert failed["creation_result"]["configuration_complete"] is False
+    code, replay = task.run("execute", tx)
+    assert code == 2
+    assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
+
+
+def test_set_new_node_reuses_prospective_reference_hierarchy_proof(tmp_path):
+    task = ProspectiveReferenceTask(tmp_path, "2025.1")
+    restart(task, "object.set")
+    task.declare_hierarchy(reverse=True)
+    code, verified = task.transaction("ask_before_changes")
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[CREATED]["SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+    assert task.objects[CREATED]["DefaultSwitchOrState"] == HIERARCHY_TARGET
+    assert sum(uri.endswith("object.set") for uri, _, _ in task.calls) == 1
+    assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
+@pytest.mark.parametrize("policy", ["read_only", "allow_changes"])
+def test_new_reference_hierarchy_retains_creation_policy_authority(tmp_path, version, policy):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    code, configured = task.run("config-set", "--project-modification-policy", policy)
+    assert code == 0, configured
+    task.declare_hierarchy()
+    code, result = task.transaction(policy)
+    if policy == "read_only":
+        assert code == 2 and CREATED not in task.objects, result
+        assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+    else:
+        assert code == 0 and result["verified"] is True, result
+        assert task.objects[CREATED]["SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+        assert task.objects[CREATED]["DefaultSwitchOrState"] == HIERARCHY_TARGET
+        assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
