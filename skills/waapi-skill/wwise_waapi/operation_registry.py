@@ -7146,7 +7146,7 @@ def _resolve_object_set_import_type(
 
 
 def _prepare_prospective_reference_hierarchy(
-    references, *, class_id, read, property_info_cache,
+    references, *, class_id,
 ):
     """Validate new-node reference edges against explicit prospective values."""
     by_name = {info.name.casefold(): (info, targets) for info, targets in references}
@@ -7332,8 +7332,7 @@ def _prepare_object_node_specs(
             value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
             resolved_references[descriptor.request_path] = value
             spec["references"].append({"name": descriptor.name, "target_id": value})
-        hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id,
-            read=read, property_info_cache=property_info_cache)
+        hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id)
         if hierarchy:
             spec["reference_target_conditions"] = hierarchy
         if any(info.dependencies for info in property_info_by_name.values()):
