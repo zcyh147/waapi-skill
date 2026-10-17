@@ -67,10 +67,12 @@ class LayoutClient(FakeClient):
         if uri == URI + 'setLayout':
             self.calls.append((uri, args, options))
             self.layouts[args['name']] = deepcopy(args['layout'])
+            self.views.setdefault(args['name'], [])
             return {}
         if uri == URI + 'removeLayout':
             self.calls.append((uri, args, options))
             self.layouts.pop(args['name'])
+            self.views.pop(args['name'], None)
             return {}
         if uri == URI + 'getCurrentLayoutName':
             self.calls.append((uri, args, options))

@@ -617,13 +617,13 @@ class ScenarioLifecycle:
                 except BaseException as quarantine_exc:  # noqa: BLE001
                     errors.append(_format_error("quarantine-seal", quarantine_exc))
 
-        try:
-            self.lock.__exit__(None, None, None)
-            self._lock_acquired = False
-        except BaseException as exc:  # noqa: BLE001 - lock release is systemic
-            errors.append(_format_error("sandbox-lock-release", exc))
-            final_status = "BLOCKED"
-            retained = True
+        if not (prepared_success and final_status == "PREPARED" and not errors):
+            try:
+                self._release_lock_best_effort()
+            except BaseException as exc:  # noqa: BLE001 - lock release is systemic
+                errors.append(_format_error("sandbox-lock-release", exc))
+                final_status = "BLOCKED"
+                retained = True
 
         result = ScenarioLifecycleResult(
             scenario_id=self.scenario_id,
@@ -644,16 +644,31 @@ class ScenarioLifecycle:
             self._prepared_cleanup_paths = tuple(str(path.resolve(strict=True)) for path in (
                 runtime.sandbox.source_project, runtime.sandbox.source_root, runtime.owned_root,
                 runtime.sandbox.sandbox_path, runtime.sandbox.sandbox_project))
-        _write_json(runtime.evidence_root / "lifecycle.json", result.as_dict())
         self._finished = True
+        try:
+            _write_json(runtime.evidence_root / "lifecycle.json", result.as_dict())
+        except BaseException:
+            self.cancel_prepared_cleanup()
+            raise
         return result
 
-    def release_prepared_cleanup(self, *, post_teardown_check: PostShutdownHook) -> ScenarioLifecycleResult:
-        """Release only a successful preparation after all node teardowns."""
+    def cancel_prepared_cleanup(self) -> None:
+        """Permanently revoke deferred cleanup and release its retained lock."""
+        self._prepared_cleanup = None
+        self._release_lock_best_effort()
+
+    def release_prepared_cleanup(
+        self, *, post_teardown_check: PostShutdownHook,
+        publication_hook: Callable[[ScenarioLifecycleResult], None] | None = None,
+    ) -> ScenarioLifecycleResult:
+        """Revalidate, clean and publish under the original global owner lock."""
         prepared, runtime = self._prepared_cleanup, self.runtime
-        if (prepared is None or runtime is None or not self._finished or self._lock_acquired
+        if (prepared is None or runtime is None or not self._finished or not self._lock_acquired
                 or not prepared.cleanup_deferred or prepared.final_status != 'PREPARED' or prepared.errors):
             raise ScenarioLifecycleError('no eligible prepared success cleanup exists')
+        # Consume before any check/deletion: uncertain cleanup is never retried.
+        self._prepared_cleanup = None
+        phase = 'post-teardown'
         try:
             paths = tuple(str(path.resolve(strict=True)) for path in (
                 runtime.sandbox.source_project, runtime.sandbox.source_root, runtime.owned_root,
@@ -668,14 +683,7 @@ class ScenarioLifecycle:
                 raise ScenarioLifecycleError('post-teardown immutable source hash or mtime changed')
             if post_teardown_check(runtime) is not None:
                 raise ScenarioLifecycleError('post-teardown resource check did not complete')
-        except BaseException as exc:
-            self._prepared_cleanup = None
-            _write_json(runtime.evidence_root / 'lifecycle-release-error.json', {
-                'status': 'BLOCKED', 'phase': 'post-teardown', 'error': _format_error('post-teardown', exc)})
-            raise ScenarioLifecycleError(_format_error('post-teardown', exc)) from exc
-        # Consume before deletion: uncertain cleanup is never retried or promoted.
-        self._prepared_cleanup = None
-        try:
+            phase = 'release'
             cleanup_sandbox(runtime.sandbox, keep=False, failed=False)
             if runtime.owned_root.exists():
                 shutil.rmtree(runtime.owned_root, ignore_errors=False)
@@ -684,11 +692,15 @@ class ScenarioLifecycle:
             result = replace(prepared, final_status='PASS', sandbox_retained=False,
                              quarantine_path=None, cleanup_deferred=False)
             _write_json(runtime.evidence_root / 'lifecycle-final.json', result.as_dict())
+            if publication_hook is not None:
+                publication_hook(result)
             return result
         except BaseException as exc:
             _write_json(runtime.evidence_root / 'lifecycle-release-error.json', {
-                'status': 'BLOCKED', 'phase': 'release', 'error': _format_error('post-teardown', exc)})
+                'status': 'BLOCKED', 'phase': phase, 'error': _format_error('post-teardown', exc)})
             raise ScenarioLifecycleError(_format_error('post-teardown', exc)) from exc
+        finally:
+            self._release_lock_best_effort()
 
     def _archive_launch_environment_roots(
         self,

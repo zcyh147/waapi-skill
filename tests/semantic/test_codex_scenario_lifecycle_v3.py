@@ -755,3 +755,57 @@ def test_original_nonpass_owner_never_becomes_a_prepared_release(monkeypatch, tm
     with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='prepared'):
         owner.release_prepared_cleanup(post_teardown_check=lambda _: pytest.fail('nonpass must not reach release'))
     assert runtime.owned_root.exists()
+
+
+@pytest.mark.parametrize('failure', ['none', 'proof', 'publication'])
+def test_prepared_cleanup_keeps_global_lock_through_proof_cleanup_and_publication(monkeypatch, tmp_path, failure):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = _controller(tmp_path)
+    runtime = owner.start()
+    exits_before = _FakeLock.exited
+    owner.finish('PASS', defer_success_cleanup=True)
+    assert owner._lock_acquired is True
+    assert _FakeLock.exited == exits_before
+    events = []
+    def proof(actual):
+        assert owner._lock_acquired
+        assert _FakeLock.exited == exits_before
+        assert actual.owned_root.exists()
+        events.append('proof')
+        if failure == 'proof':
+            raise RuntimeError('late resource failure')
+    def publish(result):
+        assert owner._lock_acquired
+        assert _FakeLock.exited == exits_before
+        assert not runtime.owned_root.exists()
+        assert result.final_status == 'PASS'
+        events.append('publication')
+        if failure == 'publication':
+            raise RuntimeError('publication failed')
+    if failure == 'none':
+        owner.release_prepared_cleanup(post_teardown_check=proof, publication_hook=publish)
+        assert events == ['proof', 'publication']
+    else:
+        with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='post-teardown'):
+            owner.release_prepared_cleanup(post_teardown_check=proof, publication_hook=publish)
+    assert not owner._lock_acquired
+    assert _FakeLock.exited == exits_before + 1
+
+
+def test_prepared_receipt_failure_consumes_finish_without_repeating_shutdown(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = _controller(tmp_path)
+    runtime = owner.start()
+    original = lifecycle_v3._write_json
+    def write(path, value):
+        if path.name == 'lifecycle.json':
+            raise OSError('prepared receipt write failed')
+        original(path, value)
+    monkeypatch.setattr(lifecycle_v3, '_write_json', write)
+    with pytest.raises(OSError, match='prepared receipt'):
+        owner.finish('PASS', defer_success_cleanup=True)
+    assert owner._finished is True
+    assert owner._lock_acquired is False
+    assert runtime.owned_root.exists()
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='not active'):
+        owner.finish('BLOCKED')
