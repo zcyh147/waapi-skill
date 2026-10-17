@@ -15,7 +15,10 @@ from tests.unit.test_field_interface_closure_gateway import FieldTask, FIRST, SE
 def condition_product_capture(request, tmp_path):
     from tests.support.condition_branch_evidence import prepare_condition_capture, finish_condition_capture
     root = Path(os.environ.get("WAAPI_CONDITION_BRANCH_EVIDENCE_ROOT", str(tmp_path / "condition-product-evidence"))).resolve()
-    capture = prepare_condition_capture(root, request.node.nodeid)
+    case_name = getattr(request, "param", "slew-rate-show")
+    if case_name != "slew-rate-show":
+        root = root / case_name
+    capture = prepare_condition_capture(root, request.node.nodeid, case_name=case_name)
     observed = {}
     from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
     register_exact_evidence_finalizer(request.node, lambda reports: finish_condition_capture(capture, reports, observed))
@@ -84,6 +87,7 @@ def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_
     assert scalar["multiple_choices"] == "require_explicit_user_value_when_current_value_does_not_satisfy"
     assert condition_contract["conditions"]["reference"]["condition"] == "referenceIsSet_boolean"
     assert condition_contract["conditions"]["visibility"]["prerequisite_write"] is False
+    assert condition_contract["conditions"]["visibility"]["master_bus"]["topology_changes"] is False
     assert condition_contract["conditions"]["association_owner"]["source_type"] == "ObjectSettingAssociation"
     assert condition_contract["conditions"]["association_owner"]["recursive_prerequisites"] == ["property", "override", "reference"]
     assert condition_contract["safety"]["related_object_writes"] == "separately_preview_and_authorize"
@@ -1422,3 +1426,154 @@ def test_native_condition_enum_schema_invalid_entry_is_rejected_before_mutation(
     code, checked = task.step("draft-check")
     assert code == 2, checked
     assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+
+
+class MasterBusDeviceTask(AttenuationTask):
+    def __init__(self, path, version, operation="object.setReference", enabled=True):
+        super().__init__(path, version, operation=operation)
+        self.enabled = enabled
+        self.enabled_reads = []
+        self.objects[FIRST].update(name="Main Mix", type="Bus", path=r"\Master-Mixer Hierarchy\Default Work Unit\Main Mix", AudioDevice=None)
+        self.objects[SECOND].update(name="System", type="AudioDevice", path=r"\Audio Devices\Default Work Unit\System")
+        self.metadata = {"AudioDevice": {"name": "AudioDevice", "type": "",
+            "restriction": {"type": "reference", "restrictions": [{"type": ["AudioDevice"]}, "notNull"]},
+            "dependencies": [{"type": "isMasterBus", "value": True, "action": "Show", "context": "Self"}]}}
+        self.types = [{"classId": index + 1, "name": name, "type": "WObject"}
+                      for index, name in enumerate(("Bus", "AudioDevice"))]
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith("isPropertyEnabled"):
+            self.calls.append((uri, deepcopy(args), options))
+            result = {"return": self.enabled.get(args["platform"], False) if isinstance(self.enabled, dict) else self.enabled}
+            self.enabled_reads.append({"uri": uri, "args": deepcopy(args), "options": options, "result": deepcopy(result)})
+            return result
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", ["object.setReference", "object.set"])
+@pytest.mark.parametrize("enabled", [True, False])
+@pytest.mark.parametrize("platform", [None, PlatformConditionTask.platform])
+def test_master_bus_device_visibility_uses_live_enabled_proof_without_topology_change(tmp_path, version, operation, enabled, platform):
+    task = MasterBusDeviceTask(tmp_path, version, operation, {platform: enabled} if platform else enabled)
+    before = deepcopy(task.objects)
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", source, "--meaning", "AudioDevice",
+                                *(["--platform", platform] if platform else []))
+    if not enabled:
+        assert code == 2 or not discovered.get("meaning_results", [{}])[0].get("candidates"), discovered
+        assert task.objects == before
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, discovered
+    field = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", source,
+                              "--field-handle", field, "--target-handle", target) if operation == "object.setReference" else
+                      task.step("draft-declare-existing", "--declaration-id", "device", "--object-handle", source,
+                                "--field-value", field, target))
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert not preview["preview_summary"].get("derived_changes"), preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects == {**before, FIRST: {**before[FIRST], "AudioDevice": {"id": SECOND}}}
+    writes = [(uri, args) for uri, args, _ in task.calls if uri.endswith(("setProperty", "setReference", "object.set"))]
+    assert len(writes) == 1
+    assert writes[0][0].endswith("setReference" if operation == "object.setReference" else "object.set")
+    assert task.enabled_reads
+    assert all(row["args"]["platform"] == (platform or "{00000000-0000-0000-0000-000000000000}") for row in task.enabled_reads)
+
+
+@pytest.mark.parametrize("version,condition_product_capture", [
+    ("2024.1", "master-bus-device-2024.1"), ("2025.1", "master-bus-device-2025.1")], indirect=["condition_product_capture"])
+def test_product_master_bus_audio_device_show_condition_changes_only_the_selected_reference(tmp_path, version, condition_product_capture):
+    task = MasterBusDeviceTask(tmp_path, version)
+    before = deepcopy(task.objects)
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    field = task.discover(source, "AudioDevice")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", source, "--field-handle", field, "--target-handle", target)
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects == {**before, FIRST: {**before[FIRST], "AudioDevice": {"id": SECOND}}}
+    writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls
+              if uri.endswith(("setProperty", "setReference", "object.set"))]
+    assert len(writes) == 1 and writes[0]["uri"].endswith("setReference")
+    enabled_reads = deepcopy(task.enabled_reads)
+    assert len(enabled_reads) >= 3
+    assert all(row["args"]["object"] == FIRST and row["args"]["property"] == "AudioDevice" for row in enabled_reads)
+    condition_product_capture.update(
+        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
+        native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["AudioDevice"]),
+            "observations": [{"before": before[FIRST], "after": deepcopy(task.objects[FIRST]),
+                "target_before": before[SECOND], "target_after": deepcopy(task.objects[SECOND]),
+                "enabled_before": enabled_reads[0]["result"]["return"],
+                "enabled_after": enabled_reads[-1]["result"]["return"], "enabled_reads": enabled_reads}]}},
+    )
+
+
+@pytest.mark.parametrize("version", ["2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", ["object.setReference", "object.set"])
+@pytest.mark.parametrize("failure", ["wrong-target-class", "disabled-before", "disabled-after"])
+def test_master_bus_device_reference_retains_target_restrictions_and_enabled_proof(tmp_path, version, operation, failure):
+    task = MasterBusDeviceTask(tmp_path, version, operation)
+    if failure == "wrong-target-class":
+        task.objects[SECOND]["type"] = "Sound"
+        task.types.append({"classId": 3, "name": "Sound", "type": "WObject"})
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    field = task.discover(source, "AudioDevice")
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", source,
+                              "--field-handle", field, "--target-handle", target) if operation == "object.setReference" else
+                      task.step("draft-declare-existing", "--declaration-id", "device", "--object-handle", source,
+                                "--field-value", field, target))
+    if failure == "wrong-target-class" and code == 2:
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    if failure == "wrong-target-class":
+        assert code == 2, checked
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if failure == "disabled-before":
+        task.enabled = False
+    code, executed = task.run("execute", tx)
+    if failure == "disabled-before":
+        assert code == 2, executed
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.enabled = False
+    code, verified = task.run("verify", tx)
+    assert code == 2 and verified["verified"] is False, verified
+    assert task.objects[FIRST]["AudioDevice"] == {"id": SECOND}
+    assert sum(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls) == 1

@@ -125,6 +125,14 @@ def is_terminal_override_dependency(name: str, metadata_type: str | None, depend
     }
 
 
+def is_master_bus_visibility_dependency(dependency: Mapping[str, Any]) -> bool:
+    """Recognize the exact structural Show predicate without inferring topology."""
+    return (set(dependency) == {"type", "value", "action", "context"}
+            and dependency.get("type") == "isMasterBus"
+            and type(dependency.get("value")) is bool
+            and dependency.get("action") == "Show" and dependency.get("context") == "Self")
+
+
 def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
     """Evaluate a validated scalar condition with Boolean/number distinction."""
     if restriction["type"] == "enum":

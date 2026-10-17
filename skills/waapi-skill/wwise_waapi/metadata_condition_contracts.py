@@ -32,6 +32,9 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                 "action": "Show", "contexts": ["Self", "Parent", "AssocParent"],
                 "conditions": "validated_property_or_reference_presence_condition",
                 "prerequisite_write": False,
+                "master_bus": {"action": "Show", "context": "Self", "value": "native_boolean",
+                    "true_predicate": "require_fresh_exact_object_field_enabled_proof_before_and_after_execution",
+                    "topology_changes": False},
             },
             "association_owner": {
                 "action": "Enable", "context": "AssocParent", "source_type": "ObjectSettingAssociation",
