@@ -28,6 +28,7 @@ from tests.destructive.support.sandbox_fixture import (
     hash_project,
     launch_sandboxed_wwise,
     prepare_sample_project_sandbox,
+    require_authoring_launch_proof,
     shutdown_sandboxed_wwise,
 )
 from tests.semantic.support.codex_campaign import (
@@ -38,6 +39,7 @@ from tests.semantic.support.codex_filesystem_security import (
     path_is_link_or_reparse,
 )
 from wwise_waapi.headless import HeadlessLifecycle
+from wwise_waapi.native_catalog import load_native_catalog
 
 
 SCENARIO_LIFECYCLE_CONTRACT = "waapi-skill.codex-semantic-scenario-lifecycle/v3"
@@ -202,6 +204,7 @@ class ScenarioLifecycle:
         prelaunch_hook: PrelaunchHook | None = None,
         launch_environment_overrides: Mapping[str, str] | None = None,
         owned_wine_prefix: Path | None = None,
+        host_kind: str = 'wwise-console',
         lock_root: Path = GLOBAL_LIVE_LIFECYCLE_LOCK_ROOT,
     ) -> None:
         if not scenario_id or not scenario_id.strip():
@@ -213,10 +216,25 @@ class ScenarioLifecycle:
         self.scenario_root = Path(scenario_root).expanduser().resolve(strict=False)
         self.live_environment = {str(key): str(value) for key, value in live_environment.items()}
         self.prelaunch_hook = prelaunch_hook
+        if host_kind not in {'wwise-console', 'wwise-authoring'}:
+            raise ValueError('unsupported scenario host kind')
+        self.host_kind = host_kind
+        self.authoring_build = None
         self.launch_environment_overrides = _validate_launch_environment_overrides(
             launch_environment_overrides or {},
             scenario_root=self.scenario_root,
         )
+        if host_kind == 'wwise-authoring':
+            if version not in {'2024.1', '2025.1'}:
+                raise ValueError('owned Authoring lifecycle requires the pinned 2024.1/2025.1 catalog')
+            home = self.launch_environment_overrides.get('HOME')
+            if home is None:
+                raise ValueError('owned Authoring lifecycle requires a private HOME')
+            default_prefix = Path(home) / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64'
+            if owned_wine_prefix is not None and Path(owned_wine_prefix) != default_prefix:
+                raise ValueError('owned Authoring lifecycle requires the default private HOME bottle')
+            owned_wine_prefix = default_prefix
+            self.authoring_build = load_native_catalog(version, 'wwise-authoring')['provenance']['build']
         self.owned_wine_prefix = _validate_owned_wine_prefix(
             owned_wine_prefix,
             overrides=self.launch_environment_overrides,
@@ -296,9 +314,12 @@ class ScenarioLifecycle:
                     env,
                     wine_prefix_path=self.owned_wine_prefix,
                     case_owned_root=owned_root,
+                    **({'host_kind': self.host_kind} if self.host_kind == 'wwise-authoring' else {}),
                 )
             stage = "wwise-launch-identity"
-            if lifecycle.port is None or str(sandbox.sandbox_project) not in lifecycle.command:
+            if self.host_kind == 'wwise-authoring':
+                require_authoring_launch_proof(lifecycle, project=sandbox.sandbox_project, build=self.authoring_build)
+            elif lifecycle.port is None or str(sandbox.sandbox_project) not in lifecycle.command:
                 raise ScenarioLifecycleError(
                     "Wwise launch did not prove the private project path and dynamic WAAPI port"
                 )
@@ -359,6 +380,12 @@ class ScenarioLifecycle:
                         if self.owned_wine_prefix is not None
                         else None
                     ),
+                    **({
+                        'host_kind': self.host_kind, 'authoring_build': self.authoring_build,
+                        'get_info': dict(lifecycle.ready_result),
+                        'launch_project_attestation': dict(lifecycle.launch_project_attestation),
+                        'launch_preparation': list(lifecycle.launch_preparation),
+                    } if self.host_kind == 'wwise-authoring' else {}),
                 },
             )
             return self.runtime

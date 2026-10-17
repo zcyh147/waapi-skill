@@ -191,6 +191,11 @@ Examples:
 """
 
 
+def _owned_authoring_requested(pytest_args: Sequence[str]) -> bool:
+    return any(value == '--owned-authoring-batch-root' or value.startswith('--owned-authoring-batch-root=')
+               for value in pytest_args)
+
+
 def parse_request(arguments: Sequence[str]) -> TestRequest | None:
     version = ""
     mode = ""
@@ -247,6 +252,8 @@ def parse_request(arguments: Sequence[str]) -> TestRequest | None:
         raise TestDriverError("matrix/focused mode requires version 'all'")
     if mode in {"smoke", "live", "destructive"} and version == "none":
         raise TestDriverError(f"mode '{mode}' requires a real Wwise version or 'all'")
+    if _owned_authoring_requested(pytest_args) and (mode != 'destructive' or version not in {'2024.1', '2025.1'}):
+        raise TestDriverError('owned Authoring requires one exact 2024.1/2025.1 destructive lane')
     return TestRequest(version=version, mode=mode, pytest_args=pytest_args)
 
 
@@ -512,6 +519,9 @@ class TestDriver:
     def _run_real(
         self, version: str, mode: str, pytest_args: Sequence[str]
     ) -> int:
+        owned_authoring = _owned_authoring_requested(pytest_args)
+        if owned_authoring and (mode != 'destructive' or version not in {'2024.1', '2025.1'} or self.windows):
+            raise TestDriverError('owned Authoring currently requires one exact Mac 2024.1/2025.1 destructive lane')
         defaults = default_live_paths(
             version,
             mode,
@@ -523,7 +533,7 @@ class TestDriver:
         elif mode == "live":
             child = ("-m", "pytest", *LIVE_TEST_NODES[version], *pytest_args)
         elif mode == "destructive":
-            child = ("-m", "pytest", *DESTRUCTIVE_TEST_NODES[version], *pytest_args)
+            child = ("-m", "pytest", *(() if owned_authoring else DESTRUCTIVE_TEST_NODES[version]), *pytest_args)
         else:
             raise TestDriverError(f"Unsupported real-test mode: {mode}")
         # The live helper treats this fixed prefix only as an argv schema and
@@ -554,7 +564,7 @@ class TestDriver:
             helper_argv,
             command_runner=self.command_runner,
             python_executable=self.python_executable,
-            environment=self.environment,
+            environment={**self.environment, **({'WWISE_AUTHORING_LIVE': '1'} if owned_authoring else {})},
         )
 
     def _run_matrix(self, pytest_args: Sequence[str]) -> int:

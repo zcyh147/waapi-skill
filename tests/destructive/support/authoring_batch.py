@@ -362,7 +362,8 @@ def candidate_source_context(repo_root: Path):
     import subprocess
     roots = ['skills/waapi-skill', 'tests/destructive/support', 'tests/destructive/test_authoring_ui_business_live.py',
              'tests/semantic/support', 'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
-             'tests/maintenance/branch_audit_completion.py']
+             'tests/maintenance/branch_audit_completion.py', 'ci/test_driver.py',
+             'ci/run_live_test_command.py', 'ci/resolve_live_test_config.py', 'ci/test_readiness.py']
     changed = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=normal', '--', *roots],
         cwd=repo_root, text=True, capture_output=True, check=True).stdout
     if changed.strip():
@@ -376,13 +377,63 @@ def candidate_source_context(repo_root: Path):
 
 
 def install_authoring_batch(config, *, owner: ScenarioLifecycle, repo_root: Path, selected_nodeids: Sequence[str]):
-    """The existing lifecycle owner supplies the object before pytest collection."""
+    """Install the actual owner after the caller validates the exact collection."""
     if getattr(config, '_waapi_authoring_batch', None) is not None:
         raise ValueError('An owned Authoring batch is already installed')
     batch = AuthoringBatchAdapter(owner=owner, repo_root=repo_root, selected_nodeids=selected_nodeids)
     config.pluginmanager.register(batch, 'waapi-owned-authoring-batch')
     config._waapi_authoring_batch = batch
     return batch
+
+
+# Only nodes that consume this actual owner can enter its native batch. Other
+# families remain explicit integration work until they use the same protocol.
+OWNED_AUTHORING_NODEIDS = (
+    'tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_registration_and_switch',
+    *('tests/destructive/test_authoring_ui_business_live.py::test_authoring_layout_owned_view_lifecycle[' + variant + ']'
+      for variant in ('omitted', 'x-only', 'y-only', 'both')),
+)
+
+
+def configure_authoring_batch_owner(config, items, *, repo_root: Path):
+    """Allocate the existing lifecycle only after a closed exact collection."""
+    raw_root = config.getoption('owned_authoring_batch_root', default=None)
+    if raw_root is None:
+        return None
+    selected = tuple(item.nodeid for item in items)
+    if (not selected or len(selected) > 64 or len(set(selected)) != len(selected)
+            or not set(selected).issubset(OWNED_AUTHORING_NODEIDS)
+            or tuple(config.args) != selected):
+        raise pytest.UsageError('Owned Authoring requires exact explicitly selected owner-aware node IDs')
+    if any(config.getoption(key, default=None) for key in ('keyword', 'markexpr', 'deselect', 'numprocesses', 'forked')):
+        raise pytest.UsageError('Owned Authoring does not accept filtered or parallel native batches')
+    if os.getenv('PYTEST_XDIST_WORKER'):
+        raise pytest.UsageError('Owned Authoring cannot launch from a parallel worker')
+    if config.getoption('collectonly', default=False) or config.getoption('setupplan', default=False):
+        return None
+    if (os.getenv('WWISE_VERSION') not in {'2024.1', '2025.1'}
+            or any(os.getenv(name) != '1' for name in ('WWISE_LIVE', 'WWISE_DESTRUCTIVE', 'WWISE_AUTHORING_LIVE'))):
+        raise pytest.UsageError('Owned Authoring requires an explicit supported destructive Authoring test context')
+    root = Path(raw_root)
+    if (not root.is_absolute() or os.path.lexists(root)
+            or any(path_is_link_or_reparse(part) for part in root.parents)
+            or root != root.resolve(strict=False)):
+        raise ValueError('Owned Authoring batch root must be a fresh absolute path without aliases')
+    source_context = candidate_source_context(repo_root)
+    def check_frozen_source(_sandbox, _assets, _io):
+        if candidate_source_context(repo_root) != source_context:
+            raise ValueError('Owned Authoring source candidate changed before launch')
+    owner = ScenarioLifecycle(scenario_id='owned-authoring-batch', version=os.environ['WWISE_VERSION'],
+        scenario_root=root, live_environment=dict(os.environ), host_kind='wwise-authoring',
+        launch_environment_overrides={'HOME': str(root / 'owned/private-home')},
+        prelaunch_hook=check_frozen_source)
+    owner.start()
+    try:
+        return install_authoring_batch(config, owner=owner, repo_root=repo_root, selected_nodeids=selected)
+    except BaseException:
+        if not owner._finished:
+            owner.finish('BLOCKED', reason='owned Authoring adapter installation failed')
+        raise
 
 
 def evidence_tree_manifest(root: Path):

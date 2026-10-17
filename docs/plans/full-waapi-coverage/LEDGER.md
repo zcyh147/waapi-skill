@@ -256,3 +256,12 @@ native alternatives and all remaining requirements remain in the denominator.
 Neither these route linkages nor controlled producer/lifecycle tests establish
 native effects, exact accepted branch evidence or ticket completion. The new
 shared Authoring adapter and condition native fixture remain not launch-ready.
+
+Ticket #188 additionally has fake-tested owned Mac Authoring strategy plumbing in
+the existing ScenarioLifecycle/sandbox/HeadlessLifecycle path. Exact build,
+private default bottle, copied-project roundtrip, readiness identity and cleanup
+failure controls passed without launching an installed tool or native client.
+This grants no branch/native effect credit. The existing driver now installs the
+Mac owner after exact successful collection with fake-only controls. Native
+Windows ownership, cross-family integration and the remaining layout contracts
+and observations stay open; the Authoring permission-window hold remains active.
