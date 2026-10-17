@@ -256,7 +256,7 @@ def _batch_ready_for_final_reports(owner, tmp_path, monkeypatch, *, nodeids=('la
     return batch, items[0] if len(items) == 1 else items, target
 
 
-@pytest.mark.parametrize('damage', ['teardown-fail', 'teardown-absent', 'source-content', 'source-mtime', 'resource', 'code', 'receipt'])
+@pytest.mark.parametrize('damage', ['teardown-fail', 'teardown-absent', 'source-content', 'source-mtime', 'resource', 'code', 'receipt', 'lock'])
 def test_late_batch_failures_cannot_release_or_leave_a_pass_record(owned_authoring, tmp_path, monkeypatch, damage):
     import json
     import os
@@ -278,8 +278,10 @@ def test_late_batch_failures_cannot_release_or_leave_a_pass_record(owned_authori
         monkeypatch.setattr(HeadlessLifecycle, '_process_rows', lambda *_, **__: [(98765, f'WINEPREFIX={prefix} Wwise.exe')])
     elif damage == 'code':
         monkeypatch.setattr(authoring_batch, 'candidate_source_context', lambda _: {'candidate': 'a' * 40, 'sources': {'fake-code': 'c' * 64}})
-    else:
+    elif damage == 'receipt':
         batch.receipts['last-node'].append({'argv': ['layout-read', 'current'], 'payload': {'ok': True}})
+    else:
+        owned_authoring.lock.__exit__(None, None, None)
     result = batch.finalize([item], terminal=True)
     assert result['outcome'] in {'FAIL', 'BLOCKED'}
     assert owned_authoring.runtime.owned_root.exists()
@@ -381,6 +383,11 @@ def test_final_batch_seal_binds_every_nodes_original_observations(owned_authorin
     for item in items:
         item._waapi_phase_reports['teardown'] = 'passed'
     assert batch.finalize(items)['outcome'] == 'PASS'
+    seal = json.loads(batch.batch_seal_path.read_text())
+    assert seal['resources']['cleanup_report']['process_exited'] is True
+    assert seal['resources']['cleanup_report']['launch_pid'] == 1234
+    assert seal['resources']['cleanup_report']['residual_processes'] == []
+    assert seal['resources']['port'] == {'host': '127.0.0.1', 'port': 31337, 'released': True}
     raw = target.read_bytes()
     if damage == 'seal-missing':
         batch.batch_seal_path.rename(tmp_path / 'retained-original-batch-seal.json')
@@ -427,3 +434,22 @@ def test_actual_pytest_waits_for_the_last_module_teardown_before_batch_credit(ow
     rows = list(map(json.loads, target.read_text().splitlines()))
     assert rows[-1]['invocation']['outcome'] == ('FAIL' if late_failure else 'PASS')
     assert batch.batch_seal_path.exists() is (not late_failure)
+
+
+def test_batch_cannot_substitute_a_process_list_without_prefix_environment_proof(owned_authoring, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from wwise_waapi import headless
+    original_snapshot = headless.HeadlessLifecycle._process_rows
+    batch, item, _ = _batch_ready_for_final_reports(owned_authoring, tmp_path, monkeypatch)
+    item._waapi_phase_reports['teardown'] = 'passed'
+    monkeypatch.setattr(headless.HeadlessLifecycle, '_process_rows', original_snapshot)
+    commands = []
+    def run(command, **kwargs):
+        commands.append(command)
+        if command == ['ps', 'eww', '-axo', 'pid=,command=']:
+            return SimpleNamespace(returncode=1, stdout='')
+        return SimpleNamespace(returncode=0, stdout='1234 ordinary process list without environments\n')
+    monkeypatch.setattr(headless.subprocess, 'run', run)
+    assert batch.finalize([item])['outcome'] == 'BLOCKED'
+    assert commands == [['ps', 'eww', '-axo', 'pid=,command=']]
+    assert owned_authoring.runtime.owned_root.exists()

@@ -264,6 +264,11 @@ def validate_authoring_batch_finalization(run, base):
                 or lifecycle['source_hash_after']['digest'] != run['source']['hash_after']
                 or lifecycle['source_mtime_after_ns'] != run['source']['mtime_after_ns']
                 or seal['resources'].get('residual_processes') != []
+                or seal['resources']['cleanup_report']['process_exited'] is not True
+                or seal['resources']['cleanup_report']['residual_processes'] != []
+                or seal['resources']['cleanup_report']['wine_prefix'] != seal['resources']['owned_prefix']
+                or seal['resources']['fresh_inspection']['row_count'] < 1
+                or seal['resources']['port']['released'] is not True
                 or seal['source_context']['candidate'] != run['candidate']):
             raise ValueError('batch context or final proof differs')
         for category in categories:

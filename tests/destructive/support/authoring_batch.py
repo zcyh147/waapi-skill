@@ -7,7 +7,7 @@ import json
 import shutil
 import time
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import asdict, replace
 from hashlib import sha256
 from typing import Sequence
 import pytest
@@ -114,6 +114,8 @@ class AuthoringBatchAdapter:
             raise ValueError('Authoring batch needs a bounded exact unique node selection')
         self.runtime = runtime
         self.owner = owner
+        self.owner_lock_handle = owner.lock._handle
+        self.launch_pid = runtime.lifecycle.process.pid
         self.repo_root = repo_root
         self.selected_nodeids = tuple(selected_nodeids)
         self.source_context = candidate_source_context(repo_root)
@@ -262,9 +264,12 @@ class AuthoringBatchAdapter:
 
     def _fresh_resource_check(self, runtime):
         lifecycle = runtime.lifecycle
+        if (not self.owner._lock_acquired or self.owner.lock._handle is not self.owner_lock_handle
+                or self.owner_lock_handle.closed):
+            raise ValueError('Post-teardown Authoring owner lock is no longer held')
         self._archive_observations()
         report = lifecycle.cleanup_report
-        if (lifecycle.process is not None or report is None or not report.is_clean
+        if (lifecycle.process is not None or report is None or not report.is_clean or report.launch_pid != self.launch_pid
                 or runtime.sandbox.metadata.process_cleanup_result != 'cleaned'):
             raise ValueError('Post-teardown Authoring host cleanup is incomplete')
         # This exact owned-prefix inspection is read-only. Never kill a new
@@ -274,7 +279,7 @@ class AuthoringBatchAdapter:
             raise ValueError('Native Windows Authoring post-teardown process attestation remains required')
         if (prefix is None or prefix != self.owned_prefix or not prefix.resolve(strict=True).is_relative_to(runtime.owned_root)):
             raise ValueError('Post-teardown Authoring owned prefix context changed')
-        rows = lifecycle._process_rows(include_env=True)
+        rows = lifecycle._process_rows(include_env=True, require_env=True)
         if not rows:
             raise ValueError('Post-teardown owned process inspection is unavailable')
         residual = [{'pid': pid, 'command': command} for pid, command in rows
@@ -284,6 +289,9 @@ class AuthoringBatchAdapter:
         if residual:
             raise ValueError('Owned Authoring resources reappeared after teardown')
         assert_port_free(runtime.host, runtime.port)
+        self.last_resources.update(cleanup_report=asdict(report), owned_prefix=str(prefix),
+            fresh_inspection={'checked_at_unix_ns': time.time_ns(), 'row_count': len(rows)},
+            port={'host': runtime.host, 'port': runtime.port, 'released': True})
 
     def _invalidate_batch_seal(self):
         if self.batch_seal_path.exists():
@@ -353,7 +361,8 @@ def candidate_source_context(repo_root: Path):
     """Bind the fixture, lifecycle and packaged sources to one clean Git commit."""
     import subprocess
     roots = ['skills/waapi-skill', 'tests/destructive/support', 'tests/destructive/test_authoring_ui_business_live.py',
-             'tests/semantic/support', 'tests/conftest.py', 'tests/maintenance/branch_audit_completion.py']
+             'tests/semantic/support', 'tests/conftest.py', 'tests/support/exact_evidence_finalization.py',
+             'tests/maintenance/branch_audit_completion.py']
     changed = subprocess.run(['git', 'status', '--porcelain', '--untracked-files=normal', '--', *roots],
         cwd=repo_root, text=True, capture_output=True, check=True).stdout
     if changed.strip():
