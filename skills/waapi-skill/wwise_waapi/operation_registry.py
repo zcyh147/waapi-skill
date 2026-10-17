@@ -9566,7 +9566,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     or _is_strict_descendant_object_path(parent_path, source_path)):
                 raise OperationContractError("INVALID_REPLACEMENT_TOPOLOGY", "Replacement destination cannot be the source's current parent or lie inside its subtree.")
             try:
-                lifecycle_source = capture_lifecycle_graph(source.object, read=read)
+                lifecycle_source = capture_lifecycle_graph(source.object, read=read, version=request.version)
                 if collision_rows:
                     collision_row = collision_rows[0]
                     collision = ResolvedObject(identity=ObjectIdentity(path=collision_path), object=collision_row.get("id"),
@@ -9577,13 +9577,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                             or _is_strict_descendant_object_path(source_path, collision_path)
                             or _same_identity(source.object, collision.object)):
                         raise OperationContractError("INVALID_REPLACEMENT_TOPOLOGY", "Replacement must target exactly the destination's direct collision without deleting the source.")
-                    lifecycle_replaced = capture_lifecycle_graph(collision.object, read=read)
+                    lifecycle_replaced = capture_lifecycle_graph(collision.object, read=read, version=request.version)
                     roles["replace_collision"] = collision
             except LifecycleGraphError as exc:
                 raise OperationContractError("INVALID_LIFECYCLE_SNAPSHOT", str(exc)) from exc
             metadata["copy_move_collision_guard"].update({
                 "source_snapshot": lifecycle_source,
                 "replacement_snapshot": lifecycle_replaced,
+                "snapshot_version": request.version,
             })
         try:
             auto_check_out = normalize_auto_check_out_to_source_control(
@@ -9625,9 +9626,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "on_name_conflict": conflict,
             **({"source_subtree_rows": lifecycle_source,
                 "replaced_subtree_rows": lifecycle_replaced,
+                "snapshot_version": request.version,
                 "verification_scope": {
-                    "observed": ["hierarchy", "notes", "discovered_default_view_fields", "replaced_guid_absence"],
-                    "unobserved": ["unlinked_platform_views", "owned_lists_and_plugin_state"],
+                    "observed": ["hierarchy", "notes", "discovered_default_view_fields", "replaced_guid_absence", "discovered_project_platform_field_views"],
+                    "unobserved": ["owned_lists_and_plugin_state"]
+                        + (["platform_link_flags"] if any(
+                            row.get("platform_observation", {}).get("link_flags_complete") is not True for row in lifecycle_source) else []),
                     "complete_business_verification": False,
                 }} if conflict == "replace" else {}),
         }
@@ -14560,7 +14564,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 return result
 
             try:
-                observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read)
+                observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read, version=copy_move_collision_guard.get("snapshot_version"))
             except LifecycleGraphError as exc:
                 observed = {"error": str(exc)}
             assertions.append({"name": "copy/move " + label + " is unchanged", "passed": observed == expected,
@@ -18665,7 +18669,7 @@ def verify_prepared_operation(
                 return result
 
             try:
-                actual_graph = capture_lifecycle_graph(object_id, read=graph_read)
+                actual_graph = capture_lifecycle_graph(object_id, read=graph_read, version=plan.get("snapshot_version"))
                 graph_matches = lifecycle_graph_matches(source_snapshot, actual_graph, is_copy=is_copy)
             except LifecycleGraphError as exc:
                 actual_graph, graph_matches = {"error": str(exc)}, False
@@ -18673,7 +18677,7 @@ def verify_prepared_operation(
                   {"source": source_snapshot, "result": actual_graph})
             if is_copy:
                 try:
-                    remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read)
+                    remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read, version=plan.get("snapshot_version"))
                 except LifecycleGraphError as exc:
                     remaining_source = {"error": str(exc)}
                 check("copy leaves its complete source subtree unchanged", remaining_source == source_snapshot,
@@ -18688,8 +18692,10 @@ def verify_prepared_operation(
             if all(assertion.get("passed") is True for assertion in assertions):
                 return VerificationResult(
                     operation, "indeterminate", tuple(assertions), tuple(readbacks),
-                    "Hierarchy, notes, discovered default-view fields and replaced GUID absence passed. Unlinked platform views and owned-list/plug-in state remain unobserved; complete copy/move preservation is unverified.",
-                    "hierarchy_notes_default_view_fields_only", False,
+                    "Observed hierarchy, notes, field views and replaced GUID absence passed. Remaining unobserved state: "
+                    + ", ".join(plan.get("verification_scope", {}).get("unobserved", ["unlinked_platform_views", "owned_lists_and_plugin_state"]))
+                    + "; complete copy/move preservation is unverified.",
+                    "hierarchy_notes_certified_field_views_only", False,
                 )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")

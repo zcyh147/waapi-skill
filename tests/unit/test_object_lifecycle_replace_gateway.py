@@ -52,6 +52,15 @@ class ReplaceTask(OwnedGraphTask):
         assert code == 0, declared
 
     def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri.endswith("getProjectInfo"):
+            return {**super().call(uri, args, options), "platforms": []}
+        if uri.endswith("object.getTypes") and self.version == "2021.1":
+            return {"return": [*super().call(uri, args, options)["return"],
+                               {"classId": 4522000, "name": "Platform", "type": "WObject"}]}
+        if uri.endswith("object.get") and args.get("from") == {"ofType": ["Platform"]}:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["transform"] == [{"range": [0, 33]}] and options == {"return": ["id", "name"]}
+            return {"return": deepcopy(getattr(self, "platforms", []))[:33]}
         if uri.endswith(("object.copy", "object.move")):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args["object"] == FIRST and args["parent"] == SECOND
@@ -233,3 +242,140 @@ def test_replace_guard_retains_raw_metadata_omission_provenance(
     code, rejected = task.run("execute", tx)
     assert code == 2, rejected
     assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
+
+
+PLATFORMS = [
+    {"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}", "name": "Desktop"},
+    {"id": "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}", "name": "Mobile"},
+]
+
+
+class PlatformReplaceTask(ReplaceTask):
+    def __init__(self, path: Path, version: str, operation: str) -> None:
+        super().__init__(path, version, operation)
+        self.platforms = deepcopy(PLATFORMS)
+        self.metadata["Volume"]["supports"] = {"unlink": True}
+        self.metadata["Target"]["supports"] = {"unlink": False}
+        self.platform_values = {row["id"]: {platform["id"]: -10.0 - offset
+            for offset, platform in enumerate(PLATFORMS)} for row in self.objects.values()}
+        self.platform_links = {row["id"]: {platform["id"]: offset == 0
+            for offset, platform in enumerate(PLATFORMS)} for row in self.objects.values()}
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri.endswith("getProjectInfo"):
+            result = super().call(uri, args, options)
+            return {**result, "platforms": deepcopy(self.platforms)}
+        if uri.endswith("object.isLinked"):
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert self.version in VERSIONS[2:] and args["property"] == "Volume"
+            return {"linked": self.platform_links[args["object"]][args["platform"]]}
+        result = super().call(uri, args, options)
+        if uri.endswith(("object.copy", "object.move")):
+            root_id, child_id = (COPIED_ROOT, COPIED_CHILD) if self.operation == "object.copy" else (FIRST, SOURCE_CHILD)
+            for old_id, new_id in ((FIRST, root_id), (SOURCE_CHILD, child_id)):
+                self.platform_values[new_id] = deepcopy(self.platform_values[old_id])
+                self.platform_links[new_id] = deepcopy(self.platform_links[old_id])
+            if self.failure == "wrong-platform-value":
+                self.platform_values[child_id][PLATFORMS[1]["id"]] = -100.0
+            elif self.failure == "wrong-platform-link":
+                self.platform_links[child_id][PLATFORMS[1]["id"]] = True
+        if uri.endswith("object.get") and options.get("platform") is not None:
+            for row in result["return"]:
+                row["@Volume"] = self.platform_values[row["id"]][options["platform"]]
+        return result
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+def test_replace_preserves_every_project_platform_field_view_and_available_link_flags(
+    tmp_path: Path, version: str, operation: str,
+) -> None:
+    task = PlatformReplaceTask(tmp_path, version, operation)
+    task.declare()
+    tx, shown = task.preview()
+    prepared = shown["artifact"]["prepared_operation"]
+    observation = prepared["verification_plan"]["source_subtree_rows"][0]["platform_observation"]
+    assert observation["platforms"] == PLATFORMS
+    assert observation["values"][PLATFORMS[1]["id"]]["Volume"] == -11.0
+    assert observation["link_flags_complete"] is (version in VERSIONS[2:])
+    scope = prepared["verification_plan"]["verification_scope"]
+    assert "unlinked_platform_views" not in scope["unobserved"]
+    assert "owned_lists_and_plugin_state" in scope["unobserved"]
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verification"]["status"] == "indeterminate", verified
+    assert all(assertion["passed"] for assertion in verified["verification"]["assertions"])
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+def test_replace_detects_a_changed_nondefault_platform_value(tmp_path: Path, version: str, operation: str) -> None:
+    task = PlatformReplaceTask(tmp_path, version, operation)
+    task.declare()
+    tx, shown = task.preview()
+    task.failure = "wrong-platform-value"
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verification"]["status"] == "verification_failed", verified
+    assert any(not assertion["passed"] for assertion in verified["verification"]["assertions"])
+
+
+@pytest.mark.parametrize("version", VERSIONS[2:])
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+def test_replace_detects_changed_platform_link_flags(tmp_path: Path, version: str, operation: str) -> None:
+    task = PlatformReplaceTask(tmp_path, version, operation)
+    task.declare()
+    tx, shown = task.preview()
+    task.failure = "wrong-platform-link"
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verification"]["status"] == "verification_failed", verified
+    assert any(not assertion["passed"] for assertion in verified["verification"]["assertions"])
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("scope", ("source", "replacement", "inventory"))
+def test_replace_revalidates_platform_views_and_inventory_before_dispatch(
+    tmp_path: Path, version: str, scope: str,
+) -> None:
+    task = PlatformReplaceTask(tmp_path, version, "object.copy")
+    task.declare()
+    tx, shown = task.preview()
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if scope == "inventory":
+        task.platforms[1]["name"] = "Renamed platform"
+    else:
+        task.platform_values[SOURCE_CHILD if scope == "source" else CHILD][PLATFORMS[1]["id"]] = -99.0
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("malformed", ("duplicate", "oversized", "missing-name"))
+def test_replace_rejects_incomplete_or_ambiguous_platform_inventory_without_write(
+    tmp_path: Path, version: str, malformed: str,
+) -> None:
+    task = PlatformReplaceTask(tmp_path, version, "object.copy")
+    if malformed == "duplicate":
+        task.platforms.append(deepcopy(task.platforms[0]))
+    elif malformed == "oversized":
+        task.platforms = [deepcopy(task.platforms[0]) for _ in range(33)]
+    else:
+        del task.platforms[0]["name"]
+    task.declare()
+    code, rejected = task.step("draft-check")
+    assert code == 2, rejected
+    assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
+
+
+def test_2021_platform_discovery_is_a_bounded_fixed_live_type_read(tmp_path: Path) -> None:
+    task = PlatformReplaceTask(tmp_path, "2021.1", "object.copy")
+    task.declare()
+    _, shown = task.preview()
+    observation = shown["artifact"]["prepared_operation"]["verification_plan"]["source_subtree_rows"][0]["platform_observation"]
+    assert observation["discovery"] == {"source": "live_getTypes_and_fixed_ofType",
+        "class": {"classId": 4522000, "name": "Platform", "type": "WObject"}}
+    assert not any(uri.endswith("getProjectInfo") or uri.endswith("object.isLinked") for uri, _, _ in task.calls)
+    queries = [(args, options) for uri, args, options in task.calls
+               if uri.endswith("object.get") and args.get("from") == {"ofType": ["Platform"]}]
+    assert queries and all(args == {"from": {"ofType": ["Platform"]}, "transform": [{"range": [0, 33]}]}
+                           and options == {"return": ["id", "name"]} for args, options in queries)
