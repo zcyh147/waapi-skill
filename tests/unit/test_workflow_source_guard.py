@@ -20,6 +20,141 @@ def workflow(monkeypatch):
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
 
 
+def _new_result_reference_runtime(tmp_path, workflow, version, *, fault=None):
+    """The real public Gateway above an exact, independently mutated native tree."""
+    from copy import deepcopy
+    import uuid
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask
+
+    operation = "object.create" if version == "2021.1" else "object.set"
+    task = OwnedGraphTask(tmp_path, version, operation)
+    parent = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
+    root, target, source = ("{" + str(uuid.UUID(int=value)) + "}" for value in (3, 5, 6))
+    task.types = [{"name": name, "classId": value, "type": "WObject"} for name, value in (
+        ("WorkUnit", 1638416), ("Bus", 1376272), ("AuxBus", 3997712))]
+    task.objects = {parent: {"id": parent, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep parent"}}
+    commands, writes = [], []
+    independent_read = False
+    original = task.call
+    base = r"\Master-Mixer Hierarchy\Default Work Unit\WAAPI_RESULT_REFERENCE_TEST"
+
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args.get("classId") == 3997712 or args.get("object") == source, args
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": ["UserAuxSend0"]}
+            assert args["property"] == "UserAuxSend0", args
+            return {"name": "UserAuxSend0", "type": "Reference", "display": {"name": "User-Defined Auxiliary Send 0"},
+                "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
+        if uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"}:
+            writes.append((uri, deepcopy(args), deepcopy(options)))
+            children = [{"type": "AuxBus", "name": "Destination"},
+                {"type": "AuxBus", "name": "Sender", "@UserAuxSend0": base + r"\Destination"}]
+            if operation == "object.create":
+                assert args == {"parent": parent, "type": "Bus", "name": "WAAPI_RESULT_REFERENCE_TEST",
+                    "children": children, "onNameConflict": "fail", "autoAddToSourceControl": False}
+            else:
+                assert args == {"objects": [{"object": parent, "children": [{"type": "Bus",
+                    "name": "WAAPI_RESULT_REFERENCE_TEST", "children": children}]}], "onNameConflict": "fail",
+                    "autoAddToSourceControl": False, "listMode": "append"}
+            if fault == "native-error":
+                raise RuntimeError("Frozen native graph rejection; never replay")
+            task.objects[root] = {"id": root, "name": "WAAPI_RESULT_REFERENCE_TEST", "type": "Bus", "classId": 1376272,
+                "path": base, "parent": {"id": parent}, "notes": ""}
+            for identity, name in ((target, "Destination"), (source, "Sender")):
+                task.objects[identity] = {"id": identity, "name": name, "type": "AuxBus", "classId": 3997712,
+                    "path": base + "\\" + name, "parent": {"id": root}, "notes": ""}
+            task.objects[source]["@UserAuxSend0"] = {"id": root if fault == "wrong-guid" else target}
+            result = {"id": root, "name": "WAAPI_RESULT_REFERENCE_TEST", "children": [
+                {"id": target, "name": "Destination"}, {"id": source, "name": "Sender"}]}
+            return result if operation == "object.create" else {"objects": [{"id": parent, "name": "Default Work Unit", "children": [result]}]}
+        if uri.endswith("object.get") and args.get("waql", "").startswith('from object "') and not args["waql"].endswith(" take 1"):
+            expression = args["waql"]
+            identity = expression.split('"')[1]
+            assert expression == f'from object "{identity}"', expression
+            result = {"return": [deepcopy(row) for row in task.objects.values() if identity in {row["id"], row["path"]}]}
+        else:
+            result = original(uri, args, options)
+        if uri.endswith("object.get") and args.get("waql") != "from type Project take 1":
+            # Honor the literal native return projection, including reference spelling.
+            rows = []
+            for row in result["return"]:
+                projected = {key: deepcopy(row.get(key, row.get("@" + key))) for key in options["return"]
+                    if key in row or "@" + key in row}
+                if independent_read and fault == "independent-path" and row["id"] == target:
+                    projected["path"] = base + r"\NotRequested"
+                if independent_read and fault == "independent-guid" and row["id"] == source and "UserAuxSend0" in projected:
+                    projected["UserAuxSend0"] = {"id": root}
+                if independent_read and fault == "independent-class" and row["id"] == target and "classId" in projected:
+                    projected["classId"] = True
+                if independent_read and fault == "independent-parent" and row["id"] == target and "parent" in projected:
+                    projected["parent"] = {"id": parent}
+                rows.append(projected)
+            return {"return": rows}
+        return result
+
+    task.call = call
+    runtime = SimpleNamespace(version=version, state_dir=tmp_path / "state", env=task.env,
+        candidate="fixture-candidate", category_results=[])
+    def raw(command):
+        nonlocal independent_read
+        commands.append(list(command))
+        independent_read = command[0] == "query-object"
+        return workflow.waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: task)
+    runtime.raw_gateway = raw
+    return runtime, commands, writes, task
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_new_result_reference_acceptance_uses_real_gateway_and_one_graph_write(tmp_path, workflow, version):
+    runtime, commands, writes, _task = _new_result_reference_runtime(tmp_path, workflow, version)
+    workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    category, = runtime.category_results
+    assert category["status"] == "PASS", category
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert receipt["native_outcome"] == "accepted" and receipt["reference_effect"] == "proven", receipt
+    assert receipt["independent_source"]["references"]["UserAuxSend0"]["id"] == receipt["independent_target"]["id"]
+    assert len(writes) == 1 and [command[0] for command in commands].count("execute") == 1
+    assert writes[0][0] == "ak.wwise.core.object." + ("create" if version == "2021.1" else "set")
+    declaration = next(command for command in commands if command[0] == "draft-declare-new" and "source" in command)
+    assert declaration[declaration.index("--field-value") + 1].startswith("bfh1-")
+    assert declaration[declaration.index("--field-value") + 2].startswith("bnh1-")
+    assert any(command[:1] == ["query-object"] and "--include-field" in command for command in commands)
+    assert not any(flag in command for command in commands for flag in ("--advanced-waql", "--args", "--request-file"))
+
+
+@pytest.mark.parametrize("version,fault", (("2021.1", "wrong-guid"), ("2025.1", "wrong-guid"),
+    ("2021.1", "independent-path"), ("2025.1", "independent-guid"),
+    ("2025.1", "independent-class"), ("2025.1", "independent-parent")))
+def test_new_result_reference_acceptance_rejects_wrong_effect_or_independent_drift(tmp_path, workflow, version, fault):
+    runtime, commands, writes, _task = _new_result_reference_runtime(tmp_path, workflow, version, fault=fault)
+    with pytest.raises(AssertionError):
+        workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    category, = runtime.category_results
+    assert category["status"] == "FAIL", category
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert receipt["native_outcome"] == "accepted" and receipt["reference_effect"] != "proven", receipt
+    assert receipt["business_effect_verified"] is False
+    assert len(writes) == 1 and [command[0] for command in commands].count("execute") == 1
+    assert receipt["gateway_verification"]["payload"].get("verified") is (fault != "wrong-guid"), receipt
+    if fault in {"wrong-guid", "independent-guid"}:
+        assert receipt["independent_source"]["references"]["UserAuxSend0"]["id"] != receipt["independent_target"]["id"]
+
+
+def test_new_result_reference_acceptance_retains_native_failure_without_retry(tmp_path, workflow):
+    runtime, commands, writes, _task = _new_result_reference_runtime(tmp_path, workflow, "2025.1", fault="native-error")
+    category = workflow._collect_new_result_scalar_reference_acceptance(runtime, root_name="WAAPI_RESULT_REFERENCE_TEST")
+    receipt = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "FAIL" and receipt["native_outcome"] in {"rejected", "indeterminate"}, receipt
+    assert receipt["reference_effect"] == "not_observed" and receipt["business_effect_verified"] is False
+    assert "Frozen native graph rejection" in json.dumps(receipt["native_response"])
+    assert len(writes) == 1 and [command[0] for command in commands].count("execute") == 1
+    assert not any(command[0] in {"verify", "query-object"} for command in commands[commands.index(next(command for command in commands if command[0] == "execute")) + 1:])
+
+
 @pytest.mark.parametrize("state", ("execution_failed", "indeterminate"))
 def test_inline_wav_probe_keeps_terminal_receipt_without_retry(tmp_path, workflow, state):
     calls = []

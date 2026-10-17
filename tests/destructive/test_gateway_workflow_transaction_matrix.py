@@ -4401,6 +4401,138 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
         category.update(status=status, reason=reason)
 
 
+def _collect_new_result_scalar_reference_acceptance(
+    runtime: _WorkflowSandboxRuntime, *, root_name: str,
+) -> dict[str, Any]:
+    """One public graph write; source scalar value must equal a new target's actual GUID."""
+    operation = "object.create" if runtime.version == "2021.1" else "object.set"
+    observation_path = runtime.state_dir / "new-result-scalar-reference-acceptance.json"
+    category = {"category": "same-graph-new-result-scalar-reference", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_exact_guid_class_parent_and_scalar_reference",
+        "observation_path": str(observation_path), "operation": operation}
+    runtime.category_results.append(category)
+    receipt: dict[str, Any] = {"candidate": runtime.candidate, "version": runtime.version,
+        "operation": operation, "calls": [], "native_outcome": "not_executed",
+        "reference_effect": "not_observed", "business_effect_verified": False,
+        "lifecycle_acceptance": "Requires this node's final host-category-evidence/v3 PASS; prepared/PENDING grants no cleanup or source-integrity credit."}
+
+    def persist():
+        encoded = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(encoded) <= 2 * 1024 * 1024, "graph scalar-reference receipt bound exceeded"
+        observation_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = observation_path.with_suffix(".tmp")
+        temporary.write_bytes(encoded)
+        temporary.replace(observation_path)
+
+    class ReceiptGateway:
+        def raw_gateway(self, command):
+            assert len(receipt["calls"]) < 32, "graph scalar-reference public call bound exceeded"
+            row = {"argv": list(command)}
+            receipt["calls"].append(row)
+            try:
+                code, payload = runtime.raw_gateway(command)
+                row.update(exit_code=code, payload=payload)
+                return code, payload
+            except Exception as exc:
+                row["exception"] = {"type": type(exc).__name__, "message": str(exc)}
+                raise
+            finally:
+                persist()
+
+        def gateway(self, command, *, live):
+            code, payload = self.raw_gateway(command)
+            assert code == 0 and payload.get("ok") is True, payload
+            return payload
+
+    gateway = ReceiptGateway()
+
+    def exact_row(command):
+        payload = gateway.gateway(command, live=True)
+        rows = payload.get("objects")
+        assert payload.get("count") == 1 and isinstance(rows, list) and len(rows) == 1, payload
+        assert isinstance(rows[0], Mapping), payload
+        uuid_value = uuid.UUID(_required_string(rows[0], "id"))
+        assert uuid_value.int != 0, rows[0]
+        return rows[0]
+
+    segments = ("Master-Mixer Hierarchy", "Default Work Unit")
+    field_meaning = "User-Defined Auxiliary Send 0"
+    try:
+        draft = _start_business_draft(gateway, operation)
+        parent_handle = _bind_business_object(gateway, draft, path_segments=segments)
+        types = {name: _discover_business_type(gateway, draft, meaning=name, role="object", expected_label=name)
+            for name in ("Bus", "AuxBus")}
+        discovered = _update_business_draft(gateway, draft, "draft-discover-fields",
+            ["--type-handle", types["AuxBus"], "--meaning", field_meaning], live=True)
+        field_handle = discovered_business_field_handle(discovered, field_meaning)
+        root = _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "root",
+            "--parent-handle", parent_handle, "--name", root_name, "--kind", types["Bus"]], live=False)
+        root_handle = declared_business_object_handle(root, "root")
+        target = _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "target",
+            "--parent-handle", root_handle, "--name", "Destination", "--kind", types["AuxBus"]], live=False)
+        target_handle = declared_business_object_handle(target, "target")
+        _update_business_draft(gateway, draft, "draft-declare-new", ["--declaration-id", "source",
+            "--parent-handle", root_handle, "--name", "Sender", "--kind", types["AuxBus"],
+            "--field-value", field_handle, target_handle], live=False)
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        transaction_id = _required_string(preview, "transaction_id")
+        category["transaction_id"] = receipt["transaction_id"] = transaction_id
+        receipt["artifact_hash"] = preview["artifact_hash"]
+        shown = gateway.gateway(["transaction-show", transaction_id], live=False)
+        receipt["compiled_native_request"] = shown["artifact"]["prepared_operation"]["dispatch"]
+        gateway.gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        receipt["native_outcome"] = "indeterminate"
+        execute_code, executed = gateway.raw_gateway(["execute", transaction_id])
+        receipt["native_response"] = executed
+        if execute_code != 0 or executed.get("ok") is not True:
+            receipt["native_outcome"] = "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+            return category
+        assert executed.get("state") == "executed_unverified" and executed.get("automatic_retry") is False, executed
+        receipt["native_outcome"] = "accepted"
+        verify_code, verified = gateway.raw_gateway(["verify", transaction_id])
+        receipt["gateway_verification"] = {"exit_code": verify_code, "payload": verified}
+        receipt["reference_effect"] = "incomplete"
+        # Select by closed fixture names, then independently re-read every exact GUID.
+        independently_found = {}
+        for name, child_segments in (("root", ()), ("target", ("Destination",)), ("source", ("Sender",))):
+            path_segments = (*segments, root_name, *child_segments)
+            found = exact_row(["query-object", *(value for segment in path_segments for value in ("--path-segment", segment))])
+            exact = exact_row(["query-object", "--exact-id", found["id"], "--include", "class-id", "--include", "parent",
+                *(["--include-field", field_meaning] if name == "source" else [])])
+            assert all(found.get(key) == exact.get(key) for key in ("id", "name", "type", "path")), (found, exact)
+            receipt["independent_" + name] = exact
+            independently_found[name] = exact
+        root_row, target_row, source_row = (independently_found[name] for name in ("root", "target", "source"))
+        assert len({row["id"] for row in (root_row, target_row, source_row)}) == 3, independently_found
+        for row, expected_class, expected_type in ((root_row, 1376272, "Bus"), (target_row, 3997712, "AuxBus"), (source_row, 3997712, "AuxBus")):
+            assert type(row.get("class_id")) is int and row["class_id"] == expected_class and row["type"] == expected_type, row
+        assert target_row.get("parent", {}).get("id") == root_row["id"], target_row
+        assert source_row.get("parent", {}).get("id") == root_row["id"], source_row
+        reference = source_row.get("references", {}).get("UserAuxSend0")
+        actual_target_id = reference.get("id") if isinstance(reference, Mapping) else reference
+        assert actual_target_id == target_row["id"], {"source_reference": reference, "independent_target": target_row}
+        assert verify_code == 0 and verified.get("state") == "verified" and verified.get("verified") is True, verified
+        assert verified.get("verification", {}).get("business_state_verified") is True, verified
+        receipt.update(reference_effect="proven", business_effect_verified=True)
+        category["status"] = "PASS"
+        return category
+    except Exception as exc:
+        receipt["failure"] = {"type": type(exc).__name__, "message": str(exc)}
+        raise
+    finally:
+        persist()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_same_graph_new_result_scalar_reference_acceptance(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """2021 create and 2022–2025 set share one isolated lifecycle, never a retry."""
+    category = _collect_new_result_scalar_reference_acceptance(workflow_sandbox_runtime,
+        root_name="WAAPI_RESULT_REFERENCE_" + uuid.uuid4().hex[:12])
+    assert category["status"] == "PASS", category
+
+
 @pytest.mark.live
 @pytest.mark.destructive
 def test_read_only_owned_list_native_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
