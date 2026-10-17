@@ -732,6 +732,12 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 and len(commands) - len(recoverable_preprocess_attempt_indexes(commands))
                     == count - prefix + len(classified.allowed_read_commands), "raw commands violate Skill-only/no-bypass gates")
             repair_plan = plan.get("contract") == "waapi-skill.repair-task-plan/v1"
+            if "skill_read_schedule" in plan:
+                expected_schedule = [["SKILL.md", "references/waapi-query.md" if plan["policy"] == "read_only" else "references/waapi-operate.md"]]
+                _require(repair_plan and plan["skill_read_schedule"] == expected_schedule
+                    and list(references) == expected_schedule[index - 1]
+                    and tuple(command.command for command in commands[:len(references)]) == tuple(classified.allowed_read_commands),
+                    "sealed repair Skill read schedule differs from raw reads")
             from tests.semantic.support.codex_repair_cases import repair_notice
             _require(not result["passed"] or index != 1 or (repair_plan and plan["policy"] == "read_only") or (c09_notice if c09_notice is not None else (repair_notice if repair_plan else expansion_preview_notice)(SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
@@ -739,7 +745,11 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 before_snapshot=oracle.get("preview_before") or plan["before"])),
                      "visible post-Preview notice is missing")
             if rejected_read:
-                false_gates = {"broker_provenance", "policy_checkpoint", "visible_preview_notice"}
+                false_gates = {"broker_provenance", "policy_checkpoint"}
+                # Read-only repair turns have no Preview/notice obligation;
+                # preserve the producer's true gate instead of rewriting FAIL.
+                if not (repair_plan and plan["policy"] == "read_only"):
+                    false_gates.add("visible_preview_notice")
                 _require(result["passed"] is False and grade.get("passed") is False
                     and set(grade.get("errors", [])) == false_gates
                     and all(value is (key not in false_gates) for key, value in grade["common_gates"].items()),
@@ -852,7 +862,9 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
             and (rejected_declaration or rejected_check or records[-1]["gateway_arguments"][0] in allowed_prefix)
             and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
             and oracle.get("authorization") is None and oracle.get("permit") is None
-            and oracle.get("after") is None and result.get("assertions") == {}
+            and ((repair and case_id == "F2" and oracle.get("after") == plan["before"]
+                  and isinstance(result.get("assertions"), dict) and result["assertions"].get("read_refinement") is False)
+                 or oracle.get("after") is None and result.get("assertions") == {})
             and broker.get("passed") is False and broker.get("complete") is False,
             "rejected read cannot carry a Preview, mutation or successful outcome")
         if rejected_check:

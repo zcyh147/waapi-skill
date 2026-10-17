@@ -1,0 +1,54 @@
+{
+  "evidence_kind": "authenticated_read_rejection_with_harness_routing_and_archive_discrepancy",
+  "candidate": "459455b2f92ff2ee1deaea21c6a68a8dec659e50",
+  "original_campaign_root": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-remaining3-r4",
+  "unit": "REPAIR25-F2",
+  "original_task_status": "FAIL",
+  "business_pass": false,
+  "original_campaign_classification": "BLOCKED; F3-F4 pending",
+  "agent_seconds": 31.505095875356346,
+  "failed_gates": [
+    "broker_provenance",
+    "policy_checkpoint"
+  ],
+  "visible_preview_notice": true,
+  "agent_project_query_count": 0,
+  "agent_mutation_count": 0,
+  "routing_attribution": "Harness injected an exact SKILL.md then waapi-operate.md read schedule despite read_only; Skill guidance already routes read-only diagnosis to waapi-query.md. The rejected guessed query remains an ordinary Agent CLI failure; it is not business PASS.",
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "errors": [
+      "scenario:V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint"
+    ],
+    "final_status": "FAIL",
+    "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-remaining3-r4/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/quarantine.json",
+    "requested_status": "FAIL",
+    "sandbox_retained": true,
+    "scenario_id": "REPAIR25-F2",
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_mtime_after_ns": 1785701407051832215,
+    "source_mtime_before_ns": 1785701407051832215,
+    "version": "2025.1"
+  },
+  "files_sha256": {
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-task-result.json": "c4dce6e66c36371c478d1335f3a80fabe53cb12f7686a723e29c98c9e5c35f93",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/lifecycle.json": "2484abab4663d12f5f2a51698d9daeafb316036e69360d384fc33dc95b8f3d3c",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-broker.json": "0445d7c1eead4396f4bfd99743d80096bd3808e286a16169b7bc9f0eeb4fb5e2",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/events.jsonl": "f3d98a5829071dc723e8b4f40c67b24f6db7a21ee0d96e93b1aa577ea01d7a4a",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/turn-grade.json": "f609d6f405cd26abc1b890cc13d8c38e3d78acb87bd9ab2a4532bd9927435b60"
+  },
+  "preservation": "Original r4 failure and quarantine unchanged; no regrade/verify-only or new Agent run. F2 rerun is not authorized."
+}
