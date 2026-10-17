@@ -50,7 +50,7 @@ for _version, _build, _index in (("2021.1", "2021.1.14.8108", 4), ("2022.1", "20
     }
 _PROGRAM_CASES["association-continue-play-2025.1"] = {
     "branch_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|"
-                 "PluginModule/WwiseObject[ObjectSettingAssoc]/Properties/Property[ContinuePlay]/Dependencies/0/condition",
+                 "PluginModule/WwiseObject[ObjectSettingAssoc]/Properties/Property[ContinuePlay]/Dependencies/5/condition",
     "public_uri": "ak.wwise.core.object.setProperty",
     "selector": "exact_bound_ObjectSettingAssociation_ContinuePlay_Field_Handle_true_with_exact_SwitchContainer_owner_SwitchBehavior_1",
     "reason": "Exact AssocParent ContinuePlay condition. Retained2025 native read-only facts certify the observed relationship/value and source class metadata; owner typed metadata is explicitly an installed-definition model. Injected mutation verifies exact owner scope without owner writes. Native owner metadata, enabled applicability and mutation effects remain unverified; older native identities remain unresolved.",
