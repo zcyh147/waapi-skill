@@ -21,6 +21,7 @@ from .builders.metadata import (
     GET_TYPES_URI,
     IS_PROPERTY_ENABLED_URI,
     parse_get_property_info_result,
+    bind_get_property_info_result,
     parse_get_types_result,
     parse_is_property_enabled_result,
     parse_property_and_reference_names_result,
@@ -1044,6 +1045,12 @@ class BusinessHandleRegistry:
                 )
 
 
+
+def _require_available_field_value_type(info, token):
+    if info.type is None and info.restriction.get("type") != "reference":
+        raise _error("FIELD_TYPE_UNAVAILABLE", field=token, unavailable_facts=["type"],
+                     action="inspect the exact field metadata or select a field with a certified value type")
+
 def bind_live_field(
     registry: BusinessHandleRegistry,
     *,
@@ -1098,13 +1105,9 @@ def bind_live_field(
             action="choose one exact token returned for this live scope",
         )
     try:
-        info = parse_get_property_info_result(
-            read_call(
-                GET_PROPERTY_INFO_URI,
-                {**live_scope, "property": token},
-                {},
-            )
-        )
+        info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": token}, {})
+        info = (bind_get_property_info_result(info_result, field_token=token, available_names=exact_names)
+                if scope_kind == "object" else parse_get_property_info_result(info_result))
     except (TypeError, ValueError) as exc:
         raise _error(
             "METADATA_READBACK_INVALID",
@@ -1118,9 +1121,10 @@ def bind_live_field(
             candidates=(info.name,),
             action="refresh live Wwise metadata before continuing",
         )
+    _require_available_field_value_type(info, token)
     field_kind = (
         "reference"
-        if info.type.casefold() in {"reference", "objectreference"}
+        if (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or info.restriction.get("type") == "reference"
         else "property"
     )
@@ -1262,13 +1266,10 @@ def revalidate_live_field(
                 rejected_handle=field.handle,
                 action="refresh live metadata and use the new field handle",
             )
-        info = parse_get_property_info_result(
-            read_call(
-                GET_PROPERTY_INFO_URI,
-                {**live_scope, "property": field.token},
-                {},
-            )
-        )
+        info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": field.token}, {})
+        info = (bind_get_property_info_result(info_result, field_token=field.token,
+                                             available_names=tuple(row.name for row in names))
+                if field.scope_kind == "object" else parse_get_property_info_result(info_result))
     except BusinessDeclarationError:
         raise
     except (TypeError, ValueError) as exc:
@@ -1284,6 +1285,7 @@ def revalidate_live_field(
             rejected_handle=field.handle,
             action="refresh live metadata and use the new field handle",
         )
+    _require_available_field_value_type(info, field.token)
     dependency_fields = _dependency_field_tokens(info.dependencies)
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()

@@ -117,9 +117,9 @@ def condition_values_equal(left: Any, right: Any) -> bool:
     return type(left) is type(right) and left == right
 
 
-def is_terminal_override_dependency(name: str, metadata_type: str, dependency: Mapping[str, Any]) -> bool:
+def is_terminal_override_dependency(name: str, metadata_type: str | None, dependency: Mapping[str, Any]) -> bool:
     """A Boolean switch's exact self override is a terminal metadata marker."""
-    return metadata_type.casefold() in {"bool", "boolean"} and dependency == {
+    return isinstance(metadata_type, str) and metadata_type.casefold() in {"bool", "boolean"} and dependency == {
         "type": "override", "action": "Enable", "context": "Self", "property": name,
     }
 
