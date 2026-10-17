@@ -66,6 +66,16 @@ for _version, _build, _index in (("2021.1", "2021.1.14.8108", 152), ("2022.1", "
                      f"PluginModule/WwiseObject[GameParameter]/Properties/Property[SlewRateUp]/Dependencies/{_index}/condition",
     }
 
+for _version, _build, _index in (("2021.1", "2021.1.14.8108", 160), ("2025.1", "2025.1.7.9143", 150)):
+    _PROGRAM_CASES[f"time-modulator-range-{_version}"] = {
+        "branch_id": f"{_version}|installed|{_build}|condition|existing-object|WObjects/WObjects.xml|"
+                     f"PluginModule/WwiseObject[ModulatorTime]/Properties/Property[EnvelopeStopPlayback]/Dependencies/{_index}/condition",
+        "public_uri": "ak.wwise.core.object.setProperty",
+        "selector": "exact_bound_existing_modeled_ModulatorTime_EnvelopeStopPlayback_Field_Handle_false_with_TimeModLoops_50",
+        "reason": "Exact installed range1..100 condition with sealed version-matching class metadata. Injected public workflow preserves50; endpoints, invalid0, explicit staged repair and available atomic repair are covered. Instance identity and controller metadata are explicitly modeled from installed definitions, not native observations. Native instance applicability, enabled behavior and mutation effects remain unverified.",
+        "scalar": {"controller": "TimeModLoops", "controller_value": 50, "field": "EnvelopeStopPlayback", "value": False},
+    }
+
 
 def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show", create_output: bool = True) -> dict:
     """Freeze exact source and branch facts before the public workflow executes."""
@@ -87,6 +97,13 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/destructive/test_condition_visibility_gateway.py",
         "tests/destructive/support/exact_real_evidence.py",
         "tests/destructive/support/category_evidence.py",
+        "tests/destructive/support/condition_finalization.py",
+        "tests/destructive/support/sandbox_fixture.py",
+        "tests/destructive/support/live_environment.py",
+        "tests/semantic/support/codex_scenario_lifecycle_v3.py",
+        "tests/semantic/support/codex_campaign.py",
+        "tests/semantic/support/codex_filesystem_security.py",
+        "tests/unit/test_condition_native_finalization.py",
         "tests/conftest.py", "tests/support/exact_evidence_finalization.py",
         "tests/maintenance/branch_audit_completion.py", "tests/maintenance/branch_coverage_audit.py",
         "docs/branch-coverage-condition-sources.json",
@@ -97,6 +114,8 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/unit/test_association_condition_product_gateway.py",
         "tests/fixtures/metadata-conditions/association-continue-play-2025.json",
         "tests/unit/test_condition_native_evidence.py",
+        "tests/unit/test_time_modulator_range_gateway.py",
+        "tests/fixtures/metadata-conditions/time-modulator-range.json",
     ])
     sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in sorted(set(relevant))}
     return {"root": root, "nodeid": nodeid, "branch": branch, "case": case,
@@ -208,11 +227,7 @@ def publish_condition_native_capture(capture: dict, category: dict, observation_
         raise ValueError("native wrapper requires the exact finalized PASS node")
     if category["candidate"] != capture["git_candidate"]:
         raise ValueError("native original candidate differs from frozen source")
-    if (not capture["relevant_sources"] or any(
-            hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() != seal
-            for name, seal in capture["relevant_sources"].items())
-            or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=audit.ROOT, text=True).strip() != capture["git_candidate"]):
-        raise ValueError("native frozen source changed")
+    validate_condition_frozen_source(capture)
     observation_bytes = observation_path.read_bytes()
     observation = json.loads(observation_bytes)
     host = category["host"]
@@ -299,3 +314,12 @@ def publish_condition_native_capture(capture: dict, category: dict, observation_
     if observation_path.read_bytes() != observation_bytes:
         raise ValueError("original native observation changed before publication")
     pending.rename(root)
+
+
+def validate_condition_frozen_source(capture: dict) -> None:
+    """Require the original source seal again before destructive cleanup."""
+    if (not capture["relevant_sources"] or any(
+            hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() != seal
+            for name, seal in capture["relevant_sources"].items())
+            or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=audit.ROOT, text=True).strip() != capture["git_candidate"]):
+        raise ValueError("native frozen source changed")

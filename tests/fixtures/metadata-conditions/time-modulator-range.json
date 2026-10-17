@@ -1,0 +1,128 @@
+{
+  "contract": "waapi-skill.recorded-time-modulator-range-facts/v1",
+  "evidence_scope": "Native class-scoped dependent-field metadata plus installed controller-definition inputs only; instance identity/controller native metadata/applicability/effects remain unobserved.",
+  "versions": {
+    "2021.1": {
+      "build": "2021.1.14.8108",
+      "field_metadata": {
+        "name": "EnvelopeStopPlayback",
+        "type": "bool",
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Enable",
+            "property": "TimeModLoops",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "range",
+                  "min": 1,
+                  "max": 100
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "metadata_scope": {
+        "kind": "object_type",
+        "requested": "ModulatorTime",
+        "resolved": {
+          "classId": 5111824,
+          "name": "ModulatorTime",
+          "type": "WObject"
+        }
+      },
+      "original_receipt": {
+        "artifact": ".waapi-skill-state/full-coverage/condition-metadata-2021-r1/014.stdout",
+        "sha256": "d3b484ba720f84761a8646227482a060a7f5cf388f8a792fe41a9acd64d68047"
+      },
+      "controller_metadata_model": {
+        "name": "TimeModLoops",
+        "type": "int32",
+        "restriction": {
+          "type": "range",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "controller_model_source": {
+        "installed_definition_sha256": "6538b45e18ba6575b9172af100b18b876923ee2614ada38d80cff44e090b478d",
+        "element": "<Property Name=\"TimeModLoops\" Type=\"int32\" SupportModifier=\"true\" DisplayName=\"Loops\">\n       <UserInterface InfiniteValue=\"0\" />\n       <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>0</Min>\n              <Max>100</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n     </Property>\n     "
+      },
+      "instance_identity_model": {
+        "type": "ModulatorTime",
+        "basis": "Installed class label only, not a native instance type observation"
+      },
+      "missing_native_facts": [
+        "instance identity/class applicability",
+        "object-scoped controller metadata",
+        "enabled-state behavior",
+        "mutation/readback effect"
+      ]
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "field_metadata": {
+        "name": "EnvelopeStopPlayback",
+        "type": "bool",
+        "restriction": {},
+        "dependencies": [
+          {
+            "type": "property",
+            "action": "Enable",
+            "property": "TimeModLoops",
+            "context": "Self",
+            "conditions": [
+              {
+                "restriction": {
+                  "type": "range",
+                  "min": 1,
+                  "max": 100
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "metadata_scope": {
+        "kind": "object_type",
+        "requested": "ModulatorTime",
+        "resolved": {
+          "classId": 5111824,
+          "name": "ModulatorTime",
+          "type": "WObject"
+        }
+      },
+      "original_receipt": {
+        "artifact": ".waapi-skill-state/full-coverage/condition-metadata-2025-r1/014.stdout",
+        "sha256": "686377d6a4a98c4286c962caae5e845c995bb0923dc27b280ff4c2cc2f2ce302"
+      },
+      "controller_metadata_model": {
+        "name": "TimeModLoops",
+        "type": "int32",
+        "restriction": {
+          "type": "range",
+          "min": 0,
+          "max": 100
+        }
+      },
+      "controller_model_source": {
+        "installed_definition_sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+        "element": "<Property Name=\"TimeModLoops\" Type=\"int32\" SupportModifier=\"true\" DisplayName=\"Loops\">\n       <UserInterface InfiniteValue=\"0\" />\n       <DefaultValue>1</DefaultValue>\n        <Restrictions>\n          <ValueRestriction>\n            <Range Type=\"int32\">\n              <Min>0</Min>\n              <Max>100</Max>\n            </Range>\n          </ValueRestriction>\n        </Restrictions>\n     </Property>\n     "
+      },
+      "instance_identity_model": {
+        "type": "ModulatorTime",
+        "basis": "Installed class label only, not a native instance type observation"
+      },
+      "missing_native_facts": [
+        "instance identity/class applicability",
+        "object-scoped controller metadata",
+        "enabled-state behavior",
+        "mutation/readback effect"
+      ]
+    }
+  }
+}

@@ -2017,6 +2017,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     metadata_scope = metadata.add_mutually_exclusive_group()
+    metadata_scope.add_argument("--type-selection", dest="metadata_type_selection",
+                               help="Copy a disclosed live type selection for class metadata")
     metadata_scope.add_argument(
         "--path-segment",
         action="append",
@@ -5815,6 +5817,7 @@ def preflight_metadata_input(
     semantic_kind = getattr(args, "metadata_semantic_kind", None)
     custom_kind_meaning = getattr(args, "metadata_custom_kind_meaning", None)
     exact_id = getattr(args, "metadata_exact_id", None)
+    type_selection = getattr(args, "metadata_type_selection", None)
     meanings = list(getattr(args, "metadata_meanings", None) or ())
     if path_segments:
         args.object = _business_object_path_from_segments(path_segments)
@@ -5844,12 +5847,14 @@ def preflight_metadata_input(
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
     args.detail = False
 
-    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation not in {"detail", "media-pool-fields"}:
+    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation not in {"detail", "media-pool-fields", "types"}:
         raise GatewayInputError("metadata --detail-page requires detail --selection")
     if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
         raise GatewayInputError("metadata --detail-item requires a nonnegative typed choices/dependencies item index")
 
     if args.operation in {"types", "media-pool-fields"}:
+        if args.operation == "types" and args.selection is not None and meanings:
+            raise GatewayInputError("metadata types --selection cannot also filter the inventory with --meaning")
         if args.operation == "media-pool-fields" and resolve_catalog_versions(args, env=env) != ("2025.1",):
             raise GatewayInputError("Media Pool field discovery requires the Wwise 2025.1 contract")
         if (
@@ -5857,11 +5862,12 @@ def preflight_metadata_input(
             or semantic_kind is not None
             or custom_kind_meaning is not None
             or exact_id is not None
+            or type_selection is not None
             or args.platform
             or args.curve_role
         ):
             raise GatewayInputError(f"metadata {args.operation} accepts no business input")
-        if ((args.operation == "types" and args.selection is not None) or not 1 <= args.page_size <= 64
+        if (not 1 <= args.page_size <= 64
                 or args.selection is not None and args.page is not None
                 or args.detail_page is not None and args.selection is None
                 or args.detail_view != "raw" or args.detail_item is not None):
@@ -5916,7 +5922,7 @@ def preflight_metadata_input(
     if args.operation in {"discover", "list", "detail"}:
         if sum(
             value is not None
-            for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id)
+            for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id, type_selection)
         ) != 1:
             raise GatewayInputError(
                 "metadata discover requires exactly one --path-segment, --kind, "
@@ -5926,6 +5932,8 @@ def preflight_metadata_input(
             raise GatewayInputError(
                 "metadata discover does not accept --platform or --curve-role"
             )
+        if type_selection is not None and args.operation not in {"list", "detail"}:
+            raise GatewayInputError("metadata --type-selection requires list or detail")
         return
 
     if args.operation == "property-state":
@@ -12082,14 +12090,16 @@ def dispatch_media_build_business_read(
 ) -> dict[str, Any]:
     """Revalidate and execute one closed media/build business read."""
 
-    def native_failure_evidence(native_call: Mapping[str, Any]) -> dict[str, Any]:
+    def native_failure_evidence(native_call: Mapping[str, Any], *, maximum_inline_bytes: int | None = None) -> dict[str, Any]:
         observation = native_call.get("result")
+        inline_limit = maximum_inline_bytes or (6 * 1024 if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else 64 * 1024)
         evidence: dict[str, Any] = {"call": dispatch_call_summary(native_call)}
-        if probe_gateway_json_document_size(observation, 64 * 1024) == "ok":
+        if probe_gateway_json_document_size(observation, inline_limit) == "ok":
             evidence["native_observation"] = observation
         else:
             evidence["native_observation_boundary"] = {
-                "complete": False, "inline_limit_bytes": 64 * 1024,
+                "complete": False, "inline_limit_bytes": inline_limit,
+                "native_result_sha256": canonical_sha256(observation),
                 "evidence_path": native_call.get("evidence_path"),
             }
         return evidence
@@ -12187,6 +12197,17 @@ def dispatch_media_build_business_read(
             raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
+    peak_page = None
+    if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
+        from wwise_waapi.peak_read_continuation import PeakContinuationError, prepare_peak_page
+        peak_context = {"configuration": selected_connection_binding(env),
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")}}
+        try:
+            peak_page = prepare_peak_page(request, token=args.peak_page, context=peak_context)
+        except PeakContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     if args.api == MEDIA_POOL_GET_URI:
         required_type = None
         identity_rows = None
@@ -12326,6 +12347,17 @@ def dispatch_media_build_business_read(
                 details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
+        if peak_page is not None:
+            from wwise_waapi.peak_read_continuation import finish_peak_page, peak_page_argv
+            context_available = (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
+                and live_info["processId"] > 0)
+            try:
+                normalized = finish_peak_page(peak_page, raw=result["result"], normalized=normalized,
+                    context_available=bool(context_available),
+                    next_command=lambda token: transaction_next_command("core-call", peak_page_argv(request, token)))
+            except PeakContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result,
+                    maximum_inline_bytes=4096 if exc.code == "PEAK_PROJECTION_LIMIT_EXCEEDED" else None), error_code=exc.code) from exc
         if args.api == MEDIA_POOL_GET_URI:
             from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
             try:
@@ -12428,6 +12460,14 @@ def dispatch_media_build_business_read(
         **({"read_page": normalized["page"]} if incomplete_media_pool else {}),
         **({"next_command": normalized["next_command"]}
            if incomplete_media_pool and "next_command" in normalized else {}),
+        **({"read_resource_boundary": {
+                "requested_pairs_per_channel": request["business_request"]["peak_pair_count"],
+                "requested_channel_mode": request["business_request"]["channel_mode"],
+                "combined_native_result_limit_bytes": int(capability.execution_contract["result_limit_bytes"]),
+                "native_capability_or_completion_proven": False,
+                "next_step": "Review the disclosed schema and choose an explicit smaller read; original resolution, region and channel mode are preserved and never silently changed",
+            }, "next_command": transaction_next_command("request-schema", ["request-schema", args.api])}
+           if peak_page is not None and result.get("error_code") == "RESULT_TOO_LARGE" else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 
@@ -14812,14 +14852,27 @@ def dispatch_command(
         if args.operation == "types":
             from wwise_waapi.metadata_discovery import browse_metadata_types
             metadata_calls: list[dict[str, Any]] = []
+            filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
+            def decorate_types(page):
+                if page.get("next_page"):
+                    page["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", page["next_page"]])
+                for row in page["types"]:
+                    if row.get("details_complete") is False:
+                        row["detail_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", row["selection"]])
+                        if isinstance(row.get("classId"), int):
+                            row["fields_command"] = transaction_next_command("metadata", ["metadata", "list", "--type-selection", row["selection"]])
             result = browse_metadata_types(
                 read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
                 context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
                 meanings=args.queries or (), page=args.page, page_size=args.page_size,
+                selection=args.selection, detail_page=args.detail_page, decorate=decorate_types,
             )
-            if result.get("next_page"):
-                filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
-                result["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", result["next_page"]])
+            if args.selection is not None:
+                from wwise_waapi.metadata_detail import fit_detail_continuations
+                def decorate_type_detail(page):
+                    if page.get("next_detail_page"):
+                        page["next_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", args.selection, "--detail-page", page["next_detail_page"]])
+                result = fit_detail_continuations(result, decorate_type_detail)
             return {"ok": True, "status": "ok", **common, "operation": args.operation,
                     "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls), "agent_result": result}
         if args.operation in {"discover", "property-state", "list", "detail"}:
@@ -14877,6 +14930,12 @@ def dispatch_command(
             )
             if args.operation in {"list", "detail"}:
                 from wwise_waapi.metadata_discovery import browse_metadata
+                if args.metadata_type_selection is not None:
+                    from wwise_waapi.metadata_discovery import resolve_metadata_type_selection
+                    args.class_id = resolve_metadata_type_selection(
+                        read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                        context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
+                        selection=args.metadata_type_selection)
                 result = browse_metadata(
                     read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
                     context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
@@ -14885,6 +14944,8 @@ def dispatch_command(
                     complete_detail=True, detail_page=args.detail_page, detail_view=args.detail_view, detail_item=args.detail_item,
                 )
                 scope_argv = []
+                if args.metadata_type_selection is not None:
+                    scope_argv.extend(["--type-selection", args.metadata_type_selection])
                 for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
                     if value is not None:
                         scope_argv.extend([flag, value])

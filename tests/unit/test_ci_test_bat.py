@@ -352,7 +352,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 221
+    assert len(nodes) == 230
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_branch_evidence_readers.py"
     assert {
@@ -360,6 +360,10 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_metadata_selection_gateway.py",
         "tests/unit/test_conditional_reference_gateway.py",
         "tests/unit/test_condition_native_evidence.py",
+        "tests/unit/test_condition_native_finalization.py",
+        "tests/unit/test_peak_branch_evidence.py",
+        "tests/unit/test_authoring_batch_owner.py",
+        "tests/unit/test_authoring_launch_lifecycle.py",
         "tests/unit/test_authoring_batch_adapter.py",
         "tests/unit/test_authoring_layout_native_fixture.py",
         "tests/unit/test_authoring_layout_splitter_gateway.py",

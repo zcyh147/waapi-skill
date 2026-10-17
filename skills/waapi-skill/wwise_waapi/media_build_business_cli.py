@@ -19,6 +19,7 @@ from .media_build_business_contracts import (
     media_build_business_contract_data,
 )
 from .media_pool_continuation import MediaPoolContinuationError, parse_media_pool_page
+from .peak_read_continuation import PeakContinuationError, parse_peak_page
 
 
 class MediaBuildBusinessCliError(ValueError):
@@ -36,6 +37,7 @@ def add_media_build_read_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--start-seconds", type=float)
     parser.add_argument("--end-seconds", type=float)
     parser.add_argument("--peak-pair-count", type=int)
+    parser.add_argument("--peak-page", help="Copy the returned exact-observation peak continuation verbatim")
     parser.add_argument(
         "--channel-mode",
         choices=("per-channel", "cross-channel", "native-default"),
@@ -77,6 +79,7 @@ def media_build_fields_supplied(args: argparse.Namespace) -> bool:
             "start_seconds",
             "end_seconds",
             "peak_pair_count",
+            "peak_page",
             "channel_mode",
             "soundbank_id",
             "max_results",
@@ -120,6 +123,8 @@ def media_build_input_from_namespace(
     )
     try:
         if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
+            if operation == PEAKS_TRIMMED_URI and any(value is not None for value in (args.start_seconds, args.end_seconds)):
+                raise MediaBuildBusinessCliError("Trimmed peak reads do not accept explicit time-region fields; use the disclosed region route")
             if any(value is not None for value in foreign_core_values):
                 raise MediaBuildBusinessCliError(
                     "Audio peak reads accept only their disclosed media business fields"
@@ -128,6 +133,8 @@ def media_build_input_from_namespace(
                 raise MediaBuildBusinessCliError(
                     "Audio peak reads accept only their disclosed media business fields"
                 )
+            if args.peak_page is not None:
+                parse_peak_page(args.peak_page)
             plan = {
                 "audio_source_id": args.audio_source_id,
                 "peak_pair_count": args.peak_pair_count,
@@ -160,6 +167,7 @@ def media_build_input_from_namespace(
                     args.start_seconds,
                     args.end_seconds,
                     args.peak_pair_count,
+                    args.peak_page,
                     args.channel_mode,
                 )
             ) or _media_pool_fields_supplied(args):
@@ -181,6 +189,7 @@ def media_build_input_from_namespace(
                     args.start_seconds,
                     args.end_seconds,
                     args.peak_pair_count,
+                    args.peak_page,
                     args.channel_mode,
                     args.soundbank_id,
                 )
@@ -197,7 +206,7 @@ def media_build_input_from_namespace(
             if args.media_page is not None:
                 parse_media_pool_page(args.media_page)
             return MediaBuildCliInput(deferred_media_pool_plan=plan)
-    except (MediaBuildBusinessError, MediaPoolContinuationError) as exc:
+    except (MediaBuildBusinessError, MediaPoolContinuationError, PeakContinuationError) as exc:
         raise MediaBuildBusinessCliError(str(exc)) from exc
     raise MediaBuildBusinessCliError("Unsupported media/build business read")
 

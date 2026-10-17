@@ -266,6 +266,19 @@ Mac owner after exact successful collection with fake-only controls. Native
 Windows ownership, cross-family integration and the remaining layout contracts
 and observations stay open; the Authoring permission-window hold remains active.
 
+The fifth partial integration refreshes current source seals for peak/raw/header
+continuations, live metadata selections, unconditional selected-field drift
+guards and original condition/Authoring lifecycle plumbing. Its exact public
+route set remains unchanged at 874 version rows / 216 unique URIs. Every native
+ID/shape/owner tuple, independent catalog, original definition and detailed
+selector/completed-family seal is preserved, with no state transition or new
+verified/native/Fresh credit. All 25 layout rows retain #188 migration-required
+ownership. Controlled condition cleanup now waits for final pytest reports;
+native execution, Windows ownership and cross-family proof remain outstanding.
+Definition Short-ID version-proof inconsistency is a new explicit open #183
+acceptance item with shared #181 work, not an exclusion or denominator change.
+No old product receipt is transferred to this integrated source candidate.
+
 
 Ticket #188 has a further code-only partial for exact-target docking/redocking
 and signed splitter movement on 2024.1/2025.1. Docking binds the same scoped

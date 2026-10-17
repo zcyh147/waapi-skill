@@ -2989,7 +2989,11 @@ def test_reference_can_be_explicitly_cleared_and_null_is_verified(version: str, 
             {
                 "ak.wwise.core.object.get": [
                     {"return": [result_row]}
-                ]
+                ],
+                "ak.wwise.core.object.getPropertyInfo": [{
+                    "name": "OutputBus", "type": "Reference", "supports": {"reference": True},
+                    "restriction": {"type": "reference", "restrictions": [{"type": ["Bus"]}]},
+                }],
             }
         ),
     )

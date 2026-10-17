@@ -140,6 +140,44 @@ final integrated acceptance:
   special-route counter. After updating only the derived counters and retaining
   exact versioned undock membership, the entire 17-test Registry file passed
   separately. The first artifact FAIL remains preserved.
+- Exact clean fourth integration `a0c192d9` passed the fixed five-version
+  Program gate: **8356 passed, 3 native-Windows-only skips**, exit 0, in
+  1443.43 pytest seconds (1446.83 wall seconds).
+  `program-a0c192d9-r1.result.json` seals the unchanged source, empty process
+  group and original log SHA-256
+  `d9236654a2710d91078d121d45271d6c46d9d844a359ee0ab1c208b487b53237`.
+  The skipped native shell, Python locator and NTFS junction checks grant no
+  Windows execution proof. This gate predates the selected-metadata drift
+  guard below and does not certify the successor or complete functional scope.
+- Fifth partial integration consumes only #177 `6902c70f`, #181 `7d9018e8`
+  and #188 `cd1363ec`. It adds recorded range controls and defers successful
+  condition sandbox cleanup until actual final pytest reports, preserving
+  publication failure separately from native/node failure. Both peak routes
+  expose bounded decoded/raw/header fragments with exact repeated-result
+  continuation checks; native response/time ceilings stay enforced. Oversized
+  metadata names/types remain recoverable through scoped live selections and
+  raw detail pages. Every ordinary selected property/reference seals normalized
+  and original raw metadata before execution and during verification, including
+  reference clear; absence and explicit null remain distinct. The existing
+  lifecycle/driver now has fake-tested owned Mac Authoring strategy and exact
+  collection hookup for five owner-aware layout nodes. No installed tool,
+  Authoring, Console, native client or Fresh process was launched.
+  Native Windows ownership, cross-family support, full remaining native/layout/
+  query/metadata/peak branches and all exact evidence requirements remain open.
+  No old product receipt is forwarded; earlier failed producer roots retain
+  their original verdicts. This partial grants no native or completion credit.
+  Combined source focus on exact clean `5b87ae32` passed **2689 tests**, with
+  eleven Windows cmd.exe parity skips and six intentionally excluded product
+  capture parameters, in 282.25 seconds. Source/head stayed clean and unchanged,
+  and its owned process group was empty afterward. The new guard is covered by
+  this focused run; a0 Program proof remains attached to the earlier candidate.
+  The single remote-verified #183 Definition Short-ID acceptance item is synced
+  locally as an open version-proof inconsistency, without a runtime change or
+  native failure/absence claim. Existing ticket text and dependency are retained.
+  Source reconciliation preserves all 874 route keys and all 272,313 native
+  ID/shape/owner tuples, original definitions, independent catalogs, detailed
+  policy and historical family seals. There is no branch-state transition or
+  new verified/native/Fresh credit; all 25 layout rows stay #188 migration work.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
