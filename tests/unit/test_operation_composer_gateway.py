@@ -33,6 +33,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     list_operation_specs,
     operation_input_mode,
     operation_request_schema_digest,
+    operation_request_machine_contract,
 )
 from wwise_waapi.typed_requests import (  # pyright: ignore[reportMissingImports]
     expand_gateway_field_table,
@@ -330,9 +331,23 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Reviewed delta: explicit owner/ShareSet placement and Boolean reference
-    # dependency closure. Existing operation/version inventory remains unchanged.
+    # Reviewed delta: only waapi.call adds the private Gateway-owned layout
+    # proof. Removing that exact optional property reproduces the previous seal;
+    # every other machine-contract field and operation/version pair is unchanged.
     assert canonical_sha256(non_object_set_digests) == (
+        "e2ff2fedc414e846f092b06d03ad807952461373873ef1ed2c9d2b4ee42970de"
+    )
+    previous = dict(non_object_set_digests)
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("layout_binding")
+        contract["argument_contract"]["optional"].remove("layout_binding")
+        assert contract["argument_contract"]["properties"].pop("layout_binding") == {
+            "type": "object",
+            "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
+        }
+        previous[f"waapi.call@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(previous) == (
         "4f05743e90078e3d3ca52dc525b000b2fe46bbd4376ba9a701f1fddde5ca246f"
     )
     assert {
