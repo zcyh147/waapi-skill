@@ -11,7 +11,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Protocol
+from typing import Any, Callable, Mapping, Protocol
 
 from .category_policy import (  # pyright: ignore[reportMissingImports]
     is_policy_exempt_category,
@@ -25,7 +25,10 @@ from .subscriptions import (
     MAX_WAIT_EVENT_COUNT,
     SubscriptionCleanupError,
     SubscriptionEvent,
+    SubscriptionEventValidationError,
     SubscriptionManager,
+    SubscriptionStreamIngressError,
+    SubscriptionStreamOverflow,
     SubscriptionTimeout,
     SubscriptionUnavailable,
     payload_matches,
@@ -91,6 +94,7 @@ class DispatcherRequest:
     live_behavior: bool = False
     result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES
     topic_event_count: int = 1
+    topic_event_validator: Callable[[Any], Any] | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -180,6 +184,7 @@ class WwiseDispatcher:
         topic_mode: str = "wait",
         topic_match: Mapping[str, Any] | None = None,
         topic_event_count: int = 1,
+        topic_event_validator: Callable[[Any], Any] | None = None,
         live_behavior: bool = False,
         result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES,
     ) -> dict[str, Any]:
@@ -197,6 +202,7 @@ class WwiseDispatcher:
             topic_mode=topic_mode,
             topic_match=topic_match,
             topic_event_count=topic_event_count,
+            topic_event_validator=topic_event_validator,
             live_behavior=live_behavior,
             result_limit_bytes=result_limit_bytes,
         )
@@ -314,9 +320,12 @@ class WwiseDispatcher:
                 "timeout": request.timeout,
                 "options": dict(request.options or {}),
             }
-            if request.topic_match is not None:
-                expected = dict(request.topic_match)
-                wait_kwargs["predicate"] = lambda event: payload_matches(event.payload, expected)
+            if request.topic_match is not None or request.topic_event_validator is not None:
+                def accepts(event: SubscriptionEvent) -> bool:
+                    if request.topic_event_validator is not None:
+                        request.topic_event_validator(event.payload)
+                    return request.topic_match is None or payload_matches(event.payload, request.topic_match)
+                wait_kwargs["predicate"] = accepts
             if request.topic_event_count == 1:
                 event = manager.wait_for_event(request.api, **wait_kwargs)
                 payload: Any = _subscription_event_envelope(event)
@@ -372,6 +381,16 @@ class WwiseDispatcher:
                 exc,
                 item_type=entry.item_type,
                 error_code="SUBSCRIPTION_UNAVAILABLE",
+            )
+        except (SubscriptionEventValidationError, SubscriptionStreamIngressError, SubscriptionStreamOverflow) as exc:
+            # The manager has completed unsubscribe before raising a predicate
+            # or ingress failure. Keep that cleanup evidence on the failure.
+            return _with_subscription_cleanup(
+                self._exception_result(
+                    request, exc, item_type=entry.item_type,
+                    error_code=exc.error_code,
+                ),
+                status=SUBSCRIPTION_CLEANUP_UNSUBSCRIBED,
             )
         return _with_subscription_cleanup(
             self._success_result(
@@ -580,6 +599,7 @@ class WwiseDispatcher:
             topic_mode=str(kwargs["topic_mode"]),
             topic_match=kwargs["topic_match"],
             topic_event_count=kwargs["topic_event_count"],
+            topic_event_validator=kwargs["topic_event_validator"],
             live_behavior=bool(kwargs["live_behavior"]),
             result_limit_bytes=int(kwargs["result_limit_bytes"]),
         )

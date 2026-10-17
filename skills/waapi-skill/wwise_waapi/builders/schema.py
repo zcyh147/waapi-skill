@@ -281,6 +281,58 @@ def validate_semantic_event(
     return validator.validate_event(uri, event)
 
 
+def validate_resolved_semantic_event(
+    uri: str,
+    event: Any,
+    *,
+    version: str = DEFAULT_WWISE_VERSION,
+    authoring_ui_profile: bool = False,
+) -> SchemaValidationResult:
+    """Validate delivered events against the complete pinned definition graph.
+
+    Subscription acknowledgement and a conservative unresolved-reference check
+    do not prove event delivery conforms to the native publish contract.
+    """
+    from wwise_waapi.schema_inventory import (
+        SchemaInventoryError, load_definition_graph, resolve_schema_reference, topic_publish_schema,
+    )
+
+    graph = load_definition_graph(version)
+    schema = SemanticSchemaValidator(
+        version=version, authoring_ui_profile=authoring_ui_profile,
+    ).schema_for(uri)
+    publish = topic_publish_schema(version, uri, schema)
+
+    class EventWalker(_SchemaWalker):
+        context: Mapping[str, Any] = publish
+
+        def validate(self, node, value, *, path, depth=0):
+            reference = node.get("$ref", node.get("#ref"))
+            if reference is not None:
+                self.nodes += 1
+                if depth > SCHEMA_VALIDATION_MAX_DEPTH or self.nodes > SCHEMA_VALIDATION_MAX_NODES:
+                    raise _schema_error(uri, version, "Topic event exceeded resolved schema budget", section=path)
+                try:
+                    resolved = resolve_schema_reference(reference, root_schema=self.context, graph=graph)
+                except (SchemaInventoryError, TypeError) as exc:
+                    raise _schema_error(uri, version, "Topic event definition cannot be resolved", section=path) from exc
+                previous = self.context
+                self.context = previous if resolved.document_name == "<schema>" else graph.documents[resolved.document_name]
+                try:
+                    self.validate(resolved.target, value, path=path, depth=depth + 1)
+                finally:
+                    self.context = previous
+                node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
+            super().validate(node, value, path=path, depth=depth)
+
+    walker = EventWalker(uri=uri, version=version)
+    walker.validate(publish, event, path="event")
+    return SchemaValidationResult(
+        uri=uri, version=version, section="event", validated_nodes=walker.nodes,
+        required_fields=_required_fields(publish), required_families=_required_families(publish),
+    )
+
+
 def extract_semantic_constraint_facts(
     uri: str,
     family: BuilderFamily | str,

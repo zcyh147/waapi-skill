@@ -186,7 +186,7 @@ from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[report
     topic_business_contract,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    validate_semantic_event,
+    validate_resolved_semantic_event as validate_semantic_event,
     validate_semantic_payload,
     validate_semantic_result,
 )
@@ -513,6 +513,7 @@ from wwise_waapi.safety import (  # noqa: E402  # pyright: ignore[reportMissingI
 from wwise_waapi.subscriptions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DEFAULT_LISTENER_QUEUE_SIZE,
     MAX_WAIT_EVENT_COUNT,
+    SubscriptionEventValidationError,
     SubscriptionManager,
     payload_matches,
 )
@@ -3277,6 +3278,8 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
             "a missing or stale business vocabulary before connecting"
         ),
     )
+    parser.add_argument("--signal-model", help="For click/toggle Topics, one Gateway-owned frontend model resource")
+    parser.add_argument("--signal-widget", help="For click/toggle Topics, one exact widget key in that model's owned template")
     parser.add_argument(
         "--include-object-identity",
         action="store_true",
@@ -6291,6 +6294,20 @@ def preflight_typed_topic_input(
             "different topic/version. Run topic-schema again and copy its exact "
             "--topic-contract-digest value."
         )
+    signal_topic = args.api in {"ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"}
+    if signal_topic:
+        if not isinstance(args.signal_model, str) or re.fullmatch(r"ar1-[0-9a-f]{32}", args.signal_model) is None:
+            raise GatewayInputError("Signal observation requires --signal-model with an exact Gateway-owned model handle")
+        if not isinstance(args.signal_widget, str) or not args.signal_widget or len(args.signal_widget.encode("utf-8")) > 4096:
+            raise GatewayInputError("Signal observation requires --signal-widget with one bounded exact owned widget key")
+        if any(getattr(args, name) for name in (
+            "topic_option", "topic_option_as", "topic_option_empty", "event_match", "event_match_as",
+            "event_empty", "event_row", "event_row_as", "event_row_empty", "event_entry", "event_entry_as",
+            "event_entry_empty", "event_entry_object", "event_entry_object_as", "event_entry_row", "event_entry_row_as",
+        )):
+            raise GatewayInputError("Signal Topic identities are derived only from --signal-model and --signal-widget; additional native identity facts are not accepted")
+    elif args.signal_model is not None or args.signal_widget is not None:
+        raise GatewayInputError("--signal-model and --signal-widget are accepted only for click/toggle signal Topics")
     shortcut_requested = (
         args.include_object_identity
         or args.match_platform_name is not None
@@ -6337,7 +6354,7 @@ def preflight_typed_topic_input(
                 kind="text",
             )
         )
-    args.typed_topic_input = materialize_topic_business_inputs(
+    constructor = dict(
         version=version,
         topic=args.api,
         option_facts=tuple(option_facts),
@@ -6371,6 +6388,13 @@ def preflight_typed_topic_input(
         entry_object_facts=_topic_business_entry_object_facts(args, business),
         entry_row_facts=_topic_business_entry_row_facts(args, business),
     )
+    if signal_topic:
+        # Native IDs are available only after attesting the live resource scope.
+        # Nothing from this deferred business declaration can dispatch directly.
+        args.pending_signal_topic_input = constructor
+        args.typed_topic_input = None
+    else:
+        args.typed_topic_input = materialize_topic_business_inputs(**constructor)
 
 
 def _topic_business_facts(
@@ -8724,6 +8748,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "idle_override": "--idle-timeout",
                 "idle_disable": "--no-idle-timeout",
                 "default_idle_applies": "without_total_timeout",
+                "event_validation": "pinned_publish_schema_and_reachable_definitions_before_matching",
+                "matching": {
+                    "objects": "recursive_subset",
+                    "arrays": "exact_length_and_position",
+                    "scalars": "json_equality_with_distinct_booleans",
+                    "duplicate_callbacks": "count_separately",
+                },
+                "completion_authority": "monitoring_outcome.target_completed",
+                "partial_duration_or_idle_status": "stopped",
+                "subscription_acknowledgement": "setup_only",
             },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
@@ -8862,6 +8896,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             ),
         }
+        if args.api in {"ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"}:
+            payload["continuation"]["owned_signal_observation"] = {
+                "model": "--signal-model <owned-model-resource>",
+                "widget": "--signal-widget <owned-widget-key>",
+                "binding": "configuration_host_build_session_project_and_active_model_parents",
+                "filter": "gateway_derived_native_options_and_exact_callback_identity",
+                "unbounded_monitor_scope_read_timeout_seconds": DEFAULT_TIMEOUT,
+            }
+            payload["continuation"]["business_fact_argv"] = {}
+            payload["business_input"]["options"]["rows"] = []
+            payload["business_input"]["event_match"]["rows"] = []
+            payload["business_input"]["event_match_groups"]["rows"] = []
+            payload["business_input"]["gateway_derived_identity_fields"] = ["handle-id", "widget-id"]
         final_payload = attach_gateway_session_context(
             payload,
             args=args,
@@ -15379,9 +15426,6 @@ def dispatch_command(
             stream_sink=stream_sink,
         )
     if args.command == "wait-topic":
-        typed_topic_input = args.typed_topic_input
-        request_options = dict(typed_topic_input.options)
-        match = dict(typed_topic_input.match)
         authoring_boundary = live_authoring_api_boundary(
             args.api,
             command="wait-topic",
@@ -15410,6 +15454,12 @@ def dispatch_command(
         )
         if route_boundary is not None:
             return route_boundary
+        typed_topic_input = resolve_monitored_topic_input(
+            args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher,
+        )
+        request_options = dict(typed_topic_input.options)
+        match = dict(typed_topic_input.match)
         result = dispatch(
             dispatcher,
             args.api,
@@ -15418,6 +15468,10 @@ def dispatch_command(
             options=request_options,
             topic_match=match or None,
             topic_event_count=args.event_count,
+            topic_event_validator=lambda event: validate_monitored_topic_event(
+                args.api, event, version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            ),
             operation_timeout=reserved_topic_wait_timeout(connection),
             result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         )
@@ -15443,6 +15497,19 @@ def dispatch_command(
             "call": dispatch_call_summary(result),
         }
         cleanup = topic_subscription_cleanup_status(result)
+        payload["monitoring_outcome"] = {
+            "subscription_established": True if cleanup != "unknown" else None,
+            "requested_event_count": args.event_count,
+            "event_count": (
+                args.event_count if result.get("ok")
+                else (result.get("details") or {}).get("event_count")
+            ),
+            "target_completed": bool(result.get("ok")),
+            "termination": (
+                "event_count_reached" if result.get("ok")
+                else "timeout" if result.get("error_code") == "TIMEOUT" else "error"
+            ),
+        }
         if args.event_count == 1:
             event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
             event_validation = (
@@ -15503,6 +15570,59 @@ def dispatch_command(
     raise GatewayInputError(f"unsupported command: {args.command}")
 
 
+def resolve_monitored_topic_input(
+    args: argparse.Namespace, *, env: Mapping[str, str], connection: GatewayConnection,
+    detected_version: str, live_info: Mapping[str, Any], dispatcher: WwiseDispatcher,
+) -> Any:
+    """Bind signal filters to the same owned frontend authority as emission."""
+    constructor = getattr(args, "pending_signal_topic_input", None)
+    if constructor is None:
+        return args.typed_topic_input
+    from dataclasses import replace
+    from wwise_waapi.authoring_model_business import require_owned_widget
+
+    resource_connection = connection
+    if math.isinf(connection.timeout):
+        # A count/idle-bounded monitor has no total duration, but scope reads
+        # remain finite functions. This budget applies only to resource setup.
+        resource_connection = replace(
+            connection, timeout=DEFAULT_TIMEOUT, deadline=GatewayDeadline.start(DEFAULT_TIMEOUT),
+        )
+    context = authoring_resource_context(
+        args, env=env, connection=resource_connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher,
+    )
+    model = AuthoringResourceStore(resolve_transaction_state_directory(args, env=env)).resolve(
+        args.signal_model, context=context, kind="model",
+    )
+    require_owned_widget(model, args.signal_widget)
+    identities = (
+        TopicBusinessFact("handle-id", model["native_id"]),
+        TopicBusinessFact("widget-id", args.signal_widget),
+    )
+    args.typed_topic_input = materialize_topic_business_inputs(
+        **{**constructor, "option_facts": identities, "match_facts": identities},
+    )
+    return args.typed_topic_input
+
+
+def validate_monitored_topic_event(
+    topic: str, event: Any, *, version: str, authoring_ui_profile: bool,
+) -> Any:
+    """Keep a small exact native-shape diagnostic without accepting bad events."""
+    try:
+        return validate_semantic_event(
+            topic, event, version=version, authoring_ui_profile=authoring_ui_profile,
+        )
+    except SemanticValidationError as exc:
+        diagnostic = None
+        if probe_gateway_json_document_size(event, 2048) == "ok":
+            diagnostic = json.dumps(event, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        raise SubscriptionEventValidationError(
+            topic, validation_failure=exc.as_dict(), event_json=diagnostic,
+        ) from exc
+
+
 def dispatch_topic_stream(
     args: argparse.Namespace,
     *,
@@ -15516,9 +15636,6 @@ def dispatch_topic_stream(
 ) -> dict[str, Any]:
     """Keep one reviewed topic subscription open and publish events immediately."""
 
-    typed_topic_input = args.typed_topic_input
-    request_options = dict(typed_topic_input.options)
-    match = dict(typed_topic_input.match)
     authoring_boundary = live_authoring_api_boundary(
         args.api,
         command="stream-topic",
@@ -15547,6 +15664,13 @@ def dispatch_topic_stream(
     )
     if route_boundary is not None:
         return route_boundary
+
+    typed_topic_input = resolve_monitored_topic_input(
+        args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher,
+    )
+    request_options = dict(typed_topic_input.options)
+    match = dict(typed_topic_input.match)
 
     result_limit_bytes = int(
         capability.execution_contract["result_limit_bytes"]
@@ -15671,8 +15795,6 @@ def dispatch_topic_stream(
             )
             if event is None:
                 continue
-            if match and not payload_matches(event.payload, match):
-                continue
             payload_probe = probe_gateway_json_document_size(
                 event.payload,
                 result_limit_bytes,
@@ -15691,12 +15813,14 @@ def dispatch_topic_stream(
                         else "RESULT_NOT_JSON"
                     ),
                 )
-            validation = validate_semantic_event(
+            validation = validate_monitored_topic_event(
                 args.api,
                 event.payload,
                 version=detected_version,
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
+            if match and not payload_matches(event.payload, match):
+                continue
             if idle_seconds is not None:
                 idle_expires_at = time.monotonic() + idle_seconds
             sequence = event_count + 1
@@ -15776,6 +15900,13 @@ def dispatch_topic_stream(
         "event_count_reached": event_count >= args.event_count,
         "elapsed_seconds": max(0.0, time.monotonic() - stream_started_at),
         "cleanup": cleanup_status,
+        "monitoring_outcome": {
+            "subscription_established": True,
+            "requested_event_count": args.event_count,
+            "event_count": event_count,
+            "target_completed": event_count >= args.event_count and primary_error is None and cleanup_failure is None,
+            "termination": "error" if primary_error is not None or cleanup_failure is not None else completion_reason,
+        },
     }
     if primary_error is not None:
         normalized = normalize_gateway_exception(primary_error)
@@ -15811,7 +15942,7 @@ def dispatch_topic_stream(
     terminal.update(
         {
             "ok": True,
-            "status": "stopped" if completion_reason == "idle_timeout" else "completed",
+            "status": "completed" if completion_reason == "event_count_reached" else "stopped",
             "completion_reason": completion_reason,
         }
     )
@@ -22588,6 +22719,7 @@ def dispatch(
     topic_mode: str = "wait",
     topic_match: Mapping[str, Any] | None = None,
     topic_event_count: int = 1,
+    topic_event_validator: Callable[[Any], Any] | None = None,
     live_behavior: bool = False,
     exact_object_lookup: bool = False,
     operation_timeout: float | None = None,
@@ -22611,6 +22743,7 @@ def dispatch(
         topic_mode=topic_mode,
         topic_match=topic_match,
         topic_event_count=topic_event_count,
+        topic_event_validator=topic_event_validator,
         live_behavior=live_behavior,
         result_limit_bytes=result_limit_bytes,
     )
