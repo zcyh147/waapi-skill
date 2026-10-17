@@ -858,8 +858,8 @@ def test_cli_media_ids_observe_owned_file_and_work_units_without_inventing_mappi
     class MediaTask(CliProjectTask):
         def call(self, uri, args=None, options=None):
             if uri == self.operation:
-                # Deliberately unknown representation: XML validity is not a
-                # native mapping-format or business-completeness assertion.
+                # Deliberately unknown representation: the saved bytes do not
+                # establish a native container or complete mapping semantics.
                 self.media.write_text('<UnestablishedMediaMappingFormat revision="after"/>')
             return super().call(uri, args, options)
     task = MediaTask(tmp_path, version, 'ak.wwise.cli.' + operation)
@@ -874,9 +874,31 @@ def test_cli_media_ids_observe_owned_file_and_work_units_without_inventing_mappi
     assert code == 0 and payload['verified'] is False, payload
     observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-media-id-artifacts']
     assert len(observed) == 1 and observed[0]['mapping_file']['exists'] is True, payload
-    assert observed[0]['mapping_file']['xml_valid'] is True
+    assert observed[0]['mapping_file']['format'] == 'unestablished'
     assert 'central_media_id_mapping_representation' in observed[0]['unresolved']
     assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_unknown_media_id_container_is_unverified_not_a_proven_native_failure(tmp_path, version):
+    class OpaqueMediaTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.project_file.with_suffix('.mediaid').write_bytes(b'\x00unestablished-container\xff')
+            return super().call(uri, args, options)
+    task = OpaqueMediaTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    saved_fixture_project(task)
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    assert payload['verified'] is False
+    observation = next(row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-media-id-artifacts')
+    assert observation['mapping_file']['exists'] is True
+    assert observation['mapping_file']['format'] == 'unestablished'
+    assert 'central_media_id_mapping_representation' in observation['unresolved']
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
 
 
 @pytest.mark.parametrize('failure', ['missing-mapping', 'malformed-mapping', 'lost-workunit', 'unrelated-setting'])
@@ -903,7 +925,13 @@ def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, f
     task.media = task.project_file.with_suffix('.mediaid')
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    assert code != 0 and payload['state'] == 'verification_failed', payload
+    assert payload['verified'] is False, payload
+    if failure == 'malformed-mapping':
+        # This is malformed XML, but the native container has not been proved
+        # to be XML. It therefore establishes neither success nor failure.
+        assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    else:
+        assert code != 0 and payload['state'] == 'verification_failed', payload
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == task.operation]) == 1

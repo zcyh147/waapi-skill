@@ -737,7 +737,8 @@ def cli_console_business_contract_data(
             'post_terminal_native_calls': 'none',
         }} if operation == 'ak.wwise.cli.migrate' else {}),
         **({'effect_verification': {
-            'mapping_file': 'owned_project_name_mediaid_stable_bounded_XML_if_present',
+            'mapping_file': 'owned_project_name_mediaid_stable_bounded_bytes_if_present',
+            'mapping_container_format': 'unestablished_non_XML_is_not_proven_failure',
             'work_units': 'bounded_saved_MediaIDList_observation_and_preservation_outside_media_storage',
             'central_mapping_record_representation': 'unresolved_no_business_acceptance',
             'post_terminal_native_calls': 'none',

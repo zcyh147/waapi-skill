@@ -358,8 +358,10 @@ def inspect_cli_project_effect(effect):
                 or effect['uri'].endswith('updateMediaIdsInSingleFile') and effect['mapping_before']['exists']) and not mapping['exists']:
             raise SoundBankContractError('MISSING_ARTIFACT', 'Requested media ID mapping artifact is missing')
         if mapping['exists']:
-            document, proof = _read_xml_artifact(effect['mapping_path'], effect['io_root'], require_wwise_document=False)
-            mapping = {'exists': True, 'file_proof': proof, 'xml_valid': True, 'root_element': document.tag}
+            # The pinned command names this artifact but does not establish its
+            # container format. Unknown bytes cannot prove a native failure.
+            _, proof = _read_bounded_artifact(effect['mapping_path'], effect['io_root'])
+            mapping = {'exists': True, 'file_proof': proof, 'format': 'unestablished'}
         unresolved = ['central_media_id_mapping_representation']
         return {'observations': [{'kind': 'cli-media-id-artifacts', 'mapping_file': mapping,
             'saved_model_files': len(model['files']), 'work_unit_media_id_count_before': source_count,
