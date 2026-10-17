@@ -1,9 +1,65 @@
 {
   "contract": "waapi-skill.authoring-layout-mutation-supplement/v1",
-  "version": "2025.1",
   "host": "wwise-authoring",
   "native_catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
   "schemas": {
+    "ak.wwise.ui.layout.removeLayout": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout to unregister.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Unregisters a temporary layout, previously registered with \\ref ak_wwise_ui_layout_setlayout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.setLayout": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "layout": {
+            "$ref": "waapi_ui_definitions.json#/definitions/LayoutEntity",
+            "description": "The layout description in JSON format."
+          },
+          "name": {
+            "description": "The name of the layout to register.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "layout"
+        ],
+        "type": "object"
+      },
+      "description": "Registers a new layout from a JSON format.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
     "ak.wwise.ui.layout.switchLayout": {
       "argsSchema": {
         "additionalProperties": false,
@@ -30,5 +86,6 @@
         "type": "object"
       }
     }
-  }
+  },
+  "version": "2025.1"
 }

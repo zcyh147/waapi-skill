@@ -23,7 +23,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, validate_layout_call, validate_layout_live_binding
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -8747,6 +8747,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             metadata['layout_original_current'] = dict(current)
             verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
                 'expected_name': call_args['name']}
+            if api == LAYOUT_SET_URI:
+                try:
+                    metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('LAYOUT_REGISTRATION_COLLISION', str(exc)) from exc
+                verification['expected_layout'] = dict(call_args['layout'])
+            elif api == LAYOUT_REMOVE_URI:
+                try:
+                    metadata['layout_factory_names'] = dict(require_temporary_layout(call_args['name'], read=read))
+                except ValueError as exc:
+                    raise OperationContractError('FACTORY_LAYOUT_REMOVAL_FORBIDDEN', str(exc)) from exc
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -13480,6 +13491,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 pre_state = prepared.get('pre_state')
                 if not isinstance(pre_state, Mapping) or current != pre_state.get('layout_original_current'):
                     raise ValueError('Current layout changed since preview; inspect and preview again')
+                if api == LAYOUT_SET_URI:
+                    absence = require_layout_absence(call_args['name'], read=read_call)
+                    readbacks.append(absence)
+                elif api == LAYOUT_REMOVE_URI:
+                    require_temporary_layout(call_args['name'], read=layout_guard_read)
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
@@ -15751,11 +15767,29 @@ def verify_prepared_operation(
             check('Layout mutation returned its exact result contract', False, exc.as_dict())
         else:
             check('Layout mutation returned its exact result contract', True, validation.as_dict())
-        current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
-        validate_layout_read_result('current', current)
-        readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
-        check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
-            {'expected': plan.get('expected_name'), 'actual': current.get('name')})
+        if uri == LAYOUT_SET_URI:
+            registered = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+            validate_layout_read_result('contents', registered)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': registered})
+            expected_layout = plan.get('expected_layout')
+            # This initial closed registration declares only a name: no canvas or arrangement is claimed.
+            check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
+                and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
+                {'expected': expected_layout, 'actual': registered})
+        elif uri == LAYOUT_REMOVE_URI:
+            try:
+                absent = require_layout_absence(plan['expected_name'], read=read_call)
+            except ValueError as exc:
+                check('Temporary layout is absent after unregister', False, {'reason': str(exc)})
+            else:
+                readbacks.append(absent)
+                check('Temporary layout is absent after unregister', True, absent)
+        else:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
+                {'expected': plan.get('expected_name'), 'actual': current.get('name')})
     elif kind == "project-setting-state":
         uri = plan.get("uri")
         version = plan.get("version")

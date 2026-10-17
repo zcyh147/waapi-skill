@@ -1627,8 +1627,9 @@ def test_compact_operations_reconstructs_detailed_directory_without_loss(
     defaults = compact["request_schema_route_defaults"]
     reconstructed = {}
     for row in compact["request_schema_routes"]:
-        namespace_defaults = next((value for prefix, value in compact.get(
-            "request_schema_route_defaults_by_namespace", {}).items() if row["api"].startswith(prefix)), {})
+        namespaces = compact.get('request_schema_route_defaults_by_namespace', {})
+        matching = [prefix for prefix in namespaces if row['api'].startswith(prefix)]
+        namespace_defaults = namespaces[max(matching, key=len)] if matching else {}
         full = {**defaults, **namespace_defaults, **row}
         full.setdefault("next_command", [
             part.replace("<api>", row["api"])

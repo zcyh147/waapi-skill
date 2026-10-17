@@ -9,8 +9,9 @@ def expand_operations_directory_row(
     """Reconstruct one catalog row without treating templates as continuations."""
 
     if "api" in row:
-        namespace_defaults = next((value for prefix, value in directory.get(
-            "request_schema_route_defaults_by_namespace", {}).items() if row["api"].startswith(prefix)), {})
+        namespaces = directory.get("request_schema_route_defaults_by_namespace", {})
+        matching = [prefix for prefix in namespaces if row['api'].startswith(prefix)]
+        namespace_defaults = namespaces[max(matching, key=len)] if matching else {}
         expanded = {**directory.get("request_schema_route_defaults", {}), **namespace_defaults, **row}
         template_key, command, marker, identity = (
             "request_schema_command_template", "request-schema", "<api>", row["api"],

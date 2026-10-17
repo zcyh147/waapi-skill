@@ -64,10 +64,10 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 705,
+        "function_lanes": 709,
         "topic_lanes": 160,
-        "total_lanes": 865,
-        "unique_function_uris": 176,
+        "total_lanes": 869,
+        "unique_function_uris": 178,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -78,7 +78,7 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
         for row in result["lanes"]
         if row["item_type"] == "function"
     }
-    assert function_shapes == {"zero", "inline", "draft", "closed_read"}
+    assert function_shapes == {"zero", "inline", "draft", "closed_read", "closed_business"}
     assert sum(
         row["construction_shape"] == "zero"
         for row in result["lanes"]
@@ -88,7 +88,7 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
         row["construction_shape"] == "inline"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 473
+    ) == 471
     assert sum(
         row["construction_shape"] == "draft"
         for row in result["lanes"]
@@ -472,3 +472,19 @@ def test_closed_layout_reads_retain_native_definition_graph_and_unresolved_resul
         assert layout['result_semantics']['status'] == 'definition_semantics_unresolved'
         assert layout['native_result_definition_graph_sha256'] == graph['sha256']
         assert layout['result_semantics']['business_arrangement_verified'] is False
+
+
+def test_closed_layout_business_lanes_retain_exact_native_request_definition_obligations():
+    result = build_typed_request_surface(root=RESOURCE_ROOT)
+    rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business']
+    assert len(rows) == 6
+    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout'}
+    assert result['unresolved_references'] == []
+    for row in rows:
+        assert row['business_contract']['input_mode'] == 'business_declaration'
+        assert row['native_request_schema_is_not_public_construction'] is True
+        if row['uri'].endswith('.setLayout'):
+            assert row['request_semantics']['status'] == 'definition_semantics_unresolved'
+            graph = result['native_result_definition_graphs'][row['version']]
+            assert row['native_ui_definition_graph_sha256'] == graph['sha256']
+            assert graph['documents']['waapi_ui_definitions.json']['definitions']['Element']['OneOf']
