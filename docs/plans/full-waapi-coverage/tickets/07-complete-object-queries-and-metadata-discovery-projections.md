@@ -30,3 +30,5 @@ Users can express valid in-scope read semantics and inspect every applicable pro
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+The structured Short-ID type mapping is a shared source-consistency prerequisite with [09 / #183](https://github.com/zcyh147/waapi-skill/issues/183): the Definition resolver's unversioned Event/Effect/AuxBus codes cannot establish the unresolved 2021 query codes. Preserve the exact per-version source proof and keep 2021 pending until reconciled; do not infer codes from PluginID, classId, or later releases.
