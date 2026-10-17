@@ -2575,6 +2575,151 @@ def test_state_and_switch_reads_use_bounded_business_continuations(
         assert result["agent_result"] == expected
 
 
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("subject", ("State", "Switch"))
+def test_state_switch_write_is_verified_by_independent_exact_scope_getter(tmp_path: Path, version: str, subject: str) -> None:
+    env = _env(tmp_path, version)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path, version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        return original(uri, args, options)
+    client.call = call
+    key = subject.lower()
+    group = getattr(client, key + "_group_id")
+    value = getattr(client, key + "_id")
+    declaration = [f"--{key}-group-handle", f"<bound:{key}_group>", f"--{key}-handle", f"<bound:{key}>"]
+    expected_args = {key + "Group": group}
+    if subject == "Switch":
+        handle, native_id = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env,
+            client=client, name="Player", version=version)
+        declaration.extend(["--game-object-handle", handle])
+        expected_args["gameObject"] = native_id
+    previewed, artifact = _preview_soundengine_plan(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.set" + subject, declaration=declaration,
+        role_bindings=((key + "_group", group), (key, value)), version=version)
+    result = _execute_and_verify_soundengine(state_dir=state_dir, env=env, client=client, previewed=previewed, version=version)
+    assert result["verified"] is True, result
+    getter = "ak.soundengine.get" + subject
+    assert (getter, expected_args, {"return": ["id"]}) in calls
+    readbacks = [row for row in result["verification"]["readbacks"] if row.get("uri") == getter]
+    assert readbacks[-1]["result"]["return"]["id"] == value
+    assert artifact["prepared_operation"]["verification_plan"]["kind"] == "soundengine-state-effect"
+    assert calls.count(("ak.soundengine.set" + subject, artifact["request"]["arguments"]["args"], {})) == 1
+
+
+@pytest.mark.parametrize("subject", ("State", "Switch"))
+@pytest.mark.parametrize("observation", ("wrong-id", "null", "missing-id", "malformed", "error", "lost-reply", "role-drift"))
+def test_state_switch_unproven_getter_never_passes_or_replays_write(tmp_path: Path, subject: str, observation: str) -> None:
+    version = "2025.1"
+    env = _env(tmp_path, version)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path, version)
+    original = client.call
+    calls = []
+    getter = "ak.soundengine.get" + subject
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        if observation == "role-drift" and uri == "ak.wwise.core.object.get" and "ak.soundengine.set" + subject in calls:
+            result = original(uri, args, options)
+            for row in result["return"]:
+                if row["id"] == (client.state_id if subject == "State" else client.switch_id):
+                    row["path"] += "_moved"
+            return result
+        if uri == getter:
+            if observation == "role-drift":
+                return original(uri, args, options)
+            if observation == "wrong-id":
+                return {"return": {"id": client.event_id, "name": "Storm" if subject == "State" else "Metal"}}
+            if observation == "null":
+                return {"return": None}
+            if observation == "missing-id":
+                return {"return": {"name": "Storm"}}
+            if observation == "malformed":
+                return {"return": [{"id": client.state_id}]}
+            raise RuntimeError("native query rejected" if observation == "error" else "native observation reply lost")
+        return original(uri, args, options)
+    client.call = call
+    key = subject.lower()
+    group, value = getattr(client, key + "_group_id"), getattr(client, key + "_id")
+    declaration = [f"--{key}-group-handle", f"<bound:{key}_group>", f"--{key}-handle", f"<bound:{key}>"]
+    if subject == "Switch":
+        handle, _native_id = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env,
+            client=client, name="Player", version=version)
+        declaration.extend(["--game-object-handle", handle])
+    previewed, _artifact = _preview_soundengine_plan(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.set" + subject, declaration=declaration,
+        role_bindings=((key + "_group", group), (key, value)), version=version)
+    transaction_id = previewed["transaction_id"]
+    shown_code, shown = gateway.execute_gateway(["--state-dir", str(state_dir), "transaction-show", transaction_id], env=env)
+    assert shown_code == 0, shown
+    code, confirmed = gateway.execute_gateway(shown["next_command"]["full_argv"][3:], env=env)
+    assert code == 0, confirmed
+    code, executed = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", transaction_id], env=env, client_factory=lambda _url: client)
+    assert code == 0, executed
+    code, result = gateway.execute_gateway(["--state-dir", str(state_dir), "verify", transaction_id], env=env, client_factory=lambda _url: client)
+    assert code == 2 and result.get("verified", False) is False, result
+    assert result["state"] != "verified"
+    assert result["automatic_retry"] is False
+    assert calls.count("ak.soundengine.set" + subject) == 1
+    assert calls.count(getter) == (0 if observation == "role-drift" else 1)
+
+
+def test_switch_verification_cannot_certify_a_retired_game_object_generation(tmp_path: Path) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    handle, _native_id = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Player")
+    previewed, _artifact = _preview_soundengine_plan(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.setSwitch", declaration=["--switch-group-handle", "<bound:switch_group>",
+            "--switch-handle", "<bound:switch>", "--game-object-handle", handle],
+        role_bindings=(("switch_group", client.switch_group_id), ("switch", client.switch_id)))
+    transaction_id = previewed["transaction_id"]
+    prefix = ["--state-dir", str(state_dir)]
+    code, shown = gateway.execute_gateway([*prefix, "transaction-show", transaction_id], env=env)
+    assert code == 0, shown
+    code, confirmed = gateway.execute_gateway(shown["next_command"]["full_argv"][3:], env=env)
+    assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*prefix, "execute", transaction_id], env=env, client_factory=lambda _url: client)
+    assert code == 0, executed
+    removed, _artifact = _preview_soundengine_plan(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.unregisterGameObj", declaration=["--game-object-handle", handle])
+    _execute_and_verify_soundengine(state_dir=state_dir, env=env, client=client, previewed=removed)
+    client.soundengine_calls.clear()
+    code, result = gateway.execute_gateway([*prefix, "verify", transaction_id], env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["verified"] is False, result
+    assert result["state"] == "verification_failed"
+    assert "ak.soundengine.getSwitch" not in client.soundengine_calls
+    code, durable = gateway.execute_gateway([*prefix, "transaction-show", transaction_id], env=env)
+    assert code == 0 and durable["state"] == "verification_failed", durable
+
+
+@pytest.mark.parametrize("version,subject", (("2021.1", "State"), ("2021.1", "Switch"), ("2023.1", "Switch"), ("2024.1", "Switch"), ("2025.1", "Switch")))
+def test_unresolved_state_switch_observation_scopes_are_disclosed_and_remain_unverified(tmp_path: Path, version: str, subject: str) -> None:
+    env = _env(tmp_path, version)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path, version)
+    key = subject.lower()
+    operation = "ak.soundengine.set" + subject
+    code, schema = gateway.execute_gateway(["request-schema", operation], env=env)
+    assert code == 0, schema
+    assert schema["business_adapter"]["effect_verification"]["unresolved_scopes"]
+    declaration = [f"--{key}-group-handle", f"<bound:{key}_group>", f"--{key}-handle", f"<bound:{key}>"]
+    if version == "2021.1" and subject == "Switch":
+        handle, _native_id = _register_game_object_for_test(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Player", version=version)
+        declaration.extend(["--game-object-handle", handle])
+    previewed, artifact = _preview_soundengine_plan(tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation=operation, declaration=declaration,
+        role_bindings=((key + "_group", getattr(client, key + "_group_id")), (key, getattr(client, key + "_id"))), version=version)
+    assert artifact["prepared_operation"]["verification_plan"]["kind"] == "result-schema"
+    assert artifact["prepared_operation"]["verification_plan"]["business_observation_boundary"]
+    result = _execute_and_verify_soundengine(state_dir=state_dir, env=env, client=client, previewed=previewed, version=version)
+    assert result["verified"] is False and result["state"] == "result_schema_checked", result
+    assert "ak.soundengine.get" + subject not in client.soundengine_calls
+
+
 def test_post_event_stops_before_dispatch_when_bound_event_drifts(
     tmp_path: Path,
 ) -> None:

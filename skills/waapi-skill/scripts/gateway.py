@@ -366,6 +366,7 @@ from wwise_waapi.media_build_business_cli import (  # noqa: E402  # pyright: ign
     media_build_input_from_namespace,
 )
 from wwise_waapi.runtime_inspection_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    PROFILER_GET_CURSOR_TIME_URI,
     TRANSPORT_CREATE_URI,
     TRANSPORT_DESTROY_URI,
     TRANSPORT_EXECUTE_ACTION_URI,
@@ -387,6 +388,7 @@ from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ig
     RuntimeTransportHandleError,
     RuntimeTransportHandleStore,
     validate_runtime_transport_handle,
+    runtime_transport_authority_snapshot,
 )
 from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     EXECUTE_ACTION_ON_EVENT_URI,
@@ -1656,11 +1658,13 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--profiler-cursor")
     core_call.add_argument(
         "--result-view",
-        choices=("summary", "identity", "diagnostics"),
+        choices=("summary", "identity", "diagnostics", "capture-defaults", "empty-selection"),
     )
     core_call.add_argument("--bus-instance-handle")
     core_call.add_argument("--voice-instance-handle")
     core_call.add_argument("--transport-handle")
+    core_call.add_argument("--runtime-observation")
+    core_call.add_argument("--runtime-page")
     core_call.add_argument("--state-group-id")
     core_call.add_argument("--switch-group-id")
     core_call.add_argument("--game-object-handle")
@@ -3612,6 +3616,9 @@ def _execute_gateway_unconstrained(
                 raise GatewayInputError("Layout reads require Wwise 2024.1 or 2025.1 Authoring; absent from the exact older native catalogs")
         if args.command == "core-call":
             preflight_core_business_input(args, env=source_env)
+            if getattr(args, "runtime_observation_record", None) is not None:
+                result = runtime_observation_page_payload(args, env=source_env)
+                return finish(0, result)
         if args.command in {"draft-apply", "draft-check", "preview-from-draft"}:
             preflight_retired_media_build_draft(args, env=source_env)
         if args.command == "typed-operation":
@@ -5114,6 +5121,8 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
+    if (args.runtime_observation is not None or args.runtime_page is not None) and args.api not in runtime_inspection_business_read_operations():
+        raise GatewayInputError("Runtime observation continuation is valid only for its original runtime-inspection operation")
     if args.api in soundengine_control_business_read_operations():
         contract = soundengine_control_business_contract_data(args.api, versions[0])
         identity_field = (
@@ -5154,6 +5163,25 @@ def preflight_core_business_input(
     if args.api in runtime_inspection_business_read_operations():
         try:
             runtime_inspection_business_contract_data(args.api, versions[0])
+            from wwise_waapi.runtime_inspection_observations import RuntimeInspectionObservationStore, resolve_pipeline, validate_pipeline_handle
+            from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
+            if args.runtime_observation is not None or args.runtime_page is not None:
+                if args.runtime_observation is None or args.runtime_page is None or any(value is not None for value in
+                        (args.log_channel, args.max_results, args.profiler_position, args.profiler_cursor, args.result_view,
+                         args.bus_instance_handle, args.voice_instance_handle, args.transport_handle)):
+                    raise GatewayInputError("Copy only the exact runtime observation and page continuation")
+                observation = RuntimeInspectionObservationStore(resolve_transaction_state_directory(args, env=env)).resolve(args.runtime_observation)
+                if observation["context"]["configuration"] != selected_connection_binding(env) or observation["plan"]["operation"] != args.api:
+                    raise GatewayInputError("Runtime observation configuration or operation changed")
+                args.runtime_observation_record = observation
+                return
+            args.profiler_pipeline_bindings = {}
+            for kind, handle in (("bus", args.bus_instance_handle), ("voice", args.voice_instance_handle)):
+                if handle is not None:
+                    validate_pipeline_handle(handle)
+                    args.profiler_pipeline_bindings[handle] = resolve_pipeline(
+                        RuntimeInspectionObservationStore(resolve_transaction_state_directory(args, env=env)), handle,
+                        kind=kind, configuration=selected_connection_binding(env))
             if args.api == TRANSPORT_GET_STATE_URI:
                 validate_runtime_transport_handle(args.transport_handle)
                 if any(
@@ -5189,6 +5217,7 @@ def preflight_core_business_input(
                 bus_instance_handle=args.bus_instance_handle,
                 voice_instance_handle=args.voice_instance_handle,
                 transport_handle=args.transport_handle,
+                pipeline_bindings=args.profiler_pipeline_bindings,
             )
         except (RuntimeInspectionBusinessError, ValueError) as exc:
             raise GatewayInputError(str(exc)) from exc
@@ -6097,12 +6126,20 @@ def preflight_stable_read_input(
             time=args.time,
         )
         return
+    from wwise_waapi.runtime_inspection_observations import RuntimeInspectionObservationStore, resolve_pipeline, validate_pipeline_handle
+    args.profiler_pipeline_bindings = {}
+    def resolve_handle(value, kind):
+        try:
+            validate_pipeline_handle(value)
+            binding = resolve_pipeline(RuntimeInspectionObservationStore(resolve_transaction_state_directory(args, env=env)),
+                value, kind=kind, configuration=selected_connection_binding(env))
+            args.profiler_pipeline_bindings[value] = binding
+            return profiler_pipeline_id_from_handle(value, kind=kind, binding=binding)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     if args.voice_instance_handle is not None:
         try:
-            args.voice_pipeline_id = profiler_pipeline_id_from_handle(
-                args.voice_instance_handle,
-                kind="voice",
-            )
+            args.voice_pipeline_id = resolve_handle(args.voice_instance_handle, "voice")
         except RuntimeInspectionBusinessError as exc:
             raise GatewayInputError(str(exc)) from exc
         if args.game_object_id is not None:
@@ -6137,7 +6174,7 @@ def preflight_stable_read_input(
     if bus_instance_handles:
         try:
             args.bus_pipeline_id = [
-                profiler_pipeline_id_from_handle(value, kind="bus")
+                resolve_handle(value, "bus")
                 for value in bus_instance_handles
             ]
         except RuntimeInspectionBusinessError as exc:
@@ -11258,8 +11295,23 @@ def resolve_profiler_voice_path(
     detected_version: str,
     dispatcher: WwiseDispatcher,
     common: Mapping[str, Any],
+    env: Mapping[str, str],
+    live_info: Mapping[str, Any],
 ) -> tuple[int, tuple[int, ...]] | dict[str, Any]:
     """Resolve semantic voice/Bus identities to one live pipeline path."""
+
+    if args.profiler_pipeline_bindings:
+        project, _project_call = current_project(dispatcher, connection=connection, version=detected_version)
+        context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+            "project": {key: project.get(key) for key in ("id", "path", "filePath")},
+            "live": {key: live_info.get(key) for key in ("version", "sessionId", "processId")}}
+        if isinstance(args.time, str):
+            cursor = dispatch(dispatcher, PROFILER_GET_CURSOR_TIME_URI, connection=connection, version=detected_version,
+                args={"cursor": args.time}, options={}, allow_destructive=True, result_limit_bytes=4096)
+            args.time = cursor.get("result", {}).get("return") if cursor.get("ok") else None
+        if type(args.time) is not int or args.time < 0 or any(binding["context"] != context or binding["time"] != args.time
+                for binding in args.profiler_pipeline_bindings.values()):
+            raise GatewayInputError("Profiler instance observation belongs to another capture position, project or host context; refresh the read")
 
     def read_rows(api: str) -> tuple[list[dict[str, Any]], Mapping[str, Any]]:
         request_args = {"time": args.time}
@@ -11335,6 +11387,12 @@ def resolve_profiler_voice_path(
                     error_code="INVALID_STABLE_READ_RESULT",
                 )
             normalized.append(dict(row))
+        kind = "voice" if api.endswith("getVoices") else "bus"
+        for binding in args.profiler_pipeline_bindings.values():
+            if binding["kind"] == kind:
+                matching = [row for row in normalized if row["pipelineID"] == binding["native_id"]]
+                if len(matching) != 1 or any(matching[0].get(key) != value for key, value in binding["identity"].items()):
+                    raise GatewayInputError("Profiler capture instance identity changed or is unavailable; refresh the original read")
         return normalized, result
 
     if args.voice_pipeline_id is not None:
@@ -12008,6 +12066,21 @@ def dispatch_core_business_read(
     }
 
 
+def runtime_observation_page_payload(args, *, env):
+    from wwise_waapi.runtime_inspection_observations import observation_page
+    from wwise_waapi.media_pool_continuation import MediaPoolContinuationError
+    try:
+        page = observation_page(args.runtime_observation_record, token=args.runtime_page)
+    except MediaPoolContinuationError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    token = page.pop("next_page")
+    if token is not None:
+        page["next_command"] = transaction_next_command("core-call", ["core-call", args.api,
+            "--runtime-observation", args.runtime_observation_record["handle"], "--runtime-page", token], state_dir=args.state_dir)
+    return {"ok": True, "status": "ok" if page["complete"] else "partial", "command": "core-call",
+        "api_attempted": args.api, "retained_observation": True, "native_read_dispatched": False, "agent_result": page}
+
+
 def dispatch_runtime_inspection_business_read(
     args: argparse.Namespace,
     *,
@@ -12079,7 +12152,42 @@ def dispatch_runtime_inspection_business_read(
                 error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
             ) from exc
     else:
-        request = args.runtime_inspection_request
+        request = dict(args.runtime_inspection_request)
+        request["args"] = dict(request["args"])
+    observation_context = None
+    profiler_rows = args.api.startswith("ak.wwise.core.profiler.") and args.api != PROFILER_GET_CURSOR_TIME_URI
+    if profiler_rows:
+        project, project_call = current_project(dispatcher, connection=connection, version=detected_version)
+        state_dir = resolve_transaction_state_directory(args, env=env)
+        require_runtime_directory_outside_project(state_dir, project=project)
+        observation_context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+            "project": {key: project.get(key) for key in ("id", "path", "filePath")},
+            "live": {key: live_info.get(key) for key in ("version", "sessionId", "processId")}}
+        if isinstance(request["args"]["time"], str):
+            cursor = dispatch(dispatcher, PROFILER_GET_CURSOR_TIME_URI, connection=connection, version=detected_version,
+                args={"cursor": request["args"]["time"]}, options={}, allow_destructive=True,
+                result_limit_bytes=4096)
+            position = cursor.get("result", {}).get("return") if cursor.get("ok") else None
+            if type(position) is not int or position < 0:
+                raise GatewayResultShapeError("Profiler cursor has no available capture position", details={"api": args.api},
+                    error_code="PROFILER_CAPTURE_UNAVAILABLE")
+            request["args"]["time"] = position
+        for binding in args.profiler_pipeline_bindings.values():
+            if binding["context"] != observation_context or binding["time"] != request["args"]["time"]:
+                raise GatewayInputError("Profiler instance observation belongs to another capture position, project or host context; refresh the read")
+            # Check the same frozen position and canonical identity fields. This
+            # is capture evidence, never proof of instantaneous native life.
+            identity_api = "ak.wwise.core.profiler.getBusses" if binding["kind"] == "bus" else "ak.wwise.core.profiler.getVoices"
+            checked = dispatch(dispatcher, identity_api, connection=connection, version=detected_version,
+                args={"time": binding["time"]}, options={"return": list(PROFILER_PIPELINE_IDENTITY_RETURN_FIELDS)},
+                allow_destructive=True, result_limit_bytes=STABLE_READ_RESULT_LIMIT_BYTES)
+            check_rows = checked.get("result", {}).get("return") if checked.get("ok") else None
+            matches = [row for row in check_rows if isinstance(row, Mapping) and row.get("pipelineID") == binding["native_id"]] if isinstance(check_rows, list) else []
+            if len(matches) != 1 or any(matches[0].get(key) != value for key, value in binding["identity"].items()):
+                raise GatewayInputError("Profiler capture instance identity changed or is unavailable; refresh the original read")
+        if args.api.endswith(("getVoices", "getBusses", "getAudioObjects")) and args.runtime_inspection_business_request.get("result_view") in {"summary", "identity", "diagnostics"}:
+            identity_fields = ["busGUID", "gameObjectID"] if args.api.endswith("getAudioObjects") else ["objectGUID", "gameObjectID"]
+            request["options"] = {"return": list(dict.fromkeys([*request["options"]["return"], *identity_fields]))}
     if not isinstance(request, Mapping):  # pragma: no cover - preflight invariant
         raise GatewayInputError("Runtime-inspection request was not materialized")
     request_validation = validate_semantic_payload(
@@ -12197,9 +12305,57 @@ def dispatch_runtime_inspection_business_read(
             },
             error_code="RUNTIME_INSPECTION_RESULT_INVALID",
         ) from exc
+    if normalized is not None and any(field in normalized for field in ("return", "meters", "items")):
+        import time
+        from wwise_waapi.runtime_inspection_observations import RuntimeInspectionObservationStore, observation_pipeline_handle, pipeline_key
+        # Retain the complete single native observation before presenting any
+        # rows. The native dispatcher byte ceiling remains authoritative.
+        field = next(field for field in ("return", "meters", "items") if field in normalized)
+        native_rows = result["result"][field]
+        complete_result = normalize_runtime_inspection_result(args.api, result["result"],
+            business_request=args.runtime_inspection_business_request, max_results=max(1, len(native_rows)))
+        pipeline_bindings = {}
+        native_field = "busPipelineID" if args.api.endswith("getAudioObjects") else "pipelineID"
+        kind = "voice" if args.api.endswith("getVoices") else "bus"
+        has_pipelines = args.api.endswith(("getVoices", "getBusses", "getAudioObjects"))
+        for index, (native, row) in enumerate(zip(native_rows, complete_result[field], strict=True)):
+            row.pop("bus_instance_handle", None)
+            row.pop("voice_instance_handle", None)
+            native_id = native.get(native_field)
+            if has_pipelines and type(native_id) is int and 0 <= native_id <= 0xFFFFFFFF:
+                guid_field = "busGUID" if args.api.endswith("getAudioObjects") else "objectGUID"
+                identity = {key: native[source] for key, source in (("objectGUID", guid_field), ("gameObjectID", "gameObjectID")) if source in native}
+                if len(identity) == 2:
+                    key = pipeline_key(kind, native_id)
+                    if key in pipeline_bindings:
+                        if pipeline_bindings[key]["identity"] != identity:
+                            raise GatewayResultShapeError("Profiler instance has conflicting captured identities", details={"api": args.api}, error_code="PROFILER_IDENTITY_AMBIGUOUS")
+                        pipeline_bindings[key]["row_indexes"].append(index)
+                    else:
+                        pipeline_bindings[key] = {"kind": kind, "native_id": native_id,
+                            "time": request["args"]["time"], "identity": identity, "row_indexes": [index]}
+        if profiler_rows or len(native_rows) > args.runtime_inspection_limit or len(canonical_json_bytes(complete_result)) > 4096:
+            if observation_context is None:
+                project, project_call = current_project(dispatcher, connection=connection, version=detected_version)
+                state_dir = resolve_transaction_state_directory(args, env=env)
+                require_runtime_directory_outside_project(state_dir, project=project)
+                observation_context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+                    "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
+            store = RuntimeInspectionObservationStore(state_dir)
+            # Retain one immutable observation. Issued selector decoration is
+            # derived from its opaque key without changing the sealed record.
+            handle = store.issue(plan={"operation": args.api, "request": request, "result": complete_result,
+                "page_size": args.runtime_inspection_limit, "pipeline_bindings": pipeline_bindings},
+                context=observation_context, issued=int(time.time()))
+            record = store.resolve(handle)
+            # Handle decoration is a deterministic projection of retained data;
+            # the record itself is never changed after issue.
+            args.runtime_observation_record = record
+            page_payload = runtime_observation_page_payload(args, env=env)
+            normalized = page_payload["agent_result"]
     return {
         "ok": bool(result.get("ok")),
-        "status": "ok" if result.get("ok") else "error",
+        "status": ("partial" if normalized is not None and normalized.get("complete") is False else "ok") if result.get("ok") else "error",
         **dict(common),
         "api_attempted": args.api,
         "business_request": {
@@ -14568,6 +14724,8 @@ def dispatch_command(
             detected_version=detected_version,
             dispatcher=dispatcher,
             common=common,
+            env=env,
+            live_info=live_info,
         )
         if isinstance(resolved, dict):
             return resolved
@@ -16517,6 +16675,14 @@ def dispatch_operation_draft_check(
             ),
             declared_settings=business_session.settings,
         )
+    if str(business_operation).startswith("ak.wwise.core.transport."):
+        try:
+            checked_artifact["prepared_operation"]["pre_state"]["transport_authority"] = runtime_transport_authority_snapshot(
+                request_payload, state_dir=state_dir,
+                context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                    detected_version=detected_version, live_info=live_info), declared_settings=business_session.settings)
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.error_code) from exc
     prepared = require_mapping(
         checked_artifact.get("prepared_operation"),
         "checked prepared operation",
@@ -20281,6 +20447,11 @@ def create_transaction_preview(
                 detected_version=detected_version, live_info=live_info,
             ),
         )
+    if str(canonical_request.get("arguments", {}).get("api")).startswith("ak.wwise.core.transport."):
+        artifact["prepared_operation"]["pre_state"]["transport_authority"] = runtime_transport_authority_snapshot(
+            canonical_request, state_dir=state_dir,
+            context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                detected_version=detected_version, live_info=live_info))
     artifact["connection_configuration"] = selected_connection_binding(env)
     prepared = require_mapping(
         artifact.get("prepared_operation"),
@@ -20677,7 +20848,8 @@ def dispatch_transaction_command(
         sealed = store.load_preview(transaction_id).artifact
         api = sealed.get('request', {}).get('arguments', {}).get('api')
         resource_lease = AuthoringResourceStore(store.state_dir).lease() if api in MODEL_OPERATIONS else nullcontext()
-        runtime_resource_lease = soundengine_resource_lease(store.state_dir) if api in soundengine_control_business_operations() else nullcontext()
+        runtime_resource_lease = (RuntimeTransportHandleStore(store.state_dir).lease() if str(api).startswith("ak.wwise.core.transport.") else
+            soundengine_resource_lease(store.state_dir) if api in soundengine_control_business_operations() else nullcontext())
         with store.execution_lease(transaction_id), resource_lease, runtime_resource_lease:
             return _dispatch_transaction_command_with_execution_lease(
                 args,
@@ -21173,6 +21345,9 @@ def _dispatch_transaction_command_with_execution_lease(
                     transport_id,
                     context=transport_context,
                 )
+                if prepared.get("pre_state", {}).get("transport_authority") != transport_record.binding_dict():
+                    raise RuntimeTransportHandleError("TRANSPORT_HANDLE_GENERATION_DRIFT",
+                        "The immutable Preview binds an older transport capability; create a new Preview.")
                 transport_list = read_call(
                     "ak.wwise.core.transport.getList",
                     {},
@@ -21539,6 +21714,11 @@ def _dispatch_transaction_command_with_execution_lease(
             env=env,
             read_only_transaction=read_transaction_contract is not None,
         )
+        if call_uri == TRANSPORT_CREATE_URI:
+            try:
+                RuntimeTransportHandleStore(store.state_dir).require_lifetime_capacity()
+            except RuntimeTransportHandleError as exc:
+                raise GatewayResultShapeError(str(exc), details={"operation_dispatched": False, "executed": False}, error_code=exc.error_code) from exc
         if call_uri in MODEL_OPERATIONS:
             model_binding = request_payload['arguments']['model_binding']
             context = authoring_resource_context(args, env=env, connection=connection,
@@ -21556,6 +21736,19 @@ def _dispatch_transaction_command_with_execution_lease(
             transaction_id,
             expected_authorization=record.state,
         )
+        transport_authority_revocation = None
+        if call_uri == TRANSPORT_DESTROY_URI:
+            try:
+                retired = handle_store.retire_native_id(transport_id, context=transport_context)
+                transport_authority_revocation = {"retired_transport_handle_count": len(retired)}
+            except (RuntimeTransportHandleError, OSError, ValueError) as exc:
+                failed = store.mark_execution_indeterminate(transaction_id, details={
+                    "phase": "transport_authority_consumption_before_native_dispatch", "native_dispatch_attempted": False,
+                    "automatic_retry": False, "message": str(exc)})
+                return {"ok": False, "status": "transport_handle_retirement_failed", **common,
+                    "transaction_id": transaction_id, "state": failed.state.value,
+                    "error_code": getattr(exc, "error_code", "TRANSPORT_HANDLE_PERSISTENCE_FAILED"), "message": str(exc),
+                    "native_dispatch_attempted": False, "executed": False, "verified": False, "automatic_retry": False}
         if call_uri in {'ak.wwise.ui.window.close', 'ak.wwise.ui.model.destroyHandle', 'ak.wwise.ui.model.createHandle'}:
             try:
                 if call_uri == 'ak.wwise.ui.model.createHandle':
@@ -21684,6 +21877,24 @@ def _dispatch_transaction_command_with_execution_lease(
                     "executed": True, "verified": False, "automatic_retry": False,
                     "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate", execution_result=result),
                 }
+        if transport_authority_revocation is not None:
+            result["transport_authority_revocation"] = transport_authority_revocation
+        if call_uri == TRANSPORT_CREATE_URI:
+            try:
+                RuntimeTransportHandleStore(store.state_dir).begin_lifetime(
+                    transport_id=result.get("result", {}).get("transport"),
+                    context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                        detected_version=detected_version, live_info=live_info),
+                    source_transaction_id=transaction_id, source_artifact_hash=preview.artifact_hash)
+            except (RuntimeTransportHandleError, OSError, ValueError) as exc:
+                failed = store.mark_execution_indeterminate(transaction_id, details={
+                    "phase": "transport_lifetime_after_native_dispatch", "dispatch_result": result,
+                    "automatic_retry": False, "message": str(exc)})
+                return {"ok": False, "status": "transport_handle_persistence_failed", **common,
+                    "transaction_id": transaction_id, "state": failed.state.value,
+                    "error_code": getattr(exc, "error_code", "TRANSPORT_HANDLE_PERSISTENCE_FAILED"), "message": str(exc),
+                    "dispatch_result": result, "executed": True, "verified": False, "automatic_retry": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate", execution_result=result)}
         if call_uri == POST_EVENT_URI:
             native_playing_id = result.get("result", {}).get("return")
             if isinstance(native_playing_id, int) and not isinstance(native_playing_id, bool) and native_playing_id > 0:
@@ -21931,12 +22142,53 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
                 "automatic_retry": False,
             }
+        transport_lifetime_error = None
+        soundengine_observation_authority_error = None
         try:
-            verification = verify_prepared_operation(
-                prepared,
-                execution_result=execution_result,
-                read_call=read_call,
-            )
+            if request_payload.get("arguments", {}).get("api") == TRANSPORT_CREATE_URI:
+                try:
+                    RuntimeTransportHandleStore(store.state_dir).require_current_lifetime(
+                        transport_id=execution_result.get("result", {}).get("transport"),
+                        context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                            detected_version=detected_version, live_info=live_info),
+                        source_transaction_id=transaction_id, source_artifact_hash=preview.artifact_hash)
+                except RuntimeTransportHandleError as exc:
+                    if exc.error_code not in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}:
+                        raise
+                    transport_lifetime_error = exc
+            if prepared.get("verification_plan", {}).get("kind") == "soundengine-state-effect":
+                try:
+                    current_authority = soundengine_authority_snapshot(
+                        request_payload, state_dir=store.state_dir,
+                        context=_runtime_game_object_context_from_live(endpoint=common["endpoint"], project=project,
+                            detected_version=detected_version, live_info=live_info))
+                    if prepared.get("pre_state", {}).get("soundengine_authority") != current_authority:
+                        raise RuntimeGameObjectHandleError("SOUNDENGINE_AUTHORITY_GENERATION_DRIFT",
+                            "The executed state/switch scope no longer binds its original runtime capability generation.")
+                except (RuntimeGameObjectHandleError, RuntimePlayingHandleError) as exc:
+                    soundengine_observation_authority_error = exc
+            if transport_lifetime_error is not None:
+                verification = VerificationResult(
+                    operation="waapi.call", status="verification_failed",
+                    assertions=({"name": "Execution-bound transport lifetime still belongs to this transaction", "passed": False,
+                        "evidence": {"error_code": transport_lifetime_error.error_code, "message": str(transport_lifetime_error),
+                            "native_same_id_row_is_not_lifetime_proof": True}},),
+                    message="The executed transport lifetime was retired or replaced; its business state is not verified.",
+                    verification_strength="gateway_transport_lifetime_invalidated", business_state_verified=False)
+            elif soundengine_observation_authority_error is not None:
+                verification = VerificationResult(
+                    operation="waapi.call", status="verification_failed",
+                    assertions=({"name": "Runtime observation retains the execution-bound game-object generation", "passed": False,
+                        "evidence": {"error_code": soundengine_observation_authority_error.error_code,
+                            "message": str(soundengine_observation_authority_error)}},),
+                    message="The original runtime scope cannot be revalidated; no later getter value certifies its effect.",
+                    verification_strength="soundengine_observation_authority_unavailable", business_state_verified=False)
+            else:
+                verification = verify_prepared_operation(
+                    prepared,
+                    execution_result=execution_result,
+                    read_call=read_call,
+                )
             if project_guard_mode != PROJECT_GUARD_INVARIANT:
                 verification = strengthen_project_transition_verification(
                     verification,
@@ -21975,6 +22227,10 @@ def _dispatch_transaction_command_with_execution_lease(
             "state": final_record.state.value,
             "artifact_hash": preview.artifact_hash,
             "verification": verification.as_dict(),
+            **({"error_code": transport_lifetime_error.error_code, "message": str(transport_lifetime_error)}
+                if transport_lifetime_error is not None else {}),
+            **({"error_code": soundengine_observation_authority_error.error_code, "message": str(soundengine_observation_authority_error)}
+                if soundengine_observation_authority_error is not None else {}),
             "guard_validation": guard_validation,
             "project_call": project_call,
             "executed": True,
@@ -22083,6 +22339,7 @@ def _dispatch_transaction_command_with_execution_lease(
                             source_transaction_id=transaction_id,
                             source_artifact_hash=preview.artifact_hash,
                             transport_row_sha256=canonical_sha256(bound_rows[0]),
+                            require_current_lifetime=True,
                         )
                         agent_result["business_result"] = {
                             "contract": "waapi-skill.runtime-control-result/v1",
@@ -22101,13 +22358,14 @@ def _dispatch_transaction_command_with_execution_lease(
                         )
                         agent_result["business_result"] = {
                             "contract": "waapi-skill.runtime-control-result/v1",
-                            "retired_transport_handle_count": len(retired),
+                            "retired_transport_handle_count": len(retired) + execution_result.get("transport_authority_revocation", {}).get("retired_transport_handle_count", 0),
                         }
                 except (RuntimeTransportHandleError, OSError, ValueError) as exc:
                     payload.update(
                         {
                             "ok": False,
                             "status": "transport_handle_persistence_failed",
+                            "verified": False,
                             "error_code": getattr(
                                 exc,
                                 "error_code",

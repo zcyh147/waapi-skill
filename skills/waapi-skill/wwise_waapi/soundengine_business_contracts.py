@@ -876,6 +876,16 @@ def soundengine_control_business_contract_data(
             "continuation",
         ],
         "legacy_typed_call_public": False,
+        **({"effect_verification": {
+            "mode": "independent_runtime_getter_for_bound_scope" if version != "2021.1" else "unresolved_matching_waapi_observer",
+            "state": "Compare the independently observed State GUID in the exact bound State Group",
+            "switch": "Compare the independently observed Switch GUID for the exact bound Switch Group and registered game-object generation",
+            "observation_delay_seconds": 0.01,
+            "write_retry": False,
+            "unresolved_scopes": (["2021.1 matching WAAPI observer; native SDK Query::GetState/GetSwitch remain possible investigation leads"]
+                if version == "2021.1" else ["Switch setter's omitted transport-game-object scope is not proved equivalent to getter omission"]
+                if operation == SET_SWITCH_URI and version in {"2023.1", "2024.1", "2025.1"} else []),
+        }} if operation in {SET_STATE_URI, SET_SWITCH_URI} else {}),
         "safety": {
             "preview": "not_applicable_read_only" if bounded_read else "immutable_before_execution",
             "authorization": "not_required_read_only" if bounded_read else "normal_transaction_policy",

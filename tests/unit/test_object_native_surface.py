@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import io
+import wave
 from collections import deque
 from pathlib import Path
 from typing import Any, Mapping
@@ -734,10 +736,21 @@ def test_object_set_2023_child_language_and_import_are_closed_and_proven(
     ) == 1
 
 
+def _inline_pcm_wav(frames: bytes = b"") -> bytes:
+    output = io.BytesIO()
+    with wave.open(output, "wb") as writer:
+        writer.setnchannels(1)
+        writer.setsampwidth(2)
+        writer.setframerate(44100)
+        writer.writeframes(frames)
+    return output.getvalue()
+
+
+@pytest.mark.parametrize("unpadded_base64", [False, True])
 def test_object_set_2023_inline_wav_import_is_canonicalized(
-    tmp_path: Path,
+    tmp_path: Path, unpadded_base64: bool,
 ) -> None:
-    wav = b"RIFF\x04\x00\x00\x00WAVE"
+    wav = _inline_pcm_wav(b"\x00" * 4 if unpadded_base64 else b"")
     encoded = base64.b64encode(wav).decode("ascii")
     request = parse_operation_request(
         {
@@ -783,6 +796,16 @@ def test_object_set_2023_inline_wav_import_is_canonicalized(
         }
     )
 
+    if unpadded_base64:
+        # The pinned 2023.1 importArg pattern requires '=' padding. This valid
+        # 48-byte PCM WAV is a documented native/schema compatibility gap;
+        # never alter audio bytes or add noncanonical '=' to bypass it.
+        from wwise_waapi.builders.common import SemanticValidationError
+        assert len(wav) == 48 and not encoded.endswith("=")
+        with pytest.raises(SemanticValidationError, match="reflected pattern") as error:
+            prepare_operation(request, read_call=reader)
+        assert error.value.details["section"].endswith(".audioFileBase64")
+        return
     prepared = prepare_operation(request, read_call=reader).as_dict()
 
     import_arg = prepared["dispatch"]["args"]["objects"][0]["children"][0][
@@ -812,7 +835,7 @@ def test_object_set_import_source_control_uses_effective_closed_default(
     nested_auto_add: bool | None,
     expected: bool,
 ) -> None:
-    wav = base64.b64encode(b"RIFF\x04\x00\x00\x00WAVE").decode("ascii")
+    wav = base64.b64encode(_inline_pcm_wav()).decode("ascii")
     import_arg: dict[str, Any] = {
         "files": [
             {"audio_file_base64": rf"Generated\Default.wav|{wav}"}
