@@ -1378,6 +1378,8 @@ class _RuntimeControlDraftClient:
         self.project_file.write_text("fixture", encoding="utf-8")
 
     def call(self, uri: str, args: object = None, options: object = None) -> object:
+        if uri == "ak.wwise.core.remote.getConnectionStatus":
+            return {"isConnected": False, "status": "Not connected"}
         if uri == "ak.wwise.core.getInfo":
             year, major = (int(part) for part in self.version.split("."))
             return {
@@ -1459,6 +1461,131 @@ class _RuntimeControlDraftClient:
 
     def disconnect(self) -> None:
         return None
+
+
+class _RemoteLifecycleClient(_RuntimeControlDraftClient):
+    def __init__(self, tmp_path: Path, *, version: str, observation: str):
+        super().__init__(tmp_path, version=version)
+        self.observation = observation
+        self.connected = False
+        self.calls = []
+
+    def call(self, uri, args=None, options=None):
+        self.calls.append((uri, args, options))
+        if uri == "ak.wwise.core.remote.connect":
+            self.connected = True
+            return {}
+        if uri == "ak.wwise.core.remote.disconnect":
+            self.connected = False
+            return {}
+        console = {"host": "127.0.0.2" if self.observation == "wrong-host" else "127.0.0.1",
+            "appName": "Wrong Game" if self.observation == "wrong-app" else "Game Preview",
+            "name": "Remote Console", "platform": "Windows", "customPlatform": "Windows"}
+        if uri == "ak.wwise.core.remote.getConnectionStatus":
+            return {"isConnected": self.connected, "status": "Connected" if self.connected else "Not connected",
+                **({"console": console} if self.connected and self.observation != "missing-console" else {})}
+        if uri == "ak.wwise.core.remote.getAvailableConsoles":
+            rows = [{**console, "commandPort": 24026 if self.observation == "wrong-port" else 24024,
+                **({"notificationPort": 24025} if self.version == "2021.1" else {})}]
+            if self.observation == "ambiguous-port":
+                rows.append({**rows[0], "commandPort": 24027})
+            return {"consoles": rows}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version,observation", [
+    (version, observation) for version in ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"]
+    for observation in ["exact", "wrong-host", "wrong-app", "exact-port", "wrong-port", "ambiguous-port", "hostname-alias", "missing-console", "connection-drift"]
+] + [(version, "host-port") for version in ["2022.1", "2023.1", "2024.1", "2025.1"]])
+def test_remote_public_lifecycle_verifies_the_requested_host_and_application(tmp_path: Path, version: str, observation: str) -> None:
+    client = _RemoteLifecycleClient(tmp_path, version=version, observation=observation)
+    state = tmp_path / "remote-state"
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", "ak.wwise.core.remote.connect")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    host = "game-host" if observation == "hostname-alias" else "127.0.0.1:24024" if observation == "host-port" else "127.0.0.1"
+    operands = ["--remote-host", host, "--application-name", "Game Preview"]
+    if observation.endswith("port") and observation != "host-port":
+        operands += ["--command-port", "24024"]
+        if version == "2021.1":
+            operands += ["--notification-port", "24025"]
+    code, declared = run("draft-declare-runtime-control-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", str(started["draft"]["revision"]), *operands)
+    assert code == 0, declared
+    code, checked = run("draft-check", draft_id, "--task-authority", authority, "--expected-revision", str(declared["draft"]["revision"]))
+    assert code == 0, checked
+    code, previewed = run("preview-from-draft", draft_id, "--task-authority", authority, "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, previewed
+    transaction = previewed["transaction_id"]
+    snapshot = TransactionStore(state).load_snapshot(transaction)
+    code, confirmed = run("confirm", transaction, "--confirmation-token", snapshot.confirmation_token)
+    assert code == 0, confirmed
+    if observation == "connection-drift":
+        client.connected = True
+    code, executed = run("execute", transaction)
+    if observation == "connection-drift":
+        assert code == 2, executed
+        assert not any(call[0] == "ak.wwise.core.remote.connect" for call in client.calls)
+        return
+    assert code == 0, executed
+    code, verified = run("verify", transaction)
+    diagnostic = json.dumps(verified, ensure_ascii=False)
+    if observation == "exact":
+        assert code == 0 and verified["verified"] is True, diagnostic
+    elif observation in {"wrong-host", "wrong-app"}:
+        assert code == 2 and verified.get("verification", {}).get("status") == "verification_failed", diagnostic
+    else:
+        assert code == 0 and verified["verified"] is False, verified
+        assert verified["verification"]["business_state_verified"] is False
+        assert verified["verification"]["verification_strength"] == "partial_remote_target_observation"
+        if observation.endswith("port"):
+            observed = next(row for row in verified["verification"]["readbacks"] if row.get("kind") == "remote-target-observation")
+            assert any(row["reason"] == "connected_status_has_no_port_or_process_identity" for row in observed["unresolved"])
+            assert not any(row["field"] in {"commandPort", "notificationPort"} for row in observed["checks"])
+            if observation in {"exact-port", "wrong-port", "host-port"}:
+                corroboration = next(row for row in observed["corroboration"] if row["field"] == "commandPort")
+                assert corroboration["matches_requested"] is (observation != "wrong-port")
+                assert corroboration["connected_instance_identity_proven"] is False
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.connect"]) == 1
+    code, rejected = run("execute", transaction)
+    assert code == 2, rejected
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.connect"]) == 1
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("drift", [False, True])
+def test_remote_disconnect_public_preview_preserves_connection_identity(tmp_path: Path, version: str, drift: bool) -> None:
+    client = _RemoteLifecycleClient(tmp_path, version=version, observation="exact")
+    client.connected = True
+    state = tmp_path / "disconnect-state"
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _: client)
+    code, schema = run("request-schema", "ak.wwise.core.remote.disconnect")
+    assert code == 0, schema
+    code, previewed = run(*schema["continuation"]["gateway_argv"])
+    assert code == 0, previewed
+    transaction = previewed["transaction_id"]
+    token = TransactionStore(state).load_snapshot(transaction).confirmation_token
+    code, confirmed = run("confirm", transaction, "--confirmation-token", token)
+    assert code == 0, confirmed
+    if drift:
+        client.observation = "wrong-app"
+    code, executed = run("execute", transaction)
+    if drift:
+        assert code == 2, executed
+        assert not any(call[0] == "ak.wwise.core.remote.disconnect" for call in client.calls)
+    else:
+        assert code == 0, executed
+        code, verified = run("verify", transaction)
+        assert code == 0 and verified["verified"] is True, verified
+        assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.disconnect"]) == 1
+    code, rejected = run("execute", transaction)
+    assert code == 2, rejected
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.remote.disconnect"]) == (0 if drift else 1)
 
 
 @pytest.mark.parametrize(
@@ -1699,6 +1826,21 @@ def _seal_runtime_control_preview(
     return TransactionStore(state_dir).load_preview(
         previewed["transaction_id"]
     ).artifact
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+def test_remote_notification_port_is_disclosed_and_preserved_as_native_unused_input(tmp_path: Path, version: str) -> None:
+    code, schema = gateway.execute_gateway(["request-schema", "ak.wwise.core.remote.connect"],
+        env=_env(tmp_path, version=version), client_factory=lambda _: pytest.fail("schema must be offline"))
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    assert "notification_port" in declaration["optional_fields"]
+    assert declaration["field_semantics"]["notification_port"]["native_effect"] == "unused"
+    assert declaration["field_semantics"]["notification_port"]["selector_used_by_native"] is False
+    assert declaration["field_semantics"]["notification_port"]["target_identity_evidence"] is False
+    artifact = _seal_runtime_control_preview(tmp_path, operation="ak.wwise.core.remote.connect", version=version,
+        declaration=("--remote-host", "127.0.0.1", "--notification-port", "0"))
+    assert artifact["request"]["arguments"]["args"] == {"host": "127.0.0.1", "notificationPort": 0}
 
 
 @pytest.mark.parametrize(
@@ -1996,8 +2138,8 @@ def test_runtime_object_control_binds_role_then_seals_native_guid_preview(
         (
             "ak.wwise.core.remote.connect",
             "2022.1",
-            ("--remote-host", "127.0.0.1", "--notification-port", "24025"),
-            "not disclosed",
+            ("--remote-host", "127.0.0.1", "--notification-port", "65536"),
+            "BUSINESS_VALUE_INVALID",
         ),
         (
             "ak.wwise.core.remote.connect",

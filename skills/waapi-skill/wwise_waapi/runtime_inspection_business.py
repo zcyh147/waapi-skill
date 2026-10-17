@@ -135,11 +135,11 @@ def _bound_role(
 
 
 def _port(value: Any, *, field: str) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 65535:
+    if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 65535:
         raise business_repair(
             "BUSINESS_VALUE_INVALID",
             field=field,
-            action="provide an integer TCP port from 1 to 65535",
+            action="provide a native uint16 port value from 0 to 65535",
         )
     return value
 
@@ -574,9 +574,7 @@ def materialize_runtime_control_business_request(
             )
         args = {"channel": native_channel}
     elif operation == REMOTE_CONNECT_URI:
-        allowed_optional = {"application_name", "command_port"}
-        if version == "2021.1":
-            allowed_optional.add("notification_port")
+        allowed_optional = {"application_name", "command_port", "notification_port"}
         require_fields({"remote_host"}, allowed_optional)
         args = {
             "host": _required_text(plan.get("remote_host"), field="remote_host")
@@ -604,11 +602,8 @@ def materialize_runtime_control_business_request(
                     field="notification_port",
                     action="provide both command_port and notification_port or omit both",
                 )
-            if notification_port is not None:
-                args["notificationPort"] = _port(
-                    notification_port,
-                    field="notification_port",
-                )
+        if notification_port is not None:
+            args["notificationPort"] = _port(notification_port, field="notification_port")
     elif operation in {TRANSPORT_CREATE_URI, TRANSPORT_PREPARE_URI}:
         optional = {"game_object_id"} if operation == TRANSPORT_CREATE_URI else set()
         require_fields({"target_handle"}, optional)

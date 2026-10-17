@@ -231,6 +231,7 @@ GET_PROJECT_INFO_URI = "ak.wwise.core.getProjectInfo"
 SOUNDBANK_GET_INCLUSIONS_URI = "ak.wwise.core.soundbank.getInclusions"
 SWITCHCONTAINER_GET_ASSIGNMENTS_URI = "ak.wwise.core.switchContainer.getAssignments"
 REMOTE_GET_CONNECTION_STATUS_URI = "ak.wwise.core.remote.getConnectionStatus"
+REMOTE_GET_AVAILABLE_CONSOLES_URI = "ak.wwise.core.remote.getAvailableConsoles"
 REMOTE_CONNECT_URI = "ak.wwise.core.remote.connect"
 OBJECT_SET_IMPORT_VERSIONS = frozenset(
     {"2023.1", "2024.1", "2025.1"}
@@ -294,6 +295,7 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_
         SOUNDBANK_GET_INCLUSIONS_URI,
         SWITCHCONTAINER_GET_ASSIGNMENTS_URI,
         REMOTE_GET_CONNECTION_STATUS_URI,
+        REMOTE_GET_AVAILABLE_CONSOLES_URI,
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
         "ak.soundengine.getState",
@@ -4483,12 +4485,14 @@ def _public_call_verification_plan(
             "expected_maximum": float(maximum),
         }
     if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+        from .remote_transition import remote_target
         return {
             "kind": "remote-connection-state",
             **common,
             "strategy": "operation_specific_readback",
             "base_result_strategy": strategy,
             "expected_connected": api == REMOTE_CONNECT_URI,
+            **({"expected_target": remote_target(version, args)} if api == REMOTE_CONNECT_URI else {}),
         }
     if api == TRANSPORT_CREATE_URI:
         return {
@@ -9208,6 +9212,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+            from .remote_transition import remote_connection_snapshot
+            try:
+                metadata["remote_connection_before"] = remote_connection_snapshot(request.version, read)
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
         if api in CLI_PROJECT_FILE_URIS:
             try:
                 effect = prepare_cli_project_effect(api, call_args, execution_contract['io_audit'], request.version)
@@ -14096,6 +14106,17 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api in {REMOTE_CONNECT_URI, REMOTE_DISCONNECT_URI}:
+            from .remote_transition import remote_connection_snapshot
+            before = prepared.get("pre_state", {}).get("remote_connection_before")
+            try:
+                current = remote_connection_snapshot(version, read_call)
+            except (ValueError, SemanticValidationError) as exc:
+                raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
+            readbacks.append({"uri": REMOTE_GET_CONNECTION_STATUS_URI, "args": {}, "options": {}, "result": current})
+            if not isinstance(before, Mapping) or dict(before) != current:
+                raise OperationContractError("STALE_REMOTE_CONNECTION", "Remote connection changed after Preview; inspect and preview again.",
+                    details={"expected": before, "actual": current, "remote_mutation_dispatched": False})
         if api in CLI_PROJECT_FILE_URIS:
             try:
                 validate_cli_project_effect(prepared.get('pre_state', {}).get('cli_project_effect'),
@@ -16891,6 +16912,21 @@ def verify_prepared_operation(
             isinstance(actual_connected, bool) and actual_connected is expected_connected,
             {"expected": expected_connected, "actual": actual_connected, "status": status.get("status")},
         )
+        if expected_connected:
+            from .remote_transition import DISCOVERY_URI, needs_remote_discovery, observe_remote_target
+            target = plan.get("expected_target")
+            if not isinstance(target, Mapping) or not isinstance(target.get("host"), str):
+                raise OperationContractError("INVALID_PREVIEW", "Remote verification lacks the exact requested target.")
+            discovery = (verified_readback(DISCOVERY_URI, {}, version=version)
+                if actual_connected is True and isinstance(status.get("console"), Mapping) and needs_remote_discovery(target) else None)
+            observation = observe_remote_target(target, status, discovery=discovery)
+            readbacks.append({"kind": "remote-target-observation", **observation})
+            for observed_check in observation["checks"]:
+                check(f"remote target {observed_check['field']} matches the requested identity", observed_check["passed"], observed_check)
+            if observation["unresolved"]:
+                business_state_verified = False
+                success_status = "result_schema_checked"
+                verification_strength = "partial_remote_target_observation"
     elif kind == "transport-created":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -20683,6 +20719,12 @@ def verify_prepared_operation(
             'The requested observable Tone WAV artifact state passed independent verification.'
             if outcome.business_state_verified else
             'Applicable Tone WAV artifact checks passed; requested postconditions remain explicitly unresolved.')
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "remote-connection-state" and not outcome.business_state_verified:
+        message = ("The requested remote target did not match independent observations; do not replay the executed transition."
+            if outcome.status == "verification_failed" else
+            "Connection state was observed; the exact requested remote target remains explicitly unresolved. Do not replay the executed transition.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
     return outcome

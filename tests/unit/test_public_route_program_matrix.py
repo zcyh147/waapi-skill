@@ -395,12 +395,16 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         },
         expected_version=entry.version,
     )
+    def preparation_readback(uri, call_args, call_options):
+        if uri == "ak.wwise.core.remote.getConnectionStatus":
+            return {"isConnected": False, "status": "Not connected"}
+        return {}
     prepared = prepared_before_dispatch or prepare_operation(
-        operation_request, read_call=lambda uri, call_args, call_options: {})
+        operation_request, read_call=preparation_readback)
     prepared_payload = prepared.as_dict()
     role_validation = role_validation_before_dispatch or validate_prepared_roles(
         prepared_payload,
-        read_call=lambda uri, call_args, call_options: {},
+        read_call=preparation_readback,
     )
     def readback(uri: str, call_args: Mapping[str, Any], call_options: Mapping[str, Any]) -> Mapping[str, Any]:
         if uri == "ak.wwise.core.object.get":
@@ -436,7 +440,15 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             return {
                 "isConnected": entry.uri == "ak.wwise.core.remote.connect",
                 "status": "program fixture",
+                **({"console": {"host": args["host"], "appName": args.get("appName", "Program Game"),
+                    "name": "Program Console", "platform": "Windows", "customPlatform": "Windows"}}
+                   if entry.uri == "ak.wwise.core.remote.connect" else {}),
             }
+        if uri == "ak.wwise.core.remote.getAvailableConsoles":
+            return {"consoles": [{"host": args["host"], "appName": args.get("appName", "Program Game"),
+                "name": "Program Console", "platform": "Windows", "customPlatform": "Windows",
+                "commandPort": args.get("commandPort", 0),
+                **({"notificationPort": args.get("notificationPort", 0)} if entry.version == "2021.1" else {})}]}
         if uri == "ak.wwise.core.transport.getList":
             if entry.uri == "ak.wwise.core.transport.create":
                 return {"list": [{"transport": 0}]}

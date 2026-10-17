@@ -6158,7 +6158,7 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
                 version="2022.1",
             )
         ),
-        read_call=ScriptedReader({}),
+        read_call=ScriptedReader({"ak.wwise.core.remote.getConnectionStatus": [{"isConnected": False, "status": "Not connected"}]}),
     ).as_dict()
 
     assert prepared["verification_plan"] == {
@@ -6168,6 +6168,7 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
         "strategy": "operation_specific_readback",
         "base_result_strategy": "result_schema",
         "expected_connected": expected_connected,
+        **({"expected_target": {"version": "2022.1", "host": "127.0.0.1"}} if expected_connected else {}),
     }
     reader = ScriptedReader(
         {
@@ -6175,6 +6176,8 @@ def test_public_remote_lifecycle_uses_connection_status_business_readback(
                 {
                     "isConnected": expected_connected,
                     "status": "Connected" if expected_connected else "Not connected",
+                    **({"console": {"host": "127.0.0.1", "appName": "Game", "name": "Console",
+                        "platform": "Windows", "customPlatform": "Windows"}} if expected_connected else {}),
                 }
             ]
         }
