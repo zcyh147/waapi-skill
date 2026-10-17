@@ -825,3 +825,210 @@ def test_source_file_usage_outputs_do_not_advertise_unpinned_source_control_rout
         env=_env(tmp_path, version=version), client_factory=lambda _url: pytest.fail("offline schema connected"))
     assert code == 2 and payload["ok"] is False
     assert "usage_output_choices" not in json.dumps(payload)
+
+
+def _source_control_object_file_case(tmp_path, *, version="2025.1", choice="--object-file", operation="ak.wwise.core.sourceControl.checkOut", live_type=None, declaration_error=None, object_count=1, external_containing=False, approve_external=False):
+    from tests.unit.test_object_graph_business_gateway import _info
+    state_dir = tmp_path / "state"
+    object_id = "{11111111-1111-1111-1111-111111111111}"
+    class Client(_SourceControlDraftClient):
+        def __init__(self):
+            super().__init__(tmp_path)
+            self.containing = ((tmp_path / "approved" / "External.wwu") if external_containing else
+                               self.project_root / "Actor-Mixer Hierarchy" / "Default Work Unit.wwu")
+            self.containing.parent.mkdir()
+            self.containing.write_text("fixture", encoding="utf-8")
+            self.media = self.originals / "Rain.wav"
+            self.media.write_bytes(b"fixture")
+            self.row = {"id": object_id, "name": "Rain", "type": live_type or ("AudioFileSource" if choice == "--original-media-object" else "Sound"), "path": "\\Actor-Mixer Hierarchy\\Rain",
+                        "parent": None, "filePath": str(self.containing), "originalFilePath": str(self.media)}
+            self.rows = {object_id: self.row}
+            if object_count == 2:
+                second_id = "{22222222-2222-2222-2222-222222222222}"
+                self.rows[second_id] = {**self.row, "id": second_id, "name": "RainTwo", "path": "\\Actor-Mixer Hierarchy\\RainTwo"}
+            self.calls = []
+        def call(self, uri, args=None, options=None):
+            self.calls.append((uri, args, options))
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.object.get":
+                return {"return": [dict(self.rows[selected]) for selected in args["from"]["id"] if selected in self.rows]}
+            if uri == operation:
+                return ({"log": [], "result": [{"owner": "fixture-owner", "status": "fixture-status"}]}
+                        if operation.endswith("getStatus") else {"log": []})
+            return super().call(uri, args, options)
+    client = Client()
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state_dir), *argv], env=env, client_factory=lambda _url: client)
+    code, phase = run("draft-start", operation)
+    assert code == 0, phase
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    selections = []
+    for selected in client.rows:
+        code, phase = run("draft-bind-object", draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]), "--object-id", selected)
+        assert code == 0, phase
+        selections.extend((choice, phase["bound_object"]["handle"]))
+    code, phase = run("draft-declare-source-control-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), *selections,
+        *(("--commit-message", "Exact object-file changes") if operation.endswith("commit") else ()),
+        *(("--io-root", str(client.containing.parent)) if approve_external else ()))
+    if declaration_error:
+        assert code == 2 and declaration_error in json.dumps(phase), phase
+        return client, state_dir, phase, run
+    assert code == 0, phase
+    code, phase = run("draft-check", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, phase
+    code, preview = run("preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--apply")
+    assert code == 0, preview
+    code, shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run(*shown["next_command"]["gateway_argv"])
+    assert code == 0, confirmed
+    return client, state_dir, preview, run
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_containing_file_scope_is_derived_from_exact_bound_object(tmp_path, version):
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, version=version)
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["args"] == {"files": [str(client.containing)]}
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0 and executed["executed"] is True, executed
+    writes = [row for row in client.calls if row[0] == "ak.wwise.core.sourceControl.checkOut"]
+    assert [row[1:] for row in writes] == [({"files": [str(client.containing)]}, {})]
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["agent_result"]["verified"] is False, verified
+    assert verified["agent_result"]["result"] == {"log": []}
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("choice", ("--object-file", "--original-media-object"))
+def test_source_control_object_file_accessor_drift_stops_before_provider_write(tmp_path, version, choice):
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, version=version, choice=choice)
+    accessor = "filePath" if choice == "--object-file" else "originalFilePath"
+    other = client.project_root / "Another.wwu"
+    other.write_text("fixture", encoding="utf-8")
+    client.row[accessor] = str(other)
+    code, rejected = run("execute", preview["transaction_id"])
+    assert code == 2 and rejected["status"] == "repreview_required", rejected
+    assert rejected["executed"] is False
+    assert not any(row[0].startswith("ak.wwise.core.sourceControl.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_exact_audio_source_original_file_executes_once_without_claiming_provider_effect(tmp_path, version):
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, version=version, choice="--original-media-object")
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["args"] == {"files": [str(client.media)]}
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0 and executed["executed"] is True, executed
+    writes = [row for row in client.calls if row[0] == "ak.wwise.core.sourceControl.checkOut"]
+    assert len(writes) == 1 and writes[0][1] == {"files": [str(client.media)]}
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["agent_result"]["verified"] is False, verified
+    code, replay = run("execute", preview["transaction_id"])
+    assert code == 2 and len([row for row in client.calls if row[0].endswith("checkOut")]) == 1, replay
+
+
+def test_source_control_sound_original_file_needs_exact_source_and_language_choice(tmp_path):
+    client, state_dir, rejected, _run = _source_control_object_file_case(tmp_path,
+        choice="--original-media-object", live_type="Sound", declaration_error="exact AudioFileSource")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.sourceControl.") for row in client.calls)
+
+
+@pytest.mark.parametrize("change", ("missing", "replaced", "symlink"))
+def test_source_control_object_file_binding_drift_cannot_reach_provider(tmp_path, change):
+    client, _state_dir, preview, run = _source_control_object_file_case(tmp_path)
+    client.containing.unlink()
+    if change == "replaced":
+        client.containing.write_text("changed payload after immutable Preview", encoding="utf-8")
+    elif change == "symlink":
+        target = client.project_root / "different.wwu"
+        target.write_text("unapproved file", encoding="utf-8")
+        client.containing.symlink_to(target)
+    code, rejected = run("execute", preview["transaction_id"])
+    assert code == 2 and rejected["ok"] is False, rejected
+    assert not any(row[0].startswith("ak.wwise.core.sourceControl.") for row in client.calls)
+
+
+@pytest.mark.parametrize("changed,value", (("name", "Different"), ("type", "Event"), ("path", "\\Actor-Mixer Hierarchy\\Moved"),
+                                           ("id", "{33333333-3333-3333-3333-333333333333}"), ("filePath", None)))
+def test_source_control_object_identity_and_missing_accessor_drift_fail_closed(tmp_path, changed, value):
+    client, _state_dir, preview, run = _source_control_object_file_case(tmp_path)
+    client.row[changed] = value
+    code, rejected = run("execute", preview["transaction_id"])
+    assert code == 2 and rejected["ok"] is False, rejected
+    assert not any(row[0].startswith("ak.wwise.core.sourceControl.") for row in client.calls)
+
+
+def test_source_control_two_objects_in_one_containing_file_are_one_native_file_scope(tmp_path):
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, object_count=2)
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["args"] == {"files": [str(client.containing)]}
+    assert len(artifact["request"]["arguments"]["source_control_binding"]["objects"]) == 2
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0 and executed["executed"] is True, executed
+    assert [row[1] for row in client.calls if row[0].endswith("checkOut")] == [{"files": [str(client.containing)]}]
+
+
+@pytest.mark.parametrize("action", ("add", "commit", "delete", "revert", "getStatus"))
+def test_source_control_file_actions_share_the_exact_object_scope_without_status_identity_inference(tmp_path, action):
+    operation = "ak.wwise.core.sourceControl." + action
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, operation=operation)
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0 and executed["executed"] is True, executed
+    calls = [row for row in client.calls if row[0] == operation]
+    expected = {"files": [str(client.containing)]}
+    if action == "commit":
+        expected["message"] = "Exact object-file changes"
+    assert len(calls) == 1 and calls[0][1] == expected
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["agent_result"]["verified"] is False, verified
+    expected_result = ({"log": [], "result": [{"owner": "fixture-owner", "status": "fixture-status"}]}
+                       if action == "getStatus" else {"log": []})
+    assert verified["agent_result"]["result"] == expected_result
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_source_control_object_file_discovery_is_versioned_and_keeps_explicit_file_alternatives(tmp_path, version):
+    code, schema = gateway.execute_gateway(["--version", version, "request-schema", "ak.wwise.core.sourceControl.checkOut"],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail(f"offline discovery connected to {url}"))
+    if version in {"2021.1", "2022.1"}:
+        assert code == 2 and "object_file_scopes" not in json.dumps(schema), schema
+        return
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    assert set(declaration["optional_fields"]) >= {"files", "object_files", "io_root"}
+    assert "files" not in declaration["required_fields"]
+    choices = declaration["object_file_scopes"]
+    assert choices["maximum_scopes"] == 64
+    assert choices["containing-file"]["cli"] == "--object-file <Object Handle>"
+    assert choices["original-media"]["cli"] == "--original-media-object <AudioFileSource Handle>"
+    assert choices["file_input"] == "one_or_more_file_locators_or_object_file_scopes"
+    code, phase = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "draft-start", "ak.wwise.core.sourceControl.checkOut"],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail(f"offline start connected to {url}"))
+    assert code == 0, phase
+    binding = phase["draft"]["next_action_binding"]["declaration"]["optional_object_file_binding"]
+    assert "draft-bind-object" in binding["fixed_argv_prefix"]
+    assert binding["append"] == ["--object-id <chosen-exact-GUID>"]
+
+
+def test_source_control_observed_external_file_still_requires_explicit_io_authority(tmp_path):
+    client, state_dir, rejected, _run = _source_control_object_file_case(tmp_path,
+        external_containing=True, declaration_error="SOURCE_CONTROL_PATH_OUTSIDE_ROOT")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.sourceControl.") for row in client.calls)
+
+
+def test_source_control_observed_external_file_can_use_an_exact_approved_io_root(tmp_path):
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, external_containing=True, approve_external=True)
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["io_root"] == str(client.containing.parent)
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0 and executed["executed"] is True, executed
+    assert [row[1] for row in client.calls if row[0].endswith("checkOut")] == [{"files": [str(client.containing)]}]

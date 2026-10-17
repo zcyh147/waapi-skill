@@ -2031,7 +2031,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding"),
+        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2066,6 +2066,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "source_control_binding": {"type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded."},
                 "model_binding": {"type": "object", "description": "Gateway-owned Authoring resource and declaration proof."},
                 "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
                 "result_projection": {
@@ -2076,7 +2077,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -4250,6 +4251,18 @@ def _public_call_arguments(
         authoring_ui_profile=api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS)
     if api in PROJECT_FILE_URIS:
         validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
+    source_control_binding = arguments.get("source_control_binding")
+    if source_control_binding is not None:
+        from .source_control_object_files import validate_object_file_binding
+        try:
+            bound_files = validate_object_file_binding(api, source_control_binding)
+            native_files = raw_args.get("files", [])
+            for row in bound_files:
+                path = str(Path(_localize_waapi_file_path(row["file_path"], field="source-control bound file path")).resolve(strict=False))
+                if path not in native_files:
+                    raise ValueError("A bound object file is not present in the sealed native file scope")
+        except ValueError as exc:
+            raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", str(exc)) from exc
     result_projection = arguments.get("result_projection")
     if result_projection is not None:
         if api != "ak.wwise.core.sourceControl.getSourceFiles":
@@ -9317,6 +9330,20 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 metadata["remote_connection_before"] = remote_connection_snapshot(request.version, read)
             except (ValueError, SemanticValidationError) as exc:
                 raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
+        if arguments.get("source_control_binding") is not None:
+            from .source_control_object_files import observe_object_file_binding
+            try:
+                observed = observe_object_file_binding(api, arguments["source_control_binding"], read=read)
+                if observed != arguments["source_control_binding"]:
+                    raise ValueError("The selected object identity or file accessor changed before Preview")
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_CHANGED", str(exc)) from exc
+            metadata["source_control_binding"] = observed
+            from .source_control_object_files import observe_bound_file_state
+            try:
+                metadata["source_control_file_state"] = observe_bound_file_state(api, observed)
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_CHANGED", str(exc)) from exc
         if api in CLI_PROJECT_FILE_URIS:
             try:
                 effect = prepare_cli_project_effect(api, call_args, execution_contract['io_audit'], request.version)
@@ -14346,6 +14373,28 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             }
         )
+        if arguments.get("source_control_binding") is not None:
+            from .source_control_object_files import observe_object_file_binding
+            def object_file_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "source-control-object-files", "uri": uri,
+                                  "args": dict(args), "options": dict(options), "result": dict(result)})
+                return result
+            try:
+                observed = observe_object_file_binding(api, arguments["source_control_binding"], read=object_file_read)
+            except ValueError as exc:
+                observed = {"error": str(exc)}
+            from .source_control_object_files import observe_bound_file_state
+            try:
+                file_state = observe_bound_file_state(api, arguments["source_control_binding"])
+            except ValueError as exc:
+                file_state = {"error": str(exc)}
+            binding_unchanged = (observed == prepared.get("pre_state", {}).get("source_control_binding") == arguments["source_control_binding"]
+                                 and file_state == prepared.get("pre_state", {}).get("source_control_file_state"))
+            passed = passed and binding_unchanged
+            assertions.append({"name": "source-control object identities and exact file accessors unchanged",
+                "passed": binding_unchanged, "evidence": {"expected": arguments["source_control_binding"], "actual": observed,
+                    "expected_file_state": prepared.get("pre_state", {}).get("source_control_file_state"), "actual_file_state": file_state}})
         role_snapshots: list[tuple[str, Any, Mapping[str, Any]]] = []
         for role, snapshot_value in roles.items():
             if not isinstance(snapshot_value, Mapping):
@@ -14424,7 +14473,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS else [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")

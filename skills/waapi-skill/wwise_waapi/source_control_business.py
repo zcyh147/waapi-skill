@@ -410,26 +410,37 @@ def materialize_source_control_business_request(
         return _get_source_files_request(plan, version=session.context.wwise_version)
     roots = _roots(raw_roots)
     explicit_io_root = _io_root(plan)
-    allowed = {"files", "io_root"}
+    allowed = {"files", "io_root", "object_file_binding"}
     if operation == SOURCE_CONTROL_COMMIT_URI:
         allowed.add("commit_message")
     if operation == SOURCE_CONTROL_MOVE_URI:
         allowed = {"moves", "io_root"}
-    if set(plan) != (allowed - {"io_root"}) and not (
-        "io_root" in plan and set(plan) == allowed
-    ):
+    required = {"moves"} if operation == SOURCE_CONTROL_MOVE_URI else {"files"}
+    if operation == SOURCE_CONTROL_COMMIT_URI:
+        required.add("commit_message")
+    if not required <= set(plan) or set(plan) - allowed:
         _repair(
             "SOURCE_CONTROL_PLAN_FIELDS_INVALID",
             field="source_control_plan",
             action="submit exactly the disclosed fields for this source-control action",
         )
     if operation in _FILE_OPERATIONS:
-        paths = _file_paths(
-            plan.get("files"),
-            roots=roots,
-            io_root=explicit_io_root,
-            require_existing=operation in _EXISTING_SOURCE_OPERATIONS,
-        )
+        paths = ([] if plan.get("files") == [] and plan.get("object_file_binding") else _file_paths(
+            plan.get("files"), roots=roots, io_root=explicit_io_root,
+            require_existing=operation in _EXISTING_SOURCE_OPERATIONS))
+        if plan.get("object_file_binding"):
+            from .source_control_object_files import validate_object_file_binding
+            try:
+                bound_files = validate_object_file_binding(operation, plan["object_file_binding"])
+            except ValueError as exc:
+                _repair("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", field="object_files", action=str(exc))
+            observed_paths = list(dict.fromkeys(row["file_path"] for row in bound_files))
+            derived = _file_paths([{"scope": "exact", "path": path} for path in observed_paths],
+                roots=roots, io_root=explicit_io_root or roots["project"],
+                require_existing=operation in _EXISTING_SOURCE_OPERATIONS)
+            paths = list(dict.fromkeys([*paths, *derived]))
+            if len(paths) > MAX_SOURCE_CONTROL_FILES:
+                _repair("SOURCE_CONTROL_FILES_INVALID", field="object_files", action="reduce the combined exact file set")
         native_args: dict[str, Any] = {"files": [str(path) for path in paths]}
         if operation == SOURCE_CONTROL_COMMIT_URI:
             message = plan.get("commit_message")
@@ -512,6 +523,8 @@ def materialize_source_control_business_request(
         "args": native_args,
         "options": {},
     }
+    if plan.get("object_file_binding"):
+        arguments["source_control_binding"] = dict(plan["object_file_binding"])
     if operation in _MUTATIONS:
         arguments["io_root"] = str(
             _mutation_io_root(

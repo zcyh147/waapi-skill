@@ -13661,6 +13661,13 @@ def dispatch_business_source_control_plan(
         )
     except SourceControlBusinessCliError as exc:
         raise GatewayInputError(str(exc)) from exc
+    if plan.get("object_files"):
+        from wwise_waapi.source_control_object_files import capture_object_file_binding
+        try:
+            plan["object_file_binding"] = capture_object_file_binding(binding.record.operation, session,
+                plan.pop("object_files"), read=binding.read_call)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     roots = _source_control_roots_from_project(binding.project)
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -27204,6 +27211,12 @@ def _business_next_action_binding(
                         "--io-root <exact-approved-absolute-root>",
                     ],
                 },
+                **({"optional_object_file_binding": {
+                    **operation_draft_prefix_copy_binding(object_bind_prefix),
+                    "append": ["--object-id <chosen-exact-GUID>"],
+                    "alternative_selector": "--object-path-segment <literal-name> (repeat)",
+                    "purpose": "copy_returned_Object_Handle_to_a_disclosed_object_file_scope",
+                }} if "object_files" in business_contract["declaration"]["optional_fields"] else {}),
                 "move_pair_flag": (
                     "--move <project|originals|exact> <source-path> "
                     "<project|originals|exact> <destination-path>"

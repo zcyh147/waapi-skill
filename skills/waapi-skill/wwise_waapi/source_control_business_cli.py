@@ -39,6 +39,8 @@ def add_source_control_arguments(
         default=[],
         help="Exact absolute caller-owned path under --io-root",
     )
+    parser.add_argument("--object-file", action="append", default=[], help="Containing file of an exact bound Object Handle")
+    parser.add_argument("--original-media-object", action="append", default=[], help="Original file of an exact AudioFileSource Handle")
     parser.add_argument("--io-root")
     parser.add_argument("--commit-message")
     parser.add_argument(
@@ -89,7 +91,7 @@ def source_control_fields_supplied(args: argparse.Namespace) -> bool:
         )
     ) or any(
         bool(getattr(args, name, ()))
-        for name in ("project_file", "originals_file", "exact_file", "move", "usage_output")
+        for name in ("project_file", "originals_file", "exact_file", "move", "usage_output", "object_file", "original_media_object")
     )
 
 
@@ -122,8 +124,11 @@ def source_control_plan_from_namespace(
             plan["usage_outputs"] = list(args.usage_output)
         return plan
     files = _file_locators(args)
+    object_files = [{"handle": handle, "scope": scope}
+                    for name, scope in (("object_file", "containing-file"), ("original_media_object", "original-media"))
+                    for handle in getattr(args, name, [])]
     if operation == SOURCE_CONTROL_MOVE_URI:
-        if files or args.commit_message is not None:
+        if files or object_files or args.commit_message is not None:
             raise SourceControlBusinessCliError(
                 "sourceControl.move accepts only --move pairs and optional --io-root"
             )
@@ -148,6 +153,8 @@ def source_control_plan_from_namespace(
             raise SourceControlBusinessCliError(
                 "Only sourceControl.commit accepts --commit-message"
             )
+    if object_files:
+        plan["object_files"] = object_files
     if args.io_root is not None:
         plan["io_root"] = args.io_root
     if bool(args.usage_output) or any(
@@ -168,7 +175,7 @@ def source_control_plan_from_namespace(
 def _locator_fields_supplied(args: argparse.Namespace) -> bool:
     return any(
         bool(getattr(args, name, ()))
-        for name in ("project_file", "originals_file", "exact_file")
+        for name in ("project_file", "originals_file", "exact_file", "object_file", "original_media_object")
     )
 
 

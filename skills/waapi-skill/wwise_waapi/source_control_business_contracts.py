@@ -203,6 +203,21 @@ def source_control_business_contract_data(
             "automatic_retry": False,
         },
     }
+    if operation not in {SOURCE_CONTROL_GET_SOURCE_FILES_URI, SOURCE_CONTROL_MOVE_URI, SOURCE_CONTROL_SET_PROVIDER_URI}:
+        payload["binding"]["identity"] = "exact_file_locator_or_bound_object_file_accessor"
+        payload["declaration"]["required_fields"].remove("files")
+        payload["declaration"]["optional_fields"].extend(("files", "object_files"))
+        payload["declaration"]["field_types"]["object_files"] = "bound_object_file_scopes"
+        from .source_control_object_files import MAX_SOURCE_CONTROL_OBJECT_SCOPES
+        payload["declaration"]["object_file_scopes"] = {
+            "containing-file": {"cli": "--object-file <Object Handle>", "derived_from": "filePath"},
+            "original-media": {"cli": "--original-media-object <AudioFileSource Handle>", "derived_from": "originalFilePath",
+                               "sound_source_and_language_selection": "unfinished; bind the exact AudioFileSource instead"},
+            "maximum_scopes": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
+            "file_input": "one_or_more_file_locators_or_object_file_scopes",
+            "binding": "GUID_name_type_path_exact_accessor_and_ordinary_file_stat_rechecked_before_execution",
+            "file_stat_scope": "device_inode_size_mtime_mode; not_file_content_or_provider_effect_proof",
+        }
     if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
         from .object_query_outputs import available_query_outputs
         payload["declaration"]["usage_output_choices"] = {
@@ -239,6 +254,8 @@ def source_control_business_contract_data(
         "absolute_native_file_paths",
         "path_pair_alignment",
         "native_request",
+        "exact_object_file_accessors_when_selected",
+        "ordinary_file_stat_binding_when_selected",
         "result_projection_and_limit",
         "continuation",
     ]
