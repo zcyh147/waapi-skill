@@ -183,6 +183,27 @@ def test_installed_conditions_keep_existing_new_and_plugin_placement_obligations
     assert all(r['owner_issue'] in range(177, 194) for r in native['obligations'])
 
 
+def test_existing_plugin_condition_grammar_does_not_depend_on_plugin_creation(frozen_inventory):
+    from tests.maintenance.branch_coverage_audit import ROOT, load
+    rows = frozen_inventory['native_coverage']['obligations']
+    original = load(ROOT / 'docs/branch-coverage-inventory.json')['native_coverage']['obligations']
+    # Changing dependency scheduling must retain the independently enumerated
+    # denominator, exact ownership, and unresolved proof obligations.
+    assert {(r['id'], r['owner_issue']) for r in rows} == {(r['id'], r['owner_issue']) for r in original}
+    for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
+        plugin_conditions = [r for r in rows if r['kind'] == 'metadata_condition'
+                             and r.get('version') == version and '|plugin-condition|' in r['id']]
+        existing = [r for r in plugin_conditions if r['business_dimensions']['operation_mode'] == 'existing-object']
+        new = [r for r in plugin_conditions if r['business_dimensions']['operation_mode'] == 'new-object']
+        assert existing and new
+        assert all(r['owner_issue'] == 177 and r['dependencies'] == [] for r in existing)
+        assert all(r['owner_issue'] == 178 and r['dependencies'] == [177, 179] for r in new)
+        topology = [r for r in rows if r['kind'] == 'plugin_topology' and r.get('version') == version]
+        assert topology and all(r['owner_issue'] == 179 and r['dependencies'] == [177, 178] for r in topology)
+    assert all(r['state'] == 'unresolved' and not r['requirements']
+               for r in rows if r['kind'] == 'metadata_condition')
+
+
 def test_finite_and_unfamiliar_schema_alternatives_remain_explicit():
     rows = list(schema_branches({'type': 'object', 'properties': {
         'enabled': {'type': 'boolean', 'default': False},
