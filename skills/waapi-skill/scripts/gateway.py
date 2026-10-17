@@ -41,6 +41,10 @@ from wwise_waapi.authoring_ui_commands_manifest import (  # noqa: E402  # pyrigh
 from wwise_waapi.authoring_ui_topics_manifest import AUTHORING_UI_OBSERVATION_TOPICS  # noqa: E402
 from wwise_waapi.authoring_core_manifest import COMMON_URIS as AUTHORING_CORE_URIS  # noqa: E402
 from wwise_waapi.authoring_core_manifest import requires_core_supplement  # noqa: E402
+from wwise_waapi.authoring_layout import (  # noqa: E402
+    LAYOUT_READS, LAYOUT_READ_URIS, LAYOUT_VERSIONS, MAX_LAYOUT_RESULT_BYTES,
+    layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result,
+)
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -583,7 +587,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-AUTHORING_HOST_REQUIRED_URIS = AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
+AUTHORING_HOST_REQUIRED_URIS = LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -1592,6 +1596,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Return the one typed construction continuation for a migrated WAAPI API",
     )
     request_schema.add_argument("api")
+
+    layout_read = subparsers.add_parser(
+        "layout-read", help="Inspect layouts and views through a bounded Authoring read",
+    )
+    layout_read.add_argument("subject", choices=tuple(LAYOUT_READS))
+    layout_read.add_argument("--layout-name")
 
     waapi_schema = subparsers.add_parser(
         "waapi-schema",
@@ -3502,6 +3512,14 @@ def _execute_gateway_unconstrained(
             preflight_stable_read_input(args, env=source_env)
         if args.command == "typed-call":
             preflight_typed_request_input(args, env=source_env)
+        if args.command == "layout-read":
+            try:
+                layout_read_arguments(args.subject, args.layout_name)
+            except ValueError as exc:
+                raise GatewayInputError(str(exc)) from exc
+            configured_version = load_gateway_config(source_env).config.wwise_version
+            if configured_version is not None and configured_version not in LAYOUT_VERSIONS:
+                raise GatewayInputError("Layout reads require Wwise 2024.1 or 2025.1 Authoring; absent from the exact older native catalogs")
         if args.command == "core-call":
             preflight_core_business_input(args, env=source_env)
         if args.command in {"draft-apply", "draft-check", "preview-from-draft"}:
@@ -4606,7 +4624,7 @@ def authoring_host_required_payload(
         "command": command,
         "error_code": "AUTHORING_HOST_REQUIRED",
         "message": (
-            "This Wwise UI-command capability requires Wwise Authoring; "
+            "This Wwise Authoring capability requires Wwise Authoring; "
             "WwiseConsole cannot expose or execute it."
         ),
         "details": {
@@ -4909,6 +4927,8 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
+    if args.api in LAYOUT_READ_URIS:
+        raise GatewayInputError("Layout reads use the closed layout-read continuation")
     if core_business_route_available(args.api, versions[0]):
         raise GatewayInputError(
             f"{args.api} uses request-schema and its closed Core business continuation"
@@ -5271,6 +5291,8 @@ def preflight_typed_zero_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-zero-call requires one configured Wwise version")
+    if args.api in LAYOUT_READ_URIS:
+        raise GatewayInputError("Layout reads use the closed layout-read continuation")
     contract = request_contract(versions[0], args.api)
     dedicated_zero = {
         "ak.wwise.debug.restartWaapiServers": "debug.restartWaapiServers",
@@ -8678,6 +8700,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 )
             except CapabilityNotFoundError:
                 capability = None
+        if args.api in LAYOUT_READ_URIS:
+            if args.command != "request-schema":
+                raise GatewayInputError("Layout reads use request-schema and its closed layout-read continuation")
+            try:
+                return layout_read_contract(versions[0], args.api)
+            except ValueError as exc:
+                raise GatewayInputError(str(exc)) from exc
         if (
             args.command == "request-schema"
             and capability is not None
@@ -9353,6 +9382,8 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             raise GatewayInputError(
                 "draft-start requires an explicit or configured Wwise version."
             )
+        if args.operation in LAYOUT_READ_URIS:
+            raise GatewayInputError("Layout reads use request-schema and its closed layout-read continuation")
         if args.operation in (
             media_build_business_operations()
             | runtime_inspection_business_read_operations()
@@ -9796,6 +9827,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             operations.append(projection)
         request_schema_routes = list(
             (
+                *layout_catalog_rows(),
                 *cli_console_business_catalog_rows(),
                 *host_ui_debug_business_catalog_rows(),
                 *core_business_catalog_rows(),
@@ -9996,9 +10028,9 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             ]
             payload["request_schema_route_defaults"] = route_defaults
             payload["directory_reading"] = (
-                "Request rows inherit omitted supported_versions and host_surface "
+                "Rows inherit supported_versions and host_surface "
                 "from request_schema_route_defaults; explicit row fields override. "
-                "For schema discovery only, use a row's next_command if present; "
+                "For schema discovery, use row next_command when present; "
                 "otherwise instantiate the static schema-command templates: "
                 "operation_schema_command_template replaces only <name> with the "
                 "selected name; request_schema_command_template replaces only <api> "
@@ -13091,6 +13123,38 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "layout-read":
+        api = LAYOUT_READS[args.subject]
+        boundary = live_authoring_api_boundary(
+            api, command=args.command, live_info=live_info, common=common,
+        )
+        if boundary is not None:
+            return boundary
+        if detected_version not in LAYOUT_VERSIONS:
+            return unreflected_interface_payload(api, detected_version, command=args.command, common=common)
+        capability = live_capability(detected_version, api, live_info=live_info)
+        if capability.execution_contract.get("route") != "bounded_call" or args.command not in capability.gateway_commands:
+            raise GatewayInputError("Layout read is not bound to its packaged closed route")
+        native_args = layout_read_arguments(args.subject, args.layout_name)
+        result = dispatch(
+            dispatcher, api, connection=connection, version=detected_version,
+            args=native_args, options={}, operation_timeout=10,
+            result_limit_bytes=MAX_LAYOUT_RESULT_BYTES,
+        )
+        if not result.get("ok"):
+            return {**common, "ok": False, "status": "error", "api_attempted": api,
+                    "call": dispatch_call_summary(result)}
+        raw = result.get("result")
+        try:
+            observation = validate_layout_read_result(args.subject, raw)
+        except ValueError as exc:
+            raise GatewayResultShapeError(str(exc), error_code="INVALID_LAYOUT_READ_RESULT",
+                details={"api": api, "call": dispatch_call_summary(result),
+                         "native_observation": raw, "business_arrangement_verified": False}) from exc
+        return {**common, "ok": True, "status": "ok", "api_attempted": api,
+                "complete": True, "truncated": False, "result": raw,
+                "observation": observation, "call": dispatch_call_summary(result),
+                "agent_result": raw}
     if args.command == "core-call":
         return dispatch_core_business_read(
             args,

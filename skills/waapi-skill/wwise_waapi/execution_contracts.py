@@ -15,6 +15,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
+from .authoring_layout import LAYOUT_READ_URIS
 from .authoring_ui_commands_manifest import (
     AUTHORING_UI_COMMAND_FUNCTION_URIS,
     AUTHORING_UI_COMMAND_TOPIC_URIS,
@@ -48,7 +49,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "8d25abc4519331083d9db8b0dd8783fde9f5521128c9ace9b6c12df6e29491b2"
+    "9bb4e2aaa88b65cbfdffcbb5a8182bd066838f0727dd024fe3601ac02928a564"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -119,35 +120,35 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         ),
         "2024.1": MappingProxyType(
             {
-                "functions": 161,
+                "functions": 166,
                 "topics": 34,
-                "public_functions": 161,
+                "public_functions": 166,
                 "public_topics": 34,
-                "public_total": 195,
+                "public_total": 200,
             }
         ),
         "2025.1": MappingProxyType(
             {
-                "functions": 168,
+                "functions": 173,
                 "topics": 35,
-                "public_functions": 168,
+                "public_functions": 173,
                 "public_topics": 35,
-                "public_total": 203,
+                "public_total": 208,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 849
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 849
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 203
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 859
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 859
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 208
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
             "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
-            "2024.1": "507ac5837fed7c1fd92f203c35e0eb638ca0f7b02236b35e3145fa890f7cb6a8",
-            "2025.1": "0b38412a85ac82e7005e1f6729b3abdbdd908946038e520fdee2ceadba7715ae",
+            "2024.1": "32df06bf2360ddbbaff26421abfb78d7ce8c7d102c0f5cb859b3f4d3e17daeb6",
+            "2025.1": "4a608a28f7af4f2797ae7cf3fed721856bd232d56bb39c51a3985ad52f4da723",
         }
     )
 )
@@ -240,7 +241,8 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
         "ak.wwise.waapi.getTopics",
     }
 ) | (
-    core_business_read_operations()
+    LAYOUT_READ_URIS
+    | core_business_read_operations()
     | media_build_business_operations()
     | runtime_inspection_business_read_operations()
 )
@@ -678,7 +680,9 @@ class ExecutionContractRegistry:
                 program_case="fixed-command-dispatch",
             )
         if uri in BOUNDED_DIRECT_CALL_URIS:
-            if uri == "ak.wwise.waapi.getSchema":
+            if uri in LAYOUT_READ_URIS:
+                gateway_commands = ("request-schema", "layout-read")
+            elif uri == "ak.wwise.waapi.getSchema":
                 gateway_commands = ("request-schema", "waapi-schema")
             elif uri in (
                 core_business_operations()
@@ -697,7 +701,7 @@ class ExecutionContractRegistry:
                 gateway_commands=gateway_commands,
                 timeout_seconds=10.0,
                 result_limit_bytes=256 * 1024,
-                verification_strategy="result_schema",
+                verification_strategy=("bounded_native_observation" if uri in LAYOUT_READ_URIS else "result_schema"),
                 accepted_authorization_modes=(),
                 program_case="call-result-schema",
             )
