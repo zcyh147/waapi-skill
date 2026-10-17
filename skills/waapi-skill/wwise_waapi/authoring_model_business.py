@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .canonical import canonical_sha256
-from .authoring_wafm import compile_template, widget_catalog, value_schema, compile_value, text, template_constructor_schemas, attribute_assignment_schema, compile_template_registration, select_registered_template
+from .authoring_wafm import compile_template, value_schema, compile_value, text, template_constructor_schemas, attribute_assignment_schema, compile_template_registration, select_registered_template
 
 VERSIONS = ('2024.1', '2025.1')
 PREFIX = 'ak.wwise.ui.'
