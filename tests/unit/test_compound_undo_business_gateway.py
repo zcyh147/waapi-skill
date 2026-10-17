@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tests.unit.test_operation_input_gateway import (
     OBJECT_GUID,
     ObjectLifecycleClient,
@@ -707,3 +709,179 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
     )
     snapshotted = session.settings["undo_plan"]["children"][0]
     assert snapshotted["request"]["arguments"]["value"] == "snapshotted"
+
+
+def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None):
+    state_dir = tmp_path / "state"
+    env = gateway_env(tmp_path, version=version)
+    def run(*argv):
+        code, payload = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *argv],
+            env=env, client_factory=lambda _url: client)
+        assert code == 0, json.dumps(payload, ensure_ascii=False)
+        return payload
+    parent = run("draft-start", "waapi.undoGroup")
+    draft, authority, revision = parent["draft"]["draft_id"], parent["task_authority"], str(parent["draft"]["revision"])
+    children = []
+    for operation, flag, value in (("object.setNotes", "--notes", "after"), ("object.setName", "--new-name", "Renamed")):
+        phase = run("draft-start-undo-child", draft, "--task-authority", authority,
+                    "--expected-revision", revision, "--operation", operation)
+        child, child_authority = phase["draft"]["draft_id"], phase["task_authority"]
+        phase = run("draft-bind-object", child, "--task-authority", child_authority,
+                    "--expected-revision", str(phase["draft"]["revision"]), "--object-id", OBJECT_GUID)
+        phase = run("draft-declare-object-change", child, "--task-authority", child_authority,
+                    "--expected-revision", str(phase["draft"]["revision"]), flag, value)
+        run("draft-check", child, "--task-authority", child_authority, "--expected-revision", str(phase["draft"]["revision"]))
+        children.extend(("--child-draft", child, child_authority))
+    declaration = ("draft-declare-undo-plan", draft, "--task-authority", authority,
+        "--expected-revision", revision, "--display-name", "Cancellation case", *children,
+        "--failure-cancellation", cancellation)
+    if declaration_error:
+        code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *declaration],
+            env=env, client_factory=lambda _url: client)
+        assert code == 2 and declaration_error in json.dumps(rejected), rejected
+        return state_dir, env, rejected
+    phase = run(*declaration)
+    phase = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    preview = run("preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--apply")
+    shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+    run(*shown["next_command"]["gateway_argv"])
+    return state_dir, env, preview
+
+
+def _cancellation_client(version, *, fault=None):
+    from tests.unit.test_object_graph_business_gateway import _info
+    class Client(ObjectLifecycleClient):
+        def __init__(self):
+            super().__init__()
+            if fault == "missing-notes-before":
+                self.source.pop("notes")
+            self.before = dict(self.source)
+        def call(self, uri, native_args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if version == "2021.1" and uri == "ak.wwise.core.object.get" and native_args.get("waql") == "from type Project take 1":
+                from tests.unit.test_operation_input_gateway import project_row
+                project = project_row()
+                return {"return": [{**project, "type": "Project", "filePath": project["path"]}]}
+            if uri == "ak.wwise.core.object.get" and getattr(self, "cancelled", False) and fault == "read-error":
+                raise RuntimeError("fixture cancellation observation unavailable")
+            if uri.startswith("ak.wwise.core.undo."):
+                self.calls.append((uri, native_args, options))
+                if uri.endswith("cancelGroup"):
+                    self.cancelled = True
+                    if fault == "cancel-error":
+                        return {"fixture_invalid_cancel_result": True}
+                    if native_args.get("undo") is True and fault != "not-restored":
+                        self.source = dict(self.before)
+                return {}
+            if uri in {"ak.wwise.core.object.setNotes", "ak.wwise.core.object.setName"}:
+                self.calls.append((uri, native_args, options))
+                if uri.endswith("setNotes"):
+                    self.source["notes"] = native_args["value"]
+                    return {}
+                self.source.update(name=native_args["value"], path="\\Actor-Mixer Hierarchy\\Default Work Unit\\" + native_args["value"])
+                if fault == "child-exception":
+                    raise RuntimeError("fixture unknown rename outcome")
+                return {"fixture_invalid_native_result": True}
+            return super().call(uri, native_args, options)
+    return Client()
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("cancellation,args", (("undo-changes", {"undo": True}),
+    ("preserve-changes", {"undo": False}), ("native-default", {})))
+def test_compound_failure_cancellation_keeps_native_choices_and_observes_partial_state(tmp_path, version, cancellation, args):
+    client = _cancellation_client(version)
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version, cancellation=cancellation)
+    plan = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact["prepared_operation"]["pre_state"]["execution_plan"]
+    assert plan["cancel"]["args"] == args
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", json.dumps(result, ensure_ascii=False)
+    assert result["rollback_verified"] is (cancellation == "undo-changes")
+    observation = result["compound_execution"]["cancellation_observation"]
+    assert observation["complete"] is True
+    assert observation["pre_state_restored"] is (cancellation == "undo-changes")
+    assert observation["scope"] == "sealed_child_preflight_readbacks_only"
+    assert result["verified"] is False and result["automatic_retry"] is False
+    writes = [call for call in client.calls if call[0].startswith("ak.wwise.core.undo.") or call[0] in {
+        "ak.wwise.core.object.setNotes", "ak.wwise.core.object.setName"}]
+    assert [call[0] for call in writes] == ["ak.wwise.core.undo.beginGroup", "ak.wwise.core.object.setNotes",
+        "ak.wwise.core.object.setName", "ak.wwise.core.undo.cancelGroup"]
+    assert writes[-1][1] == args
+
+
+@pytest.mark.parametrize("fault", ("not-restored", "read-error", "cancel-error", "read-budget", "byte-budget", "missing-notes-before"))
+def test_compound_cancellation_does_not_turn_acknowledgement_or_missing_reads_into_rollback(tmp_path, monkeypatch, fault):
+    from wwise_waapi import compound_undo_observation
+    client = _cancellation_client("2025.1", fault=fault)
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version="2025.1", cancellation="undo-changes")
+    if fault == "read-budget":
+        monkeypatch.setattr(compound_undo_observation, "MAX_CANCELLATION_READS", 0)
+    if fault == "byte-budget":
+        monkeypatch.setattr(compound_undo_observation, "MAX_CANCELLATION_OBSERVATION_BYTES", 4096)
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["verified"] is False, result
+    assert result.get("rollback_verified", False) is False
+    assert result["automatic_retry"] is False
+    if fault == "cancel-error":
+        assert result["status"] == "indeterminate" and "cancellation_observation" not in result["compound_execution"]
+    else:
+        observed = result["compound_execution"]["cancellation_observation"]
+        assert observed["pre_state_restored"] is False
+        assert observed["complete"] is (fault == "not-restored")
+        if fault in {"read-error", "read-budget", "byte-budget"}:
+            assert all(row["complete"] is False for row in observed["children"])
+        assert len(json.dumps(observed).encode()) <= compound_undo_observation.MAX_CANCELLATION_OBSERVATION_BYTES
+    writes = [row for row in client.calls if row[0] in {"ak.wwise.core.object.setNotes", "ak.wwise.core.object.setName"}]
+    assert len(writes) == 2
+    code, repeated = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2
+    assert len([row for row in client.calls if row[0] in {"ak.wwise.core.object.setNotes", "ak.wwise.core.object.setName"}]) == 2
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_cancellation_discovery_retains_exact_version_choices(tmp_path, version):
+    code, result = offline_execute(tmp_path, "--version", version, "operation-schema", "waapi.undoGroup", version=version)
+    assert code == 0, result
+    choices = result["business_adapter"]["declaration"]["failure_cancellation"]["choices"]
+    assert choices == (["native-default"] if version in {"2021.1", "2022.1"}
+                       else ["undo-changes", "preserve-changes", "native-default"])
+
+
+def test_compound_client_error_retains_failure_and_scoped_restoration_without_replay(tmp_path):
+    client = _cancellation_client("2025.1", fault="child-exception")
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version="2025.1", cancellation="undo-changes")
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    assert result["compound_execution"]["failed_phase"]["failure"]["kind"] == "dispatch_failed"
+    assert "fixture unknown rename outcome" in json.dumps(result["compound_execution"]["failed_phase"])
+    assert result["compound_execution"]["cancellation_observation"]["pre_state_restored"] is True
+    assert result["verified"] is False and result["automatic_retry"] is False
+    assert len([row for row in client.calls if row[0].endswith("cancelGroup")]) == 1
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+def test_older_compound_native_default_is_observed_without_inventing_undo_option(tmp_path, version):
+    client = _cancellation_client(version)
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version, cancellation="native-default")
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    assert [row[1] for row in client.calls if row[0].endswith("cancelGroup")] == [{}]
+    assert result["rollback_verified"] is False
+    assert result["compound_execution"]["cancellation_observation"]["complete"] is True
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+@pytest.mark.parametrize("cancellation", ("undo-changes", "preserve-changes"))
+def test_older_compound_rejects_unpinned_cancel_option_before_parent_preview(tmp_path, version, cancellation):
+    client = _cancellation_client(version)
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation=cancellation, declaration_error="UNSUPPORTED_CANCELLATION_OPTION")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)

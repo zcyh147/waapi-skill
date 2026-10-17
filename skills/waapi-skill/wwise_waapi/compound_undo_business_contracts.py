@@ -44,6 +44,16 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "settings_field": "undo_plan",
             "submit_once": True,
             "required_fields": ["display_name", "child_drafts"],
+            "optional_fields": ["failure_cancellation"],
+            "failure_cancellation": {
+                "cli": "--failure-cancellation <choice>",
+                "choices": (["native-default"] if version in {"2021.1", "2022.1"}
+                            else ["undo-changes", "preserve-changes", "native-default"]),
+                "default": "native-default" if version in {"2021.1", "2022.1"} else "undo-changes",
+                "native-default": "omit cancelGroup.undo; older-version rollback meaning is not inferred",
+                "preserve-changes": "explicit cancelGroup.undo=false; 2023.1-2025.1 only",
+                "undo-changes": "explicit cancelGroup.undo=true; restoration requires separate bounded readback",
+            },
             "child_input": (
                 "ordered_parent_owned_checked_closed_draft_snapshot"
             ),
@@ -108,6 +118,14 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             "automatic_retry": False,
             "inner_failure_attempts_cancel": True,
             "cancel_is_not_rollback_verification": True,
+            "cancellation_observation": {
+                "scope": "sealed_child_preflight_readbacks_only",
+                "maximum_distinct_reads": 128,
+                "maximum_report_bytes": 32768,
+                "original_read_results": "immutable_preview_and_dispatcher_evidence",
+                "missing_affected_prestate": "incomplete; never restoration proof",
+                "group_lifetime_and_external_effects": "not_verified_by_this_observation",
+            },
             "every_eligible_child_requires_business_state_verification": True,
             "overlapping_final_outcomes": "reject_before_preview",
             "immutable_preview": True,
