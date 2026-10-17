@@ -4,9 +4,12 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Mapping
 
+from .builders.metadata import parse_get_property_info_result
+
 
 GET = "ak.wwise.core.object.get"
 NAMES = "ak.wwise.core.object.getPropertyAndReferenceNames"
+INFO = "ak.wwise.core.object.getPropertyInfo"
 FIELDS = ("id", "name", "type", "path", "parent", "notes")
 MAX_NODES = 128
 MAX_FIELDS = 1024
@@ -70,6 +73,18 @@ def capture_lifecycle_graph(root_id: str, *, read: Read) -> list[dict[str, Any]]
                 or len(names) != len(set(names))):
             raise LifecycleGraphError("Lifecycle field discovery must be bounded, complete and unique")
         values: dict[str, Any] = {}
+        reference_fields = []
+        field_types = {}
+        for name in sorted(names):
+            try:
+                info = parse_get_property_info_result(read(INFO, {"object": row["id"], "property": name}, {}))
+            except ValueError as exc:
+                raise LifecycleGraphError("Lifecycle field metadata is malformed") from exc
+            if info.name != name or not isinstance(info.type, str):
+                raise LifecycleGraphError("Lifecycle field metadata does not match the discovered field")
+            field_types[name] = info.type
+            if info.type.casefold() in {"reference", "objectreference"} or info.restriction.get("type") == "reference":
+                reference_fields.append(name)
         for offset in range(0, len(names), 32):
             chunk = sorted(names)[offset:offset + 32]
             observed = _rows(read(GET, {"from": {"id": [row["id"]]}}, {"return": ["id", *("@" + name for name in chunk)]}))
@@ -80,6 +95,8 @@ def capture_lifecycle_graph(root_id: str, *, read: Read) -> list[dict[str, Any]]
                     raise LifecycleGraphError("Lifecycle field read omitted a discovered field")
                 values[name] = observed[0]["@" + name]
         row["field_values"] = values
+        row["reference_fields"] = reference_fields
+        row["field_types"] = field_types
     return sorted(normalized, key=lambda row: (row["path"].count("\\"), row["path"]))
 
 
@@ -118,6 +135,12 @@ def lifecycle_graph_matches(source: list[dict[str, Any]], actual: list[dict[str,
             return False
         if path and row["name"] != other["name"]:
             return False
-        if value(row["field_values"], translate=True) != value(other["field_values"], translate=False):
+        if row["field_types"] != other["field_types"] or row["reference_fields"] != other["reference_fields"]:
+            return False
+        expected_values = {name: (value(raw, translate=True) if name in row["reference_fields"] else raw)
+                           for name, raw in row["field_values"].items()}
+        observed_values = {name: (value(raw, translate=False) if name in other["reference_fields"] else raw)
+                           for name, raw in other["field_values"].items()}
+        if expected_values != observed_values:
             return False
     return True

@@ -163,3 +163,17 @@ def test_replace_keeps_native_absent_and_case_insensitive_collision_choices(
     code, verified = task.finish(tx, shown)
     assert code == 2 and verified["verification"]["status"] == "indeterminate", verified
     assert all(row["passed"] for row in verified["verification"]["assertions"])
+
+
+def test_copy_snapshot_preserves_guid_text_properties_without_reference_rebinding(tmp_path: Path) -> None:
+    task = ReplaceTask(tmp_path, "2025.1", "object.copy")
+    task.metadata["UserMarker"] = {"name": "UserMarker", "type": "string"}
+    for row in task.objects.values():
+        row["@UserMarker"] = FIRST
+    task.declare()
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verification"]["status"] == "indeterminate", verified
+    assert all(row["passed"] for row in verified["verification"]["assertions"])
+    assert task.objects[COPIED_ROOT]["@UserMarker"] == FIRST
+    assert task.objects[COPIED_CHILD]["@Target"] == {"id": COPIED_ROOT}
