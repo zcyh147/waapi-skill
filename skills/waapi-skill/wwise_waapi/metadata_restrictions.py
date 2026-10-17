@@ -154,7 +154,9 @@ def supports_property_prerequisite_workflow(dependencies: Any) -> bool:
     if not activations:
         return False
     for item in activations:
-        if item.get("context") != "Self" or item.get("action") != "Enable":
+        if item.get("context") not in {"Self", "AssocParent"} or item.get("action") != "Enable":
+            return False
+        if item.get("context") == "AssocParent" and item.get("type") != "property":
             return False
         if item.get("type") == "override" and set(item) == {"type", "action", "context", "property"}:
             continue

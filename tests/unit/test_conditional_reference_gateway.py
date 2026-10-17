@@ -54,7 +54,7 @@ class AttenuationTask(FieldTask):
                     if key.startswith("@"):
                         is_reference = self.metadata.get(key[1:], {}).get("restriction", {}).get("type") == "reference"
                         self.objects[row["object"]][key[1:]] = {"id": value} if is_reference else value
-            return {"objects": [{"id": FIRST, "name": "Rain", "type": self.objects[FIRST]["type"]}]}
+            return {"objects": [{"id": FIRST, "name": self.objects[FIRST]["name"], "type": self.objects[FIRST]["type"]}]}
         result = super().call(uri, args, options)
         return deepcopy(result)
 
@@ -618,6 +618,65 @@ class SerializedScalarTask(ScalarPropertyTask):
     def call(self, uri, args=None, options=None):
         # Exercise independent JSON values as the external WAAPI transport does.
         return json.loads(json.dumps(super().call(uri, args, options)))
+
+
+@pytest.mark.parametrize("drift", ["none", "owner-before", "value-before", "value-after", "metadata-before"])
+@pytest.mark.parametrize("operation", ["object.setProperty", "object.set"])
+@pytest.mark.parametrize("enabled", [True, False])
+def test_association_parent_condition_uses_exact_owner_and_guards_it(tmp_path, drift, operation, enabled):
+    task = ScalarPropertyTask(tmp_path, "2025.1", operation=operation)
+    task.enabled = enabled
+    task.metadata = {
+        "ContinuePlay": {"name": "ContinuePlay", "type": "bool", "dependencies": [{
+            "type": "property", "action": "Enable", "context": "AssocParent", "property": "SwitchBehavior",
+            "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}],
+        }]},
+        "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16"},
+    }
+    task.objects[FIRST].update(name="", type="ObjectSettingAssociation",
+        path=r"\Containers\Minigun\Shells\<Unnamed Object Setting Association>",
+        parent=None, owner={"id": SECOND}, ContinuePlay=False)
+    task.objects[SECOND].update(name="Shells", type="SwitchContainer", path=r"\Containers\Minigun\Shells", SwitchBehavior=1)
+    target = task.bind(FIRST)
+    field = task.discover(target, "ContinuePlay")
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "true") if operation == "object.setProperty" else
+                      task.step("draft-declare-existing", "--declaration-id", "continue-play", "--object-handle", target,
+                                "--field-value", field, "true"))
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "owner-before":
+        task.objects[FIRST]["owner"] = None
+    if drift == "value-before":
+        task.objects[SECOND]["SwitchBehavior"] = 0
+    if drift == "metadata-before":
+        task.metadata["SwitchBehavior"]["default"] = 0
+    code, executed = task.run("execute", tx)
+    if drift.endswith("before"):
+        assert code == 2, executed
+        assert not any(uri.endswith(("setProperty", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    if drift == "value-after":
+        task.objects[SECOND]["SwitchBehavior"] = 0
+    code, verified = task.run("verify", tx)
+    assert code == (2 if drift == "value-after" else 0), json.dumps(verified)
+    assert task.objects[FIRST]["ContinuePlay"] is True
+    writes = [(uri, args) for uri, args, _ in task.calls if uri.endswith(("setProperty", "object.set"))]
+    assert len(writes) == 1
+    if operation == "object.setProperty":
+        assert writes[0][1]["object"] == FIRST
+    else:
+        assert writes[0][1]["objects"][0]["object"] == FIRST
+        assert "@SwitchBehavior" not in writes[0][1]["objects"][0]
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
