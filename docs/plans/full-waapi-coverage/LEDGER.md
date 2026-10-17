@@ -265,3 +265,26 @@ This grants no branch/native effect credit. The existing driver now installs the
 Mac owner after exact successful collection with fake-only controls. Native
 Windows ownership, cross-family integration and the remaining layout contracts
 and observations stay open; the Authoring permission-window hold remains active.
+
+
+Ticket #188 has a further code-only partial for exact-target docking/redocking
+and signed splitter movement on 2024.1/2025.1. Docking binds the same scoped
+layout, view and target, preserves floating and already-docked paths, and checks
+serialized parent/child order and orientation plus independent rectangles.
+Splitter movement derives its axis from the exact parent stack and rejects
+clipped, resized, perpendicular or stale effects without replay. The original
+native schemas and contradictory definition graph remain unchanged. Four exact
+version/function rows are added; all 29 layout rows retain migration-required
+ownership under #188. This branch's source inventory is 878 public rows / 218
+unique URIs; combined generated artifacts remain integration-owned.
+
+Focused fake evidence is retained without erasing failures: splitter controls
+passed 25; target-kind docking controls passed 8; the combined product selection
+reported 214 passed / 1 failed / 64 deselected because its exact owner roster
+missed the two new URIs. The corrected owner-only control then passed 1. Existing
+mutation regression reported 65 passed / 1 failed / 40 deselected because the
+Program manifest count needed its new splitter file; that exact manifest control
+then passed together with the owner control (2 passed). These are deterministic contract/effect-oracle tests,
+not owned native observations, branch completion or release acceptance. Nested
+setLayout construction, 2025 reset semantics, exact native interpretations and
+consolidated host-specific validation remain open under the GUI launch hold.

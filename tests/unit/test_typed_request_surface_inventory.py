@@ -477,8 +477,8 @@ def test_closed_layout_reads_retain_native_definition_graph_and_unresolved_resul
 def test_closed_layout_business_lanes_retain_exact_native_request_definition_obligations():
     result = build_typed_request_surface(root=RESOURCE_ROOT)
     rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business']
-    assert len(rows) == 11
-    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView', 'undockView'}
+    assert len(rows) == 15
+    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView', 'undockView', 'dockView', 'moveSplitter'}
     assert {row['version'] for row in rows if row['uri'].endswith('.closeView')} == {'2025.1'}
     assert result['unresolved_references'] == []
     for row in rows:

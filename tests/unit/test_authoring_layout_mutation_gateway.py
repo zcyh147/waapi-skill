@@ -101,7 +101,7 @@ def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', o
         client_setup(client)
     code, schema = gateway.execute_gateway(['--version', version, 'request-schema', URI + operation], env=env,
         client_factory=lambda _: pytest.fail('schema must stay offline'))
-    assert code == 0, schema
+    assert code == 0, (schema.get('message'), schema.get('details'))
     code, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', layout_name],
         env=env, client_factory=lambda _: client)
     assert code == 0, inspected
@@ -543,3 +543,176 @@ def test_undock_never_certifies_a_returned_empty_result_without_requested_busine
     verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
     assert verified['verification']['business_state_verified'] is False
     assert [row[0] for row in client.calls].count(URI + 'undockView') == 1
+
+
+def _seed_dock_client(client, *, initially_docked=False):
+    view_id = '{22222222-2222-2222-2222-222222222222}'
+    client.views['Designer'] = [{'viewID': view_id, 'viewName': 'ProjectExplorer',
+        'viewDisplayName': 'Project Explorer', 'viewIsDocked': initially_docked}]
+    anchor_id = '{33333333-3333-3333-3333-333333333333}'
+    client.layouts['Designer']['Layout']['StackPanel']['@Children'] = [
+        {'@type': 'ObjectPanel', 'ID': anchor_id, 'Name': 'Existing target contents'}]
+    client.rectangles[anchor_id] = {'left': 100, 'top': 100, 'right': 400, 'bottom': 500}
+    client.rectangles[NODE] = dict(client.rectangles[anchor_id])
+    client.rectangles[view_id] = {'left': 600, 'top': 100, 'right': 900, 'bottom': 500}
+    if initially_docked:
+        client.layouts['Designer']['Layout']['StackPanel']['@Children'].append(
+            {'@type': 'View', 'ID': view_id, 'Name': 'ProjectExplorer', 'SelectionChannel': '1'})
+        client.rectangles[NODE]['right'] = 900
+    original = client.call
+    def dock(uri, args=None, options=None):
+        if uri == URI + 'dockView':
+            client.calls.append((uri, args, options))
+            client.views['Designer'][0]['viewIsDocked'] = True
+            client.rectangles[view_id] = {
+                'left': {'left': 0, 'top': 100, 'right': 90, 'bottom': 500},
+                'right': {'left': 410, 'top': 100, 'right': 500, 'bottom': 500},
+                'top': {'left': 100, 'top': 0, 'right': 400, 'bottom': 90},
+                'bottom': {'left': 100, 'top': 510, 'right': 400, 'bottom': 600},
+            }[args['side']]
+            stack = client.layouts['Designer']['Layout']['StackPanel']
+            anchor = deepcopy(next(child for child in stack['@Children'] if child['ID'] == anchor_id))
+            view = {'@type': 'View', 'ID': view_id, 'Name': 'ProjectExplorer', 'SelectionChannel': '1'}
+            stack['Orientation'] = 'Horizontal' if args['side'] in {'left', 'right'} else 'Vertical'
+            stack['@Children'] = [view, anchor] if args['side'] in {'left', 'top'} else [anchor, view]
+            v, a = client.rectangles[view_id], client.rectangles[anchor_id]
+            client.rectangles[NODE] = {'left': min(v['left'], a['left']), 'top': min(v['top'], a['top']),
+                'right': max(v['right'], a['right']), 'bottom': max(v['bottom'], a['bottom'])}
+            return {}
+        return original(uri, args, options)
+    client.call = dock
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+@pytest.mark.parametrize('side', ['left', 'right', 'top', 'bottom'])
+@pytest.mark.parametrize('initially_docked', [False, True], ids=['floating', 'redock'])
+def test_dock_view_binds_exact_target_side_and_verifies_independent_geometry(tmp_path, version, side, initially_docked):
+    view_id = '{22222222-2222-2222-2222-222222222222}'
+    def seed(client):
+        _seed_dock_client(client, initially_docked=initially_docked)
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', side), client_setup=seed)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    assert prepared['dispatch'] == {'uri': URI + 'dockView', 'args': {
+        'name': 'Designer', 'viewID': view_id, 'targetID': NODE, 'side': side}, 'options': {}}
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert [row[0] for row in client.calls].count(URI + 'dockView') == 1
+
+
+@pytest.mark.parametrize('failure', ['wrong-side', 'missing-view', 'different-view-type', 'missing-target', 'current-layout', 'container-overlap', 'no-perpendicular-overlap', 'unrelated-placement', 'wrong-order', 'wrong-orientation', 'no-effect'])
+def test_dock_does_not_certify_a_docked_flag_without_exact_target_side_effect(tmp_path, failure):
+    env, state, client, preview = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=_seed_dock_client)
+    original = client.call
+    view_id = '{22222222-2222-2222-2222-222222222222}'
+    def wrong_effect(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'dockView':
+            if failure == 'wrong-side':
+                client.rectangles[view_id] = {'left': 410, 'top': 100, 'right': 500, 'bottom': 500}
+            elif failure == 'missing-view':
+                client.views['Designer'] = []
+            elif failure == 'different-view-type':
+                client.views['Designer'][0]['viewName'] = 'OtherView'
+            elif failure == 'missing-target':
+                client.layouts['Designer']['Layout']['StackPanel']['ID'] = '{33333333-3333-3333-3333-333333333333}'
+            elif failure == 'current-layout':
+                client.current = 'Profiler'
+            elif failure == 'container-overlap':
+                client.rectangles[view_id] = {'left': 100, 'top': 100, 'right': 200, 'bottom': 500}
+            elif failure == 'no-perpendicular-overlap':
+                client.rectangles[view_id] = {'left': 0, 'top': 600, 'right': 90, 'bottom': 700}
+            elif failure == 'unrelated-placement':
+                client.layouts['Designer']['Layout']['StackPanel']['@Children'] = []
+            elif failure == 'wrong-order':
+                client.layouts['Designer']['Layout']['StackPanel']['@Children'].reverse()
+            elif failure == 'wrong-orientation':
+                client.layouts['Designer']['Layout']['StackPanel']['Orientation'] = 'Vertical'
+            else:
+                client.views['Designer'][0]['viewIsDocked'] = False
+        return result
+    client.call = wrong_effect
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    assert [row[0] for row in client.calls].count(URI + 'dockView') == 1
+
+
+def test_dock_revalidates_target_rectangle_immediately_before_the_single_write(tmp_path):
+    env, state, client, preview = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=_seed_dock_client)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, _ = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0
+    client.rectangles[NODE]['left'] = 101
+    code, result = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, result
+    assert URI + 'dockView' not in [row[0] for row in client.calls]
+
+
+def test_dock_rejects_the_same_native_view_and_target_even_with_different_role_handles(tmp_path):
+    def seed(client):
+        _seed_dock_client(client)
+        client.views['Designer'][0]['viewID'] = NODE
+    switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=seed,
+        expect_declaration_error=True)
+
+
+def test_dock_accepts_finite_fractional_native_rectangles_without_integer_coercion(tmp_path):
+    def seed(client):
+        _seed_dock_client(client)
+        client.rectangles[NODE] = {'left': 100.5, 'top': 100.5, 'right': 400.5, 'bottom': 500.5}
+        client.rectangles['{33333333-3333-3333-3333-333333333333}'] = dict(client.rectangles[NODE])
+    env, state, client, preview = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=seed)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    assert prepared['pre_state']['layout_dock_prestate']['rectangles']['target']['left'] == 100.5
+    assert confirm_execute_verify(env, state, client, preview)['verification']['business_state_verified'] is True
+
+
+@pytest.mark.parametrize('wrong_target', ['view-role', 'other-layout'])
+def test_dock_rejects_wrong_role_or_foreign_layout_target_before_any_write(tmp_path, wrong_target):
+    env, state, client, _ = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=_seed_dock_client)
+    _, selected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Designer'], env=env, client_factory=lambda _: client)
+    if wrong_target == 'view-role':
+        target = selected['views'][0]['handle']
+    else:
+        _, foreign = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Profiler'], env=env, client_factory=lambda _: client)
+        target = foreign['elements'][0]['handle']
+    _, schema = gateway.execute_gateway(['--version', '2025.1', 'request-schema', URI + 'dockView'], env=env)
+    _, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env)
+    draft = started['draft']
+    code, result = gateway.execute_gateway([*state, 'draft-declare-layout-plan', draft['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(draft['revision']),
+        '--layout-handle', selected['layout_handle'], '--view-handle', selected['views'][0]['handle'],
+        '--target-element-handle', target, '--dock-side', 'left'], env=env, client_factory=lambda _: client)
+    assert code != 0, result
+    assert URI + 'dockView' not in [row[0] for row in client.calls]
+
+
+@pytest.mark.parametrize('target_kind', ['ObjectPanel', 'ObjectTabPanel', 'View', 'StackPanel'])
+@pytest.mark.parametrize('side', ['left', 'bottom'])
+def test_dock_keeps_exact_leaf_and_nested_container_target_kinds_representable(tmp_path, target_kind, side):
+    target_id = '{33333333-3333-3333-3333-333333333333}'
+    def seed(client):
+        _seed_dock_client(client)
+        anchor = client.layouts['Designer']['Layout']['StackPanel']['@Children'][0]
+        anchor['@type'] = target_kind
+        if target_kind == 'StackPanel':
+            anchor.update(Orientation='Vertical', **{'@Children': [{'@type': 'ObjectPanel', 'ID': 'retained inner panel'}]})
+    env, state, client, preview = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'], '--target-element-handle',
+            next(row['handle'] for row in inspected['elements'] if row.get('name') == 'Existing target contents'), '--dock-side', side), client_setup=seed)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    assert prepared['dispatch']['args']['targetID'] == target_id
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert [row[0] for row in client.calls].count(URI + 'dockView') == 1

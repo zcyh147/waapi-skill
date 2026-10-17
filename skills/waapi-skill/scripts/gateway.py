@@ -47,7 +47,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
 )
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -2626,6 +2626,10 @@ def build_parser() -> argparse.ArgumentParser:
     draft_layout_plan.add_argument("--view-handle")
     draft_layout_plan.add_argument("--position-x", type=int)
     draft_layout_plan.add_argument("--position-y", type=int)
+    draft_layout_plan.add_argument('--splitter-handle')
+    draft_layout_plan.add_argument('--pixel-delta', type=int)
+    draft_layout_plan.add_argument('--target-element-handle')
+    draft_layout_plan.add_argument('--dock-side', choices=('left', 'right', 'top', 'bottom'))
     draft_layout_plan.add_argument('--view-type')
     draft_layout_plan.add_argument('--initial-x', type=int)
     draft_layout_plan.add_argument('--initial-y', type=int)
@@ -13356,7 +13360,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
     elif args.view_type is not None or args.initial_x is not None or args.initial_y is not None:
         raise GatewayInputError('View type and initial coordinates belong only to get-or-create-view')
     view_identity = None
-    if pending.operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+    if pending.operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
         view_identity = resolve_layout_identity(args.view_handle, role='view', context=context, args=args,
             env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
         if view_identity['layout_name'] != identity['layout_name']:
@@ -13370,10 +13374,30 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         plan.update(position_request)
     elif args.position_x is not None or args.position_y is not None:
         raise GatewayInputError('Floating positions belong only to the undock-view plan')
+    target_identity = None
+    dock_request = None
+    if pending.operation == LAYOUT_DOCK_URI:
+        target_identity = resolve_layout_identity(args.target_element_handle, role='element', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        dock_request = {'dock_side': args.dock_side}
+        plan.update(target_element_handle=args.target_element_handle, **dock_request)
+    elif args.target_element_handle is not None or args.dock_side is not None:
+        raise GatewayInputError('Target element and docking side belong only to dock-view')
+    splitter_identity = None
+    splitter_request = None
+    if pending.operation == LAYOUT_SPLITTER_URI:
+        splitter_identity = resolve_layout_identity(args.splitter_handle, role='element', context=context, args=args,
+            env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+        splitter_request = {'pixel_delta': args.pixel_delta}
+        plan.update(splitter_handle=args.splitter_handle, **splitter_request)
+    elif args.splitter_handle is not None or args.pixel_delta is not None:
+        raise GatewayInputError('Splitter identity and pixel displacement belong only to move-splitter')
     settings = {'authoring_layout_plan': plan,
                 'authoring_layout_binding': layout_binding_descriptor(identity,
                     registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None,
-                    view_request=view_request, view_identity=view_identity, position_request=position_request)}
+                    view_request=view_request, view_identity=view_identity, position_request=position_request,
+                    target_identity=target_identity, dock_request=dock_request,
+                    splitter_identity=splitter_identity, splitter_request=splitter_request)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
         adapter.materialize(candidate)

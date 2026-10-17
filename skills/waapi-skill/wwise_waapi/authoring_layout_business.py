@@ -15,12 +15,14 @@ from .canonical import canonical_sha256
 LAYOUT_SWITCH_URI = 'ak.wwise.ui.layout.switchLayout'
 LAYOUT_SET_URI = 'ak.wwise.ui.layout.setLayout'
 LAYOUT_REMOVE_URI = 'ak.wwise.ui.layout.removeLayout'
+LAYOUT_SPLITTER_URI = 'ak.wwise.ui.layout.moveSplitter'
+LAYOUT_DOCK_URI = 'ak.wwise.ui.layout.dockView'
 LAYOUT_UNDOCK_URI = 'ak.wwise.ui.layout.undockView'
 LAYOUT_CLOSE_URI = 'ak.wwise.ui.layout.closeView'
 LAYOUT_GET_OR_CREATE_URI = 'ak.wwise.ui.layout.getOrCreateView'
-LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI})
+LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI})
 MUTATION_RESOURCE = 'authoring-layout-mutation-supplement.json'
-MUTATION_SHA256: dict[str, str] = {'2024.1': '9f2ec68caecb598ae96cbb6a46840046ea21871c942cf745dade7c86589aab20', '2025.1': '14c085f77d5c2c0cf6474733f7db15129446caf7eb46e7329c1916671dd65413'}
+MUTATION_SHA256: dict[str, str] = {'2024.1': 'a93363f7c0cf837f90eff10ae04430854405dcb22ecc1fb000e583d5ee04486e', '2025.1': 'ff8bf4e3072c20fa93bb5de34f4ed897bb29449173a8b2d3f8a7005ca849e7d3'}
 
 
 def layout_mutation_versions(operation: str) -> tuple[str, ...]:
@@ -78,7 +80,20 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
             'preserve omitted coordinate fields', 'get or create once after authorization', 'verify the returned view identity and applicable initial coordinates']
         result['coordinate_scope'] = 'initial positions apply only to a newly created view; an existing view is reused'
         result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent view instances, plus explicit initial coordinate readbacks when created'}
-    elif operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+    elif operation == LAYOUT_SPLITTER_URI:
+        for field, kind in (('splitter_handle', 'scoped_element_handle'), ('pixel_delta', 'integer')):
+            result['declaration']['required_fields'].append(field)
+            result['declaration']['public_fields'].append(field)
+            result['declaration']['field_types'][field] = kind
+            result['declaration']['input_forms'][field] = {'gateway_flag': '--' + field.replace('_', '-'), 'shape': 'integer' if kind == 'integer' else 'scalar'}
+        result['responsibility_split']['agent'] = ['choose a discovered splitter and signed pixel displacement']
+        result['responsibility_split']['gateway'] = ['revalidate the exact splitter in the current layout',
+            'derive the movement axis from its parent stack', 'freeze the exact rectangle',
+            'move once after authorization', 'verify the exact displacement, size and perpendicular coordinates']
+        result['gateway_derivations'].append('movement axis from the discovered parent stack orientation')
+        result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent exact splitter rectangle delta and parent axis',
+            'clipped_or_incomplete_effect': 'not_verified; never replay the movement'}
+    elif operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
         result['declaration']['required_fields'].append('view_handle')
         result['declaration']['public_fields'].append('view_handle')
         result['declaration']['field_types']['view_handle'] = 'scoped_view_handle'
@@ -87,6 +102,17 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
             'request close once after authorization', 'poll bounded independent instances for exact disappearance']
         result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'exact view absent from independently read instances',
             'maximum_polls': 16, 'poll_interval_seconds': 0.2, 'incomplete_boundary': 'pending_async_close'}
+        if operation == LAYOUT_DOCK_URI:
+            for field, kind in (('target_element_handle', 'scoped_element_handle'), ('dock_side', 'enum:left,right,top,bottom')):
+                result['declaration']['required_fields'].append(field)
+                result['declaration']['public_fields'].append(field)
+                result['declaration']['field_types'][field] = kind
+                result['declaration']['input_forms'][field] = {'gateway_flag': '--' + field.replace('_', '-'), 'shape': 'scalar'}
+            result['responsibility_split']['agent'] = ['choose a discovered view, target element and exact docking side']
+            result['responsibility_split']['gateway'] = ['revalidate both identities in the current layout',
+                'dock or redock once without an extra undock write', 'verify the same view and exact target-relative side']
+            result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent exact docked topology, order, orientation and target-relative rectangles'}
+            result['verifier']['unresolved_native_effects'] = ['owned native characterization of target-kind topology semantics', 'omitted or nonpositive target rectangles']
         if operation == LAYOUT_UNDOCK_URI:
             result['declaration']['optional_fields'] = ['position_x', 'position_y']
             for field in ('position_x', 'position_y'):
@@ -100,7 +126,7 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
 
 
 def layout_business_catalog_rows() -> tuple[dict[str, Any], ...]:
-    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view', LAYOUT_UNDOCK_URI: 'float a discovered view'}[uri],
+    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view', LAYOUT_UNDOCK_URI: 'float a discovered view', LAYOUT_DOCK_URI: 'dock or redock a discovered view', LAYOUT_SPLITTER_URI: 'move a discovered splitter by signed pixels'}[uri],
                   'supported_versions': list(layout_mutation_versions(uri))} for uri in sorted(LAYOUT_MUTATION_URIS))
 
 
@@ -127,7 +153,11 @@ def merge_layout_mutations(manifest: Mapping[str, Any], *, root: Path | None, ve
 def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: str | None = None,
                               view_request: Mapping[str, Any] | None = None,
                               view_identity: Mapping[str, Any] | None = None,
-                              position_request: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                              position_request: Mapping[str, Any] | None = None,
+                              target_identity: Mapping[str, Any] | None = None,
+                              dock_request: Mapping[str, Any] | None = None,
+                              splitter_identity: Mapping[str, Any] | None = None,
+                              splitter_request: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body = {key: record[key] for key in ('handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at')}
     body['observation_sha256'] = canonical_sha256(record['observation'])
     if registration_name is not None:
@@ -140,21 +170,34 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
     if position_request is not None:
         native_position_request(position_request)
         body['position_request'] = dict(position_request)
+    if target_identity is not None:
+        body['target_identity'] = layout_binding_descriptor(target_identity)
+    if dock_request is not None:
+        native_dock_side(dock_request)
+        body['dock_request'] = dict(dock_request)
+    if splitter_identity is not None:
+        body['splitter_identity'] = layout_binding_descriptor(splitter_identity)
+    if splitter_request is not None:
+        native_splitter_request(splitter_request)
+        body['splitter_request'] = dict(splitter_request)
     return {**body, 'binding_sha256': canonical_sha256(body)}
 
 
 def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, Any]:
     expected = {'handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at', 'observation_sha256', 'binding_sha256'}
-    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}):
+    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}, expected | {'view_identity', 'target_identity', 'dock_request'}, expected | {'splitter_identity', 'splitter_request'}):
         raise ValueError('Layout mutation lacks an exact Gateway-owned identity binding')
     body = dict(binding)
     digest = body.pop('binding_sha256')
     if (canonical_sha256(body) != digest or body['role'] != role
+            or (role != 'layout' and set(binding) != expected)
             or (role == 'layout' and body['native_id'] != body['layout_name'])
             or (role == 'view' and (set(binding) != expected or not re.fullmatch(
                 r'\{[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\}', str(body['native_id']))))):
         raise ValueError('Layout mutation identity binding is malformed')
-    if not isinstance(body['context'], Mapping) or not isinstance(body['layout_name'], str):
+    if (not isinstance(body['context'], Mapping) or not isinstance(body['layout_name'], str)
+            or not isinstance(body['native_id'], str) or not body['native_id'] or '\x00' in body['native_id']
+            or len(body['native_id'].encode('utf-8')) > 4096):
         raise ValueError('Layout mutation identity binding context is malformed')
     context = body['context']
     session = context.get('session')
@@ -182,6 +225,18 @@ def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, 
         view = validate_layout_binding(body['view_identity'], role='view')
         if view['context'] != body['context'] or view['layout_name'] != body['layout_name']:
             raise ValueError('View and layout identities must share their exact live scope')
+    if 'target_identity' in body:
+        target = validate_layout_binding(body['target_identity'], role='element')
+        if (target['context'] != body['context'] or target['layout_name'] != body['layout_name']
+                or target['native_id'].upper() == body['view_identity']['native_id'].upper()
+                or not re.fullmatch(r'\{[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\}', target['native_id'])):
+            raise ValueError('Dock target must be a different exact GUID element in the same layout scope')
+        native_dock_side(body['dock_request'])
+    if 'splitter_identity' in body:
+        splitter = validate_layout_binding(body['splitter_identity'], role='element')
+        if splitter['context'] != body['context'] or splitter['layout_name'] != body['layout_name']:
+            raise ValueError('Splitter and layout identities must share their exact live scope')
+        native_splitter_request(body['splitter_request'])
     return dict(binding)
 
 
@@ -206,7 +261,12 @@ def materialize_layout_business_request(operation: str, session: Any) -> Mapping
         if binding.get('view_request') != view_request:
             raise ValueError('View declaration differs from its Gateway-owned binding')
         native_args = native_view_request(view_request)
-    elif operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+    elif operation == LAYOUT_SPLITTER_URI:
+        if (plan['splitter_handle'] != binding.get('splitter_identity', {}).get('handle')
+                or {'pixel_delta': plan['pixel_delta']} != binding.get('splitter_request')):
+            raise ValueError('Splitter declaration differs from its scoped identity and displacement binding')
+        native_args = {'id': binding['splitter_identity']['native_id'], **native_splitter_request(binding['splitter_request'])}
+    elif operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
         view = binding.get('view_identity', {})
         if plan['view_handle'] != view.get('handle'):
             raise ValueError('View declaration differs from its Gateway-owned discovered identity')
@@ -216,6 +276,12 @@ def materialize_layout_business_request(operation: str, session: Any) -> Mapping
             if position != binding.get('position_request'):
                 raise ValueError('Floating position differs from its Gateway-owned declaration binding')
             native_args.update(name=binding['layout_name'], **native_position_request(position))
+        elif operation == LAYOUT_DOCK_URI:
+            if (plan['target_element_handle'] != binding.get('target_identity', {}).get('handle')
+                    or {'dock_side': plan['dock_side']} != binding.get('dock_request')):
+                raise ValueError('Dock declaration differs from its exact target/side binding')
+            native_args.update(name=binding['layout_name'], targetID=binding['target_identity']['native_id'],
+                side=native_dock_side(binding['dock_request']))
     request = {'contract': 'waapi-skill.operation-request/v1', 'version': session.context.wwise_version,
         'operation': 'waapi.call', 'arguments': {'api': operation, 'args': native_args,
             'options': {}, 'layout_binding': binding}}
@@ -232,11 +298,16 @@ def validate_layout_call(version: str, api: str, args: Mapping[str, Any], option
         expected = {'name': name, 'layout': {'Layout': {'Name': name}}}
     elif api == LAYOUT_GET_OR_CREATE_URI:
         expected = native_view_request(verified.get('view_request'))
-    elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+    elif api == LAYOUT_SPLITTER_URI:
+        expected = {'id': verified['splitter_identity']['native_id'], **native_splitter_request(verified['splitter_request'])}
+    elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
         view = validate_layout_binding(verified.get('view_identity'), role='view')
         expected = {'viewID': view['native_id']}
         if api == LAYOUT_UNDOCK_URI:
             expected.update(name=verified['layout_name'], **native_position_request(verified.get('position_request')))
+        elif api == LAYOUT_DOCK_URI:
+            expected.update(name=verified['layout_name'], targetID=verified['target_identity']['native_id'],
+                side=native_dock_side(verified['dock_request']))
     if dict(args) != expected or options:
         raise ValueError('Layout native request differs from the Gateway-owned business binding')
     return verified
@@ -364,3 +435,188 @@ def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any) -> Ma
     if len(matches) != 1 or canonical_sha256(matches[0]) != view['observation_sha256']:
         raise ValueError('The discovered view changed or disappeared; inspect and preview again')
     return matches[0]
+
+
+def native_dock_side(plan: Any) -> str:
+    if not isinstance(plan, Mapping) or set(plan) != {'dock_side'} or plan['dock_side'] not in ('left', 'right', 'top', 'bottom'):
+        raise ValueError('Docking requires one exact left/right/top/bottom side')
+    return plan['dock_side']
+
+
+def require_layout_rectangle(value: Any) -> dict[str, int | float]:
+    validate_layout_read_result('rectangle', value)
+    if (not isinstance(value, Mapping) or set(value) != {'left', 'top', 'right', 'bottom'}
+            or any(type(edge) not in (int, float) or not math.isfinite(edge) for edge in value.values())
+            or value['right'] <= value['left'] or value['bottom'] <= value['top']):
+        raise ValueError('Layout effect requires a complete positive native rectangle')
+    return dict(value)
+
+
+def layout_element_observation(layout: Mapping[str, Any], identity: str) -> Mapping[str, Any]:
+    from .authoring_layout import layout_identity_rows
+    validate_layout_read_result('contents', layout)
+    elements, _ = layout_identity_rows(layout, {'viewInstances': []})
+    matches = [row for row in elements if _element_identity(row['native_id']) == _element_identity(identity)]
+    if len(matches) != 1:
+        raise ValueError('The exact discovered layout element is missing or ambiguous')
+    return matches[0]
+
+
+def dock_state_observation(binding: Mapping[str, Any], *, read: Any) -> dict[str, Any]:
+    view = validate_layout_view_binding(binding, read=read)
+    target = validate_layout_binding(binding['target_identity'], role='element')
+    if not time.time() < target['expires_at']:
+        raise ValueError('The discovered dock target expired; inspect again')
+    layout = read('ak.wwise.ui.layout.getLayout', {'name': binding['layout_name']}, {})
+    element = layout_element_observation(layout, target['native_id'])
+    if canonical_sha256(element['observation']) != target['observation_sha256']:
+        raise ValueError('The discovered dock target changed; inspect again')
+    return {'view': dict(view), 'target': dict(element), 'rectangles': {
+        role: require_layout_rectangle(read('ak.wwise.ui.layout.getElementRectangle', {'id': identity}, {}))
+        for role, identity in (('view', view['viewID']), ('target', target['native_id']))}}
+
+
+def docking_side_matches(view: Mapping[str, Any], target: Mapping[str, Any], side: str) -> bool:
+    view, target = require_layout_rectangle(view), require_layout_rectangle(target)
+    vertical_overlap = min(view['bottom'], target['bottom']) > max(view['top'], target['top'])
+    horizontal_overlap = min(view['right'], target['right']) > max(view['left'], target['left'])
+    return {'left': view['right'] <= target['left'] and vertical_overlap,
+            'right': view['left'] >= target['right'] and vertical_overlap,
+            'top': view['bottom'] <= target['top'] and horizontal_overlap,
+            'bottom': view['top'] >= target['bottom'] and horizontal_overlap}[side]
+
+
+def _element_identity(value: str) -> str:
+    return value.upper() if re.fullmatch(r'\{[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\}', value) else value
+
+
+def _content_children(node: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    children = node.get('@Children', [])
+    if not isinstance(children, list) or any(not isinstance(child, Mapping) for child in children):
+        raise ValueError('Dock topology children are malformed')
+    return [child for child in children if child.get('@type') != 'Splitter']
+
+
+def layout_subtree_ids(node: Mapping[str, Any]) -> list[str]:
+    result = []
+    def walk(current):
+        if isinstance(current.get('ID'), str):
+            result.append(current['ID'])
+        for child in _content_children(current):
+            walk(child)
+    walk(node)
+    return sorted(set(result))
+
+
+def docking_topology_proof(layout: Mapping[str, Any], *, view_id: str, target_id: str,
+                           side: str, previous_target_ids: list[str]) -> dict[str, Any]:
+    """Require an exact ordered stack relationship; geometry alone is insufficient."""
+    validate_layout_read_result('contents', layout)
+    root = layout.get('Layout', {}).get('StackPanel')
+    if not isinstance(root, Mapping):
+        raise ValueError('Docked stack topology was omitted')
+    paths = {view_id: [], target_id: []}
+    def walk(node, parents):
+        path = [*parents, node]
+        for identity in paths:
+            if isinstance(node.get('ID'), str) and _element_identity(node['ID']) == _element_identity(identity):
+                paths[identity].append(path)
+        for child in _content_children(node):
+            walk(child, path)
+    walk(root, [])
+    if any(len(matches) != 1 for matches in paths.values()):
+        raise ValueError('Exact view and target must each occur once in the docked topology')
+    view_path, target_path = paths[view_id][0], paths[target_id][0]
+    if view_path[-1].get('@type') != 'View':
+        raise ValueError('Docked view identity has no exact serialized View node')
+    def require_stack(node):
+        if (node is not root and node.get('@type') != 'StackPanel') or node.get('Orientation') != (
+                'Horizontal' if side in {'left', 'right'} else 'Vertical'):
+            raise ValueError('Dock topology orientation does not prove the requested side')
+    def transparent_to(branch, identity):
+        while _element_identity(str(branch.get('ID', ''))) != _element_identity(identity):
+            children = _content_children(branch)
+            if branch.get('@type') != 'StackPanel' or len(children) != 1:
+                raise ValueError('Intervening panes prevent an exact target-relative docking proof')
+            branch = children[0]
+    common = 0
+    while common < min(len(view_path), len(target_path)) and view_path[common] is target_path[common]:
+        common += 1
+    before = side in {'left', 'top'}
+    if common == len(target_path):
+        parent = target_path[-1]
+        require_stack(parent)
+        children = _content_children(parent)
+        branch = view_path[common]
+        transparent_to(branch, view_id)
+        index = next(i for i, child in enumerate(children) if child is branch)
+        if len(children) < 2 or index != (0 if before else len(children) - 1):
+            raise ValueError('View is not at the requested container boundary')
+        peer = children[1 if before else -2]
+        known = {_element_identity(value) for value in previous_target_ids if _element_identity(value) != _element_identity(view_id)}
+        while _element_identity(str(peer.get('ID', ''))) not in known:
+            descendants = _content_children(peer)
+            if peer.get('@type') != 'StackPanel' or len(descendants) != 1:
+                raise ValueError('Container docking lacks an exact retained target peer')
+            peer = descendants[0]
+        return {'relationship': 'container_boundary', 'parent_id': parent.get('ID'),
+                'orientation': parent['Orientation'], 'peer_id': peer['ID']}
+    if not common or common >= len(view_path):
+        raise ValueError('View and target have no provable sibling stack relationship')
+    parent = view_path[common - 1]
+    require_stack(parent)
+    view_branch, target_branch = view_path[common], target_path[common]
+    transparent_to(view_branch, view_id)
+    transparent_to(target_branch, target_id)
+    children = _content_children(parent)
+    vi = next(i for i, child in enumerate(children) if child is view_branch)
+    ti = next(i for i, child in enumerate(children) if child is target_branch)
+    if vi != ti + (-1 if before else 1):
+        raise ValueError('View and exact dock target are not adjacent in the requested order')
+    return {'relationship': 'adjacent_stack_children', 'parent_id': parent.get('ID'),
+            'orientation': parent['Orientation'], 'peer_id': target_id}
+
+
+def native_splitter_request(plan: Any) -> dict[str, int]:
+    if not isinstance(plan, Mapping) or set(plan) != {'pixel_delta'} or type(plan['pixel_delta']) is not int:
+        raise ValueError('Splitter movement requires one signed integer pixel displacement')
+    return {'delta': plan['pixel_delta']}
+
+
+def splitter_element_context(layout: Mapping[str, Any], identity: str) -> dict[str, Any]:
+    validate_layout_read_result('contents', layout)
+    matches, stacks = [], set()
+    def walk(value, parent=None, implicit_stack=False):
+        if isinstance(value, list):
+            for child in value:
+                walk(child, parent)
+        elif isinstance(value, Mapping):
+            if implicit_stack or value.get('@type') == 'StackPanel':
+                stacks.add(id(value))
+            if isinstance(value.get('ID'), str) and _element_identity(value['ID']) == _element_identity(identity):
+                matches.append((value, parent))
+            for field in ('Layout', 'StackPanel', 'Undocked', '@Children'):
+                if field in value:
+                    walk(value[field], value if field == '@Children' else None, field == 'StackPanel')
+    walk(layout)
+    if len(matches) != 1:
+        raise ValueError('The exact splitter has no unique serialized parent context')
+    element, parent = matches[0]
+    if (element.get('@type') != 'Splitter' or parent is None or id(parent) not in stacks
+            or parent.get('Orientation') not in {'Horizontal', 'Vertical'}
+            or not isinstance(parent.get('ID'), str) or not parent['ID']):
+        raise ValueError('A splitter requires its exact typed parent stack and orientation')
+    return {'element': dict(element), 'parent_id': parent['ID'], 'orientation': parent['Orientation'],
+            'axis': 'x' if parent['Orientation'] == 'Horizontal' else 'y'}
+
+
+def splitter_state_observation(binding: Mapping[str, Any], *, read: Any) -> dict[str, Any]:
+    splitter = validate_layout_binding(binding['splitter_identity'], role='element')
+    if not time.time() < splitter['expires_at']:
+        raise ValueError('The discovered splitter expired; inspect again')
+    layout = read('ak.wwise.ui.layout.getLayout', {'name': binding['layout_name']}, {})
+    observed = splitter_element_context(layout, splitter['native_id'])
+    if canonical_sha256(observed['element']) != splitter['observation_sha256']:
+        raise ValueError('The discovered splitter changed; inspect again')
+    return {**observed, 'rectangle': require_layout_rectangle(
+        read('ak.wwise.ui.layout.getElementRectangle', {'id': splitter['native_id']}, {}))}
