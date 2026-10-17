@@ -136,6 +136,10 @@ final integrated acceptance:
   from missing implementation to unresolved. Every original native ID, shape,
   owner, independent catalog seal, definition file and historical family seal
   stays unchanged. All 25 layout rows retain migration-required #188 ownership.
+  Artifact validation retained **66 passed / 1 failed** for a stale Authoring
+  special-route counter. After updating only the derived counters and retaining
+  exact versioned undock membership, the entire 17-test Registry file passed
+  separately. The first artifact FAIL remains preserved.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
