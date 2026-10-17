@@ -907,3 +907,39 @@ def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, f
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def test_cli_add_platform_does_not_hide_significant_saved_text_whitespace_change(tmp_path):
+    class ChangedText(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform', Name='Studio',
+                    ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
+                self.unit.write_text(self.unit.read_text().replace('Keep.wav ', 'Keep.wav'))
+            return super().call(uri, args, options)
+    task = ChangedText(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(tree.find('.//Sound'), 'AudioFileSource', Name='Source',
+        ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(source, 'AudioFile').text = 'Keep.wav '
+    tree.write(task.unit)
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+
+
+def test_cli_project_model_has_a_disclosed_directory_depth_budget(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.project_file.parent.joinpath(*['level'] * 65).mkdir(parents=True)
+    code, schema = task.run('--version', '2025.1', 'request-schema', task.operation)
+    assert code == 0, schema
+    assert schema['business_adapter']['effect_verification']['limits'].get('model_depth') == 64
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
+        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code != 0 and payload['error_code'] == 'LIMIT_EXCEEDED', payload
+    assert not any(row[0] == task.operation for row in task.calls)
