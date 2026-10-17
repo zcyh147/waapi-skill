@@ -311,7 +311,7 @@ def prepare_cli_project_effect(uri, args, audit, version):
         return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
             'name': name, 'project_before': before,
             'model_before': _model_snapshot(path, root, excluded_platform=name,
-                selected_platforms=(source, name) if source is not None else ())}
+                selected_platforms=(source, name) if source is not None else (name,))}
     if uri != CLI_CREATE_URI:
         return None
     translated = {'path': args['project']}
@@ -446,7 +446,7 @@ def inspect_cli_project_effect(effect):
         source = args.get('copy-from-platform')
         old_model = effect['model_before']
         model = _model_snapshot(effect['path'], effect['io_root'], excluded_platform=name,
-            selected_platforms=(source, name) if source is not None else ())
+            selected_platforms=(source, name) if source is not None else (name,))
         added = [row for row in after['platforms'] if row['Name'] == name]
         checks = [
             {'name': 'Requested platform name and base were saved exactly once',
@@ -459,7 +459,8 @@ def inspect_cli_project_effect(effect):
              'passed': model['root_identity'] == old_model['root_identity']
                 and {key: row['preserved_model_sha256'] for key, row in model['files'].items()}
                  == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}]
-        unresolved = []
+        unresolved = (['preexisting_unregistered_platform_values']
+            if old_model['platform_settings'][name] else [])
         if source is not None:
             expected = old_model['platform_settings'][source]
             actual = model['platform_settings'][name]

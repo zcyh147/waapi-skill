@@ -714,6 +714,7 @@ def cli_console_business_contract_data(
             'saved_project_and_work_units': 'bounded_UTF8_XML_exact_name_base_and_preserved_model',
             'copy_settings': 'compare_explicit_platform_values_in_all_observed_WPROJ_and_WWU_files',
             'inherited_or_elided_copy_values': 'unresolved_no_business_acceptance_without_native_evidence',
+            'preexisting_unregistered_platform_values': 'unresolved_no_business_acceptance',
             'prewrite_inputs': 'all_observed_files_and_root_identity_must_match_Preview',
             'post_terminal_native_calls': 'none',
             'limits': {'model_files': MAX_MODEL_FILES, 'model_directories': MAX_MODEL_DIRECTORIES, 'model_depth': MAX_MODEL_DEPTH,
