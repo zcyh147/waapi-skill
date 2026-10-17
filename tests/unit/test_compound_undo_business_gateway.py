@@ -1175,3 +1175,36 @@ def test_compound_alias_of_current_unlinked_platform_still_overlaps(tmp_path, pl
         parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
     assert not (state_dir / "transactions").exists()
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("fault", ("null-guid", "not-a-project-platform"))
+def test_compound_current_platform_must_be_a_real_project_platform_before_preview(tmp_path, fault):
+    client = _property_cancellation_client("2025.1")
+    if fault == "null-guid":
+        client.current_platform = "{00000000-0000-0000-0000-000000000000}"
+        client.platform_names["Windows"] = client.current_platform
+        client.platform_values[client.current_platform] = 1.0
+    else:
+        # The schema-valid current GUID has no corresponding project row.
+        del client.platform_names["Windows"]
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
+        cancellation="undo-changes", property_child=True, parent_check_error="INVALID_READBACK")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("fault", ("removed-platform", "duplicate-platform-id"))
+def test_compound_current_platform_membership_drift_blocks_before_begin_group(tmp_path, fault):
+    client = _property_cancellation_client("2025.1")
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version="2025.1",
+        cancellation="undo-changes", property_child=True)
+    if fault == "removed-platform":
+        del client.platform_names["Windows"]
+    else:
+        client.platform_names["Alias Windows"] = client.current_platform
+    code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and rejected["status"] == "repreview_required", rejected
+    assert rejected["executed"] is False
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+    assert not any(row[0].endswith("setProperty") for row in client.calls)
