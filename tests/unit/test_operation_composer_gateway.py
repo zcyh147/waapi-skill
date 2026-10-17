@@ -333,6 +333,25 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "394a834d31bc4bbe49a106abdcfbb9db0998b8e9dee941817bc175cd604bb3e7"
+    )
+    # Reviewed lifecycle replacement and create null-reference additions.
+    # Restore only those exact fifteen lane deltas before checking prior seals.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        for operation in ("object.copy", "object.move"):
+            contract = operation_request_machine_contract(operation, version)
+            conflict = contract["argument_contract"]["properties"]["on_name_conflict"]
+            assert conflict["enum"] == ["fail", "rename", "replace"]
+            conflict["enum"] = ["fail", "rename"]
+            non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
+        contract = operation_request_machine_contract("object.create", version)
+        properties = contract["argument_contract"]["properties"]
+        for node in (properties, properties["children"]["items"]["properties"]):
+            target = node["references"]["items"]["properties"]["target"]
+            assert target == {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"}]}
+            node["references"]["items"]["properties"]["target"] = IDENTITY_ARGUMENT_SCHEMA
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
         "38eefcd78cd9265657e74d7b0775403bf1832b382373e9ce586a09e3e3a3c2fd"
     )
     # Four plugin lanes add two ShareSet kinds and bound references. Restore

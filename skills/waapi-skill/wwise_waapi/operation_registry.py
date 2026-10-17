@@ -29,7 +29,7 @@ from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
-from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect
 from .canonical import canonical_json_bytes, canonical_sha256
 from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
 from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
@@ -296,6 +296,8 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_
         REMOTE_GET_CONNECTION_STATUS_URI,
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
+        "ak.soundengine.getState",
+        "ak.soundengine.getSwitch",
         UI_COMMAND_GET_COMMANDS_URI,
     }
 )
@@ -4542,7 +4544,15 @@ def _closed_operation_preview(
 ) -> SemanticPreview:
     """Build a reviewed registry-owned preview and validate its exact dispatch."""
 
-    validation = validate_semantic_payload(uri, args, options, version=version)
+    # These graph requests contain recursive nodes and dynamic @field values
+    # whose native constraints live in the pinned definition documents.  A
+    # conservative inspection result cannot certify the compiled dispatch.
+    validator = (
+        validate_resolved_semantic_payload
+        if uri in {"ak.wwise.core.object.create", OBJECT_SET_URI}
+        else validate_semantic_payload
+    )
+    validation = validator(uri, args, options, version=version)
     return SemanticPreview(
         envelope=SemanticEnvelope(
             uri=uri,
@@ -9207,6 +9217,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api in CLI_PROJECT_FILE_URIS:
+            try:
+                effect = prepare_cli_project_effect(api, call_args, execution_contract['io_audit'], request.version)
+                if effect is not None:
+                    metadata['cli_project_effect'] = effect
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == CONSOLE_CREATE_URI:
             try:
                 verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version)
@@ -9397,6 +9414,26 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                         "value_id": roles[value_role].object,
                     },
                 )
+        if api in {"ak.soundengine.setState", "ak.soundengine.setSwitch"}:
+            is_state = api.endswith("setState")
+            if request.version != "2021.1" and (is_state or "gameObject" in call_args):
+                group_field = "stateGroup" if is_state else "switchGroup"
+                verification = {
+                    "kind": "soundengine-state-effect", "uri": api, "version": request.version,
+                    "getter_uri": "ak.soundengine.getState" if is_state else "ak.soundengine.getSwitch",
+                    "getter_args": {group_field: call_args[group_field],
+                        **({"gameObject": call_args["gameObject"]} if not is_state else {})},
+                    "getter_options": {"return": ["id"]},
+                    "expected_value_id": call_args["state" if is_state else "switchState"],
+                    "observation_delay_seconds": 0.01,
+                }
+            else:
+                verification["business_observation_boundary"] = (
+                    "Matching 2021.1 WAAPI state/switch observer remains unresolved; SDK Query APIs exist but are not a Gateway route."
+                    if request.version == "2021.1" else
+                    "The setter's omitted transport-game-object scope is not proven equal to the getter's omitted scope."
+                )
+                warnings.append(verification["business_observation_boundary"])
         metadata["execution_contract"] = execution_contract
     elif request.operation in {
         "lua.executeCliFile",
@@ -14080,6 +14117,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api in CLI_PROJECT_FILE_URIS:
+            try:
+                validate_cli_project_effect(prepared.get('pre_state', {}).get('cli_project_effect'),
+                    api, call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == CONSOLE_CREATE_URI:
             try:
                 validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version)
@@ -16431,7 +16474,7 @@ def verify_prepared_operation(
         try:
             observed = inspect_created_project(plan)
         except SoundBankContractError as exc:
-            if exc.error_code not in {'MISSING_ARTIFACT', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+            if exc.error_code not in {'MISSING_ARTIFACT', 'MISSING_PATH', 'INVALID_PATH_KIND', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
             check('Requested saved project artifact is present and valid', False,
                 {'code': exc.error_code, 'message': str(exc), **exc.details})
@@ -16457,6 +16500,50 @@ def verify_prepared_operation(
         business_state_verified = False
         success_status = 'result_schema_checked'
         verification_strength = 'documented_cli_process_outcome'
+        effect = pre_state.get('cli_project_effect')
+        if effect is not None and not observed.get('reported_errors', False):
+            try:
+                effect_result = inspect_cli_project_effect(effect)
+            except SoundBankContractError as exc:
+                if exc.error_code not in {'MISSING_ARTIFACT', 'MISSING_PATH', 'INVALID_PATH_KIND', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+                    raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+                check('Requested Console project/file effect is independently observable', False,
+                    {'code': exc.error_code, 'message': str(exc), **exc.details})
+            else:
+                readbacks.extend(effect_result['observations'])
+                for assertion in effect_result['checks']:
+                    check(assertion['name'], assertion['passed'], assertion.get('evidence', {}))
+                business_state_verified = not effect_result['unresolved']
+                success_status = 'verified' if business_state_verified else 'result_schema_checked'
+                verification_strength = 'independent_console_project_file_artifact'
+
+
+    elif kind == "soundengine-state-effect":
+        check_result_schema(plan["uri"], plan["version"])
+        roles = validate_prepared_roles(prepared, read_call=read_call)
+        readbacks.extend(roles.get("readbacks", ()))
+        check("Exact bound group and value identities still match the immutable Preview", roles.get("ok") is True, roles)
+        if roles.get("ok") is True:
+            # The matching getState documentation permits a brief asynchronous
+            # update delay. Observe once after a bounded 10ms settling interval;
+            # neither the original write nor a mismatching observation is retried.
+            time.sleep(plan["observation_delay_seconds"])
+            observed = read_call(plan["getter_uri"], plan["getter_args"], plan["getter_options"])
+            readbacks.append({"uri": plan["getter_uri"], "args": plan["getter_args"],
+                "options": plan["getter_options"], "result": observed})
+            try:
+                validation = validate_semantic_result(plan["getter_uri"], observed, version=plan["version"])
+            except SemanticValidationError as exc:
+                check("Independent SoundEngine observation matches its reflected result contract", False, exc.as_dict())
+            else:
+                check("Independent SoundEngine observation matches its reflected result contract", True, validation.as_dict())
+            value = observed.get("return") if isinstance(observed, Mapping) else None
+            actual_id = value.get("id") if isinstance(value, Mapping) else None
+            check("Independent runtime group value matches the requested State or Switch identity",
+                _valid_object_id(actual_id) and _same_identity(actual_id, plan["expected_value_id"]),
+                {"expected_value_id": plan["expected_value_id"], "actual_value_id": actual_id,
+                    "scope": plan["getter_args"]})
+        verification_strength = "independent_soundengine_state_observation"
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False

@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from .console_project_operations import (
-    CLI_PROJECT_FILE_URIS, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
+    CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_DEPTH, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
     MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
 )
 
@@ -701,6 +701,49 @@ def cli_console_business_contract_data(
                 'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
                 'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
         }} if operation == 'ak.wwise.console.project.create' else {}),
+        **({'effect_verification': {
+            'saved_project': 'bounded_UTF8_WPROJ_without_post_terminal_native_calls',
+            'requested_fields': ['exact_destination_project_name', 'platforms'],
+            'language_default': 'not_inferred_from_Console_create',
+            'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
+                'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
+        }} if operation == 'ak.wwise.cli.createNewProject' else {}),
+        **({'effect_verification': {
+            'saved_project_and_work_units': 'bounded_UTF8_XML_exact_name_base_and_preserved_model',
+            'copy_settings': 'compare_explicit_platform_values_in_all_observed_WPROJ_and_WWU_files',
+            'inherited_or_elided_copy_values': 'unresolved_no_business_acceptance_without_native_evidence',
+            'preexisting_unregistered_platform_values': 'unresolved_no_business_acceptance',
+            'prewrite_inputs': 'all_observed_files_and_root_identity_must_match_Preview',
+            'post_terminal_native_calls': 'none',
+            'limits': {'model_files': MAX_MODEL_FILES, 'model_directories': MAX_MODEL_DIRECTORIES, 'model_depth': MAX_MODEL_DEPTH,
+                'model_entries': MAX_MODEL_ENTRIES, 'model_total_bytes': MAX_MODEL_BYTES,
+                'model_snapshot_bytes': MAX_MODEL_SNAPSHOT_BYTES, 'file_bytes': MAX_PROJECT_FILE_BYTES,
+                'xml_nodes_per_file': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH},
+        }} if operation == 'ak.wwise.cli.addNewPlatform' else {}),
+        **({'effect_verification': {
+            'output_artifact': 'stable_confined_bounded_UTF8_JSON',
+            'native_object_model_content_and_session_representation': 'unresolved_no_business_acceptance',
+            'source_project': 'bytes_and_directory_identity_preserved',
+            'limits': {'file_bytes': MAX_PROJECT_FILE_BYTES, 'json_nodes': MAX_PROJECT_XML_NODES,
+                'json_depth': MAX_PROJECT_XML_DEPTH},
+        }} if operation == 'ak.wwise.cli.dumpObjects' else {}),
+        **({'effect_verification': {
+            'saved_project': 'target_Wwise_version_and_preserved_project_identity_platforms_languages',
+            'saved_model': 'all_observed_Work_Units_object_media_identities_and_header_independent_XML',
+            'native_model_transformations': 'partial_until_transformation_semantics_are_established',
+            'unchanged_artifact': 'partial_without_observed_save',
+            'post_terminal_native_calls': 'none',
+        }} if operation == 'ak.wwise.cli.migrate' else {}),
+        **({'effect_verification': {
+            'mapping_file': 'owned_project_name_mediaid_stable_bounded_bytes_if_present',
+            'mapping_container_format': 'unestablished_non_XML_is_not_proven_failure',
+            'work_units': 'bounded_saved_MediaIDList_observation_and_preservation_outside_media_storage',
+            'central_mapping_record_representation': 'unresolved_no_business_acceptance',
+            'post_terminal_native_calls': 'none',
+        }} if operation in {'ak.wwise.cli.moveMediaIdsToSingleFile', 'ak.wwise.cli.moveMediaIdsToWorkUnits',
+            'ak.wwise.cli.updateMediaIdsInSingleFile'} else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
             "version_specific_field_availability",

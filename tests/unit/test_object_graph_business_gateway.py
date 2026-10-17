@@ -2388,3 +2388,209 @@ def test_gateway_set_preserves_global_platform_and_per_target_choices(
             "children": [{"type": "Sound", "name": "Rain"}],
         }],
     }
+
+
+@pytest.mark.parametrize(
+    ("version", "operation"),
+    [(version, "object.create") for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")]
+    + [(version, "object.set") for version in ("2022.1", "2023.1", "2024.1", "2025.1")],
+)
+@pytest.mark.parametrize("native_case", ["scalar", "null", "empty-array", "malformed-object", "missing-definition"])
+def test_public_graph_preview_validates_reachable_native_definitions(
+    tmp_path: Path, version: str, operation: str, native_case: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    parent = {
+        "id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+        "path": rf"\{root}\Default Work Unit", "@Volume": 0.0,
+    }
+    calls: list[str] = []
+
+    class GraphClient:
+        def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+            calls.append(uri)
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return _project(tmp_path)
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [
+                    {"classId": 1, "name": "PropertyContainer" if version == "2025.1" else "ActorMixer", "type": "WObject"},
+                    {"classId": 2, "name": "Sound", "type": "Sound"},
+                ]}
+            if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+                return {"return": ["Volume"]}
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                assert args["property"] == "Volume"
+                return {"name": "Volume", "type": "Real64", "supports": {"unlink": True}}
+            if uri == "ak.wwise.core.object.get":
+                if args == {"waql": "from type Project take 1"}:
+                    return {"return": [{**_project(tmp_path), "type": "Project"}]}
+                if args.get("from", {}).get("id") == [PARENT_ID] and not args.get("transform"):
+                    return {"return": [parent]}
+                return {"return": []}
+            raise AssertionError(f"Unexpected native dispatch: {uri} {args!r} {options!r}")
+
+        def disconnect(self) -> None:
+            pass
+
+    def online(*argv: str) -> tuple[int, dict[str, Any]]:
+        return gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path, version), client_factory=lambda _url: GraphClient(),
+        )
+
+    code, started = _offline(tmp_path, "draft-start", operation, version=version)
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, bound = online(
+        "draft-bind-object", draft_id, "--task-authority", authority,
+        "--expected-revision", "1", "--object-id", PARENT_ID,
+    )
+    assert code == 0, bound
+    code, declared = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--declaration-id", "group",
+        "--parent-handle", bound["bound_object"]["handle"],
+        "--name", "Weather", "--kind", "actor-mixer", version=version,
+    )
+    assert code == 0, declared
+    revision = declared["draft"]["revision"]
+    group_handle = declared["draft"]["declared_object"]["result_handle"]
+    parent_handle = group_handle
+    child_count = {"depth-limit": 7, "node-limit": 126 if operation == "object.set" else 127}.get(native_case, 1)
+    branch_handles: list[str] = []
+    for index in range(1, child_count + 1):
+        if native_case == "node-limit":
+            parent_handle = group_handle if index <= 32 else branch_handles[(index - 33) // 32]
+        kind = "sound-sfx"
+        if (
+            native_case == "depth-limit" and index < child_count
+            or native_case == "node-limit" and index <= 3
+        ):
+            kind = "actor-mixer"
+        code, child = _offline(
+            tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+            "--expected-revision", str(revision), "--declaration-id", f"rain{index}",
+            "--parent-handle", parent_handle,
+            "--name", "Rain" if child_count == 1 else f"Rain{index}", "--kind", kind,
+            *(["--field", "volume_db", "-4"] if kind == "sound-sfx" else []),
+            version=version,
+        )
+        assert code == 0, child
+        revision = child["draft"]["revision"]
+        if native_case == "depth-limit":
+            parent_handle = child["draft"]["declared_object"]["result_handle"]
+        elif native_case == "node-limit" and index <= 3:
+            branch_handles.append(child["draft"]["declared_object"]["result_handle"])
+    rejected = native_case in {"malformed-object", "missing-definition", "reference-cycle"} or (
+        native_case == "empty-array" and operation == "object.create"
+    )
+    injected_rows: list[dict[str, Any]] = []
+
+    def install_compiler_control() -> None:
+        # Test-only native output, never a caller-authored payload route. Legal
+        # shapes stay stable across check and preview; faulty output is added
+        # after the valid check to exercise the Preview gate itself.
+        import wwise_waapi.operation_registry as registry
+        if native_case in {"null", "empty-array", "malformed-object"}:
+            materialize = registry._materialize_canonical_object_node
+
+            def injected_node(*args: Any, **kwargs: Any) -> dict[str, Any]:
+                node = materialize(*args, **kwargs)
+
+                def inject(row: dict[str, Any]) -> None:
+                    if row.get("type") == "Sound":
+                        row["@OutputBus"] = {
+                            "null": None, "empty-array": [],
+                            "malformed-object": {"unrecognized": True},
+                        }[native_case]
+                        injected_rows.append(dict(row))
+                    for child in row.get("children", []):
+                        inject(child)
+                inject(node)
+                return node
+
+            monkeypatch.setattr(registry, "_materialize_canonical_object_node", injected_node)
+        elif native_case in {"missing-definition", "reference-cycle"}:
+            import wwise_waapi.schema_inventory as inventory
+            resolve = inventory.resolve_schema_reference
+
+            def missing_object_arg(reference: str, **kwargs: Any) -> Any:
+                if reference.endswith("/objectArg"):
+                    if native_case == "missing-definition":
+                        raise inventory.SchemaInventoryError("test dependency loss: objectArg")
+                    from dataclasses import replace
+                    return replace(resolve(reference, **kwargs), target={"$ref": reference})
+                return resolve(reference, **kwargs)
+
+            monkeypatch.setattr(inventory, "resolve_schema_reference", missing_object_arg)
+
+    if not rejected:
+        install_compiler_control()
+    code, checked = online(
+        "draft-check", draft_id, "--task-authority", authority, "--expected-revision", str(revision),
+    )
+    assert code == 0, json.dumps(checked)
+    if rejected:
+        install_compiler_control()
+    code, previewed = online(
+        "preview-from-draft", draft_id, "--task-authority", authority, "--expected-revision", str(revision + 1),
+    )
+    if rejected:
+        assert code == 2, json.dumps(previewed)
+        assert previewed["error_code"] == "SemanticValidationError", previewed
+        assert previewed["details"]["uri"] == f"ak.wwise.core.{operation}"
+        assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
+        if native_case not in {"missing-definition", "reference-cycle"}:
+            expected_bad_value: Any = [] if native_case == "empty-array" else {"unrecognized": True}
+            assert injected_rows and injected_rows[-1]["@OutputBus"] == expected_bad_value
+        if native_case == "reference-cycle":
+            assert previewed["details"]["maximum_depth"] == 32
+            assert "reference depth budget" in previewed["message"]
+        assert "transaction_id" not in previewed
+        assert not any(uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"} for uri in calls)
+        return
+    assert code == 0, json.dumps(previewed)
+    code, shown = _offline(
+        tmp_path, "transaction-show", previewed["transaction_id"], version=version,
+    )
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    dispatch = prepared["dispatch"]
+    metadata = prepared["semantic_preview"]["envelope"]["metadata"]
+    assert metadata["request_validation_strength"] == "complete_reflected_schema", metadata
+    assert metadata["schema_validation"]["unresolved_refs"] == []
+    group = dispatch["args"] if operation == "object.create" else dispatch["args"]["objects"][0]["children"][0]
+    if native_case in {"depth-limit", "node-limit"}:
+        def sizes(row: Mapping[str, Any]) -> tuple[int, int]:
+            children = [sizes(child) for child in row.get("children", [])]
+            return 1 + sum(size for size, _depth in children), 1 + max((depth for _size, depth in children), default=0)
+        assert sizes(group) == ((8, 8) if native_case == "depth-limit" else (child_count + 1, 3))
+        assert not any(uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"} for uri in calls)
+        return
+    expected_child: dict[str, Any] = {"type": "Sound", "name": "Rain", "@Volume": -4.0}
+    if native_case in {"null", "empty-array"}:
+        expected_child["@OutputBus"] = None if native_case == "null" else []
+    assert group["children"][0] == expected_child
+    assert not any(uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"} for uri in calls)
+
+
+@pytest.mark.parametrize("operation", ["object.create", "object.set"])
+@pytest.mark.parametrize("native_case", ["depth-limit", "node-limit"])
+def test_public_graph_declared_limits_remain_valid_with_resolved_schemas(
+    tmp_path: Path, operation: str, native_case: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_public_graph_preview_validates_reachable_native_definitions(
+        tmp_path, "2025.1", operation, native_case, monkeypatch,
+    )
+
+
+def test_public_graph_preview_bounds_recursive_schema_reference_expansion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    test_public_graph_preview_validates_reachable_native_definitions(
+        tmp_path, "2025.1", "object.create", "reference-cycle", monkeypatch,
+    )

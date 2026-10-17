@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import json
@@ -35,6 +36,7 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     exact_git_candidate,
 )
+from tests.destructive.support.console_file_observation import observe_console_file  # noqa: E402
 from tests.destructive.support.exact_real_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     finalize_exact_real_evidence,
 )
@@ -1862,8 +1864,50 @@ def test_cli_console_business_object_dump(
             "category": "cli-console-object-dump",
             "status": "PASS",
             "verifier_strength": "result_schema_plus_exact_file_oracle",
+            "requested_content": "property_sets",
+            "include_session_objects": False,
+            "artifact_observation": observe_console_file(dump_file, io_root=runtime.sandbox.sandbox_root),
         }
     )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_media_id_file_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Retain the native central-file representation without inventing its format.
+
+    Run this terminal CLI node in its own process/lifecycle. Its capture is
+    prerequisite evidence for the mapping oracle, not business acceptance.
+    """
+    runtime = workflow_sandbox_runtime
+    project = runtime.sandbox.sandbox_project
+    mapping = project.with_suffix(".mediaid")
+    assert not mapping.exists(), "This observation requires the original Work Unit storage fixture"
+    work_units = sorted(project.parent.rglob("*.wwu"))
+    assert len(work_units) <= 512
+    sample = sample_observation = None
+    for path in work_units:
+        candidate = observe_console_file(path, io_root=project.parent)
+        if b"<MediaID " in base64.b64decode(candidate["content_base64"], validate=True):
+            sample, sample_observation = path, candidate
+            break
+    assert sample is not None, "A media-ID-free project cannot establish the central mapping format"
+    observation = {
+        "category": "cli-media-id-file-format-observation", "status": "FAIL",
+        "verifier_strength": "native_file_format_observation_only_not_business_acceptance",
+        "source_work_unit": sample_observation,
+    }
+    runtime.category_results.append(observation)
+    draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
+    _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
+        ["--value", "project_file", str(project)], live=True)
+    result = _complete_core_result_schema_draft(runtime, draft)
+    observation["transaction_id"] = result["verify"]["transaction_id"]
+    observation["mapping_file"] = observe_console_file(mapping, io_root=project.parent)
+    observation["source_work_unit_after"] = observe_console_file(sample, io_root=project.parent)
+    observation["status"] = "PASS"
 
 
 @pytest.mark.live
@@ -3676,3 +3720,170 @@ def _source_tree_inventory(root: Path) -> tuple[str, int]:
             digest.update(os.readlink(path).encode("utf-8"))
             digest.update(b"\0")
     return digest.hexdigest(), len(paths)
+
+
+def _collect_rtpc_curve_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe existing RTPC.Curve through public bounded reads; never create one."""
+    from wwise_waapi.object_query_outputs import available_query_outputs
+
+    points_available = "curve-points" in available_query_outputs(runtime.version)
+    output = runtime.state_dir / "rtpc-curve-metadata-observation.json"
+    evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous_evidence = set(evidence_root.glob("*.json"))
+    observation: dict[str, Any] = {
+        "contract": "waapi-skill.rtpc-curve-metadata-observation/v1",
+        "candidate": runtime.candidate, "version": runtime.version,
+        "endpoint": {"host": runtime.lifecycle.host, "port": runtime.port,
+                     "url": runtime.lifecycle.waapi_url},
+        "config_path": runtime.env["WAAPI_SKILL_CONFIG_PATH"],
+        "config_sha256": hashlib.sha256(Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"]).read_bytes()).hexdigest(),
+        "dispatcher_evidence_directory": str(evidence_root),
+        "calls": [], "native_evidence": [], "boundaries": [],
+        "mutation_authority": False, "business_effect_verified": False,
+    }
+    category: dict[str, Any] = {
+        "category": "rtpc-curve-native-metadata-observation", "status": "FAIL",
+        "verifier_strength": "read_only_metadata_and_reference_observation_only",
+        "observation_path": str(output), "reason": "observation incomplete",
+    }
+    runtime.category_results.append(category)
+
+    def retain() -> None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 2 * 1024 * 1024, "Curve observation exceeded retained byte bound"
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    def read(stage: str, argv: Sequence[str]) -> dict[str, Any]:
+        assert len(observation["calls"]) < 64, "Curve observation exceeded public call bound"
+        code, payload = runtime.raw_gateway(argv)
+        observation["calls"].append({"stage": stage, "gateway_argv": list(argv),
+                                     "exit_code": code, "payload": payload})
+        retain()
+        if code == 0 and payload.get("ok") is True and argv[0] not in {"config-show", "query-schema"}:
+            assert payload.get("endpoint") == observation["endpoint"], payload
+            assert payload.get("detected_version") == runtime.version, payload
+        if code != 0 or payload.get("ok") is not True:
+            observation["boundaries"].append({"stage": stage, "reason": "public_read_rejected",
+                                               "error_code": payload.get("error_code")})
+        return payload
+
+    def pages(stage: str, argv: Sequence[str], field: str) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        command = list(argv)
+        for _ in range(8):
+            payload = read(stage, command)
+            if payload.get("ok") is not True:
+                return rows
+            result = payload["agent_result"]
+            rows.extend(result.get(field, []))
+            if result.get("complete") is True:
+                return rows
+            next_command = result.get("next_command", {}).get("gateway_argv")
+            assert isinstance(next_command, list) and next_command[0] == "metadata", payload
+            command = next_command
+        observation["boundaries"].append({"stage": stage, "reason": "eight_page_bound_reached"})
+        return rows
+
+    def curve_metadata(stage: str, scope: Sequence[str]) -> None:
+        fields = pages(stage + "-names", ["metadata", "list", *scope, "--page-size", "64"], "fields")
+        matches = [row for row in fields if row.get("name") == "Curve"]
+        if len(matches) != 1:
+            observation["boundaries"].append({"stage": stage, "reason": "Curve_not_uniquely_listed",
+                                               "matching_count": len(matches)})
+            return
+        command = ["metadata", "detail", *scope, "--selection", matches[0]["selection"]]
+        for _ in range(8):
+            payload = read(stage + "-detail", command)
+            if payload.get("ok") is not True or payload["agent_result"].get("complete") is True:
+                return
+            command = payload["agent_result"]["next_command"]["gateway_argv"]
+            assert command[0] == "metadata", payload
+        observation["boundaries"].append({"stage": stage, "reason": "eight_detail_page_bound_reached"})
+
+    try:
+        if not points_available:
+            observation["boundaries"].append({"stage": "Curve-points-contract",
+                "reason": "curve_points_output_unavailable_in_public_version",
+                "native_availability": "not_inferred"})
+        read("configuration", ["config-show"])
+        read("host-and-project", ["status"])
+        types = pages("live-types", ["metadata", "types", "--meaning", "RTPC",
+                                     "--meaning", "Curve", "--page-size", "64"], "types")
+        selected = {name: [row for row in types if row.get("name") == name]
+                    for name in ("RTPC", "Curve")}
+        observation["selected_types"] = selected
+        if any(len(rows) != 1 for rows in selected.values()):
+            observation["boundaries"].append({"stage": "live-types", "reason": "type_not_uniquely_observed"})
+        if len(selected["RTPC"]) == 1:
+            rtpc_selection = selected["RTPC"][0]["selection"]
+            curve_metadata("RTPC-class-Curve", ["--type-selection", rtpc_selection])
+            candidates = read("existing-RTPCs", ["query-object", "--type-selection", rtpc_selection,
+                                                 "--max-results", "2"])
+            owners = candidates.get("objects", []) if candidates.get("ok") is True else []
+            assert isinstance(owners, list) and len(owners) <= 2, candidates
+            observation["selected_RTPCs"] = owners
+            if not owners:
+                observation["boundaries"].append({"stage": "existing-RTPCs", "reason": "no_existing_RTPC_observed"})
+            else:
+                read("advanced-read-contract", ["query-schema", "--advanced"])
+            for index, owner in enumerate(owners):
+                owner_id = _required_string(owner, "id")
+                assert owner.get("type") == "RTPC", owner
+                assert owner_id.casefold() == ("{" + str(uuid.UUID(owner_id)) + "}").casefold(), owner
+                curve_metadata(f"RTPC-{index}-Curve", ["--exact-id", owner_id])
+                # The business relationship list has no outward reference hop.
+                # The existing advanced read contract owns URI/projection/take.
+                curve = read(f"RTPC-{index}-Curve-value", [
+                    "query-object", "--advanced-waql", f'from object "{owner_id}" select @Curve',
+                    "--max-results", "1", "--include", "class-id",
+                    *(["--include", "curve-points"] if points_available else []),
+                ])
+                rows = curve.get("objects", []) if curve.get("ok") is True else []
+                assert isinstance(rows, list) and len(rows) <= 1, curve
+                for row in rows:
+                    curve_id = _required_string(row, "id")
+                    assert curve_id.casefold() == ("{" + str(uuid.UUID(curve_id)) + "}").casefold(), row
+                    exact = read(f"RTPC-{index}-Curve-exact-ID", [
+                        "query-object", "--exact-id", curve_id, "--include", "class-id",
+                        *(["--include", "curve-points"] if points_available else []),
+                    ])
+                    exact_rows = exact.get("objects", []) if exact.get("ok") is True else []
+                    if len(exact_rows) != 1 or exact_rows[0].get("id") != curve_id or exact_rows[0].get("type") != "Curve":
+                        observation["boundaries"].append({"stage": f"RTPC-{index}-Curve-exact-ID",
+                                                           "reason": "Curve_exact_identity_type_not_observed"})
+                if not rows or any(row.get("type") != "Curve" or points_available and "curve_points" not in row for row in rows):
+                    observation["boundaries"].append({"stage": f"RTPC-{index}-Curve-value",
+                                                       "reason": "typed_Curve_points_not_observed"})
+        category["status"] = "blocked" if observation["boundaries"] else "PASS"
+        category["reason"] = ("bounded observation has explicit gaps" if observation["boundaries"]
+                              else "native metadata and points observed; eligibility requires separate review")
+        return category
+    finally:
+        completed_status = category["status"]
+        completed_reason = category["reason"]
+        category.update(status="FAIL", reason="observation evidence retention incomplete")
+        new_evidence = sorted(set(evidence_root.glob("*.json")) - previous_evidence)
+        assert len(new_evidence) <= 512, "Curve dispatcher evidence exceeded file bound"
+        total_bytes = 0
+        for path in new_evidence:
+            body = path.read_bytes()
+            total_bytes += len(body)
+            assert total_bytes <= 32 * 1024 * 1024, "Curve dispatcher evidence exceeded byte bound"
+            observation["native_evidence"].append({"path": str(path), "bytes": len(body),
+                                                    "sha256": hashlib.sha256(body).hexdigest()})
+        retain()
+        category.update(status=completed_status, reason=completed_reason)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_rtpc_curve_native_metadata_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Read existing sample RTPC/Curve facts on the selected one of five versions."""
+    category = _collect_rtpc_curve_metadata_probe(workflow_sandbox_runtime)
+    if category["status"] == "blocked":
+        pytest.skip(f"RTPC.Curve observation incomplete; retained exact evidence: {category}")
+    assert category["status"] == "PASS", category

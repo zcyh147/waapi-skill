@@ -216,6 +216,7 @@ def validate_resolved_semantic_payload(
 
     class ResolvedWalker(_SchemaWalker):
         context: Mapping[str, Any]
+        reference_depth: int = 0
 
         def validate(self, node, value, *, path, depth=0):
             if depth > SCHEMA_VALIDATION_MAX_DEPTH:
@@ -231,9 +232,16 @@ def validate_resolved_semantic_payload(
                     raise _schema_error(uri, version, "Native schema reference cannot be resolved", section=path) from exc
                 previous = self.context
                 self.context = previous if resolved.document_name == "<schema>" else graph.documents[resolved.document_name]
+                self.reference_depth += 1
                 try:
-                    self.validate(resolved.target, value, path=path, depth=depth + 1)
+                    # Expansion does not descend into the payload. Keep the
+                    # existing structural depth budget available to recursive
+                    # object graphs, and bound reference recursion separately.
+                    if self.reference_depth > SCHEMA_VALIDATION_MAX_DEPTH:
+                        raise _schema_error(uri, version, "Resolved schema exceeds the reference depth budget", section=path, maximum_depth=SCHEMA_VALIDATION_MAX_DEPTH)
+                    self.validate(resolved.target, value, path=path, depth=depth)
                 finally:
+                    self.reference_depth -= 1
                     self.context = previous
                 node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
             super().validate(node, value, path=path, depth=depth)

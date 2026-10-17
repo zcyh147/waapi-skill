@@ -48,6 +48,15 @@ class ScriptedReader:
         return values.popleft()
 
 
+def plugin_type_catalog(kind: str) -> dict[str, Any]:
+    assert kind in {"source", "effect"}
+    return {"return": [{
+        "classId": 123_456 if kind == "source" else 7_733_251,
+        "name": "Fixture Source" if kind == "source" else "Fixture Effect",
+        "type": "Source" if kind == "source" else "Effect",
+    }]}
+
+
 def target_row(*, object_type: str = "Sound") -> dict[str, Any]:
     return {
         "id": TARGET_ID,
@@ -142,6 +151,7 @@ def test_source_prepare_replays_class_id_metadata_and_complete_child_guard() -> 
     )
     preview_reader = ScriptedReader(
         {
+            "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
             "ak.wwise.core.object.get": [
                 {"return": [target_row()]},
                 {"return": []},
@@ -208,6 +218,7 @@ def test_source_prepare_replays_class_id_metadata_and_complete_child_guard() -> 
 
     replay_reader = ScriptedReader(
         {
+            "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
             "ak.wwise.core.object.get": [
                 {"return": [target_row()]},
                 {"return": []},
@@ -253,6 +264,7 @@ def test_public_source_language_contract_dispatches_in_every_supported_version(
         parse_operation_request(payload),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row()]},
                     {"return": []},
@@ -283,6 +295,7 @@ def test_source_preexisting_child_drift_requires_a_new_preview() -> None:
         operation_request,
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row()]},
                     {"return": []},
@@ -295,6 +308,7 @@ def test_source_preexisting_child_drift_requires_a_new_preview() -> None:
         prepared,
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row()]},
                     {
@@ -338,6 +352,7 @@ def test_source_verifier_uses_sealed_dynamic_view_and_requested_state() -> None:
         parse_operation_request(payload),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row()]},
                     {"return": []},
@@ -438,6 +453,7 @@ def test_source_verifier_rejects_tampered_property_validation_before_reads() -> 
         ),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("source")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row()]},
                     {"return": []},
@@ -477,6 +493,7 @@ def test_2022_effect_prepare_uses_complete_fixed_slot_snapshot_and_verifies_plug
         parse_operation_request(request(version="2022.1", kind="effect")),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("effect")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
                     {"return": [fixed_snapshot]},
@@ -573,6 +590,7 @@ def test_effect_verifier_resolves_effect_slot_to_effect_guid_before_plugin_read(
         parse_operation_request(payload),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("effect")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
                     {
@@ -703,6 +721,7 @@ def test_effect_prepare_requires_independent_empty_list_proof(
     version: str, proof: Mapping[str, Any],
 ) -> None:
     reader = ScriptedReader({
+        "ak.wwise.core.object.getTypes": [plugin_type_catalog("effect")],
         "ak.wwise.core.object.get": [
             {"return": [target_row(object_type="ActorMixer")]},
             {"return": [{"id": TARGET_ID}]},
@@ -731,7 +750,8 @@ def test_effect_verifies_owner_chain_without_hierarchy_parent(
 ) -> None:
     prepared = prepare_operation(
         parse_operation_request(request(version=version, kind="effect")),
-        read_call=ScriptedReader({"ak.wwise.core.object.get": [
+        read_call=ScriptedReader({"ak.wwise.core.object.getTypes": [plugin_type_catalog("effect")],
+                                  "ak.wwise.core.object.get": [
             {"return": [target_row(object_type="ActorMixer")]},
             {"return": [{"id": TARGET_ID, "@Effects": []}]},
         ]}),
@@ -758,6 +778,7 @@ def test_2023_effect_verifier_fails_closed_when_slot_has_no_effect_reference() -
         parse_operation_request(request(version="2023.1", kind="effect")),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("effect")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
                     {"return": [{"id": TARGET_ID, "@Effects": []}]},
@@ -801,6 +822,7 @@ def test_2023_effect_verifier_rejects_a_reused_preexisting_slot_id() -> None:
         parse_operation_request(request(version="2023.1", kind="effect")),
         read_call=ScriptedReader(
             {
+                "ak.wwise.core.object.getTypes": [plugin_type_catalog("effect")],
                 "ak.wwise.core.object.get": [
                     {"return": [target_row(object_type="ActorMixer")]},
                     {

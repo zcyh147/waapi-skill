@@ -192,6 +192,43 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             assert not output.exists()
             output.write_text(project_xml, encoding="utf-8")
 
+    elif entry.uri in CLI_PROJECT_FILE_URIS:
+        # These matrix rows deliberately supply only a successful process result,
+        # with no filesystem effect. Freeze real isolated inputs so the current
+        # independent observer can reject missing effects or retain its explicit
+        # partial boundary, rather than failing at an invented path prerequisite.
+        io_root = (tmp_path / "cli-project-effect").resolve()
+        io_root.mkdir()
+        project = io_root / "ProgramProbe.wproj"
+        args, options = {"project": str(project)}, {}
+        if entry.uri == "ak.wwise.cli.createNewProject":
+            args["platform"] = ["Windows"]
+        else:
+            schema_version = {"2021.1": "103", "2022.1": "110", "2023.1": "119",
+                              "2024.1": "123", "2025.1": "133"}[entry.version]
+            project.write_text(
+                f'<WwiseDocument Type="Project" SchemaVersion="{schema_version}" WwiseVersion="v{entry.version}.0">'
+                + '''<ProjectInfo><Project Name="ProgramProbe" ID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{CCCCCCCC-CCCC-CCCC-CCCC-000000000001}" /></Platforms>
+<LanguageList><Language Name="SFX" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000001}" />
+<Language Name="English(US)" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000002}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>''', encoding="utf-8")
+        if entry.uri == "ak.wwise.cli.addNewPlatform":
+            args.update({"new-platform-name": "Studio", "new-platform-base": "Windows"})
+        elif entry.uri == "ak.wwise.cli.dumpObjects":
+            args["output"] = str(io_root / "objects.json")
+        cli_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(cli_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        assert prepared_before_dispatch.as_dict()["pre_state"]["cli_project_effect"]["uri"] == entry.uri
+
     request_validation = validate_semantic_payload(
         entry.uri,
         args,
@@ -432,7 +469,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert cleanup["automatic_retry"] is False
         assert len(cleanup["spec_sha256"]) == 64
     assert role_validation["ok"] is True
-    assert verification.ok is True, verification.as_dict()
+    missing_cli_effect = entry.uri in {
+        "ak.wwise.cli.createNewProject", "ak.wwise.cli.addNewPlatform", "ak.wwise.cli.dumpObjects",
+    }
+    assert verification.ok is (not missing_cli_effect), verification.as_dict()
     if entry.uri == "ak.wwise.debug.generateToneWAV":
         assert verification.status == "verified"
         assert verification.business_state_verified is True
@@ -459,14 +499,26 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert observed["unresolved"] == []
         assert len(observed["file_proof"]["sha256"]) == 64
     elif entry.uri in CLI_PROJECT_FILE_URIS:
-        assert verification.status == "result_schema_checked"
-        assert verification.business_state_verified is False
-        assert verification.verification_strength == "documented_cli_process_outcome"
         observed = verification.readbacks[0]
+        # Process success remains a separate fact from the unchanged/missing
+        # project artifacts. No fake native response can grant business credit.
         assert observed["business_effect_proven"] is False
         assert observed["outcome"] == ("not_reported" if earlier_void else "success")
         assert ("exit_code" not in observed) if earlier_void else observed["exit_code"] == 0
-        assert verification.message == "The documented Console command outcome passed; file and project effects remain unverified."
+        assert verification.business_state_verified is False
+        if entry.uri in {
+            "ak.wwise.cli.createNewProject", "ak.wwise.cli.addNewPlatform", "ak.wwise.cli.dumpObjects",
+        }:
+            assert verification.status == "verification_failed"
+            assert any(not row["passed"] for row in verification.assertions)
+        else:
+            assert verification.status == "result_schema_checked"
+            assert verification.verification_strength == "independent_console_project_file_artifact"
+            expected_boundary = (
+                "migration_save_has_no_observed_write" if entry.uri == "ak.wwise.cli.migrate"
+                else "central_media_id_mapping_representation"
+            )
+            assert verification.readbacks[-1]["unresolved"] == [expected_boundary]
     elif entry.uri in BUSINESS_STATE_VERIFIED_APIS:
         assert verification.status == "verified"
         assert verification.business_state_verified is True

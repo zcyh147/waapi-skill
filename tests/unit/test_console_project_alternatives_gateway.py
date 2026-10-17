@@ -37,7 +37,7 @@ class ConsoleProjectTask(FieldTask):
 
     def write_created_project(self, args):
         document = ET.Element('WwiseDocument', Type='Project',
-            SchemaVersion={'2023.1': '119', '2024.1': '123', '2025.1': '133'}[self.version],
+            SchemaVersion={'2021.1': '103', '2022.1': '110', '2023.1': '119', '2024.1': '123', '2025.1': '133'}[self.version],
             WwiseVersion='v' + self.version + '.0', WwiseBuild='1')
         project = ET.SubElement(ET.SubElement(document, 'ProjectInfo'), 'Project',
             Name='Created', ID='{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}')
@@ -273,10 +273,23 @@ class CliProjectTask(FieldTask):
     def __init__(self, path, version, operation='ak.wwise.cli.migrate', outcome=0):
         self.operation, self.outcome = operation, outcome
         super().__init__(path, version, operation)
+        if type(self) is CliProjectTask:
+            self.unit = saved_fixture_project(self)
+            if operation == 'ak.wwise.cli.addNewPlatform':
+                tree = ET.parse(self.project_file)
+                tree.find('./ProjectInfo/Project/Platforms/Platform').set('Name', 'Windows_Old')
+                tree.write(self.project_file)
+                self.unit.write_text(self.unit.read_text().replace('Platform="Windows"', 'Platform="Windows_Old"'))
 
     def call(self, uri, args=None, options=None):
         if uri == self.operation:
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if type(self) is CliProjectTask and uri == 'ak.wwise.cli.addNewPlatform':
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform',
+                    Name=args.get('new-platform-name', args['new-platform-base']),
+                    ReferencePlatform=args['new-platform-base'], ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
             return deepcopy(getattr(self, 'result_payload', {'result': self.outcome}))
         return super().call(uri, args, options)
 
@@ -304,8 +317,8 @@ def test_cli_add_platform_uses_documented_2025_default_name_when_omitted(tmp_pat
     writes = [args for uri, args, _ in task.calls if uri == task.operation]
     assert writes == [{'project': str(task.project_file), 'new-platform-base': 'Windows'}]
     code, payload = task.run('verify', tx)
-    assert code == 0 and payload['state'] == 'result_schema_checked', payload
-    assert payload['verification']['business_state_verified'] is False
+    assert code == 0 and payload['state'] == 'verified', payload
+    assert payload['verification']['business_state_verified'] is True
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
@@ -558,3 +571,464 @@ def test_console_create_observation_budget_is_unknown_not_a_proven_bad_effect(tm
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+class CliCreateEffectTask(ConsoleProjectTask):
+    def __init__(self, path, version):
+        self.created_file = path / 'New parent' / 'Created.wproj'
+        self.operation = 'ak.wwise.cli.createNewProject'
+        FieldTask.__init__(self, path, version, self.operation)
+    def call(self, uri, args=None, options=None):
+        if uri == self.operation:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            self.created_file.parent.mkdir(parents=True)
+            self.write_created_project({'platforms': [{'basePlatform': 'Windows'}, {'basePlatform': 'Android'}]})
+            return {'result': 0}
+        return FieldTask.call(self, uri, args, options)
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_create_verifies_saved_project_without_a_post_terminal_native_call(tmp_path, version):
+    task = CliCreateEffectTask(tmp_path, version)
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file',
+        str(task.created_file), '--item', 'platforms', 'Windows', '--item', 'platforms', 'Android')
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    code, payload = task.run('transaction-show', tx)
+    assert code == 0, payload
+    code, payload = task.run('confirm', tx, '--confirmation-token', payload['confirmation']['token'])
+    assert code == 0, payload
+    code, payload = task.run('execute', tx)
+    assert code == 0, payload
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('failure', ['missing', 'malformed', 'wrong-platform', 'wrong-name', 'too-large'])
+def test_cli_create_missing_or_wrong_artifact_never_verifies_or_reexecutes(tmp_path, failure):
+    task = CliCreateEffectTask(tmp_path, '2025.1')
+    original = task.write_created_project
+    def write(args):
+        original(args)
+        if failure == 'missing':
+            task.created_file.unlink()
+        elif failure == 'malformed':
+            task.created_file.write_text('<Project />')
+        elif failure == 'too-large':
+            task.created_file.write_bytes(b' ' * (8 * 1024 * 1024 + 1))
+        else:
+            tree = ET.parse(task.created_file)
+            if failure == 'wrong-platform':
+                tree.find('./ProjectInfo/Project/Platforms/Platform').set('ReferencePlatform', 'Mac')
+            else:
+                tree.find('./ProjectInfo/Project').set('Name', 'Wrong')
+            tree.write(task.created_file)
+    task.write_created_project = write
+    # The common public chain owns authorization and creates no directories.
+    task.project_file = task.created_file
+    tx = CliProjectTask.execute_plan(task, '--item', 'platforms', 'Windows', '--item', 'platforms', 'Android')
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload.get('verified') is not True, payload
+    assert payload['state'] == ('executed_unverified' if failure == 'too-large' else 'verification_failed'), payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def saved_fixture_project(task):
+    task.created_file = task.project_file
+    ConsoleProjectTask.write_created_project(task, {})
+    tree = ET.parse(task.project_file)
+    tree.find('./ProjectInfo/Project').set('Name', 'Fixture')
+    tree.write(task.project_file)
+    unit = task.project_file.parent / 'Actor-Mixer Hierarchy' / 'Default Work Unit.wwu'
+    unit.parent.mkdir()
+    unit.write_text('''<WwiseDocument Type="WorkUnit" SchemaVersion="1" WwiseVersion="v2025.1.0">
+<ActorMixerHierarchy><WorkUnit Name="Default Work Unit" ID="{11111111-1111-1111-1111-111111111111}" PersistMode="Standalone">
+<ChildrenList><Sound Name="Keep" ID="{22222222-2222-2222-2222-222222222222}"><PropertyList><Property Name="Volume" Type="Real64"><ValueList><Value Platform="Windows">-6</Value></ValueList></Property></PropertyList></Sound></ChildrenList>
+</WorkUnit></ActorMixerHierarchy></WwiseDocument>'''.replace('v2025.1.0', 'v' + task.version + '.0'))
+    return unit
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+@pytest.mark.parametrize('copy_settings', [False, True])
+def test_cli_add_platform_checks_saved_platform_and_preserved_settings(tmp_path, version, copy_settings):
+    class AddTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform', Name='Studio',
+                    ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
+                if copy_settings:
+                    unit_tree = ET.parse(self.unit)
+                    ET.SubElement(unit_tree.find('.//ValueList'), 'Value', Platform='Studio').text = '-6'
+                    unit_tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = AddTask(tmp_path, version, 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    extra = ['--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio']
+    if copy_settings:
+        extra += ['--value', 'copy_settings_from_platform', 'Windows']
+    tx = task.execute_plan(*extra)
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('failure', ['missing-platform', 'wrong-base', 'wrong-name', 'existing-platform-lost',
+    'existing-setting-changed', 'wrong-copy', 'elided-copy'])
+def test_cli_add_platform_rejects_wrong_effect_and_keeps_elided_copy_partial(tmp_path, failure):
+    class AddFailureTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                platforms = tree.find('./ProjectInfo/Project/Platforms')
+                if failure != 'missing-platform':
+                    ET.SubElement(platforms, 'Platform', Name='Other' if failure == 'wrong-name' else 'Studio',
+                        ReferencePlatform='Mac' if failure == 'wrong-base' else 'Windows',
+                        ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                if failure == 'existing-platform-lost':
+                    platforms.remove(platforms[0])
+                tree.write(self.project_file)
+                tree = ET.parse(self.unit)
+                values = tree.find('.//ValueList')
+                if failure == 'existing-setting-changed':
+                    values[0].text = '-99'
+                if failure not in {'elided-copy', 'missing-platform'}:
+                    ET.SubElement(values, 'Value', Platform='Studio').text = '-99' if failure == 'wrong-copy' else '-6'
+                tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = AddFailureTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio',
+        '--value', 'copy_settings_from_platform', 'Windows')
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is False, payload
+    if failure == 'elided-copy':
+        assert code == 0 and payload['state'] == 'result_schema_checked', payload
+        assert payload['verification']['readbacks'][-1]['unresolved'] == ['copy_settings_inherited_or_elided_native_representation']
+    else:
+        assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def test_cli_add_platform_freezes_all_observed_work_units_before_execution(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    unit = saved_fixture_project(task)
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
+        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    code, payload = task.run('transaction-show', tx)
+    assert code == 0, payload
+    code, payload = task.run('confirm', tx, '--confirmation-token', payload['confirmation']['token'])
+    assert code == 0, payload
+    unit.write_text(unit.read_text().replace('-6', '-12'))
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert not any(row[0] == task.operation for row in task.calls)
+    assert '-12' in unit.read_text()
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_dump_reports_independent_json_artifact_without_inventing_model_format(tmp_path, version):
+    class DumpTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text('{"independent_fixture": ["Keep", "Fixture"]}')
+            return super().call(uri, args, options)
+    task = DumpTask(tmp_path, version, 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output), '--value', 'content', 'property_sets',
+        '--toggle', 'include_session_objects', 'disable')
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is False, payload
+    observations = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-object-dump-artifact']
+    assert len(observations) == 1, payload
+    assert observations[0]['json_valid'] is True
+    assert observations[0]['unresolved'] == ['object_model_content_and_session_representation']
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+def test_cli_dump_missing_artifact_cannot_verify_or_retry(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.dumpObjects')
+    output = tmp_path / 'missing.json'
+    tx = task.execute_plan('--value', 'output_file', str(output))
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_migration_observes_target_version_and_preserves_saved_model(tmp_path, version):
+    class MigrateTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                tree.getroot().set('WwiseVersion', 'v' + version + '.0')
+                tree.getroot().set('WwiseBuild', '2')
+                tree.getroot().set('SchemaVersion', {'2021.1': '103', '2022.1': '110',
+                    '2023.1': '119', '2024.1': '123', '2025.1': '133'}[version])
+                tree.write(self.project_file)
+            return super().call(uri, args, options)
+    task = MigrateTask(tmp_path, version)
+    saved_fixture_project(task)
+    tree = ET.parse(task.project_file)
+    tree.getroot().set('WwiseVersion', 'v2021.1.0')
+    tree.getroot().set('SchemaVersion', '103')
+    tree.write(task.project_file)
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-migrated-project-artifact']
+    assert len(observed) == 1 and observed[0]['saved_model_files'] == 2, payload
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+@pytest.mark.parametrize('output', ['{', '{"duplicate":1,"duplicate":2}', 'NaN', '[] trailing', '<xml/>'])
+def test_cli_dump_rejects_malformed_json_output(tmp_path, output):
+    class InvalidDump(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text(output)
+            return super().call(uri, args, options)
+    task = InvalidDump(tmp_path, '2025.1', 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output))
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+
+
+@pytest.mark.parametrize('failure', ['wrong-version', 'lost-workunit', 'wrong-project', 'property-transform', 'unchanged'])
+def test_cli_migration_distinguishes_failed_preservation_and_unresolved_transformation(tmp_path, failure):
+    class MigrateFailure(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                if failure != 'unchanged':
+                    tree.getroot().set('WwiseBuild', '2')
+                    tree.getroot().set('WwiseVersion', 'v2024.1.0' if failure == 'wrong-version' else 'v2025.1.0')
+                    if failure == 'wrong-project':
+                        tree.find('./ProjectInfo/Project').set('ID', '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                    tree.write(self.project_file)
+                if failure == 'lost-workunit':
+                    self.unit.unlink()
+                elif failure == 'property-transform':
+                    self.unit.write_text(self.unit.read_text().replace('-6', '-12'))
+            return super().call(uri, args, options)
+    task = MigrateFailure(tmp_path, '2025.1')
+    task.unit = saved_fixture_project(task)
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is False, payload
+    if failure in {'property-transform', 'unchanged'}:
+        assert code == 0 and payload['state'] == 'result_schema_checked', payload
+        expected = ('migration_model_transformation_semantics' if failure == 'property-transform'
+            else 'migration_save_has_no_observed_write')
+        assert expected in payload['verification']['readbacks'][-1]['unresolved']
+    else:
+        assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+@pytest.mark.parametrize('operation', ['moveMediaIdsToSingleFile', 'moveMediaIdsToWorkUnits', 'updateMediaIdsInSingleFile'])
+def test_cli_media_ids_observe_owned_file_and_work_units_without_inventing_mapping_format(tmp_path, version, operation):
+    class MediaTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                # Deliberately unknown representation: the saved bytes do not
+                # establish a native container or complete mapping semantics.
+                self.media.write_text('<UnestablishedMediaMappingFormat revision="after"/>')
+            return super().call(uri, args, options)
+    task = MediaTask(tmp_path, version, 'ak.wwise.cli.' + operation)
+    saved_fixture_project(task)
+    task.media = task.project_file.with_suffix('.mediaid')
+    task.media.write_text('<UnestablishedMediaMappingFormat revision="before"/>')
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is False, payload
+    observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-media-id-artifacts']
+    assert len(observed) == 1 and observed[0]['mapping_file']['exists'] is True, payload
+    assert observed[0]['mapping_file']['format'] == 'unestablished'
+    assert 'central_media_id_mapping_representation' in observed[0]['unresolved']
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_unknown_media_id_container_is_unverified_not_a_proven_native_failure(tmp_path, version):
+    class OpaqueMediaTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.project_file.with_suffix('.mediaid').write_bytes(b'\x00unestablished-container\xff')
+            return super().call(uri, args, options)
+    task = OpaqueMediaTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    saved_fixture_project(task)
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    assert payload['verified'] is False
+    observation = next(row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-media-id-artifacts')
+    assert observation['mapping_file']['exists'] is True
+    assert observation['mapping_file']['format'] == 'unestablished'
+    assert 'central_media_id_mapping_representation' in observation['unresolved']
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('failure', ['missing-mapping', 'malformed-mapping', 'lost-workunit', 'unrelated-setting'])
+def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, failure):
+    class MediaFailure(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                if failure == 'malformed-mapping':
+                    self.media.write_text('<broken')
+                elif failure != 'missing-mapping':
+                    self.media.write_text('<UnknownNativeMediaFormat/>')
+                if failure == 'lost-workunit':
+                    self.unit.unlink()
+                elif failure == 'unrelated-setting':
+                    self.unit.write_text(self.unit.read_text().replace('-6', '-12'))
+            return super().call(uri, args, options)
+    task = MediaFailure(tmp_path, '2025.1', 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(tree.find('.//Sound'), 'AudioFileSource', Name='Keep.wav',
+        ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
+    tree.write(task.unit)
+    task.media = task.project_file.with_suffix('.mediaid')
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is False, payload
+    if failure == 'malformed-mapping':
+        # This is malformed XML, but the native container has not been proved
+        # to be XML. It therefore establishes neither success nor failure.
+        assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    else:
+        assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def test_cli_add_platform_does_not_hide_significant_saved_text_whitespace_change(tmp_path):
+    class ChangedText(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform', Name='Studio',
+                    ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
+                self.unit.write_text(self.unit.read_text().replace('Keep.wav ', 'Keep.wav'))
+            return super().call(uri, args, options)
+    task = ChangedText(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(tree.find('.//Sound'), 'AudioFileSource', Name='Source',
+        ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(source, 'AudioFile').text = 'Keep.wav '
+    tree.write(task.unit)
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+
+
+def test_cli_project_model_has_a_disclosed_directory_depth_budget(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.project_file.parent.joinpath(*['level'] * 65).mkdir(parents=True)
+    code, schema = task.run('--version', '2025.1', 'request-schema', task.operation)
+    assert code == 0, schema
+    assert schema['business_adapter']['effect_verification']['limits'].get('model_depth') == 64
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
+        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code != 0 and payload['error_code'] == 'LIMIT_EXCEEDED', payload
+    assert not any(row[0] == task.operation for row in task.calls)
+
+
+def test_cli_dump_unavailable_read_remains_a_structured_unknown_outcome(tmp_path, monkeypatch):
+    import os
+    class Dump(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text('{"fixture":true}')
+            return super().call(uri, args, options)
+    task = Dump(tmp_path, '2025.1', 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output))
+    inode = task.output.stat().st_ino
+    original = os.fdopen
+    matched = 0
+    class UnavailableRead:
+        def __init__(self, opened):
+            self.opened = opened
+        def __enter__(self):
+            self.opened.__enter__()
+            return self
+        def __exit__(self, *args):
+            return self.opened.__exit__(*args)
+        def read(self, *args):
+            raise OSError('Injected filesystem read failure')
+        def fileno(self):
+            return self.opened.fileno()
+    def fdopen(descriptor, *args, **kwargs):
+        nonlocal matched
+        selected = os.fstat(descriptor).st_ino == inode
+        if selected:
+            matched += 1
+        opened = original(descriptor, *args, **kwargs)
+        return UnavailableRead(opened) if selected and matched == 2 else opened
+    monkeypatch.setattr(os, 'fdopen', fdopen)
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'executed_unverified', payload
+    assert payload['error_code'] == 'INVALID_FILE', payload
+
+
+def test_cli_add_platform_keeps_preexisting_unregistered_platform_values_unresolved(tmp_path):
+    class OrphanValues(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform', Name='Studio',
+                    ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
+                tree = ET.parse(self.unit)
+                tree.find('.//Value[@Platform="Studio"]').text = '-99'
+                tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = OrphanValues(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    ET.SubElement(tree.find('.//ValueList'), 'Value', Platform='Studio').text = '-6'
+    tree.write(task.unit)
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is False and payload['state'] == 'result_schema_checked', payload
+    assert 'preexisting_unregistered_platform_values' in payload['verification']['readbacks'][-1]['unresolved']
