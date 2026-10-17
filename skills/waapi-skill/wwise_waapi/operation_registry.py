@@ -21821,14 +21821,16 @@ def _read_shared_reference_target(target_id, *, read, platform, version, require
     parent = rows[0].get("parent")
     if "parent" not in rows[0] or isinstance(parent, Mapping) and "id" not in parent:
         raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a fresh canonical parent relationship.")
-    if _reference_value_is_null(parent):
-        if require_match:
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a non-null parent relationship.")
+    if parent is None:
         parent_id = None
     else:
         parent_id = _reference_identity(parent)
         if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
             raise OperationContractError("INVALID_READBACK", "Shared-only target parent must expose a canonical GUID.")
+        if _reference_value_is_null(parent_id):
+            parent_id = None
+    if parent_id is None and require_match:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a non-null parent relationship.")
     preview = WaqlQueryBuilder(version=version).build({
         "contract": STRUCTURED_QUERY_CONTRACT,
         "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},

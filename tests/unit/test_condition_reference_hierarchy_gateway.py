@@ -798,3 +798,30 @@ def test_malformed_classifier_postread_remains_unknown_rather_than_proven_false(
     code, repeated = task.run('execute', tx)
     assert code == 2, repeated
     assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+def test_shared_only_canonical_null_parent_id_cannot_hide_behind_additional_pointer_fields(tmp_path):
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID, 'extra_native_fact': True}
+    task.declare()
+    code, checked = task.step('draft-check')
+    if code == 2:
+        assert checked['error_code'] in {'CONSTRAINED_REFERENCE_BOUNDARY', 'INVALID_READBACK'}, checked
+        return
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 2, preview
+
+
+def test_scalar_null_guid_parent_postread_is_malformed_not_a_proven_missing_parent(tmp_path):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND]['parent'] = NULL_GUID
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred'
+    assert TransactionStore(task.path / 'state').load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
