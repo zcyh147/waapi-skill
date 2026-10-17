@@ -426,6 +426,9 @@ from wwise_waapi.runtime_game_object_handles import (  # noqa: E402  # pyright: 
     RuntimeGameObjectHandleStore,
     validate_runtime_game_object_handle,
 )
+from wwise_waapi.soundengine_lifecycle import (  # noqa: E402
+    consume_soundengine_control_authority, soundengine_authority_snapshot, soundengine_resource_lease,
+)
 from wwise_waapi.runtime_playing_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     RuntimePlayingHandleError,
     RuntimePlayingHandleStore,
@@ -2878,6 +2881,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_soundengine_plan.add_argument("--monitor-message")
     draft_declare_soundengine_plan.add_argument("--game-object-name")
     draft_declare_soundengine_plan.add_argument("--game-object-handle")
+    draft_declare_soundengine_plan.add_argument("--all-game-objects", action="store_true", default=None)
     draft_declare_soundengine_plan.add_argument("--event-handle")
     draft_declare_soundengine_plan.add_argument("--action")
     draft_declare_soundengine_plan.add_argument("--playing-handle")
@@ -2897,6 +2901,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_soundengine_plan.add_argument("--trigger-handle")
     draft_declare_soundengine_plan.add_argument("--game-parameter-handle")
     draft_declare_soundengine_plan.add_argument("--value", type=float)
+    draft_declare_soundengine_plan.add_argument("--global-scope", action="store_true", default=None)
     draft_declare_soundengine_plan.add_argument("--sound-bank-handle")
     draft_declare_soundengine_plan.add_argument("--emitter-handle")
     draft_declare_soundengine_plan.add_argument(
@@ -2921,7 +2926,10 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
     )
     draft_declare_soundengine_plan.add_argument("--volume-db", type=float)
+    draft_declare_soundengine_plan.add_argument("--volume-percent", type=float)
+    draft_declare_soundengine_plan.add_argument("--all-listeners", action="store_true", default=None)
     draft_declare_soundengine_plan.add_argument("--multi-position-mode")
+    draft_declare_soundengine_plan.add_argument("--clear-positions", action="store_true", default=None)
     draft_declare_soundengine_plan.add_argument("--spatialization")
     draft_declare_soundengine_plan.add_argument("--channel-layout")
     draft_declare_soundengine_plan.add_argument("--channel-layout-kind")
@@ -2944,6 +2952,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--aux-send",
         nargs=3,
         action="append",
+    )
+    draft_declare_soundengine_plan.add_argument(
+        "--aux-send-all-listeners", nargs=2, action="append",
     )
     draft_declare_soundengine_plan.add_argument(
         "--clear-aux-sends",
@@ -13211,6 +13222,7 @@ def dispatch_business_soundengine_plan(
     supplied = {
         "monitor_message": args.monitor_message,
         "game_object_name": args.game_object_name,
+        "all_game_objects": args.all_game_objects,
         "game_object_handle": args.game_object_handle,
         "event_handle": args.event_handle,
         "action": args.action,
@@ -13227,14 +13239,18 @@ def dispatch_business_soundengine_plan(
         "trigger_handle": args.trigger_handle,
         "game_parameter_handle": args.game_parameter_handle,
         "value": args.value,
+        "global_scope": args.global_scope,
         "sound_bank_handle": args.sound_bank_handle,
         "emitter_handle": args.emitter_handle,
         "obstruction_percent": args.obstruction_percent,
         "occlusion_percent": args.occlusion_percent,
         "attenuation_scale_percent": args.attenuation_scale_percent,
         "volume_db": args.volume_db,
+        "volume_percent": args.volume_percent,
+        "all_listeners": args.all_listeners,
         "clear_listeners": args.clear_listeners,
         "multi_position_mode": args.multi_position_mode,
+        "clear_positions": args.clear_positions,
         "spatialization": args.spatialization,
         "channel_layout": args.channel_layout,
         "channel_layout_kind": args.channel_layout_kind,
@@ -13243,6 +13259,7 @@ def dispatch_business_soundengine_plan(
         "speaker_offsets_db": args.speaker_offset_db,
         "channel_offsets_db": args.channel_offset_db,
         "aux_sends": args.aux_send,
+        "aux_sends_all_listeners": args.aux_send_all_listeners,
         "clear_aux_sends": args.clear_aux_sends,
     }
     if args.listener_handle is not None:
@@ -16491,6 +16508,15 @@ def dispatch_operation_draft_check(
         skill_root=SKILL_ROOT,
         ttl_seconds=DEFAULT_PREVIEW_TTL_SECONDS,
     ).as_dict()
+    if business_operation in soundengine_control_business_operations():
+        checked_artifact["prepared_operation"]["pre_state"]["soundengine_authority"] = soundengine_authority_snapshot(
+            request_payload, state_dir=state_dir,
+            context=_runtime_game_object_context_from_live(
+                endpoint=common["endpoint"], project=project,
+                detected_version=detected_version, live_info=live_info,
+            ),
+            declared_settings=business_session.settings,
+        )
     prepared = require_mapping(
         checked_artifact.get("prepared_operation"),
         "checked prepared operation",
@@ -20215,6 +20241,14 @@ def create_transaction_preview(
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
+    if canonical_request.get("arguments", {}).get("api") in soundengine_control_business_operations():
+        artifact["prepared_operation"]["pre_state"]["soundengine_authority"] = soundengine_authority_snapshot(
+            canonical_request, state_dir=state_dir,
+            context=_runtime_game_object_context_from_live(
+                endpoint=common["endpoint"], project=project,
+                detected_version=detected_version, live_info=live_info,
+            ),
+        )
     artifact["connection_configuration"] = selected_connection_binding(env)
     prepared = require_mapping(
         artifact.get("prepared_operation"),
@@ -20611,7 +20645,8 @@ def dispatch_transaction_command(
         sealed = store.load_preview(transaction_id).artifact
         api = sealed.get('request', {}).get('arguments', {}).get('api')
         resource_lease = AuthoringResourceStore(store.state_dir).lease() if api in MODEL_OPERATIONS else nullcontext()
-        with store.execution_lease(transaction_id), resource_lease:
+        runtime_resource_lease = soundengine_resource_lease(store.state_dir) if api in soundengine_control_business_operations() else nullcontext()
+        with store.execution_lease(transaction_id), resource_lease, runtime_resource_lease:
             return _dispatch_transaction_command_with_execution_lease(
                 args,
                 env=env,
@@ -21164,6 +21199,36 @@ def _dispatch_transaction_command_with_execution_lease(
                     "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
                     "automatic_retry": False,
                 }
+        if call_uri in soundengine_control_business_operations():
+            try:
+                current_authority = soundengine_authority_snapshot(
+                    sealed_request, state_dir=store.state_dir,
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"], project=project,
+                        detected_version=detected_version, live_info=live_info,
+                    ),
+                )
+                if call_uri == POST_EVENT_URI:
+                    RuntimePlayingHandleStore(store.state_dir).require_lifetime_capacity()
+                if prepared.get("pre_state", {}).get("soundengine_authority") != current_authority:
+                    raise RuntimePlayingHandleError(
+                        "SOUNDENGINE_AUTHORITY_GENERATION_DRIFT",
+                        "The immutable Preview does not bind the current runtime capability generation; create a new Preview.",
+                    )
+            except (RuntimeGameObjectHandleError, RuntimePlayingHandleError) as exc:
+                repreview = store.require_repreview(
+                    transaction_id, expected_authorization=record.state,
+                    details={"error_code": exc.error_code},
+                )
+                return {
+                    "ok": False, "status": "repreview_required", **common,
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
+                    "transaction_id": transaction_id, "state": repreview.state.value,
+                    "artifact_hash": preview.artifact_hash, "error_code": exc.error_code,
+                    "message": str(exc), "executed": False, "verified": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
+                    "automatic_retry": False,
+                }
         game_object_binding_validation = None
         game_object_id = (
             call_args.get("gameObject")
@@ -21472,6 +21537,35 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {'ok': False, 'status': 'resource_retirement_failed', **common, 'transaction_id': transaction_id,
                     'state': failed.state.value, 'error_code': 'AUTHORING_RESOURCE_PERSISTENCE_FAILED', 'message': str(exc),
                     'native_dispatch_attempted': False, 'executed': False, 'verified': False, 'automatic_retry': False}
+        soundengine_authority_revocation = None
+        try:
+            if call_uri in {STOP_PLAYING_ID_URI, STOP_ALL_URI, EXECUTE_ACTION_ON_EVENT_URI, UNREGISTER_GAME_OBJECT_URI}:
+                soundengine_authority_revocation = consume_soundengine_control_authority(
+                    call_uri, call_args, state_dir=store.state_dir,
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"], project=project,
+                        detected_version=detected_version, live_info=live_info,
+                    ),
+                )
+        except (RuntimePlayingHandleError, RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+            failed = store.mark_execution_indeterminate(transaction_id, details={
+                "phase": "soundengine_authority_consumption_before_native_dispatch",
+                "native_dispatch_attempted": False,
+                "soundengine_authority_revocation": soundengine_authority_revocation,
+                "automatic_retry": False,
+                "error_code": getattr(exc, "error_code", "PLAYING_HANDLE_RETIREMENT_FAILED"),
+                "message": str(exc),
+            })
+            return {
+                "ok": False, "status": "playing_handle_retirement_failed", **common,
+                "transaction_id": transaction_id, "state": failed.state.value,
+                "error_code": getattr(exc, "error_code", "PLAYING_HANDLE_RETIREMENT_FAILED"),
+                "message": str(exc), "native_dispatch_attempted": False,
+                "executed": False, "verified": False,
+                "soundengine_authority_revocation": soundengine_authority_revocation,
+                "automatic_retry": False,
+                "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
+            }
         try:
             result = dispatch(
                 dispatcher,
@@ -21491,6 +21585,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     "reason": "exception after execution_started",
                     "error_type": type(exc).__name__,
                     "message": str(exc),
+                    "soundengine_authority_revocation": soundengine_authority_revocation,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -21504,6 +21599,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "message": str(exc),
                 **wire_path_output,
                 "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
+                "soundengine_authority_revocation": soundengine_authority_revocation,
                 "automatic_retry": False,
             }
         if result.get("ok") is not True:
@@ -21511,6 +21607,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 transaction_id,
                 details={
                     "dispatch_result": result,
+                    "soundengine_authority_revocation": soundengine_authority_revocation,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -21530,8 +21627,57 @@ def _dispatch_transaction_command_with_execution_lease(
                     phase="indeterminate",
                     execution_result=result,
                 ),
+                "soundengine_authority_revocation": soundengine_authority_revocation,
                 "automatic_retry": False,
             }
+        soundengine_registration_epoch = None
+        if call_uri == REGISTER_GAME_OBJECT_URI:
+            try:
+                soundengine_registration_epoch = RuntimeGameObjectHandleStore(store.state_dir).registration_epoch(
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"], project=project,
+                        detected_version=detected_version, live_info=live_info,
+                    ), create=True,
+                )
+            except (RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+                failed = store.mark_execution_indeterminate(transaction_id, details={
+                    "phase": "soundengine_registration_epoch_after_native_dispatch",
+                    "dispatch_result": result, "automatic_retry": False, "message": str(exc),
+                })
+                return {
+                    "ok": False, "status": "game_object_handle_persistence_failed", **common,
+                    "transaction_id": transaction_id, "state": failed.state.value,
+                    "error_code": getattr(exc, "error_code", "GAME_OBJECT_HANDLE_PERSISTENCE_FAILED"),
+                    "message": str(exc), "dispatch_result": result,
+                    "executed": True, "verified": False, "automatic_retry": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate", execution_result=result),
+                }
+        if call_uri == POST_EVENT_URI:
+            native_playing_id = result.get("result", {}).get("return")
+            if isinstance(native_playing_id, int) and not isinstance(native_playing_id, bool) and native_playing_id > 0:
+                try:
+                    RuntimePlayingHandleStore(store.state_dir).begin_lifetime(
+                        playing_id=native_playing_id,
+                        event_id=call_args["event"], game_object_id=call_args.get("gameObject"),
+                        context=_runtime_game_object_context_from_live(
+                            endpoint=common["endpoint"], project=project,
+                            detected_version=detected_version, live_info=live_info,
+                        ),
+                        source_transaction_id=transaction_id, source_artifact_hash=preview.artifact_hash,
+                    )
+                except (RuntimePlayingHandleError, OSError, ValueError) as exc:
+                    failed = store.mark_execution_indeterminate(transaction_id, details={
+                        "phase": "soundengine_playing_lifetime_after_native_dispatch",
+                        "dispatch_result": result, "automatic_retry": False, "message": str(exc),
+                    })
+                    return {
+                        "ok": False, "status": "playing_handle_persistence_failed", **common,
+                        "transaction_id": transaction_id, "state": failed.state.value,
+                        "error_code": getattr(exc, "error_code", "PLAYING_HANDLE_PERSISTENCE_FAILED"),
+                        "message": str(exc), "dispatch_result": result,
+                        "executed": True, "verified": False, "automatic_retry": False,
+                        "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate", execution_result=result),
+                    }
         try:
             executed = store.mark_executed_unverified(
                 transaction_id,
@@ -21545,6 +21691,8 @@ def _dispatch_transaction_command_with_execution_lease(
                     "game_object_binding_validation": game_object_binding_validation,
                     "playing_binding_validation": playing_binding_validation,
                     "game_object_collection_validation": game_object_collection_validation,
+                    "soundengine_authority_revocation": soundengine_authority_revocation,
+                    "soundengine_registration_epoch": soundengine_registration_epoch,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -21597,6 +21745,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 phase="executed",
                 execution_result=result,
             ),
+            "soundengine_authority_revocation": soundengine_authority_revocation,
             "automatic_retry": False,
         }
         execute_payload["agent_control"] = {
@@ -21980,6 +22129,7 @@ def _dispatch_transaction_command_with_execution_lease(
                         ),
                         source_transaction_id=transaction_id,
                         source_artifact_hash=preview.artifact_hash,
+                        require_current_lifetime=True,
                     )
                     agent_result["business_result"] = {
                         "contract": "waapi-skill.soundengine-control-result/v1",
@@ -21993,6 +22143,10 @@ def _dispatch_transaction_command_with_execution_lease(
                                 "soundengine_playback_not_started"
                                 if getattr(exc, "error_code", None)
                                 == "PLAYING_HANDLE_NOT_STARTED"
+                                else "playing_authority_unavailable"
+                                if getattr(exc, "error_code", None) in {
+                                    "PLAYING_HANDLE_LIFETIME_RETIRED", "PLAYING_HANDLE_GENERATION_DRIFT",
+                                }
                                 else "playing_handle_persistence_failed"
                             ),
                             "error_code": getattr(
@@ -22030,6 +22184,9 @@ def _dispatch_transaction_command_with_execution_lease(
                     else None
                 )
                 try:
+                    registration_epoch = event_details.get("soundengine_registration_epoch") if isinstance(event_details, Mapping) else None
+                    if isinstance(registration_epoch, bool) or not isinstance(registration_epoch, int):
+                        raise RuntimeGameObjectHandleError("GAME_OBJECT_REGISTRATION_EVIDENCE_MISSING", "Registration execution lacks its immutable epoch binding.")
                     issued = RuntimeGameObjectHandleStore(store.state_dir).issue(
                         game_object_id=game_object_id,
                         game_object_name=game_object_name,
@@ -22041,6 +22198,7 @@ def _dispatch_transaction_command_with_execution_lease(
                         ),
                         source_transaction_id=transaction_id,
                         source_artifact_hash=preview.artifact_hash,
+                        expected_registration_epoch=registration_epoch,
                     )
                     agent_result["business_result"] = {
                         "contract": "waapi-skill.soundengine-control-result/v1",
@@ -22051,7 +22209,11 @@ def _dispatch_transaction_command_with_execution_lease(
                     payload.update(
                         {
                             "ok": False,
-                            "status": "game_object_handle_persistence_failed",
+                            "status": (
+                                "game_object_authority_unavailable"
+                                if getattr(exc, "error_code", None) in {"GAME_OBJECT_REGISTRATION_RETIRED", "GAME_OBJECT_REGISTRATION_EVIDENCE_MISSING"}
+                                else "game_object_handle_persistence_failed"
+                            ),
                             "error_code": getattr(
                                 exc,
                                 "error_code",
@@ -22063,7 +22225,16 @@ def _dispatch_transaction_command_with_execution_lease(
                         }
                     )
                     return payload
-            if transaction_api == UNREGISTER_GAME_OBJECT_URI:
+            soundengine_authority_revocation = (
+                event_details.get("soundengine_authority_revocation")
+                if isinstance(event_details, Mapping) else None
+            )
+            if isinstance(soundengine_authority_revocation, Mapping):
+                agent_result["business_result"] = {
+                    "contract": "waapi-skill.soundengine-control-result/v1",
+                    **soundengine_authority_revocation,
+                }
+            if transaction_api == UNREGISTER_GAME_OBJECT_URI and soundengine_authority_revocation is None:
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
@@ -22113,7 +22284,7 @@ def _dispatch_transaction_command_with_execution_lease(
                         }
                     )
                     return payload
-            if transaction_api == STOP_PLAYING_ID_URI:
+            if transaction_api == STOP_PLAYING_ID_URI and soundengine_authority_revocation is None:
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
@@ -26275,7 +26446,7 @@ def _business_next_action_binding(
                     "--game-object-name <exact-runtime-game-object-name>"
                 ],
                 "ak.soundengine.unregisterGameObj": [
-                    "--game-object-handle <gateway-runtime-game-object-handle>"
+                    "<exactly-one-of --game-object-handle <gateway-runtime-game-object-handle> | --all-game-objects>"
                 ],
                 "ak.soundengine.postEvent": [
                     "--event-handle <bound-event-handle>",
@@ -26332,19 +26503,11 @@ def _business_next_action_binding(
                 "ak.soundengine.setRTPCValue": [
                     "--game-parameter-handle <bound-game-parameter-handle>",
                     "--value <finite-business-value>",
-                    *(
-                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
-                        if record.version in {"2021.1", "2022.1"}
-                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
-                    ),
+                    "<exactly-one-of --game-object-handle <gateway-runtime-game-object-handle> | --global-scope>" if record.version in {"2021.1", "2022.1"} else "[--game-object-handle <gateway-runtime-game-object-handle> | --global-scope] (omission uses the transport game object)",
                 ],
                 "ak.soundengine.resetRTPCValue": [
                     "--game-parameter-handle <bound-game-parameter-handle>",
-                    *(
-                        ["--game-object-handle <gateway-runtime-game-object-handle>"]
-                        if record.version in {"2021.1", "2022.1"}
-                        else ["[--game-object-handle <gateway-runtime-game-object-handle>]"]
-                    ),
+                    "<exactly-one-of --game-object-handle <gateway-runtime-game-object-handle> | --global-scope>" if record.version in {"2021.1", "2022.1"} else "[--game-object-handle <gateway-runtime-game-object-handle> | --global-scope] (omission uses the transport game object)",
                 ],
                 "ak.soundengine.loadBank": [
                     "--sound-bank-handle <bound-sound-bank-handle>",
@@ -26366,7 +26529,7 @@ def _business_next_action_binding(
                 "ak.soundengine.setMultiplePositions": [
                     "--game-object-handle <gateway-runtime-game-object-handle>",
                     "--multi-position-mode <SingleSource|MultiSources|MultiDirections>",
-                    "--position-frame <x> <y> <z> <front-x> <front-y> <front-z> <top-x> <top-y> <top-z> [repeat for each frame]",
+                    "<exactly-one-of --position-frame <x> <y> <z> <front-x> <front-y> <front-z> <top-x> <top-y> <top-z> [repeat for each frame] | --clear-positions>",
                 ],
                 "ak.soundengine.setObjectObstructionAndOcclusion": [
                     "--emitter-handle <gateway-runtime-game-object-handle>",
@@ -26380,8 +26543,8 @@ def _business_next_action_binding(
                 ],
                 "ak.soundengine.setGameObjectOutputBusVolume": [
                     "--emitter-handle <gateway-runtime-game-object-handle>",
-                    "--listener-handle <gateway-runtime-game-object-handle>",
-                    "--volume-db <finite-decibels>",
+                    "<exactly-one-of --listener-handle <gateway-runtime-game-object-handle> | --all-listeners>",
+                    "<exactly-one-of --volume-db <finite-decibels-within-append-fields-maximum> | --volume-percent <0..1600; zero is silence>>",
                 ],
                 "ak.soundengine.setListenerSpatialization": [
                     "--listener-handle <gateway-runtime-game-object-handle>",
@@ -26392,7 +26555,7 @@ def _business_next_action_binding(
                 ],
                 "ak.soundengine.setGameObjectAuxSendValues": [
                     "--emitter-handle <gateway-runtime-game-object-handle>",
-                    "<exactly-one-of --aux-send <listener-game-object-handle> <bound-aux-bus-handle> <0..100-percent> [repeat 1..4] | --clear-aux-sends>",
+                    "<one-or-both --aux-send <listener-game-object-handle> <bound-aux-bus-handle> <0..1600-percent> | --aux-send-all-listeners <bound-aux-bus-handle> <0..1600-percent> [combined 1..4 rows]; or --clear-aux-sends>",
                 ],
             }[record.operation],
             "submit_once": True,
