@@ -12,6 +12,18 @@ class CliConsoleBusinessCliError(ValueError):
     """One CLI/Console declaration does not match its disclosed contract."""
 
 
+class _CollectionRowAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        # Keep the cross-flag order supplied by the user. Separate argparse
+        # append lists cannot represent interleaved named/unnamed platforms.
+        rows = list(getattr(namespace, self.dest, None) or [])
+        rows.append(values)
+        setattr(namespace, self.dest, rows)
+        ordered = list(getattr(namespace, '_cli_console_collection_rows', None) or [])
+        ordered.append((self.dest, list(values)))
+        setattr(namespace, '_cli_console_collection_rows', ordered)
+
+
 def add_cli_console_plan_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--empty", action="append", default=[], metavar="BUSINESS_COLLECTION")
     parser.add_argument(
@@ -23,14 +35,14 @@ def add_cli_console_plan_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--item",
-        action="append",
+        action=_CollectionRowAction,
         nargs=2,
         default=[],
         metavar=("BUSINESS_COLLECTION", "VALUE"),
     )
     parser.add_argument(
         "--mapping",
-        action="append",
+        action=_CollectionRowAction,
         nargs=3,
         default=[],
         metavar=("BUSINESS_MAPPING", "KEY", "VALUE"),
@@ -145,6 +157,12 @@ def cli_console_plan_from_namespace(
         if not isinstance(current, list):
             raise CliConsoleBusinessCliError(f"{name} uses conflicting input forms")
         current.append([key, value])
+    ordered_rows = getattr(args, '_cli_console_collection_rows', None)
+    if ordered_rows is not None:
+        for field, value_type in field_types.items():
+            if value_type == 'platform_creation_mappings' and field in result:
+                result[field] = [values[1] if form == 'item' else values[1:]
+                    for form, values in ordered_rows if values[0] == field]
     for name, raw in args.toggle:
         if field_type(name) != "boolean":
             raise CliConsoleBusinessCliError(

@@ -280,6 +280,7 @@ from wwise_waapi.business_adapters import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.audio_import_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     AUDIO_IMPORT_BUSINESS_BATCH_MAX_ROWS,
 )
+from wwise_waapi.console_project_operations import CLI_PROJECT_FILE_URIS
 from wwise_waapi.cli_console_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CLI_CONSOLE_BUSINESS_OPERATIONS,
     cli_console_business_catalog_rows,
@@ -30443,12 +30444,17 @@ def transaction_post_execution_project_guard_policy(
                 prepared.get("verification_plan"),
                 "prepared verification plan",
             )
-            != {
+            != ({
+                "kind": "console-project-process",
+                "uri": api,
+                "version": version,
+                "base_result_strategy": "result_schema",
+            } if api in CLI_PROJECT_FILE_URIS else {
                 "kind": "result-schema",
                 "uri": api,
                 "version": version,
                 "strategy": "result_schema",
-            }
+            })
         )
     ):
         raise GatewayInputError(

@@ -27,6 +27,7 @@ from .layout_blueprint import declared_layout_matches, declared_layout_mismatche
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
@@ -55,7 +56,7 @@ from .builders.debug_lua import (
     seal_inline_lua_source,
     seal_isolated_lua_file,
 )
-from .builders.schema import validate_semantic_payload, validate_semantic_result
+from .builders.schema import validate_semantic_payload, validate_semantic_result, validate_resolved_semantic_payload
 from .builders.soundbank import SoundBankBuilder
 from .builders.switchcontainer import SwitchContainerAssignmentBuilder
 from .execution_contracts import ExecutionContractError, ExecutionContractRegistry
@@ -4196,6 +4197,8 @@ def _public_call_arguments(
         raise OperationContractError('INVALID_ARGUMENT', 'Layout binding is reserved for closed Authoring layout operations')
     validation = validate_semantic_payload(api, raw_args, raw_options, version=version,
         authoring_ui_profile=api in LAYOUT_MUTATION_URIS)
+    if api in PROJECT_FILE_URIS:
+        validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
     result_projection = arguments.get("result_projection")
     if result_projection is not None:
         if api != "ak.wwise.core.sourceControl.getSourceFiles":
@@ -4387,6 +4390,8 @@ def _public_call_verification_plan(
     result_projection: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     common = {"uri": api, "version": version}
+    if api in CLI_PROJECT_FILE_URIS:
+        return {"kind": "console-project-process", **common, "base_result_strategy": strategy}
     if api == "ak.wwise.core.sound.setActiveSource":
         sound_id = args.get("sound")
         source_id = args.get("source")
@@ -15956,6 +15961,20 @@ def verify_prepared_operation(
             verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
             readbacks.append(observed)
             check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
+    elif kind == "console-project-process":
+        uri, version = plan['uri'], plan['version']
+        check_result_schema(uri, version)
+        try:
+            observed = observe_cli_project_outcome(uri, version, execution_result.get('result'))
+        except ValueError as exc:
+            # A missing/unknown result is uncertainty, not proof of a failed
+            # project effect. The durable execution remains non-retryable.
+            raise OperationContractError('UNRECOGNIZED_CLI_PROCESS_OUTCOME', str(exc)) from exc
+        readbacks.append(observed)
+        check('Console command did not report errors', not observed.get('reported_errors', False), observed)
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'documented_cli_process_outcome'
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False
@@ -19850,6 +19869,14 @@ def verify_prepared_operation(
         business_state_verified=business_state_verified,
     )
 
+    if kind == 'console-project-process':
+        message = (
+            'The documented Console command outcome passed; file and project effects remain unverified.'
+            if outcome.ok else
+            'The Console command reported errors; partial effects are possible and execution must not be retried.'
+        )
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
     if kind == 'tone-wav-artifact':
         message = ('The requested Tone WAV artifact failed independent verification.'
             if outcome.status == 'verification_failed' else

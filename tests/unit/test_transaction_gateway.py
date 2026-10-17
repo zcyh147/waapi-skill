@@ -7661,12 +7661,17 @@ def test_additional_reviewed_explicit_project_cli_calls_verify_without_project_p
     assert sealed_contract["route"] == "isolated_transaction"
     assert sealed_contract["project_guard_mode"] == "invariant"
     assert sealed_contract["verification_strategy"] == "result_schema"
-    assert artifact["prepared_operation"]["verification_plan"] == {
+    assert artifact["prepared_operation"]["verification_plan"] == ({
+        "kind": "console-project-process",
+        "uri": api,
+        "version": "2022.1",
+        "base_result_strategy": "result_schema",
+    } if api == "ak.wwise.cli.migrate" else {
         "kind": "result-schema",
         "uri": api,
         "version": "2022.1",
         "strategy": "result_schema",
-    }
+    })
     assert [call[0] for call in preview_client.calls] == [
         "ak.wwise.core.getInfo",
         "ak.wwise.core.getProjectInfo",
