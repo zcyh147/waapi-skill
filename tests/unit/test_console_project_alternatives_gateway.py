@@ -981,3 +981,26 @@ def test_cli_dump_unavailable_read_remains_a_structured_unknown_outcome(tmp_path
     code, payload = task.run('verify', tx)
     assert code != 0 and payload['state'] == 'executed_unverified', payload
     assert payload['error_code'] == 'INVALID_FILE', payload
+
+
+def test_cli_add_platform_keeps_preexisting_unregistered_platform_values_unresolved(tmp_path):
+    class OrphanValues(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform', Name='Studio',
+                    ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
+                tree = ET.parse(self.unit)
+                tree.find('.//Value[@Platform="Studio"]').text = '-99'
+                tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = OrphanValues(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    ET.SubElement(tree.find('.//ValueList'), 'Value', Platform='Studio').text = '-6'
+    tree.write(task.unit)
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is False and payload['state'] == 'result_schema_checked', payload
+    assert 'preexisting_unregistered_platform_values' in payload['verification']['readbacks'][-1]['unresolved']
