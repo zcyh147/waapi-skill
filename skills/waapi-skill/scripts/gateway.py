@@ -47,7 +47,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
 )
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -2618,6 +2618,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_layout_plan = subparsers.add_parser("draft-declare-layout-plan", help="Declare one closed Authoring layout outcome")
     _add_business_draft_binding_arguments(draft_layout_plan)
     draft_layout_plan.add_argument("--layout-handle", required=True)
+    draft_layout_plan.add_argument("--new-layout-name")
     draft_declare_host_plan = subparsers.add_parser(
         "draft-declare-host-plan",
         help=(
@@ -10083,9 +10084,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "supported_versions": list(versions),
                 "host_surface": "wwise-console",
             }
-            namespace_defaults = {"ak.wwise.ui.": {"host_surface": "wwise-authoring"}}
+            namespace_defaults = {"ak.wwise.ui.layout.": {"host_surface": "wwise-authoring",
+                "supported_versions": list(LAYOUT_VERSIONS)}, "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
+                "ak.soundengine.": {"intent": "perform one closed SoundEngine runtime business operation"},
+                "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view"}}
             def defaults_for_route(api: str) -> dict[str, Any]:
-                return {**route_defaults, **next((value for prefix, value in namespace_defaults.items() if api.startswith(prefix)), {})}
+                matching = [prefix for prefix in namespace_defaults if api.startswith(prefix)]
+                return {**route_defaults, **(namespace_defaults[max(matching, key=len)] if matching else {})}
             payload["request_schema_routes"] = [
                 {
                     key: value
@@ -10106,7 +10111,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             payload["request_schema_route_defaults"] = route_defaults
             payload["request_schema_route_defaults_by_namespace"] = namespace_defaults
             payload["directory_reading"] = (
-                "Rows inherit request_schema_route_defaults, then matching "
+                "Rows inherit request_schema_route_defaults, then the longest matching API prefix in "
                 "request_schema_route_defaults_by_namespace; explicit row fields override. "
                 "For schema discovery, use row next_command when present; "
                 "otherwise instantiate the static schema-command templates: "
@@ -13282,8 +13287,14 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         live_info=live_info, dispatcher=dispatcher)
     identity = resolve_layout_identity(args.layout_handle, role='layout', context=context, args=args,
         env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
-    settings = {'authoring_layout_plan': {'layout_handle': args.layout_handle},
-                'authoring_layout_binding': layout_binding_descriptor(identity)}
+    plan = {'layout_handle': args.layout_handle}
+    if pending.operation == LAYOUT_SET_URI:
+        plan['new_layout_name'] = args.new_layout_name
+    elif args.new_layout_name is not None:
+        raise GatewayInputError('--new-layout-name belongs only to temporary layout registration')
+    settings = {'authoring_layout_plan': plan,
+                'authoring_layout_binding': layout_binding_descriptor(identity,
+                    registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
         adapter.materialize(candidate)
@@ -28198,7 +28209,8 @@ def operation_draft_payload(
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
 
     read_only_draft = (
-        record.operation.startswith("ak.")
+        record.operation not in LAYOUT_MUTATION_URIS
+        and record.operation.startswith("ak.")
         and public_typed_contract(record.version, record.operation).effect == "read"
     )
 

@@ -23,7 +23,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, validate_layout_call, validate_layout_live_binding
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -5715,6 +5715,7 @@ def _prepare_object_set(
                 reference_requirements=reference_requirements,
                 desired_references=desired_references,
                 related_conditions=related_conditions,
+                platform=platform,
             )
             if activation_properties:
                 for row in target_spec["references"]:
@@ -6146,10 +6147,23 @@ def _prepare_object_set(
             }
         )
         for property_spec in target_spec["properties"]:
-            if property_spec.get("derived") and condition_values_equal(_field_value(
-                snapshot_rows[0], property_spec["name"]
-            ), property_spec["value"]):
+            if not property_spec.get("derived"):
+                continue
+            current_value = _field_value(snapshot_rows[0], property_spec["name"])
+            restriction = property_spec.get("condition_restriction")
+            if isinstance(restriction, Mapping):
+                from .metadata_restrictions import condition_matches
+                satisfied = _has_field(snapshot_rows[0], property_spec["name"]) and condition_matches(restriction, current_value)
+                if not satisfied and len(restriction.get("values", [])) != 1:
+                    raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "The final Preview state requires an explicit satisfying prerequisite choice.", details={
+                        "object_id": target.object, "property": property_spec["name"], "current_value": current_value,
+                        "restriction": restriction, "mutation_dispatched": False,
+                    })
+            else:
+                satisfied = _has_field(snapshot_rows[0], property_spec["name"]) and condition_values_equal(current_value, property_spec["value"])
+            if satisfied:
                 trusted.pop(f"@{property_spec['name']}", None)
+                property_spec["value"] = current_value
                 property_spec["already_satisfied"] = True
         target_spec["pre_state"] = snapshot_rows[0]
         target_spec["expected_parent_id"] = _parent_value(
@@ -7297,7 +7311,7 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
         )
 
 
-def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements):
+def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, platform=None):
     """Bind the observed Switch association context to its exact native owner."""
     from .metadata_restrictions import condition_matches
     if object_id is None:
@@ -7317,7 +7331,9 @@ def _prepare_association_parent_condition(*, object_id, property_name, restricti
     info = _read_property_info(read, name=property_name, object_id=owner.object)
     if info.name != property_name or info.dependencies:
         raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Association controller metadata requires its exact resolved condition closure.")
-    values = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {"return": ["id", property_name]}))
+    values = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
+        "return": ["id", property_name], **({"platform": platform} if platform is not None else {}),
+    }))
     if len(values) != 1 or not _same_identity(values[0].get("id"), owner.object) or not _has_field(values[0], property_name):
         raise OperationContractError("INVALID_READBACK", "Association controller must resolve on its exact owner.")
     value = _field_value(values[0], property_name)
@@ -7334,6 +7350,8 @@ def _prepare_association_parent_condition(*, object_id, property_name, restricti
                    "source_identity": {key: source.get(key) for key in ("id", "name", "type", "path")},
                    "owner_identity": {key: owner.row.get(key) for key in ("id", "name", "type", "path")},
                    "metadata": info.as_dict()}
+    if platform is not None:
+        requirement["platform"] = platform
     if requirement not in requirements:
         requirements.append(requirement)
     if len(requirements) > 16:
@@ -7347,6 +7365,8 @@ def _related_condition_assertions(requirements, *, read):
         source_id, owner_id, name = requirement["source_id"], requirement["owner_id"], requirement["property"]
         args = {"from": {"id": [source_id, owner_id]}}
         options = {"return": ["id", "name", "type", "path", "owner", name]}
+        if requirement.get("platform") is not None:
+            options["platform"] = requirement["platform"]
         result = read(OBJECT_GET_URI, args, options)
         readbacks.append({"uri": OBJECT_GET_URI, "args": args, "options": options, "result": result})
         rows = _rows(result)
@@ -7386,6 +7406,7 @@ def _apply_reference_activation_dependencies(
     reference_requirements: dict[str, Any] | None = None,
     desired_references: Mapping[str, Any] | None = None,
     related_conditions: list[dict[str, Any]] | None = None,
+    platform: str | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded same-object Boolean activation requirements.
 
@@ -7454,7 +7475,9 @@ def _apply_reference_activation_dependencies(
             if reference_info.name != name:
                 raise OperationContractError("INVALID_METADATA", "Reference prerequisite metadata names a different field.")
             _require_object_reference_metadata(reference_info)
-            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": ["id", name]}))
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {
+                "return": ["id", name], **({"platform": platform} if platform is not None else {}),
+            }))
             if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], name):
                 raise OperationContractError("INVALID_READBACK", "Reference prerequisite must resolve on the exact object.")
             value = _field_value(rows[0], name)
@@ -7480,6 +7503,7 @@ def _apply_reference_activation_dependencies(
                 reference_requirements=reference_requirements,
                 desired_references=desired_references,
                 related_conditions=related_conditions,
+                platform=platform,
             ))
             continue
         fields = set(dependency)
@@ -7556,6 +7580,7 @@ def _apply_reference_activation_dependencies(
                 _prepare_association_parent_condition(
                     object_id=object_id, property_name=property_name, restriction=restriction,
                     read=read, requirements=related_conditions,
+                    platform=platform,
                 )
                 continue
             supplied = next((spec for spec in property_specs
@@ -7570,7 +7595,7 @@ def _apply_reference_activation_dependencies(
                 choices = restriction.get("values", [])
                 if object_id is not None:
                     rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
-                                      {"return": ["id", property_name]}))
+                                      {"return": ["id", property_name], **({"platform": platform} if platform is not None else {})}))
                     if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], property_name):
                         raise OperationContractError("INVALID_READBACK", "Condition value must resolve on the exact object.")
                     required_value = _field_value(rows[0], property_name)
@@ -7660,6 +7685,11 @@ def _apply_reference_activation_dependencies(
                     "metadata_type": property_info.type,
                 },
             )
+        if (dependency_type == "property" and supplied is None
+                and property_info.type.casefold().startswith(("int", "uint"))
+                and isinstance(required_value, float) and math.isfinite(required_value)
+                and required_value.is_integer()):
+            required_value = int(required_value)
         _require_object_property_value(property_info, required_value)
         activation_names.extend(_apply_reference_activation_dependencies(
             property_info, read=read, property_specs=property_specs,
@@ -7671,6 +7701,7 @@ def _apply_reference_activation_dependencies(
             reference_requirements=reference_requirements,
             desired_references=desired_references,
             related_conditions=related_conditions,
+            platform=platform,
         ))
 
         matching_specs = [
@@ -7705,6 +7736,8 @@ def _apply_reference_activation_dependencies(
                 "metadata_type": property_info.type,
                 "derived": True,
             }
+            if dependency_type == "property":
+                property_spec["condition_restriction"] = restriction
             property_specs.append(property_spec)
             derived_properties[property_info.name] = required_value
 
@@ -8714,6 +8747,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             metadata['layout_original_current'] = dict(current)
             verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
                 'expected_name': call_args['name']}
+            if api == LAYOUT_SET_URI:
+                try:
+                    metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('LAYOUT_REGISTRATION_COLLISION', str(exc)) from exc
+                verification['expected_layout'] = dict(call_args['layout'])
+            elif api == LAYOUT_REMOVE_URI:
+                try:
+                    metadata['layout_factory_names'] = dict(require_temporary_layout(call_args['name'], read=read))
+                except ValueError as exc:
+                    raise OperationContractError('FACTORY_LAYOUT_REMOVAL_FORBIDDEN', str(exc)) from exc
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -9113,6 +9157,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 derived_properties={}, request_path="$.reference",
                 reference_requirements=activation_reference_requirements,
                 related_conditions=related_conditions,
+                platform=platform,
             )
             activation_requirements = {spec["name"]: spec["value"] for spec in activation_specs}
             if related_conditions:
@@ -9144,8 +9189,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         missing_activators = [
             name for name, value in activation_requirements.items()
             if not _has_field(field_before_rows[0], name)
-            or type(_field_value(field_before_rows[0], name)) is not type(value)
-            or _field_value(field_before_rows[0], name) != value
+            or not condition_values_equal(_field_value(field_before_rows[0], name), value)
         ]
         if missing_activators:
             raise OperationContractError(
@@ -13447,6 +13491,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 pre_state = prepared.get('pre_state')
                 if not isinstance(pre_state, Mapping) or current != pre_state.get('layout_original_current'):
                     raise ValueError('Current layout changed since preview; inspect and preview again')
+                if api == LAYOUT_SET_URI:
+                    absence = require_layout_absence(call_args['name'], read=read_call)
+                    readbacks.append(absence)
+                elif api == LAYOUT_REMOVE_URI:
+                    require_temporary_layout(call_args['name'], read=layout_guard_read)
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
@@ -13863,7 +13912,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 assertions.append({
                     "name": f"reference activation {name} unchanged",
                     "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
-                              and _has_field(rows[0], name) and type(actual) is type(expected) and actual == expected,
+                              and _has_field(rows[0], name) and condition_values_equal(actual, expected),
                     "evidence": {"expected": expected, "actual": actual},
                 })
             for name, expected in activation_reference_requirements.items():
@@ -14203,7 +14252,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             assertions.append(
                 {
                     "name": f"object graph field snapshot {index} unchanged",
-                    "passed": actual == expected,
+                    "passed": _native_snapshot_equal(actual, expected),
                     "evidence": {"expected": expected, "actual": actual},
                 }
             )
@@ -15718,11 +15767,29 @@ def verify_prepared_operation(
             check('Layout mutation returned its exact result contract', False, exc.as_dict())
         else:
             check('Layout mutation returned its exact result contract', True, validation.as_dict())
-        current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
-        validate_layout_read_result('current', current)
-        readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
-        check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
-            {'expected': plan.get('expected_name'), 'actual': current.get('name')})
+        if uri == LAYOUT_SET_URI:
+            registered = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+            validate_layout_read_result('contents', registered)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': registered})
+            expected_layout = plan.get('expected_layout')
+            # This initial closed registration declares only a name: no canvas or arrangement is claimed.
+            check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
+                and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
+                {'expected': expected_layout, 'actual': registered})
+        elif uri == LAYOUT_REMOVE_URI:
+            try:
+                absent = require_layout_absence(plan['expected_name'], read=read_call)
+            except ValueError as exc:
+                check('Temporary layout is absent after unregister', False, {'reason': str(exc)})
+            else:
+                readbacks.append(absent)
+                check('Temporary layout is absent after unregister', True, absent)
+        else:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
+                {'expected': plan.get('expected_name'), 'actual': current.get('name')})
     elif kind == "project-setting-state":
         uri = plan.get("uri")
         version = plan.get("version")
@@ -16740,7 +16807,8 @@ def verify_prepared_operation(
                 expected = field_spec.get("value")
                 check(
                     f"{request_path}.{field_name} matches typed metadata",
-                    _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
+                    (_has_field(row, str(field_name)) and condition_values_equal(actual, expected))
+                    if field_spec.get("derived") else _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
             for field_spec in spec.get("references", []):
@@ -17688,8 +17756,7 @@ def verify_prepared_operation(
             )
             for name, expected_value in activation_requirements.items():
                 check(f"property activation {name} remains satisfied",
-                      _has_field(rows[0], name) and type(_field_value(rows[0], name)) is type(expected_value)
-                      and _field_value(rows[0], name) == expected_value,
+                      _has_field(rows[0], name) and condition_values_equal(_field_value(rows[0], name), expected_value),
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
             for name, expected_value in activation_reference_requirements.items():
                 check(f"reference prerequisite {name} remains satisfied",
@@ -17738,8 +17805,7 @@ def verify_prepared_operation(
         if len(rows) == 1:
             for name, expected_value in activation_requirements.items():
                 check(f"reference activation {name} remains satisfied",
-                      _has_field(rows[0], name) and type(_field_value(rows[0], name)) is type(expected_value)
-                      and _field_value(rows[0], name) == expected_value,
+                      _has_field(rows[0], name) and condition_values_equal(_field_value(rows[0], name), expected_value),
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
             for name, expected_value in activation_reference_requirements.items():
                 check(f"reference prerequisite {name} remains satisfied",
@@ -21635,6 +21701,19 @@ def _reference_requirement_matches(row: Mapping[str, Any], name: str, expected: 
         return _reference_value_is_null(value)
     actual = _reference_identity(value)
     return isinstance(actual, str) and _PLUGIN_GUID.fullmatch(actual) is not None and _same_identity(actual, expected)
+
+
+def _native_snapshot_equal(actual: Any, expected: Any) -> bool:
+    """Keep native snapshot values exact while distinguishing Boolean scalars."""
+    if isinstance(actual, Mapping) and isinstance(expected, Mapping):
+        return actual.keys() == expected.keys() and all(
+            _native_snapshot_equal(actual[key], expected[key]) for key in actual
+        )
+    if isinstance(actual, list) and isinstance(expected, list):
+        return len(actual) == len(expected) and all(
+            _native_snapshot_equal(left, right) for left, right in zip(actual, expected)
+        )
+    return condition_values_equal(actual, expected)
 
 
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:
