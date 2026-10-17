@@ -50,6 +50,39 @@ def test_unresolved_inherited_or_reference_receiver_cannot_become_a_product_mode
                 batch.scalar_model(case)
 
 
+def test_field_source_model_retains_all_sibling_enable_conditions():
+    cases = batch.scalar_manifest(Path(__file__).parents[2])["occurrences"]
+    case = next(c for c in cases if c["version"] == "2025.1" and c["receiver"]["field"] == "GainBand1")
+    model = batch.scalar_model(case)
+    dependencies = model["metadata"]["GainBand1"]["dependencies"]
+    assert {d["property"] for d in dependencies if d["action"] == "Enable"} == {"OnOffBand1", "FilterTypeBand1"}
+    assert {d["property"] for d in dependencies if d["action"] == "Show"} == {"NumBands"}
+    assert model["before"]["OnOffBand1"] is True
+    assert model["before"]["FilterTypeBand1"] in {4, 5, 6}
+    assert model["provenance"]["isolated_predicate_only"] is False
+
+
+def test_recursive_controller_source_metadata_is_not_assumed_terminal():
+    cases = batch.scalar_manifest(Path(__file__).parents[2])["occurrences"]
+    case = next(c for c in cases if c["version"] == "2025.1" and c["receiver"]["field"] == "GainBand1")
+    model = batch.scalar_model(case)
+    controller = model["metadata"]["FilterTypeBand1"]
+    assert controller["type"] == "int32"
+    assert any(d["property"] == "OnOffBand1" and d["action"] == "Enable" for d in controller["dependencies"])
+    assert any(d["property"] == "NumBands" and d["action"] == "Show" for d in controller["dependencies"])
+    assert model["provenance"]["controller_recursive_metadata"] == "exact_scoped_installed_declarations"
+
+
+def test_inner_type_declarations_remain_separate_from_object_field_applicability():
+    cases = batch.scalar_manifest(Path(__file__).parents[2])["occurrences"]
+    case = next(c for c in cases if c["version"] == "2025.1" and c["receiver"]["field"] == "ReplaceFindWhat")
+    assert case["receiver"]["source_declared_type"] == "string"
+    assert case["receiver"]["source_scope_kind"] == "inner-type-property"
+    assert "ReplaceFindWhat" in case["source_scope_fields"]
+    with pytest.raises(ValueError, match="inner-type public field applicability"):
+        batch.scalar_model(case)
+
+
 def test_parent_collector_refuses_a_changed_installed_file_before_extracting_its_type(tmp_path):
     from tests.maintenance.condition_parent_sources import collect
     (tmp_path / "docs").mkdir()
@@ -67,7 +100,8 @@ def test_parent_collector_refuses_a_changed_installed_file_before_extracting_its
 
 
 @pytest.mark.parametrize("version,controller", [("2021.1", "LfoWaveform"), ("2022.1", "SystemAudioObjectsPolicy"),
-    ("2023.1", "TimeModLoops"), ("2024.1", "IsStreamingEnabled"), ("2025.1", "PreEQBand1FilterType")])
+    ("2023.1", "TimeModLoops"), ("2024.1", "IsStreamingEnabled"), ("2025.1", "PreEQBand1FilterType"),
+    ("2025.1", "OnOffBand1")])
 def test_exact_source_model_runs_the_public_field_workflow(tmp_path, version, controller):
     from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST
     from tests.unit.test_time_modulator_range_gateway import finish

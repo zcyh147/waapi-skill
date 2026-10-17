@@ -6,6 +6,7 @@ against the committed corpus before extracting its exact parent node.
 from __future__ import annotations
 
 import argparse
+import base64
 import gzip
 import hashlib
 import json
@@ -16,7 +17,7 @@ import xml.etree.ElementTree as ET
 
 def collect(root: Path, installed_root: Path) -> dict:
     source = json.loads((root / "docs/branch-coverage-condition-sources.json").read_text())
-    records, parsed = {}, {}
+    records, parsed, files_snapshot = {}, {}, {}
     for corpus in source["corpora"]:
         for lane in corpus["lanes"]:
             files = {f["path"]: f for f in lane["files"]}
@@ -35,6 +36,9 @@ def collect(root: Path, installed_root: Path) -> dict:
                     if hashlib.sha256(raw).hexdigest() != files[row["file"]]["sha256"]:
                         raise ValueError("pinned installed source digest mismatch: " + str(path))
                     parsed[cache] = ET.fromstring(raw)
+                    files_snapshot["|".join(cache)] = {
+                        "sha256": files[row["file"]]["sha256"],
+                        "bytes_base64": base64.b64encode(raw).decode("ascii")}
                 node = parsed[cache]
                 components = row["path"].split("/")[:-1]
                 if components.pop(0) != node.tag:
@@ -57,7 +61,7 @@ def collect(root: Path, installed_root: Path) -> dict:
                     raise ValueError("conflicting exact installed parent")
                 records[key] = record
     return {"contract": "waapi-skill.installed-condition-parent-sources/v1",
-            "evidence_kind": "installed_definition_only", "parents": records}
+            "evidence_kind": "installed_definition_only", "parents": records, "files": files_snapshot}
 
 
 if __name__ == "__main__":

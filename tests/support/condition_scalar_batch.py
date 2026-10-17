@@ -6,6 +6,7 @@ No cross-member PASS inheritance or native applicability is inferred here.
 from __future__ import annotations
 
 from collections import defaultdict
+import base64
 from copy import deepcopy
 import gzip
 import hashlib
@@ -41,7 +42,14 @@ def scalar_manifest(root: Path) -> dict:
     """Declare exact alternatives without claiming native type or applicability."""
     source = audit.load(root / "docs/branch-coverage-condition-sources.json")
     parent_bytes = (root / "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz").read_bytes()
-    parents = json.loads(gzip.decompress(parent_bytes))["parents"]
+    parent_document = json.loads(gzip.decompress(parent_bytes))
+    parents = parent_document["parents"]
+    source_roots = {}
+    for key, file in parent_document["files"].items():
+        raw = base64.b64decode(file["bytes_base64"], validate=True)
+        if hashlib.sha256(raw).hexdigest() != file["sha256"]:
+            raise ValueError("complete installed source snapshot seal mismatch")
+        source_roots[key] = ET.fromstring(raw)
     by_occurrence = defaultdict(list)
     for branch in installed_obligations(root, digest=audit.digest, load=audit.load):
         if branch["owner_issue"] == 177 and branch["kind"] == "metadata_condition":
@@ -76,6 +84,8 @@ def scalar_manifest(root: Path) -> dict:
                 receiver = ({"kind": match[1], "field": match[2]} if match else
                             {"kind": "inherited-base", "field": None})
                 receiver["native_type"] = None
+                receiver["source_scope_kind"] = ("inner-type-property" if "/InnerTypes/" in row["path"]
+                                                  else "source-property" if match else "inherited-base")
                 parent_key = "|".join((build, corpus["name"], row["file"], row["path"]))
                 parent = parents[parent_key]
                 if (hashlib.sha256(parent["xml"].encode()).hexdigest() != parent["parent_xml_sha256"]
@@ -118,6 +128,8 @@ def scalar_manifest(root: Path) -> dict:
                 cases.append({"id": prefix + "condition", "version": version, "build": build,
                               "corpus": corpus["name"], "file": row["file"], "pointer": row["path"],
                               "class": deepcopy(row.get("class")), "xml": row["xml"],
+                              "source_parent_xml": parent["xml"],
+                              **_source_scope(source_roots["|".join((build, corpus["name"], row["file"]))], row["path"]),
                               "attributes": deepcopy(attrs), "controller": attrs["Name"],
                               "predicate": predicate, "receiver": receiver, "members": members,
                               "native_applicability": "unverified"})
@@ -127,31 +139,136 @@ def scalar_manifest(root: Path) -> dict:
             "occurrences": cases}
 
 
+def _source_scope(root, pointer):
+    """Resolve only explicit source ObjectBaseRef edges, with no native alias."""
+    scopes = {(n.tag, n.get("Name")): n for n in root}
+    fields, visited = {}, set()
+    def visit(node, active):
+        key = id(node)
+        if key in active:
+            raise ValueError("cyclic installed source base composition")
+        if key in visited:
+            return
+        for base in node.findall("./ObjectBaseRef"):
+            visit(scopes[("ObjectBase", base.attrib["Name"])], active | {key})
+        for field in node.findall("./Properties/Property"):
+            name = field.attrib["Name"]
+            raw = ET.tostring(field, encoding="unicode").strip()
+            if name in fields and fields[name] != raw:
+                raise ValueError("ambiguous installed source field composition")
+            fields[name] = raw
+        visited.add(key)
+    try:
+        scope = root
+        for component in pointer.rsplit("/Properties/", 1)[0].split("/")[1:]:
+            if component == "Dependencies":
+                continue
+            match = re.fullmatch(r"([^\[]+)(?:\[(.*)\])?", component)
+            candidates = [n for n in scope if n.tag == match[1] and (match[2] is None or n.get("Name") == match[2])]
+            if len(candidates) != 1:
+                raise ValueError("source parent scope is not exact")
+            scope = candidates[0]
+        visit(scope, set())
+    except (KeyError, ValueError) as exc:
+        return {"source_scope_fields": {}, "source_scope_error": str(exc)}
+    field_match = re.search(r"/Properties/Property\[([^\]]+)\]/Dependencies$", pointer)
+    if field_match is None:
+        return {"source_scope_fields": {}, "source_scope_error": "receiver_requires_separate_applicability"}
+    selected, pending = {}, [field_match[1]]
+    while pending:
+        name = pending.pop()
+        if name in selected:
+            continue
+        if name not in fields:
+            return {"source_scope_fields": selected, "source_scope_error": "source_controller_declaration_unresolved:" + name}
+        selected[name] = fields[name]
+        pending.extend(n.attrib["Name"] for n in ET.fromstring(fields[name]).findall("./Dependencies/*")
+                       if n.tag in {"PropertyDependency", "OverrideDependency"} and n.get("Context", "Self") == "Self")
+    return {"source_scope_fields": selected, "source_scope_error": None}
+
+
+def _source_metadata(raw):
+    source = ET.fromstring(raw)
+    field, kind = source.attrib["Name"], source.attrib["Type"]
+    result = {"name": field, "type": kind}
+    default = source.find("DefaultValue")
+    if default is not None:
+        result["default"] = _scalar(default.text, kind)
+    restrictions = source.findall("./Restrictions/ValueRestriction/*")
+    if len(restrictions) > 1:
+        raise ValueError("multiple source restrictions need explicit review")
+    if restrictions:
+        restriction = restrictions[0]
+        if restriction.tag == "Range":
+            result["restriction"] = {"type": "range", "min": _scalar(restriction.findtext("Min"), restriction.get("Type")),
+                                     "max": _scalar(restriction.findtext("Max"), restriction.get("Type"))}
+        elif restriction.tag == "Enumeration":
+            result["restriction"] = {"type": "enum", "values": [{"value": _scalar(v.text, restriction.get("Type")),
+                **({"displayName": v.attrib["DisplayName"]} if "DisplayName" in v.attrib else {})}
+                for v in restriction if v.tag == "Value"]}
+        else:
+            raise ValueError("unreviewed source restriction")
+    dependencies = []
+    for node in source.findall("./Dependencies/*"):
+        if (node.tag != "PropertyDependency" or node.get("Context", "Self") != "Self"
+                or node.get("Action", "Enable") not in {"Enable", "Show"}):
+            raise ValueError("parent predicate requires a distinct context/grammar witness")
+        conditions = list(node.findall("./Condition/*"))
+        if len(conditions) != 1:
+            raise ValueError("compound parent predicate requires explicit review")
+        condition = conditions[0]
+        condition_kind = condition.attrib["Type"]
+        if condition.tag == "Enumeration":
+            restriction = {"type": "enum", "values": [{"value": _scalar(v.text, condition_kind)}
+                                                      for v in condition if v.tag == "Value"]}
+        elif condition.tag == "Range":
+            restriction = {"type": "range", "min": _scalar(condition.findtext("Min"), condition_kind),
+                           "max": _scalar(condition.findtext("Max"), condition_kind)}
+        else:
+            raise ValueError("unreviewed parent predicate")
+        name = node.attrib["Name"]
+        dependencies.append({"type": "property", "action": node.get("Action", "Enable"), "context": "Self",
+                             "property": name, "conditions": [{"restriction": restriction}]})
+    if dependencies:
+        result["dependencies"] = dependencies
+    return result
+
+
 def scalar_model(case: dict) -> dict:
-    """Model only the exact isolated source predicate, never native field facts."""
+    """Model complete scoped source declarations, never live effective facts."""
     if case["receiver"]["kind"] != "Property":
         raise ValueError("receiver needs separate exact field applicability proof")
+    if case["receiver"]["source_scope_kind"] == "inner-type-property":
+        raise ValueError("inner-type public field applicability requires exact native scope proof")
+    if case["source_scope_error"]:
+        raise ValueError(case["source_scope_error"])
     field, controller = case["receiver"]["field"], case["controller"]
     if field == controller:
         raise ValueError("self-referential scalar predicate needs separate review")
-    predicate = case["predicate"]
-    if predicate["kind"] == "enum":
-        restriction = {"type": "enum", "values": [{"value": v} for v in predicate["values"]]}
-        satisfied = predicate["values"][0]
-    else:
-        restriction = {"type": "range", "min": predicate["min"], "max": predicate["max"]}
-        satisfied = predicate["min"]
-    dependency = {"type": "property", "action": "Enable", "context": "Self", "property": controller,
-                  "conditions": [{"restriction": restriction}]}
+    metadata = {name: _source_metadata(raw) for name, raw in case["source_scope_fields"].items()}
+    dependencies = [d for info in metadata.values() for d in info.get("dependencies", [])]
+    controller_before = {}
+    for name, info in metadata.items():
+        if name == field:
+            continue
+        restrictions = [d["conditions"][0]["restriction"] for d in dependencies
+                        if d["property"] == name and d["action"] == "Enable"]
+        if "restriction" in info:
+            restrictions.append(info["restriction"])
+        candidates = [info["default"]] if "default" in info else []
+        candidates.extend(v["value"] for r in restrictions if r["type"] == "enum" for v in r["values"])
+        candidates.extend(r["min"] for r in restrictions if r["type"] == "range")
+        def allowed(value):
+            return all(any(type(v["value"]) is type(value) and v["value"] == value for v in r["values"])
+                       if r["type"] == "enum" else r["min"] <= value <= r["max"] for r in restrictions)
+        satisfied = next((v for v in candidates if allowed(v)), None)
+        if satisfied is None:
+            raise ValueError("source prerequisite intersection has no modeled satisfying value")
+        controller_before[name] = satisfied
     receiver = case["receiver"]
     field_type = receiver["source_declared_type"]
     if field_type is None:
         raise ValueError("source dependent type unavailable; controlled model cannot grant product evidence")
-    field_metadata = {"name": field, "type": field_type, "dependencies": [dependency]}
-    if "source_default" in receiver:
-        field_metadata["default"] = deepcopy(receiver["source_default"])
-    if "source_restriction" in receiver:
-        field_metadata["restriction"] = deepcopy(receiver["source_restriction"])
     before = receiver.get("source_default", False if field_type == "bool" else "" if field_type == "string" else 0)
     if field_type == "bool":
         requested = not before
@@ -166,10 +283,11 @@ def scalar_model(case: dict) -> dict:
         else:
             requested = 1 if before != 1 else 0
     return {"field": field, "controller": controller,
-            "metadata": {field: field_metadata,
-                         controller: {"name": controller, "type": predicate["type"]}},
-            "before": {field: before, controller: satisfied}, "requested": requested,
-            "provenance": {"predicate": "exact_installed_definition_model", "isolated_predicate_only": True,
+            "metadata": metadata,
+            "before": {field: before, **controller_before}, "requested": requested,
+            "provenance": {"predicate": "exact_installed_definition_model", "isolated_predicate_only": False,
                            "dependent_type": "exact_installed_parent_Property_Type",
+                           "controller_recursive_metadata": "exact_scoped_installed_declarations",
+                           "source_inheritance": "source_ObjectBaseRef_composition_only_not_live_applicability",
                            "instance_identity": "explicit_program_model_native_class_applicability_unavailable",
                            "effective_native_metadata": "unobserved", "native_effect": "unverified"}}
