@@ -114,9 +114,11 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
+    MAX_QUERY_RETURN_SCOPE_BYTES,
     advanced_query_schema,
     build_advanced_object_get_query,
     build_object_get_query,
+    query_return_scope_options,
 )
 from wwise_waapi.object_query_outputs import (  # noqa: E402
     QUERY_BUSINESS_OUTPUTS,
@@ -1919,6 +1921,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument("--max-results", type=int)
+    query_object.add_argument("--platform", dest="query_platform", action="append", help="Read values for one exact platform name or GUID")
+    query_object.add_argument("--language", dest="query_language", action="append", help="Read values for one exact language name or GUID")
     query_object.add_argument(
         "--include",
         action="append",
@@ -2001,6 +2005,7 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
+            "media-pool-fields",
             "list",
             "detail",
             "discover",
@@ -5124,12 +5129,23 @@ def preflight_core_business_input(
         return
     if args.api in media_build_business_operations():
         try:
+            restored_plan = None
+            args.media_query_record = None
+            if args.api == MEDIA_POOL_GET_URI and args.media_query is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, MediaPoolQueryStore
+                store = MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env))
+                record = store.resolve(args.media_query)
+                if record["context"].get("configuration") != selected_connection_binding(env):
+                    raise MediaPoolContinuationError("Media Pool query configuration changed; start the search again")
+                args.media_query_record = record
+                restored_plan = record["plan"]
             media_input = media_build_input_from_namespace(
                 args,
                 operation=args.api,
                 version=versions[0],
+                restored_media_pool_plan=restored_plan,
             )
-        except MediaBuildBusinessCliError as exc:
+        except (MediaBuildBusinessCliError, ValueError, OSError) as exc:
             raise GatewayInputError(str(exc)) from exc
         args.media_build_request = media_input.materialized_request
         args.media_build_plan = media_input.deferred_media_pool_plan
@@ -5427,6 +5443,15 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "--max-results or pass exactly 100."
             )
         args.max_results = 100
+    for key in ("platform", "language"):
+        selected = getattr(args, f"query_{key}", None) or []
+        if len(selected) > 1:
+            raise GatewayInputError(f"query-object --{key} accepts one exact selection")
+        setattr(args, f"query_{key}", selected[0] if selected else None)
+    try:
+        query_return_scope_options(platform=args.query_platform, language=args.query_language)
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
     (projection_version,) = resolve_catalog_versions(args, env=env)
     _compile_query_business_projection(args, version=projection_version)
     args.where = []
@@ -5501,6 +5526,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "max_results": args.max_results,
             },
             version=advanced_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5534,6 +5561,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=MAX_QUERY_TAKE,
             return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5567,6 +5596,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=args.take,
             return_fields=return_fields,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
     _require_explicit_query_bound(args)
 
@@ -5785,12 +5816,14 @@ def preflight_metadata_input(
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
     args.detail = False
 
-    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation != "detail":
+    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation not in {"detail", "media-pool-fields"}:
         raise GatewayInputError("metadata --detail-page requires detail --selection")
     if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
         raise GatewayInputError("metadata --detail-item requires a nonnegative typed choices/dependencies item index")
 
-    if args.operation == "types":
+    if args.operation in {"types", "media-pool-fields"}:
+        if args.operation == "media-pool-fields" and resolve_catalog_versions(args, env=env) != ("2025.1",):
+            raise GatewayInputError("Media Pool field discovery requires the Wwise 2025.1 contract")
         if (
             path_segments
             or semantic_kind is not None
@@ -5799,14 +5832,17 @@ def preflight_metadata_input(
             or args.platform
             or args.curve_role
         ):
-            raise GatewayInputError("metadata types accepts no business input")
-        if args.selection is not None or not 1 <= args.page_size <= 64:
-            raise GatewayInputError("metadata types accepts --page and --page-size 1..64, not --selection")
+            raise GatewayInputError(f"metadata {args.operation} accepts no business input")
+        if ((args.operation == "types" and args.selection is not None) or not 1 <= args.page_size <= 64
+                or args.selection is not None and args.page is not None
+                or args.detail_page is not None and args.selection is None
+                or args.detail_view != "raw" or args.detail_item is not None):
+            raise GatewayInputError(f"metadata {args.operation} requires --page-size 1..64 and compatible paging/selection inputs")
         if len(meanings) > MAX_METADATA_DISCOVERY_QUERIES or any(
             not meaning.strip() or meaning != meaning.strip()
             or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS for meaning in meanings
         ) or sum(map(len, meanings)) > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
-            raise GatewayInputError("metadata types --meaning must contain bounded, trimmed lexical filters")
+            raise GatewayInputError(f"metadata {args.operation} --meaning must contain bounded, trimmed lexical filters")
         return
 
     if args.operation in {"discover", "property-state"}:
@@ -6950,6 +6986,7 @@ def public_typed_contract(version: str, api: str) -> Any:
 
 def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
     """Describe one deep fixed route without exposing its native request schema."""
+    from wwise_waapi.media_pool_field_discovery import media_pool_field_discovery_contract
 
     def command_requires_business_values(command: str) -> bool:
         return (
@@ -6961,7 +6998,7 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
             "profiler-voice-contributions",
             "debug-validate-call",
             }
-            and command != "metadata types"
+            and command not in {"metadata types", "metadata media-pool-fields"}
         )
 
     commands = [
@@ -7030,6 +7067,8 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         "input_shape": "fixed_business_command",
         "native_request_fields_disclosed": False,
         "commands": commands,
+        **({"business_contract": media_pool_field_discovery_contract()}
+           if capability.uri == "ak.wwise.core.mediaPool.getFields" else {}),
         "continuation": (
             commands[0]
             if len(commands) == 1
@@ -8396,6 +8435,7 @@ def query_business_schema_payload(
             "query_contract": ADVANCED_QUERY_CONTRACT,
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+            "return_scope": _query_return_scope_contract(),
             "result_presence": _query_result_presence_contract(),
             "business_outputs": list(available_query_outputs(version)),
             "output_detail": "query-schema --output <business-output>",
@@ -8437,6 +8477,7 @@ def query_business_schema_payload(
         "query_contract": BUSINESS_QUERY_CONTRACT,
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+        "return_scope": _query_return_scope_contract(),
         "result_presence": _query_result_presence_contract(),
         "business_outputs": list(available_query_outputs(version)),
         "output_detail": "query-schema --output <business-output>",
@@ -11560,6 +11601,7 @@ def dispatch_core_business_read(
     if args.api in media_build_business_operations():
         return dispatch_media_build_business_read(
             args,
+            env=env,
             connection=connection,
             detected_version=detected_version,
             live_info=live_info,
@@ -11995,6 +12037,7 @@ def dispatch_runtime_inspection_business_read(
 def dispatch_media_build_business_read(
     args: argparse.Namespace,
     *,
+    env: Mapping[str, str],
     connection: GatewayConnection,
     detected_version: str,
     live_info: Mapping[str, Any],
@@ -12002,6 +12045,18 @@ def dispatch_media_build_business_read(
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Revalidate and execute one closed media/build business read."""
+
+    def native_failure_evidence(native_call: Mapping[str, Any]) -> dict[str, Any]:
+        observation = native_call.get("result")
+        evidence: dict[str, Any] = {"call": dispatch_call_summary(native_call)}
+        if probe_gateway_json_document_size(observation, 64 * 1024) == "ok":
+            evidence["native_observation"] = observation
+        else:
+            evidence["native_observation_boundary"] = {
+                "complete": False, "inline_limit_bytes": 64 * 1024,
+                "evidence_path": native_call.get("evidence_path"),
+            }
+        return evidence
 
     project, project_call = current_project(
         dispatcher,
@@ -12015,6 +12070,8 @@ def dispatch_media_build_business_read(
         version=detected_version,
     )
     field_discovery_call = None
+    media_page = None
+    media_context_available = False
     if args.api == MEDIA_POOL_GET_URI:
         field_api = "ak.wwise.core.mediaPool.getFields"
         field_capability = live_capability(
@@ -12066,6 +12123,25 @@ def dispatch_media_build_business_read(
             )
         except MediaBuildBusinessError as exc:
             raise GatewayInputError(str(exc)) from exc
+        from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, prepare_media_pool_page
+        media_context_available = (_canonical_guid(live_info.get("sessionId")) and isinstance(live_info.get("processId"), int)
+                                   and not isinstance(live_info.get("processId"), bool) and live_info["processId"] > 0)
+        media_context = {
+            "configuration": selected_connection_binding(env),
+            "modification_policy": load_gateway_config(env).config.project_modification_policy,
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")},
+        }
+        try:
+            if args.media_query_record is not None:
+                state_dir = resolve_transaction_state_directory(args, env=env)
+                require_runtime_directory_outside_project(state_dir, project=project)
+                if args.media_query_record["context"] != media_context:
+                    raise MediaPoolContinuationError("Stored Media Pool query belongs to a different live context; start the search again")
+            media_page = prepare_media_pool_page(request, token=args.media_page, context=media_context)
+        except MediaPoolContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
     if args.api == MEDIA_POOL_GET_URI:
@@ -12135,15 +12211,14 @@ def dispatch_media_build_business_read(
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
     )
-    result_validation = (
-        validate_semantic_result(
-            request["api"],
-            result.get("result"),
-            version=detected_version,
+    try:
+        result_validation = (
+            validate_semantic_result(request["api"], result.get("result"), version=detected_version)
+            if result.get("ok") else None
         )
-        if result.get("ok")
-        else None
-    )
+    except SemanticValidationError as exc:
+        raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result),
+            error_code="MEDIA_BUILD_RESULT_INVALID") from exc
     normalized = None
     result_identity_rows: list[Mapping[str, Any]] = []
     if result.get("ok"):
@@ -12205,13 +12280,50 @@ def dispatch_media_build_business_read(
         except MediaBuildBusinessError as exc:
             raise GatewayResultShapeError(
                 str(exc),
-                details={"media_build_error_code": exc.code},
+                details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
+        if args.api == MEDIA_POOL_GET_URI:
+            from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
+            try:
+                normalized, next_page, next_maximum = finish_media_pool_page(media_page, rows=result["result"]["return"],
+                    request=request, normalized=normalized, context_available=media_context_available)
+            except MediaPoolContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result), error_code=exc.code) from exc
+            if next_page is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                handle = args.media_query
+                state_dir = None
+                if handle is not None:
+                    state_dir = resolve_transaction_state_directory(args, env=env)
+                next_command = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
+                if handle is None and probe_gateway_json_document_size(next_command, 64 * 1024) != "ok":
+                    try:
+                        state_dir = resolve_transaction_state_directory(args, env=env)
+                        require_runtime_directory_outside_project(state_dir, project=project)
+                        handle = MediaPoolQueryStore(state_dir).issue(plan=args.media_build_plan, context=media_context, issued=media_page.issued)
+                    except (MediaPoolContinuationError, GatewayInputError, OSError) as exc:
+                        normalized["page"]["query_state_unavailable"] = str(exc)[:512]
+                if handle is not None:
+                    next_command = transaction_next_command("core-call", ["core-call", MEDIA_POOL_GET_URI,
+                        "--max-results", str(next_maximum), "--media-query", handle, "--media-page", next_page], state_dir=state_dir)
+                if probe_gateway_json_document_size(next_command, 64 * 1024) == "ok":
+                    normalized["next_command"] = next_command
+                else:
+                    normalized["page"].update({
+                        "continuation_unavailable_reason": "continuation_command_limit_exceeded",
+                        "continuation_command_limit_bytes": 64 * 1024,
+                    })
+            elif args.media_query is not None and normalized.get("complete") is True:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                try:
+                    MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env)).retire(args.media_query)
+                except (MediaPoolContinuationError, OSError) as exc:
+                    normalized["page"]["query_state_cleanup"] = {"complete": False, "message": str(exc)[:512]}
     incomplete_media_pool = (
         args.api == MEDIA_POOL_GET_URI
         and isinstance(normalized, Mapping)
-        and normalized.get("complete") is False
+        and normalized.get("incomplete_reason") == "candidate_limit_reached_before_exact_case_post_filter"
     )
     effective_ok = bool(result.get("ok")) and not incomplete_media_pool
     return {
@@ -12219,6 +12331,11 @@ def dispatch_media_build_business_read(
         "status": (
             "incomplete_boundary"
             if incomplete_media_pool
+            else "partial"
+            if isinstance(normalized, Mapping) and (
+                normalized.get("projection_complete") is False
+                or args.api == MEDIA_POOL_GET_URI and normalized.get("complete") is False
+            )
             else "ok"
             if result.get("ok")
             else "error"
@@ -12263,6 +12380,11 @@ def dispatch_media_build_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
+        **({key: value for key, value in native_failure_evidence(result).items() if key != "call"}
+           if incomplete_media_pool else {}),
+        **({"read_page": normalized["page"]} if incomplete_media_pool else {}),
+        **({"next_command": normalized["next_command"]}
+           if incomplete_media_pool and "next_command" in normalized else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 
@@ -14488,6 +14610,8 @@ def dispatch_command(
             take=args.take,
             return_fields=return_fields,
             version=detected_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         _require_explicit_query_bound(args)
         envelope = preview.envelope
@@ -14544,6 +14668,54 @@ def dispatch_command(
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
+        if args.operation == "media-pool-fields":
+            from wwise_waapi.media_pool_field_discovery import browse_media_pool_fields
+            from wwise_waapi.metadata_discovery import MetadataDiscoveryError
+            api = "ak.wwise.core.mediaPool.getFields"
+            capability = live_capability(detected_version, api, live_info=live_info)
+            result = dispatch(dispatcher, api, connection=connection, version=detected_version, args={}, options={},
+                result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+                operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+            base = {**common, "operation": args.operation, "metadata_authority": "live-waapi", "call": dispatch_call_summary(result)}
+            if not result.get("ok"):
+                return {"ok": False, "status": "error", **base, "agent_result": None}
+            filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
+            page_size, fragment_size = args.page_size, 2048
+            while True:
+                try:
+                    validate_semantic_result(api, result["result"], version=detected_version)
+                    fields = browse_media_pool_fields(result["result"], context={"configuration": selected_connection_binding(env),
+                        "endpoint": common["endpoint"], "version": detected_version, "live_info": live_info},
+                        meanings=args.queries or (), page=args.page, page_size=page_size,
+                        selection=args.selection, detail_page=args.detail_page, fragment_size=fragment_size)
+                    if fields.get("next_page"):
+                        fields["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                            "--page-size", str(args.page_size), "--page", fields["next_page"]])
+                    for field in fields.get("fields", []):
+                        if field.get("detail_required"):
+                            field["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                                "--selection", field["selection"]])
+                    if fields.get("next_detail_page"):
+                        fields["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                            "--selection", args.selection, "--detail-page", fields["next_detail_page"]])
+                    if probe_gateway_json_document_size({**base, "agent_result": fields}, 28 * 1024) == "ok":
+                        break
+                    if args.selection is not None and fragment_size > 1:
+                        fragment_size //= 2
+                    elif args.selection is None and page_size > 1:
+                        page_size -= 1
+                    else:
+                        raise MetadataDiscoveryError("DISCOVERY_RESULT_LIMIT_EXCEEDED", "The complete Media Pool field page and continuation exceed the bounded output")
+                except (SemanticValidationError, MetadataDiscoveryError) as exc:
+                    evidence = {"call": dispatch_call_summary(result)}
+                    if probe_gateway_json_document_size(result["result"], 64 * 1024) == "ok":
+                        evidence["native_observation"] = result["result"]
+                    else:
+                        evidence["native_observation_boundary"] = {"complete": False, "inline_limit_bytes": 64 * 1024,
+                            "evidence_path": result.get("evidence_path")}
+                    raise GatewayResultShapeError(str(exc), details=evidence,
+                        error_code=getattr(exc, "error_code", "MEDIA_POOL_FIELDS_INVALID")) from exc
+            return {"ok": True, "status": "partial" if fields.get("projection_complete") is False else "ok", **base, "agent_result": fields}
         if args.operation == "types":
             from wwise_waapi.metadata_discovery import browse_metadata_types
             metadata_calls: list[dict[str, Any]] = []
@@ -18493,9 +18665,13 @@ def dispatch_business_field_discovery(
         if accepted:
             eligible.append(candidate)
         else:
+            unavailable_type = "type" not in metadata and kind != "reference"
             incompatible.append({
                 "field": candidate.get("name"),
-                "reason": ("RTPC requires a numeric property with live RTPC support"
+                **({"error_code": "FIELD_TYPE_UNAVAILABLE", "unavailable_facts": ["type"]}
+                   if unavailable_type else {}),
+                "reason": ("Native metadata omits the type needed to certify a typed field value"
+                           if unavailable_type else "RTPC requires a numeric property with live RTPC support"
                            if binding.record.operation == "object.setRTPC"
                            else "Live field kind/type/support is incompatible with this operation"),
                 "operation": binding.record.operation,
@@ -18526,7 +18702,11 @@ def dispatch_business_field_discovery(
                 "candidate_count_scope": "returned_compatible_live_fields",
                 "rejected_candidates": incompatible[:8],
                 "fallback_detail_scan": dict(discovery.fallback_detail_scan),
-                "recovery": "Refine the missing discovery meaning for this bound object; no declaration was changed.",
+                "recovery": (
+                    "Inspect the exact field metadata or select a field with a certified type; no declaration was changed."
+                    if any(row.get("error_code") == "FIELD_TYPE_UNAVAILABLE" for row in incompatible)
+                    else "Refine the missing discovery meaning for this bound object; no declaration was changed."
+                ),
             },
         )
     narrowed: list[Mapping[str, Any]] = []
@@ -22330,6 +22510,8 @@ def dispatch_original_file_reference_match(
         take=MAX_QUERY_TAKE,
         return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
         version=detected_version,
+        platform=args.query_platform,
+        language=args.query_language,
     )
     envelope = preview.envelope
     result = dispatch(
@@ -22693,6 +22875,22 @@ def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     return {"mode": "exact-object"}
 
 
+def _query_return_scope_argv(args: argparse.Namespace) -> list[str]:
+    return [token for key in ("platform", "language")
+            if getattr(args, f"query_{key}", None) is not None
+            for token in (f"--{key}", getattr(args, f"query_{key}"))]
+
+
+def _query_return_scope_contract() -> dict[str, Any]:
+    return {
+        "platform": {"cli": "--platform <exact name or GUID>", "omitted": "current Wwise platform"},
+        "language": {"cli": "--language <exact name or GUID>", "omitted": "native Wwise language default; Gateway supplies no language"},
+        "max_utf8_bytes": MAX_QUERY_RETURN_SCOPE_BYTES,
+        "literal_identity": True,
+        "native_options_authored_by": "Gateway",
+    }
+
+
 def _query_result_presence_contract() -> dict[str, Any]:
     return {
         "absent_fields": "unavailable_fields; omitted values are never replaced with null",
@@ -22797,6 +22995,7 @@ def _query_mutation_selection(
                         GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         object_id,
                     ]
@@ -22860,6 +23059,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             source_id,
                             "--include",
@@ -22879,6 +23079,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             bus_id,
                             "--include",
@@ -22899,6 +23100,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             event_id,
                             "--relationship",
@@ -22924,6 +23126,7 @@ def _query_business_continuations(
                     "query-object",
                     [
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         target_id,
                         "--view",
@@ -22956,24 +23159,24 @@ def _bind_custom_kind_from_live_types(
         connection=connection,
         version=detected_version,
     )
-    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}))
+    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}), require_identity=False)
 
     def lexical(value: str) -> str:
         return "".join(character.casefold() for character in value if character.isalnum())
 
     needle = lexical(meaning)
-    exact = [record for record in records if lexical(record.name) == needle]
+    exact = [record for record in records if isinstance(record.name, str) and lexical(record.name) == needle]
     matches = exact or [
         record
         for record in records
-        if needle and (needle in lexical(record.name) or lexical(record.name) in needle)
+        if needle and isinstance(record.name, str) and (needle in lexical(record.name) or lexical(record.name) in needle)
     ]
     if len(matches) != 1:
         return {
             "metadata_authority": "live-waapi",
             "meaning": meaning,
             "candidate_count": len(matches),
-            "candidates": [record.as_dict() for record in matches[:8]],
+            "candidates": [dict(record.raw) for record in matches[:8]],
             "repair": "refine --custom-kind until one live Wwise type matches",
         }
     args.object_type = matches[0].name

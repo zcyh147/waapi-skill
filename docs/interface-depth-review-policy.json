@@ -17,10 +17,10 @@
   },
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
-    "gateway_parser_sha256": "95ef97b4b5da6880295919ffec6cb2c22c1955fbdcba8ba879ace6f7d7ec4e60",
-    "operation_contract_sha256": "6a23d3b55db2a6526be907f7a15680bb1898ca8e01d1f737dc7686d696b93fdb",
-    "public_continuation_sha256": "b71ec601a1328c08db7eef6f40923cd58f6d534b94cd0cbe1f6d02e66727e6af",
-    "typed_request_surface_sha256": "3d88ee827197f529aff3cb264b2dec9db8ad375e2602a050182f754faed8ce7e"
+    "gateway_parser_sha256": "82f0f4e4d5ebecebef18ee66a1a75b49aae6af5997c43a9a228b7f30c14cdeda",
+    "operation_contract_sha256": "8e3879d5ad7a9b93c544a11b5ea52f169f744f74b09a87ea255025112a126606",
+    "public_continuation_sha256": "47ee3f415f9d6cd0e06c9747253fd1c8cb6a443d7837e387956135e88b00754f",
+    "typed_request_surface_sha256": "139a8b26fc639071318ccfb08d2a6a0c1098bb64c33cdd556eaf294642ef2eb3"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",

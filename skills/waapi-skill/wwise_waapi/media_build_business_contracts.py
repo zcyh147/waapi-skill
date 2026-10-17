@@ -251,6 +251,11 @@ def media_build_business_contract_data(
             "optional_fields": list(row["optional_fields"]),
             "field_types": dict(row["field_types"]),
             "input_forms": dict(row["input_forms"]),
+            **({"field_choices": {"channel_mode": {
+                "per-channel": "separate peak data for each channel; Gateway default when the flag is omitted",
+                "cross-channel": "one peak stream across all channels",
+                "native-default": "omit the optional native channel mode; report the actual returned channel count without assuming its default",
+            }}} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         },
         "gateway_derivations": [
             "exact_object_selector",
@@ -269,6 +274,26 @@ def media_build_business_contract_data(
             "result_bound": True,
         },
         "result_shape": row["result_shape"],
+        **({"result_projection": {
+            "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",
+            "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
+            "malformed_present_fields": "bounded structured failure with native call evidence",
+            "partial_projection": "status=partial; projection_complete=false; decode_available=false; native_result retained",
+        }} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
+        **({"read_continuation": {
+            "flag": "--media-page", "input": "copy returned Gateway continuation only",
+            "long_query_flag": "--media-query; copy returned opaque read-plan handle only",
+            "long_query_state": "immutable validated business plan; exact context binding; no native payload input or mutation authority",
+            "state_lifetime": "completed query plans retired; expired plans safely reclaimed within bounded record and byte capacity",
+            "native_offset_supported": False, "mode": "larger bounded prefix reread",
+            "binding": ["query", "configuration", "project", "host_session", "exact preceding native prefix"],
+            "expires_after_seconds": 900, "maximum_prefix_count": 200,
+            "maximum_continuation_command_bytes": 64 * 1024,
+            "oversized_continuation": "retain useful rows and complete=false; explicit continuation command boundary",
+            "ceiling_hit": "partial; complete=false; useful rows retained",
+            "post_processed_presentation": "larger prefix replaces the preceding presentation",
+            "ultimate_bound": "explicit resource boundary; never evidence that the native collection ends here",
+        }} if operation == MEDIA_POOL_GET_URI else {}),
     }
 
 

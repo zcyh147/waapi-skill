@@ -49,7 +49,9 @@ def test_media_pool_empty_and_weight_native_observations() -> None:
                  "--waapi-port", str(runtime.port), "--project-modification-policy", "read_only"])
         evidence["status"] = gateway(["status"])
         disclosed = gateway(["request-schema", "ak.wwise.core.mediaPool.getFields"])
-        fields = gateway(disclosed["continuation"]["gateway_argv"])["agent_result"]["return"]
+        continuation = disclosed["continuation"]
+        fields = gateway([continuation["subcommand"], *continuation["arguments"], "--meaning", "Filename"])["agent_result"]["fields"]
+        fields = [field["name"] for field in fields if field.get("name_complete") is True]
         assert "Filename" in fields
         base = ["core-call", "ak.wwise.core.mediaPool.get", "--max-results", "5", "--database-scope", "project-originals"]
         cases = [

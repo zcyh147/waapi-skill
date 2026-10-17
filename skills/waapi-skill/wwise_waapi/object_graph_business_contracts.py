@@ -6,6 +6,7 @@ from typing import Any
 
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
 from .business_fields import ACTION_DURATION_FIELDS, ACTION_DURATION_SEMANTICS, OBJECT_BUSINESS_FIELD_TYPES
+from .metadata_condition_contracts import existing_field_condition_contract
 
 
 OBJECT_GRAPH_BUSINESS_CONTRACT = "waapi-skill.object-graph-business/v1"
@@ -187,6 +188,7 @@ def object_graph_business_contract_data(
         }
     if operation == "object.set":
         return {
+            "activation_prerequisites": existing_field_condition_contract(version),
             "contract": OBJECT_GRAPH_BUSINESS_CONTRACT,
             "operation": operation,
             "version": version,

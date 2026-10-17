@@ -10,38 +10,39 @@
     "unresolved_references": []
   },
   "construction_shapes": {
+    "closed_business": 9,
     "closed_read": 14,
     "draft": 116,
-    "inline": 473,
+    "inline": 471,
     "topic": 160,
     "zero": 102
   },
   "contract": "waapi-skill.full-surface-release-report/v1",
   "coverage": {
-    "construction_covered_lanes": 865,
-    "function_lanes": 705,
+    "construction_covered_lanes": 872,
+    "function_lanes": 712,
     "topic_lanes": 160,
-    "total_lanes": 865,
-    "unique_function_uris": 176,
+    "total_lanes": 872,
+    "unique_function_uris": 180,
     "unique_topic_uris": 35
   },
   "execution_routes": {
-    "bounded_call": 130,
+    "bounded_call": 129,
     "bounded_topic_wait": 160,
     "compound_transaction_member": 15,
-    "fixed_command": 58,
+    "fixed_command": 59,
     "isolated_transaction": 145,
-    "managed_transaction": 244,
+    "managed_transaction": 251,
     "transaction": 113
   },
   "host_lanes": {
-    "wwise-authoring": 66,
+    "wwise-authoring": 73,
     "wwise-console": 799
   },
   "intentionally_blocked_field_occurrences": 79,
   "source_inventory": {
     "contract": "waapi-skill.typed-request-surface/v1",
-    "inventory_sha256": "3d88ee827197f529aff3cb264b2dec9db8ad375e2602a050182f754faed8ce7e",
+    "inventory_sha256": "139a8b26fc639071318ccfb08d2a6a0c1098bb64c33cdd556eaf294642ef2eb3",
     "versions": [
       "2021.1",
       "2022.1",

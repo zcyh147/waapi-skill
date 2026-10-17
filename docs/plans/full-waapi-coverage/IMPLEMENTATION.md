@@ -73,6 +73,37 @@ final integrated acceptance:
   failures; #181 owns five query/protocol/reference-budget failures; #188 owns
   eight layout contract/catalog/inventory expectation failures. Their repairs
   and later passing runs must be recorded separately. This run is not a pass.
+- Second integration `1bcaeeba3f03c50ca819fe64e03880542e3c8f81` merged exact
+  #177 `65d7be41`, #181 `6b5ddae4` and #188 `bf69ec09` partials. The combined
+  focus passed 1093 tests; one product-capture prerequisite error was retained
+  until generated artifacts were reconciled. On the clean reconciled candidate,
+  the exact product node passed separately and 64 artifact tests passed. Its
+  separate product receipt proves one exact program branch only; required native
+  evidence is missing, and the default ledger remains incomplete. The retained
+  65 and 1bcaeeba receipts grant no proof to later source candidates.
+- The fixed five-version Program gate on exact clean `1bcaeeba` **passed**:
+  **7681 passed, 3 native-Windows-only skips**, exit 0, in 1036.40 seconds.
+  `program-1bcaeeba-r1-result.json` seals the original log SHA-256
+  `b4098b253967e2092a2536a427321c7b9a03ec8d1caed0ccd5346f6b38130062`.
+  The owned process group was empty and source remained clean afterward. The
+  three skipped native Windows checks grant no Windows execution evidence.
+  This is candidate-specific Program proof, not full functional acceptance;
+  the original `d9431c70` failure remains unchanged.
+- Third partial integration consumes only #177 `3ba15e5e`, #181 `59fa22b7`
+  and #188 `5ded219b`. It adds recursive satisfied association-owner condition
+  guards, exact discovered-token binding for optional native metadata names,
+  certified reference restrictions with absent type, explicit unavailable scalar
+  type diagnostics, bounded Media Pool field-name discovery, scoped view
+  get-or-create and 2025-only asynchronous close verification. No owner write,
+  raw input route or broader native definition interpretation is introduced.
+  Combined source validation passed **2062 tests**, with the exact product
+  capture intentionally excluded. The artifact run passed 65 tests and retained
+  one old route-count assertion failure; after synchronizing the exact getFields
+  fixed-route count, its entire 17-test registry file passed separately.
+  The 272,313 native ID/shape/owner tuples and historical seals remain unchanged;
+  three newly linked view version rows grant no verified or native effect credit.
+  All three tickets and their exact branch/native obligations stay open. No
+  product receipt is recaptured or inherited for this successor.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
