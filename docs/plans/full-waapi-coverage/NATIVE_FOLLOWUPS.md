@@ -93,10 +93,15 @@ The same candidate exposed a Short ID lookup gap under #181. Typed Event lookup
 and exact-ID readback succeeded on all five versions. DialogueEvent
 `Objective_Status`, Short ID `3970659059`, was discovered normally but missed by
 typed Short ID lookup on 2021.1, 2022.1 and 2023.1; the identical ID lookup
-succeeded on 2024.1 and 2025.1. Numeric literal/signedness behavior is a
-hypothesis, not an established cause. Diagnose with matching sources and bounded
-public reads, repair construction, then prove affected versions. Do not select
-a convenient lower ID, remove DialogueEvent support or narrow uint32.
+succeeded on 2024.1 and 2025.1. Subsequent read-only diagnosis at `f7c77edc` found
+that equivalent decimal comparisons succeed on the older three versions while
+integer and signed-conversion comparisons fail. Repair `b347acfa` changes only
+the older typed-query literal rendering; the public uint32 identity and exact
+GUID/type checks stay unchanged. The original Event/DialogueEvent observation
+node passed on each affected version, with unchanged source hashes/mtimes,
+removed PASS sandboxes and no owned process residue. The three original c988
+failures remain failures. This does not establish an internal overflow cause,
+Definition mutation acceptance, collision handling or complete #181 coverage.
 
 Real RTPC.Curve class/object metadata and referenced Curve observations now
 exist for 2022.1–2025.1. The 2021.1 collector retained absent type-discovery

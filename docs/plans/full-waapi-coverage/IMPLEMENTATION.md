@@ -33,13 +33,14 @@ references. No main merge is authorized.
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
   [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
-- Active implementation workers own #179 (plugin placements) and #185
-  (SoundEngine controls and resource lifetimes), each in a separate worktree
-  with `fork_turns="none"`. The #178/#187/#189 partials are integrated at
-  `c689fd05`; their remaining implementation and native obligations stay open.
-  #177/#181/#188 and #184/#193/#194 also retain open partial checkpoints.
-  Root owns decisions, integration and native scheduling. #180 retains its
-  #178 dependency; shared primitives alone do not establish ticket completion.
+- Current workers advance #180/#181 documented list-field discovery and #192
+  per-file source-control status plus provider/credential handling. The #178
+  prospective group/default implementation is integrated in R17 staging; its
+  targeted native preparation is fixed separately. Root owns decisions,
+  integration, broad-gate triage and native scheduling. All functional tickets
+  retain their remaining implementation and native obligations; these partial
+  checkpoints do not establish whole-ticket completion. Every newly created
+  subagent uses `fork_turns="none"` and only the necessary task context.
 - Read-only object/plugin condition research is retained for #177/#178/#179.
   It includes integer enums/ranges, parent contexts, reference requirements,
   visibility, Uint16 plugin conditions and expanded 2025 EQ conditions. Installed
@@ -481,6 +482,86 @@ All 1,835 tracked hashes and source-project hashes/mtime stayed unchanged;
 process teardown was clean. Failed/mixed-SKIP sandboxes remain quarantined.
 Individual passes are not whole-lifecycle passes. No Fresh/Windows acceptance,
 ticket closure or main merge follows from this checkpoint.
+
+## Fifteenth and sixteenth integration checkpoints
+
+R15 `7926e4fdab45885e2d23579708c1297148b0254b` combines remote-target
+identity checks, source-file usage projections, scoped compound cancellation
+observations and legacy native-default handling. Review found that cancellation
+readbacks used the dispatcher's default byte ceiling instead of the selected
+catalog contract. The public 300 KiB negative reproduced the error; `f8043c8d`
+now applies that contract's 256 KiB limit and preserves incomplete observation
+and rollback-false outcomes. Its exact negative passed separately. Final R15
+preflight passed **825 in 22.08 seconds** and the combined focus passed **23 in
+18.46 seconds**. All 1,837 tracked hashes stayed unchanged and owned processes
+ended. These results do not establish provider effects or undo-history lifetime.
+
+R16 `49f5e2f05c957506c6a6e8b1973b2a4e5112dc3d` adds the native-diagnosed
+Short ID repair and effective compound property-platform binding. Omitted
+platforms remain omitted in native requests; matching project context binds
+their meaning where observed. Review reproduced null, unlisted, removed and
+duplicate current-platform identities; `6af1b49a` requires a non-null GUID in
+exactly one project-platform row before preparation and execution. Those four
+negatives and the independent-platform positive passed separately. Final R16
+preflight passed **825 in 22.10 seconds**, with **19 in 6.34 seconds** in the
+deduplicated focus. All 1,837 tracked hashes stayed unchanged and owned processes
+ended. Earlier-version and reference-specific platform gaps remain unfinished.
+
+Both batches preserve **896 public version rows / 227 URIs / 251 Program roster
+entries** and all **272,313** native obligation identities, ownership and
+evidence. Neither assigns native ledger completion credit. Original failures
+remain attached to their candidates. The latest completed full Non-live run is
+still the R11 failure; focused repairs do not regrade that run.
+
+## Repaired Short ID native observation
+
+Read-only diagnostic candidate `f7c77edc` showed the same DialogueEvent on
+2021–2023 failing an integer WAQL comparison while matching the equivalent
+decimal comparison. GUID-only reads found the object; a signed conversion also
+failed. The 2024 control accepted both the positive integer and decimal. This
+supports the observed comparison difference, not an assumed internal overflow.
+
+Repair `b347acfa570c8e51ac908d77eeb2ae68847aa7f4` uses equivalent decimal
+rendering only for typed Short ID predicates in 2021–2023. The public uint32,
+exact GUID/type checks, candidate limits, later typed routes and existing numeric
+selectors stay unchanged. The original public Event/DialogueEvent observation
+node then passed once on each of **2021.1, 2022.1 and 2023.1**, with exact GUID
+and Short ID readbacks. All 1,835 tracked hashes and source-project hashes/mtimes
+stayed unchanged; all three PASS sandboxes were removed and owned processes
+ended. Prior 2024/2025 passes remain attributed to `c98897e2`; they were not
+rerun on the repair. This is scoped lookup acceptance, not Definition mutation,
+collision, whole-ticket, Windows or Fresh acceptance.
+
+Original evidence remains in `integration-partials-r15`,
+`integration-partials-r16` and the short-id worktree's `native-f7c77edc-r1` and
+`native-b347acfa-r1` coordination roots. The original c988 failures remain intact.
+
+## Seventeenth integration checkpoint
+
+R17 staging `18370d99b0f227c23a7f5f57c62cc121c74537d0` combines Authoring
+project creation/empty-close, exact object-to-source-control file scopes and
+prospective new-object group/default references. Root and merger independently
+reviewed the fixed inputs. The original central preflight on `95dd3fa9` retained
+**800 passed / 25 failed in 27.27 seconds**. The failures exposed a shared
+project-artifact observer assuming a URI in older generic snapshot plans.
+The minimal fix preserves URI-free snapshots and uses the Authoring kind only
+for an explicit Authoring creation URI. On the repaired candidate, the exact
+25 failed nodes plus 17 non-overlapping checks passed: **42 in 15.10 seconds**.
+The 800 original passes were not repeated; this is not a final-candidate
+825-test PASS. Both runs preserved all 1,839 tracked hashes and ended with no
+owned processes. The native ledger remains byte-identical to R16; no native
+credit or ticket closure is claimed.
+
+The full Program gate on frozen R16 remains in progress at this checkpoint,
+with failures observed but no terminal verdict yet. R17 has not replaced that
+running checkout. No broad Non-live or Fresh rerun has been started.
+
+Follow-up fixed `6ad03726` adds bounded per-file getStatus reads and permits
+them in read_only mode; its 27 focused checks passed in 3.98 seconds. It is not
+yet integrated in R17. Fixed `5d7213cb` prepares Switch/State same-create native
+acceptance and adds class-ID observations to the existing owned-list collector;
+its separate 13-case focused slices are preparation evidence only. No native
+process was launched for those changes.
 
 ## Standing completion rules
 
