@@ -320,6 +320,8 @@ def _complete_business_draft(
 def _complete_core_result_schema_draft(
     runtime: _WorkflowSandboxRuntime,
     draft: _BusinessDraft,
+    *,
+    allow_verified_setup: bool = False,
 ) -> dict[str, Mapping[str, Any]]:
     """Execute one Core business Draft and retain its explicit weak boundary."""
 
@@ -349,6 +351,9 @@ def _complete_core_result_schema_draft(
     executed = runtime.gateway(["execute", transaction_id], live=True)
     verified = runtime.gateway(["verify", transaction_id], live=True)
     assert executed["state"] == TransactionState.EXECUTED_UNVERIFIED.value, executed
+    if allow_verified_setup and verified["state"] == TransactionState.VERIFIED.value:
+        assert verified["verification"]["business_state_verified"] is True, verified
+        return {"preview": preview, "execute": executed, "verify": verified}
     assert verified["state"] == "result_schema_checked", verified
     verification = verified.get("verification")
     assert isinstance(verification, Mapping), verified
@@ -2101,16 +2106,33 @@ def test_cli_console_business_object_dump(
 def test_cli_console_media_id_file_observation(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
+    _check_cli_media_id_storage(workflow_sandbox_runtime, migrate_before_capture=False)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_media_id_migrated_project_acceptance(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    _check_cli_media_id_storage(workflow_sandbox_runtime, migrate_before_capture=True)
+
+
+def _check_cli_media_id_storage(runtime: _WorkflowSandboxRuntime, *, migrate_before_capture: bool) -> None:
     """Verify central storage against the saved private sandbox's media rows.
 
     Run this terminal CLI node in its own lifecycle. The setup save establishes
     the baseline after normal fixture normalization and Wwise serialization;
     it grants no coverage credit to the media operation.
     """
-    runtime = workflow_sandbox_runtime
     project = runtime.sandbox.sandbox_project
     mapping = project.with_suffix(".mediaid")
     _save_sandbox_project(runtime)
+    migration = None
+    if migrate_before_capture:
+        setup = _start_business_draft(runtime, "ak.wwise.cli.migrate")
+        _update_business_draft(runtime, setup, "draft-declare-cli-console-plan",
+            ["--value", "project_file", str(project)], live=True)
+        migration = _complete_core_result_schema_draft(runtime, setup, allow_verified_setup=True)
     assert not mapping.exists(), "This case requires the original Work Unit storage fixture"
     work_units = sorted(project.parent.rglob("*.wwu"))
     assert len(work_units) <= 512
@@ -2131,12 +2153,21 @@ def test_cli_console_media_id_file_observation(
                     sample, sample_observation = path, candidate
     assert sample is not None, "A media-ID-free project cannot establish migration effects"
     observation = {
-        "category": "cli-media-id-file-format-observation", "status": "FAIL",
+        "category": ("cli-media-id-migrated-project" if migrate_before_capture
+                     else "cli-media-id-file-format-observation"), "status": "FAIL",
         "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
         "source_work_unit": sample_observation,
         "baseline_media_pairs": sorted(expected),
-        "baseline_setup": "public_gateway_project_save_before_capture",
+        "baseline_setup": ("public_gateway_save_then_migrate_before_capture" if migrate_before_capture
+                           else "public_gateway_project_save_before_capture"),
     }
+    if migration is not None:
+        observation["setup_migration"] = {
+            "transaction_id": migration["verify"]["transaction_id"],
+            "state": migration["verify"]["state"],
+            "business_state_verified": migration["verify"]["verification"]["business_state_verified"],
+            "coverage_credit": "none; baseline preparation only",
+        }
     runtime.category_results.append(observation)
     try:
         draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")

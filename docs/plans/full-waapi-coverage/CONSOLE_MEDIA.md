@@ -118,3 +118,27 @@ called a reported Console error, and strong success was described as unverified.
 The summary now distinguishes verified effects, unresolved effects, actual native
 errors and failed verification. Its public RED retained 2 failed / 2 passed;
 message controls and migration regression passed 14 cases in 7.00 seconds.
+
+The fixed `69d3439d` candidate subsequently passed the 2025.1 original saved-
+baseline case and its complete lifecycle (8.31 wall seconds). The same unchanged
+candidate failed that case on 2021.1–2024.1: all central mappings and storage-mode
+checks passed, but other saved model content differed. Every source/candidate
+remained unchanged; PASS cleanup deleted its sandbox, FAIL sandboxes remain
+quarantined, and every owned process ended. These results are not full #184
+acceptance and are not inherited by later candidates.
+
+Exact-baseline offline comparisons show additional differences: 2021 plugin
+inner lists and SoundSeed property representations; empty Bus references in
+2022; music custom-state entries in 2023/2024; and plugin data and Soundcaster
+RTPC lists in 2024. They are not all established equivalent representations.
+The preservation guard therefore remains unchanged for those cases.
+
+A separate existing-lifecycle case now explicitly saves and migrates its private
+fixture through public Gateway transactions before capturing the media-maintenance
+baseline. It preserves the original direct case rather than replacing its FAIL.
+Migration preparation may report schema-only effects and receives no business
+coverage credit; execution or verification errors still stop setup. The final
+media operation still requires strong verification, exact independent media rows
+and non-media preservation. The public injected-client controls prove ordering,
+preparation's truthful weak boundary and no retry on wrong output: initial
+2 failed / 1 passed / 1 deselected, then all 4 passed in 4.93 seconds.

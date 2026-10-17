@@ -1255,8 +1255,9 @@ def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_
     assert any(row["reason"] == expected for row in observed["boundaries"])
 
 
+@pytest.mark.parametrize("migrated", [False, True])
 @pytest.mark.parametrize("wrong_media", [False, True])
-def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, wrong_media):
+def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, wrong_media, migrated):
     from xml.etree import ElementTree as ET
     from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, saved_fixture_project
 
@@ -1268,6 +1269,12 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
                 tree.find(".//MediaID").set("ID", "123456")
                 tree.write(self.unit)
                 return {}
+            if uri == "ak.wwise.cli.migrate":
+                self.calls.append((uri, args, options))
+                tree = ET.parse(self.unit)
+                tree.find('.//Property[@Name="Volume"]/ValueList/Value').text = '-3'
+                tree.write(self.unit)
+                return {"result": 0}
             if uri == self.operation:
                 self.project_file.with_suffix(".mediaid").write_text('''<WwiseDocument Type="MediaIDs">
 <MediaIDInfo><MediaIDs><Language ID="393239870" Name="SFX"><File Name="Keep.wav">
@@ -1302,16 +1309,22 @@ def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_
 
     runtime = SimpleNamespace(gateway=gateway, version="2025.1", category_results=[],
         sandbox=SimpleNamespace(sandbox_project=client.project_file))
+    collect = (workflow.test_cli_console_media_id_migrated_project_acceptance if migrated
+               else workflow.test_cli_console_media_id_file_observation)
     if wrong_media:
         with pytest.raises(AssertionError):
-            workflow.test_cli_console_media_id_file_observation(runtime)
+            collect(runtime)
     else:
-        workflow.test_cli_console_media_id_file_observation(runtime)
+        collect(runtime)
     category, = runtime.category_results
     assert category["status"] == ("FAIL" if wrong_media else "PASS")
     assert category["mapping_file"]["content_base64"]
     assert category["source_work_unit_after"]["content_base64"]
     assert category["baseline_media_pairs"] == [["{33333333-3333-3333-3333-333333333333}", "123456"]]
-    writes = [uri for uri, _, _ in client.calls if uri.endswith("project.save") or uri == client.operation]
-    assert writes == ["ak.wwise.core.project.save", client.operation]
-    assert sum(command[0] == "execute" for command in commands) == 2
+    writes = [uri for uri, _, _ in client.calls if uri.endswith("project.save") or uri in {client.operation, "ak.wwise.cli.migrate"}]
+    assert writes == ["ak.wwise.core.project.save", *(["ak.wwise.cli.migrate"] if migrated else []), client.operation]
+    assert sum(command[0] == "execute" for command in commands) == (3 if migrated else 2)
+    if migrated:
+        assert category["baseline_setup"] == "public_gateway_save_then_migrate_before_capture"
+        assert category["setup_migration"]["state"] == "result_schema_checked"
+        assert category["setup_migration"]["business_state_verified"] is False
