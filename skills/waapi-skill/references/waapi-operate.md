@@ -46,7 +46,7 @@ Follow the sole `input_mode`, including Draft steps. Gateway owns native paths/t
 
 For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`; Gateway owns native construction. Configure defaults only when requested.
 
-Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. For dynamic fields, the returned `draft-discover-fields` scope also accepts `--list` (and returned `--page`) or `--selection` from that Draft/scope list; exact selection reads useful metadata and binds a Field Handle. Large fields expose bounded `metadata_detail` pages, including typed enum choices; use the relevant generated `next_command` when more detail is needed. Detail-page continuations preserve the resulting Draft revision. `--meaning` remains an auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
+Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. Returned `draft-discover-fields` accepts `--list`/returned `--page`, or a same-Draft/scope `--selection` to read metadata and bind a Field Handle. Large fields expose `metadata_detail` pages and typed enum choices through `next_command`, preserving the resulting Draft revision. `--meaning` is auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
@@ -148,8 +148,6 @@ Unless a trusted caller supplied an override, omit `--state-dir`; the Gateway ow
 - `allow_changes`: after Preview, announce the concrete impending change and continue.
 
 Preview's `policy_authorized` is separate durable authorization; no extra approval is needed.
-
-Prose covers objects, changes, results, risks and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands.
 
 ## Continue only from Gateway-owned commands
 

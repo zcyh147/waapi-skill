@@ -1041,3 +1041,63 @@ def test_public_versioned_query_outputs_preserve_native_values(tmp_path: Path, v
     assert code == 0, result
     assert client.calls == [("ak.wwise.core.object.get", {"waql": 'from object "' + object_id + '"'}, {"return": ["id", "name", "type", "path", native]})]
     assert result["agent_result"][0][output] == value
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("advanced", [False, True])
+@pytest.mark.parametrize("platform,language", [("Windows", "English(US)"),
+    ("{33333333-3333-3333-3333-333333333333}", "{44444444-4444-4444-4444-444444444444}")])
+def test_public_queries_compile_closed_platform_and_language_scopes(tmp_path: Path, version: str, advanced: bool, platform: str, language: str) -> None:
+    source = ["--advanced-waql", "from project", "--max-results", "3"] if advanced else ["--kind", "project", "--max-results", "3"]
+    client = _AdvancedQueryClient(version)
+    code, result = gateway.execute_gateway(["query-object", *source, "--platform", platform, "--language", language],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 0, result
+    assert client.calls[0][2] == {"return": ["id", "name", "type", "path"], "platform": platform, "language": language}
+    code, schema = gateway.execute_gateway(["query-schema", *( ["--advanced"] if advanced else [])], env=_env(tmp_path, version),
+        client_factory=lambda _: pytest.fail("query scope schema connected"))
+    assert code == 0, schema
+    assert schema["return_scope"]["platform"]["cli"] == "--platform <exact name or GUID>"
+    assert schema["return_scope"]["platform"]["omitted"] == "current Wwise platform"
+    assert schema["return_scope"]["language"]["cli"] == "--language <exact name or GUID>"
+
+
+@pytest.mark.parametrize("argv", [
+    ["--platform", ""], ["--language", " "], ["--platform", "name\nother"],
+    ["--language", "声" * 200], ["--platform", "Windows", "--platform", "Mac"],
+    ["--language", "SFX", "--language", "English(US)"],
+])
+def test_query_return_scope_rejects_unusable_or_repeated_selection_before_transport(tmp_path: Path, argv: list[str]) -> None:
+    code, result = gateway.execute_gateway(["query-object", "--kind", "project", "--max-results", "1", *argv],
+        env=_env(tmp_path, "2025.1"), client_factory=lambda _: pytest.fail("invalid return scope connected"))
+    assert code == 2, result
+    assert result["error_code"] == "GatewayInputError"
+
+
+def test_query_generated_event_hop_preserves_return_scope(tmp_path: Path) -> None:
+    event_id = "{22222222-2222-2222-2222-222222222222}"
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            return {"return": [{"id": event_id, "name": "Play", "type": "Event", "path": r"\Events\Play"}]}
+    client = Client("2025.1")
+    code, result = gateway.execute_gateway(["query-object", "--exact-id", event_id, "--platform", "Windows", "--language", "SFX"],
+        env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["continuations"][0]["next_command"]["gateway_argv"] == ["query-object", "--platform", "Windows", "--language", "SFX", "--exact-id", event_id, "--relationship", "event-actions"]
+
+
+def test_original_file_reference_scan_compiles_requested_return_scope(tmp_path: Path) -> None:
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            return {"return": []}
+    client = Client("2025.1")
+    code, result = gateway.execute_gateway(["query-object", "--match-original-file-path", "/owned/source.wav", "--max-results", "1000", "--platform", "Windows", "--language", "SFX"],
+        env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
+    assert code == 0, result
+    assert client.calls[0][2] == {"return": ["id", "path", "originalFilePath"], "platform": "Windows", "language": "SFX"}

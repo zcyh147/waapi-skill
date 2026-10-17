@@ -287,15 +287,16 @@ def _materialize_peaks(
             f"peak_pair_count must be an integer from 1 through {MAX_PEAK_PAIR_COUNT}"
         )
     channel_mode = plan.get("channel_mode", "per-channel")
-    if channel_mode not in {"per-channel", "cross-channel"}:
+    if channel_mode not in {"per-channel", "cross-channel", "native-default"}:
         raise MediaBuildBusinessError(
-            "channel_mode must be per-channel or cross-channel"
+            "channel_mode must be per-channel, cross-channel or native-default"
         )
     args: dict[str, Any] = {
         "object": source_id,
         "numPeaks": count,
-        "getCrossChannelPeaks": channel_mode == "cross-channel",
     }
+    if channel_mode != "native-default":
+        args["getCrossChannelPeaks"] = channel_mode == "cross-channel"
     business_request: dict[str, Any] = {
         "audio_source_id": source_id,
         "peak_pair_count": count,
@@ -679,6 +680,23 @@ def _normalize_peaks_result(raw_result: Any, plan: Mapping[str, Any]) -> dict[st
             "peak result must be an object",
             code="MEDIA_BUILD_RESULT_INVALID",
         )
+    fields = ("numChannels", "peaksArrayLength", "peaksBinaryStrings", "peaksDataSize", "maxAbsValue")
+    # Native schemas make these fields optional. Present counters still have
+    # to be usable integer facts before a partial observation is accepted.
+    for field in ("numChannels", "peaksArrayLength", "peaksDataSize"):
+        if field in raw_result:
+            _whole_number(raw_result[field], field=field)
+    missing = [field for field in fields if field not in raw_result]
+    if missing:
+        return {
+            "contract": MEDIA_BUILD_RESULT_CONTRACT,
+            "kind": "peak_observation",
+            "projection_complete": False,
+            "decode_available": False,
+            "decode_unavailable_reason": "missing_native_fields",
+            "unavailable_fields": missing,
+            "native_result": dict(raw_result),
+        }
     count = _whole_number(raw_result.get("peaksArrayLength"), field="peaksArrayLength")
     requested = int(plan["requested_peak_pair_count"])
     if count > requested:
@@ -700,9 +718,9 @@ def _normalize_peaks_result(raw_result: Any, plan: Mapping[str, Any]) -> dict[st
         )
     data_size = _whole_number(raw_result.get("peaksDataSize"), field="peaksDataSize")
     maximum = _finite_number(raw_result.get("maxAbsValue"), field="maxAbsValue")
-    if maximum <= 0:
+    if maximum < 0:
         raise MediaBuildBusinessError(
-            "peak result maxAbsValue must be positive",
+            "peak result maxAbsValue must be nonnegative",
             code="MEDIA_BUILD_RESULT_INVALID",
         )
     channel_rows: list[dict[str, Any]] = []
@@ -725,12 +743,28 @@ def _normalize_peaks_result(raw_result: Any, plan: Mapping[str, Any]) -> dict[st
                 "peak binary byte count does not match peaksDataSize and peaksArrayLength",
                 code="MEDIA_BUILD_RESULT_INVALID",
             )
+        if maximum == 0:
+            if any(decoded):
+                raise MediaBuildBusinessError(
+                    "peak result has nonzero samples with a zero maxAbsValue",
+                    code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            continue
         values = struct.unpack(f"<{count * 2}h", decoded)
         pairs = [
             [values[offset] / maximum, values[offset + 1] / maximum]
             for offset in range(0, len(values), 2)
         ]
         channel_rows.append({"channel_index": index, "pairs_normalized": pairs})
+    if maximum == 0:
+        return {
+            "contract": MEDIA_BUILD_RESULT_CONTRACT,
+            "kind": "peak_observation",
+            "projection_complete": False,
+            "decode_available": False,
+            "decode_unavailable_reason": "zero_normalization_divisor",
+            "native_result": dict(raw_result),
+        }
     result: dict[str, Any] = {
         "contract": MEDIA_BUILD_RESULT_CONTRACT,
         "kind": "decoded_peaks",
@@ -867,7 +901,7 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
             code="MEDIA_BUILD_RESULT_INVALID",
         )
     exact_name = plan.get("exact_name_contains")
-    complete = True
+    complete = len(rows) < candidate_limit
     filtered = list(rows)
     if exact_name is not None:
         if len(rows) >= candidate_limit:
@@ -898,9 +932,15 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
     if isinstance(final_limit, int):
         filtered = filtered[:final_limit]
     projected: list[dict[str, Any]] = []
+    identity_projection_complete = True
     for index, row in enumerate(filtered):
         fixed: dict[str, Any] = {}
+        unavailable_fields: list[str] = []
         for native, business in (("Path", "path"), ("FileId", "file_id")):
+            if native not in row:
+                unavailable_fields.append(business)
+                identity_projection_complete = False
+                continue
             value = row.get(native)
             if not isinstance(value, str) or not value:
                 raise MediaBuildBusinessError(
@@ -934,16 +974,20 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
             else:
                 values[binding["key"]] = row[binding["field"]]
         projected.append({**fixed, "values": values,
+                          **({"unavailable_fields": unavailable_fields} if unavailable_fields else {}),
                           **({"unavailable_values": unavailable_values} if unavailable_values else {})})
     return {
         "contract": MEDIA_BUILD_RESULT_CONTRACT,
         "kind": "media_pool_rows",
+        **({"projection_complete": False} if not identity_projection_complete else {}),
         "complete": complete,
         "candidate_count": len(rows),
         "returned_count": len(projected),
         "candidate_limit": candidate_limit,
         "incomplete_reason": (
             "candidate_limit_reached_before_exact_case_post_filter"
+            if not complete and exact_name is not None
+            else "candidate_limit_reached"
             if not complete
             else None
         ),

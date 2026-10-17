@@ -113,8 +113,9 @@ def test_machine_readable_agent_result_is_terminal_for_fixed_reads_and_transacti
     assert "For successful fixed reads or transactions" in SKILL
     assert "Never reconstruct fields" in SKILL
     assert "or run another command" in SKILL
-    assert "Use live `metadata types`" in QUERY
-    assert "projection and bound are fixed" in QUERY
+    for route in ("`metadata types`", "`metadata list`", "`metadata detail --selection`"):
+        assert route in QUERY
+    assert "Gateway owns detail level, search bounds, projection" in QUERY
 
 
 def test_media_pool_reference_classification_uses_one_closed_versioned_query() -> None:
@@ -218,12 +219,13 @@ def test_skill_entry_fits_the_fresh_codex_bootstrap_window() -> None:
 def test_exact_identity_query_is_complete_in_entry_file() -> None:
     assert "one literal `--path-segment` per hierarchy level" in SKILL
     assert "`--exact-id '<exact-guid>'`" in SKILL
-    assert "always returns the four identity fields" in SKILL
+    assert "requests `id,name,type,path`; absent facts cannot certify mutation targets" in SKILL
     assert "Exact `not_found` stays Gateway-owned in compact output" in SKILL
     assert "use `--detail` only for explicit compile/dispatch diagnostics" in SKILL
     assert "do not read the query reference before or after it" in SKILL
     assert "Conditional read for a query not fully covered" in SKILL
-    assert "Identity fields are always" in QUERY
+    assert "Identity projections always request `id,name,type,path`" in QUERY
+    assert "`identity_completeness.complete=false`" in QUERY
 
 
 def test_multihop_query_reads_reference_before_a_fast_looking_first_hop() -> None:
