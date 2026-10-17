@@ -16,6 +16,74 @@ def sealed(path, **extra):
     return {'artifact': str(path), 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(), **extra}
 
 
+def test_original_move_single_attachment_uses_product_ledger_and_preserves_candidate_boundary(tmp_path):
+    import os
+    program_root = os.environ.get('WAAPI_MEDIA_ID_PROGRAM_CAPTURE_ROOT')
+    native_root = os.environ.get('WAAPI_MEDIA_ID_ORIGINAL_NATIVE_ROOT')
+    if not program_root or not native_root:
+        pytest.skip('Requires preserved original product program/native receipts; no synthetic product credit')
+    from tests.support.media_id_branch_evidence import attach_original_media_id_native
+    from tests.maintenance import branch_coverage_audit as audit
+    program = Path(program_root) / '2025.1'
+    native = Path(native_root)
+    category = sealed(native / 'category.jsonl', record_index=1, nodeid=
+        'tests/destructive/test_gateway_workflow_transaction_matrix.py::test_cli_console_media_id_file_observation')
+    dispatch = next(native.rglob('*-ak_wwise_cli_moveMediaIdsToSingleFile.json'))
+    original_category = completion.read_category_run(category, tmp_path)['record']
+    observation = next(row for row in original_category['categories'] if row['category'] == 'cli-media-id-file-format-observation')
+    events = next(native.rglob(observation['transaction_id'] + '/events.jsonl'))
+    event_rows = [json.loads(line) for line in events.read_bytes().splitlines()]
+    event_index = next(index for index, row in enumerate(event_rows) if row['event_type'] == 'verification_recorded')
+    inventory = audit.build_inventory()
+    # Keep static original bytes below this checkout so the existing reader can
+    # resolve the original Git object without adding a checkout or Git shim.
+    output = Path(program_root).resolve() / 'reader-controls' / tmp_path.parent.name / tmp_path.name
+    attached = attach_original_media_id_native(output, program,
+        category=category, dispatch=sealed(dispatch), verification=sealed(events, record_index=event_index), inventory=inventory)
+    branch_id, binding = next(iter(attached['bindings']['bindings'].items()))
+    branch = next(row for row in inventory['native_coverage']['obligations'] if row['id'] == branch_id)
+    candidate = inventory['native_coverage']['candidate_sha256']
+    assert completion.evidence_result(binding['evidence']['program'], branch, candidate, 'program', 'product',
+        tmp_path, binding, source_root=audit.ROOT) == ('passed', None)
+    assert completion.evidence_result(binding['evidence']['native'], branch, attached['original_candidate_sha256'],
+        'native', 'product', tmp_path, attached['original_binding'], source_root=Path(attached['original_source_root'])) == ('passed', None)
+    outcome, reason = completion.evidence_result(binding['evidence']['native'], branch, candidate, 'native', 'product',
+        tmp_path, binding, source_root=audit.ROOT)
+    assert outcome == 'missing' and reason in {'equivalence relevant source changed',
+        'equivalence omits original relevant source/behavior dependencies'}
+    result = completion.evaluate_coverage(audit.ROOT, inventory, attached['bindings'], digest=audit.digest,
+        requirements_document=attached['requirements'])
+    target = next(row for row in result['obligations'] if row['id'] == branch_id)
+    assert result['scope_kind'] == 'product' and result['completion']['complete'] is False
+    assert target['state'] == 'implemented_unverified' and target['requirements'] == ['native', 'program']
+    assert target['evidence_results']['program']['outcome'] == 'passed'
+    assert target['evidence_results']['native']['outcome'] == 'missing'
+    assert len(result['obligations']) == len(inventory['native_coverage']['obligations'])
+    assert category == sealed(native / 'category.jsonl', record_index=1, nodeid=category['nodeid'])
+    # Corruption controls retain the original receipts and use the real reader.
+    with pytest.raises(ValueError, match='finalized PASS'):
+        completion.read_category_run({**category, 'record_index': 0}, tmp_path)
+    native_record = completion.read_sealed_artifact(binding['evidence']['native'], tmp_path)
+    broken = deepcopy(native_record)
+    broken['native_runs'][0]['observation_sha256'] = []
+    broken_path = tmp_path / 'missing-original-links.json'
+    broken_path.write_text(json.dumps(broken))
+    assert completion.evidence_result(sealed(broken_path, nodeid=category['nodeid']), branch,
+        attached['original_candidate_sha256'], 'native', 'product', tmp_path, attached['original_binding'],
+        source_root=Path(attached['original_source_root'])) == ('missing', 'native exact node observation links missing')
+    bad_binding = deepcopy(attached['original_binding'])
+    bad_binding['relevant_sources'].remove('skills/waapi-skill/scripts/gateway.py')
+    assert completion.evidence_result(binding['evidence']['native'], branch, attached['original_candidate_sha256'],
+        'native', 'product', tmp_path, bad_binding, source_root=Path(attached['original_source_root']))[0] == 'missing'
+    broken_dispatch = tmp_path / 'changed-result.json'
+    dispatched = completion.read_sealed_artifact(sealed(dispatch), tmp_path)
+    dispatched['result'] = {'result': 0}
+    broken_dispatch.write_text(json.dumps(dispatched))
+    with pytest.raises(ValueError, match='dispatcher/result mismatch'):
+        attach_original_media_id_native(tmp_path / 'bad-result-attachment', program,
+            category=category, dispatch=sealed(broken_dispatch), verification=sealed(events, record_index=event_index), inventory=inventory)
+
+
 def test_existing_category_v3_positive_and_forged_host_negative(tmp_path):
     path = FIXTURES / 'category-v3.json'
     original = json.loads(path.read_text())
