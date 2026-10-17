@@ -267,6 +267,7 @@ class BusinessDeclarationSession:
         normalized = _normalize_fields(
             settings,
             draft_revision=self.revision,
+            authoring_model_version=self.context.wwise_version,
         )
         if normalized == self.settings:
             raise business_repair(
@@ -349,7 +350,17 @@ class BusinessDeclarationSession:
         }
         if len(canonical_json_bytes(payload)) > MAX_BUSINESS_SESSION_BYTES:
             raise ValueError("business declaration session exceeds its fixed byte limit")
-        normalized = strict_json_copy(payload)
+        # Model constructors have their own bounded depth/node grammar. Keep
+        # every other session field under the ordinary strict JSON depth guard.
+        from .authoring_model_business import MODEL_OPERATIONS
+        binding = self.settings.get("authoring_model_binding")
+        if (set(self.settings) == {"authoring_model_plan", "authoring_model_binding"}
+                and isinstance(binding, Mapping) and binding.get("operation") in MODEL_OPERATIONS):
+            settings = _normalize_fields(self.settings, authoring_model_version=self.context.wwise_version)
+            normalized = strict_json_copy({**payload, "settings": {}})
+            normalized["settings"] = settings
+        else:
+            normalized = strict_json_copy(payload)
         assert isinstance(normalized, dict)
         return normalized
 
@@ -394,7 +405,7 @@ class BusinessDeclarationSession:
             if isinstance(declaration.target, NewDescendantTarget):
                 planned_handles.add(declaration.result_handle)
         declarations = tuple(declarations_list)
-        settings = _normalize_fields(payload.get("settings"))
+        settings = _normalize_fields(payload.get("settings"), authoring_model_version=context.wwise_version)
         ids = tuple(row.declaration_id for row in declarations)
         if len(ids) != len(set(ids)) or revision < len(declarations):
             raise ValueError("business declaration ids or revision are invalid")
@@ -698,6 +709,7 @@ def _normalize_fields(
     fields: Any,
     *,
     draft_revision: int | None = None,
+    authoring_model_version: str | None = None,
 ) -> dict[str, Any]:
     if not isinstance(fields, Mapping) or len(fields) > MAX_BUSINESS_DECLARATION_FIELDS:
         raise business_repair(
@@ -706,6 +718,22 @@ def _normalize_fields(
             draft_revision=draft_revision,
             action="provide one bounded object of stable business fields",
         )
+    if authoring_model_version is not None and set(fields) == {"authoring_model_plan", "authoring_model_binding"}:
+        from .authoring_model_business import MODEL_OPERATIONS, validate_model_plan, model_resource_roles
+        binding = fields["authoring_model_binding"]
+        if isinstance(binding, Mapping) and binding.get("operation") in MODEL_OPERATIONS and binding.get("plan") == fields["authoring_model_plan"]:
+            operation = binding["operation"]
+            plan = validate_model_plan(operation, authoring_model_version, fields["authoring_model_plan"])
+            expected_resources = set(model_resource_roles(operation))
+            if operation == "ak.wwise.ui.model.registerWafm":
+                expected_resources.add("registration_name")
+                if plan.get("registration_medium", "inline") == "file": expected_resources.add("wafm_file")
+            if (set(binding) != {"operation", "context", "plan", "resources", "sha256"}
+                    or not isinstance(binding["context"], Mapping) or not isinstance(binding["resources"], Mapping)
+                    or set(binding["resources"]) != expected_resources
+                    or canonical_sha256({key: value for key, value in binding.items() if key != "sha256"}) != binding["sha256"]):
+                raise ValueError("Authoring model settings require their exact sealed business binding")
+            return strict_json_copy(dict(fields), maximum_depth=64)
     normalized: dict[str, Any] = {}
     for name, value in fields.items():
         if not isinstance(name, str) or not _BUSINESS_FIELD.fullmatch(name):

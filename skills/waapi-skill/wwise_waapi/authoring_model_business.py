@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .canonical import canonical_sha256
-from .authoring_wafm import compile_template, widget_catalog, value_schema, compile_value, text
+from .authoring_wafm import compile_template, widget_catalog, value_schema, compile_value, text, template_constructor_schemas, attribute_assignment_schema, compile_template_registration, select_registered_template
 
 VERSIONS = ('2024.1', '2025.1')
 PREFIX = 'ak.wwise.ui.'
@@ -51,27 +51,37 @@ def model_business_contract(operation: str, version: str) -> dict[str, Any]:
                   'width': {'type': 'integer', 'minimum': 1}, 'height': {'type': 'integer', 'minimum': 1}}
     required = ['title', 'width', 'height']
     if operation == PREFIX + 'model.registerWafm':
+        constructors = template_constructor_schemas(version)
         properties = {'template_key': {'type': 'string', 'minLength': 1}, 'root_widget': {'type': 'string'},
-            'widgets': {'type': 'array', 'maxItems': 2048, 'items': {'type': 'object'}},
-            'layouts': {'type': 'array', 'maxItems': 2048, 'items': {'type': 'object'}},
+            'widgets': {'type': 'array', 'maxItems': 2048, 'items': constructors['widget']},
+            'layouts': {'type': 'array', 'maxItems': 2048, 'items': constructors['layout']},
+            'registration_medium': {'enum': ['inline', 'file']},
             'registration_form': {'enum': ['template_attribute', 'named_template']},
             'template_version': {'type': 'integer', 'minimum': 1}, 'metadata': value_schema()}
-        required = ['template_key', 'root_widget', 'widgets', 'layouts']
+        unit_properties = {key: value for key, value in properties.items() if key not in {'registration_medium', 'registration_form'}}
+        properties['templates'] = {'type': 'array', 'maxItems': 128, 'items': {
+            'type': 'object', 'additionalProperties': False, 'required': ['template_key', 'root_widget', 'widgets', 'layouts'], 'properties': unit_properties}}
+        required = []
     if operation in {PREFIX + 'window.present', PREFIX + 'window.close'}:
         properties = {'window': {'type': 'string', 'pattern': '^ar1-[0-9a-f]{32}$'}}
         required = ['window']
     if operation == PREFIX + 'model.createHandle':
         properties = {'window': {'type': 'string', 'pattern': '^ar1-[0-9a-f]{32}$'},
-                      'template': {'type': 'string', 'pattern': '^ar1-[0-9a-f]{32}$'}}
+                      'template': {'type': 'string', 'pattern': '^ar1-[0-9a-f]{32}$'}, 'template_key': {'type': 'string', 'minLength': 1}}
         required = ['window', 'template']
     if operation in {PREFIX + 'model.destroyHandle', MODEL_READ_URI, PREFIX + 'model.setState', PREFIX + 'signal.emit'}:
         properties = {'model': {'type': 'string', 'pattern': '^ar1-[0-9a-f]{32}$'}}
         required = ['model']
         if operation in {MODEL_READ_URI, PREFIX + 'model.setState'}:
-            properties['widgets'] = {'type': 'array', 'maxItems': 2048, 'items': {'type': 'object'}}
+            attribute = {'type': 'string', 'minLength': 1, 'maxLength': 8192} if operation == MODEL_READ_URI else attribute_assignment_schema()
+            properties['widgets'] = {'type': 'array', 'maxItems': 2048, 'items': {
+                'type': 'object', 'additionalProperties': False, 'required': ['widget', 'attributes'],
+                'properties': {'widget': {'type': 'string', 'minLength': 1},
+                    'attributes': {'type': 'array', 'maxItems': 128, 'items': attribute}}}}
             required.append('widgets')
         if operation == PREFIX + 'signal.emit':
-            properties.update(widget={'type': 'string', 'minLength': 1}, signal={'enum': ['click', 'toggle']})
+            properties.update(widget={'type': 'string', 'minLength': 1}, signal={'oneOf': [{'enum': ['click', 'toggle']}, {'type': 'object', 'additionalProperties': False,
+                'required': ['topic_uri'], 'properties': {'topic_uri': {'type': 'string', 'minLength': 1, 'maxLength': 8192}}}]})
             required.extend(['widget', 'signal'])
     return {'contract': 'waapi-skill.authoring-model-business/v1', 'operation': operation,
         'version': version, 'input_mode': 'business_declaration', 'execution_shape': 'transaction',
@@ -81,22 +91,31 @@ def model_business_contract(operation: str, version: str) -> dict[str, Any]:
         'declaration': {'subcommand': 'draft-declare-model-plan', 'settings_field': 'authoring_model_plan',
             'submit_once': True, 'required_fields': ['plan'], 'optional_fields': [],
             'input_forms': {'plan': {'gateway_flag': '--plan', 'shape': 'json'}},
-            'schema': {'type': 'object', 'additionalProperties': False, 'required': required, 'properties': properties}},
+            'schema': {'type': 'object', 'additionalProperties': False, 'required': required, 'properties': properties,
+                'definitions': constructors['definitions'] if operation == PREFIX + 'model.registerWafm' else {'businessValue': value_schema()},
+                **({'oneOf': [{'required': ['template_key', 'root_widget', 'widgets', 'layouts'], 'not': {'required': ['templates']}},
+                    {'required': ['templates'], 'not': {'anyOf': [{'required': [key]} for key in ('template_key', 'root_widget', 'widgets', 'layouts', 'metadata', 'template_version', 'registration_form')]}}]}
+                   if operation == PREFIX + 'model.registerWafm' else {})}},
         'responsibility_split': {'agent': ['choose the window, model and widget business outcome'],
             'gateway': ['construct native payload', 'bind owned resources to configuration and live host session',
                         'execute at most once after authorization', 'retain unknown native effects explicitly']},
         'gateway_derivations': ['native request envelope', 'owned native identifiers', 'resource lifetime'],
-        'resource_lifetime': {'ownership': 'gateway_created_only', 'scope': 'configuration_host_build_session_project',
+        'resource_lifetime': {'ownership': 'gateway_created_only',
+            'ownership_recovery': ['authoring-resource', '<creation_transaction_id>'], 'scope': 'configuration_host_build_session_project',
             'cleanup': 'separately_previewed_owned_close_or_destroy', 'unknown_creation': 'never_retry'},
         'effect_verification': {'native_effect_evidence': 'required_unfinished',
-            'window_effect': 'native_result_does_not_establish_visible_or_closed_window'},
+            'window_effect': 'native_result_does_not_establish_visible_or_closed_window',
+            'signal_delivery': 'emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission',
+            'exact_topic_semantics': 'native accepts or rejects the selected URI; no availability is inferred from its spelling'},
         **({'construction': {'widget_kinds': widget_catalog(version),
             'widget': {'required': ['key', 'kind'], 'optional': ['attributes']},
             'attribute': {'required': ['attribute', 'value'], 'value': value_schema()},
             'layout': {'required': ['key', 'kind', 'children'], 'optional': ['attributes', 'splitters'],
-                'kinds': ['AnchorLayout', 'BinLayout', 'GroupBox', 'OverflowHBox', 'SplitLayout', 'DockWidgetArea']},
+                'kinds': constructors['layout_catalog']},
             'child': {'choose_one': ['widget', 'layout'], 'optional': ['positions', 'anchors', 'section', 'width', 'minimum_size']},
-            'native_schema_validation': 'complete_reachable_definitions', 'native_file_alternative': 'unfinished_owned_file_authority'}}
+            'limits': {'construction_depth': 16, 'construction_nodes': 2048, 'plan_utf8_bytes': 262144},
+            'root_layout_scope': '2024.1 only AnchorLayout; 2025.1 permits AnchorLayout, BinLayout, GroupBox, OverflowHBox, SplitLayout',
+            'native_schema_validation': 'complete_reachable_definitions', 'native_file_alternative': 'Gateway_owned_generated_WAFM_artifact_with_immutable_file_proof'}}
            if operation == PREFIX + 'model.registerWafm' else {}),
         'safety': {'immutable_preview': True, 'single_execute': True, 'authoring_host_required': True,
                    'native_request_fields': 'gateway_owned', 'automatic_retry': False}}
@@ -127,11 +146,22 @@ def compile_model_plan(operation: str, version: str, plan: Any, resources: Mappi
         name = resources.get('registration_name')
         if not isinstance(name, str) or not name.startswith('Gateway_'):
             raise ValueError('Template registration requires its frozen Gateway-owned namespace')
-        return {'wafm': compile_template(plan, version=version, template_name=name)}
+        wafm = compile_template_registration(plan, version=version, namespace=name)
+        if plan.get('registration_medium', 'inline') == 'file':
+            from .operation_import import verify_regular_file_proof
+            from .canonical import canonical_json_bytes
+            import hashlib
+            proof = resources.get('wafm_file')
+            if not isinstance(proof, Mapping) or proof.get('sha256') != hashlib.sha256(canonical_json_bytes(wafm) + b'\n').hexdigest():
+                raise ValueError('Owned WAFM artifact differs from its complete closed template construction')
+            verify_regular_file_proof(proof, field='owned_wafm_file')
+            return {'wafm': proof['path']}
+        return {'wafm': wafm}
     if operation == PREFIX + 'model.createHandle':
         window = require_model_resource(plan, resources, 'window', 'window')
         template = require_model_resource(plan, resources, 'template', 'template')
-        return {'container': window['native_id'], 'template': template['native_id']}
+        _, native_name = select_registered_template(template, plan.get('template_key'))
+        return {'container': window['native_id'], 'template': native_name}
     if operation in {PREFIX + 'model.destroyHandle', MODEL_READ_URI, PREFIX + 'model.setState', PREFIX + 'signal.emit'}:
         model = require_model_resource(plan, resources, 'model', 'model')
         native = {'handleID': model['native_id']}
@@ -140,11 +170,10 @@ def compile_model_plan(operation: str, version: str, plan: Any, resources: Mappi
         known = {row['key']: row for row in widgets}
         if operation == PREFIX + 'signal.emit':
             widget = require_owned_widget(model, plan['widget'])
-            valid = {'click': {'PushButton', 'RadioButton', 'ButtonGroup'},
-                     'toggle': {'ToggleButton', 'Checkbox', 'ButtonGroup'}}
-            if widget['kind'] not in valid[plan['signal']]:
-                raise ValueError('Selected widget kind does not emit the selected signal')
-            return {**native, 'widgetID': plan['widget'], 'signal': PREFIX + 'signal.' + plan['signal']}
+            # Topic descriptions describe usual producers, not emit receiver restrictions.
+            signal = plan['signal']
+            uri = text(signal['topic_uri'], 'Exact signal Topic URI') if isinstance(signal, Mapping) else PREFIX + 'signal.' + signal
+            return {**native, 'widgetID': plan['widget'], 'signal': uri}
         state = []
         seen = set()
         for row in plan['widgets']:
@@ -183,9 +212,17 @@ def materialize_model_business(operation: str, session: Any) -> Mapping[str, Any
 
 
 def validate_model_call(version: str, operation: str, args: Mapping[str, Any], options: Mapping[str, Any], binding: Any) -> None:
-    if not isinstance(binding, Mapping) or set(binding) != {'context', 'plan', 'resources', 'sha256'}:
+    if not isinstance(binding, Mapping) or set(binding) != {'operation', 'context', 'plan', 'resources', 'sha256'} or binding.get('operation') != operation:
         raise ValueError('Authoring operation requires its Gateway-owned business binding')
     body = {k: v for k, v in binding.items() if k != 'sha256'}
+    expected = set(model_resource_roles(operation)) | ({'registration_name'} if operation == PREFIX + 'model.registerWafm' else set())
+    if operation == PREFIX + 'model.registerWafm' and binding['plan'].get('registration_medium', 'inline') == 'file':
+        expected.add('wafm_file')
+    if not isinstance(binding['resources'], Mapping) or set(binding['resources']) != expected:
+        raise ValueError('Authoring operation has incomplete or extra resource bindings')
+    for field in model_resource_roles(operation):
+        if binding['resources'][field].get('context') != binding['context']:
+            raise ValueError('Authoring resource bindings must share their exact configuration/host/session/project')
     if canonical_sha256(body) != binding['sha256'] or options or args != compile_model_plan(operation, version, binding['plan'], binding['resources']):
         raise ValueError('Authoring native request differs from its sealed business declaration')
 
@@ -230,9 +267,50 @@ def canonical_state_result(result: Any, query: Mapping[str, Any]) -> dict[str, d
             raise ValueError('State observation has missing, duplicate, extra or malformed widgets')
         attributes = {}
         for item in row['state']:
-            if not isinstance(item, Mapping) or set(item) != {'attribute', 'value'} or item['attribute'] not in expected[row['widgetID']] or item['attribute'] in attributes:
+            if not isinstance(item, Mapping) or not {'attribute', 'value'} <= set(item) or item['attribute'] not in expected[row['widgetID']] or item['attribute'] in attributes:
                 raise ValueError('State observation has missing, duplicate, extra or malformed attributes')
             attributes[item['attribute']] = item['value']
         if set(attributes) != set(expected[row['widgetID']]): raise ValueError('State observation omitted attributes')
         actual[row['widgetID']] = attributes
     return actual
+
+
+def creation_resource_receipt(request: Mapping[str, Any], execution_result: Mapping[str, Any], *,
+    transaction_id: str, context: Mapping[str, Any], store: Any) -> dict[str, Any]:
+    import re
+    operation = request['arguments']['api']
+    binding = request['arguments']['model_binding']
+    if binding['context'] != context or execution_result.get('ok') is not True:
+        raise ValueError('Creation ownership recovery requires the exact successful dispatch and unchanged Authoring session')
+    result = execution_result.get('result')
+    if not isinstance(result, Mapping): raise ValueError('Creation did not return a recoverable native identity')
+    if operation == PREFIX + 'model.registerWafm':
+        if result.get('success') is not True:
+            raise ValueError('Rejected template registration cannot become an owned template')
+        kind = 'template'
+        native_id = binding['resources']['registration_name']
+    elif operation in {PREFIX + 'window.create', PREFIX + 'model.createHandle'}:
+        kind = 'window' if operation.endswith('window.create') else 'model'
+        native_id = result.get('windowID' if kind == 'window' else 'handleID')
+        if not isinstance(native_id, str) or not re.fullmatch(r'\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}', native_id):
+            raise ValueError('Creation returned no exact recoverable native GUID; never recreate the resource')
+    else:
+        raise ValueError('Only a recorded window/frontend creation or accepted template registration owns a resource')
+    description = dict(binding['plan']) if kind != 'model' else {
+        'template': select_registered_template(binding['resources']['template'], binding['plan'].get('template_key'))[0], 'window': binding['plan']['window']}
+    parents = [binding['plan']['window'], binding['plan']['template']] if kind == 'model' else []
+    receipt = store.issue(transaction_id=transaction_id, context=context, kind=kind,
+        native_id=native_id, description=description, parents=parents)
+    return {'resource_handle': receipt['handle'], 'resource_kind': kind, 'observable_effect_verified': False,
+        'cleanup_required': True, 'cleanup_route': (['request-schema', PREFIX + ('window.close' if kind == 'window' else 'model.destroyHandle')] if kind != 'template' else None),
+        'cleanup_mechanism': 'separately_previewed_owned_close' if kind != 'template' else 'Authoring_session_end_no_reflected_unregister_function',
+        'cleanup_complete': False, 'automatic_retry': False}
+
+
+def model_file_audit(binding: Mapping[str, Any]) -> dict[str, Any] | None:
+    proof = binding['resources'].get('wafm_file')
+    if proof is None: return None
+    return {'contract': 'waapi-skill.wwise-wire-path-input-audit/v1', 'uri': PREFIX + 'model.registerWafm',
+        'paths': [{'section': 'args', 'json_path': '$.args.wafm', 'field': 'wafm', 'role': 'read',
+                   'raw_path': proof['path'], 'resolved_path': proof['path']}],
+        'owned_artifact': True, 'source_sha256': proof['sha256']}

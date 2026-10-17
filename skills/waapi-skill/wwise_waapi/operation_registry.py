@@ -24,7 +24,8 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .layout_blueprint import declared_layout_matches, declared_layout_mismatches
-from .authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, validate_model_call, state_query_from_assignments, canonical_state_result
+from .authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, validate_model_call, state_query_from_assignments, canonical_state_result, model_file_audit
+from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
@@ -4265,6 +4266,8 @@ def _public_call_arguments(
             "waapi.call io_root is accepted only for isolated_transaction routes.",
             details={"api": api, "version": version, "route": contract.route},
         )
+    if api == 'ak.wwise.ui.model.registerWafm' and isinstance(raw_args.get('wafm'), str):
+        io_audit = model_file_audit(arguments['model_binding'])
     return api, dict(raw_args), dict(raw_options), {
         **contract.as_dict(),
         "request_validation": validation.as_dict(),
@@ -16091,7 +16094,7 @@ def verify_prepared_operation(
             valid_id = isinstance(value, str) and bool(re.fullmatch(r'\{[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\}', value))
             check('Frontend creation returned an owned native identity', valid_id, {'handleID': value})
             if valid_id:
-                widgets = plan['binding']['resources']['template']['description']['widgets']
+                widgets = select_registered_template(plan['binding']['resources']['template'], plan['binding']['plan'].get('template_key'))[0]['widgets']
                 query = {'handleID': value, 'state': [{'widgetID': row['key'], 'state': []} for row in widgets]}
                 observed_raw = read_call(MODEL_READ_URI, query, {})
                 canonical_state_result(observed_raw, query)

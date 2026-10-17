@@ -125,7 +125,7 @@ def _attributes(value: Any, *, allowed: set[str]) -> dict[str, Any]:
 
 
 def compile_template(plan: Mapping[str, Any], *, version: str, template_name: str) -> dict[str, Any]:
-    _object(plan, {'template_key', 'root_widget', 'widgets', 'layouts'}, {'registration_form', 'template_version', 'metadata'}, 'Template plan')
+    _object(plan, {'template_key', 'root_widget', 'widgets', 'layouts'}, {'registration_form', 'registration_medium', 'template_version', 'metadata'}, 'Template plan')
     text(plan['template_key'], 'Template key')
     root = text(plan['root_widget'], 'Root widget')
     if not isinstance(plan['widgets'], list) or not isinstance(plan['layouts'], list) or len(plan['widgets']) + len(plan['layouts']) > MAX_NODES:
@@ -204,3 +204,76 @@ def compile_template(plan: Mapping[str, Any], *, version: str, template_name: st
     # Reject native-schema permissiveness: all constructor fields are closed,
     # including attribute records whose native value branch is intentionally open.
     return wafm
+
+
+def layout_catalog(version: str) -> dict[str, Any]:
+    from .schema_inventory import load_authoring_definition_graph
+    graph = load_authoring_definition_graph(version)
+    result = {}
+    for name in graph.documents['wafm_definitions.json']['definitions']:
+        if name.endswith('Definition') and name not in {'wafmDefinition', 'widgetDefinition', 'layoutDefinition'}:
+            schema = _definition(version, name, graph=graph)
+            for kind in schema.get('properties', {}).get('Type', {}).get('enum', []):
+                result[kind] = {'attributes': {key: value for key, value in schema['properties'].items()
+                    if key not in {'Name', 'Type', 'Children', 'Splitters'}},
+                    'required_native_members': list(schema.get('required', []))}
+    return result
+
+
+def attribute_assignment_schema() -> dict[str, Any]:
+    return {'type': 'object', 'additionalProperties': False, 'required': ['attribute', 'value'],
+        'properties': {'attribute': {'type': 'string', 'minLength': 1, 'maxLength': MAX_TEXT}, 'value': value_schema()}}
+
+
+def template_constructor_schemas(version: str) -> dict[str, Any]:
+    assignment = attribute_assignment_schema()
+    assignments = {'type': 'array', 'maxItems': 128, 'items': assignment}
+    child = {'type': 'object', 'additionalProperties': False,
+        'properties': {'widget': {'type': 'string'}, 'layout': {'$ref': '#/definitions/businessLayout'},
+            'positions': {'type': 'array', 'minItems': 4, 'maxItems': 4, 'items': {'type': 'integer', 'minimum': 0}},
+            'anchors': {'type': 'array', 'items': {'enum': ['side-left', 'side-right', 'side-top', 'side-bottom', 'side-all']}},
+            'section': {'type': 'integer'}, 'width': {'type': 'integer', 'minimum': 1}, 'minimum_size': {'type': 'integer', 'minimum': 1}},
+        'oneOf': [{'required': ['widget']}, {'required': ['layout']}]}
+    layout = {'type': 'object', 'additionalProperties': False, 'required': ['key', 'kind', 'children'],
+        'properties': {'key': {'type': 'string', 'minLength': 1}, 'kind': {'enum': sorted(layout_catalog(version))},
+            'attributes': assignments, 'children': {'type': 'array', 'maxItems': MAX_NODES, 'items': child},
+            'splitters': {'type': 'array', 'maxItems': MAX_NODES, 'items': {'type': 'object', 'additionalProperties': False,
+                'required': ['key', 'attributes'], 'properties': {'key': {'type': 'string'}, 'attributes': assignments}}}}}
+    return {'widget': {'type': 'object', 'additionalProperties': False, 'required': ['key', 'kind'],
+        'properties': {'key': {'type': 'string', 'minLength': 1}, 'kind': {'enum': sorted(widget_catalog(version))}, 'attributes': assignments}},
+        'layout': layout, 'definitions': {'businessValue': value_schema(), 'businessLayout': layout},
+        'layout_catalog': layout_catalog(version)}
+
+
+def compile_template_registration(plan: Mapping[str, Any], *, version: str, namespace: str) -> dict[str, Any]:
+    from .canonical import canonical_sha256
+    if 'templates' not in plan:
+        return compile_template(plan, version=version, template_name=namespace)
+    _object(plan, {'templates'}, {'registration_medium'}, 'Template collection')
+    if not isinstance(plan['templates'], list) or len(plan['templates']) > 128:
+        raise ValueError('Registration requires at most 128 independently named template constructors')
+    result = {}
+    seen = set()
+    for unit in plan['templates']:
+        _object(unit, {'template_key', 'root_widget', 'widgets', 'layouts'}, {'template_version', 'metadata'}, 'Template collection item')
+        key = text(unit['template_key'], 'Template key')
+        if key in seen: raise ValueError('Template collection keys must be unique')
+        seen.add(key)
+        name = namespace + '.Template_' + canonical_sha256(key)[:24]
+        result.update(compile_template({**unit, 'registration_form': 'named_template'}, version=version, template_name=name))
+    from .builders.schema import validate_resolved_semantic_payload
+    validate_resolved_semantic_payload('ak.wwise.ui.model.registerWafm', {'wafm': result}, {}, version=version, authoring_ui_profile=True)
+    return result
+
+
+def select_registered_template(resource: Mapping[str, Any], key: str | None) -> tuple[Mapping[str, Any], str]:
+    from .canonical import canonical_sha256
+    plan = resource['description']
+    if 'templates' not in plan:
+        if key is not None and key != plan['template_key']: raise ValueError('Selected template key does not belong to this registration')
+        return plan, resource['native_id']
+    units = plan['templates']
+    if key is None and len(units) == 1: key = units[0]['template_key']
+    chosen = [unit for unit in units if unit['template_key'] == key]
+    if len(chosen) != 1: raise ValueError('Choose one exact template_key from the owned registration collection')
+    return chosen[0], resource['native_id'] + '.Template_' + canonical_sha256(key)[:24]

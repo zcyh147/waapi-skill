@@ -88,7 +88,7 @@ def test_owned_window_can_be_presented_then_closed_and_cannot_be_reused(tmp_path
     code, start = gateway.execute_gateway([*state, 'draft-start', PREFIX + 'window.present'], env=env)
     assert code == 0, start
     code, result = gateway.execute_gateway([*state, 'draft-declare-model-plan', start['draft']['draft_id'],
-        '--task-authority', start['task_authority'], '--expected-revision', '0', '--plan', json.dumps({'window': handle})],
+        '--task-authority', start['task_authority'], '--expected-revision', str(start['draft']['revision']), '--plan', json.dumps({'window': handle})],
         env=env, client_factory=lambda _: client)
     assert code != 0, result
     assert len([row for row in client.calls if row[0] == PREFIX + 'window.close']) == 1
@@ -174,3 +174,224 @@ def test_owned_model_state_roundtrip_uses_registered_widget_and_independent_read
     env, state, client, preview = model_preview(tmp_path, 'model.getState', {'model': model, 'widgets': [
         {'widget': 'Rain', 'attributes': ['Checked']}]}, version=version, client=client)
     confirm_execute_verify(env, state, client, preview)
+    # Emission is fixed to an owned widget but the native schema permits an
+    # exact Topic URI; producer descriptions are not receiver allowlists.
+    client.responses[PREFIX + 'signal.emit'] = {}
+    for signal in ['click', {'topic_uri': 'example.custom.signal'}]:
+        env, state, client, emitted = model_preview(tmp_path, 'signal.emit', {'model': model, 'widget': 'Rain', 'signal': signal}, version=version, client=client)
+        emission = confirm_execute_verify(env, state, client, emitted)
+        assert emission['verified'] is False
+    assert [row[1]['signal'] for row in client.calls if row[0] == PREFIX + 'signal.emit'] == [PREFIX + 'signal.click', 'example.custom.signal']
+    # Close cannot discard the owning window while its frontend is still active.
+    code, start = gateway.execute_gateway([*state, 'draft-start', PREFIX + 'window.close'], env=env)
+    code, rejected = gateway.execute_gateway([*state, 'draft-declare-model-plan', start['draft']['draft_id'],
+        '--task-authority', start['task_authority'], '--expected-revision', str(start['draft']['revision']), '--plan', json.dumps({'window': window})], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert PREFIX + 'window.close' not in [row[0] for row in client.calls]
+    env, state, client, preview = model_preview(tmp_path, 'model.destroyHandle', {'model': model}, version=version, client=client)
+    confirm_execute_verify(env, state, client, preview)
+    assert client.created_model is False
+    client.responses[PREFIX + 'window.close'] = {}
+    env, state, client, preview = model_preview(tmp_path, 'window.close', {'window': window}, version=version, client=client)
+    confirm_execute_verify(env, state, client, preview)
+
+
+def test_creation_identity_can_be_recovered_for_cleanup_when_effect_verification_fails(tmp_path):
+    client = LayoutClient(tmp_path)
+    client.responses[PREFIX + 'window.create'] = {'windowID': '{33333333-3333-3333-3333-333333333333}', 'unexpected': True}
+    env, state, client, preview = model_preview(tmp_path, 'window.create', {'title': 'Owned', 'width': 10, 'height': 10}, client=client)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, _ = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0
+    code, execution = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, execution
+    code, failed = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
+    assert code != 0 and failed['status'] == 'verification_failed', failed
+    code, recovered = gateway.execute_gateway([*state, 'authoring-resource', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, recovered
+    assert recovered['agent_result']['resource_handle'].startswith('ar1-')
+    assert recovered['agent_result']['observable_effect_verified'] is False
+    client.responses[PREFIX + 'window.close'] = {}
+    env, state, client, cleanup = model_preview(tmp_path, 'window.close', {'window': recovered['agent_result']['resource_handle']}, client=client)
+    confirm_execute_verify(env, state, client, cleanup)
+    assert len([row for row in client.calls if row[0] == PREFIX + 'window.create']) == 1
+
+
+@pytest.mark.parametrize('failure_stage', ['journal', 'atomic-retirement'])
+def test_failed_execution_journal_does_not_consume_an_undispatched_window(tmp_path, monkeypatch, failure_stage):
+    from wwise_waapi.transactions import TransactionStore
+    client = LayoutClient(tmp_path)
+    client.responses.update({PREFIX + 'window.create': {'windowID': '{33333333-3333-3333-3333-333333333333}'}, PREFIX + 'window.close': {}})
+    env, state, client, create = model_preview(tmp_path, 'window.create', {'title': 'Owned', 'width': 10, 'height': 10}, client=client)
+    handle = confirm_execute_verify(env, state, client, create)['agent_result']['business_result']['resource_handle']
+    env, state, client, close = model_preview(tmp_path, 'window.close', {'window': handle}, client=client)
+    tx = close['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    import wwise_waapi.transactions as transactions
+    original, original_writer = TransactionStore.begin_execution, transactions._atomic_write_json
+    def fail_begin(self, transaction_id, **kwargs):
+        raise OSError('injected durable execution journal failure')
+    def fail_retirement(path, payload):
+        if str(path).endswith('.consumed.json'):
+            raise OSError('injected atomic retirement failure')
+        return original_writer(path, payload)
+    if failure_stage == 'journal':
+        monkeypatch.setattr(TransactionStore, 'begin_execution', fail_begin)
+    else:
+        monkeypatch.setattr(transactions, '_atomic_write_json', fail_retirement)
+    code, failed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0 and 'failure' in failed['message'], failed
+    if failure_stage == 'atomic-retirement':
+        assert failed['native_dispatch_attempted'] is False and failed['automatic_retry'] is False
+    assert PREFIX + 'window.close' not in [row[0] for row in client.calls]
+    monkeypatch.setattr(TransactionStore, 'begin_execution', original)
+    monkeypatch.setattr(transactions, '_atomic_write_json', original_writer)
+    # A public declaration still resolves the live resource; the failed journal
+    # did not turn the unattempted close into a consumed handle.
+    model_preview(tmp_path, 'window.present', {'window': handle}, client=client)
+    if failure_stage == 'journal':
+        code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+        assert code == 0, executed
+    else:
+        # The exact original execution has a durable terminal no-dispatch failure;
+        # use a distinct authorized Preview rather than replaying that transaction.
+        env, state, client, replacement = model_preview(tmp_path, 'window.close', {'window': handle}, client=client)
+        confirm_execute_verify(env, state, client, replacement)
+    assert len([row for row in client.calls if row[0] == PREFIX + 'window.close']) == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+@pytest.mark.parametrize('operation', ['window.create', 'model.registerWafm', 'model.getState', 'signal.emit'])
+def test_older_captured_lanes_do_not_advertise_unlisted_native_routes(tmp_path, version, operation):
+    code, result = gateway.execute_gateway(['--version', version, 'request-schema', PREFIX + operation], env=gateway_env(tmp_path),
+        client_factory=lambda _: pytest.fail('offline route boundary opened a client'))
+    assert code != 0, result
+
+
+@pytest.mark.parametrize('mutation', ['unknown-field', 'invalid-enum', 'raw-value', 'unknown-widget', 'old-version-kind'])
+def test_malformed_template_constructors_fail_before_registration(tmp_path, mutation):
+    plan = rain_template()
+    if mutation == 'unknown-field': plan['widgets'][0]['native_json'] = {}
+    elif mutation == 'invalid-enum': plan['widgets'][0]['attributes'] = [{'attribute': 'PropertyType', 'value': {'kind': 'text', 'text': 'not-a-native-choice'}}]
+    elif mutation == 'raw-value': plan['widgets'][0]['attributes'] = [{'attribute': 'Text', 'value': {'Text': 'native dump'}}]
+    elif mutation == 'unknown-widget': plan['layouts'][0]['children'][0]['widget'] = 'Absent'
+    else: plan['widgets'][0]['kind'] = 'Image'
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version='2024.1')
+    client = LayoutClient(tmp_path, version='2024.1')
+    state = ['--state-dir', str(tmp_path / 'state')]
+    _, started = gateway.execute_gateway([*state, 'draft-start', PREFIX + 'model.registerWafm'], env=env)
+    code, rejected = gateway.execute_gateway([*state, 'draft-declare-model-plan', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(started['draft']['revision']), '--plan', json.dumps(plan)], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert PREFIX + 'model.registerWafm' not in [row[0] for row in client.calls]
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_owned_wafm_file_alternative_seals_and_dispatches_a_generated_data_file(tmp_path, version):
+    from pathlib import Path
+    from wwise_waapi.transactions import TransactionStore
+    client = ModelClient(tmp_path, version=version)
+    client.responses['ak.wwise.core.getInfo']['processPath'] = str(tmp_path / 'Wwise')
+    plan = {**rain_template(), 'registration_medium': 'file'}
+    env, state, client, preview = model_preview(tmp_path, 'model.registerWafm', plan, version=version, client=client)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    artifact = Path(prepared['dispatch']['args']['wafm'])
+    assert artifact.is_file() and artifact.suffix == '.wafm'
+    content = json.loads(artifact.read_text(encoding='utf-8'))
+    assert content['definition']['Widgets'] == [{'Name': 'Rain', 'Type': 'Checkbox'}]
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['agent_result']['business_result']['resource_kind'] == 'template'
+    assert verified['agent_result']['business_result']['cleanup_route'] is None
+    native = next(row for row in client.calls if row[0] == PREFIX + 'model.registerWafm')
+    assert native[1] == {'wafm': str(artifact)}
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_contract_discloses_owned_constructor_fields_and_exact_version_choices(tmp_path, version):
+    _, result = gateway.execute_gateway(['--version', version, 'request-schema', PREFIX + 'model.registerWafm'], env=gateway_env(tmp_path))
+    contract = result['business_adapter']
+    schema = contract['declaration']['schema']
+    assert schema['properties']['widgets']['items']['additionalProperties'] is False
+    assert schema['properties']['registration_medium']['enum'] == ['inline', 'file']
+    assert ('Image' in schema['properties']['widgets']['items']['properties']['kind']['enum']) == (version == '2025.1')
+    assert ('BinLayout' in schema['properties']['layouts']['items']['properties']['kind']['enum']) == (version == '2025.1')
+
+
+def test_owned_wafm_file_drift_is_rejected_before_registration(tmp_path):
+    from pathlib import Path
+    from wwise_waapi.transactions import TransactionStore
+    client = ModelClient(tmp_path)
+    client.responses['ak.wwise.core.getInfo']['processPath'] = str(tmp_path / 'Wwise')
+    env, state, client, preview = model_preview(tmp_path, 'model.registerWafm', {**rain_template(), 'registration_medium': 'file'}, client=client)
+    tx = preview['transaction_id']
+    artifact = TransactionStore(Path(state[1])).load_preview(tx).artifact['prepared_operation']['dispatch']['args']['wafm']
+    Path(artifact).write_text('{}', encoding='utf-8')
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert PREFIX + 'model.registerWafm' not in [row[0] for row in client.calls]
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+def test_named_template_collection_is_owned_and_frontend_selects_one_exact_template(tmp_path, version):
+    client = ModelClient(tmp_path, version=version)
+    first, second = rain_template(), {**rain_template(), 'template_key': 'Second'}
+    env, state, client, preview = model_preview(tmp_path, 'model.registerWafm', {'templates': [first, second]}, version=version, client=client)
+    template = confirm_execute_verify(env, state, client, preview)['agent_result']['business_result']['resource_handle']
+    native_templates = next(row[1]['wafm'] for row in client.calls if row[0] == PREFIX + 'model.registerWafm')
+    assert len(native_templates) == 2 and all(key.startswith('Gateway_') for key in native_templates)
+    env, state, client, preview = model_preview(tmp_path, 'window.create', {'title': 'Weather', 'width': 400, 'height': 300}, version=version, client=client)
+    window = confirm_execute_verify(env, state, client, preview)['agent_result']['business_result']['resource_handle']
+    env, state, client, preview = model_preview(tmp_path, 'model.createHandle', {'window': window, 'template': template, 'template_key': 'Second'}, version=version, client=client)
+    result = confirm_execute_verify(env, state, client, preview)
+    assert result['agent_result']['business_result']['cleanup_route'] == ['request-schema', PREFIX + 'model.destroyHandle']
+    native_choice = next(row[1]['template'] for row in client.calls if row[0] == PREFIX + 'model.createHandle')
+    assert native_choice in native_templates
+
+
+def test_rejected_registration_never_recovers_a_usable_template(tmp_path):
+    client = ModelClient(tmp_path)
+    client.responses[PREFIX + 'model.registerWafm'] = {'success': False}
+    env, state, client, preview = model_preview(tmp_path, 'model.registerWafm', rain_template(), client=client)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    code, rejected = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
+    assert code != 0 and rejected['verified'] is False, rejected
+    code, recovered = gateway.execute_gateway([*state, 'authoring-resource', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, recovered
+    assert 'Rejected template registration' in recovered['message']
+    assert len([row for row in client.calls if row[0] == PREFIX + 'model.registerWafm']) == 1
+
+
+def test_window_close_preview_cannot_overtake_a_frontend_awaiting_ownership_verification(tmp_path):
+    client = ModelClient(tmp_path)
+    client.responses[PREFIX + 'window.close'] = {}
+    env, state, client, preview = model_preview(tmp_path, 'model.registerWafm', rain_template(), client=client)
+    template = confirm_execute_verify(env, state, client, preview)['agent_result']['business_result']['resource_handle']
+    env, state, client, preview = model_preview(tmp_path, 'window.create', {'title': 'Owned', 'width': 10, 'height': 10}, client=client)
+    window = confirm_execute_verify(env, state, client, preview)['agent_result']['business_result']['resource_handle']
+    env, state, client, close = model_preview(tmp_path, 'window.close', {'window': window}, client=client)
+    env, state, client, frontend = model_preview(tmp_path, 'model.createHandle', {'window': window, 'template': template}, client=client)
+    for preview in (close, frontend):
+        _, shown = gateway.execute_gateway([*state, 'transaction-show', preview['transaction_id']], env=env)
+        code, confirmed = gateway.execute_gateway([*state, 'confirm', preview['transaction_id'], '--confirmation-token', shown['confirmation']['token']], env=env)
+        assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*state, 'execute', frontend['transaction_id']], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    code, blocked = gateway.execute_gateway([*state, 'execute', close['transaction_id']], env=env, client_factory=lambda _: client)
+    assert code != 0 and 'unresolved cleanup ownership' in blocked['message'], blocked
+    assert PREFIX + 'window.close' not in [row[0] for row in client.calls]
+    code, recovered = gateway.execute_gateway([*state, 'authoring-resource', frontend['transaction_id']], env=env, client_factory=lambda _: client)
+    assert code == 0 and recovered['agent_result']['resource_kind'] == 'model', recovered
+    env, state, client, destroy = model_preview(tmp_path, 'model.destroyHandle', {'model': recovered['agent_result']['resource_handle']}, client=client)
+    confirm_execute_verify(env, state, client, destroy)
+    code, executed = gateway.execute_gateway([*state, 'execute', close['transaction_id']], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    assert len([row for row in client.calls if row[0] == PREFIX + 'model.createHandle']) == 1

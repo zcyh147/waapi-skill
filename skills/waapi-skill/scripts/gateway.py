@@ -10,6 +10,7 @@ import os
 import queue
 import re
 import secrets
+from contextlib import nullcontext
 import shlex
 import stat
 import sys
@@ -47,7 +48,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
     layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
 )
 from wwise_waapi.layout_blueprint import validate_blueprint  # noqa: E402
-from wwise_waapi.authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, VERSIONS as MODEL_VERSIONS, model_business_contract, model_catalog_rows, validate_model_plan, PINNED as MODEL_PINNED, model_resource_roles  # noqa: E402
+from wwise_waapi.authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, VERSIONS as MODEL_VERSIONS, model_business_contract, model_catalog_rows, validate_model_plan, PINNED as MODEL_PINNED, model_resource_roles, creation_resource_receipt, canonical_state_result, model_file_audit  # noqa: E402
 from wwise_waapi.authoring_resources import AuthoringResourceStore  # noqa: E402
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
@@ -2641,6 +2642,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
     add_cli_console_plan_arguments(draft_declare_cli_console_plan)
+    authoring_resource = subparsers.add_parser("authoring-resource", help="Recover owned cleanup authority from one sealed native creation result")
+    authoring_resource.add_argument("transaction_id")
     draft_model_plan = subparsers.add_parser("draft-declare-model-plan", help="Declare an owned Authoring window/model/widget outcome")
     _add_business_draft_binding_arguments(draft_model_plan)
     draft_model_plan.add_argument("--plan", required=True)
@@ -13486,7 +13489,23 @@ def dispatch_business_model_plan(args: argparse.Namespace, *, env: Mapping[str, 
         for field, kind in model_resource_roles(pending.operation).items()}
     if pending.operation == 'ak.wwise.ui.model.registerWafm':
         resources['registration_name'] = 'Gateway_' + secrets.token_hex(16)
-    descriptor = {'context': context, 'plan': plan, 'resources': resources}
+        if plan.get('registration_medium', 'inline') == 'file':
+            from wwise_waapi.authoring_wafm import compile_template_registration
+            from wwise_waapi.operation_import import regular_file_proof
+            from wwise_waapi.transactions import _atomic_write_json
+            if not is_loopback_waapi_host(connection.host):
+                raise GatewayInputError('Gateway-owned WAFM data files require a local Authoring host')
+            artifact_root = resource_store.root / 'wafm-artifacts'
+            if artifact_root.exists() and (path_is_link_or_reparse(artifact_root) or not artifact_root.is_dir()):
+                raise GatewayInputError('Owned WAFM artifact directory is not a plain directory')
+            artifact_root.mkdir(mode=0o700, exist_ok=True)
+            document = compile_template_registration(plan, version=detected_version, namespace=resources['registration_name'])
+            artifact_path = artifact_root / (resources['registration_name'] + '.wafm')
+            _atomic_write_json(artifact_path, document)
+            resources['wafm_file'] = regular_file_proof(artifact_path, field='owned_wafm_file')
+    if pending.operation == 'ak.wwise.ui.window.close':
+        resource_store.require_no_children(plan['window'], context=context)
+    descriptor = {'operation': pending.operation, 'context': context, 'plan': plan, 'resources': resources}
     descriptor['sha256'] = canonical_sha256(descriptor)
     adapter = business_adapter(pending.operation)
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -13660,6 +13679,26 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == 'authoring-resource':
+        resource_store = AuthoringResourceStore(resolve_transaction_state_directory(args, env=env))
+        with resource_store.lease():
+            transaction_store = resolve_transaction_store(args, env=env)
+            snapshot = transaction_store.load_snapshot(args.transaction_id)
+            request = snapshot.preview.artifact['request']
+            operation = request.get('arguments', {}).get('api')
+            if operation not in MODEL_OPERATIONS:
+                raise GatewayInputError('This transaction owns no Authoring creation resource')
+            boundary = live_authoring_api_boundary(operation, command=args.command, live_info=live_info, common=common)
+            if boundary is not None: return boundary
+            events = [event for event in transaction_store.read_events(args.transaction_id) if event.get('event_type') == 'execution_completed']
+            if len(events) != 1:
+                raise GatewayInputError('Resource recovery requires exactly one sealed successful native execution; never repeat creation')
+            execution = events[0].get('details', {}).get('dispatch_result', {})
+            context = authoring_resource_context(args, env=env, connection=connection,
+                detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+            result = creation_resource_receipt(request, execution, transaction_id=args.transaction_id, context=context, store=resource_store)
+            return {'ok': True, 'status': 'owned_identity_recovered', **common,
+                'transaction_id': args.transaction_id, 'executed': False, 'verified': False, 'agent_result': result}
     if args.command == "draft-declare-model-plan":
         return dispatch_business_model_plan(args, env=env, connection=connection, detected_version=detected_version,
             live_info=live_info, dispatcher=dispatcher, common=common)
@@ -20382,7 +20421,10 @@ def dispatch_transaction_command(
     store = resolve_transaction_store(args, env=env)
     transaction_id = args.transaction_id
     try:
-        with store.execution_lease(transaction_id):
+        sealed = store.load_preview(transaction_id).artifact
+        api = sealed.get('request', {}).get('arguments', {}).get('api')
+        resource_lease = AuthoringResourceStore(store.state_dir).lease() if api in MODEL_OPERATIONS else nullcontext()
+        with store.execution_lease(transaction_id), resource_lease:
             return _dispatch_transaction_command_with_execution_lease(
                 args,
                 env=env,
@@ -21145,7 +21187,7 @@ def _dispatch_transaction_command_with_execution_lease(
         runtime_call_args = call_args
         runtime_call_options = call_options
         wire_path_adaptation: Mapping[str, Any] | None = None
-        if requires_wwise_wire_path_adaptation(call_uri):
+        if requires_wwise_wire_path_adaptation(call_uri) and not (call_uri == 'ak.wwise.ui.model.registerWafm' and not isinstance(call_args.get('wafm'), str)):
             sealed_project_guard = artifact.get("project_guard")
             try:
                 io_audit = prepared_wire_path_io_audit(
@@ -21224,13 +21266,25 @@ def _dispatch_transaction_command_with_execution_lease(
                 receipt = resource_store.resolve(model_binding['plan'][field], context=context, kind=kind)
                 if receipt != model_binding['resources'][field]:
                     raise GatewayInputError('Authoring resource ownership changed after Preview')
-            if call_uri in {'ak.wwise.ui.window.close', 'ak.wwise.ui.model.destroyHandle'}:
-                field = 'window' if call_uri.endswith('window.close') else 'model'
-                resource_store.consume(model_binding['plan'][field], context=context, transaction_id=transaction_id)
+            if call_uri == 'ak.wwise.ui.window.close':
+                resource_store.require_no_children(model_binding['plan']['window'], context=context)
         store.begin_execution(
             transaction_id,
             expected_authorization=record.state,
         )
+        if call_uri in {'ak.wwise.ui.window.close', 'ak.wwise.ui.model.destroyHandle', 'ak.wwise.ui.model.createHandle'}:
+            try:
+                if call_uri == 'ak.wwise.ui.model.createHandle':
+                    resource_store.reserve_creation(transaction_id, parents=[model_binding['plan']['window'], model_binding['plan']['template']], context=context)
+                else:
+                    field = 'window' if call_uri.endswith('window.close') else 'model'
+                    resource_store.consume(model_binding['plan'][field], context=context, transaction_id=transaction_id)
+            except Exception as exc:
+                failed = store.mark_execution_indeterminate(transaction_id, details={'phase': 'resource_retirement_before_native_dispatch',
+                    'native_dispatch_attempted': False, 'automatic_retry': False, 'message': str(exc)})
+                return {'ok': False, 'status': 'resource_retirement_failed', **common, 'transaction_id': transaction_id,
+                    'state': failed.state.value, 'error_code': 'AUTHORING_RESOURCE_PERSISTENCE_FAILED', 'message': str(exc),
+                    'native_dispatch_attempted': False, 'executed': False, 'verified': False, 'automatic_retry': False}
         try:
             result = dispatch(
                 dispatcher,
@@ -21610,23 +21664,16 @@ def _dispatch_transaction_command_with_execution_lease(
                 if isinstance(transaction_arguments, Mapping)
                 else None
             )
+            if transaction_api == MODEL_READ_URI:
+                observed = canonical_state_result(execution_result.get('result'), transaction_arguments['args'])
+                agent_result['business_result'] = {'widgets': [{'widget': key, 'attributes': values} for key, values in observed.items()],
+                    'observation': 'selected_owned_widget_state', 'automatic_retry': False}
             if transaction_api in {'ak.wwise.ui.window.create', 'ak.wwise.ui.model.registerWafm', 'ak.wwise.ui.model.createHandle'}:
-                model_binding = transaction_arguments['model_binding']
                 context = authoring_resource_context(args, env=env, connection=connection,
                     detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
-                if context != model_binding['context']:
-                    raise GatewayInputError('Authoring session changed after creation; retain the transaction and never repeat creation')
-                resource_kind = 'window' if transaction_api.endswith('window.create') else 'model' if transaction_api.endswith('model.createHandle') else 'template'
-                native_id = (execution_result['result']['windowID'] if resource_kind == 'window' else
-                    execution_result['result']['handleID'] if resource_kind == 'model' else model_binding['resources']['registration_name'])
-                description = (dict(model_binding['plan']) if resource_kind != 'model' else
-                    {'template': model_binding['resources']['template']['description'], 'window': model_binding['plan']['window']})
-                parents = [model_binding['plan']['window'], model_binding['plan']['template']] if resource_kind == 'model' else []
-                receipt = AuthoringResourceStore(resolve_transaction_state_directory(args, env=env)).issue(transaction_id=transaction_id, context=context,
-                    kind=resource_kind, native_id=native_id, description=description, parents=parents)
-                agent_result['business_result'] = {'resource_handle': receipt['handle'], 'resource_kind': resource_kind,
-                    'observable_effect_verified': False, 'cleanup_required': True,
-                    'cleanup_route': ['request-schema', 'ak.wwise.ui.window.close'], 'automatic_retry': False}
+                agent_result['business_result'] = creation_resource_receipt(transaction_request, execution_result,
+                    transaction_id=transaction_id, context=context,
+                    store=AuthoringResourceStore(resolve_transaction_state_directory(args, env=env)))
             if transaction_api in {TRANSPORT_CREATE_URI, TRANSPORT_DESTROY_URI}:
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
