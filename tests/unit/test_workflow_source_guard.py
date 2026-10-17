@@ -620,6 +620,7 @@ def test_owned_list_probe_retains_sample_only_graph_and_fresh_metadata(tmp_path,
     assert observed["mutation_authority"] is False
     assert observed["owner_comparisons"][0]["missing_known_owned_ids"] == []
     assert observed["native_evidence"] and observed["calls"]
+    assert all("class-id" in command for command in commands if command[0] == "query-object")
     details = [call for call in observed["calls"] if call["gateway_argv"][:2] == ["metadata", "detail"]]
     assert "name" not in details[0]["payload"]["agent_result"]["metadata"]
     assert "type" not in details[0]["payload"]["agent_result"]["metadata"]
@@ -1199,3 +1200,27 @@ def test_prospective_reference_native_collector_retains_failure_without_retry(tm
     if expected_creates:
         assert evidence["lifecycle_final_reference"]["transaction_id"] == category["transaction_id"]
         assert category["transaction_id"]
+
+
+def test_owned_list_probe_keeps_generic_member_type_and_exact_class_id_observation(tmp_path, workflow):
+    runtime, commands, ids = _owned_probe_runtime(tmp_path, workflow)
+    original = runtime.raw_gateway
+
+    def gateway(command):
+        code, payload = original(command)
+        if command[0] == "query-object":
+            for row in payload["objects"]:
+                if row["id"] == ids["slot"]:
+                    row.update(type="PluginInnerObject", class_id=5832704)
+        return code, payload
+
+    runtime.raw_gateway = gateway
+    category = workflow._collect_owned_list_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked"
+    members = next(row["members"] for row in observed["relationships"] if row["field"] == "Arguments")
+    assert members[0]["type"] == "PluginInnerObject" and members[0]["class_id"] == 5832704
+    assert any(row["reason"] == "Arguments_member_type_differs_from_matching_source" for row in observed["boundaries"])
+    assert observed["complete_owned_list_discovery_proven"] is False
+    assert observed["field_cardinality_permission_proven"] is False and observed["mutation_authority"] is False
+    assert all("class-id" in command for command in commands if command[0] == "query-object")
