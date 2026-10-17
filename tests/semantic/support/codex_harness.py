@@ -4087,7 +4087,10 @@ def gateway_continuation_binding_errors(
                 == "declare_ordered_checked_child_business_drafts"
             ):
                 continue
-            if prior_arguments[:1] == ("draft-check",):
+            checked_child_read = prior_arguments[:1] == ("draft-inspect",) or (
+                prior_arguments[:1] == ("draft-discover-fields",) and "--list" in prior_arguments
+            )
+            if prior_arguments[:1] == ("draft-check",) or checked_child_read:
                 try:
                     authority_index = prior_arguments.index("--task-authority")
                 except ValueError:
@@ -4105,7 +4108,34 @@ def gateway_continuation_binding_errors(
                     child_binding in compound_child_bindings
                     and current_subcommand != "preview-from-draft"
                 ):
-                    continue
+                    if not checked_child_read:
+                        continue
+                    # An exact no-event read may preserve a checked child
+                    # handoff. Bind it to the earlier observed check rather
+                    # than treating arbitrary business responses as optional.
+                    observed_draft = prior_payload.get("draft")
+                    for checked_index in range(prior_index - 1, -1, -1):
+                        checked_record = broker_records[checked_index]
+                        checked_arguments = _record_field(checked_record, "gateway_arguments", ())
+                        checked_payload = _record_field(checked_record, "payload")
+                        checked_draft = checked_payload.get("draft") if isinstance(checked_payload, Mapping) else None
+                        if (not isinstance(checked_arguments, (list, tuple))
+                                or tuple(checked_arguments[:1]) != ("draft-check",)
+                                or not isinstance(observed_draft, Mapping)
+                                or not isinstance(checked_draft, Mapping)
+                                or checked_index >= len(command_records)
+                                or not _command_output_matches_payload(command_records[checked_index], checked_payload)):
+                            continue
+                        if (observed_draft.get("draft_id") == child_binding[0]
+                                and all(observed_draft.get(key) == checked_draft.get(key)
+                                        for key in ("draft_id", "binding", "revision", "check"))
+                                and isinstance(checked_draft.get("check"), Mapping)
+                                and checked_draft["check"].get("status") == "passed"):
+                            break
+                    else:
+                        checked_index = -1
+                    if checked_index >= 0:
+                        continue
         if "next_command" not in prior_payload:
             observed_command, _ = _raw_shell_tool_command(
                 current_command,

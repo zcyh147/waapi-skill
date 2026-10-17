@@ -157,6 +157,9 @@ class WaapiClient:
                     "properties": str(root),
                 },
             }
+        if uri == "ak.wwise.cli.executeLuaScript" and "lua_cli_result" in self.fixture:
+            # Only a fake reflected result: this developer seam executes no Lua.
+            return dict(self.fixture["lua_cli_result"])
         if uri == "ak.wwise.core.object.getTypes":
             if "native_type_rows" in self.fixture:
                 return {"return": self.fixture["native_type_rows"]}
