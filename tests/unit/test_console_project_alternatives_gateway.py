@@ -273,10 +273,23 @@ class CliProjectTask(FieldTask):
     def __init__(self, path, version, operation='ak.wwise.cli.migrate', outcome=0):
         self.operation, self.outcome = operation, outcome
         super().__init__(path, version, operation)
+        if type(self) is CliProjectTask:
+            self.unit = saved_fixture_project(self)
+            if operation == 'ak.wwise.cli.addNewPlatform':
+                tree = ET.parse(self.project_file)
+                tree.find('./ProjectInfo/Project/Platforms/Platform').set('Name', 'Windows_Old')
+                tree.write(self.project_file)
+                self.unit.write_text(self.unit.read_text().replace('Platform="Windows"', 'Platform="Windows_Old"'))
 
     def call(self, uri, args=None, options=None):
         if uri == self.operation:
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if type(self) is CliProjectTask and uri == 'ak.wwise.cli.addNewPlatform':
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform',
+                    Name=args.get('new-platform-name', args['new-platform-base']),
+                    ReferencePlatform=args['new-platform-base'], ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
             return deepcopy(getattr(self, 'result_payload', {'result': self.outcome}))
         return super().call(uri, args, options)
 
@@ -304,8 +317,8 @@ def test_cli_add_platform_uses_documented_2025_default_name_when_omitted(tmp_pat
     writes = [args for uri, args, _ in task.calls if uri == task.operation]
     assert writes == [{'project': str(task.project_file), 'new-platform-base': 'Windows'}]
     code, payload = task.run('verify', tx)
-    assert code == 0 and payload['state'] == 'result_schema_checked', payload
-    assert payload['verification']['business_state_verified'] is False
+    assert code == 0 and payload['state'] == 'verified', payload
+    assert payload['verification']['business_state_verified'] is True
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
