@@ -333,6 +333,21 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "5babd9b4fa6e0993a23a1a79267967dc59fb66e41c5b10ce4638b34c1c4507bd"
+    )
+    # Only the five Undo Group contracts add this closed cancellation choice.
+    # Remove that exact addition to retain the earlier reviewed aggregate.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("waapi.undoGroup", version)
+        assert contract["optional_arguments"] == ["failure_cancellation"]
+        contract["optional_arguments"] = []
+        assert contract["argument_contract"]["optional"] == ["failure_cancellation"]
+        contract["argument_contract"]["optional"] = []
+        assert contract["argument_contract"]["properties"].pop("failure_cancellation") == {
+            "type": "string", "enum": ["undo-changes", "preserve-changes", "native-default"],
+        }
+        non_object_set_digests[f"waapi.undoGroup@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
         "f0cf1aaf03c0b79f218aff1f20b8e32f3ed19822896f32c39bf20d9f7cab9c33"
     )
     # Only the four supported Definition lanes add this reviewed Short ID
