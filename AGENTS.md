@@ -286,6 +286,9 @@ user's approval.
 Start with the cheapest lane that proves the change. Expand only when the
 changed behavior requires it.
 
+For implementation batch boundaries, cheap preflight and artifact regeneration
+order, follow [the coverage workflow](docs/plans/full-waapi-coverage/WORKFLOW.md).
+
 Repository development and ordinary test execution use the Poetry environment:
 invoke `ci/test.sh`, which delegates to Poetry, rather than installing project
 test dependencies into the Skill environment. The packaged Skill runtime and
@@ -476,197 +479,9 @@ The older `integration_workflows_cross_version_6` and
 profiles for sealed history and replay. Their roots are component evidence,
 not a unified `integration` campaign and not a single-candidate 12/12 result.
 
-The frozen public `integration` candidate
-`7f54506783a131695bafb97b89103488cb73d96c` has host-specific cumulative
-evidence, not one single-root pass. On macOS, `imac-int-7f54506-r1` passed 7
-units and failed 5, `imac-int-7f54506-r2-retry5` passed 4 and failed 1, and
-`imac-int-7f54506-r3-rifle` passed its one fresh Rifle unit and its identical
-`--resume --verify-only` audit. All 12 unique public-profile units therefore
-have macOS passing evidence across those three roots, but no root passed 12/12.
-
-On native Windows, `iwin-int-7f54506-r1` passed 9 units and failed 3. Fresh
-root `iwin-int-7f54506-r2-retry3` then passed Weather and failed both Weapons
-units, leaving 10 of 12 unique public-profile units with native-Windows passing
-evidence. Both remaining Weapons units failed in both roots when the
-authenticated Broker rejected malformed preview JSON before the rejected
-command reached the runner or Wwise; no mutation occurred. This is not complete
-native-Windows `integration` acceptance and must not be reported as Windows
-12/12. All four roots containing semantic FAILs were frozen without
-verify-only replay. Independently,
-`test_native_windows_powershell_shim_preserves_hostile_json` passed both native
-Windows parameterizations (2 passed, exit 0), proving exact hostile-JSON
-preservation through pwsh -> PS1 -> Broker without granting any semantic PASS
-credit. On both hosts every source-project full hash and mtime remained
-unchanged, passing sandboxes were removed, failed sandboxes were sealed and
-quarantined, and no scoped residual process remained.
-
-The frozen Composer public `integration` candidate
-`198a510e49f1215b3c02f6d3108c734fc5c59400` has complete cumulative evidence
-on both hosts, but neither host has a single-root 12/12 result. On macOS,
-`imac-integration-198a510-r1` passed 11 units and failed INT22 Weather;
-`imac-integration-198a510-r2-int22-weather`,
-`imac-integration-198a510-r3-int22-weather`, and
-`imac-integration-198a510-r4-int22-weather` each preserved one further
-ordinary INT22 Weather FAIL,
-while `imac-integration-198a510-r5-int22-weather` passed that unit fresh
-and then passed identical `--resume --verify-only`. On native Windows,
-`iwin-integration-198a510-r1` passed 6 and failed 6,
-`iwin-integration-198a510-r2-retry6` passed 5 and failed INT25 Footsteps,
-`iwin-integration-198a510-r3-footsteps` preserved another Footsteps FAIL, and
-`iwin-integration-198a510-r4-footsteps` passed Footsteps fresh plus identical
-verify-only. Thus all 12 unique public-profile units have PASS on the same
-frozen Skill/harness candidate on each host, cumulatively across roots. Every
-FAIL root was frozen without verify-only; every source full hash and project
-mtime was unchanged, PASS sandboxes were removed, and FAIL sandboxes were
-sealed/quarantined. Frozen-candidate development gates passed with focused
-semantic 464 passed / 4 skipped, Program 2923 passed / 2 skipped, and Non-live
-7763 passed / 104 skipped / 27 deselected. Native-Windows focused validation
-passed 462 / skipped 6 POSIX-only cases. Commit
-`030231b41e623e72f72de785d6bcbc3780d7eb37`
-changes only domain/planning docs, one unit test, and the program manifest, so
-it does not replace the frozen Skill, suite, runner, or semantic harness.
-
-Pre-review public `integration` candidate
-`ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
-root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
-`iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
-`--resume --verify-only`. Across the 24 PASS lifecycle records, source-project
-full hashes and mtimes remained unchanged, passing sandboxes were removed, and
-final scoped-process checks were empty. The macOS LaunchAgent and Windows
-`InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
-independent single-root 12/12 evidence on both hosts, not cumulative repair-root
-credit. Review-repair code candidate
-`170e8e8f01cd5e931933c6fe76baff47d0683f57` later hardened playing and
-transport capability stores against Windows reparse points and resolved
-non-stable object-set batch `--field` names through live metadata, so the
-earlier root remains truthful evidence but is not final-candidate acceptance
-for that successor. That successor passed macOS Program 4737 / 2 skipped,
-native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
-skipped / 27 deselected. Batch-order repair candidate
-`fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
-2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
-113 skipped / 27 deselected before its targeted Weapons reruns.
-
-Final semantic-harness candidate
-`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
-byte-identical to `0edaf1a` and accepts permutations of independent existing-
-object edit rows while still rejecting missing, extra, duplicate, or changed
-objects, fields, handles, and values. Native-Windows root
-`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
-one root plus identical verify-only. MacOS root
-`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
-Preview after the Agent incorrectly called an explicit
-`complete=true, truncated=false` response truncated. Fresh queued root
-`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
-verify-only without any code, suite, harness, or option change. MacOS therefore
-has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
-Every source hash and project mtime remained unchanged, passing sandboxes were
-removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
-Scheduled Tasks, and Wwise processes were cleared.
-
-Composer migration evidence is focused Adapter evidence, not public
-`integration` acceptance. For `object.set`, candidate
-`68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
-Wwise 2022.1/2025.1 in both macOS root `imac-flatrow-6869724-r1` and
-native-Windows root `i15-6869724-r1`; both four-unit roots also passed
-identical `--resume --verify-only` audits. For `audio.import`, macOS root
-`imac-import-6479595-r13-final6` at
-`6479595ea4b9a53c3351a4d1595c988e94ee5967` passed all six selected
-Weather/Rifle/Footsteps version units fresh and verify-only. Native-Windows
-root `iwin-import-f87b800-r2-interactive` passed four and failed two;
-`iwin-import-0be8266-r3-rifle-footsteps` then passed Footsteps and failed
-Rifle, and final fresh root `iwin-import-0be8266-r4-rifle` passed Rifle and
-its identical verify-only audit. The commits after `6479595` changed only
-program/semantic tests and harness support, not the packaged Skill tree. Thus
-all six Windows audio-import units have passing evidence cumulatively across
-three frozen roots, not one root or one Git candidate with a 6/6 result. Every
-recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
-sandboxes were sealed/quarantined, and scoped residual-process checks were
-empty.
-
-For Switch assignments, runtime candidate
-`d05f1ecdc3b33fca83866e75669c65039877edd6` passed the final macOS and
-native-Windows Program gates, macOS Non-live, and the closed add/remove
-workflow on native Windows Wwise 2022.1/2025.1. Route-only candidate
-`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` then passed macOS Program and
-the same real workflow on macOS 2022.1/2025.1. Fresh roots
-`imac-sab-d45f75f-r2` and `iwin-sab-d45f75f-r2` each passed the one-unit
-`switch_assignment_business_1` profile plus identical
-`--resume --verify-only`. Earlier `d05f1ec` roots on both hosts remain
-frozen FAILs because the Agents invented operation aliases; the Broker rejected
-them before Gateway or Wwise dispatch. No Fresh root executed a mutation, all
-temporary launch resources were removed, and scoped residual-process checks
-were empty.
-After the entry Skill was compacted, exact packaged-Skill candidate
-`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same one-unit PASS
-plus identical verify-only in macOS root `imac-sab-b544197-r1` and
-native-Windows root `iwin-sab-b544197-r1`. Both roots retained sealed attempt
-manifests, started no Wwise process, executed no mutation, removed their
-temporary launch resources, and ended with zero scoped residual processes.
-
-Final deepened Switch-assignment candidate
-`c874917220cb7723d60f86a14cea72c5d15cca52` passed the one-unit profile
-fresh plus identical `--resume --verify-only` in macOS root
-`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`.
-Both Agents followed the Gateway-owned copy-ready `draft-start`, then the fixed
-`switch_container`, `child`, and `state_or_switch` role continuations into one
-Preview; no Wwise process or mutation occurred. The Windows Fresh and replay
-used temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended
-with zero scoped residual processes and Windows retained zero matching tasks.
-Exact Program candidate `4c55ba6b53eeb4beff97e7b590686d78da7e612e`
-passed macOS 3659 / 2 skipped and native Windows 3646 / 15 skipped; later
-`c874917` changes only semantic evidence/protocol tests. MacOS Non-live at
-`d10dc23c4dd95eb865a5a768ac8a4e0885e6a233` passed 8639 / 110 skipped /
-27 deselected. The later packaged diffs are bounded to copy-ready business
-start/role continuations and compact audio-import receipts, covered by exact
-focused regressions (410 passed at `4389b6c`, 452 / 4 skipped at `4c55ba6`,
-and 76 passed at `c874917`); Switch native dispatch and verification did not
-change. Frozen Mac diagnostic root `imac-sab-d10dc23-r1` stopped after a
-successful schema read without issuing `draft-start`, received no PASS credit,
-and was not replayed.
-
-The completed 2026-07-31 macOS integration evidence is cumulative across frozen
-campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
-both Alarm and Harbor workflows on both versions and failed both Weather
-workflows. Fresh repaired roots `a20-int22-weather` and
-`a24-int25-weather` then passed the two Weather units. Thus all six unique
-profile units have passing evidence across those roots; do not report that
-`a12` itself passed 6/6 or that all six were rerun after the final repair.
-Every passing sandbox was removed, failed sandboxes were sealed and
-quarantined, and both source SampleProjects retained identical full hashes and
-mtimes. This older evidence belongs to the candidate before the
-structured-query request and closed mutation-selector migration.
-The roots named in this paragraph and the 2026-08-03 macOS paragraph below
-seal `runtime.platform=darwin`; later cross-host component reruns are recorded
-separately.
-
-The 2026-08-03 current-wording rerun is also cumulative, not one final-candidate
-6/6 run. `campaign-integration-workflows-v1-terra-20260803-current-r1` passed
-five units and failed `INT25-ALARM-DIAGNOSE-AND-REPAIR` before mutation because
-the Agent redundantly re-read the Action instead of following the already
-returned `Target.id`. The Skill query reference was then narrowed to forbid
-that duplicate hop. Fresh roots `r2-int25-alarm-action-hop` and
-`r3-int22-alarm-action-hop` passed both Alarm versions on the same repaired
-candidate, and both passed `--resume --verify-only`. Weather and Harbor had
-loaded only the unchanged operate reference in `r1`; all four passed there.
-Thus all six current prompt units have passing evidence across these roots,
-but there is still no single repaired-candidate 6/6 campaign. All eight
-recorded lifecycles preserved source hashes and mtimes; passing sandboxes were
-removed and the one failed sandbox remains quarantined. Those V1 roots do not
-validate the newer V2 fixture, routing, or workflow contracts.
-
-Later reruns used the legacy internal
-`integration_workflows_cross_version_6` component, not the public composed
-`integration` profile. At commit
-`9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
-`imac-wah-9e75a1a-r1` passed all six component units fresh and then passed
-`--resume --verify-only`. At commit
-`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
-`imac-wah-9b4de8f-r1` passed five units and failed one, while native-Windows
-root `iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots
-were frozen without verify-only replay. These results remain exact
-six-unit-component provenance and must not be reported as current public
-`integration` acceptance or combined into a unified 12/12 result.
+Before reporting or reusing historical acceptance, read
+[tests/TEST_INVENTORY.md](tests/TEST_INVENTORY.md); use
+[business acceptance](tests/semantic/TEST_ACCEPTANCE.md) for current scheduling and triage.
 
 The legacy internal `integration_workflows_v2_cross_version_6` component is a
 distinct fixed-baseline contract. Its three workflows run once on Wwise
@@ -683,27 +498,6 @@ seal/quarantine every failed or indeterminate sandbox. The baseline collector
 may inspect only an already-running sandbox copy and must do so through the
 public Gateway; it is not permission to use a direct WAAPI client.
 
-The completed 2026-08-03 macOS evidence for that legacy component is
-cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
-both Rifle units, `r12-2022` passed the
-2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
-`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. Thus all six
-unique units have passing evidence across those roots. Passing sandboxes were
-removed; failed or blocked diagnostic sandboxes were sealed and quarantined;
-every recorded source-project full hash and mtime remained unchanged. This
-grants no per-API coverage credit and proves only the exact Rifle, Footsteps,
-and Weapons workflow paths, not advanced WAQL or unrelated routes.
-
-The later native-Windows evidence for that legacy component is also cumulative.
-At commit `0dfea2b`,
-`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
-2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
-no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
-and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
-verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
-Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
-native-Windows passing evidence across these frozen roots, but there is no
-single-root or single-candidate Windows 6/6 result.
 
 For harness-only CI checks that start neither Codex nor Wwise, use the focused
 pytest commands in `tests/semantic/README.md`.
