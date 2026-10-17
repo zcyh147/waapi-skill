@@ -19,6 +19,7 @@ _PROGRAM_CASES = {"slew-rate-show": {
     "branch_id": SHOW_BRANCH_ID, "public_uri": "ak.wwise.core.object.setProperty",
     "selector": "exact_bound_GameParameter_live_SlewRateUp_Field_Handle_value_37_with_RTPCRamping_0",
     "reason": "Exact installed existing-object Show condition: public mutation must preserve the controller and satisfy field readback.",
+    "scalar": {"controller": "RTPCRamping", "controller_value": 0, "field": "SlewRateUp", "value": 37},
 }}
 for _version, _build, _index in (("2024.1", "2024.1.13.9056", 152), ("2025.1", "2025.1.7.9143", 164)):
     _PROGRAM_CASES[f"master-bus-device-{_version}"] = {
@@ -27,6 +28,15 @@ for _version, _build, _index in (("2024.1", "2024.1.13.9056", 152), ("2025.1", "
         "public_uri": "ak.wwise.core.object.setReference",
         "selector": "exact_bound_Bus_live_enabled_AudioDevice_Field_Handle_and_exact_chosen_AudioDevice_target",
         "reason": "Exact installed Bus.AudioDevice IsMasterBus=True occurrence: injected native-shaped Show metadata requires live enabled proof and a restricted exact AudioDevice target, without topology mutation. Native true-predicate metadata applicability remains unobserved.",
+    }
+for _version, _build in (("2022.1", "2022.1.19.8584"), ("2025.1", "2025.1.7.9143")):
+    _PROGRAM_CASES[f"existing-bed-mixer-{_version}"] = {
+        "branch_id": f"{_version}|installed|{_build}|plugin-condition|existing-object|Ak3DAudioBedMixer.xml|"
+                     "PluginModule/EffectPlugin[Wwise 3D Audio Bed Mixer]/Properties/Property[SystemAudioObjectLimit]/Dependencies/0/condition",
+        "public_uri": "ak.wwise.core.object.setProperty",
+        "selector": "exact_bound_existing_Effect_live_Uint16_SystemAudioObjectLimit_Field_Handle_value_128_with_policy_1",
+        "reason": "Exact installed existing-plugin condition, with sealed class-scoped metadata facts from this version: Uint16 SystemAudioObjectLimit requires SystemAudioObjectsPolicy in0/1. Injected existing-instance behavior preserves policy1. Native existing-instance/class applicability and effects remain unverified.",
+        "scalar": {"controller": "SystemAudioObjectsPolicy", "controller_value": 1, "field": "SystemAudioObjectLimit", "value": 128},
     }
 
 
@@ -52,6 +62,8 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/conftest.py", "tests/support/exact_evidence_finalization.py",
         "tests/maintenance/branch_audit_completion.py", "tests/maintenance/branch_coverage_audit.py",
         "docs/branch-coverage-condition-sources.json",
+        "tests/unit/test_existing_plugin_conditions_gateway.py",
+        "tests/fixtures/metadata-conditions/3d-audio-bed-mixer.json",
     ])
     sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in sorted(set(relevant))}
     return {"root": root, "nodeid": nodeid, "branch": branch, "case": case,
@@ -101,10 +113,11 @@ def finish_condition_capture(capture: dict, phase_reports: dict, observed: dict)
             {"pointer": "/observations/wwise-console/observations/0/enabled_after", "equals": True},
         ])
     else:
+        scalar = case["scalar"]
         checks.extend([
-            {"pointer": "/observations/wwise-console/observations/0/controller_before/RTPCRamping", "equals": 0},
-            {"pointer": "/observations/wwise-console/observations/0/controller_after/RTPCRamping", "equals": 0},
-            {"pointer": "/observations/wwise-console/observations/0/after/SlewRateUp", "equals": 37},
+            {"pointer": "/observations/wwise-console/observations/0/controller_before/" + scalar["controller"], "equals": scalar["controller_value"]},
+            {"pointer": "/observations/wwise-console/observations/0/controller_after/" + scalar["controller"], "equals": scalar["controller_value"]},
+            {"pointer": "/observations/wwise-console/observations/0/after/" + scalar["field"], "equals": scalar["value"]},
         ])
     record["branch_assertions"] = {branch["id"]: {"native_shape_sha256": branch["shape_sha256"], "native_route": None, "checks": checks}}
     def write(name, value):
