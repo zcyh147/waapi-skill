@@ -17794,9 +17794,11 @@ def verify_prepared_operation(
                 field_name = field_spec.get("name")
                 if "curve" in field_spec:
                     curve = _field_value(row, str(field_name))
-                    curve_type = curve.get("type") if isinstance(curve, Mapping) else None
+                    curve_type = None
                     curve_id = curve.get("id") if isinstance(curve, Mapping) else None
-                    if _valid_object_id(curve_id):
+                    # The embedded value cannot independently prove its class.
+                    # Only a canonical GUID permits a separate exact-ID read.
+                    if isinstance(curve_id, str) and _PLUGIN_GUID.fullmatch(curve_id):
                         curve_rows = read_object(object_id=curve_id, fields=("id", "type"))
                         curve_type = curve_rows[0].get("type") if len(curve_rows) == 1 and _same_identity(curve_rows[0].get("id"), curve_id) else None
                     points = curve.get("points") if isinstance(curve, Mapping) else None

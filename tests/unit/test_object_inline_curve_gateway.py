@@ -55,6 +55,13 @@ class InlineCurveTask(OwnedGraphTask):
                 self.objects[CURVE]["type"] = "Sound"
             elif self.curve_failure == "missing-class-identity":
                 del self.objects[FIRST]["@Curve"]["id"]
+            elif self.curve_failure == "malformed-class-identity":
+                self.objects[FIRST]["@Curve"].update({"id": "broken", "type": "Curve"})
+            elif self.curve_failure == "null-class-identity":
+                self.objects[FIRST]["@Curve"].update({"id": None, "type": "Curve"})
+            elif self.curve_failure == "typed-missing-class-identity":
+                del self.objects[FIRST]["@Curve"]["id"]
+                self.objects[FIRST]["@Curve"]["type"] = "Curve"
             elif self.curve_failure == "metadata-drift":
                 self.metadata["Curve"]["restriction"] = {"type": "reference", "restrictions": [{"type": ["Bus"]}]}
         return result
@@ -89,7 +96,7 @@ def test_inline_curve_points_reach_preview_native_dispatch_and_independent_point
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
-@pytest.mark.parametrize("failure", ("wrong-points", "boolean-point", "missing-points", "wrong-class", "missing-class-identity", "metadata-drift"))
+@pytest.mark.parametrize("failure", ("wrong-points", "boolean-point", "missing-points", "wrong-class", "missing-class-identity", "malformed-class-identity", "null-class-identity", "typed-missing-class-identity", "metadata-drift"))
 def test_inline_curve_never_certifies_malformed_or_unrelated_native_effects(
     tmp_path: Path, version: str, failure: str,
 ) -> None:
