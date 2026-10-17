@@ -730,9 +730,24 @@ def _short_id_probe_runtime(tmp_path, *, version="2021.1", fault=None):
             payload["agent_result"] = [dict(selected)]
             if "--short-id" in command:
                 payload["source_resolution"] = {"complete": True, "candidate_count": 1}
+        code = 0
+        if fault == "missing-dialogue" and "--custom-kind" in command:
+            payload["agent_result"] = []
+        if "--short-id" in command:
+            if fault == "native-error":
+                code, payload = 2, {"ok": False, "error_code": "native-fixture-rejection",
+                                    "call": {"waapi_error_uri": "ak.fixture.invalidQuery", "raw_error": {"fixture": None}}}
+            if fault == "incomplete":
+                payload["source_resolution"]["complete"] = False
+        if fault == "exact-drift" and "--exact-id" in command:
+            payload["agent_result"][0]["name"] = "Changed"
+        if fault == "endpoint" and command == ["status"]:
+            payload["endpoint"] = {**endpoint, "port": 9999}
+        if fault == "version" and command == ["status"]:
+            payload["detected_version"] = "2025.1"
         path = evidence_root / f"{len(commands)}.json"
         path.write_text(json.dumps({"fixture_only": True, "argv": command, "payload": payload}))
-        return 0, payload
+        return code, payload
 
     runtime = SimpleNamespace(version=version, candidate="a" * 40, state_dir=state,
         category_results=[], env={"WAAPI_SKILL_CONFIG_PATH": str(config),
@@ -764,3 +779,78 @@ def test_short_id_probe_reuses_shared_runtime_without_policy_change(tmp_path, wo
     assert len(commands) == len(observed["receipts"]) == len(observed["native_evidence"]) == 7
     assert config.read_bytes() == config_before
     assert all(command[0] in {"status", "query-object"} for command in commands)
+
+
+@pytest.mark.parametrize("fault", ["missing-dialogue", "native-error", "incomplete", "exact-drift", "endpoint", "version"])
+def test_short_id_shared_probe_retains_failure_without_retry(tmp_path, workflow, fault):
+    runtime, commands, config = _short_id_probe_runtime(tmp_path, fault=fault)
+    config_before = config.read_bytes()
+    with pytest.raises(AssertionError):
+        workflow.test_read_only_short_id_native_observation(runtime)
+    category, = runtime.category_results
+    assert category["status"] == "FAIL", category
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert observed["error"].startswith("AssertionError:")
+    assert observed["business_effect_verified"] is False
+    assert config.read_bytes() == config_before
+    assert len(commands) == len(observed["receipts"]) == len(observed["native_evidence"])
+    assert len(commands) <= 7 and commands.count(commands[-1]) == 1
+    if fault == "native-error":
+        receipt = observed["receipts"][-1]
+        assert receipt["exit_code"] == 2
+        assert receipt["payload"]["call"] == {
+            "waapi_error_uri": "ak.fixture.invalidQuery", "raw_error": {"fixture": None}}
+    if fault == "missing-dialogue":
+        assert "DialogueEvent populated fixture prerequisite missing" in observed["error"]
+        assert not any("dialogue-event" in command for command in commands)
+
+
+def test_standalone_short_id_observation_keeps_lifecycle_and_original_evidence(tmp_path, monkeypatch):
+    import tests.live.test_full_coverage_query_native as standalone
+
+    fake, commands, _config = _short_id_probe_runtime(tmp_path)
+    root = tmp_path / "standalone-native-root"
+    finished = []
+    bindings = []
+
+    class Lifecycle:
+        def __init__(self, **kwargs):
+            bindings.append(kwargs)
+
+        def start(self):
+            root.mkdir()
+            return SimpleNamespace(evidence_root=root, host="127.0.0.1", port=8080)
+
+        def finish(self, status, *, reason):
+            finished.append((status, reason))
+            return SimpleNamespace(final_status=status, as_dict=lambda: {"status": status})
+
+    def fixture_gateway(*, skill_source, runtime, version, receipts):
+        assert version == "2021.1" and runtime.evidence_root == root
+        assert skill_source.name == "waapi-skill"
+
+        def gateway(command):
+            if command[0] == "config-set":
+                assert command[-2:] == ["--project-modification-policy", "read_only"]
+                code, payload = 0, {"ok": True}
+            else:
+                code, payload = fake.raw_gateway(command)
+            receipts.append({"argv": list(command), "exit_code": code, "payload": payload})
+            assert code == 0 and payload["ok"] is True
+            return payload
+
+        return gateway
+
+    monkeypatch.setenv("WAAPI_SHORT_ID_NATIVE_ROOT", str(root))
+    monkeypatch.setenv("WWISE_VERSION", "2021.1")
+    monkeypatch.setattr(standalone, "ScenarioLifecycle", Lifecycle)
+    monkeypatch.setattr(standalone, "fixture_gateway", fixture_gateway)
+    standalone.test_short_id_typed_native_read_observations()
+    evidence = json.loads((root / "short-id-native-observations.json").read_text())
+    assert set(evidence) == {"agent_started", "project_mutation_count", "version", "scope", "receipts", "observations", "status"}
+    assert len(evidence["receipts"]) == 8 and len(commands) == 7
+    assert [row["kind"] for row in evidence["observations"]] == ["event", "dialogue-event"]
+    assert evidence["project_mutation_count"] == 0
+    assert finished == [("PASS", "")]
+    assert bindings[0]["scenario_id"] == "full-coverage-short-id-typed-observations"
+    assert bindings[0]["scenario_root"] == root
