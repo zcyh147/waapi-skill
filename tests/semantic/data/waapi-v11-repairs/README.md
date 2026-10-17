@@ -20,7 +20,8 @@ and tool iterations can involve multiple API requests; actual token usage comes
 from the sealed campaign evidence. Executor is gpt-5.6-terra, medium reasoning,
 default service tier. Each task has
 600 cumulative Agent seconds and at most 96 Gateway calls; the batch has at most
-2400 Agent seconds. No automatic retry, case subset, or version multiplication.
+2400 Agent seconds. No automatic retry or version multiplication. The only
+smaller selection is the explicitly documented F2–F4 continuation below.
 Fixture setup calls and native preflight are deterministic runner work and are
 recorded separately from Agent transactions. No Windows acceptance is claimed.
 
@@ -109,3 +110,36 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
 
 The campaign root must be new. Do not append `--resume`, select extra cases, or
 start a second batch under this preparation authorization.
+
+
+## Authorized continuation after r3 F1
+
+The original authorization covers F1–F4. Candidate `80b653c0`, root
+`imac-v11-repairs-first4-r3`, completed F1's requested business result and all
+material checks. Its campaign remains **BLOCKED** because the archive consumer
+rejected the current `connection_configuration` field. The separate assessment
+is retained at `.waapi-skill-state/repair-acceptance/r3-f1-business-assessment.json`.
+That assessment does not rewrite the original root or grant a machine PASS.
+
+A new frozen candidate may select exactly the ordered `REPAIR25-F2`,
+`REPAIR25-F3`, `REPAIR25-F4` suffix through the same formal campaign. These are the
+three unattempted workflows already authorized; F1 must not be repeated. This
+selection has three fresh CLI tasks, three user turns, two Agent transactions,
+1800 maximum cumulative Agent seconds (600 per task), no model reviewers and no
+automatic retries. Arbitrary subsets, duplicates, reordered units, other versions
+or changed model settings remain rejected. Omitting case IDs still selects all
+four workflows. The profile JSON and historical roots remain unchanged.
+
+After coordinator freeze, the continuation command is:
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile waapi_v11_repairs_4 --version 2025.1 \
+  --case-id REPAIR25-F2 --case-id REPAIR25-F3 --case-id REPAIR25-F4 \
+  --model gpt-5.6-terra --reasoning-effort medium --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/imac-v11-repairs-remaining3-r4
+```
+
+Report this root's result as **three selected workflows**, separately from the
+r3 F1 business assessment and its original BLOCKED campaign verdict. A 3/3 root
+must never be described as a single-root or same-candidate 4/4 campaign PASS.
