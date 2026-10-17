@@ -7359,11 +7359,19 @@ def _apply_reference_activation_dependencies(
             )
         required_value = True
         if dependency_type == "property":
-            from .metadata_restrictions import condition_restriction, condition_matches, MetadataRestrictionError
+            from .metadata_restrictions import condition_restriction, condition_matches, intersect_condition_restrictions, MetadataRestrictionError
             try:
-                restriction = condition_restriction(dependency.get("conditions"))
+                restriction = intersect_condition_restrictions([
+                    condition_restriction(item.get("conditions"))
+                    for item in metadata.dependencies
+                    if item.get("type") == "property"
+                    and item.get("action") == action and item.get("context") == context
+                    and isinstance(item.get("property"), str)
+                    and item["property"].casefold() == property_name.casefold()
+                ])
             except MetadataRestrictionError as exc:
-                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", str(exc),
+                code = "REFERENCE_DEPENDENCY_CONFLICT" if exc.error_code == "CONDITION_CONFLICT" else "CONSTRAINED_REFERENCE_BOUNDARY"
+                raise OperationContractError(code, str(exc),
                     details={"reference": metadata.name, "property": property_name}) from exc
             # Show controls the native editor's visibility. It conveys no
             # authority to change the controlling property, on this object or
@@ -7392,7 +7400,12 @@ def _apply_reference_activation_dependencies(
                         raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
                             "Choose an explicit prerequisite value satisfying the live condition.",
                             details={"property": property_name, "current_value": required_value,
-                                     "restriction": restriction, "mutation_dispatched": False})
+                                     "restriction": restriction, "mutation_dispatched": False,
+                                     "prerequisite_changes": [{
+                                         "operation": "object.setProperty", "discovery_meaning": property_name,
+                                         "object_id": object_id, "selection": "live_discovered_Field_Handle",
+                                         "restriction": restriction,
+                                     }]})
                 else:
                     raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
                         "A new object needs an explicit prerequisite value satisfying the live condition.",

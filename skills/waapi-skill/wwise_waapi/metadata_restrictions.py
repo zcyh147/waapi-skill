@@ -115,3 +115,38 @@ def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
         return any(type(value) is type(row["value"]) and value == row["value"] for row in restriction["values"])
     return (isinstance(value, (int, float)) and not isinstance(value, bool)
             and math.isfinite(value) and restriction["min"] <= value <= restriction["max"])
+
+
+def intersect_condition_restrictions(restrictions: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Combine accumulated native requirements before selecting any value."""
+    enums = [item for item in restrictions if item["type"] == "enum"]
+    if enums:
+        values = [dict(row) for row in enums[0]["values"]
+                  if all(condition_matches(item, row["value"]) for item in restrictions)]
+        if values:
+            return {"type": "enum", "values": values}
+    else:
+        minimum = max(item["min"] for item in restrictions)
+        maximum = min(item["max"] for item in restrictions)
+        if minimum <= maximum:
+            return {"type": "range", "min": minimum, "max": maximum}
+    raise MetadataRestrictionError("CONDITION_CONFLICT", "Accumulated dependency conditions have no shared value.")
+
+
+def supports_property_prerequisite_workflow(dependencies: Any) -> bool:
+    """A disabled field may be acquired for the closed prerequisite planner."""
+    activations = [item for item in dependencies if item.get("action") != "Show"]
+    if not activations:
+        return False
+    for item in activations:
+        if item.get("context") != "Self" or item.get("action") != "Enable":
+            return False
+        if item.get("type") == "override" and set(item) == {"type", "action", "context", "property"}:
+            continue
+        if item.get("type") != "property" or set(item) != {"type", "action", "context", "property", "conditions"}:
+            return False
+        try:
+            condition_restriction(item["conditions"])
+        except MetadataRestrictionError:
+            return False
+    return True

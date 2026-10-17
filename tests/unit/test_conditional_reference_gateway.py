@@ -297,6 +297,37 @@ def test_satisfied_scalar_condition_preserves_value_and_guards_drift(tmp_path, v
     assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in task.calls)
 
 
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_accumulated_conditions_choose_only_the_unique_shared_value(tmp_path, version):
+    task = AttenuationTask(tmp_path, version)
+    task.metadata["Attenuation"]["dependencies"] = [
+        {"type": "property", "action": "Enable", "context": "Self", "property": "Mode",
+         "conditions": [{"restriction": {"type": "enum", "values": [{"value": n} for n in choices]}}]}
+        for choices in ((1, 2), (2, 3))
+    ]
+    task.metadata["Mode"] = {"name": "Mode", "type": "int16", "restriction": {"type": "range", "min": 0, "max": 3}}
+    task.objects[FIRST]["Mode"] = 0
+    task.declare()
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert [(row["field"], row["value"]) for row in preview["preview_summary"]["derived_changes"]] == [("Mode", 2)]
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["Mode"] == 2
+    assert task.objects[FIRST]["Volume"] == -7
+    writes = [args for uri, args, _ in task.calls if uri.endswith("object.set")]
+    assert len(writes) == 1 and writes[0]["objects"][0]["@Mode"] == 2
+
+
 class ScalarPropertyTask(AttenuationTask):
     def __init__(self, path, version):
         super().__init__(path, version, operation="object.setProperty")
@@ -312,8 +343,30 @@ class ScalarPropertyTask(AttenuationTask):
     def call(self, uri, args=None, options=None):
         if uri.endswith("isPropertyEnabled"):
             self.calls.append((uri, deepcopy(args), options))
-            return {"return": True}
+            return {"return": getattr(self, "enabled", True)}
         return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_disabled_scalar_property_discloses_exact_prerequisite_choice_without_writing(tmp_path, version):
+    task = ScalarPropertyTask(tmp_path, version)
+    task.enabled = False
+    task.objects[FIRST]["LfoWaveform"] = 0
+    target = task.bind(FIRST)
+    field = task.discover(target, "LfoSmoothing")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "50")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 2 and checked["error_code"] == "REFERENCE_ACTIVATION_REQUIRED", checked
+    repair = checked["details"]["prerequisite_changes"][0]
+    assert repair["operation"] == "object.setProperty"
+    assert repair["discovery_meaning"] == "LfoWaveform"
+    assert repair["selection"] == "live_discovered_Field_Handle"
+    assert [row["value"] for row in repair["restriction"]["values"]] == [1, 2, 3, 4]
+    assert "required_value" not in repair
+    assert task.objects[FIRST]["LfoWaveform"] == 0
+    assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize("version", VERSIONS)
