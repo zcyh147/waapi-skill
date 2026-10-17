@@ -323,6 +323,22 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   Authoring, Console or Fresh process was launched for this integration, no
   historical receipt is transferred, and no ticket completion is claimed.
 
+- A separate successor integrates only #177 `4fb0dde3` after the eighth partial
+  checkpoint. Repeated or mixed target restrictions admit an existing object
+  only when fresh exact-ID facts independently satisfy every disclosed row;
+  partial matches retain the explicit boundary. Classifier reads deduplicate
+  fields, preserve selected platform and reject native type drift. This is a
+  sufficient program condition, not complete native combination semantics.
+  The affected hierarchy, activation and registry tests plus generated-interface,
+  parser and Program-roster controls passed **758 tests** in 101.76 seconds on
+  clean `7bc68aa0`, exit 0. All 1801 tracked file hashes remained unchanged and
+  the owned process group was empty. Interface and branch-ledger reproducibility
+  checks passed. Reconciliation changes only the registry source seal/index and
+  coverage candidate identity; native obligation identities, shapes, owners,
+  states, requirements and evidence remain unchanged. The earlier eighth-partial
+  result remains separate. Full Program/Non-live gates and all native acceptance
+  remain pending; no native or Fresh process was launched.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
