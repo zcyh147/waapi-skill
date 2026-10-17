@@ -46,19 +46,18 @@
     "windows_acceptance": false,
     "skip_scope": "See complete log: live/destructive lanes, native Windows checks and absent optional historical evidence are not PASS credit."
   },
-  "status": "nine_attempts_complete_f2_acceptance_decision_pending",
-  "integration_repair_candidate": "0b0631818c7b88d44d4334469b34c4118656d13c",
-  "fresh_actual_attempts": 9,
+  "status": "complete_cumulative_four_workflow_business_acceptance",
+  "integration_repair_candidate": "62d19e1c5cdc97fde30b0a26c97caf5075c65194",
+  "fresh_actual_attempts": 10,
   "fresh_unattempted": [],
   "windows_acceptance": false,
   "fresh_business_pass": [
     "F1",
+    "F2",
     "F3",
     "F4"
   ],
-  "fresh_not_completed": [
-    "F2"
-  ],
+  "fresh_not_completed": [],
   "additional_fresh_authorized": false,
   "fresh_batch": {
     "actual_attempts": 5,
@@ -520,156 +519,118 @@
     "remaining_authorized_attempts": 0
   },
   "latest_checkpoint": {
-    "actual_attempts": 9,
+    "actual_attempts": 10,
     "business_pass": [
       "F1",
+      "F2",
       "F3",
       "F4"
     ],
-    "not_completed": [
-      "F2"
-    ],
+    "not_completed": [],
     "remaining_authorized_attempts": 0,
     "all_attempts_usage": {
-      "input_tokens": 2252910,
-      "cached_input_tokens": 1996032,
-      "output_tokens": 17051,
-      "agent_seconds": 414.41109341662377
+      "input_tokens": 2473976,
+      "cached_input_tokens": 2188288,
+      "output_tokens": 19433,
+      "agent_seconds": 487.0698401252739
     },
     "latest_root": {
-      "candidate": "0b0631818c7b88d44d4334469b34c4118656d13c",
-      "root": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9",
-      "status": "FAIL",
-      "selected_result": "1/2",
-      "units": [
+      "candidate": "62d19e1c5cdc97fde30b0a26c97caf5075c65194",
+      "root": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10",
+      "status": "PASS",
+      "selected_result": "1/1",
+      "unit_id": "REPAIR25-F2",
+      "agent_seconds": 72.65874670865014,
+      "usage": {
+        "cache_write_input_tokens": 0,
+        "cached_input_tokens": 192256,
+        "input_tokens": 221066,
+        "output_tokens": 2382,
+        "reasoning_output_tokens": 1174
+      },
+      "assertions": {
+        "complete_snapshots": true,
+        "media_unchanged": true,
+        "other_objects_unchanged": true,
+        "read_refinement": true,
+        "source_unchanged": true,
+        "target_cardinality": true,
+        "target_identity": true,
+        "target_values": true
+      },
+      "material_gates": {
+        "broker_provenance": true,
+        "completed_turn": true,
+        "cumulative_agent_budget": true,
+        "final_response_present": true,
+        "memory_isolated": true,
+        "no_collaboration": true,
+        "no_discovery_or_direct_waapi": true,
+        "no_write_like_commands": true,
+        "one_target_skill": true,
+        "only_authenticated_gateway_and_skill_reads": true,
+        "only_packaged_references": true,
+        "policy_checkpoint": true,
+        "source_and_workspace_unchanged": true,
+        "visible_preview_notice": true
+      },
+      "source_unchanged": true,
+      "sandbox_retained": false,
+      "assessment": "Business PASS: exact miss -> unique fallback -> exact-ID Min/Max/InitialValue readback, same GUID, no new approval or project write. Accurate final answer.",
+      "verify_only": {
+        "exit_code": 0,
+        "inventoried_files": 75,
+        "files_unchanged": true,
+        "argv": [
+          "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/.venv/bin/python",
+          "/Users/xiye/Documents/Git/waapi-skills/tests/semantic/run_codex_skill_campaign.py",
+          "--profile",
+          "waapi_v11_repairs_4",
+          "--version",
+          "2025.1",
+          "--case-id",
+          "REPAIR25-F2",
+          "--model",
+          "gpt-5.6-terra",
+          "--reasoning-effort",
+          "medium",
+          "--service-tier",
+          "default",
+          "--codex-binary",
+          "/opt/homebrew/Caskroom/codex/0.157.1/bin/codex",
+          "--campaign-root",
+          "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10",
+          "--resume",
+          "--verify-only"
+        ]
+      },
+      "evidence": [
         {
-          "unit_id": "REPAIR25-F2",
-          "status": "FAIL",
-          "agent_seconds": 50.53855687472969,
-          "usage": {
-            "cache_write_input_tokens": 0,
-            "cached_input_tokens": 130304,
-            "input_tokens": 149553,
-            "output_tokens": 1613,
-            "reasoning_output_tokens": 756
-          },
-          "assertions": {
-            "complete_snapshots": true,
-            "media_unchanged": true,
-            "other_objects_unchanged": true,
-            "read_refinement": false,
-            "source_unchanged": true,
-            "target_cardinality": true,
-            "target_identity": true,
-            "target_values": true
-          },
-          "material_gates": {
-            "broker_provenance": false,
-            "completed_turn": true,
-            "cumulative_agent_budget": true,
-            "final_response_present": true,
-            "memory_isolated": true,
-            "no_collaboration": true,
-            "no_discovery_or_direct_waapi": true,
-            "no_write_like_commands": true,
-            "one_target_skill": true,
-            "only_authenticated_gateway_and_skill_reads": true,
-            "only_packaged_references": true,
-            "policy_checkpoint": false,
-            "source_and_workspace_unchanged": true,
-            "visible_preview_notice": true
-          },
-          "source_unchanged": true,
-          "sandbox_retained": true,
-          "assessment": "No-match followed by unique fallback without new permission is observed; required Min/Max/InitialValue were not read. Full F2 remains FAIL.",
-          "evidence": [
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-task-result.json",
-              "sha256": "5567fd88e1737b1850d3c7eaa94f6b661952a77c684d906ae83b0f28bd5e6769"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/codex-facts.json",
-              "sha256": "6afce05f0b465a6b733e2d31ae5807bce447f0a122192976b5d57e23991e0c1b"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-broker.json",
-              "sha256": "ee5cd6792990cbce35dd02aee80ef0100631aadb7bd7bf9c65312c2d81b7e7ce"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-oracle.json",
-              "sha256": "3c9251eeb6e2344540451892b9067a8097dede0b601ee6bd612b60f68876997a"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/lifecycle.json",
-              "sha256": "c60d4acfa90a5e296fe83a421a36026ae4f3547b0a8d2a59276a111de256ef82"
-            }
-          ]
+          "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-task-result.json",
+          "sha256": "081eae4ed0317d704bea524f2aed5abb61a2d3d952fb9ad15a76b2eb8a548a6d"
         },
         {
-          "unit_id": "REPAIR25-F3",
-          "status": "PASS",
-          "agent_seconds": 119.30268895812333,
-          "usage": {
-            "cache_write_input_tokens": 0,
-            "cached_input_tokens": 496896,
-            "input_tokens": 552009,
-            "output_tokens": 4272,
-            "reasoning_output_tokens": 1730
-          },
-          "assertions": {
-            "complete_snapshots": true,
-            "media_unchanged": true,
-            "other_objects_unchanged": true,
-            "source_unchanged": true,
-            "target_cardinality": true,
-            "target_identity": true,
-            "target_values": true
-          },
-          "material_gates": {
-            "broker_provenance": true,
-            "completed_turn": true,
-            "cumulative_agent_budget": true,
-            "final_response_present": true,
-            "memory_isolated": true,
-            "no_collaboration": true,
-            "no_discovery_or_direct_waapi": true,
-            "no_write_like_commands": true,
-            "one_target_skill": true,
-            "only_authenticated_gateway_and_skill_reads": true,
-            "only_packaged_references": true,
-            "policy_checkpoint": true,
-            "source_and_workspace_unchanged": true,
-            "visible_preview_notice": true
-          },
-          "source_unchanged": true,
-          "sandbox_retained": false,
-          "assessment": "Business PASS: one exact GameParameter with requested values, preserved before-state, concrete notice before execution, accurate final answer.",
-          "evidence": [
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/expansion-task-result.json",
-              "sha256": "639aba314107a8a9dcc271e5910a88bdafaf3eea410f23ac7e159c391bfb9ef5"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/turns/turn-01/codex-facts.json",
-              "sha256": "4e5827c04f85341f18003bc069b016d9f59c65fe3210628860e66f29e7e70a79"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/expansion-broker.json",
-              "sha256": "cf2894608af29238f5f18d6d1a63923c5a98ca6e1f613071cb710f620978e3a9"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/expansion-oracle.json",
-              "sha256": "0b85a09334932be1f8de76713508d5dfade8863eee8cbd90dbc31530d7b612d5"
-            },
-            {
-              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/lifecycle.json",
-              "sha256": "60972551ebb3abc18947b75125d13ca6c0d92733ad9d95421d9c1ba907eb7be0"
-            }
-          ]
+          "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/codex-facts.json",
+          "sha256": "2089350bf9d612a1739cdfdab42a229366042be613f23e055f99897c47bd3d5a"
+        },
+        {
+          "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-oracle.json",
+          "sha256": "e9f50f581604708090f2c435f25435ee8ffebfc1771d7edf590a2a203b9f43d3"
+        },
+        {
+          "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-broker.json",
+          "sha256": "989a7101df79ba930e23bcf57ff605b56bd72e25149976dea7c9e6f772961c67"
+        },
+        {
+          "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/lifecycle.json",
+          "sha256": "afd594a06df5fc404d14c09d3984248438b3576bc67573220b61e5abd6ae42b9"
+        },
+        {
+          "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f2-r10/consolidated-summary.json",
+          "sha256": "c3300a135a072619f94fb6d29981ae6eafc944494ccda198f09e9c75e173778b"
         }
-      ],
-      "verify_only_run": false,
-      "reason_no_verify_only": "Root contains an ordinary F2 FAIL; original failed roots are not replayed."
-    }
+      ]
+    },
+    "evidence_scope": "cumulative across separately frozen candidates and roots; not a single-root or same-candidate four-workflow PASS"
   }
 }

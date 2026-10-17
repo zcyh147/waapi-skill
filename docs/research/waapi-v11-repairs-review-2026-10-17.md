@@ -57,3 +57,8 @@ Subsequent r9 F3 PASS is actual Agent evidence; r9 F2 remains FAIL.
 
 Reports are preserved under the separate
 `.waapi-skill-state/repair-evidence/supplement-query-routing-963a9f5a/reviews/`.
+
+Final evidence-only successor `62d19e1c` also passed F2 fresh and identical
+verify-only. Its product/harness matches `0b063181`; all four workflows now have
+cumulative business PASS across separately frozen roots. Historical failures
+remain intact, and this is not a same-candidate or single-root four-case PASS.

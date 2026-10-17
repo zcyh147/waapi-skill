@@ -1,9 +1,11 @@
 # WAAPI v1.1 repairs: acceptance checkpoint
 
-Implementation and review are complete. Nine approved actual Fresh attempts
-provide business PASS for F1, F3 and F4; F2 remains incomplete. Latest executed
-candidate: `0b0631818c7b88d44d4334469b34c4118656d13c`. PR #173 stays draft pending
-the user's decision about the remaining Fresh limitation. No automatic rerun.
+Implementation, review and scoped acceptance are complete. Ten approved actual
+Fresh attempts provide cumulative business PASS for F1–F4 across separately
+frozen candidates and roots. This is not a single-root or same-candidate four-case
+PASS. Latest executed candidate: `62d19e1c5cdc97fde30b0a26c97caf5075c65194`, whose
+product/harness matches `0b063181`; the intervening commit records evidence only.
+PR #173 may move to ready for review; do not merge it automatically.
 
 ## Development and native evidence
 
@@ -41,8 +43,8 @@ live campaign. No native-Windows acceptance is claimed.
 ## Fresh results
 
 All actual runs used Mac Wwise 2025.1, Terra / medium / default. The original
-four-attempt budget received explicit additions of one, two, and two attempts.
-Exactly nine Agent attempts have been consumed; none remain authorized.
+four-attempt budget received explicit additions of one, two, two, and one attempts.
+Exactly ten Agent attempts have been consumed; none remain authorized.
 
 | Root suffix / candidate | Attempts | Business outcome | Original verdict |
 | --- | ---: | --- | --- |
@@ -55,13 +57,15 @@ Exactly nine Agent attempts have been consumed; none remain authorized.
 | `retry-f2-f3-r7` / `cb50f129` | F2 | Legal offline `--version 2025.1 query-schema` misclassified by harness; zero Gateway dispatch | Task FAIL; campaign BLOCKED; F3 unattempted |
 | `final-f3-r8` / `55063fa8` | F3 | Repeated existing-object setRange selection for new-object task; no Agent write | Task/matrix/campaign FAIL |
 | `retry-f2-f3-r9` / `0b063181` | F2, F3 | F2 incomplete; **F3 Business PASS** | Selected 1/2; F2 FAIL, F3 PASS; campaign FAIL |
+| `final-f2-r10` / `62d19e1c` | F2 | **Business PASS**: exact miss, unique fallback, exact-ID range/default readback; no change | Selected 1/1 task/matrix/campaign PASS; identical verify-only |
 
 Every root name above has prefix `imac-v11-repairs-` beneath the local
 `skills/waapi-skill-workspace/`. Raw failures were neither replayed nor regraded.
-Only the originally all-PASS r6 root received identical verify-only; exit 0 and
-all 78 inventoried files unchanged. The mixed r9 root was not replayed.
+Only originally all-PASS roots received identical verify-only: r6 exited 0 with
+all 78 inventoried files unchanged; r10 exited 0 with all 75 files unchanged.
+The mixed r9 root was not replayed.
 
-### Latest F2: partial outcome, full case FAIL
+### Historical r9 F2: partial outcome, full case FAIL
 
 The Agent read query-schema, queried the absent `Repair_WindSpeed`, received
 explicit read-refinement permission, and independently found the unique
@@ -75,6 +79,18 @@ is not met. The independent fixture's values do not substitute for Agent-visible
 reads. The public query reference/schema disclose custom field projection through
 `--include-field`; this attempt does not demonstrate a new business implementation
 fault. It remains an ordinary FAIL, not a framework-only business PASS.
+
+### Final r10 F2: complete autonomous read workflow
+
+On the unchanged product/harness, the approved final F2 attempt read the
+version-pinned query schema, obtained an exact no-match for Repair_WindSpeed,
+then found unique Repair_WindVelocity without requesting new permission. It
+used that exact GUID for field projection, refined non-unique field meanings,
+and read Min=-12, Max=36 and InitialValue=7. The final answer reports the exact
+identity, path and values. All eight independent assertions and all material
+turn gates passed; before/after snapshots are identical. There was no Agent
+project write, the source hash/mtime remained unchanged, and the PASS sandbox
+was removed. Identical verify-only started neither Codex nor Wwise.
 
 ### Latest F3: independently verified creation
 
@@ -113,13 +129,13 @@ regression and independent review passed, followed by r9 F3 PASS. See
 [review closeout](waapi-v11-repairs-review-2026-10-17.md). Earlier framework focused
 counts remain in preserved summaries and Git history, not a combined full gate.
 
-## Protection, usage, audit and remaining decision
+## Protection, usage, audit and closure
 
 Every actual attempt preserved source-project full hash and project mtime.
 Passing sandboxes were removed, failed sandboxes quarantined, and scoped Wwise
-processes cleared. One-shot LaunchAgents for r7/r8/r9 were removed. Total recorded
-usage: 2252910 input tokens, 1996032 cached input tokens, 17051 output tokens,
-414.4111 Agent seconds. These are usage fields, not monetary estimates; fixture
+processes cleared. One-shot LaunchAgents for r7/r8/r9/r10 were removed. Total recorded
+usage: 2473976 input tokens, 2188288 cached input tokens, 19433 output tokens,
+487.0698 Agent seconds. These are usage fields, not monetary estimates; fixture
 and development-test work is separate.
 
 The branch audit retains 849 routes, 24310 structural occurrences and explicit
@@ -131,6 +147,9 @@ relocation records and separate supplements live under
 (9898 bytes), including captured result summaries rather than full stdout.
 Original Fresh roots remain in the main workspace.
 
-F2 remains the sole incomplete Fresh workflow. Additional execution requires a
-new user budget decision; the alternative is explicit acceptance of this delivery
-limitation. Tickets #163–#172 remain linked to draft PR #173; no main merge occurs.
+All four requested Fresh business workflows now have cumulative PASS evidence.
+Historical failures, candidate differences, F1's raw archive BLOCKED verdict and
+the audit's unknown business mappings remain explicit. This does not establish
+all-branch functional support or native-Windows acceptance. Tickets #163–#172
+are linked through PR #173's closing references; they close through the normal
+merge workflow. This task prepares the reviewed PR and does not merge main.
