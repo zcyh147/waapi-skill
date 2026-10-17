@@ -50,6 +50,8 @@ Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. Repeated `--rela
 
 Identity projections always request `id,name,type,path`. Native rows can omit optional facts: `unavailable_fields` names absent outputs, while explicit null stays null. Missing identity facts also produce `identity_completeness.complete=false` and retain the bounded `native_observation`; those rows cannot certify mutation targets. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
 
+`query-schema` lists the outputs available in the selected Wwise version. Use `query-schema --output NAME` for one output's meaning, applicability, result shape and supported versions. Audio conversion facts, Work Unit status, music context, state data and extracted SoundBank data use the same closed `--include` lane.
+
 Offline schema:
 
 ```bash

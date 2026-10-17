@@ -110,6 +110,11 @@ from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[report
     build_advanced_object_get_query,
     build_object_get_query,
 )
+from wwise_waapi.object_query_outputs import (  # noqa: E402
+    QUERY_BUSINESS_OUTPUTS,
+    available_query_outputs,
+    query_output_detail,
+)
 from wwise_waapi.builders.stable_reads import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     MAX_BUS_PIPELINE_IDS,
     STABLE_READ_RESULT_LIMIT_BYTES,
@@ -746,32 +751,6 @@ QUERY_BUSINESS_VIEWS: Mapping[str, tuple[str, ...]] = {
 }
 SOUNDBANK_GENERATED_TOPIC_URI = "ak.wwise.core.soundbank.generated"
 SOUNDBANK_TOPIC_IDENTITY_FIELDS = ("id", "name", "type", "path")
-QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
-    "notes": ("notes", "notes"),
-    "volume-db": ("@Volume", "volume_db"),
-    "pitch-cents": ("@Pitch", "pitch_cents"),
-    "output-bus": ("OutputBus", "output_bus"),
-    "source-language": ("audioSource:language", "source_language"),
-    "parent": ("parent", "parent"),
-    "owner": ("owner", "owner"),
-    "included": ("isIncluded", "included"),
-    "playable": ("isPlayable", "playable"),
-    "explicitly-muted": ("isExplicitMute", "explicitly_muted"),
-    "explicitly-soloed": ("isExplicitSolo", "explicitly_soloed"),
-    "child-count": ("childrenCount", "child_count"),
-    "plugin-name": ("pluginName", "plugin_name"),
-    "category": ("category", "category"),
-    "file-path": ("filePath", "file_path"),
-    "original-file-path": ("originalFilePath", "original_file_path"),
-    "active-source": ("activeSource", "active_source"),
-    "override-output": ("OverrideOutput", "override_output"),
-    "action-type": ("ActionType", "action_type"),
-    "target": ("Target", "target"),
-    "work-unit": ("workunit", "work_unit"),
-    "source-duration": ("audioSource:playbackDuration", "source_duration"),
-    "max-radius": ("audioSource:maxRadiusAttenuation", "max_radius"),
-    "switch-container-child-context": ("switchContainerChildContext", "switch_container_child_context"),
-}
 MAX_QUERY_BUSINESS_OUTPUTS = 32
 MAX_QUERY_CUSTOM_OUTPUTS = 16
 MAX_QUERY_CUSTOM_FIELD_CHARS = 128
@@ -2271,6 +2250,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_schema.add_argument("--all-versions", action="store_true")
+    query_schema.add_argument("--output", choices=tuple(QUERY_BUSINESS_OUTPUTS), help="Describe one closed business output, its native result shape and version availability")
     query_schema.add_argument(
         "--advanced",
         action="store_true",
@@ -5397,7 +5377,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "--max-results or pass exactly 100."
             )
         args.max_results = 100
-    _compile_query_business_projection(args)
+    (projection_version,) = resolve_catalog_versions(args, env=env)
+    _compile_query_business_projection(args, version=projection_version)
     args.where = []
     args.select = [
         QUERY_BUSINESS_RELATIONSHIPS[value]
@@ -5540,7 +5521,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
     _require_explicit_query_bound(args)
 
 
-def _compile_query_business_projection(args: argparse.Namespace) -> None:
+def _compile_query_business_projection(args: argparse.Namespace, *, version: str) -> None:
     """Compile stable business output names into exact object.get accessors."""
 
     requested = list(getattr(args, "business_outputs", ()) or ())
@@ -5568,6 +5549,9 @@ def _compile_query_business_projection(args: argparse.Namespace) -> None:
 
     bindings: list[tuple[str, str, str]] = []
     for name in requested:
+        if name not in available_query_outputs(version):
+            supported = query_output_detail(version, name)["supported_versions"]
+            raise GatewayInputError(f"query-object --include {name} is available in Wwise {', '.join(supported)}; selected version is {version}")
         native, output = QUERY_BUSINESS_OUTPUTS[name]
         bindings.append(("business", native, output))
 
@@ -8333,9 +8317,16 @@ def query_business_schema_payload(
     version: str,
     *,
     advanced: bool,
+    output: str | None = None,
 ) -> dict[str, Any]:
     """Describe the one deep direct-read continuation for an object query."""
 
+    if output is not None:
+        return {
+            "contract": BUSINESS_QUERY_SCHEMA_CONTRACT,
+            "ok": True, "status": "ok", "command": "query-schema", "version": version,
+            "business_output": query_output_detail(version, output),
+        }
     if advanced:
         advanced_schema = advanced_query_schema(version=version)
         waql_schema = advanced_schema["properties"]["waql"]
@@ -8350,7 +8341,8 @@ def query_business_schema_payload(
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
             "result_presence": _query_result_presence_contract(),
-            "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+            "business_outputs": list(available_query_outputs(version)),
+            "output_detail": "query-schema --output <business-output>",
             "custom_outputs": {
                 "available": False,
                 "reason": "advanced WAQL has no Gateway-provable live metadata scope",
@@ -8390,7 +8382,8 @@ def query_business_schema_payload(
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
         "result_presence": _query_result_presence_contract(),
-        "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
+        "business_outputs": list(available_query_outputs(version)),
+        "output_detail": "query-schema --output <business-output>",
         "custom_outputs": {
             "field_meaning": "--include-field <user-facing property/reference meaning>",
             "authority": "live WAAPI metadata bound by the Gateway before object.get",
@@ -9738,7 +9731,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         if len(versions) == 1:
             return {
                 **query_business_schema_payload(
-                    versions[0], advanced=args.advanced
+                    versions[0], advanced=args.advanced, output=args.output
                 ),
                 "offline": True,
                 "versions": list(versions),
@@ -9760,6 +9753,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 version: query_business_schema_payload(
                     version,
                     advanced=args.advanced,
+                    output=args.output,
                 )
                 for version in versions
             },
