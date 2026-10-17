@@ -227,7 +227,12 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
             read_call=lambda uri, call_args, call_options: {})
         assert role_validation_before_dispatch["ok"] is True
-        assert prepared_before_dispatch.as_dict()["pre_state"]["cli_project_effect"]["uri"] == entry.uri
+        if entry.uri == "ak.wwise.cli.verify":
+            # Verify reports a documented process outcome; it does not request
+            # a project write or claim independently observed filesystem effects.
+            assert "cli_project_effect" not in prepared_before_dispatch.as_dict()["pre_state"]
+        else:
+            assert prepared_before_dispatch.as_dict()["pre_state"]["cli_project_effect"]["uri"] == entry.uri
 
     request_validation = validate_semantic_payload(
         entry.uri,
@@ -506,7 +511,11 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert observed["outcome"] == ("not_reported" if earlier_void else "success")
         assert ("exit_code" not in observed) if earlier_void else observed["exit_code"] == 0
         assert verification.business_state_verified is False
-        if entry.uri in {
+        if entry.uri == "ak.wwise.cli.verify":
+            assert verification.status == "result_schema_checked"
+            assert verification.verification_strength == "documented_cli_process_outcome"
+            assert verification.readbacks == (observed,)
+        elif entry.uri in {
             "ak.wwise.cli.createNewProject", "ak.wwise.cli.addNewPlatform", "ak.wwise.cli.dumpObjects",
         }:
             assert verification.status == "verification_failed"
