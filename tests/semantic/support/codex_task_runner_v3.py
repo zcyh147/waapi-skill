@@ -1703,6 +1703,8 @@ def run_expansion_codex_task(
     prompts = (prepared.prompt,)
     if prepared.policy == "ask_before_changes":
         prompts += ("这一步预览没问题，按当前预览执行并核验结果。",)
+    skill_read_schedule = (("SKILL.md", "references/waapi-query.md"
+        if repair and prepared.policy == "read_only" else "references/waapi-operate.md"),)
     plan = {
         "contract": "waapi-skill.repair-task-plan/v1" if repair else "waapi-skill.integration-expansion-task-plan/v1",
         "unit_id": unit.unit_id, "version": unit.version, "policy": prepared.policy,
@@ -1726,6 +1728,8 @@ def run_expansion_codex_task(
         "model": options.model, "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
     }
+    if repair:
+        plan["skill_read_schedule"] = [list(turn) for turn in skill_read_schedule]
     from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as notice_contract, CASES as notice_cases
     if unit.unit_id.rsplit("-", 1)[-1] in notice_cases:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_runtime_identity
@@ -1749,7 +1753,7 @@ def run_expansion_codex_task(
         sandbox_mode="workspace-write", allow_output_write=False, network_access=True,
         developer_instructions=semantic_task_developer_instructions(
             options.skill_source / "scripts" / "run.py", task_skill_source=skill_install,
-            expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+            expected_skill_reads=skill_read_schedule,
             expansion_modification_policy=prepared.policy,
         ),
     )
@@ -1816,7 +1820,9 @@ def run_expansion_codex_task(
                         "one_target_skill": result.prompt_audit.passed,
                         "no_collaboration": result.collab_call_count == 0,
                         "only_packaged_references": (len(references) <= 12 and set(references).issubset(allowed_references)
-                                                      and (index != 1 or bool(references) and references[0] == "SKILL.md")),
+                                                      and (index != 1 or bool(references) and references[0] == "SKILL.md")
+                                                      and (not repair or references == skill_read_schedule[index - 1]
+                                                           and tuple(record.command for record in records[:len(references)]) == tuple(facts.allowed_read_commands))),
                         "only_authenticated_gateway_and_skill_reads": (
                             effective_count == len(command_rows) + len(facts.allowed_read_commands)
                             and not facts.non_gateway_unexpected_commands),

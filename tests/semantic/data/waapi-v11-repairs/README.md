@@ -21,7 +21,7 @@ from the sealed campaign evidence. Executor is gpt-5.6-terra, medium reasoning,
 default service tier. Each task has
 600 cumulative Agent seconds and at most 96 Gateway calls; the batch has at most
 2400 Agent seconds. No automatic retry or version multiplication. The only
-smaller selection is the explicitly documented F2–F4 continuation below.
+smaller selections are the explicitly documented F2–F4 and F3–F4 continuations below.
 Fixture setup calls and native preflight are deterministic runner work and are
 recorded separately from Agent transactions. No Windows acceptance is claimed.
 
@@ -143,3 +143,31 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
 Report this root's result as **three selected workflows**, separately from the
 r3 F1 business assessment and its original BLOCKED campaign verdict. A 3/3 root
 must never be described as a single-root or same-candidate 4/4 campaign PASS.
+
+## Unattempted F3–F4 after r4
+
+Root `imac-v11-repairs-remaining3-r4` attempted F2, which remains an ordinary
+**FAIL**, with no business PASS. Its guessed query was rejected before project
+query dispatch. The harness also wrongly required the operate reference for a
+read-only task, and the archive consumer could not preserve the original
+read-only notice gate; those framework discrepancies do not change the failed
+read outcome. The original root and quarantine remain frozen.
+
+Only F3 and F4 are still unattempted and already authorized. The formal campaign
+additionally accepts exactly ordered `REPAIR25-F3`, `REPAIR25-F4`: two fresh CLI
+tasks, two user turns, two transactions and 1200 maximum Agent seconds. This is
+not authorization to retry F2 or F1. Default/all-four and the previously reviewed
+F2–F4 selection remain unchanged for their documented purposes; arbitrary
+subsets, repeats and permutations remain rejected.
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile waapi_v11_repairs_4 --version 2025.1 \
+  --case-id REPAIR25-F3 --case-id REPAIR25-F4 \
+  --model gpt-5.6-terra --reasoning-effort medium --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/imac-v11-repairs-remaining2-r5
+```
+
+A passing root would establish only its selected 2/2 result. F1's separate
+business assessment and F2's original FAIL must remain visible in any overall
+acceptance report. No failed root is regraded by this continuation.
