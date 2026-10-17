@@ -99,6 +99,39 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert event_validation.section == "event"
         return
 
+    if entry.uri == "ak.wwise.core.sourceControl.setProvider":
+        # The closed route requires a private-profile proof. Synthesized native
+        # arguments cannot replace that public binding or bypass confidentiality.
+        from tests.unit.test_remaining_core_business_gateway import (
+            _provider_profile_case,
+            _authorize_provider_preview,
+            _assert_no_provider_secret_artifacts,
+        )
+        client, run, preview, state, evidence, _profile, _credential, secret = (
+            _provider_profile_case(tmp_path, version=entry.version)
+        )
+        assert contract["gateway_commands"] == ["request-schema"]
+        assert client.calls == []
+        _authorize_provider_preview(run, preview)
+        code, executed = run("execute", preview["transaction_id"])
+        assert code == 0 and executed["executed"] is True, executed
+        assert len(client.calls) == 1
+        assert client.calls[0][0]["provider"] == "Perforce"
+        assert client.calls[0][0]["password"] == secret
+        code, verified = run("verify", preview["transaction_id"])
+        assert code == 0 and verified["verified"] is False, verified
+        assert verified["result_schema_checked"] is True
+        observation = verified["agent_result"]["result"]
+        assert observation["protected_native_result"] is True
+        assert observation["native_result_schema_valid"] is True
+        assert observation["native_text_disclosed"] is False
+        assert observation["provider_identity_verified"] is False
+        assert observation["provider_effects_verified"] is False
+        _assert_no_provider_secret_artifacts(state, evidence, secret, preview, executed, verified)
+        code, replay = run("execute", preview["transaction_id"])
+        assert code != 0 and len(client.calls) == 1, replay
+        return
+
     args, options, expected_result = request_and_result_from_schema(entry.schema)
     earlier_void = (entry.version in {"2021.1", "2022.1", "2023.1"} and entry.uri in {
         "ak.wwise.cli.moveMediaIdsToSingleFile", "ak.wwise.cli.moveMediaIdsToWorkUnits",
