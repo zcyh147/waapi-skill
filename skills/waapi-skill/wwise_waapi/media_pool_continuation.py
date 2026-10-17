@@ -30,12 +30,16 @@ class MediaPoolQueryStore:
     """Immutable read plans, outside the project, with no mutation authority."""
 
     _HANDLE = re.compile(r"^mpq1-[0-9a-f]{32}$")
+    DIRECTORY = "media-pool-query-plans-v1"
+    CONTRACT = "waapi-skill.media-pool-query-plan/v1"
+    PREFIX = "mpq1-"
+    validate_plan = staticmethod(validate_media_pool_business_plan)
     MAX_RECORDS = 128
     MAX_RECORD_BYTES = 512 * 1024
     MAX_TOTAL_BYTES = 16 * 1024 * 1024
 
     def __init__(self, state_dir: Path):
-        self.root = state_dir / "media-pool-query-plans-v1"
+        self.root = state_dir / self.DIRECTORY
 
     @classmethod
     def validate_handle(cls, handle: str) -> None:
@@ -72,13 +76,13 @@ class MediaPoolQueryStore:
                 raise ValueError("record fields changed")
             digest = payload.pop("sha256")
             expiry = payload["expires_at"]
-            if (payload["contract"] != "waapi-skill.media-pool-query-plan/v1" or payload["handle"] != handle
+            if (payload["contract"] != self.CONTRACT or payload["handle"] != handle
                     or not isinstance(digest, str) or not hmac.compare_digest(canonical_sha256(payload), digest)
                     or type(expiry) not in (int, float) or not 0 < expiry <= time.time() + 900
                     or not isinstance(payload["plan"], dict) or not isinstance(payload["context"], dict)):
                 raise ValueError("record binding changed")
             if not allow_expired or expiry > time.time():
-                validate_media_pool_business_plan(payload["plan"])
+                self.validate_plan(payload["plan"])
             if not allow_expired and expiry <= time.time():
                 raise MediaPoolContinuationError("Media Pool query expired; start the search again")
             return payload
@@ -95,7 +99,7 @@ class MediaPoolQueryStore:
         (self.root / f"{handle}.json").unlink()
 
     def issue(self, *, plan: Mapping[str, Any], context: Mapping[str, Any], issued: int) -> str:
-        validate_media_pool_business_plan(plan)
+        self.validate_plan(plan)
         self._directory(create=True)
         paths = []
         for index, path in enumerate(self.root.iterdir()):
@@ -110,8 +114,8 @@ class MediaPoolQueryStore:
             else:
                 count += 1
                 total_bytes += path.stat().st_size
-        handle = "mpq1-" + secrets.token_hex(16)
-        body = {"contract": "waapi-skill.media-pool-query-plan/v1", "handle": handle,
+        handle = self.PREFIX + secrets.token_hex(16)
+        body = {"contract": self.CONTRACT, "handle": handle,
                 "plan": dict(plan), "context": dict(context), "expires_at": issued + 900}
         encoded = canonical_json_bytes({**body, "sha256": canonical_sha256(body)})
         if len(encoded) > self.MAX_RECORD_BYTES or count >= self.MAX_RECORDS or total_bytes + len(encoded) > self.MAX_TOTAL_BYTES:
