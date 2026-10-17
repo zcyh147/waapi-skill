@@ -854,3 +854,71 @@ def test_standalone_short_id_observation_keeps_lifecycle_and_original_evidence(t
     assert finished == [("PASS", "")]
     assert bindings[0]["scenario_id"] == "full-coverage-short-id-typed-observations"
     assert bindings[0]["scenario_root"] == root
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_path, workflow, version):
+    from tests.unit.test_object_graph_business_gateway import _info, _project
+
+    runtime, commands, config = _short_id_probe_runtime(tmp_path, version=version)
+    config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1",
+        "waapi_port": 8080, "project_modification_policy": "ask_before_changes"}))
+    rows = [
+        {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "Play_Example",
+         "type": "Event", "path": "\\Events\\Play_Example", "shortId": 123},
+        {"id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}", "name": "Dialogue_Example",
+         "type": "DialogueEvent", "path": "\\Events\\Dialogue_Example", "shortId": 456},
+    ]
+    dispatches = []
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return _project(tmp_path)
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [{"classId": 100, "name": "Event", "type": "WObject"},
+                                   {"classId": 101, "name": "DialogueEvent", "type": "WObject"}]}
+            assert uri == "ak.wwise.core.object.get", (uri, args, options)
+            dispatches.append((args, options))
+            if "waql" in args:
+                expression = args["waql"]
+                selected = rows[1] if "DialogueEvent" in expression or rows[1]["id"] in expression else rows[0]
+                assert expression in {
+                    "from type Event take 1", "from type DialogueEvent take 1",
+                    "from type Event where shortId = 123 take 65",
+                    "from type DialogueEvent where shortId = 456 take 65",
+                    *(f'from object "{row["id"]}"' + suffix for row in rows for suffix in ("", " take 64")),
+                }, expression
+            else:
+                assert version != "2021.1"
+                assert args == {"from": {"id": [{"shortId": 123, "type": 10}]},
+                                "transform": [{"range": [0, 65]}]}, args
+                selected = rows[0]
+            assert options == {"return": ["id", "name", "type", "path", "shortId"]}, options
+            return {"return": [{key: selected[key] for key in options["return"]}]}
+
+        def disconnect(self):
+            pass
+
+    def gateway(command):
+        commands.append(list(command))
+        workflow.waapi_gateway.build_parser().parse_args(list(command))
+        return workflow.waapi_gateway.execute_gateway(
+            ["--state-dir", str(runtime.state_dir), *command], env=runtime.env,
+            client_factory=lambda _url: Client())
+
+    runtime.raw_gateway = gateway
+    workflow.test_read_only_short_id_native_observation(runtime)
+    category, = runtime.category_results
+    evidence = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "PASS" and len(commands) == 7
+    assert [row["short_id"] for row in evidence["observations"]] == [123, 456]
+    assert [row["canonical_id"] for row in evidence["observations"]] == [row["id"] for row in rows]
+    assert len(dispatches) == 8
+    assert any(args == {"waql": "from type DialogueEvent where shortId = 456 take 65"}
+               for args, _options in dispatches)
+    if version == "2021.1":
+        assert any(args == {"waql": "from type Event where shortId = 123 take 65"}
+                   for args, _options in dispatches)
