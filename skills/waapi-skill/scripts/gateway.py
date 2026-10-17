@@ -47,7 +47,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
 )
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -2615,6 +2615,9 @@ def build_parser() -> argparse.ArgumentParser:
     _add_business_draft_binding_arguments(draft_layout_plan)
     draft_layout_plan.add_argument("--layout-handle", required=True)
     draft_layout_plan.add_argument("--new-layout-name")
+    draft_layout_plan.add_argument('--view-type')
+    draft_layout_plan.add_argument('--initial-x', type=int)
+    draft_layout_plan.add_argument('--initial-y', type=int)
     draft_declare_host_plan = subparsers.add_parser(
         "draft-declare-host-plan",
         help=(
@@ -13179,9 +13182,19 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         plan['new_layout_name'] = args.new_layout_name
     elif args.new_layout_name is not None:
         raise GatewayInputError('--new-layout-name belongs only to temporary layout registration')
+    view_request = None
+    if pending.operation == LAYOUT_GET_OR_CREATE_URI:
+        view_request = {'view_type': args.view_type}
+        for field in ('initial_x', 'initial_y'):
+            if getattr(args, field) is not None:
+                view_request[field] = getattr(args, field)
+        plan.update(view_request)
+    elif args.view_type is not None or args.initial_x is not None or args.initial_y is not None:
+        raise GatewayInputError('View type and initial coordinates belong only to get-or-create-view')
     settings = {'authoring_layout_plan': plan,
                 'authoring_layout_binding': layout_binding_descriptor(identity,
-                    registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None)}
+                    registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None,
+                    view_request=view_request)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
         adapter.materialize(candidate)

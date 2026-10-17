@@ -50,7 +50,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "517197ef887715372723cbe97837e8b322e58a788a2cd1fe03abc26e553ad046"
+    "91272dc2321875e118cb87279df45091236d8560df1f253735af2de2e3dfd5db"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -121,35 +121,35 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         ),
         "2024.1": MappingProxyType(
             {
-                "functions": 171,
+                "functions": 172,
                 "topics": 34,
-                "public_functions": 171,
+                "public_functions": 172,
                 "public_topics": 34,
-                "public_total": 205,
+                "public_total": 206,
             }
         ),
         "2025.1": MappingProxyType(
             {
-                "functions": 178,
+                "functions": 179,
                 "topics": 35,
-                "public_functions": 178,
+                "public_functions": 179,
                 "public_topics": 35,
-                "public_total": 213,
+                "public_total": 214,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 869
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 869
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 213
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 871
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 871
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 214
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
             "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
-            "2024.1": "5829d414af16cd89198fd5e5c476e1824e60a4e741c066420664328ff6b7866a",
-            "2025.1": "e5b72e4c81be3b56bedae9e7f7bb8f84aba72688225597fb239fb5a6110cf6a0",
+            "2024.1": "e2e6d29617c510e34874191b9e5fbf2cd5bf0a463bf3cb639dec9c324c00db89",
+            "2025.1": "2d2917a05051ce45c8dd56aa8ae46c4e6c58cf9b9c1c181b526eccbd387431ad",
         }
     )
 )

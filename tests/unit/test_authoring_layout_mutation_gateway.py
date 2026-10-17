@@ -25,14 +25,33 @@ class LayoutClient(FakeClient):
         project.write_text('<WwiseDocument/>', encoding='utf-8')
         self.current = 'Designer'
         self.missing_failure = None
+        self.views = {name: [] for name in ('Designer', 'Profiler')}
+        self.rectangles = {}
         self.layouts = {name: {'Layout': {'Name': name, 'StackPanel': {'Name': 'StackPanel', 'ID': NODE,
             'Orientation': 'Horizontal', '@Children': []}}} for name in ('Designer', 'Profiler')}
         super().__init__({'ak.wwise.core.getInfo': info,
             'ak.wwise.core.getProjectInfo': {'id': PROJECT, 'name': 'Sandbox', 'path': str(project)},
             URI + 'getLayoutNames': {'layouts': ['Designer', 'Profiler']},
+            URI + 'getViewTypes': {'viewTypes': [{'viewName': 'ProjectExplorer', 'viewDisplayName': 'Project Explorer'}]},
             URI + 'getViewInstances': {'viewInstances': []}})
 
     def call(self, uri, args=None, options=None):
+        if uri == URI + 'getViewInstances':
+            self.calls.append((uri, args, options))
+            return {'viewInstances': deepcopy(self.views.get(args['name'], []))}
+        if uri == URI + 'getOrCreateView':
+            self.calls.append((uri, args, options))
+            existing = next((row for row in self.views[self.current] if row['viewName'] == args['name']), None)
+            if existing:
+                return {'id': existing['viewID']}
+            view_id = '{22222222-2222-2222-2222-222222222222}'
+            self.views[self.current].append({'viewID': view_id, 'viewName': args['name'], 'viewDisplayName': 'Project Explorer', 'viewIsDocked': False})
+            left, top = args.get('posX', 100), args.get('posY', 200)
+            self.rectangles[view_id] = {'left': left, 'top': top, 'right': left + 300, 'bottom': top + 400}
+            return {'id': view_id}
+        if uri == URI + 'getElementRectangle':
+            self.calls.append((uri, args, options))
+            return deepcopy(self.rectangles.get(args['id'], {}))
         if uri == URI + 'getLayout':
             self.calls.append((uri, args, options))
             if args['name'] not in self.layouts:
@@ -59,7 +78,7 @@ class LayoutClient(FakeClient):
         return super().call(uri, args, options)
 
 
-def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', operation='switchLayout', fields=(), client_setup=None, expect_check_error=False):
+def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', operation='switchLayout', fields=(), client_setup=None, expect_check_error=False, layout_name='Profiler'):
     env = gateway_env(tmp_path)
     set_gateway_config(env, wwise_version=version, project_modification_policy=policy)
     state_dir = tmp_path / 'state'
@@ -70,7 +89,7 @@ def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', o
     code, schema = gateway.execute_gateway(['--version', version, 'request-schema', URI + operation], env=env,
         client_factory=lambda _: pytest.fail('schema must stay offline'))
     assert code == 0, schema
-    code, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Profiler'],
+    code, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', layout_name],
         env=env, client_factory=lambda _: client)
     assert code == 0, inspected
     code, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env,
@@ -114,7 +133,7 @@ def test_register_empty_owned_layout_uses_exact_absence_proof_and_closed_name(tm
     assert URI + 'setLayout' not in [row[0] for row in client.calls]
 
 
-def confirm_execute_verify(env, state, client, preview):
+def confirm_execute_verify(env, state, client, preview, *, expect_verification_failure=False):
     tx = preview['transaction_id']
     code, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
     assert code == 0, shown
@@ -123,7 +142,7 @@ def confirm_execute_verify(env, state, client, preview):
     code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
     assert code == 0, executed
     code, verified = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
-    assert code == 0, verified
+    assert (code != 0) if expect_verification_failure else (code == 0), verified
     return verified
 
 
@@ -191,6 +210,98 @@ def test_registration_rechecks_absence_after_confirmation_without_overwrite(tmp_
     code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
     assert code != 0, rejected
     assert URI + 'setLayout' not in [row[0] for row in client.calls]
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+@pytest.mark.parametrize('coordinates', [{}, {'initial_x': 17}, {'initial_y': 29}, {'initial_x': -1, 'initial_y': 45}])
+def test_create_or_get_view_owns_live_type_and_preserves_each_optional_coordinate(tmp_path, version, coordinates):
+    fields = ['--view-type', 'ProjectExplorer']
+    for key, value in coordinates.items():
+        fields.extend(['--' + key.replace('_', '-'), str(value)])
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='getOrCreateView',
+        layout_name='Designer', fields=fields)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    expected = {'name': 'ProjectExplorer', **{ {'initial_x': 'posX', 'initial_y': 'posY'}[key]: value for key, value in coordinates.items()}}
+    assert prepared['dispatch'] == {'uri': URI + 'getOrCreateView', 'args': expected, 'options': {}}
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert [row[0] for row in client.calls].count(URI + 'getOrCreateView') == 1
+    assert client.views['Designer'][0]['viewName'] == 'ProjectExplorer'
+
+
+def test_get_existing_view_does_not_claim_initial_position_was_applied(tmp_path):
+    existing = '{33333333-3333-3333-3333-333333333333}'
+    def setup(client):
+        client.views['Designer'] = [{'viewID': existing, 'viewName': 'ProjectExplorer', 'viewIsDocked': True}]
+    env, state, client, preview = switch_preview(tmp_path, operation='getOrCreateView', layout_name='Designer',
+        fields=('--view-type', 'ProjectExplorer', '--initial-x', '17', '--initial-y', '29'), client_setup=setup)
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert client.views['Designer'] == [{'viewID': existing, 'viewName': 'ProjectExplorer', 'viewIsDocked': True}]
+    assert URI + 'getElementRectangle' not in [row[0] for row in client.calls]
+
+
+@pytest.mark.parametrize('failure', ['unknown_type', 'omitted_catalog', 'wrong_current_layout'])
+def test_create_view_requires_fresh_type_authority_and_current_layout(tmp_path, failure):
+    fields = ('--view-type', 'NoSuchView' if failure == 'unknown_type' else 'ProjectExplorer')
+    setup = (lambda client: client.responses.update({URI + 'getViewTypes': {}})) if failure == 'omitted_catalog' else None
+    switch_preview(tmp_path, operation='getOrCreateView', fields=fields,
+        layout_name='Profiler' if failure == 'wrong_current_layout' else 'Designer', client_setup=setup, expect_check_error=True)
+
+
+@pytest.mark.parametrize('drift', ['catalog', 'instances'])
+def test_create_view_revalidates_live_catalog_and_instances_before_dispatch(tmp_path, drift):
+    env, state, client, preview = switch_preview(tmp_path, operation='getOrCreateView', layout_name='Designer',
+        fields=('--view-type', 'ProjectExplorer'))
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    _, confirmed = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert confirmed['state'] == 'confirmed'
+    if drift == 'catalog':
+        client.responses[URI + 'getViewTypes'] = {'viewTypes': []}
+    else:
+        client.views['Designer'].append({'viewID': '{33333333-3333-3333-3333-333333333333}', 'viewName': 'ProjectExplorer'})
+    code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert URI + 'getOrCreateView' not in [row[0] for row in client.calls]
+
+
+@pytest.mark.parametrize('failure', ['omitted_id', 'malformed_id', 'coordinate_mismatch'])
+def test_created_view_return_is_not_enough_to_verify_identity_or_position(tmp_path, failure):
+    env, state, client, preview = switch_preview(tmp_path, operation='getOrCreateView', layout_name='Designer',
+        fields=('--view-type', 'ProjectExplorer', '--initial-x', '17'))
+    original = client.call
+    def damaged_result(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'getOrCreateView':
+            if failure == 'omitted_id':
+                return {}
+            if failure == 'malformed_id':
+                return {'id': 'not-a-guid'}
+        if uri == URI + 'getElementRectangle' and failure == 'coordinate_mismatch':
+            result['left'] = 18
+        return result
+    client.call = damaged_result
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    if failure != 'coordinate_mismatch':
+        assert verified['verification']['readbacks'] == []
+    assert [row[0] for row in client.calls].count(URI + 'getOrCreateView') == 1
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+def test_layout_version_absence_is_backed_by_independent_authoring_catalog(tmp_path, version):
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    from wwise_waapi.native_catalog import load_native_catalog
+    native = load_native_catalog(version, 'wwise-authoring')
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version=version)
+    for api in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS:
+        assert api not in native['functions']
+        code, rejected = gateway.execute_gateway(['request-schema', api], env=env,
+            client_factory=lambda _: pytest.fail('native catalog absence must stay offline'))
+        assert code != 0, rejected
 
 
 def test_switch_layout_uses_closed_business_handle_and_immutable_preview(tmp_path):
