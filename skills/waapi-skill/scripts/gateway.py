@@ -3170,7 +3170,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     draft_discover_types.add_argument(
         "--role",
-        choices=("object", "source", "effect"),
+        choices=("object", "source", "effect", "sink", "metadata", "conversion"),
         required=True,
     )
     draft_apply.add_argument(
@@ -19200,7 +19200,7 @@ def dispatch_business_field_discovery(
                 or kind == "reference"
             )
         elif binding.record.operation == "object.createPlugin":
-            accepted = kind == "property" and value_type is not None
+            accepted = (kind == "property" and value_type is not None) or kind == "reference"
         elif binding.record.operation == "object.create":
             accepted = (
                 (kind == "property" and value_type is not None)
@@ -19718,9 +19718,9 @@ def dispatch_business_type_discovery(
         category = type_category.casefold()
         if role == "source":
             return category == "source"
-        if role == "effect":
-            return category == "effect"
-        return category not in {"source", "effect"}
+        if role in {"effect", "sink", "metadata", "conversion"}:
+            return category == {"effect": "effect", "sink": "audiodevice", "metadata": "metadata", "conversion": "conversion"}[role]
+        return category not in {"source", "effect", "audiodevice", "metadata", "conversion"}
 
     def score(meaning: str, *, name: str, category: str) -> int:
         query = meaning.strip().casefold()
@@ -27551,18 +27551,8 @@ def _business_next_action_binding(
             type_discovery = {
                 **operation_draft_prefix_copy_binding(type_discover_prefix),
                 "role_decision": {
-                    "source": [
-                        "--meaning",
-                        "<user-facing-plugin-name>",
-                        "--role",
-                        "source",
-                    ],
-                    "effect": [
-                        "--meaning",
-                        "<user-facing-plugin-name>",
-                        "--role",
-                        "effect",
-                    ],
+                    role: ["--meaning", "<user-facing-plugin-name>", "--role", role]
+                    for role in ("source", "effect", "sink", "metadata")
                 },
                 "result": "copy_one_returned_type_candidate.handle",
             }
@@ -27574,12 +27564,12 @@ def _business_next_action_binding(
                 ],
                 "append_repeated": [
                     "--meaning",
-                    "<user-facing-plugin-property-meaning>",
+                    "<user-facing-plugin-property-or-reference-meaning>",
                 ],
                 "meaning_count": (
                     f"1..{MAX_METADATA_DISCOVERY_QUERIES}_distinct_meanings"
                 ),
-                "use_only_when": "the_user_requested_plugin_properties",
+                "use_only_when": "the_user_requested_plugin_properties_or_references",
                 "token_input": "forbidden",
             }
             declaration = {
@@ -27591,7 +27581,7 @@ def _business_next_action_binding(
                     "<bound-plugin-target-handle>",
                     "--field",
                     "plugin_role",
-                    "<source-or-effect>",
+                    "<source-or-effect-or-sink-or-metadata>",
                     "--field",
                     "plugin_name",
                     "<requested-plugin-object-name>",
@@ -27602,7 +27592,7 @@ def _business_next_action_binding(
                     "[--field notes <exact-user-notes>]",
                     "[--field platform <exact-user-platform>]",
                     "[--field language <exact-source-language>]",
-                    "[--field-value <bound-property-handle> <business-value>]...",
+                    "[--field-value <bound-field-handle> <business-value-or-bound-object-handle>]...",
                 ],
             }
             return {

@@ -5547,6 +5547,7 @@ def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
         {
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.getTypes": [{"return": [{"classId": 123_456, "name": "Fixture Source", "type": "Source"}]}],
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {"return": []},
@@ -5607,6 +5608,7 @@ def test_object_create_plugin_runs_full_preview_confirm_execute_verify_chain(
         {
             "ak.wwise.core.getInfo": [live_info()],
             "ak.wwise.core.getProjectInfo": [project()],
+            "ak.wwise.core.object.getTypes": [{"return": [{"classId": 123_456, "name": "Fixture Source", "type": "Source"}]}],
             "ak.wwise.core.object.get": [
                 {"return": [object_row()]},
                 {"return": []},
