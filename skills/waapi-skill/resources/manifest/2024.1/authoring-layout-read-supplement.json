@@ -145,6 +145,78 @@
         },
         "type": "object"
       }
+    },
+    "ak.wwise.ui.layout.getElementRectangle": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "description": "The ID of the element.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "description": "Retrieves the current allocated rectangle of a layout element. An empty rect is returned if the element is not found.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "bottom": {
+            "description": "The bottom position of the element.",
+            "type": "number"
+          },
+          "left": {
+            "description": "The left position of the element.",
+            "type": "number"
+          },
+          "right": {
+            "description": "The right position of the element.",
+            "type": "number"
+          },
+          "top": {
+            "description": "The top position of the element.",
+            "type": "number"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.getViewHandle": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "viewID": {
+            "description": "The ID of the view.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "viewID"
+        ],
+        "type": "object"
+      },
+      "description": "Gets the frontend handle of an instantiated view.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "items": {
+          "$ref": "common_definitions.json#/definitions/guid",
+          "description": "The ID of the view handle."
+        },
+        "type": "array"
+      }
     }
   },
   "definitions": {

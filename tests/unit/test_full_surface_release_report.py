@@ -20,14 +20,15 @@ def test_committed_full_surface_release_report_matches_packaged_truth() -> None:
 
     assert report["contract"] == "waapi-skill.full-surface-release-report/v1"
     assert report["coverage"] == {
-        "construction_covered_lanes": 849,
-        "function_lanes": 689,
+        "construction_covered_lanes": 863,
+        "function_lanes": 703,
         "topic_lanes": 160,
-        "total_lanes": 849,
-        "unique_function_uris": 168,
+        "total_lanes": 863,
+        "unique_function_uris": 175,
         "unique_topic_uris": 35,
     }
     assert report["construction_shapes"] == {
+        "closed_read": 14,
         "draft": 116,
         "inline": 471,
         "topic": 160,
@@ -91,5 +92,22 @@ def test_release_report_rejects_invented_continuation_or_semantic_binding(
 
     assert len(report["audit"][expected_audit]) == 1
     assert report["coverage"]["construction_covered_lanes"] == (
-        848 if expected_audit == "missing_continuations" else 849
+        862 if expected_audit == "missing_continuations" else 863
     )
+
+
+def test_release_report_reaches_closed_layout_reads_without_typed_codec_fallback(tmp_path):
+    import shutil
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    skill = REPO_ROOT / 'skills/waapi-skill'
+    target = tmp_path / 'skills/waapi-skill'
+    for directory in ('scripts', 'wwise_waapi', 'resources'):
+        shutil.copytree(skill / directory, target / directory,
+                        ignore=shutil.ignore_patterns('__pycache__', '.DS_Store'))
+    manifest = target / 'resources/manifest'
+    surface = build_typed_request_surface(root=manifest)
+    (manifest / 'typed-request-surface.json').write_text(DeterministicJsonWriter().dumps(surface), encoding='utf-8')
+    report = build_full_surface_release_report(repo_root=tmp_path)
+    assert report['audit']['missing_continuations'] == []
+    assert report['audit']['missing_host_overlays'] == []
+    assert report['construction_shapes']['closed_read'] == 14

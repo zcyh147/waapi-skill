@@ -630,3 +630,19 @@ def test_metadata_pagination_and_selection_values_are_gateway_derived_locators()
               for field in contract['model_values'] if field['name'] in {'page', 'selection'}]
     assert fields, 'The current metadata parser must be represented in the field ledger'
     assert all(field['value_ownership'] == 'gateway_derivation' for field in fields)
+
+
+def test_closed_layout_reads_project_scoped_business_fields_and_preserve_result_boundary():
+    from tests.maintenance.interface_depth_inventory import _public_continuation_rows, _typed_field_rows
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    surface = build_typed_request_surface()
+    lane = next(row for row in surface['lanes'] if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.layout.getElementRectangle')
+    continuation = next(row for row in _public_continuation_rows(surface) if row['version'] == lane['version']
+                        and row['uri'] == lane['uri'])
+    assert continuation['business_read']['continuation']['gateway_argv'] == ['layout-read', 'rectangle']
+    assert 'typed' not in continuation
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    assert _typed_field_rows(lane, policy) == [{'channel': 'business_read',
+        'path': ['business', 'element_handle'], 'name': 'element_handle', 'shape': 'scalar',
+        'required': True, 'value_ownership': 'live_bound_handle', 'transport_ownership': 'gateway_derivation'}]

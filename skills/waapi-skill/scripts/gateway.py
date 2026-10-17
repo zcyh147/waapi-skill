@@ -43,8 +43,9 @@ from wwise_waapi.authoring_core_manifest import COMMON_URIS as AUTHORING_CORE_UR
 from wwise_waapi.authoring_core_manifest import requires_core_supplement  # noqa: E402
 from wwise_waapi.authoring_layout import (  # noqa: E402
     LAYOUT_READS, LAYOUT_READ_URIS, LAYOUT_VERSIONS, MAX_LAYOUT_RESULT_BYTES,
-    layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result,
+    layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
 )
+from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -1602,6 +1603,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     layout_read.add_argument("subject", choices=tuple(LAYOUT_READS))
     layout_read.add_argument("--layout-name")
+    layout_read.add_argument("--element-handle")
+    layout_read.add_argument("--view-handle")
+    layout_inspect = subparsers.add_parser("layout-inspect", help="Discover session-bound layout, element and view identities")
+    layout_inspect.add_argument("--layout-name", required=True)
 
     waapi_schema = subparsers.add_parser(
         "waapi-schema",
@@ -3512,9 +3517,19 @@ def _execute_gateway_unconstrained(
             preflight_stable_read_input(args, env=source_env)
         if args.command == "typed-call":
             preflight_typed_request_input(args, env=source_env)
-        if args.command == "layout-read":
+        if args.command in {"layout-read", "layout-inspect"}:
             try:
-                layout_read_arguments(args.subject, args.layout_name)
+                if args.command == "layout-inspect":
+                    layout_read_arguments("contents", args.layout_name)
+                elif args.subject in {"rectangle", "frontend"}:
+                    expected = args.element_handle if args.subject == "rectangle" else args.view_handle
+                    other = args.view_handle if args.subject == "rectangle" else args.element_handle
+                    if not isinstance(expected, str) or not re.fullmatch(r"lh1-[0-9a-f]{32}", expected) or other is not None or args.layout_name is not None:
+                        raise ValueError("Scoped layout read requires only its Gateway-issued identity handle")
+                else:
+                    if args.element_handle is not None or args.view_handle is not None:
+                        raise ValueError("This layout read does not accept an identity handle")
+                    layout_read_arguments(args.subject, args.layout_name)
             except ValueError as exc:
                 raise GatewayInputError(str(exc)) from exc
             configured_version = load_gateway_config(source_env).config.wwise_version
@@ -10009,12 +10024,15 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "supported_versions": list(versions),
                 "host_surface": "wwise-console",
             }
+            namespace_defaults = {"ak.wwise.ui.": {"host_surface": "wwise-authoring"}}
+            def defaults_for_route(api: str) -> dict[str, Any]:
+                return {**route_defaults, **next((value for prefix, value in namespace_defaults.items() if api.startswith(prefix)), {})}
             payload["request_schema_routes"] = [
                 {
                     key: value
                     for key, value in row.items()
                     if not (
-                        (key in route_defaults and value == route_defaults[key])
+                        (key in defaults_for_route(row["api"]) and value == defaults_for_route(row["api"])[key])
                         or (
                             key == "next_command"
                             and value == ["request-schema", row["api"]]
@@ -10027,9 +10045,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "operation-schema", "<name>",
             ]
             payload["request_schema_route_defaults"] = route_defaults
+            payload["request_schema_route_defaults_by_namespace"] = namespace_defaults
             payload["directory_reading"] = (
-                "Rows inherit supported_versions and host_surface "
-                "from request_schema_route_defaults; explicit row fields override. "
+                "Rows inherit request_schema_route_defaults, then matching "
+                "request_schema_route_defaults_by_namespace; explicit row fields override. "
                 "For schema discovery, use row next_command when present; "
                 "otherwise instantiate the static schema-command templates: "
                 "operation_schema_command_template replaces only <name> with the "
@@ -13106,6 +13125,59 @@ def dispatch_business_source_control_plan(
     return payload
 
 
+def read_layout_observation(subject: str, native_args: Mapping[str, Any], *,
+    dispatcher: WwiseDispatcher, connection: GatewayConnection, version: str) -> Any:
+    result = dispatch(dispatcher, LAYOUT_READS[subject], connection=connection, version=version,
+        args=native_args, options={}, operation_timeout=10, result_limit_bytes=MAX_LAYOUT_RESULT_BYTES)
+    if not result.get('ok'):
+        raise GatewayResultShapeError('Bounded layout identity observation failed',
+            error_code='LAYOUT_IDENTITY_READ_FAILED', details={'call': dispatch_call_summary(result)})
+    raw = result.get('result')
+    try:
+        validate_layout_read_result(subject, raw)
+    except ValueError as exc:
+        raise GatewayResultShapeError(str(exc), error_code='INVALID_LAYOUT_READ_RESULT',
+            details={'native_observation': raw, 'business_arrangement_verified': False}) from exc
+    return raw
+
+
+def layout_identity_context(args: argparse.Namespace, *, env: Mapping[str, str],
+    connection: GatewayConnection, detected_version: str, live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher) -> dict[str, Any]:
+    project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+    try:
+        from wwise_waapi.authoring_layout import PINNED_SHA256
+        identity = MetadataSessionIdentity.from_live_context(endpoint=connection.url,
+            live_info=live_info, project=project, resource_digest=PINNED_SHA256[detected_version])
+    except ValueError as exc:
+        raise GatewayInputError('Layout identities require exact live session/process/build/project facts: ' + str(exc)) from exc
+    return {'session': identity.as_dict(), 'configuration': selected_connection_binding(env),
+            'project_path': project['path']}
+
+
+def resolve_layout_identity(handle: str, *, role: str, context: Mapping[str, Any],
+    args: argparse.Namespace, env: Mapping[str, str], connection: GatewayConnection,
+    version: str, dispatcher: WwiseDispatcher) -> dict[str, Any]:
+    try:
+        record = LayoutHandleStore(resolve_transaction_state_directory(args, env=env)).resolve(
+            handle, context=context, role=role)
+        subject = 'instances' if role == 'view' else 'contents'
+        raw = read_layout_observation(subject, {'name': record['layout_name']}, dispatcher=dispatcher,
+            connection=connection, version=version)
+        if role == 'layout':
+            found = raw == record['observation']
+        else:
+            elements, views = layout_identity_rows(raw if role == 'element' else {},
+                raw if role == 'view' else {'viewInstances': []})
+            found = any(row['native_id'] == record['native_id'] and row['observation'] == record['observation']
+                for row in (views if role == 'view' else elements))
+        if not found:
+            raise LayoutHandleError('Layout identity is stale or changed; inspect the layout again')
+        return record
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+
+
 def dispatch_command(
     args: argparse.Namespace,
     *,
@@ -13123,6 +13195,39 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "layout-inspect":
+        boundary = live_authoring_api_boundary(LAYOUT_READS['contents'], command=args.command, live_info=live_info, common=common)
+        if boundary is not None:
+            return boundary
+        if detected_version not in LAYOUT_VERSIONS:
+            return unreflected_interface_payload(LAYOUT_READS['contents'], detected_version, command=args.command, common=common)
+        context = layout_identity_context(args, env=env, connection=connection,
+            detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+        layout = read_layout_observation('contents', {'name': args.layout_name}, dispatcher=dispatcher,
+            connection=connection, version=detected_version)
+        instances = read_layout_observation('instances', {'name': args.layout_name}, dispatcher=dispatcher,
+            connection=connection, version=detected_version)
+        if not isinstance(layout.get('Layout'), Mapping) or layout['Layout']['Name'] != args.layout_name:
+            raise GatewayInputError("Native layout name does not match the requested identity; no handles issued")
+        try:
+            elements, views = layout_identity_rows(layout, instances)
+            store = LayoutHandleStore(resolve_transaction_state_directory(args, env=env))
+            layout_handle = store.issue(context=context, layout_name=args.layout_name, role='layout',
+                native_id=args.layout_name, observation=layout)
+            def issue(rows: list[dict[str, Any]], role: str) -> list[dict[str, Any]]:
+                return [{'handle': store.issue(context=context, layout_name=args.layout_name, role=role,
+                    native_id=row['native_id'], observation=row['observation']), 'kind': row['kind'],
+                    **({'location': row['location'], 'name': row['observation'].get('Name')} if role == 'element'
+                       else {'display_name': row['observation'].get('viewDisplayName'),
+                             'docked': row['observation'].get('viewIsDocked')})}
+                    for row in rows]
+            element_handles, view_handles = issue(elements, 'element'), issue(views, 'view')
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        projection = {'layout_name': args.layout_name, 'layout_handle': layout_handle,
+                      'elements': element_handles, 'views': view_handles}
+        return {**common, 'ok': True, 'status': 'ok', 'complete': True, 'truncated': False,
+                **projection, 'identity_lifetime_seconds': 900, 'agent_result': projection}
     if args.command == "layout-read":
         api = LAYOUT_READS[args.subject]
         boundary = live_authoring_api_boundary(
@@ -13135,7 +13240,16 @@ def dispatch_command(
         capability = live_capability(detected_version, api, live_info=live_info)
         if capability.execution_contract.get("route") != "bounded_call" or args.command not in capability.gateway_commands:
             raise GatewayInputError("Layout read is not bound to its packaged closed route")
-        native_args = layout_read_arguments(args.subject, args.layout_name)
+        native_id = None
+        if args.subject in {'rectangle', 'frontend'}:
+            context = layout_identity_context(args, env=env, connection=connection,
+                detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+            role = 'element' if args.subject == 'rectangle' else 'view'
+            handle = args.element_handle if role == 'element' else args.view_handle
+            record = resolve_layout_identity(handle, role=role, context=context, args=args, env=env,
+                connection=connection, version=detected_version, dispatcher=dispatcher)
+            native_id = record['native_id']
+        native_args = layout_read_arguments(args.subject, args.layout_name, native_id)
         result = dispatch(
             dispatcher, api, connection=connection, version=detected_version,
             args=native_args, options={}, operation_timeout=10,
