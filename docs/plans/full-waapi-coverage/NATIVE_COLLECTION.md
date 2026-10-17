@@ -63,3 +63,34 @@ Native schemas are compared with the matching existing execution profile. An
 exact difference is `native_schema_drift_pending_review`, even when the URI
 already has an executable wrapper. Neither exact schema equality nor reflection
 counts grant business execution evidence.
+
+## Offline finalization of a complete failed capture
+
+A capture that saved every schema but stopped on missing referenced definitions
+can be completed without repeating native reads. Retain the original root and
+its verdict. Supply an independent lifecycle owner's SHA-256 receipt seal and
+matching installed definition attestation; the finalizer verifies each consumed
+receipt, schema target, endpoint, host/build/session, initial/final inventories,
+installed bundle version, executable digest and definition-file digest. It
+writes only a new output root and records the original outcome and seal digest.
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/maintenance/collect_authoring_core.py \
+  --version 2025.1 --build 2025.1.7.9143 --host wwise-authoring \
+  --finalize-from /absolute/immutable/capture/evidence/catalog \
+  --receipt-seal /absolute/independent/capture-evidence-seal.json \
+  --definition-attestation /absolute/installed-definition-attestation.json \
+  --output /absolute/new/derived-catalog
+```
+
+This mode is offline and does not accept `--config`. The definition graph belongs
+to the native catalog; it does not broaden the Console execution manifest. All
+native spelling, including capital `OneOf`, remains intact. Recognizing these
+branches and implementing their public behavior belongs to the subsequent
+same-parent work, not reflection completion.
+
+The reviewed Gateway parser seal now includes offline `--native-host` selectors,
+mutual exclusion with execution profiles, and directory `--offset`. The first
+full Program run retained two expected stale-seal failures (7001 passed, three
+platform skips); the review policy and generated inventory were then refreshed.
+That run is not passing gate evidence.

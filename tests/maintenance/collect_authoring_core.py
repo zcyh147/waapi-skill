@@ -17,6 +17,8 @@ import sys
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 SKILL_ROOT = ROOT / "skills/waapi-skill"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
@@ -34,10 +36,19 @@ def main(argv=None, *, run=subprocess.run) -> int:
     parser.add_argument("--version", choices=VERSIONS, required=True, help="Expected version; never forwarded as a live override")
     parser.add_argument("--build", required=True, help="Exact expected year.major.minor.build")
     parser.add_argument("--host", choices=("wwise-console", "wwise-authoring"), required=True)
-    parser.add_argument("--config", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--config", type=Path)
+    mode.add_argument("--finalize-from", type=Path, help="Offline: derive a new catalog from an immutable complete capture")
+    parser.add_argument("--receipt-seal", type=Path, help="Independent source receipt SHA-256 seal")
+    parser.add_argument("--definition-attestation", type=Path, help="Matching installed definition source/build attestation")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
-    if not args.config.is_absolute() or not args.config.is_file():
+    if args.finalize_from is not None:
+        from tests.maintenance.native_catalog_finalize import finalize_native_capture
+        return finalize_native_capture(args, skill_root=SKILL_ROOT)
+    if args.receipt_seal is not None or args.definition_attestation is not None:
+        parser.error("receipt/definition attestation options require --finalize-from")
+    if args.config is None or not args.config.is_absolute() or not args.config.is_file():
         parser.error("--config must identify an existing absolute isolated config")
     args.output.mkdir(parents=True, exist_ok=False)
     env = {**os.environ, "WAAPI_SKILL_CONFIG_PATH": str(args.config)}

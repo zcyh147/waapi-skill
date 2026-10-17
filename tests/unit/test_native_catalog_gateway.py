@@ -343,3 +343,75 @@ def test_full_native_schema_discloses_content_bound_source_pointers(tmp_path, mo
     assert row["schema"]["source"]["definitions_pointer"] == "/definitions/documents"
     assert len(row["schema"]["source"]["catalog_sha256"]) == 64
     assert row["provenance"]["sources"] == {"capture.json": "a" * 64}
+
+
+@pytest.mark.parametrize("damage", [None, "receipt-digest", "definition-digest", "bundle-build", "wrong-schema-target", "wrong-session"])
+def test_sealed_capture_finalizes_offline_with_attested_missing_ui_definitions(tmp_path, damage):
+    import hashlib
+    import plistlib
+    config = tmp_path / "config.json"
+    env = {"WAAPI_SKILL_CONFIG_PATH": str(config), "WWISE_EVIDENCE_DIR": str(tmp_path / "evidence")}
+    assert gateway.execute_gateway(["config-set", "--wwise-version", "2025.1", "--waapi-host", "127.0.0.1", "--waapi-port", "31337", "--project-modification-policy", "read_only"], env=env)[0] == 0
+    client = NativeClient()
+    native_schema = json.loads(json.dumps(SCHEMA))
+    native_schema["resultSchema"]["properties"]["names"]["items"] = {"$ref": "waapi_ui_definitions.json#/definitions/viewId"}
+    original_call = client.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.waapi.getSchema":
+            client.calls.append((uri, args, options))
+            return native_schema
+        return original_call(uri, args, options)
+    client.call = call
+    def run(argv, **kwargs):
+        code, payload = gateway.execute_gateway(argv[3:], env=kwargs["env"], client_factory=lambda url: client)
+        return SimpleNamespace(returncode=code, stdout=json.dumps(payload), stderr="")
+    source = tmp_path / "capture"
+    with pytest.raises(ValueError, match="waapi_ui_definitions"):
+        collector.main(["--version", "2025.1", "--build", "2025.1.7.9143", "--host", "wwise-authoring", "--config", str(config), "--output", str(source)], run=run)
+    original_bytes = {p.name: p.read_bytes() for p in source.iterdir()}
+    seal = tmp_path / "capture-seal.json"
+    seal.write_text(json.dumps({"root": str(source), "candidate": "fixture", "original_outcome": {"status": "BLOCKED"}, "files": {name: hashlib.sha256(raw).hexdigest() for name, raw in original_bytes.items()}}))
+    install = tmp_path / "install"
+    install.mkdir()
+    ui_file = install / "waapi_ui_definitions.json"
+    ui_file.write_text(json.dumps({"definitions": {"viewId": {"OneOf": [{"type": "integer"}, {"type": "string"}]}}}))
+    info = install / "Info.plist"
+    info.write_bytes(plistlib.dumps({"CFBundleVersion": "2025.1.7.9143"}))
+    executable = install / "Wwise.exe"
+    executable.write_bytes(b"fixture executable")
+    attestation = tmp_path / "definition-attestation.json"
+    attestation.write_text(json.dumps({"contract": "waapi-skill.maintainer-installed-definition-attestation/v1", "sources": [{"version": "2025.1", "build": "2025.1.7.9143", "source_kind": "installed_matching_build_definition", "install_root": str(install), "bundle_info_path": str(info), "bundle_info_sha256": hashlib.sha256(info.read_bytes()).hexdigest(), "bundle_version": "2025.1.7.9143", "authoring_executable": str(executable), "authoring_executable_sha256": hashlib.sha256(executable.read_bytes()).hexdigest(), "source_path": str(ui_file), "source_sha256": hashlib.sha256(ui_file.read_bytes()).hexdigest(), "document_name": ui_file.name, "definition_count": 1}]}))
+    output = tmp_path / "derived"
+    command = ["--version", "2025.1", "--build", "2025.1.7.9143", "--host", "wwise-authoring", "--finalize-from", str(source), "--receipt-seal", str(seal), "--definition-attestation", str(attestation), "--output", str(output)]
+    if damage:
+        if damage == "receipt-digest":
+            (source / f"{URI}.json").write_bytes(original_bytes[f"{URI}.json"] + b" ")
+        elif damage == "definition-digest":
+            ui_file.write_bytes(ui_file.read_bytes() + b" ")
+        elif damage == "bundle-build":
+            info.write_bytes(plistlib.dumps({"CFBundleVersion": "2024.1.13.9056"}))
+            proof = json.loads(attestation.read_text())
+            proof["sources"][0]["bundle_info_sha256"] = hashlib.sha256(info.read_bytes()).hexdigest()
+            attestation.write_text(json.dumps(proof))
+        else:
+            path = source / f"{URI}.json"
+            receipt = json.loads(path.read_text())
+            if damage == "wrong-schema-target":
+                receipt["schema_target"] = "ak.wwise.ui.window.present"
+            else:
+                receipt["reflection_context"]["sessionId"] = "other-session"
+            path.write_text(json.dumps(receipt))
+            proof = json.loads(seal.read_text())
+            proof["files"][path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+            seal.write_text(json.dumps(proof))
+        with pytest.raises(ValueError, match="digest|seal|build|target|session"):
+            collector.main(command, run=lambda *a, **kw: pytest.fail("offline finalization must never connect"))
+        assert not output.exists()
+        return
+    assert collector.main(command, run=lambda *a, **kw: pytest.fail("offline finalization must never connect")) == 0
+    derived = json.loads((output / "native-catalog.json").read_text())
+    assert derived["schemas"][URI] == native_schema
+    assert derived["definitions"]["documents"]["waapi_ui_definitions.json"]["definitions"]["viewId"]["OneOf"] == [{"type": "integer"}, {"type": "string"}]
+    assert derived["provenance"]["derivation"]["source_seal_sha256"] == hashlib.sha256(seal.read_bytes()).hexdigest()
+    assert derived["provenance"]["derivation"]["original_outcome"]["status"] == "BLOCKED"
+    assert {p.name: p.read_bytes() for p in source.iterdir()} == original_bytes
