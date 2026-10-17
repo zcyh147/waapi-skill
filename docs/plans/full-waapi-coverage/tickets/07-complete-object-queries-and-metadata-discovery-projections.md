@@ -28,6 +28,8 @@ Users can express valid in-scope read semantics and inspect every applicable pro
 
 - [ ] Repair the same-parent shared Gateway error-contract defect: every `GatewayResultShapeError` call must supply bounded contextual details, preserving intended exact error codes for reachable invalid catalogs, identities, runtime handles/builds and source-control roots. Verification failures must retain already-executed transaction state and prohibit automatic mutation replay. Cover reachable public paths behaviorally and supplement defensive invariant sites with a packaged-call structural guard; do not mask malformed call sites with blanket empty defaults. The immutable `a01599ca` review found fifteen additional omissions; its earlier acceptance predates this repair. Other functional owners and native obligations remain separate.
 
+- [ ] Carry exact live type discovery into bounded object queries through the Gateway-issued type selection, including oversized native names and ambiguous loose meanings. Revalidate the exact current raw name, inventory, endpoint, build/session and expiry before query dispatch and on result continuations; preserve optional category/class-ID absence and native extensions. Reject unrepresentable names without constructing an expression. Native `getTypes` membership does not prove WAQL queryability: retain native rejection without aliases or automatic retry, including the unresolved `ObjectSettingAssoc` spelling. This pure-code repair does not establish native acceptance.
+
 ## Blocked by
 
 - [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
