@@ -17,6 +17,7 @@ PROFILE_CONTRACT = "waapi-skill.repair-profile/v1"
 MODEL = "gpt-5.6-terra"
 REASONING_EFFORT = "medium"
 SERVICE_TIER = "default"
+REMAINING_SUFFIX = ("REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4")
 BUDGET = {"fresh_tasks": 4, "user_turns": 4, "model_calls": 4,
           "transactions": 3, "hard_seconds_per_task": 600,
           "hard_seconds_total": 2400, "gateway_calls_per_task": 96,
@@ -102,14 +103,16 @@ class RepairProfile:
 
     @property
     def budget(self) -> dict[str, int]:
-        return dict(BUDGET)
+        return {**BUDGET, "fresh_tasks": len(self.units), "user_turns": sum(unit.user_turn_count for unit in self.units),
+                "model_calls": len(self.units), "transactions": sum(unit.transaction_count for unit in self.units),
+                "hard_seconds_total": len(self.units) * BUDGET["hard_seconds_per_task"]}
 
 
 def load_repair_profile(path: Path, *, unit_ids: Sequence[str] = (),
                         versions: Sequence[str] = ()) -> RepairProfile:
-    # The approved first batch is one complete selection, with no automatic retries.
-    if tuple(unit_ids) not in {(), ("REPAIR25-F1", "REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4")} or tuple(versions) not in {(), ("2025.1",)}:
-        raise ValueError("repair first batch requires all four workflows once on 2025.1")
+    # Default remains all four; the documented F2-F4 continuation never repeats proven F1.
+    if tuple(unit_ids) not in {(), ("REPAIR25-F1", "REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"), REMAINING_SUFFIX} or tuple(versions) not in {(), ("2025.1",)}:
+        raise ValueError("repair selection requires all four workflows or the ordered F2-F4 continuation on 2025.1")
     source = load_closed_business_profile_source(path, contract=PROFILE_CONTRACT,
         profile_id=PROFILE_ID, model=MODEL, reasoning_effort=REASONING_EFFORT,
         service_tier=SERVICE_TIER, expected_unit_count=4, error_type=ValueError,
@@ -128,4 +131,5 @@ def load_repair_profile(path: Path, *, unit_ids: Sequence[str] = (),
         if fixture != _FIXTURES[case]:
             raise ValueError("repair workflow requires deterministic fixture data")
         units.append(RepairUnit(case, policy, operation, transactions, prompt, fixture))
-    return RepairProfile(source.path, source.definition_sha256, tuple(units))
+    selected = tuple(unit for unit in units if not unit_ids or unit.unit_id in unit_ids)
+    return RepairProfile(source.path, source.definition_sha256, selected)

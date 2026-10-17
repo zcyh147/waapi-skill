@@ -119,7 +119,7 @@ def _case(plan: Mapping[str, Any]) -> tuple[Any, str]:
         "tests.semantic.support.codex_expansion_" + _CASE_MODULES[case_id] + "_case"), case_id
 
 
-def _transaction(root: Path, transaction_id: str) -> tuple[dict, list[dict], dict]:
+def _transaction(root: Path, transaction_id: str, *, require_connection_configuration: bool = False) -> tuple[dict, list[dict], dict]:
     validate_transaction_id(transaction_id)
     prefix = f"broker/state/transactions/{transaction_id}/"
     preview = _json(root, prefix + "preview.json")
@@ -130,7 +130,7 @@ def _transaction(root: Path, transaction_id: str) -> tuple[dict, list[dict], dic
     artifact = preview.get("artifact")
     _require(isinstance(artifact, dict) and preview.get("transaction_id") == transaction_id
              and preview.get("artifact_hash") == canonical_digest(artifact), "preview artifact digest mismatch")
-    _validate_artifact(artifact)
+    _validate_artifact(artifact, require_connection_configuration=require_connection_configuration)
     previous_hash, previous_state = "", None
     for index, event in enumerate(events, 1):
         _require(isinstance(event, dict), "transaction event must be an object")
@@ -695,7 +695,7 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 "Broker receipt order differs from raw Codex Gateway commands")
         c09_notice = None
         if index == 1 and "notice_adjudication" in plan:
-            artifact = (_transaction(root, oracle["transaction_id"])[0]["artifact"]
+            artifact = (_transaction(root, oracle["transaction_id"], require_connection_configuration=plan.get("contract") == "waapi-skill.repair-task-plan/v1")[0]["artifact"]
                         if oracle.get("transaction_id") else {})
             from tests.semantic.support.codex_c09_notice_adjudication import CONTRACT as legacy_notice_contract
             review_contract = plan["notice_adjudication"]["configuration"]["contract"]
@@ -735,7 +735,7 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
             from tests.semantic.support.codex_repair_cases import repair_notice
             _require(not result["passed"] or index != 1 or (repair_plan and plan["policy"] == "read_only") or (c09_notice if c09_notice is not None else (repair_notice if repair_plan else expansion_preview_notice)(SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
-                preview_artifact=_transaction(root, oracle["transaction_id"])[0]["artifact"],
+                preview_artifact=_transaction(root, oracle["transaction_id"], require_connection_configuration=plan.get("contract") == "waapi-skill.repair-task-plan/v1")[0]["artifact"],
                 before_snapshot=oracle.get("preview_before") or plan["before"])),
                      "visible post-Preview notice is missing")
             if rejected_read:
@@ -895,7 +895,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         _require({path.name for path in transactions_directory.iterdir()}
             == ({transaction_id} if transaction_id else set()), "unrecorded transaction in the Agent store")
     if transaction_id is not None:
-        preview, events, state = _transaction(root, transaction_id)
+        preview, events, state = _transaction(root, transaction_id, require_connection_configuration=repair)
         _require(oracle.get("artifact_hash") == preview["artifact_hash"], "oracle transaction binding mismatch")
         _require(oracle.get("preview_before") == oracle.get("preview_after")
             and isinstance(oracle.get("preview_before"), dict), "Preview changed business state")

@@ -54,3 +54,18 @@ def test_fixture_parents_are_stored_as_closed_business_segments():
     assert [unit.parent_segments for unit in profile.units] == [
         ("Effects", "Default Work Unit"), ("Game Parameters", "Default Work Unit"),
         ("Game Parameters", "Default Work Unit"), ("Effects", "Default Work Unit")]
+
+
+def test_documented_remaining_suffix_has_three_tasks_two_transactions_and_no_f1():
+    profile = load_repair_profile(PROFILE, unit_ids=("REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"))
+    assert [unit.case_id for unit in profile.units] == ["F2", "F3", "F4"]
+    assert profile.budget == {"fresh_tasks": 3, "user_turns": 3, "model_calls": 3,
+        "transactions": 2, "hard_seconds_per_task": 600, "hard_seconds_total": 1800,
+        "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}
+
+
+@pytest.mark.parametrize("ids", [("REPAIR25-F2",), ("REPAIR25-F3", "REPAIR25-F4"),
+    ("REPAIR25-F2", "REPAIR25-F4", "REPAIR25-F3"), ("REPAIR25-F2", "REPAIR25-F2", "REPAIR25-F4")])
+def test_remaining_suffix_does_not_enable_arbitrary_subsets(ids):
+    with pytest.raises(ValueError):
+        load_repair_profile(PROFILE, unit_ids=ids)
