@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Mapping
+import wave
 
 import pytest
 
@@ -63,7 +65,7 @@ def _row_id(entry: CapabilityRecord) -> str:
 
 
 @pytest.mark.parametrize("entry", PROGRAM_ROWS, ids=_row_id)
-def test_every_public_route_executes_through_packaged_program_code(entry: CapabilityRecord) -> None:
+def test_every_public_route_executes_through_packaged_program_code(entry: CapabilityRecord, tmp_path: Path) -> None:
     contract = entry.execution_contract
     assert contract["program_case"]
     assert contract["gateway_commands"]
@@ -114,13 +116,46 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             "platforms": ["Mac"],
             "languages": ["SFX"],
         }
+    io_root = PROBE_IO_ROOT
+    prepared_before_dispatch = None
+    role_validation_before_dispatch = None
+    tone_effect = None
+    if entry.uri == "ak.wwise.debug.generateToneWAV":
+        # This row exercises the Registry/dispatcher seam, not full public or
+        # native acceptance. Keep actual filesystem protections and artifact
+        # verification active: the fake dispatch alone creates a known WAV.
+        io_root = (tmp_path / "isolated-tone-output").resolve()
+        io_root.mkdir()
+        output = io_root / "tone.wav"
+        args, options = {"path": str(output)}, {}
+        tone_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(tone_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        assert prepared_before_dispatch.as_dict()["verification_plan"]["before"]["file"] is None
+        assert not output.exists()
+
+        def tone_effect(uri, call_args, call_options):
+            assert (uri, call_args, call_options) == (entry.uri, {"path": str(output)}, {})
+            assert not output.exists()
+            # Literal source-default fixture: mono PCM16, 48000Hz, one second
+            # of digital silence. No request-derived writer or verifier mock.
+            with wave.open(str(output), "wb") as stream:
+                stream.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
+                stream.writeframes(b"\x00\x00" * 48000)
+
     request_validation = validate_semantic_payload(
         entry.uri,
         args,
         options,
         version=entry.version,
     )
-    client = ProgramCallClient(expected_result)
+    client = ProgramCallClient(expected_result, on_call=tone_effect)
     result = WwiseDispatcher(client=client).dispatch(
         entry.uri,
         version=entry.version,
@@ -133,6 +168,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
 
     assert request_validation.uri == entry.uri
     assert result["ok"] is True, result
+    assert result["result"] == expected_result
     assert client.calls == [(entry.uri, args, options)]
     result_validation = validate_semantic_result(
         entry.uri,
@@ -264,7 +300,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
 
     arguments: dict[str, Any] = {"api": entry.uri, "args": args, "options": options}
     if contract["route"] == "isolated_transaction":
-        arguments["io_root"] = str(PROBE_IO_ROOT)
+        arguments["io_root"] = str(io_root)
     operation_request = parse_operation_request(
         {
             "contract": OPERATION_REQUEST_CONTRACT,
@@ -274,9 +310,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         },
         expected_version=entry.version,
     )
-    prepared = prepare_operation(operation_request, read_call=lambda uri, call_args, call_options: {})
+    prepared = prepared_before_dispatch or prepare_operation(
+        operation_request, read_call=lambda uri, call_args, call_options: {})
     prepared_payload = prepared.as_dict()
-    role_validation = validate_prepared_roles(
+    role_validation = role_validation_before_dispatch or validate_prepared_roles(
         prepared_payload,
         read_call=lambda uri, call_args, call_options: {},
     )
@@ -340,7 +377,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
     if contract["route"] == "isolated_transaction":
         assert prepared_contract["io_audit"]["ok"] is True
         assert prepared_contract["io_audit"]["confinement_scope"] == "explicit_write_paths_only"
-        assert prepared_contract["io_audit"]["io_root"] == str(PROBE_IO_ROOT)
+        assert prepared_contract["io_audit"]["io_root"] == str(io_root)
     if contract["companion_uris"]:
         cleanup = prepared_payload["cleanup"]
         assert cleanup["contract"] == CLEANUP_SPEC_CONTRACT
@@ -353,7 +390,21 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert len(cleanup["spec_sha256"]) == 64
     assert role_validation["ok"] is True
     assert verification.ok is True, verification.as_dict()
-    if entry.uri in BUSINESS_STATE_VERIFIED_APIS:
+    if entry.uri == "ak.wwise.debug.generateToneWAV":
+        assert verification.status == "verified"
+        assert verification.business_state_verified is True
+        assert verification.verification_strength == "tone_wav_artifact"
+        observed = verification.readbacks[0]
+        assert observed["created"] is True
+        assert observed["changed"] is True
+        assert observed["unresolved"] == []
+        assert observed["wav"]["channels"] == 1
+        assert observed["wav"]["sample_rate"] == 48000
+        assert observed["wav"]["sample_format"] == "int16"
+        assert observed["wav"]["frames"] == 48000
+        assert observed["wav"]["nonzero_samples_by_channel"] == [0]
+        assert len(observed["artifact"]["file"]["sha256"]) == 64
+    elif entry.uri in BUSINESS_STATE_VERIFIED_APIS:
         assert verification.status == "verified"
         assert verification.business_state_verified is True
         assert verification.verification_strength == "operation_specific_readback"
