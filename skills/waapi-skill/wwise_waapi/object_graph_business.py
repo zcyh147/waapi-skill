@@ -19,7 +19,7 @@ from .business_declarations import (
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
 from .documented_list_fields import resolve_list_choice, resolve_planned_list_evidence
-from .planned_references import compile_result_reference, graph_result_bindings
+from .planned_references import compile_result_reference, graph_result_bindings, order_result_rows
 from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 from .operation_object import (
     DEFAULT_MAX_CHILDREN_PER_NODE,
@@ -649,7 +649,12 @@ def _compile_create_fields(
         properties.append(
             {"name": "IgnoreParentMaxSoundInstance", "value": value}
         )
-    if "output_bus" in fields:
+    if "output_bus" in fields and isinstance(fields["output_bus"], str) and fields["output_bus"].startswith("bnh1-"):
+        from types import SimpleNamespace
+        reference = compile_result_reference(session, SimpleNamespace(token="OutputBus"), fields["output_bus"],
+            native_type=_resolve_native_object_type, allowed_types=["Bus", "AudioBus", "AuxBus", "AuxiliaryBus"])
+        references.append({"name": "OutputBus", "target": reference})
+    elif "output_bus" in fields:
         bus = session.handles.resolve_object(fields["output_bus"])
         if bus.object_type.casefold().replace(" ", "") not in {
             "bus",
@@ -1486,6 +1491,7 @@ def _materialize_set(
             field=unexpected_settings[0],
             action="use one disclosed object.set batch setting",
         )
+    rows = order_result_rows(rows, node_result_handles, revision=session.revision)
     arguments: dict[str, Any] = {"objects": rows}
     documented_bindings = []
     for row in rows:

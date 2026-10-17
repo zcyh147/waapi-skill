@@ -1525,11 +1525,13 @@ def test_new_slot_scalar_reference_uses_same_graph_target_result_handle_and_actu
     task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
     task.types.extend({"classId": cid, "name": name, "type": "WObject"} for name, cid in (
         ("WorkUnit", 1638416), ("SwitchGroup", 1245200), ("MusicSwitchContainer", 2293776), ("MusicArgumentsSlot", 5832704)))
-    task.objects[PROJECT_GROUP] = {"id": PROJECT_GROUP, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+    switch_parent_id = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
+    music_parent_id = "{CDCDCDCD-CDCD-CDCD-CDCD-CDCDCDCDCDCD}"
+    task.objects[switch_parent_id] = {"id": switch_parent_id, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
         "path": r"\Switches\Default Work Unit", "parent": None, "notes": "Keep switches"}
-    task.objects[SECOND]["path"] = r"\Interactive Music Hierarchy\Default Work Unit"
-    task.objects[FIRST]["parent"] = {"id": PROJECT_GROUP}
-    switch_parent, music_parent = task.bind(PROJECT_GROUP), task.bind(SECOND)
+    task.objects[music_parent_id] = {"id": music_parent_id, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": r"\Interactive Music Hierarchy\Default Work Unit", "parent": None, "notes": "Keep music"}
+    switch_parent, music_parent = task.bind(switch_parent_id), task.bind(music_parent_id)
     original = task.call
     group_id, slot_id = "{55555555-5555-5555-5555-555555555555}", "{77777777-7777-7777-7777-777777777777}"
     def call(uri, args=None, options=None):
@@ -1544,22 +1546,22 @@ def test_new_slot_scalar_reference_uses_same_graph_target_result_handle_and_actu
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
             assert args["objects"] == [
-                {"object": PROJECT_GROUP, "children": [{"type": "SwitchGroup", "name": "Surface"}]},
-                {"object": SECOND, "children": [{"type": "MusicSwitchContainer", "name": "Music",
+                {"object": switch_parent_id, "children": [{"type": "SwitchGroup", "name": "Surface"}]},
+                {"object": music_parent_id, "children": [{"type": "MusicSwitchContainer", "name": "Music",
                     "@Arguments": [{"type": "MusicArgumentsSlot", "name": "Surface argument", "@Argument": r"\Switches\Default Work Unit\Surface"}]}]}]
             task.objects[group_id] = {"id": group_id, "name": "Surface", "type": "SwitchGroup", "classId": 1245200,
-                "path": r"\Switches\Default Work Unit\Surface", "parent": {"id": PROJECT_GROUP}, "notes": ""}
+                "path": r"\Switches\Default Work Unit\Surface", "parent": {"id": switch_parent_id}, "notes": ""}
             task.objects[ROOT] = {"id": ROOT, "name": "Music", "type": "MusicSwitchContainer", "classId": 2293776,
-                "path": task.objects[SECOND]["path"] + r"\Music", "parent": {"id": SECOND}, "notes": "", "@Arguments": [{"id": slot_id}]}
+                "path": task.objects[music_parent_id]["path"] + r"\Music", "parent": {"id": music_parent_id}, "notes": "", "@Arguments": [{"id": slot_id}]}
             task.objects[slot_id] = {"id": slot_id, "name": "Surface argument", "type": "PluginInnerObject", "classId": 5832704,
-                "path": task.objects[ROOT]["path"] + r"\Surface argument", "owner": {"id": ROOT}, "notes": "", "@Argument": {"id": SECOND if fault == "wrong-reference-effect" else group_id}}
+                "path": task.objects[ROOT]["path"] + r"\Surface argument", "owner": {"id": ROOT}, "notes": "", "@Argument": {"id": music_parent_id if fault == "wrong-reference-effect" else group_id}}
             if fault == "wrong-class-effect":
                 task.objects[group_id]["classId"] = 65552
             elif fault == "missing-target-effect":
                 del task.objects[group_id]
             target_results = [{"id": group_id, "name": "Surface"}] * (2 if fault == "duplicate-target-result" else 1)
-            return {"objects": [{"id": PROJECT_GROUP, "name": "Default Work Unit", "children": target_results},
-                {"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "Music", "@Arguments": [{"id": slot_id, "name": "Surface argument"}]}]}]}
+            return {"objects": [{"id": switch_parent_id, "name": "Default Work Unit", "children": target_results},
+                {"id": music_parent_id, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "Music", "@Arguments": [{"id": slot_id, "name": "Surface argument"}]}]}]}
         return original(uri, args, options)
     task.call = call
     kinds = {}
@@ -1613,3 +1615,267 @@ def test_new_slot_scalar_reference_uses_same_graph_target_result_handle_and_actu
     if fault is None:
         assert task.objects[slot_id]["@Argument"] == {"id": group_id}
     assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("fault", (None, "wrong-reference-effect", "nullable"))
+def test_create_auxbus_sibling_reference_uses_new_result_or_native_nullable_value(tmp_path, version, fault):
+    """AuxBus.UserAuxSend0 is a scalar AuxBus reference in all five Objects References."""
+    task = OwnedGraphTask(tmp_path, version, "object.create")
+    task.require_class_projection = True
+    task.types = [{"classId": cid, "name": name, "type": "WObject"} for name, cid in (
+        ("WorkUnit", 1638416), ("Bus", 1376272), ("AuxBus", 3997712))]
+    bus_parent_id = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
+    task.objects[bus_parent_id] = {"id": bus_parent_id, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep buses"}
+    parent = task.bind(bus_parent_id)
+    target_id, source_id = "{55555555-5555-5555-5555-555555555555}", "{66666666-6666-6666-6666-666666666666}"
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args.get("classId") == 3997712, args
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": ["UserAuxSend0"]}
+            assert args["property"] == "UserAuxSend0", args
+            return {"name": "UserAuxSend0", "type": "Reference", "display": {"name": "User-Defined Auxiliary Send 0"},
+                "restriction": {"type": "reference", "restrictions": [{"type": ["AuxBus"]}]}}
+        if uri == "ak.wwise.core.object.create":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            target_value = None if fault == "nullable" else r"\Master-Mixer Hierarchy\Default Work Unit\Routing\Destination"
+            assert args == {"parent": bus_parent_id, "type": "Bus", "name": "Routing", "children": [
+                {"type": "AuxBus", "name": "Destination"}, {"type": "AuxBus", "name": "Sender", "@UserAuxSend0": target_value}],
+                "onNameConflict": "fail", "autoAddToSourceControl": False}
+            base = task.objects[bus_parent_id]["path"] + r"\Routing"
+            task.objects[ROOT] = {"id": ROOT, "name": "Routing", "type": "Bus", "classId": 1376272,
+                "path": base, "parent": {"id": bus_parent_id}, "notes": ""}
+            for identity, name in ((target_id, "Destination"), (source_id, "Sender")):
+                task.objects[identity] = {"id": identity, "name": name, "type": "AuxBus", "classId": 3997712,
+                    "path": base + "\\" + name, "parent": {"id": ROOT}, "notes": ""}
+            task.objects[source_id]["@UserAuxSend0"] = None if fault == "nullable" else {"id": ROOT if fault == "wrong-reference-effect" else target_id}
+            return {"id": ROOT, "name": "Routing", "children": [{"id": target_id, "name": "Destination"}, {"id": source_id, "name": "Sender"}]}
+        return original(uri, args, options)
+    task.call = call
+    kinds = {}
+    for name in ("Bus", "AuxBus"):
+        code, found = task.step("draft-discover-types", "--role", "object", "--meaning", name)
+        assert code == 0, found
+        kinds[name] = found["type_candidates"][0]["handle"]
+    code, found = task.step("draft-discover-fields", "--type-handle", kinds["AuxBus"], "--meaning", "User-Defined Auxiliary Send 0")
+    assert code == 0, found
+    field = found["meaning_results"][0]["candidates"][0]["handle"]
+    code, root = task.step("draft-declare-new", "--declaration-id", "root", "--parent-handle", parent, "--name", "Routing", "--kind", kinds["Bus"])
+    assert code == 0, root
+    root_handle = root["draft"]["declared_object"]["result_handle"]
+    code, target = task.step("draft-declare-new", "--declaration-id", "target", "--parent-handle", root_handle, "--name", "Destination", "--kind", kinds["AuxBus"])
+    assert code == 0, target
+    code, source = task.step("draft-declare-new", "--declaration-id", "source", "--parent-handle", root_handle, "--name", "Sender", "--kind", kinds["AuxBus"],
+        "--field-value", field, "null" if fault == "nullable" else target["draft"]["declared_object"]["result_handle"])
+    assert code == 0, source
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (2 if fault == "wrong-reference-effect" else 0), verified
+    assert (verified.get("verified") is True) == (fault != "wrong-reference-effect"), verified
+    assert len([uri for uri, _, _ in task.calls if uri.endswith("object.create")]) == 1
+
+
+@pytest.mark.parametrize("receiver,field_style,rename_case", (("existing", "handle", None), ("existing", "stable", None), ("new", "handle", None), ("new", "stable", None),
+    ("existing", "handle", "collision"), ("existing", "handle", "old-notes-effect"), ("existing", "handle", "candidate-drift"), ("existing", "handle", "parent-rename"), ("existing", "handle", "parent-collision")))
+def test_object_set_orders_new_bus_target_before_new_or_existing_sound_receiver(tmp_path, receiver, field_style, rename_case):
+    task = OwnedGraphTask(tmp_path, "2025.1", "object.set")
+    task.require_class_projection = True
+    task.types = [{"classId": cid, "name": name, "type": "WObject"} for name, cid in (
+        ("Sound", 65552), ("WorkUnit", 1638416), ("Bus", 1376272))]
+    task.objects[FIRST].update(type="Sound", classId=65552)
+    task.objects[SECOND]["classId"] = 1638416
+    bus_parent = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
+    task.objects[bus_parent] = {"id": bus_parent, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": r"\Master-Mixer Hierarchy\Default Work Unit", "parent": None, "notes": "Keep buses"}
+    target_collision = rename_case in {"collision", "old-notes-effect", "candidate-drift"}
+    parent_rename = rename_case in {"parent-rename", "parent-collision"}
+    prepared_bus_name = "New bus_waapi_1" if target_collision else "New bus"
+    prepared_parent_name = "Renamed routing_waapi_1" if rename_case == "parent-collision" else "Renamed routing"
+    if parent_rename:
+        work_unit = "{BCBCBCBC-BCBC-BCBC-BCBC-BCBCBCBCBCBC}"
+        task.objects[work_unit] = deepcopy(task.objects[bus_parent])
+        task.objects[work_unit]["id"] = work_unit
+        task.objects[bus_parent].update(type="Bus", classId=1376272, name="Routing", parent={"id": work_unit},
+            path=task.objects[work_unit]["path"] + r"\Routing")
+        if rename_case == "parent-collision":
+            task.objects[CHILD] = {"id": CHILD, "name": "Renamed routing", "type": "Bus", "classId": 1376272,
+                "path": task.objects[work_unit]["path"] + r"\Renamed routing", "parent": {"id": work_unit}, "notes": "Keep old collision"}
+    prepared_parent_path = (task.objects[work_unit]["path"] + "\\" + prepared_parent_name) if parent_rename else task.objects[bus_parent]["path"]
+    prepared_bus_path = prepared_parent_path + "\\" + prepared_bus_name
+    if target_collision:
+        task.objects[CHILD] = {"id": CHILD, "name": "New bus", "type": "Bus", "classId": 1376272,
+            "path": task.objects[bus_parent]["path"] + r"\New bus", "parent": {"id": bus_parent}, "notes": "Keep old collision"}
+    parent, owner, destination = task.bind(SECOND), task.bind(FIRST), task.bind(bus_parent)
+    if rename_case:
+        code, configured = task.step("draft-business-configure", "--name-conflict", "rename")
+        assert code == 0, configured
+    original = task.call
+    bus_id, sound_id = "{55555555-5555-5555-5555-555555555555}", FIRST if receiver == "existing" else ROOT
+    sound_name = task.objects[FIRST]["name"] if receiver == "existing" else "New sound"
+    native_receiver = {"object": FIRST, "@OutputBus": prepared_bus_path} if receiver == "existing" else {
+        "object": SECOND, "children": [{"type": "Sound", "name": sound_name, "@OutputBus": prepared_bus_path}]}
+    expected_objects = [{"object": bus_parent, **({"name": prepared_parent_name} if parent_rename else {}),
+        "children": [{"type": "Bus", "name": prepared_bus_name}]}, native_receiver]
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args.get("object") == FIRST or args.get("classId") == 65552, args
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": ["OutputBus"]}
+            assert args["property"] == "OutputBus", args
+            return {"name": "OutputBus", "type": "Reference", "display": {"name": "Output Bus"},
+                "restriction": {"type": "reference", "restrictions": [{"type": ["Bus"]}]}}
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == expected_objects
+            if parent_rename:
+                task.objects[bus_parent].update(name=prepared_parent_name, path=prepared_parent_path)
+            task.objects[bus_id] = {"id": bus_id, "name": prepared_bus_name, "type": "Bus", "classId": 1376272,
+                "path": prepared_bus_path, "parent": {"id": bus_parent}, "notes": ""}
+            if receiver == "new":
+                task.objects[sound_id] = {"id": sound_id, "name": sound_name, "type": "Sound", "classId": 65552,
+                    "path": task.objects[SECOND]["path"] + "\\" + sound_name, "parent": {"id": SECOND}, "notes": ""}
+            task.objects[sound_id]["@OutputBus"] = {"id": bus_id}
+            if rename_case == "old-notes-effect":
+                task.objects[CHILD]["notes"] = "Unexpected"
+            source_result = {"id": FIRST, "name": sound_name} if receiver == "existing" else {
+                "id": SECOND, "name": "Default Work Unit", "children": [{"id": sound_id, "name": sound_name}]}
+            return {"objects": [{"id": bus_parent, "name": prepared_parent_name if parent_rename else "Default Work Unit", "children": [{"id": bus_id, "name": prepared_bus_name}]}, source_result]}
+        return original(uri, args, options)
+    task.call = call
+    kinds = {}
+    for name in ("Bus", "Sound"):
+        code, found = task.step("draft-discover-types", "--role", "object", "--meaning", name)
+        assert code == 0, found
+        kinds[name] = found["type_candidates"][0]["handle"]
+    field = None
+    if field_style == "handle":
+        code, found = task.step("draft-discover-fields", *( ["--object-handle", owner] if receiver == "existing" else ["--type-handle", kinds["Sound"]]), "--meaning", "Output Bus")
+        assert code == 0, found
+        field = found["meaning_results"][0]["candidates"][0]["handle"]
+    if parent_rename:
+        code, changed = task.step("draft-declare-existing", "--declaration-id", "rename-parent", "--object-handle", destination,
+            "--field", "new_name", "Renamed routing")
+        assert code == 0, changed
+    code, target = task.step("draft-declare-new", "--declaration-id", "bus", "--parent-handle", destination,
+        "--name", "New bus", "--kind", kinds["Bus"])
+    assert code == 0, target
+    target_handle = target["draft"]["declared_object"]["result_handle"]
+    assignment = ["--field", "output_bus", target_handle] if field_style == "stable" else ["--field-value", field, target_handle]
+    if receiver == "existing":
+        code, source = task.step("draft-declare-existing", "--declaration-id", "source", "--object-handle", owner, *assignment)
+    else:
+        code, source = task.step("draft-declare-new", "--declaration-id", "source", "--parent-handle", parent,
+            "--name", sound_name, "--kind", kinds["Sound"], *assignment)
+    assert code == 0, source
+    tx, shown = task.preview()
+    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"] == expected_objects
+    if rename_case:
+        assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["onNameConflict"] == "rename"
+        assert (prepared_parent_name if parent_rename else "New bus_waapi_1") in json.dumps(shown)
+    if rename_case == "candidate-drift":
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        task.objects[ROOT] = {"id": ROOT, "name": prepared_bus_name, "type": "Bus", "classId": 1376272,
+            "path": prepared_bus_path, "parent": {"id": bus_parent}, "notes": "Unreviewed collision"}
+        code, rejected = task.run("execute", tx)
+        assert code == 2 and rejected.get("executed") is not True, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    code, verified = task.finish(tx, shown)
+    assert code == (2 if rename_case == "old-notes-effect" else 0), json.dumps(verified)
+    assert (verified.get("verified") is True) == (rename_case != "old-notes-effect"), verified
+    if rename_case == "collision":
+        assert task.objects[CHILD]["notes"] == "Keep old collision"
+    assert task.objects[sound_id]["@OutputBus"] == {"id": bus_id}
+
+
+@pytest.mark.parametrize("version,state,fault", [(version, False, None) for version in VERSIONS[1:]] +
+    [("2022.1", True, None), ("2025.1", True, None)] + [("2025.1", False, fault) for fault in
+        ("reverse-fields", "missing-controller", "wrong-controller", "wrong-parent-effect", "nullable-default")])
+def test_new_result_reference_hierarchy_reuses_explicit_planned_controller_and_parent_proof(tmp_path, version, state, fault):
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.require_class_projection = True
+    group_type, value_type = ("StateGroup", "State") if state else ("SwitchGroup", "Switch")
+    group_class, value_class = (458768, 393232) if state else (1245200, 1310736)
+    group_path = (r"\States" if state else r"\Switches") + r"\Default Work Unit\Surface"
+    task.types = [{"classId": cid, "name": name, "type": "WObject"} for name, cid in (
+        ("WorkUnit", 1638416), (group_type, group_class), (value_type, value_class), ("SwitchContainer", 655376))]
+    switch_parent = "{ABABABAB-ABAB-ABAB-ABAB-ABABABABABAB}"
+    task.objects[switch_parent] = {"id": switch_parent, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": group_path.rsplit("\\", 1)[0], "parent": None, "notes": "Keep switches"}
+    task.objects[SECOND]["classId"] = 1638416
+    parent, group_parent = task.bind(SECOND), task.bind(switch_parent)
+    group_id, value_id = "{55555555-5555-5555-5555-555555555555}", "{66666666-6666-6666-6666-666666666666}"
+    metadata = {
+        "DefaultSwitchOrState": {"name": "DefaultSwitchOrState", "type": "", "default": None,
+            "restriction": {"type": "reference", "restrictions": [{"childOfReference": "SwitchGroupOrStateGroup"}, {"type": ["Switch", "State"]}]},
+            "dependencies": [{"type": "reference", "action": "Enable", "context": "Self", "property": "SwitchGroupOrStateGroup", "conditions": [{"referenceIsSet": True}]}]},
+        "SwitchGroupOrStateGroup": {"name": "SwitchGroupOrStateGroup", "type": "", "default": None,
+            "restriction": {"type": "reference", "restrictions": [{"type": ["SwitchGroup", "StateGroup"]}]}}}
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args.get("classId") == 655376, args
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": list(metadata)}
+            return deepcopy(metadata[args["property"]])
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": switch_parent, "children": [{"type": group_type, "name": "Surface",
+                "children": [{"type": value_type, "name": "Concrete"}]}]},
+                {"object": SECOND, "children": [{"type": "SwitchContainer", "name": "Footsteps",
+                    "@DefaultSwitchOrState": None if fault == "nullable-default" else group_path + r"\Concrete",
+                    "@SwitchGroupOrStateGroup": group_path}]}]
+            task.objects[group_id] = {"id": group_id, "name": "Surface", "type": group_type, "classId": group_class,
+                "path": group_path, "parent": {"id": switch_parent}, "notes": ""}
+            task.objects[value_id] = {"id": value_id, "name": "Concrete", "type": value_type, "classId": value_class,
+                "path": task.objects[group_id]["path"] + r"\Concrete", "parent": {"id": SECOND if fault == "wrong-parent-effect" else group_id}, "notes": ""}
+            task.objects[ROOT] = {"id": ROOT, "name": "Footsteps", "type": "SwitchContainer", "classId": 655376,
+                "path": task.objects[SECOND]["path"] + r"\Footsteps", "parent": {"id": SECOND}, "notes": "",
+                "@DefaultSwitchOrState": None if fault == "nullable-default" else {"id": value_id}, "@SwitchGroupOrStateGroup": {"id": group_id}}
+            return {"objects": [{"id": switch_parent, "name": "Default Work Unit", "children": [{"id": group_id, "name": "Surface", "children": [{"id": value_id, "name": "Concrete"}]}]},
+                {"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "Footsteps"}]}]}
+        return original(uri, args, options)
+    task.call = call
+    kinds, fields = {}, {}
+    for name in (group_type, value_type, "SwitchContainer"):
+        code, found = task.step("draft-discover-types", "--role", "object", "--meaning", name)
+        assert code == 0, found
+        kinds[name] = found["type_candidates"][0]["handle"]
+    for name in metadata:
+        code, found = task.step("draft-discover-fields", "--type-handle", kinds["SwitchContainer"], "--meaning", name)
+        assert code == 0, found
+        fields[name] = found["meaning_results"][0]["candidates"][0]["handle"]
+    code, group = task.step("draft-declare-new", "--declaration-id", "group", "--parent-handle", group_parent, "--name", "Surface", "--kind", kinds[group_type])
+    assert code == 0, group
+    group_handle = group["draft"]["declared_object"]["result_handle"]
+    code, value = task.step("draft-declare-new", "--declaration-id", "value", "--parent-handle", group_handle, "--name", "Concrete", "--kind", kinds[value_type])
+    assert code == 0, value
+    controller = group_handle
+    if fault == "wrong-controller":
+        code, other = task.step("draft-declare-new", "--declaration-id", "other", "--parent-handle", group_parent, "--name", "Other group", "--kind", kinds[group_type])
+        assert code == 0, other
+        controller = other["draft"]["declared_object"]["result_handle"]
+    assignments = [(fields["DefaultSwitchOrState"], "null" if fault == "nullable-default" else value["draft"]["declared_object"]["result_handle"])]
+    if fault != "missing-controller":
+        assignments.append((fields["SwitchGroupOrStateGroup"], controller))
+    if fault == "reverse-fields":
+        assignments.reverse()
+    code, source = task.step("draft-declare-new", "--declaration-id", "source", "--parent-handle", parent, "--name", "Footsteps", "--kind", kinds["SwitchContainer"],
+        *(argument for field, handle in assignments for argument in ("--field-value", field, handle)))
+    assert code == 0, source
+    if fault in {"missing-controller", "wrong-controller"}:
+        code, rejected = task.step("draft-check")
+        assert code == 2 and ("REFERENCE_ACTIVATION_REQUIRED" if fault == "missing-controller" else "INVALID_REFERENCE_TARGET") in json.dumps(rejected), rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (2 if fault == "wrong-parent-effect" else 0), verified
+    assert (verified.get("verified") is True) == (fault != "wrong-parent-effect"), verified

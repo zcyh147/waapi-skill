@@ -25,7 +25,7 @@ class NewObjectDefaultError(ValueError):
 
 
 def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
-                           supplied_references=None, discovery=False, validate_scalar=None):
+                           supplied_references=None, planned_references=None, discovery=False, validate_scalar=None):
     """Collect the complete graph, then evaluate combined prerequisites.
 
     Discovery certifies grammar and seals metadata without choosing missing
@@ -36,6 +36,7 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
     metadata = {info.name: info for info in infos}
     supplied = supplied_values or {}
     references = supplied_references or {}
+    planned = planned_references or {}
     restrictions, presences = {}, {}
     visited, controllers, override_controllers = set(), set(), set()
     derived_properties = {}
@@ -123,20 +124,30 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
             if len(states) != 1:
                 raise NewObjectDefaultError("Class reference-presence conditions conflict.", error_code="NEW_OBJECT_DEPENDENCY_CONFLICT")
             info = metadata[name]
-            value = references.get(name, info.default)
-            resolved = name in references or "default" in info.raw
-            if isinstance(value, Mapping):
-                if ("id" not in value or set(value) - {"id", "name", "type", "path"}
-                        or any(not isinstance(item, str) for item in value.values())):
-                    raise NewObjectDefaultError("Reference class default has an unimplemented native shape.", error_code="INVALID_METADATA")
-                value = value["id"]
-            if value is not None and (not isinstance(value, str) or re.fullmatch(
-                    r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", value) is None):
-                raise NewObjectDefaultError("Reference class default must be a canonical GUID or native null.", error_code="INVALID_METADATA")
-            if isinstance(value, str):
-                value = value.upper()
-            if value == "{00000000-0000-0000-0000-000000000000}":
-                value = None
+            if name in planned:
+                binding = planned[name]
+                if (set(binding) != {"result_handle", "target_request_path"}
+                        or not isinstance(binding["result_handle"], str)
+                        or re.fullmatch(r"bnh1-[0-9a-f]{32}", binding["result_handle"]) is None
+                        or not isinstance(binding["target_request_path"], str) or not binding["target_request_path"].startswith("$")):
+                    raise NewObjectDefaultError("A planned prerequisite needs its exact graph result binding.", error_code="INVALID_METADATA")
+                value = {"planned_result_handle": binding["result_handle"], "target_request_path": binding["target_request_path"]}
+                resolved = True
+            else:
+                value = references.get(name, info.default)
+                resolved = name in references or "default" in info.raw
+                if isinstance(value, Mapping):
+                    if ("id" not in value or set(value) - {"id", "name", "type", "path"}
+                            or any(not isinstance(item, str) for item in value.values())):
+                        raise NewObjectDefaultError("Reference class default has an unimplemented native shape.", error_code="INVALID_METADATA")
+                    value = value["id"]
+                if value is not None and (not isinstance(value, str) or re.fullmatch(
+                        r"\{[0-9A-Fa-f]{8}(?:-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}\}", value) is None):
+                    raise NewObjectDefaultError("Reference class default must be a canonical GUID or native null.", error_code="INVALID_METADATA")
+                if isinstance(value, str):
+                    value = value.upper()
+                if value == "{00000000-0000-0000-0000-000000000000}":
+                    value = None
             present = value is not None
             required = next(iter(states))
             if not discovery and (not resolved or present != required):
@@ -144,7 +155,7 @@ def class_default_evidence(*, infos, scope, read_call, supplied_values=None,
                     error_code="REFERENCE_ACTIVATION_REQUIRED", details={"property": name, "required_presence": required, "mutation_dispatched": False})
             requirements.append({"name": name, "kind": "reference", "required_presence": required,
                                  "effective_value": value, "value_resolved": resolved,
-                                 "source": "explicit" if name in references else "class_default"})
+                                 "source": "planned_declaration" if name in planned else "explicit" if name in references else "class_default"})
     except MetadataRestrictionError as exc:
         raise NewObjectDefaultError(str(exc), error_code=("NEW_OBJECT_DEPENDENCY_CONFLICT" if exc.error_code == "CONDITION_CONFLICT" else exc.error_code)) from exc
     return {"class_scope": dict(scope), "requirements": requirements, "derived_properties": derived_properties,

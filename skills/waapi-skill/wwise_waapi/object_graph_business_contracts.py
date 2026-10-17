@@ -350,6 +350,7 @@ def object_graph_business_contract_data(
                 "array_requires": "documented_List_Field_Handle_for_exact_owner_class_and_version; scalar_Reference_metadata_is_insufficient",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
                 "planned_target": "Gateway_derives_native_path_from_exact_root_and_normalized_graph_occurrence;_verify_actual_result_GUID_and_independent_class_parent_readback",
+                "planned_target_rename": "Gateway_discloses_a_proved_unoccupied_candidate_name_for_referenced_rename_collisions;_native_rename_policy_preserved_and_collision_state_revalidated",
             },
             "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
             "safety": {
@@ -391,6 +392,7 @@ def object_graph_business_contract_data(
                 "native_value_boundary": "pinned_propertyValue_is_scalar_or_null;_array_inline_and_curve_values_require_an_available_object.set_lane",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
                 "planned_target": "Gateway_derives_native_path_from_exact_root_and_normalized_graph_occurrence;_verify_actual_result_GUID_and_independent_class_parent_readback",
+                "planned_target_rename": "Gateway_discloses_a_proved_unoccupied_candidate_name_for_referenced_rename_collisions;_native_rename_policy_preserved_and_collision_state_revalidated",
             },
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
             "planned_parent": "copy_previous_declaration_result_handle",

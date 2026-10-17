@@ -832,6 +832,14 @@ _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
                                                           "items": _RTPC_POINT_ARGUMENT_SCHEMA}}}]}},
 }
 
+_GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": True,
+    "description": "Gateway-owned declaration result bindings; no native identities or caller paths.",
+    "items": {"type": "object", "required": ["result_handle", "request_path"], "additionalProperties": False,
+        "properties": {"result_handle": {"type": "string", "pattern": r"^bnh1-[0-9a-f]{32}$"},
+            "request_path": {"type": "string", "minLength": 1, "maxLength": 1024}}},
+}
+
 _OBJECT_CREATE_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
     "type": "string",
     "minLength": 1,
@@ -2303,7 +2311,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "references": {"type": "array", "items": _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                 "list": _OBJECT_LIST_NAME_SCHEMA,
-                "graph_result_bindings": {"type": "array", "maxItems": 128, "items": {"type": "object"}},
+                "graph_result_bindings": _GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA,
                 "documented_list_bindings": {"type": "array", "maxItems": 128, "items": {"type": "object"},
                     "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 "auto_add_to_source_control": {"type": "boolean", "default": False},
@@ -2781,7 +2789,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         ),
                     },
                     "auto_add_to_source_control": {"type": "boolean", "default": False},
-                    "graph_result_bindings": {"type": "array", "maxItems": 128, "items": {"type": "object"}},
+                    "graph_result_bindings": _GRAPH_RESULT_BINDINGS_ARGUMENT_SCHEMA,
                     "documented_list_bindings": {"type": "array", "maxItems": 128,
                         "items": {"type": "object"}, "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 },
@@ -4639,6 +4647,18 @@ def _closed_operation_preview(
     )
 
 
+def _capture_planned_rename_collision(row, *, read):
+    collision = ResolvedObject(identity=ObjectIdentity(id=row["id"]), object=row["id"], resolution="live-exact-path", row=row)
+    identities = [item["id"] for item in _capture_replace_subtree_snapshot(collision, read=read)]
+    if len(identities) > MULTI_IDENTITY_READ_MAX_IDS:
+        raise OperationContractError("MULTI_IDENTITY_READ_LIMIT_EXCEEDED", "Rename preservation exceeds the exact read bound")
+    fields = ["id", "name", "type", "path", "parent", "owner", "notes", "classId"]
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, {"return": fields}))
+    if len(rows) != len(identities) or len({row.get("id") for row in rows}) != len(identities) or {row.get("id") for row in rows} != set(identities):
+        raise OperationContractError("INVALID_READBACK", "Rename collision preservation must resolve every old GUID exactly once")
+    return {"fields": fields, "rows": [{key: item[key] for key in fields if key in item} for item in sorted(rows, key=lambda item: item["id"])]}
+
+
 def _prepare_object_create(
     request: OperationRequest,
     *,
@@ -4736,7 +4756,7 @@ def _prepare_object_create(
     from .planned_references import prepare_result_context
     result_context = prepare_result_context(arguments.get("graph_result_bindings", []), normalized.nodes,
         {"$": (parent, requested_conflict)}, resolve_type=lambda name: _resolve_object_type(
-            "PropertyContainer" if request.version == "2025.1" and name == "ActorMixer" else name, catalog=type_catalog), read=read)
+            "PropertyContainer" if request.version == "2025.1" and name == "ActorMixer" else name, catalog=type_catalog), read=read, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     canonical_types: dict[str, str] = {}
     resolved_references: dict[str, Any] = {}
     derived_properties: dict[str, dict[str, Any]] = {}
@@ -5015,11 +5035,14 @@ def _prepare_object_create(
         if list_name is None
         else []
     )
+    from .planned_references import apply_result_name_choices
+    apply_result_name_choices(node_specs, result_context)
     trusted_root = _materialize_canonical_object_node(
         normalized.root,
         canonical_types=canonical_types,
         resolved_references=resolved_references,
         derived_properties=derived_properties,
+        prepared_names=result_context["prepared_names"] if result_context else None,
     )
     dispatch_args = {
         "parent": parent.object,
@@ -5039,6 +5062,7 @@ def _prepare_object_create(
         family="object-mutation",
         metadata={
             "closed_object_tree": True,
+            "Gateway_rename_choices": result_context["renames"] if result_context else [],
             "node_count": len(node_specs),
             "on_name_conflict": conflict,
             "platform": platform,
@@ -5757,11 +5781,13 @@ def _prepare_object_set(
     result_context = None
     if arguments.get("graph_result_bindings"):
         from .planned_references import prepare_result_context
-        result_nodes, result_roots = [], {}
+        result_nodes, result_roots, result_references = [], {}, []
         for result_index, result_item in enumerate(raw_objects):
             prefix = f"$.objects[{result_index}]"
             result_roots[prefix] = (_resolve_identity(result_item["object"], role=f"objects[{result_index}].object",
-                read=read, identity_cache=identity_cache), str(result_item.get("on_name_conflict", conflict)))
+                read=read, identity_cache=identity_cache), str(result_item.get("on_name_conflict", conflict)), result_item.get("name"))
+            result_references.extend(normalize_reference_descriptors(result_item.get("references", []),
+                request_path=prefix + ".references", allow_unions=True))
             result_nodes.extend(normalize_object_forest(result_item.get("children", []), base_path=prefix + ".children",
                 allow_platform=True, allow_language=True, allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS).nodes)
             result_nodes.extend(node for descriptor in normalize_object_lists(result_item.get("lists", []),
@@ -5769,7 +5795,7 @@ def _prepare_object_set(
                 allow_import=request.version in OBJECT_SET_IMPORT_VERSIONS) for node in descriptor.nodes)
         result_context = prepare_result_context(arguments["graph_result_bindings"], result_nodes, result_roots,
             resolve_type=lambda name: _resolve_object_type("PropertyContainer" if request.version == "2025.1" and name == "ActorMixer" else name,
-                catalog=type_catalog), read=read)
+                catalog=type_catalog), read=read, references=result_references, capture_collision=lambda row: _capture_planned_rename_collision(row, read=read))
     resolved_target_ids: dict[str, int] = {}
     for index, item in enumerate(raw_objects):
         merge_child_snapshots: list[dict[str, Any]] = []
@@ -5918,7 +5944,7 @@ def _prepare_object_set(
                     "Renaming an existing object does not support on_name_conflict=merge.",
                     details={"index": index},
                 )
-            trusted["name"] = requested_name
+            trusted["name"] = result_context["root_prepared_names"].get(target_spec["request_path"], requested_name) if result_context else requested_name
         for descriptor in properties:
             info = _read_property_info_cached(
                 read,
@@ -5977,6 +6003,17 @@ def _prepare_object_set(
                     field_name=descriptor.name,
                     platform=platform,
                 )
+            if (result_context and getattr(descriptor.target, "kind", None) == "id"
+                    and descriptor.target.value in result_context["handles"]):
+                from .planned_references import PlannedReferenceTarget
+                target_path = result_context["handles"][descriptor.target.value]
+                fact = result_context["facts"][target_path]
+                _require_reference_target_allowed(info, PlannedReferenceTarget(fact))
+                trusted[f"@{descriptor.name}"] = fact["path"]
+                target_spec["references"].append({"name": descriptor.name, "target_request_path": target_path,
+                    "target_result_handle": fact["result_handle"], "planned_native_path": fact["path"]})
+                result_context["metadata"].append({"object_id": target.object, "name": descriptor.name, "metadata": info.as_dict()})
+                continue
             if isinstance(descriptor.target, ObjectCurveDescriptor):
                 try:
                     value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
@@ -5996,7 +6033,7 @@ def _prepare_object_set(
             value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
             trusted[f"@{descriptor.name}"] = value
             target_spec["references"].append({"name": descriptor.name, "target_id": value})
-        desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in target_spec["references"]}
+        desired_references = {row["name"].casefold(): row.get("planned_native_path", row.get("target_id", row.get("curve"))) for row in target_spec["references"]}
         for info, resolved in reference_targets:
             _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
                 platform=platform, desired_references=desired_references,
@@ -6081,6 +6118,7 @@ def _prepare_object_set(
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
                     materialized_imports=materialized_imports,
+                    prepared_names=result_context["prepared_names"] if result_context else None,
                 )
                 for root in children.roots
             ]
@@ -6094,7 +6132,7 @@ def _prepare_object_set(
             parent_path = target_path.rsplit("\\", 1)[0]
             future_target_path = _child_path(
                 parent_path,
-                item.get("name"),
+                trusted.get("name", item.get("name")),
                 field=f"objects[{index}].parent_path",
             )
             rename_rows = _read_object_path_rows(
@@ -6463,6 +6501,7 @@ def _prepare_object_set(
                     resolved_references=resolved_references,
                     derived_properties=derived_child_properties,
                     materialized_imports=materialized_imports,
+                    prepared_names=result_context["prepared_names"] if result_context else None,
                 )
                 for root in descriptor.objects
             ]
@@ -6703,6 +6742,8 @@ def _prepare_object_set(
     }
     if global_platform is not None:
         dispatch_args["platform"] = global_platform
+    from .planned_references import apply_result_name_choices
+    apply_result_name_choices(node_specs, result_context)
     preview = _closed_operation_preview(
         uri="ak.wwise.core.object.set",
         args=dispatch_args,
@@ -6711,6 +6752,7 @@ def _prepare_object_set(
         family="object-mutation",
         metadata={
             "closed_object_batch": True,
+            "Gateway_rename_choices": result_context["renames"] if result_context else [],
             "target_count": len(raw_objects),
             "node_count": len(node_specs),
             "platform": global_platform,
@@ -7340,6 +7382,7 @@ def _prepare_prospective_reference_hierarchy(
     references, *, class_id,
 ):
     """Validate new-node reference edges against explicit prospective values."""
+    from .planned_references import PlannedReferenceTarget
     by_name = {info.name.casefold(): (info, targets) for info, targets in references}
     conditions, controllers, validated = [], set(), set()
 
@@ -7378,15 +7421,16 @@ def _prepare_prospective_reference_hierarchy(
             parent = targets[0]
             _require_object_reference_metadata(controller_info, allow_hierarchy=True)
             parent_id = _reference_identity(target.row.get("parent"))
-            if (not isinstance(parent.object, str) or _PLUGIN_GUID.fullmatch(parent.object) is None
-                    or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None):
+            planned = isinstance(target, PlannedReferenceTarget) or isinstance(parent, PlannedReferenceTarget)
+            if (not isinstance(parent.object, str) or (not isinstance(parent, PlannedReferenceTarget) and _PLUGIN_GUID.fullmatch(parent.object) is None)
+                    or not isinstance(parent_id, str) or (not isinstance(target, PlannedReferenceTarget) and _PLUGIN_GUID.fullmatch(parent_id) is None)):
                 raise OperationContractError("INVALID_READBACK", "Prospective hierarchy needs canonical target and controlling parent GUIDs.")
             if not _same_identity(parent_id, parent.object):
                 raise OperationContractError("INVALID_REFERENCE_TARGET", "Chosen new-object reference target is not a child of its declared controlling reference.",
                     details={"reference": info.name, "target_id": target.object, "parent_reference": name,
                              "expected_parent_id": parent.object, "actual_parent_id": parent_id})
             visit(controller_info, parent, (*path, info.name.casefold()))
-            condition = {"kind": "prospective_reference_parent", "class_id": class_id,
+            condition = {"kind": "planned_reference_parent" if planned else "prospective_reference_parent", "class_id": class_id,
                 "reference": info.name, "target_id": target.object, "parent_reference": name, "parent_id": parent.object,
                 "metadata": {record.name: {"normalized": record.as_dict(), "native": dict(record.raw)}
                              for record in (info, controller_info)}}
@@ -7578,6 +7622,8 @@ def _prepare_object_node_specs(
                     scope={"classId": type_info.class_id}, read_call=read,
                     supplied_values={descriptor.name: descriptor.value for descriptor in node.properties},
                     supplied_references={row["name"]: row.get("target_id", row.get("curve")) for row in spec["references"]},
+                    planned_references={row["name"]: {"result_handle": row["target_result_handle"],
+                        "target_request_path": row["target_request_path"]} for row in spec["references"] if "target_request_path" in row},
                     validate_scalar=_require_object_property_value,
                 )
             except NewObjectDefaultError as exc:
@@ -8040,10 +8086,20 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
                 and info.name == result_context["facts"][path]["type"]]) == 1 for path in result_context["target_paths"])
             metadata_cache = {}
             changed_fields = [binding["name"] for binding in result_context["metadata"]
-                if _read_property_info_cached(read, cache=metadata_cache, class_id=binding["class_id"],
+                if _read_property_info_cached(read, cache=metadata_cache,
+                    **({"object_id": binding["object_id"]} if "object_id" in binding else {"class_id": binding["class_id"]}),
                     name=binding["name"]).as_dict() != binding["metadata"]]
-            passed = valid_types and not changed_fields
-            evidence = {"target_classes_match": valid_types, "changed_fields": changed_fields}
+            collision_changes = []
+            for rename in result_context["renames"]:
+                for snapshot in rename["collision_state"]:
+                    expected = snapshot["rows"]
+                    identities = [row["id"] for row in expected]
+                    actual = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, {"return": snapshot["fields"]}))
+                    normalized = [{key: row[key] for key in snapshot["fields"] if key in row} for row in actual]
+                    if sorted(normalized, key=lambda row: row.get("id", "")) != expected:
+                        collision_changes.append(rename["request_path"])
+            passed = valid_types and not changed_fields and not collision_changes
+            evidence = {"target_classes_match": valid_types, "changed_fields": changed_fields, "changed_rename_collisions": collision_changes}
         except (OperationContractError, ValueError, KeyError, TypeError) as exc:
             passed, evidence = False, {"error": str(exc)}
         assertions.append({"name": "planned scalar reference target classes and field metadata remain bound", "passed": bool(passed), "evidence": evidence})
@@ -8570,6 +8626,7 @@ def _materialize_canonical_object_node(
     resolved_references: Mapping[str, Any],
     derived_properties: Mapping[str, Mapping[str, Any]],
     materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
+    prepared_names: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     try:
         subtree_import_paths = {
@@ -8597,6 +8654,8 @@ def _materialize_canonical_object_node(
 
     def apply(current: ObjectNodeDescriptor, row: dict[str, Any]) -> None:
         row["type"] = canonical_types[current.request_path]
+        if prepared_names and current.request_path in prepared_names:
+            row["name"] = prepared_names[current.request_path]
         for property_name, value in derived_properties.get(current.request_path, {}).items():
             if (
                 not isinstance(property_name, str)
@@ -18497,6 +18556,8 @@ def verify_prepared_operation(
                 for requirement in evidence["requirements"]:
                     name = requirement["name"]
                     expected = requirement["effective_value"]
+                    if isinstance(expected, Mapping) and "planned_result_handle" in expected:
+                        continue
                     passed = (_reference_requirement_matches(row, name, expected)
                               if requirement["kind"] == "reference" else
                               _has_field(row, name) and condition_values_equal(_field_value(row, name), expected))
@@ -19005,13 +19066,36 @@ def verify_prepared_operation(
         for source_spec in specs:
             source_path = str(source_spec["request_path"])
             source_row = observed_row_by_path.get(source_path, {})
+            for evidence in source_spec.get("new_object_default_evidence", []):
+                for requirement in evidence["requirements"]:
+                    expected = requirement["effective_value"]
+                    if not isinstance(expected, Mapping) or "planned_result_handle" not in expected:
+                        continue
+                    target_path = expected["target_request_path"]
+                    target_id = resolved_id_by_path.get(target_path)
+                    check(f"{source_path}.{requirement['name']} planned creation prerequisite matches its actual GUID",
+                        isinstance(target_id, str) and _PLUGIN_GUID.fullmatch(target_id) is not None and target_path in observed_row_by_path
+                        and _reference_requirement_matches(source_row, requirement["name"], target_id),
+                        {"target_path": target_path, "expected_id": target_id, "actual": _field_value(source_row, requirement["name"])})
+            for condition in source_spec.get("reference_target_conditions", []):
+                if condition.get("kind") != "planned_reference_parent":
+                    continue
+                context = pre_state["planned_reference_context"]
+                target_path = context["handles"].get(condition["target_id"])
+                parent_path = context["handles"].get(condition["parent_id"])
+                target_row = observed_row_by_path.get(target_path, {})
+                parent_id = resolved_id_by_path.get(parent_path) if parent_path else condition["parent_id"]
+                check(f"{source_path}.{condition['reference']} actual target retains its chosen controlling parent",
+                    isinstance(parent_id, str) and _PLUGIN_GUID.fullmatch(parent_id) is not None and bool(target_row)
+                    and _same_identity(_reference_identity(target_row.get("parent")), parent_id),
+                    {"target_path": target_path, "expected_parent_id": parent_id, "actual_parent": target_row.get("parent")})
             for reference in source_spec.get("references", []):
                 if "target_request_path" not in reference:
                     continue
                 target_path = reference["target_request_path"]
                 target_id = resolved_id_by_path.get(target_path)
                 check(f"{source_path}.{reference['name']} references the exact independently verified graph result",
-                    _valid_object_id(target_id) and target_path in observed_row_by_path
+                    isinstance(target_id, str) and _PLUGIN_GUID.fullmatch(target_id) is not None and target_path in observed_row_by_path
                     and _reference_requirement_matches(source_row, reference["name"], target_id),
                     {"target_request_path": target_path, "target_id": target_id, "actual": _field_value(source_row, reference["name"])})
         if kind == "object-create-graph" and plan.get("on_name_conflict") == "replace":
@@ -23469,6 +23553,12 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        if condition.get("kind") == "planned_reference_parent":
+            valid = all(_native_snapshot_equal(_read_property_info(read, class_id=condition["class_id"], name=name).as_dict(), expected["normalized"])
+                for name, expected in condition["metadata"].items())
+            assertions.append({"name": "planned reference parent metadata remains bound", "passed": valid,
+                "evidence": {"actual_parent_verification": "deferred_to_independent_graph_GUIDs"}})
+            continue
         if condition.get("kind") == "prospective_reference_parent":
             target = condition["target_id"]
             options = {"return": ["id", "parent"]}

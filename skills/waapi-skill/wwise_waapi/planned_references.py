@@ -1,11 +1,12 @@
 """Bind declaration result handles to normalized graph occurrences, never guessed GUIDs."""
 from __future__ import annotations
 
+import re
 from typing import Mapping
 
 from .business_declarations import NewDescendantTarget, business_repair
 from .metadata_restrictions import reference_type_token
-from .operation_object import DEFAULT_MAX_NODES, ObjectOperationContractError
+from .operation_object import DEFAULT_MAX_NODES, DEFAULT_MAX_NAME_LENGTH, ObjectOperationContractError
 
 
 class PlannedReferenceTarget:
@@ -21,14 +22,14 @@ class PlannedReferenceTarget:
         return {"planned_result_handle": self.object, "prospective": True, "facts": self.row}
 
 
-def compile_result_reference(session, field, handle, *, native_type):
+def compile_result_reference(session, field, handle, *, native_type, allowed_types=None):
     rows = [row for row in session.declarations if row.result_handle == handle
         and isinstance(row.target, NewDescendantTarget)]
     if len(rows) != 1:
         raise business_repair("PLANNED_REFERENCE_TARGET_NOT_AVAILABLE", field=field.token,
             action="copy one new declaration result handle from this same Draft")
     target_type = native_type(session, rows[0].target.kind)
-    allowed = field.restrictions.get("allowed_target_types", [])
+    allowed = field.restrictions.get("allowed_target_types", []) if allowed_types is None else allowed_types
     if allowed and reference_type_token(target_type) not in {reference_type_token(value) for value in allowed}:
         raise business_repair("REFERENCE_TARGET_TYPE_MISMATCH", field=field.token,
             allowed_target_types=allowed, action="choose a same-Draft result with one allowed class")
@@ -61,49 +62,26 @@ def graph_result_bindings(roots, result_handles):
     return bindings
 
 
-def prepare_result_context(bindings, nodes, roots, *, resolve_type, read):
-    """Observe existing roots and index normalized nodes; construct no native tree."""
+def prepare_result_context(bindings, nodes, roots, *, resolve_type, read, references=(), capture_collision=None):
+    """Index normalized occurrences and observe paths; construct no native tree."""
     if not bindings:
         return None
     by_path = {node.request_path: node for node in nodes}
     handles, paths = {}, {}
     if len(nodes) > DEFAULT_MAX_NODES or len(bindings) != len(nodes):
-        raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Result bindings must cover the bounded normalized new graph", details={"bindings": bindings, "nodes": list(by_path)})
+        raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Result bindings must cover the bounded normalized new graph")
     for binding in bindings:
         if (set(binding) != {"result_handle", "request_path"} or binding["request_path"] not in by_path
-                or not isinstance(binding["result_handle"], str) or not binding["result_handle"].startswith("bnh1-")
+                or not isinstance(binding["result_handle"], str) or re.fullmatch(r"bnh1-[0-9a-f]{32}", binding["result_handle"]) is None
                 or binding["result_handle"] in handles or binding["request_path"] in paths):
-            raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Each result handle binds exactly one new graph occurrence")
+            raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Each result handle binds one new graph occurrence")
         handles[binding["result_handle"]] = binding["request_path"]
         paths[binding["request_path"]] = binding["result_handle"]
-    used = {reference.target.value for node in nodes for reference in node.references
+    all_references = [reference for node in nodes for reference in node.references] + list(references)
+    used = {reference.target.value for reference in all_references
         if getattr(reference.target, "kind", None) == "id" and str(reference.target.value).startswith("bnh1-")}
     if used - set(handles):
         raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "A scalar result target left this normalized graph")
-    facts = {}
-    def resolve(path):
-        if path in facts:
-            return facts[path]
-        node = by_path[path]
-        parent_path = node.parent_request_path
-        if parent_path is not None:
-            parent = resolve(parent_path)
-            parent_native_path, parent_identity = parent["path"], parent["result_handle"]
-        else:
-            matches = [value for prefix, value in roots.items() if path == prefix or path.startswith(prefix + ".")]
-            if len(matches) != 1:
-                raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "A planned node needs one exact live root")
-            parent_native_path, parent_identity = matches[0][0].row["path"], matches[0][0].object
-        info = resolve_type(node.type)
-        fact = {"result_handle": paths[path], "request_path": path, "path": parent_native_path.rstrip("\\") + "\\" + node.name,
-            "type": info.name, "class_id": info.class_id, "parent_identity": parent_identity,
-            "relation": "parent" if node.collection == "children" else "owner"}
-        facts[path] = fact
-        return fact
-    for path in paths:
-        resolve(path)
-    if len({row["path"].casefold() for row in facts.values()}) != len(facts):
-        raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Planned reference paths must name distinct new graph occurrences")
     selected = {handles[handle] for handle in used}
     ancestors = set(selected)
     for path in tuple(selected):
@@ -111,16 +89,144 @@ def prepare_result_context(bindings, nodes, roots, *, resolve_type, read):
         while parent_path is not None:
             ancestors.add(parent_path)
             parent_path = by_path[parent_path].parent_request_path
-    snapshots = []
-    for path in sorted(ancestors):
-        fact = facts[path]
-        result = read("ak.wwise.core.object.get", {"from": {"path": [fact["path"]]}},
-            {"return": ["id", "name", "type", "path", "classId"]})
+    projection = ["id", "name", "type", "path", "classId", "parent", "owner", "notes"]
+    facts, snapshots, names, renames, root_paths, root_names = {}, [], {}, [], {}, {}
+
+    def observed(path):
+        result = read("ak.wwise.core.object.get", {"from": {"path": [path]}}, {"return": projection})
         rows = result.get("return") if isinstance(result, Mapping) else None
-        if not isinstance(rows, list) or len(rows) > 1 or any(not isinstance(row, Mapping) for row in rows):
-            raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Each planned reference path must have at most one exact collision")
-        root = next(value for prefix, value in roots.items() if path == prefix or path.startswith(prefix + "."))
-        if root[1] == "rename" and rows:
-            raise ObjectOperationContractError("PLANNED_REFERENCE_RENAME_COLLISION", "The same-call result reference needs a disclosed deterministic rename choice before its native path is known")
-        snapshots.append({"path": fact["path"], "fields": ["id", "name", "type", "path", "classId"], "rows": rows})
-    return {"handles": handles, "facts": facts, "target_paths": sorted(selected), "path_snapshots": snapshots, "metadata": []}
+        if (not isinstance(rows, list) or len(rows) > 1 or any(not isinstance(row, Mapping)
+                or not isinstance(row.get("id"), str) or re.fullmatch(r"\{[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\}", row["id"]) is None
+                or not isinstance(row.get("path"), str) or row["path"].casefold() != path.casefold() for row in rows)):
+            raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "A planned reference path needs at most one exact canonical collision")
+        normalized = [{key: row[key] for key in projection if key in row} for row in rows]
+        snapshots.append({"path": path, "fields": projection, "rows": normalized})
+        return normalized
+
+    def chosen_name(request_path, name, parent_path, policy, *, exclude_id=None, reserved=()):
+        path = parent_path.rstrip("\\") + "\\" + name
+        rows = observed(path)
+        collisions = [row for row in rows if row["id"] != exclude_id]
+        if policy != "rename" or not collisions:
+            return name, path, rows
+        for index in range(1, 33):
+            suffix = f"_waapi_{index}"
+            candidate = name[:DEFAULT_MAX_NAME_LENGTH - len(suffix)] + suffix
+            if candidate.casefold() in reserved:
+                continue
+            candidate_path = parent_path.rstrip("\\") + "\\" + candidate
+            if not observed(candidate_path):
+                if capture_collision is None:
+                    raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "Rename preservation requires the graph observer")
+                renames.append({"request_path": request_path, "requested_name": name, "prepared_name": candidate,
+                    "native_path": candidate_path, "collision_state": [capture_collision(row) for row in collisions],
+                    "name_policy": "Gateway_selected_candidate; native_onNameConflict_remains_rename"})
+                return candidate, candidate_path, []
+        raise ObjectOperationContractError("PLANNED_REFERENCE_RENAME_SEARCH_LIMIT", "No free Gateway rename candidate was proved within 32 bounded choices")
+
+    def root_for(path):
+        matches = [(prefix, value) for prefix, value in roots.items() if path == prefix or path.startswith(prefix + ".")]
+        if len(matches) != 1:
+            raise ObjectOperationContractError("PLANNED_REFERENCE_BINDING_INVALID", "A planned node needs one exact live root")
+        return matches[0]
+
+    def root_path(prefix, root):
+        if prefix not in root_paths:
+            current = root[0].row["path"]
+            requested_name = root[2] if len(root) > 2 else None
+            if requested_name is None:
+                root_paths[prefix] = current
+            else:
+                name, path, _rows = chosen_name(prefix, requested_name, current.rsplit("\\", 1)[0], root[1], exclude_id=root[0].object)
+                root_paths[prefix] = path
+                if name != requested_name:
+                    root_names[prefix] = name
+        return root_paths[prefix]
+
+    def resolve(path):
+        if path in facts:
+            return facts[path]
+        node = by_path[path]
+        prefix, root = root_for(path)
+        if node.parent_request_path is not None:
+            parent = resolve(node.parent_request_path)
+            parent_native_path, parent_identity = parent["path"], parent["result_handle"]
+        else:
+            parent_native_path, parent_identity = root_path(prefix, root), root[0].object
+        name, native_path, rows = node.name, parent_native_path.rstrip("\\") + "\\" + node.name, []
+        if path in ancestors:
+            reserved = {other.name.casefold() for other in nodes if other.request_path != path
+                and other.parent_request_path == node.parent_request_path and root_for(other.request_path)[0] == prefix}
+            name, native_path, rows = chosen_name(path, node.name, parent_native_path, root[1], reserved=reserved)
+            if name != node.name:
+                names[path] = name
+            elif root[1] == "merge" and rows:
+                native_path = rows[0]["path"]
+                name = rows[0]["name"]
+        info = resolve_type(node.type)
+        fact = {"result_handle": paths[path], "request_path": path, "path": native_path, "name": name,
+            "type": info.name, "class_id": info.class_id, "parent_identity": parent_identity,
+            "relation": "parent" if node.collection == "children" else "owner"}
+        facts[path] = fact
+        return fact
+    for path in paths:
+        resolve(path)
+    if len({row["path"].casefold() for row in facts.values()}) != len(facts):
+        raise ObjectOperationContractError("AMBIGUOUS_IDENTITY", "Planned reference paths must name distinct new occurrences")
+    return {"handles": handles, "facts": facts, "target_paths": sorted(selected), "bound_paths": sorted(ancestors),
+        "path_snapshots": snapshots, "prepared_names": names, "renames": renames, "root_paths": root_paths,
+        "root_prepared_names": root_names, "metadata": []}
+
+
+def apply_result_name_choices(specs, context):
+    if not context:
+        return
+    for spec in specs:
+        path = spec["request_path"]
+        name = context["prepared_names"].get(path, context["root_prepared_names"].get(path))
+        if name is not None:
+            spec["original_requested_name"] = spec["requested_name"]
+            spec["requested_name"] = name
+        if path in context["bound_paths"]:
+            fact = context["facts"][path]
+            if name is None and fact["name"] != spec["requested_name"]:
+                spec["original_requested_name"] = spec["requested_name"]
+                spec["requested_name"] = fact["name"]
+            spec["expected_path"] = fact["path"]
+        elif spec.get("existing_target") and path in context["root_paths"]:
+            spec["expected_path"] = context["root_paths"][path]
+
+
+def order_result_rows(rows, result_handles, *, revision):
+    """Order existing compiled associations with the shared dependency kernel.
+
+    Owned List member order and the compiled trees themselves stay intact.
+    """
+    owners, dependencies = {}, [set() for _ in rows]
+    def descendants(node):
+        yield node
+        for child in node.get("children", []):
+            yield from descendants(child)
+        for descriptor in node.get("lists", []):
+            for member in descriptor["objects"]:
+                yield from descendants(member)
+    for index, root in enumerate(rows):
+        for node in descendants(root):
+            handle = result_handles.get(id(node))
+            if handle:
+                owners[handle] = index
+    for index, root in enumerate(rows):
+        for node in descendants(root):
+            for reference in node.get("references", []):
+                target = reference["target"]
+                owner = owners.get(target.get("value")) if isinstance(target, Mapping) else None
+                if owner is not None and owner != index:
+                    dependencies[index].add(owner)
+    if not any(dependencies):
+        return rows
+    from .business_planning import BusinessEffect, _topological_order
+    effects = [BusinessEffect(effect_id=f"row-{index}", declaration_id=f"row-{index}",
+        depends_on=tuple(f"row-{dependency}" for dependency in sorted(dependencies[index])),
+        batch_key="single-graph", native_fragment=root, verifier_expectation={}, readable_lines=("Reference targets before consumers",))
+        for index, root in enumerate(rows)]
+    return [effect.native_fragment for effect in _topological_order(effects, draft_revision=revision)]
