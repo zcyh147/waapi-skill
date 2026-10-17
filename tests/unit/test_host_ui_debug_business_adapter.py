@@ -780,6 +780,7 @@ class _ToneFileClient(_HostClient):
         self.write_output = write_output
         self.artifact_bytes = None
         self.after_write = None
+        self.session_label = None
 
     def call(self, uri, args=None, options=None):
         if uri == 'ak.wwise.debug.generateToneWAV':
@@ -796,11 +797,14 @@ class _ToneFileClient(_HostClient):
             if self.after_write is not None:
                 self.after_write(Path(args['path']))
             return {}
-        return super().call(uri, args, options)
+        observed = super().call(uri, args, options)
+        if uri == 'ak.wwise.core.getInfo' and self.session_label is not None:
+            observed['sessionId'] = self.session_label
+        return observed
 
 
 def _tone_collection_preview(tmp_path, version, fields, *, policy='ask_before_changes',
-                             is_command_line=True, write_output=True, reject_declaration=False, values=None, existing_bytes=None, declaration_only=False, reject_preparation=False):
+                             is_command_line=True, write_output=True, reject_declaration=False, values=None, existing_bytes=None, declaration_only=False, reject_preparation=False, client_setup=None):
     state = ['--state-dir', str(tmp_path / 'state')]
     env = set_gateway_config(_env(tmp_path, version), project_modification_policy=policy)
     output = tmp_path / 'io' / 'tone.wav'
@@ -812,6 +816,8 @@ def _tone_collection_preview(tmp_path, version, fields, *, policy='ask_before_ch
     business_values.update(values or {})
     value_argv = [token for field, value in business_values.items() if value is not None for token in (('--toggle', field, 'enable' if value == 'true' else 'disable') if field == 'anonymous_channels' else ('--value', field, value))]
     client = _ToneFileClient(tmp_path, version, is_command_line=is_command_line, write_output=write_output)
+    if client_setup is not None:
+        client_setup(client)
     code, schema = gateway.execute_gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'],
         env=env, client_factory=lambda _: pytest.fail('schema is offline'))
     assert code == 0, schema
@@ -999,6 +1005,7 @@ def test_tone_verifier_checks_all_silent_samples_and_exact_format(tmp_path, floa
     client.artifact_bytes = _tone_wav_bytes(floating=floating)
     verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
     assert verified['verification']['business_state_verified'] is True
+    assert verified['stdout_projection']['stdout_budget_bytes'] == 24576
     assert verified['agent_result']['request'] == preview['agent_result']['request']
 
 
@@ -1154,15 +1161,22 @@ def test_tone_output_estimate_rejects_resource_overflow_before_dispatch(tmp_path
     assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
 
 
-def test_tone_large_marker_terminal_gap_is_explicit_without_replaying_native_write(tmp_path):
+def test_tone_large_marker_request_survives_exact_terminal_delivery(tmp_path, monkeypatch, capsys):
     fields = [token for number in range(4) for token in ('--marker', str(number), 'x' * 8192)]
     env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', fields)
-    code, failed_delivery = _finish_tone_collection(env, state, client, preview, return_verify_outcome=True)
-    assert code != 0, failed_delivery
-    assert failed_delivery['error_code'] == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
-    assert failed_delivery['details']['agent_result_exact'] is True
+    verified = _finish_tone_collection(env, state, client, preview)
+    rendered = gateway.gateway_stdout_json_encoder(verified).encode(gateway.gateway_stdout_payload(verified)) + '\n'
+    with monkeypatch.context() as emitting:
+        emitting.setattr(gateway, 'execute_gateway', lambda argv: (0, verified))
+        assert gateway.main(['verify', preview['transaction_id']]) == 0
+    assert capsys.readouterr().out == rendered
+    decoded = json.loads(rendered)
+    assert decoded['agent_result'] == verified['agent_result']
+    assert decoded['agent_result']['request'] == preview['agent_result']['request']
+    assert list(decoded)[-1] == 'agent_result'
+    assert 32768 < len(rendered.encode('utf-8')) <= 286720
     assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
-    # OPEN #194: this retained reproduction is not delivery/effect acceptance.
+
 
 
 
@@ -1265,3 +1279,168 @@ def test_tone_removed_output_root_is_a_recorded_verification_failure(tmp_path):
         ['--empty', 'waveform_channels'])
     client.after_write = lambda path: path.parent.rename(tmp_path / 'removed-owned-root')
     _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+
+def test_tone_preparation_normalizes_post_hash_output_disappearance(tmp_path, monkeypatch):
+    import os
+    output = tmp_path / 'io' / 'tone.wav'
+    real_fstat = os.fstat
+    injected = []
+    def unlink_after_hash(descriptor):
+        observed = real_fstat(descriptor)
+        try:
+            at_end = os.lseek(descriptor, 0, os.SEEK_CUR) == observed.st_size
+        except OSError:
+            at_end = False
+        if not injected and at_end and observed.st_size > 0 and output.exists() and output.stat().st_ino == observed.st_ino:
+            output.unlink()
+            injected.append(True)
+        return observed
+    monkeypatch.setattr(os, 'fstat', unlink_after_hash)
+    rejected, client = _tone_collection_preview(tmp_path, '2025.1', ['--empty', 'waveform_channels'],
+        existing_bytes=_tone_wav_bytes(), reject_preparation=True)
+    assert injected
+    assert rejected['error_code'] == 'FILE_CHANGED', rejected
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
+
+
+
+def test_tone_verification_normalizes_root_disappearance_between_stat_and_resolve(tmp_path, monkeypatch):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'])
+    original_resolve, injected = Path.resolve, []
+    def disappearing_resolve(path, *args, **kwargs):
+        if path == output.parent and kwargs.get('strict') is True and not injected:
+            path.rename(tmp_path / 'lost-root-during-resolve')
+            injected.append(True)
+        return original_resolve(path, *args, **kwargs)
+    client.after_write = lambda _: monkeypatch.setattr(Path, 'resolve', disappearing_resolve)
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+    assert injected
+
+
+
+def _maximum_marker_fields(tmp_path, unit):
+    plan = {'output_file': str(tmp_path / 'io' / 'tone.wav'), 'waveform': 'white_noise',
+        'channel_layout': '2.0', 'sample_rate_hz': 8000, 'bit_depth': 'int16',
+        'attack_seconds': 0, 'sustain_seconds': 0.0005, 'release_seconds': 0,
+        'waveform_channels': [], 'markers': [{'position_seconds': 0, 'label': ''} for _ in range(128)]}
+    def size():
+        return len(json.dumps(plan, ensure_ascii=False, separators=(',', ':')).encode('utf-8'))
+    low, high = 0, 8192 // len(unit.encode('utf-8'))
+    while low < high:
+        middle = (low + high + 1) // 2
+        for marker in plan['markers']:
+            marker['label'] = unit * middle
+        if size() <= 131072:
+            low = middle
+        else:
+            high = middle - 1
+    for marker in plan['markers']:
+        marker['label'] = unit * low
+    plan['markers'][-1]['label'] += 'x' * (131072 - size())
+    assert size() == 131072
+    assert max(len(marker['label'].encode('utf-8')) for marker in plan['markers']) <= 8192
+    return [token for marker in plan['markers'] for token in ('--marker', '0', marker['label'])], plan['markers']
+
+
+@pytest.mark.parametrize('unit', ['x', '界', '"\\\n'], ids=['ascii', 'utf8', 'escaping'])
+def test_maximum_tone_marker_plan_and_count_survive_artifact_and_actual_stdout(tmp_path, unit, monkeypatch, capsys):
+    import struct
+    fields, markers = _maximum_marker_fields(tmp_path, unit)
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', *fields],
+        client_setup=lambda fake: setattr(fake, 'session_label', '界"\\' * 500))
+    cue = struct.pack('<I', 128) + b''.join(struct.pack('<II4sIII', index, 0, b'data', 0, 0, 0) for index in range(128))
+    adtl = b'adtl' + b''.join(_riff_chunk(b'labl', struct.pack('<I', index) + marker['label'].encode('utf-8') + b'\0')
+        for index, marker in enumerate(markers))
+    assert len(adtl) < 131072
+    client.artifact_bytes = _tone_wav_bytes(extra=_riff_chunk(b'cue ', cue) + _riff_chunk(b'LIST', adtl))
+    verified = _finish_tone_collection(env, state, client, preview)
+    rendered = gateway.gateway_stdout_json_encoder(verified).encode(gateway.gateway_stdout_payload(verified)) + '\n'
+    with monkeypatch.context() as emitting:
+        emitting.setattr(gateway, 'execute_gateway', lambda argv: (0, verified))
+        assert gateway.main(['verify', preview['transaction_id']]) == 0
+    assert capsys.readouterr().out == rendered
+    decoded = json.loads(rendered)
+    assert decoded['agent_result'] == verified['agent_result']
+    assert decoded['agent_result']['request'] == preview['agent_result']['request']
+    assert list(decoded)[-1] == 'agent_result'
+    assert len(rendered.encode('utf-8')) <= 286720
+    assert 'session_context' in decoded
+    assert decoded['stdout_projection']['stdout_budget_bytes'] == 286720
+    from wwise_waapi.transactions import TransactionStore
+    store = TransactionStore(Path(state[1]))
+    assert store.load_preview(preview['transaction_id']).artifact['request'] == decoded['agent_result']['request']
+    events = store.read_events(preview['transaction_id'])
+    journal = next(event['details']['verification'] for event in events if event['event_type'] == 'verification_recorded')
+    assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
+    (tmp_path / 'terminal.stdout.json').write_text(rendered, encoding='utf-8')
+
+
+
+@pytest.mark.parametrize('branch', ['marker-metadata', 'extensible-header'])
+def test_tone_prewrite_artifact_budget_accounts_for_metadata_and_format_header(tmp_path, monkeypatch, branch):
+    from wwise_waapi import operation_tone
+    # Scale the fixed artifact resource bound, never a native capability or
+    # caller-controlled option; expose omitted overhead without a 512 MiB file.
+    monkeypatch.setattr(operation_tone, 'MAX_TREE_FILE_BYTES', 256 if branch == 'marker-metadata' else 64)
+    fields = ['--empty', 'waveform_channels']
+    values = {}
+    if branch == 'marker-metadata':
+        fields += ['--marker', '0', 'x' * 256]
+    else:
+        values['channel_layout'] = '0.1'
+    rejected, client = _tone_collection_preview(tmp_path, '2025.1', fields,
+        values=values, reject_preparation=True)
+    assert rejected['error_code'] == 'LIMIT_EXCEEDED', rejected
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
+
+
+
+def test_tone_one_byte_over_business_plan_budget_is_rejected_before_mutation(tmp_path):
+    fields, _ = _maximum_marker_fields(tmp_path, 'x')
+    fields[-1] += 'x'
+    rejected = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', *fields], reject_declaration=True)
+    assert rejected['error_code'] == 'INVALID_ARGUMENT'
+    assert '131072' in str(rejected)
+
+
+@pytest.mark.parametrize('defect', ['other-api', 'unsupported-version', 'unknown-field', 'label-limit', 'marker-count', 'options', 'missing-root', 'unbound-aggregate', 'wrong-root', 'unbound-mask'])
+def test_unowned_tone_shapes_cannot_gain_extra_terminal_capacity(tmp_path, defect):
+    from copy import deepcopy
+    fields = [token for number in range(4) for token in ('--marker', str(number), 'x' * 8192)]
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', fields)
+    verified = _finish_tone_collection(env, state, client, preview)
+    payload = deepcopy(verified)
+    from wwise_waapi.transactions import TransactionStore
+    events = TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
+    payload['verification'] = deepcopy(next(event['details']['verification'] for event in events
+        if event['event_type'] == 'verification_recorded'))
+    request = payload['agent_result']['request']
+    arguments = request['arguments']
+    if defect == 'other-api':
+        arguments['api'] = 'ak.wwise.ui.commands.getCommands'
+    elif defect == 'unsupported-version':
+        request['version'] = '2022.1'
+    elif defect == 'unknown-field':
+        arguments['args']['padding'] = True
+    elif defect == 'label-limit':
+        arguments['args']['markers'][0]['label'] += 'x'
+    elif defect == 'marker-count':
+        arguments['args']['markers'] += [{'position': 0}] * 125
+    elif defect == 'options':
+        arguments['options'] = {'extra': True}
+    elif defect == 'missing-root':
+        arguments.pop('io_root')
+    elif defect == 'wrong-root':
+        arguments['io_root'] = str(tmp_path / 'unbound-root')
+    elif defect == 'unbound-mask':
+        arguments['args']['waveformChannelMask'] = -1
+    else:
+        arguments['args']['markers'] *= 5
+    with pytest.raises(gateway.GatewayResultShapeError) as caught:
+        gateway.project_successful_transaction_verify_payload(payload)
+    assert caught.value.error_code == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'

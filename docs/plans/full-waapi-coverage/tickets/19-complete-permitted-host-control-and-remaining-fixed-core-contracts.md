@@ -92,3 +92,41 @@ part of this verifier checkpoint. Fixing accepted-request terminal capacity
 remains #193 implementation work; deterministic Broker/archive delivery remains
 #194 acceptance. Complete WAL delivery, the rest of #193 and remaining #188
 layout/state/native evidence obligations remain open.
+
+
+## Bounded successor: terminal capacity and disappearing paths
+
+The successor to `c253c5ae` repairs the retained legal long-marker terminal
+failure through the existing successful-verify projection. Only a validated
+canonical Tone request matching the closed versioned shape, derived output
+root, channel-index mask, collection/text limits and aggregate native bound can
+select the existing 256 KiB rendered-request plus 24 KiB framing envelope. Small
+requests and other/unbound shapes retain 24 KiB. Declaration, Preview and stored
+execution paths check rendered UTF-8 fit before dispatch. The exact agent_result
+is preserved in its final position; complete verification remains in the
+existing hash-chained journal. No accepted marker count or label limit shrank.
+
+Public fake controls reach the exact 128 KiB business-plan edge with 128 markers
+for ASCII, UTF-8 and escaped text, including enriched session context, an actual
+bounded RIFF artifact, exact immutable request/journal digest and actual main
+stdout. Their UTF-8 LIST framing fits the current 128 KiB artifact limit; that
+review question did not justify changing the limit. Other native marker text
+encodings remain uncharacterized and receive no acceptance credit.
+
+Two public filesystem fault controls reproduced raw post-hash FileNotFoundError
+and a stat/resolve root race that previously left execution unverified. Existing
+artifact/root helpers now normalize disappearance into structured failure, while
+retaining non-retry/prewrite guards. Separate scaled-resource controls exposed
+that audio+44 omitted extensible-format and marker framing overhead. Preparation
+now retains a disclosed reservation for the complete accepted fmt payload plus
+RIFF/data/cue/UTF-8-label framing. The fmt reserve is resource policy, not proof
+of the native writer's format; additional native chunks, fractional rounding and
+actual label encoding remain explicitly unknown and bounded at readback.
+
+This checkpoint repairs deterministic CLI delivery and filesystem behavior only.
+The existing formal Broker/archive chain still needs #194 acceptance of larger
+exact replies; no Fresh run is authorized. Implementable active-waveform and
+populated-marker checks remain #193 work. A genuinely indistinguishable native
+observation may justify a reviewed weaker result under Spec96, but current
+missing checks are not that evidence. Full #193/WAL and remaining #188 scope
+remain open under the native launch hold.

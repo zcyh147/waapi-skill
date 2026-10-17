@@ -101,6 +101,7 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
 from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     HostPathError,
     host_path_comparison_key,
+    parse_absolute_host_path,
     localize_waapi_host_path,
 )
 from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -302,6 +303,7 @@ from wwise_waapi.host_ui_debug_business_cli import (  # noqa: E402  # pyright: i
 )
 from wwise_waapi.host_ui_debug_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     materialize_waapi_schema_read_args,
+    MAX_HOST_PLAN_BYTES, MAX_COLLECTION_ITEMS, MAX_TEXT_BYTES, MAX_PATH_BYTES,
 )
 from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     core_business_catalog_rows,
@@ -17520,10 +17522,9 @@ def dispatch_business_host_ui_debug_plan(
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings({"host_ui_debug_plan": plan})
-        parse_operation_request(
-            adapter.materialize(candidate),
-            expected_version=detected_version,
-        )
+        materialized = parse_operation_request(
+            adapter.materialize(candidate), expected_version=detected_version).as_dict()
+        transaction_verify_terminal_budget(materialized)
         return candidate
 
     record = binding.store.apply_business_update(
@@ -19788,7 +19789,7 @@ def create_transaction_preview(
         request_payload,
         expected_version=detected_version,
     ).as_dict()
-    layout_blueprint_terminal_budget(canonical_request)
+    transaction_verify_terminal_budget(canonical_request)
     project_guard_mode, target_project_path = transaction_project_guard_spec(
         canonical_request,
         version=detected_version,
@@ -20422,7 +20423,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         request_payload = require_mapping(artifact.get("request"), "transaction request")
-        layout_blueprint_terminal_budget(request_payload)
+        transaction_verify_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -21269,7 +21270,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 f"current state is {record.state.value!r}."
             )
         request_payload = require_mapping(artifact.get("request"), "transaction request")
-        layout_blueprint_terminal_budget(request_payload)
+        transaction_verify_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -24264,6 +24265,58 @@ def layout_blueprint_terminal_budget(request: Any) -> int:
         else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES)
 
 
+def transaction_verify_terminal_budget(request: Any) -> int:
+    """Select bounded exceptional capacity only for reviewed closed constructors."""
+    ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    layout_budget = layout_blueprint_terminal_budget(request)
+    if layout_budget != ordinary:
+        return layout_budget
+    if (not isinstance(request, Mapping)
+            or set(request) != {'contract', 'version', 'operation', 'arguments'}
+            or request.get('contract') != 'waapi-skill.operation-request/v1'
+            or request.get('operation') != 'waapi.call'
+            or request.get('version') not in {'2023.1', '2024.1', '2025.1'}):
+        return ordinary
+    arguments = request.get('arguments')
+    if (not isinstance(arguments, Mapping)
+            or set(arguments) != {'api', 'args', 'options', 'io_root'}
+            or arguments.get('api') != 'ak.wwise.debug.generateToneWAV'
+            or arguments.get('options') != {} or not isinstance(arguments.get('args'), Mapping)):
+        return ordinary
+    native = arguments['args']
+    try:
+        parse_operation_request(request, expected_version=request['version'])
+        validate_semantic_payload(arguments['api'], native, {}, version=request['version'])
+        path = native['path']
+        markers = native.get('markers', [])
+        layout = native.get('channelConfig', '1.0')
+        channels = ((int(layout.split()[1][0]) + 1) ** 2 if layout.startswith('Ambisonics ')
+            else sum(int(part) for part in layout.split('.')))
+        mask = native.get('waveformChannelMask')
+        if (not path.casefold().endswith('.wav')
+                or host_path_comparison_key(str(parse_absolute_host_path(path).pure_path.parent)) != host_path_comparison_key(arguments['io_root'])
+                or mask is not None and (isinstance(mask, bool) or not isinstance(mask, int) or not 0 <= mask < 1 << channels)
+                or layout.startswith('Ambisonics ') and native.get('waveform', 'silence') != 'silence'):
+            return ordinary
+        if (len(canonical_json_bytes(native)) > MAX_HOST_PLAN_BYTES
+                or not isinstance(path, str) or len(path.encode('utf-8')) > MAX_PATH_BYTES
+                or not isinstance(markers, list) or len(markers) > MAX_COLLECTION_ITEMS
+                or any('label' in row and (not isinstance(row['label'], str)
+                    or '\x00' in row['label'] or len(row['label'].encode('utf-8')) > MAX_TEXT_BYTES) for row in markers)):
+            return ordinary
+    except (ValueError, TypeError, KeyError):
+        return ordinary
+    # Host plans are shallow and sealed under 128 KiB. Retaining their exact
+    # request uses the existing 256 KiB rendered-request/Draft ceiling plus
+    # ordinary terminal framing. No input count/label bound is reduced.
+    rendered_limit = min(MAX_OPERATION_DRAFT_EVIDENCE_BYTES, 2 * MAX_HOST_PLAN_BYTES)
+    observed = gateway_json_document_size({'agent_result': {'request': request}},
+        stop_after_bytes=rendered_limit)
+    if observed > rendered_limit:
+        raise GatewayInputError('Tone request exceeds its bounded rendered terminal UTF-8 capacity')
+    return ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES
+
+
 def project_successful_transaction_verify_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -24280,7 +24333,7 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
-    stdout_budget = layout_blueprint_terminal_budget(agent_result.get("request"))
+    stdout_budget = transaction_verify_terminal_budget(agent_result.get("request"))
     projected = dict(payload)
     projected.pop("agent_result", None)
     projection = {

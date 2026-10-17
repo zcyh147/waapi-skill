@@ -168,12 +168,16 @@ def capture_file_proof(
             details={"path": str(path), "error": str(exc)},
         ) from exc
     _require_unchanged_file_stat(before, after, field=field, path=path)
-    if guard is not None:
-        current = Path(value).stat()
-        names = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
-        if any(getattr(before, name) != getattr(current, name) for name in names) or prove_artifact_path(
-                value, io_root=io_root, field=field, must_exist=True, expect_directory=False) != guard:
-            raise SoundBankContractError('FILE_CHANGED', f'{field} path changed during its confined proof.')
+    try:
+        if guard is not None:
+            current = Path(value).stat()
+            names = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+            if any(getattr(before, name) != getattr(current, name) for name in names) or prove_artifact_path(
+                    value, io_root=io_root, field=field, must_exist=True, expect_directory=False) != guard:
+                raise SoundBankContractError('FILE_CHANGED', f'{field} path changed during its confined proof.')
+    except OSError as exc:
+        raise SoundBankContractError('FILE_CHANGED', f'{field} disappeared during its confined proof.',
+            details={'path': str(path), 'reason': str(exc)}) from exc
     body = {
         "contract": FILE_PROOF_CONTRACT,
         "path": str(path),
@@ -2611,7 +2615,11 @@ def _require_io_root(value: str | os.PathLike[str]) -> Path:
             "io_root must be a real directory, not a file or symbolic link.",
             details={"path": str(supplied)},
         )
-    return supplied.resolve(strict=True)
+    try:
+        return supplied.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise SoundBankContractError('INVALID_IO_ROOT', 'io_root changed while it was resolved.',
+            details={'path': str(supplied), 'reason': str(exc)}) from exc
 
 
 def _absolute_path(value: str | os.PathLike[str] | Any, *, field: str) -> Path:
