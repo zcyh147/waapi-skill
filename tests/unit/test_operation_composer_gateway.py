@@ -333,6 +333,26 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "8a89bd2ef65432a3a4fcddcb72a5ecfa49c32d6a4497d929199a6cf4802e0191"
+    )
+    # Only the five create contracts add same-graph result bindings here.
+    # Invert the exact closed field before retaining every historical seal.
+    def before_graph_result_bindings(version):
+        contract = operation_request_machine_contract("object.create", version)
+        contract["optional_arguments"].remove("graph_result_bindings")
+        contract["argument_contract"]["optional"].remove("graph_result_bindings")
+        assert contract["argument_contract"]["properties"].pop("graph_result_bindings") == {
+            "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": True,
+            "description": "Gateway-owned declaration result bindings; no native identities or caller paths.",
+            "items": {"type": "object", "required": ["result_handle", "request_path"], "additionalProperties": False,
+                "properties": {"result_handle": {"type": "string", "pattern": r"^bnh1-[0-9a-f]{32}$"},
+                    "request_path": {"type": "string", "minLength": 1, "maxLength": 1024}}},
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(before_graph_result_bindings(version))
+    assert canonical_sha256(non_object_set_digests) == (
         "cced6997d5ad93b10d934d95b76890cd535e55678fbd50b870cdef1fe8fa21b1"
     )
     # Only five internal waapi.call contracts add the history expectation proof.
@@ -354,7 +374,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only object.create adds the internal documented List proof. Remove that
     # exact property and both optional entries to retain every prior seal.
     def before_documented_create_list_binding(version):
-        contract = operation_request_machine_contract("object.create", version)
+        contract = before_graph_result_bindings(version)
         contract["optional_arguments"].remove("documented_list_bindings")
         contract["argument_contract"]["optional"].remove("documented_list_bindings")
         assert contract["argument_contract"]["properties"].pop("documented_list_bindings") == {
