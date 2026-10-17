@@ -153,6 +153,7 @@ def test_large_identity_is_explicitly_omitted_from_headers_and_never_mutation_ca
     first = task.first()
     header = first['agent_result']['objects'][0]
     assert 'name' not in header and 'name' in header['projection_omitted_fields']
+    assert first['agent_result']['identity_headers_complete'] is False
     assert 'mutation_selection' not in first
     assert first['agent_result']['page']['mutation_authority'] is False
     assert first['agent_result']['projection_complete'] is False
@@ -190,6 +191,7 @@ def test_detail_query_preserves_diagnostics_and_missing_native_identity_without_
     assert 'semantic_preview' in first and 'call' in first
     assert 'native_observation' not in first
     assert 'type' not in first['agent_result']['objects'][0]
+    assert first['agent_result']['identity_headers_complete'] is False
     assert 'mutation_selection' not in first
     seen = []
     while True:
@@ -326,3 +328,14 @@ def test_large_advanced_compilation_keeps_small_ordinary_reply_direct_without_pa
     assert 'projection_complete' not in result
     assert not any(uri.endswith('getProjectInfo') for uri, _, _ in task.calls)
     assert sum(uri.endswith('object.get') for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_paged_query_identity_headers_are_complete_only_when_every_exact_identity_atom_is_retained(tmp_path, version):
+    task = QueryTask(tmp_path, version)
+    result = task.first()
+    page = result['agent_result']
+    assert page['identity_header_row_count'] == 1
+    assert page['identity_headers_complete'] is True
+    assert {key: page['objects'][0][key] for key in ('id', 'name', 'type', 'path')} == {
+        key: task.row[key] for key in ('id', 'name', 'type', 'path')}

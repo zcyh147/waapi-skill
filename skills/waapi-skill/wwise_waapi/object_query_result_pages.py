@@ -80,7 +80,9 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
         complete = end == len(entries)
         result = {"objects": headers, "entries": entries[offset:end],
             "projection_complete": complete, "identity_header_row_count": len(headers),
-            "identity_headers_complete": len(headers) == len(payload["objects"]),
+            "identity_headers_complete": (len(headers) == len(payload["objects"])
+                and all(all(isinstance(header.get(key), str) for key in ("id", "name", "type", "path"))
+                        for header in headers)),
             "query_exhaustion": "not_certified_by_projection_completion",
             "page": {"offset": offset, "next_offset": end, "total_positions": len(entries),
                 "position_unit": "lossless JSON entries with exact pointers and string offsets",
