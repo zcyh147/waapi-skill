@@ -82,7 +82,8 @@ def test_campaign_child_rejects_partial_repair_selection(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("archive_valid", [True, False])
-@pytest.mark.parametrize("ids", [["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F4"]])
+@pytest.mark.parametrize("ids", [["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F4"],
+    ["REPAIR25-F2"], ["REPAIR25-F2", "REPAIR25-F3"]])
 def test_remaining_campaign_argv_reaches_exact_selected_executors_and_archive_gates(tmp_path, monkeypatch, archive_valid, ids):
     import json
     from dataclasses import replace
