@@ -28,6 +28,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from wwise_waapi.recovery import PREWRITE_GUARD_REJECTION, recovery_receipt
+from wwise_waapi.native_catalog import (NATIVE_CATALOG_ROOT, NATIVE_HOSTS, load_native_catalog, native_capability)  # noqa: E402
 from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CapabilityCatalog,
     CapabilityNotFoundError,
@@ -2182,6 +2183,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     capabilities.add_argument("--all-versions", action="store_true")
+    capabilities.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect complete attested native reflection independently of executable profiles")
     capabilities.add_argument(
         "--profile",
         choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
@@ -2192,6 +2194,7 @@ def build_parser() -> argparse.ArgumentParser:
             "selection never overrides live host detection"
         ),
     )
+    capabilities.add_argument("--offset", type=int, default=0, help="First matching row for complete offline pagination")
     capabilities.add_argument("--category")
     capabilities.add_argument("--item-type", choices=("function", "topic"))
     capabilities.add_argument("--family")
@@ -2219,6 +2222,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one URI, its schema, stable route, safety gate, request template when reviewed, and evidence boundary offline",
     )
     describe.add_argument("api")
+    describe.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect host-specific native schema truth without enabling execution")
     describe.add_argument("--all-versions", action="store_true")
     describe.add_argument(
         "--profile",
@@ -9492,12 +9496,48 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             reset=bool(args.reset),
         )
 
+    if args.command == "capabilities" and args.native_host:
+        versions = resolve_catalog_versions(args, env=env)
+        if args.limit < 0 or args.offset < 0:
+            raise GatewayInputError("--limit and --offset must be zero or greater")
+        selected = []
+        summaries = {}
+        for version in versions:
+            native = load_native_catalog(version, args.native_host, root=NATIVE_CATALOG_ROOT)
+            summaries[version] = {"functions": len(native["functions"]), "topics": len(native["topics"]), "schema_count": len(native["schemas"]), "evidence_kind": "reflection_only", "build": native["provenance"]["build"], "content_sha256": native["content_sha256"]}
+            for uri in sorted(native["schemas"]):
+                row = native_capability(native, uri)
+                if args.item_type and row["item_type"] != args.item_type:
+                    continue
+                if args.query and args.query.casefold() not in uri.casefold():
+                    continue
+                if args.category and row.get("category") != args.category:
+                    continue
+                if args.family and row["interface"].get("semantic_family") != args.family:
+                    continue
+                if args.route and row["interface"].get("preferred_route") != args.route:
+                    continue
+                selected.append(row)
+        visible = [] if args.summary_only else selected[args.offset:args.offset + args.limit] if args.limit else selected[args.offset:]
+        more = not args.summary_only and args.offset + len(visible) < len(selected)
+        continuation = None
+        if more:
+            next_argv = ([] if args.all_versions else ["--version", versions[0]]) + ["capabilities", "--native-host", args.native_host, "--limit", str(args.limit), "--offset", str(args.offset + len(visible))]
+            if args.all_versions:
+                next_argv.append("--all-versions")
+            for flag, value in (("--item-type", args.item_type), ("--query", args.query), ("--category", args.category), ("--family", args.family), ("--route", args.route)):
+                if value:
+                    next_argv.extend([flag, value])
+            if args.detail:
+                next_argv.append("--detail")
+            continuation = {"gateway_argv": next_argv}
+        return {"contract": GATEWAY_RESULT_CONTRACT, "ok": True, "status": "ok", "command": "capabilities", "offline": True, "native_host": args.native_host, "versions": list(versions), "summary": summaries, "match_count": len(selected), "returned_count": len(visible), "truncated": more, "capabilities": visible, "continuation": continuation}
     if args.command == "capabilities":
         catalog = CapabilityCatalog()
         versions = resolve_catalog_versions(args, env=env)
         profile = args.profile
-        if args.limit < 0:
-            raise GatewayInputError("--limit must be zero or greater")
+        if args.limit < 0 or args.offset < 0:
+            raise GatewayInputError("--limit and --offset must be zero or greater")
         selected = []
         for version in versions:
             selected.extend(
@@ -9512,7 +9552,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 )
             )
         total_matches = len(selected)
-        visible = selected[: args.limit] if args.limit else selected
+        visible = selected[args.offset:args.offset + args.limit] if args.limit else selected[args.offset:]
         payload: dict[str, Any] = {
             "contract": GATEWAY_RESULT_CONTRACT,
             "ok": True,
@@ -9543,6 +9583,14 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 for entry in visible
             ]
         return payload
+    if args.command == "describe" and args.native_host:
+        versions = resolve_catalog_versions(args, env=env)
+        availability = {}
+        for version in versions:
+            native = load_native_catalog(version, args.native_host, root=NATIVE_CATALOG_ROOT)
+            present = args.api in native["functions"] or args.api in native["topics"]
+            availability[version] = {"available": present, **({"capability": native_capability(native, args.api, full_schema=args.full_schema)} if present else {"status": "absent_from_attested_native_inventory", "fallback_allowed": False})}
+        return {"contract": GATEWAY_RESULT_CONTRACT, "ok": True, "status": "ok", "command": "describe", "offline": True, "native_host": args.native_host, "versions": list(versions), "api": args.api, "availability": availability}
     if args.command == "describe":
         catalog = CapabilityCatalog()
         versions = resolve_catalog_versions(args, env=env)
@@ -13303,6 +13351,7 @@ def dispatch_command(
             **common,
             "api_attempted": api,
             "schema_target": args.target_uri,
+            "reflection_context": status_wwise_summary(live_info),
             "semantic_preview": {
                 "uri": api,
                 "business_request": {
@@ -13688,6 +13737,7 @@ def dispatch_command(
                 "result": result_validation.as_dict() if result_validation else None,
             },
             "inventory": inventory,
+            **({"reflection_context": status_wwise_summary(live_info)} if inventory is not None else {}),
             "agent_result": (
                 inventory
                 if inventory is not None
