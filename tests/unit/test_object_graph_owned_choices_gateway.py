@@ -112,6 +112,7 @@ def test_documented_arguments_assigns_existing_references_with_order_and_preserv
 
 def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, select=True, list_name="Metadata", clear=True):
     task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.require_class_projection = True
     element_class = 5570560 if version == "2025.1" else 5308432
     element_name = "MetadataSlot" if version == "2025.1" else "Metadata"
     if list_name == "RTPC":
@@ -473,6 +474,8 @@ class OwnedGraphTask(FieldTask):
                 else:
                     assert args["transform"] == [{"select": ["descendants"]}], args
                     rows = [row for row in self.objects.values() if row["path"].startswith(parent["path"] + "\\")]
+            if getattr(self, "require_class_projection", False) and "classId" not in options.get("return", []):
+                rows = [{key: value for key, value in row.items() if key != "classId"} for row in rows]
             return {"return": deepcopy(rows)}
         if uri.endswith("object.create"):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
@@ -971,6 +974,32 @@ def test_set_rejects_fictitious_custom_list_without_source_or_live_list_evidence
     assert code == 2 and rejected["error_code"] == "DOCUMENTED_LIST_SELECTION_REQUIRED", rejected
     assert "Metadata" in rejected["details"]["repair"]["choices"]
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+def test_documented_list_merge_uses_explicit_actual_class_projection_without_rewriting_native_type(tmp_path):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    code, types = task.step("draft-discover-types", "--role", "object", "--meaning", "MetadataSlot")
+    assert code == 0, types
+    code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
+    assert code == 0, configured
+    code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", task.list_owner_handle,
+        "--name", "Metadata", "--kind", types["type_candidates"][0]["handle"],
+        "--field", "notes", "Updated slot", "--field", "object_list", task.list_field_handle)
+    assert code == 0, declared
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": FIRST,
+                "@Metadata": [{"type": "MetadataSlot", "name": "Metadata", "notes": "Updated slot"}]}]
+            task.objects[CHILD]["notes"] = "Updated slot"
+            return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": [{"id": CHILD, "name": "Metadata"}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[CHILD]["type"] == "PluginInnerObject" and task.objects[CHILD]["notes"] == "Updated slot"
 
 
 def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path):

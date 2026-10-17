@@ -6309,7 +6309,12 @@ def _prepare_object_set(
                         subtree.update({"object_id": target.object, "list": descriptor.name})
                     list_subtree_snapshots.extend(replacement_subtrees)
                 if row_list_mode == "append" and row_conflict == "merge" and collisions:
-                    if not _object_type_matches(collisions[0].get("type"), root_spec, actual_class_id=collisions[0].get("classId")):
+                    # The ordinary List snapshot does not request classId. Never
+                    # accept an incidental extra field as semantic class proof.
+                    class_rows = _read_object_id_rows(collisions[0]["id"], fields=("id", "classId"), read=read)
+                    if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                            or not _object_type_matches(collisions[0].get("type"), root_spec,
+                                actual_class_id=class_rows[0].get("classId"))):
                         raise OperationContractError(
                             "INVALID_TARGET_TYPE",
                             "An object-list merge collision has a different live type.",
