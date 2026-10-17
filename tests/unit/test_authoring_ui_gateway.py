@@ -335,10 +335,10 @@ def test_offline_capability_profile_is_explicit_and_defaults_to_console(
     }
     assert authoring_payload["profile"] == "wwise-authoring-ui"
     assert authoring_payload["summary"]["profile"] == "wwise-authoring-ui"
-    assert authoring_payload["summary"]["totals"]["total"] == 863
+    assert authoring_payload["summary"]["totals"]["total"] == 865
     assert authoring_payload["summary"]["totals"]["interface_status"] == {
         "available": 348,
-        "available_via_transaction": 515,
+        "available_via_transaction": 517,
     }
     assert authoring_payload["filters"]["profile"] == "wwise-authoring-ui"
 

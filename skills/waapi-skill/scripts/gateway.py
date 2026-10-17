@@ -46,6 +46,9 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
     layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
 )
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
+from wwise_waapi.authoring_layout_business import (  # noqa: E402
+    LAYOUT_MUTATION_URIS, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+)
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
     canonical_sha256,
@@ -588,7 +591,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-AUTHORING_HOST_REQUIRED_URIS = LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
+AUTHORING_HOST_REQUIRED_URIS = LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -2624,6 +2627,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
     add_cli_console_plan_arguments(draft_declare_cli_console_plan)
+    draft_layout_plan = subparsers.add_parser("draft-declare-layout-plan", help="Declare one closed Authoring layout outcome")
+    _add_business_draft_binding_arguments(draft_layout_plan)
+    draft_layout_plan.add_argument("--layout-handle", required=True)
     draft_declare_host_plan = subparsers.add_parser(
         "draft-declare-host-plan",
         help=(
@@ -4621,7 +4627,7 @@ def transaction_capability(version: str, api: str) -> CapabilityRecord:
     """Resolve offline construction/guard facts, not permission to dispatch."""
     catalog = CapabilityCatalog()
     return (catalog.authoring_ui_describe(version, api)
-            if requires_core_supplement(version, api) else catalog.describe(version, api))
+            if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS else catalog.describe(version, api))
 
 
 def authoring_host_required_payload(
@@ -4773,7 +4779,7 @@ def live_authoring_transaction_boundary(
         if operation == "waapi.call" and isinstance(arguments, Mapping)
         else None
     )
-    if native_api in {"ak.wwise.ui.project.close", "ak.wwise.ui.project.create", "ak.wwise.ui.project.open"} or (
+    if native_api in LAYOUT_MUTATION_URIS or native_api in {"ak.wwise.ui.project.close", "ak.wwise.ui.project.create", "ak.wwise.ui.project.open"} or (
         isinstance(native_api, str)
         and requires_core_supplement(version_key_from_get_info(live_info), native_api)
     ):
@@ -6867,6 +6873,8 @@ def operation_composer_input_contract(
 def operation_draft_schema_digest(operation: str, version: str) -> str:
     """Bind named-operation and exact-URI Drafts to their owning schema."""
 
+    if operation in LAYOUT_MUTATION_URIS:
+        return canonical_sha256(layout_business_contract_data(operation, version))
     if operation.startswith("ak."):
         return request_contract(version, operation).schema_digest
     if operation in DRAFT_TYPED_OPERATIONS:
@@ -7028,7 +7036,9 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     """Expose one reviewed Core declaration without reflected typed fields."""
 
     contract = (
-        host_ui_debug_business_contract_data(api, version)
+        layout_business_contract_data(api, version)
+        if api in LAYOUT_MUTATION_URIS
+        else host_ui_debug_business_contract_data(api, version)
         if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS
         else cli_console_business_contract_data(api, version)
         if api in CLI_CONSOLE_BUSINESS_OPERATIONS
@@ -7077,6 +7087,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 
 
 def core_business_route_available(api: str, version: str) -> bool:
+    if api in LAYOUT_MUTATION_URIS:
+        return version in LAYOUT_VERSIONS
     if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS:
         return version in host_ui_debug_business_versions(api)
     if api in CLI_CONSOLE_BUSINESS_OPERATIONS:
@@ -9843,6 +9855,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         request_schema_routes = list(
             (
                 *layout_catalog_rows(),
+                *layout_business_catalog_rows(),
                 *cli_console_business_catalog_rows(),
                 *host_ui_debug_business_catalog_rows(),
                 *core_business_catalog_rows(),
@@ -13125,6 +13138,38 @@ def dispatch_business_source_control_plan(
     return payload
 
 
+def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str, str],
+    connection: GatewayConnection, detected_version: str, live_info: Mapping[str, Any],
+    dispatcher: WwiseDispatcher, common: Mapping[str, Any]) -> dict[str, Any]:
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(args.draft_id, task_authority=args.task_authority)
+    if pending.operation not in LAYOUT_MUTATION_URIS:
+        raise GatewayInputError('This Draft does not expose a layout business plan')
+    boundary = live_authoring_api_boundary(pending.operation, command=args.command, live_info=live_info, common=common)
+    if boundary is not None:
+        return boundary
+    binding = _open_business_binding(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    adapter = business_adapter(binding.record.operation)
+    context = layout_identity_context(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    identity = resolve_layout_identity(args.layout_handle, role='layout', context=context, args=args,
+        env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
+    settings = {'authoring_layout_plan': {'layout_handle': args.layout_handle},
+                'authoring_layout_binding': layout_binding_descriptor(identity)}
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings(settings)
+        adapter.materialize(candidate)
+        return candidate
+    record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
+        expected_revision=args.expected_revision,
+        schema_digest=operation_draft_schema_digest(binding.record.operation, detected_version),
+        composer_digest=operation_composer_digest(binding.record.operation, detected_version),
+        context=binding.context, update=update, event_type='settings.revised')
+    return operation_draft_payload(args.command, record, offline=False, state_dir=args.state_dir,
+        task_authority=args.task_authority)
+
+
 def read_layout_observation(subject: str, native_args: Mapping[str, Any], *,
     dispatcher: WwiseDispatcher, connection: GatewayConnection, version: str) -> Any:
     result = dispatch(dispatcher, LAYOUT_READS[subject], connection=connection, version=version,
@@ -13195,6 +13240,9 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "draft-declare-layout-plan":
+        return dispatch_business_layout_plan(args, env=env, connection=connection,
+            detected_version=detected_version, live_info=live_info, dispatcher=dispatcher, common=common)
     if args.command == "layout-inspect":
         boundary = live_authoring_api_boundary(LAYOUT_READS['contents'], command=args.command, live_info=live_info, common=common)
         if boundary is not None:
@@ -25939,6 +25987,21 @@ def _business_next_action_binding(
                 "native_request_input": "forbidden",
             },
         }
+    if adapter.family == "authoring-layout-business":
+        declaration = business_contract['declaration']
+        shared = {'contract': 'waapi-skill.business-draft-next-action/v1',
+            'responsibility_split': business_contract['responsibility_split'],
+            'business_contract': business_contract, 'forbidden_inputs': forbidden_inputs,
+            'shell_tool_timeout_ms': GATEWAY_SHELL_TOOL_TIMEOUT_MS,
+            'then_read_next_response': True, 'precompute_or_increment_revision': False}
+        if session is not None and adapter.is_complete(session):
+            return {**shared, 'required_next_phase': 'check_complete_layout_plan',
+                'check': {**operation_draft_prefix_copy_binding(check), 'append': []}}
+        return {**shared, 'required_next_phase': 'declare_complete_layout_plan',
+            'declaration': {**operation_draft_prefix_copy_binding([*base, 'draft-declare-layout-plan', *binding],
+                append_action='copy_verbatim_then_append_disclosed_layout_fields'),
+                'required_fields': declaration['required_fields'], 'optional_fields': declaration['optional_fields'],
+                'input_forms': declaration['input_forms'], 'submit_once': True, 'native_request_input': 'forbidden'}}
     if adapter.family == "host-ui-debug-business":
         declaration = business_contract["declaration"]
         shared = {
@@ -29608,6 +29671,8 @@ def transaction_read_call(
             # dispatcher gate must be bypassed internally without broadening
             # the public direct-call surface.
             allow_destructive=True,
+            operation_timeout=10 if uri in LAYOUT_READ_URIS else None,
+            result_limit_bytes=MAX_LAYOUT_RESULT_BYTES if uri in LAYOUT_READ_URIS else MAX_GATEWAY_RESULT_JSON_BYTES,
         )
         if result.get("ok") is not True:
             raise OperationContractError(

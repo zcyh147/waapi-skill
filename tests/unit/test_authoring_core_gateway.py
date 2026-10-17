@@ -40,7 +40,7 @@ def test_compact_catalog_reaches_all_approved_authoring_entries_offline(tmp_path
         assert schema["version"] == version
     assert ("ak.wwise.ui.getSelectedFiles" in rows) is (version == "2025.1")
     assert {uri for uri in rows if uri.startswith("ak.wwise.ui.layout.")} == {
-        "ak.wwise.ui.layout." + suffix for suffix in ("getLayoutNames", "getCurrentLayoutName", "getLayout", "getViewInstances", "getViewTypes", "getElementRectangle", "getViewHandle")
+        "ak.wwise.ui.layout." + suffix for suffix in ("getLayoutNames", "getCurrentLayoutName", "getLayout", "getViewInstances", "getViewTypes", "getElementRectangle", "getViewHandle", "switchLayout")
     }
     assert not any(uri.startswith("ak.wwise.ui.model.") for uri in rows)
 

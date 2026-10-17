@@ -1,0 +1,34 @@
+{
+  "contract": "waapi-skill.authoring-layout-mutation-supplement/v1",
+  "version": "2024.1",
+  "host": "wwise-authoring",
+  "native_catalog_sha256": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
+  "schemas": {
+    "ak.wwise.ui.layout.switchLayout": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout to load.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Switches the current layout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    }
+  }
+}

@@ -16,6 +16,7 @@ from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
 from .authoring_layout import LAYOUT_READ_URIS
+from .authoring_layout_business import LAYOUT_MUTATION_URIS
 from .authoring_ui_commands_manifest import (
     AUTHORING_UI_COMMAND_FUNCTION_URIS,
     AUTHORING_UI_COMMAND_TOPIC_URIS,
@@ -49,7 +50,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "4325863420005b0cd7ccd33afdf723d8bde5ecd14624c536e9e651fc1ce640ef"
+    "d38f82745e064b5df13410dc118f4614d1c4a252a82bc694be19e04529b09ed8"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -120,35 +121,35 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         ),
         "2024.1": MappingProxyType(
             {
-                "functions": 168,
+                "functions": 169,
                 "topics": 34,
-                "public_functions": 168,
+                "public_functions": 169,
                 "public_topics": 34,
-                "public_total": 202,
+                "public_total": 203,
             }
         ),
         "2025.1": MappingProxyType(
             {
-                "functions": 175,
+                "functions": 176,
                 "topics": 35,
-                "public_functions": 175,
+                "public_functions": 176,
                 "public_topics": 35,
-                "public_total": 210,
+                "public_total": 211,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 863
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 863
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 210
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 865
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 865
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 211
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
             "2021.1": "80caea46b0613135df09ea9b74ba55d261061b7b7e6f0cc54a93793bccc60e43",
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
-            "2024.1": "862078065a73661a2fe44e9369845a4eb339ffa1b90fd44783dd0e83b09c6061",
-            "2025.1": "eec2afac54957e7ce280fc9d68bbfb507c35119aa129322aa4a0415970b134bf",
+            "2024.1": "84bd53f3d27ab9c9161139bd4ffd5919e725e8e3e70fdd8713bd956ca6562305",
+            "2025.1": "314b823018e1830a016cef2f849c76dd5433621a13a5c3d0b04590c7ac77eeb5",
         }
     )
 )
@@ -706,7 +707,7 @@ class ExecutionContractRegistry:
                 program_case="call-result-schema",
             )
 
-        effect = classify_function_effect(uri)
+        effect = "project_mutation" if uri in LAYOUT_MUTATION_URIS else classify_function_effect(uri)
         route = _transaction_route(uri, effect)
         project_guard_mode = PROJECT_TRANSITION_GUARD_MODES.get(
             uri,
@@ -740,6 +741,7 @@ class ExecutionContractRegistry:
             verification_strategy=(
                 "result_schema_and_project_transition"
                 if project_guard_mode != PROJECT_GUARD_INVARIANT
+                else "authoring_layout_state" if uri in LAYOUT_MUTATION_URIS
                 else "result_schema"
             ),
             accepted_authorization_modes=(

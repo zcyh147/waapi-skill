@@ -64,10 +64,10 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 703,
+        "function_lanes": 705,
         "topic_lanes": 160,
-        "total_lanes": 863,
-        "unique_function_uris": 175,
+        "total_lanes": 865,
+        "unique_function_uris": 176,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -88,7 +88,7 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
         row["construction_shape"] == "inline"
         for row in result["lanes"]
         if row["item_type"] == "function"
-    ) == 471
+    ) == 473
     assert sum(
         row["construction_shape"] == "draft"
         for row in result["lanes"]

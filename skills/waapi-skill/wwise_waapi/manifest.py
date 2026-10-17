@@ -303,12 +303,13 @@ class ManifestStore:
         from .authoring_core_manifest import merge_authoring_core
 
         from .authoring_layout import merge_authoring_layout_reads
+        from .authoring_layout_business import merge_layout_mutations
 
-        return merge_authoring_layout_reads(merge_authoring_core(
+        return merge_layout_mutations(merge_authoring_layout_reads(merge_authoring_core(
             merge_authoring_ui_topics(
                 self.load_with_authoring_ui_commands(version), root=self.root, version=version,
             ), root=self.root, version=version,
-        ), root=self.root, version=version)
+        ), root=self.root, version=version), root=self.root, version=version)
 
     def load_authoring_ui_commands_supplement(
         self,
