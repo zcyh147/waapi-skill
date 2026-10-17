@@ -634,6 +634,13 @@ def cli_console_business_contract_data(
     if operation == "ak.wwise.cli.waapiServer" and version in {"2021.1", "2022.1"}:
         required = ["project_file"]
     optional = list(row["optional_by_version"].get(version, row["optional"]))
+    constraints = deepcopy(row["constraints"])
+    if operation == "ak.wwise.cli.addNewPlatform" and version == "2025.1":
+        # This default is explicit in the pinned 2025 native field description;
+        # earlier lanes do not establish the same omission semantics.
+        required.remove("platform_name")
+        optional.insert(0, "platform_name")
+        constraints["platform_name_when_omitted"] = "use the base_platform name"
     optional = [field for field in optional if field not in required]
     public_fields = [*required, *optional]
     field_types = {
@@ -675,8 +682,8 @@ def cli_console_business_contract_data(
             **({"explicit_empty_collections": list(_EXPLICIT_EMPTY_COLLECTIONS[operation])}
                if operation in _EXPLICIT_EMPTY_COLLECTIONS else {}),
             **(
-                {"constraints": deepcopy(row["constraints"])}
-                if row["constraints"]
+                {"constraints": constraints}
+                if constraints
                 else {}
             ),
         },

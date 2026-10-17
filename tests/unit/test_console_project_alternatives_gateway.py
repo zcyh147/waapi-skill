@@ -174,6 +174,53 @@ class CliProjectTask(FieldTask):
         return tx
 
 
+def test_cli_add_platform_uses_documented_2025_default_name_when_omitted(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    tx = task.execute_plan('--value', 'base_platform', 'Windows')
+    writes = [args for uri, args, _ in task.calls if uri == task.operation]
+    assert writes == [{'project': str(task.project_file), 'new-platform-base': 'Windows'}]
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    assert payload['verification']['business_state_verified'] is False
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_add_platform_discloses_versioned_name_requirement_and_preserves_explicit_name(tmp_path, version):
+    task = CliProjectTask(tmp_path, version, 'ak.wwise.cli.addNewPlatform')
+    code, schema = task.run('--version', version, 'request-schema', task.operation)
+    assert code == 0, schema
+    declaration = schema['business_adapter']['declaration']
+    assert ('platform_name' in declaration['required_fields']) is (version != '2025.1')
+    assert ('platform_name' in declaration['optional_fields']) is (version == '2025.1')
+    if version == '2025.1':
+        assert declaration['constraints']['platform_name_when_omitted'] == 'use the base_platform name'
+    code, started = task.run('draft-start', task.operation)
+    assert code == 0, started
+    continuation = started['draft']['next_action_binding']['declaration']
+    for field in ('required_fields', 'optional_fields', 'input_forms'):
+        assert continuation[field] == declaration[field]
+    assert started['draft']['next_action_binding']['business_contract']['declaration'] == declaration
+    tx = task.execute_plan('--value', 'base_platform', 'Windows',
+                           '--value', 'platform_name', 'Studio',
+                           '--value', 'copy_settings_from_platform', 'Windows_Old')
+    assert [args for uri, args, _ in task.calls if uri == task.operation] == [{
+        'project': str(task.project_file), 'new-platform-base': 'Windows',
+        'new-platform-name': 'Studio', 'copy-from-platform': 'Windows_Old'}]
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+
+
+def test_cli_add_platform_default_name_still_requires_documented_base(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    code, payload = task.step('draft-declare-cli-console-plan',
+        '--value', 'project_file', str(task.project_file))
+    assert code != 0, payload
+    assert not any(uri == task.operation for uri, _, _ in task.calls)
+
+
 @pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
 def test_cli_reported_error_cannot_pass_verification_or_retry(tmp_path, version):
     task = CliProjectTask(tmp_path, version, outcome=1)
@@ -329,6 +376,33 @@ def test_console_create_saves_requested_language_order_and_default(tmp_path, ver
     observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'console-created-project-artifact']
     assert observed[0]['default_language'] == 'French'
     assert [row['Name'] for row in observed[0]['languages']] == ['SFX', 'French', 'Japanese']
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('missing_named', [False, True])
+def test_console_create_matches_named_platform_before_base_only_saved_rows(tmp_path, version, missing_named):
+    task = ConsoleProjectTask(tmp_path, version)
+    tx, code, payload = execute_console_creation(task,
+        '--item', 'platforms', 'Windows', '--mapping', 'platforms', 'Windows', 'Custom')
+    assert code == 0, payload
+    document = ET.fromstring(task.created_file.read_bytes())
+    platforms = document.find('./ProjectInfo/Project/Platforms')
+    rows = list(platforms)
+    assert [row.get('Name') for row in rows] == ['Windows', 'Custom']
+    if missing_named:
+        rows[1].set('Name', 'Unrequested')
+    platforms[:] = list(reversed(rows))
+    task.created_file.write_bytes(ET.tostring(document, encoding='utf-8'))
+    retained = task.created_file.read_bytes()
+    code, verified = task.run('verify', tx)
+    if missing_named:
+        assert code != 0 and verified['state'] == 'verification_failed', verified
+    else:
+        assert code == 0 and verified['verified'] is True, verified
+    assert task.created_file.read_bytes() == retained
+    code, repeated = task.run('execute', tx)
+    assert code != 0, repeated
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1
 
 
 @pytest.mark.parametrize('version', VERSIONS)

@@ -7520,6 +7520,57 @@ def _related_condition_assertions(requirements, *, read):
     return assertions, readbacks
 
 
+def _collect_existing_condition_closure(
+    sources, *, read, object_id, property_info_by_name, property_info_cache,
+):
+    """Acquire the complete bounded Self graph before selecting prerequisites.
+
+    A controller can be reached through several fields. Choosing its value
+    while following the first path loses restrictions disclosed by later paths.
+    Collection only acquires metadata; the ordinary planner still validates
+    each native shape, checks live values and owns every prospective write.
+    """
+    collected = {info.name.casefold(): info for info in sources}
+    controllers: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(info, path):
+        key = info.name.casefold()
+        if key in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.")
+        if key in visited:
+            return
+        if len(path) >= MAX_CONDITION_PATH_FIELDS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Condition path exceeds the finite unique-field budget.")
+        for dependency in info.dependencies:
+            if is_terminal_override_dependency(info.name, info.type, dependency):
+                continue
+            if (dependency.get("action") != "Enable" or dependency.get("context") != "Self"
+                    or dependency.get("type") not in {"property", "override", "reference"}):
+                continue
+            name = dependency.get("property")
+            if not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+                continue  # The ordinary planner reports the malformed shape.
+            controller = name.casefold()
+            controllers.add(controller)
+            if len(controllers) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
+            child = collected.get(controller) or property_info_by_name.get(controller)
+            if child is None:
+                child = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id)
+                         if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id))
+            if child.name != name:
+                raise OperationContractError("INVALID_METADATA", "Condition controller metadata names a different field.")
+            collected[controller] = child
+            property_info_by_name[controller] = child
+            visit(child, (*path, key))
+        visited.add(key)
+
+    for info in tuple(collected.values()):
+        visit(info, ())
+    return tuple(collected.values())
+
+
 def _apply_reference_activation_dependencies(
     metadata: PropertyInfoMetadataRecord,
     *,
@@ -7541,8 +7592,9 @@ def _apply_reference_activation_dependencies(
     desired_references: Mapping[str, Any] | None = None,
     related_conditions: list[dict[str, Any]] | None = None,
     platform: str | None = None,
+    _closure_collected: bool = False,
 ) -> tuple[str, ...]:
-    """Compile bounded same-object Boolean activation requirements.
+    """Compile bounded scalar and reference-presence activation requirements.
 
     Wwise references such as ``OutputBus`` can be accepted syntactically while
     remaining inherited unless a same-object Boolean override is enabled.  The
@@ -7552,6 +7604,13 @@ def _apply_reference_activation_dependencies(
 
     if (object_id is None) == (class_id is None):  # pragma: no cover - internal invariant.
         raise AssertionError("object_id or class_id must be supplied exclusively")
+
+    if object_id is not None and not _closure_collected:
+        _condition_sources = _collect_existing_condition_closure(
+            (metadata, *_condition_sources), read=read, object_id=object_id,
+            property_info_by_name=property_info_by_name, property_info_cache=property_info_cache,
+        )
+        _closure_collected = True
 
     if len(_activation_path) >= MAX_CONDITION_PATH_FIELDS:
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Condition path exceeds the finite unique-field budget.",
@@ -7642,6 +7701,7 @@ def _apply_reference_activation_dependencies(
                 desired_references=desired_references,
                 related_conditions=related_conditions,
                 platform=platform,
+                _closure_collected=_closure_collected,
             ))
             continue
         fields = set(dependency)
@@ -7840,6 +7900,7 @@ def _apply_reference_activation_dependencies(
             desired_references=desired_references,
             related_conditions=related_conditions,
             platform=platform,
+            _closure_collected=_closure_collected,
         ))
 
         matching_specs = [
