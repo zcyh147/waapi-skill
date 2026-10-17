@@ -10,9 +10,10 @@ import tempfile
 from tests.maintenance.branch_audit_completion import pointer_value
 from tests.support.condition_branch_evidence import prepare_condition_capture, validate_condition_frozen_source
 from tests.maintenance import branch_coverage_audit as audit
+from tests.support import condition_scalar_requirements as requirements
 
 
-_SOURCES = ["tests/support/condition_scalar_program.py", "tests/support/condition_scalar_batch.py",
+_SOURCES = ["tests/support/condition_scalar_requirements.py", requirements.PROGRAM_REVIEW_PATH, "tests/support/condition_scalar_program.py", "tests/support/condition_scalar_batch.py",
             "tests/maintenance/condition_parent_sources.py", "tests/unit/test_condition_scalar_program.py",
             "tests/unit/test_scalar_condition_product_gateway.py", "tests/unit/test_condition_scalar_batch_evidence.py",
             "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz"]
@@ -31,14 +32,34 @@ def _exact(observed, expected):
     return type(observed) is type(expected) and audit.digest(observed) == audit.digest(expected)
 
 
-def prepare_program_batch(root: Path, nodeids: list[str], plan: dict, inventory: dict, *, scope_kind="controlled") -> dict:
+def prepare_program_batch(root: Path, nodeids: list[str], plan: dict, inventory: dict, *, scope_kind="controlled",
+                          reviewed_requirements=None, node_groups=None) -> dict:
     """Use the caller's one frozen inventory; never rebuild it per field."""
     if not nodeids or len(set(nodeids)) != len(nodeids) or scope_kind not in {"product", "controlled"}:
         raise ValueError("exact selected original nodes required")
     if scope_kind == "product":
-        raise ValueError("product batch requires reviewed native-effect linkage on coherent source; source models alone are insufficient")
+        if reviewed_requirements is None:
+            raise ValueError("product program requires reviewed requirements; native-effect linkage remains required")
+        requirements.validate_program_review(audit.ROOT, plan, reviewed_requirements)
+        if not isinstance(node_groups, dict) or set(node_groups) != set(nodeids):
+            raise ValueError("exact predeclared original node roster required")
+    all_groups = {group["id"]: group for group in plan["groups"]}
+    if len(all_groups) != len(plan["groups"]):
+        raise ValueError("duplicate original source group")
+    if node_groups is not None:
+        selected = [identity for node in nodeids for identity in node_groups.get(node, [])]
+        if (set(node_groups) != set(nodeids) or not selected or any(not node_groups[node] for node in nodeids)
+                or len(selected) != len(set(selected))
+                or any(identity not in all_groups for identity in selected)):
+            raise ValueError("exact node/group roster has missing, extra or duplicate source groups")
+    else:
+        selected = list(all_groups)
     capture = prepare_condition_capture(root, nodeids[0], create_output=False, inventory=inventory)
     branches = {b["id"]: b for b in inventory["native_coverage"]["obligations"]}
+    if scope_kind == "product":
+        for identity, policy in reviewed_requirements["requirements"]["branches"].items():
+            if identity not in branches or branches[identity]["shape_sha256"] != policy["native_shape_sha256"]:
+                raise ValueError("reviewed full source member missing from inventory")
     for group in plan["groups"]:
         for member in group["members"]:
             branch = branches[member["id"]]
@@ -48,12 +69,25 @@ def prepare_program_batch(root: Path, nodeids: list[str], plan: dict, inventory:
     capture["relevant_sources"].update({name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in _SOURCES})
     root.mkdir(parents=True, exist_ok=False)
     capture.update(scope_kind=scope_kind, nodeids=list(nodeids), plan=deepcopy(plan), reports={}, observations={},
-                   branches=branches, routes={r["id"]: r for r in inventory["routes"]})
+                   branches=branches, routes={r["id"]: r for r in inventory["routes"]},
+                   selected_group_ids=selected, node_groups=deepcopy(node_groups),
+                   reviewed_requirements=deepcopy(reviewed_requirements))
+    if reviewed_requirements is not None:
+        capture["review_artifact"] = _write(root / "reviewed-requirements.json", reviewed_requirements)
+        capture["requirements_artifact"] = _write(root / "requirements.json", reviewed_requirements["requirements"])
     capture["plan_artifact"] = _write(root / "plan.json", plan)
     capture["sources_artifact"] = _write(root / "sources.json", {
         "candidate_sha256": capture["candidate_sha256"], "git_candidate": capture["git_candidate"],
         "relevant_sources": capture["relevant_sources"]})
+    capture["batch_plan_artifact"] = _write(root / "batch-plan.json", _batch_header(capture))
     return capture
+
+
+def _batch_header(capture):
+    return {"scope_kind": capture["scope_kind"], "nodeids": capture["nodeids"],
+        "node_groups": capture["node_groups"], "selected_group_ids": capture["selected_group_ids"],
+        "plan_sha256": audit.digest(capture["plan"]),
+        "reviewed_requirements_sha256": audit.digest(capture["reviewed_requirements"])}
 
 
 def _validate_observation(group, observed, before_values):
@@ -121,8 +155,15 @@ def _validate_group(group, bundle):
 def finish_program_node(capture: dict, nodeid: str, reports: dict, observations: dict) -> None:
     """Seal raw observations now; publish only after every actual teardown report."""
     root = capture["root"]
+    if not _exact(json.loads((root / "batch-plan.json").read_text()), _batch_header(capture)):
+        raise ValueError("original predeclared source/plan/node roster changed")
     if nodeid not in capture["nodeids"] or nodeid in capture["reports"]:
         raise ValueError("wrong or repeated original node")
+    passed = all(reports.get(phase) == "passed" for phase in ("setup", "call", "teardown"))
+    if capture["node_groups"] is not None:
+        expected = set(capture["node_groups"][nodeid])
+        if set(observations) - expected or (passed and set(observations) != expected):
+            raise ValueError("original node observations differ from the exact predeclared group roster")
     if set(capture["observations"]) & set(observations):
         raise ValueError("another original node already owns this exact field observation")
     capture["reports"][nodeid] = deepcopy(reports)
@@ -134,12 +175,17 @@ def finish_program_node(capture: dict, nodeid: str, reports: dict, observations:
                for node in capture["nodeids"] for phase in ("setup", "call", "teardown")):
         _write(root / "outcome.json", {"outcome": "FAIL", "reports": capture["reports"], "acceptance": "withheld"})
         return
-    groups = {g["id"]: g for g in capture["plan"]["groups"]}
+    groups = {g["id"]: g for g in capture["plan"]["groups"] if g["id"] in capture["selected_group_ids"]}
     if set(capture["observations"]) != set(groups):
         raise ValueError("missing or extra original field observations")
     validate_condition_frozen_source(capture)
     if audit.digest(json.loads((root / "plan.json").read_text())) != audit.digest(capture["plan"]):
         raise ValueError("predeclared original plan changed")
+    if capture["scope_kind"] == "product":
+        requirements.validate_program_review(audit.ROOT, capture["plan"], capture["reviewed_requirements"])
+        if (not _exact(json.loads((root / "reviewed-requirements.json").read_text()), capture["reviewed_requirements"])
+                or not _exact(json.loads((root / "requirements.json").read_text()), capture["reviewed_requirements"]["requirements"])):
+            raise ValueError("original reviewed requirements artifact changed")
     for identity, group in groups.items():
         _validate_group(group, capture["observations"][identity]["observed"])
     destination = root / "published"
@@ -149,12 +195,17 @@ def finish_program_node(capture: dict, nodeid: str, reports: dict, observations:
     bindings = {}
     seal = {"contract": "waapi-skill.condition-scalar-program-batch/v1", "outcome": "PASS",
             "candidate_sha256": capture["candidate_sha256"], "scope_kind": capture["scope_kind"],
+            "batch_plan_sha256": capture["batch_plan_artifact"]["sha256"],
             "plan_sha256": capture["plan_artifact"]["sha256"], "sources_sha256": capture["sources_artifact"]["sha256"],
-            "reports": capture["reports"], "groups": sorted(groups),
+            "reports": capture["reports"], "node_groups": capture["node_groups"], "groups": sorted(groups),
             "exact_members": sorted(m["id"] for g in groups.values() for m in g["members"])}
+    if capture["reviewed_requirements"] is not None:
+        seal["reviewed_requirements_sha256"] = capture["review_artifact"]["sha256"]
+        seal["requirements_sha256"] = capture["requirements_artifact"]["sha256"]
     seal_path = root / "batch-final.json"
     seal_descriptor = {"artifact": str(seal_path), "sha256": hashlib.sha256(_encoded(seal)).hexdigest()}
-    relevant = ["skills/waapi-skill/wwise_waapi/operation_registry.py",
+    relevant = ["skills/waapi-skill/scripts/run.py", "skills/waapi-skill/scripts/gateway.py",
+                "skills/waapi-skill/wwise_waapi/operation_registry.py",
                 "skills/waapi-skill/wwise_waapi/metadata_restrictions.py", *_SOURCES]
     for identity, group in groups.items():
         entry = capture["observations"][identity]
@@ -162,10 +213,12 @@ def finish_program_node(capture: dict, nodeid: str, reports: dict, observations:
         raw = _write(root / ("observed-" + identity + ".json"), entry)
         for flow_id in sorted({member["behavioral_workflow_ids"][0] for member in group["members"]}):
             _publish_flow(stage, destination, capture, group, entry, bundle, flow_id, raw, seal_descriptor, relevant, bindings)
+    if capture["reviewed_requirements"] is not None:
+        _write(stage / "requirements.json", capture["reviewed_requirements"]["requirements"])
     _write(stage / "bindings.json", {"contract": "waapi-skill.branch-bindings/v1", "bindings": bindings})
     _write(stage / "outcome.json", {"outcome": "PASS", "reports": capture["reports"],
         "functional_coverage": "program_only_effective_native_metadata_and_requirements_unverified",
-        "requirements_state": "pending_review", "exact_observed_members": len(bindings)})
+        "requirements_state": "program_collection_approved_native_equivalence_pending" if capture["scope_kind"] == "product" else "pending_review", "exact_observed_members": len(bindings)})
     stage.rename(destination)
     validate_condition_frozen_source(capture)
     pending = root / ".batch-final.pending"
@@ -186,7 +239,9 @@ def _publish_flow(stage, destination, capture, group, entry, bundle, flow_id, ra
                   {"nodeid": node, "outcome": "PASS"} for node in capture["nodeids"]]},
               **deepcopy(observed), "branch_assertions": {},
               "behavioral_workflows": deepcopy(summaries), "negative_controls": deepcopy(bundle["negative_controls"]),
-              "artifacts": [capture["plan_artifact"], capture["sources_artifact"], raw, seal_descriptor]}
+              "artifacts": [capture["plan_artifact"], capture["sources_artifact"], capture["batch_plan_artifact"], raw, seal_descriptor]}
+    if capture["reviewed_requirements"] is not None:
+        record["artifacts"].extend([capture["review_artifact"], capture["requirements_artifact"]])
     route = capture["routes"][group["version"] + "|function|ak.wwise.core.object.setProperty"]
     for member in members:
         branch = capture["branches"][member["id"]]

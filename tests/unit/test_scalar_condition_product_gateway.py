@@ -1,6 +1,10 @@
 """Actual public Gateway workflows for predeclared exact source field models."""
 from copy import deepcopy
 import json
+import os
+from pathlib import Path
+
+import pytest
 
 from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST
 from tests.unit.test_time_modulator_range_gateway import finish
@@ -64,3 +68,48 @@ def run_scalar_public_group(path, group):
                 "--task-authority", task.authority, "--expected-revision", str(task.revision)], "exit_code": code, "payload": checked},
             "before": before[FIRST], "after": deepcopy(task.objects[FIRST]), "mutation_calls": []}
     return observed
+
+
+# Explicit standalone original producer. Ordinary Program never runs this batch
+# implicitly: a new evidence root and frozen selection are developer inputs.
+@pytest.fixture(scope='session')
+def original_scalar_program_batch(request):
+    from tests.maintenance import branch_coverage_audit as audit
+    from tests.support.condition_scalar_batch import scalar_manifest, scalar_plan
+    from tests.support.condition_scalar_requirements import load_program_review
+    from tests.support.condition_scalar_program import prepare_program_batch
+    destination = os.environ.get('WAAPI_SCALAR_PROGRAM_BATCH_ROOT')
+    if not destination:
+        pytest.skip('original scalar program batch requires an explicit new evidence root')
+    root = Path(__file__).parents[2]
+    plan = scalar_plan(scalar_manifest(root))
+    selected = {group['id'] for group in plan['groups']}
+    selection_path = os.environ.get('WAAPI_SCALAR_PROGRAM_SELECTION')
+    if selection_path:
+        selection = json.loads(Path(selection_path).read_text())
+        assert selection['contract'] == 'waapi-skill.condition-scalar-program-selection/v1'
+        assert len(selection['group_ids']) == len(set(selection['group_ids']))
+        selected = set(selection['group_ids'])
+        assert selected and selected <= {group['id'] for group in plan['groups']}
+    nodes = [item for item in request.session.items if item.originalname == 'test_product_self_scalar_source_conditions']
+    roster = {item.nodeid: [group['id'] for group in plan['groups']
+        if group['version'] == item.callspec.params['version'] and group['id'] in selected] for item in nodes}
+    assert selected == {identity for identities in roster.values() for identity in identities}
+    output = Path(destination)
+    assert output.is_absolute()
+    inventory = audit.build_inventory()  # Once per frozen original batch.
+    capture = prepare_program_batch(output, list(roster), plan, inventory, scope_kind='product',
+        reviewed_requirements=load_program_review(root), node_groups=roster)
+    return capture, {group['id']: group for group in plan['groups']}
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_product_self_scalar_source_conditions(tmp_path, request, version, original_scalar_program_batch):
+    from tests.support.condition_scalar_program import finish_program_node
+    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+    capture, groups = original_scalar_program_batch
+    observed = {}
+    register_exact_evidence_finalizer(request.node,
+        lambda reports: finish_program_node(capture, request.node.nodeid, reports, observed))
+    for identity in capture['node_groups'][request.node.nodeid]:
+        observed[identity] = run_scalar_public_group(tmp_path / identity, groups[identity])

@@ -1,4 +1,4 @@
-"""Controlled original-batch producer checks; no product/native credit."""
+"""Original program collection and producer controls; no native credit."""
 from copy import deepcopy
 import hashlib
 from pathlib import Path
@@ -115,10 +115,10 @@ def test_unpublished_staged_program_cannot_bypass_final_publication_failure(tmp_
     assert status == "missing" and "batch-final.json" in reason
 
 
-def test_source_model_batch_cannot_emit_product_evidence_before_native_linkage_review(tmp_path, source_inputs):
+def test_source_model_batch_cannot_emit_product_evidence_without_reviewed_requirements(tmp_path, source_inputs):
     plan, inventory, _ = deepcopy(source_inputs)
     node = "tests/unit/test_scalar_condition_product_gateway.py::test_product_self_scalar_source_conditions[2025.1]"
-    with pytest.raises(ValueError, match="reviewed native-effect linkage"):
+    with pytest.raises(ValueError, match="reviewed requirements"):
         producer.prepare_program_batch(tmp_path / "capture", [node], plan, inventory, scope_kind="product")
     assert not (tmp_path / "capture").exists()
 
@@ -206,4 +206,110 @@ def test_behavior_linkage_and_range_controls_are_required_before_publication(tmp
     with pytest.raises(ValueError, match='behavior|outside-value'):
         producer.finish_program_node(capture, request.node.nodeid,
             {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}, {group['id']: observed})
+    assert not (capture['root'] / 'batch-final.json').exists()
+
+
+@pytest.fixture(scope='module')
+def reviewed_source_inputs():
+    from tests.support import condition_scalar_requirements as requirements
+    root = Path(__file__).parents[2]
+    plan = condition_scalar_batch.scalar_plan(condition_scalar_batch.scalar_manifest(root))
+    return plan, requirements.load_program_review(root), audit.build_inventory()
+
+
+def test_product_program_requires_exact_review_but_keeps_native_and_metadata_missing(tmp_path, request, reviewed_source_inputs):
+    from tests.support import condition_scalar_requirements as requirements
+    from tests.maintenance.branch_audit_completion import evaluate_coverage
+    root = Path(__file__).parents[2]
+    plan, review, inventory = reviewed_source_inputs
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'GainBand1')
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [request.node.nodeid], plan, inventory,
+        scope_kind='product', reviewed_requirements=review, node_groups={request.node.nodeid: [group['id']]})
+    producer.finish_program_node(capture, request.node.nodeid,
+        {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'},
+        {group['id']: run_scalar_public_group(tmp_path / 'workflow', group)})
+    published = capture['root'] / 'published'
+    bindings = json.loads((published / 'bindings.json').read_text())
+    policies = json.loads((published / 'requirements.json').read_text())
+    result = evaluate_coverage(root, inventory, bindings, digest=audit.digest, evidence_base=published,
+        requirements_document=policies)
+    rows = {row['id']: row for row in result['obligations']}
+    for identity, binding in bindings['bindings'].items():
+        assert rows[identity]['state'] == 'implemented_unverified', rows[identity]
+        assert rows[identity]['evidence_results']['program']['outcome'] == 'passed'
+        assert rows[identity]['evidence_results']['native']['outcome'] == 'missing'
+        assert rows[identity]['evidence_results']['live_metadata']['outcome'] == 'missing'
+        assert evidence_result(binding['evidence']['program'], rows[identity], inventory['native_coverage']['candidate_sha256'],
+            'program', 'controlled', published, binding)[0] == 'missing'
+    unresolved = plan['unresolved'][0]['id']
+    assert unresolved in policies['branches'] and unresolved not in bindings['bindings']
+    assert rows[unresolved]['state'] == 'unresolved'
+    assert not result['completion']['complete']
+
+
+@pytest.mark.parametrize('damage', ['native-category', 'unresolved-member', 'shape', 'partial-plan',
+    'extra-node', 'duplicate-group', 'unknown-group', 'missing-inventory-member'])
+def test_product_admission_cannot_relax_reviewed_categories_members_or_roster(tmp_path, request, reviewed_source_inputs, damage):
+    plan, review, inventory = reviewed_source_inputs
+    plan, review = deepcopy(plan), deepcopy(review)
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'GainBand1')
+    roster = {request.node.nodeid: [group['id']]}
+    identity = group['members'][0]['id']
+    if damage == 'native-category': review['requirements']['branches'][identity]['categories'].remove('native')
+    if damage == 'unresolved-member': plan['unresolved'].pop()
+    if damage == 'shape': review['requirements']['branches'][identity]['native_shape_sha256'] = '0' * 64
+    if damage == 'partial-plan': plan['groups'] = [group]
+    if damage == 'extra-node': roster['not-selected-original-node'] = []
+    if damage == 'duplicate-group': roster[request.node.nodeid].append(group['id'])
+    if damage == 'unknown-group': roster[request.node.nodeid].append('unreviewed-source-group')
+    if damage == 'missing-inventory-member':
+        inventory = {**inventory, 'native_coverage': {**inventory['native_coverage'],
+            'obligations': [b for b in inventory['native_coverage']['obligations'] if b['id'] != plan['unresolved'][0]['id']]}}
+    with pytest.raises(ValueError, match='reviewed|roster'):
+        producer.prepare_program_batch(tmp_path / 'capture', [request.node.nodeid], plan, inventory,
+            scope_kind='product', reviewed_requirements=review, node_groups=roster)
+    assert not (tmp_path / 'capture').exists()
+
+
+def test_product_node_roster_is_frozen_before_any_workflow_executes(tmp_path, request, reviewed_source_inputs):
+    plan, review, inventory = reviewed_source_inputs
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'GainBand1')
+    node = request.node.nodeid
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [node], plan, inventory,
+        scope_kind='product', reviewed_requirements=review, node_groups={node: [group['id']]})
+    capture['node_groups'][node] = []
+    capture['selected_group_ids'] = []
+    with pytest.raises(ValueError, match='predeclared.*roster'):
+        producer.finish_program_node(capture, node, {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}, {})
+    assert not (capture['root'] / 'batch-final.json').exists()
+
+
+@pytest.mark.parametrize('damage', ['requirements-source', 'requirements-artifact', 'missing-workflow', 'wrong-workflow'])
+def test_product_capture_withholds_program_on_source_policy_or_behavior_drift(tmp_path, request, reviewed_source_inputs, damage):
+    plan, review, inventory = reviewed_source_inputs
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'GainBand1')
+    node = request.node.nodeid
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [node], plan, inventory,
+        scope_kind='product', reviewed_requirements=review, node_groups={node: [group['id']]})
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    if damage == 'requirements-source': capture['relevant_sources']['tests/support/condition_scalar_requirements.py'] = '0' * 64
+    if damage == 'requirements-artifact': (capture['root'] / 'requirements.json').write_text('{}')
+    if damage == 'missing-workflow': observed['workflows'].pop(next(iter(observed['workflows'])))
+    if damage == 'wrong-workflow':
+        flow = next(iter(observed['workflows'].values()))
+        flow['observations']['before']['FilterTypeBand1'] = 6 if flow['observations']['before']['FilterTypeBand1'] != 6 else 4
+    with pytest.raises(ValueError):
+        producer.finish_program_node(capture, node, {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}, {group['id']: observed})
+    assert not (capture['root'] / 'published').exists()
+
+
+def test_failed_original_product_node_retains_partial_observations_without_program_pass(tmp_path, request, reviewed_source_inputs):
+    plan, review, inventory = reviewed_source_inputs
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'GainBand1')
+    node = request.node.nodeid
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [node], plan, inventory,
+        scope_kind='product', reviewed_requirements=review, node_groups={node: [group['id']]})
+    producer.finish_program_node(capture, node, {'setup': 'passed', 'call': 'failed', 'teardown': 'passed'}, {})
+    assert (capture['root'] / 'observations-1.json').exists()
+    assert json.loads((capture['root'] / 'outcome.json').read_text())['outcome'] == 'FAIL'
     assert not (capture['root'] / 'batch-final.json').exists()

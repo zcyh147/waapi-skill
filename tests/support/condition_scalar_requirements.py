@@ -105,3 +105,38 @@ def requirements_proposal(plan):
             "coverage_credit": "none", "scope": "exact_self_scalar_enable_source_members_only",
             "source_plan_sha256": digest(plan), "members": members, "mechanisms": mechanisms,
             "live_metadata_requirements": live_metadata}
+
+
+PROGRAM_REVIEW_PATH = 'tests/fixtures/metadata-conditions/self-scalar-program-review.json.gz'
+PROGRAM_REVIEW_SHA256 = '093e81caef8c779d675a633e581108c90c26ba3e0906b774a9f6d78420ef244c'
+
+
+def program_review_document(plan):
+    """Exact program collection policy; every native obligation stays required."""
+    proposal = requirements_proposal(plan)
+    return {'contract': 'waapi-skill.condition-scalar-program-review/v1',
+        'program_collection_review': 'approved', 'native_equivalence_review': 'pending',
+        'reviewed_reason': 'Maintainer approved exact original product program collection while effective live metadata and native mechanism/equivalence remain mandatory and unresolved; this grants no completion or native waiver.',
+        'source_plan_sha256': digest(plan), 'proposal_sha256': digest(proposal),
+        'requirements': {'contract': 'waapi-skill.branch-evidence-requirements/v1', 'branches': {
+            identity: {'native_shape_sha256': member['shape_sha256'], 'categories': ['program', 'live_metadata', 'native'],
+                'reason': 'Exact Self scalar source member requires original public behavioral program evidence, matching effective live metadata and reviewed native mechanism effect linkage.',
+                'mechanism_key': member['mechanism_key'], 'native_witness_ids': member['native_witness_ids'],
+                'equivalence_review': 'pending', **({'unresolved_reason': member['reason']} if member.get('reason') else {})}
+            for identity, member in proposal['members'].items()}}}
+
+
+def load_program_review(root):
+    import gzip
+    import hashlib
+    import json
+    raw = (root / PROGRAM_REVIEW_PATH).read_bytes()
+    if hashlib.sha256(raw).hexdigest() != PROGRAM_REVIEW_SHA256:
+        raise ValueError('reviewed program requirements source seal differs')
+    return json.loads(gzip.decompress(raw))
+
+
+def validate_program_review(root, plan, review):
+    """Admission is exact program-only approval, never a caller category waiver."""
+    if digest(review) != digest(load_program_review(root)) or digest(review) != digest(program_review_document(plan)):
+        raise ValueError('reviewed requirements, full source plan or unresolved members differ')
