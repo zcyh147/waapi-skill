@@ -458,3 +458,17 @@ The original f72 scalar batch and strict-reader program milestone remains tied
 to its original source; it is not loaded into this default ledger. Contextual
 query failures, source closure/admission and partial layout constructors retain
 all unproven applicability, native effects and downstream delivery obligations.
+
+
+The seventh combined partial merges only fixed query `b95bddbb`, reference
+hierarchy/classifier safety `7ed7a105` and Tone artifact verification `c253c5ae`.
+Reconciliation retains every original 272,313 native ID/shape/owner tuple,
+independent catalog/definition, detailed native policy and historical family
+seal. All 878 public route keys remain unchanged; there is no branch-state
+transition or native/Fresh acceptance credit. The actual Program roster is 241
+unique entries without whole-file/exact-node overlap. Unknown reference target
+classifiers, native query type spelling/2021 Short-ID mapping, Tone waveform and
+populated-marker semantics, larger terminal delivery and all other original
+scope remain owned. Source-level artifact verification and explicit boundaries
+are partial implementation, not completion of those obligations. Existing
+product receipts are not transferred to this successor.
