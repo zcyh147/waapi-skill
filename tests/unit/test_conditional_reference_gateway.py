@@ -1364,3 +1364,33 @@ def test_native_reference_restriction_certifies_reference_when_optional_type_is_
     assert task.objects[FIRST]["Attenuation"] == {"id": SECOND}
     assert task.objects[FIRST]["ListenerRelativeRouting"] is True
     assert task.objects[FIRST]["OverridePositioning"] is True
+
+
+@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
+    for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
+@pytest.mark.parametrize("original,current,metadata_type,expected_code", [(True, 1, "bool", 2), (1, 1.0, "int16", 0)])
+def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_path, version, operation, original, current, metadata_type, expected_code):
+    task = AttenuationTask(tmp_path, version, operation=operation)
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True, ControllerMode=original)
+    task.metadata["ControllerMode"] = {"name": "ControllerMode", "type": metadata_type}
+    task.metadata["Attenuation"]["dependencies"] = [condition("ControllerMode", original)]
+    task.declare()
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    task.metadata["Attenuation"]["dependencies"][0]["conditions"][0]["restriction"]["values"][0]["value"] = current
+    code, executed = task.run("execute", tx)
+    assert code == expected_code, executed
+    if expected_code == 2:
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        assert task.objects[FIRST]["Attenuation"] is None
+        return
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["Attenuation"] == {"id": SECOND}

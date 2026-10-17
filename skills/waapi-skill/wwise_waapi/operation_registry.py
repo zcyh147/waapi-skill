@@ -13948,7 +13948,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             args = {"object": condition_metadata["object_id"], "property": name}
             observed = _read_property_info(read_call, object_id=condition_metadata["object_id"], name=name).as_dict()
             assertions.append({"name": f"condition metadata {name} unchanged",
-                               "passed": observed == expected,
+                               "passed": _native_snapshot_equal(observed, expected),
                                "evidence": {"expected": expected, "actual": observed}})
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
     source = roles.get("object") if isinstance(roles, Mapping) else None
