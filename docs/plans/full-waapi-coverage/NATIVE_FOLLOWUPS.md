@@ -114,9 +114,14 @@ did not disclose sampled RTPC/Effects/Arguments lists even where bounded native
 relationship reads returned members. Native rows omitted `owner` on ordinary
 objects and `parent` on owned objects; missing is not silently null. In 2025.1
 the MusicSwitchContainer Arguments member returned type `PluginInnerObject`,
-while its path identified a MusicArgumentsSlot. Obtain exact class identity
-before equating documented class and returned object type. These findings need
-discovery/ownership implementation under #180/#181; SKIPs are not coverage.
+while its path identified a MusicArgumentsSlot. A later exact observation on
+`5d7213cb` returned `class_id:5832704`, matching the retained MusicArgumentsSlot
+class declaration without rewriting native type. The member's owner matched the
+container and its parent was omitted, not null; exact-ID readback reproduced
+these facts. This resolves that sampled member's class identity only. The old
+type guard prevented the inner Argument hop, so that hop was not observed.
+Universal discovery, cardinality, owned-graph completeness and write effects
+remain unfinished under #180/#181; the observer's SKIP is not coverage.
 
 Durable ignored receipts: `.waapi-skill-state/full-coverage/native-c98897e2-r1/summary.json`
 contains all five candidate/build/response and final lifecycle references.
@@ -127,3 +132,23 @@ the actual Gateway with fake native dispatch. Only the failed Short ID case was
 repeated on 2021. Every final record proves unchanged source hashes/mtime and
 no scoped process residue. Mixed failed/SKIP lifecycles stay quarantined,
 including those with an individual WAV PASS; no whole lifecycle passed.
+
+## Prospective group/default creation — #178
+
+Fixed `5d7213cbdd114dd7e9ab976f6493a272c91becd9` passed the Switch and
+State same-create cases on each matching 2021.1–2025.1 Console version:
+**10 individual native PASSs**. The public Gateway created each SwitchContainer
+once with explicit existing group/default choices; independent exact-GUID reads
+proved root identity, parent and both references, with selected group/child
+identities preserved. No later setReference repair or creation retry was used.
+Other new-object conditions and placements remain open.
+
+The 2021–2024 lifecycles passed with sandbox deletion. The 2025 invocation also
+selected the owned-list observer: **2 passed / 1 skipped**, whole lifecycle SKIP,
+sandbox quarantined. Its class observation above is useful evidence, not complete
+list discovery or a three-node PASS. Every version preserved source hashes,
+mtime/tree metadata and tracked files, and had no owned process residue.
+Original results, final lifecycle records and observations remain in the query
+worktree's ignored `native-5d7213cb-r1/summary.json`; summary/handoff and small
+terminal receipts are also archived under `integration-partials-r18`. No native
+ledger state, Windows/Fresh acceptance or ticket closure follows from this run.

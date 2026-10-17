@@ -33,10 +33,10 @@ references. No main merge is authorized.
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
   [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
-- Current workers advance #180/#181 documented list-field discovery and #192
-  per-file source-control status plus provider/credential handling. The #178
-  prospective group/default implementation is integrated in R17 staging; its
-  targeted native preparation is fixed separately. Root owns decisions,
+- Current work advances #180/#181 documented list-field discovery and the
+  remaining #192 source-control branches. The #178 prospective group/default
+  implementation is integrated in R17 staging; its targeted five-version native
+  results are recorded below. Root owns decisions,
   integration, broad-gate triage and native scheduling. All functional tickets
   retain their remaining implementation and native obligations; these partial
   checkpoints do not establish whole-ticket completion. Every newly created
@@ -560,8 +560,42 @@ Follow-up fixed `6ad03726` adds bounded per-file getStatus reads and permits
 them in read_only mode; its 27 focused checks passed in 3.98 seconds. It is not
 yet integrated in R17. Fixed `5d7213cb` prepares Switch/State same-create native
 acceptance and adds class-ID observations to the existing owned-list collector;
-its separate 13-case focused slices are preparation evidence only. No native
-process was launched for those changes.
+its separate 13-case focused slices remain preparation evidence. The subsequent
+native run is recorded separately below.
+
+## Eighteenth integration evidence checkpoint
+
+On fixed `5d7213cbdd114dd7e9ab976f6493a272c91becd9`, both prospective
+SwitchContainer creation families passed on every matching macOS Console version
+2021.1–2025.1: **10 individual native PASSs**. Each created once with both group
+and default references, then independently read back the root identity and both
+references. The 2021–2024 lifecycles passed and removed their sandboxes. The 2025
+run retained **2 passed / 1 skipped**: its additional owned-list observer stayed
+incomplete, so the whole lifecycle remained SKIP and its sandbox quarantined.
+All source-project hashes/mtimes/tree metadata and 1,837 tracked hashes were
+unchanged; owned processes ended. These scoped results do not assign native
+ledger completion or whole-ticket credit. See [native follow-ups](NATIVE_FOLLOWUPS.md)
+for the observed class identity and remaining discovery gap.
+
+R18 staging combines the fixed status reader `6ad03726`, provider profile
+`8c781e34` and the test-only native preparation. Provider evidence is fake/public
+Gateway and protected result-schema proof: native connection/credential values
+stay transient, while the verifier remains `verified:false` and provider
+identity/settings/effects remain unproved. No provider native or Windows privacy
+acceptance is claimed.
+
+The isolated 2025 named-template node passed once before and once after the
+accepted per-call graph reuse repair: **29.16 seconds** on `d483d670` and
+**22.40 seconds** on `a3821579`. This is one timing observation, not a general
+performance claim. The earlier cProfile run's deadline TIMEOUT remains a separate
+failure; its overhead may contribute. Four public schema-equivalence, fresh-byte
+tamper and alternate-root controls passed; no cross-call cache, plan-validation
+removal or deadline relaxation was introduced. R18 has not run its central
+preflight or final combined focus. The original full Program on frozen R16 is
+still in progress, with failures observed and no terminal verdict yet; its exact
+repairs remain pending for this batch. Original receipts are retained under
+ignored `integration-partials-r18` and the query worktree's
+`native-5d7213cb-r1` roots.
 
 ## Standing completion rules
 
