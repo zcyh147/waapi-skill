@@ -86,7 +86,28 @@ Bounded preparation and readiness records survive launch-proof failure.
 
 Focused fake-only lifecycle, sandbox, shared-batch, category and evidence-reader
 controls passed 214 cases. No installed preparation tool, Wwise process or native
-client was executed. This is code evidence only. The consolidated pytest driver
-still needs to construct and install the actual shared owner; native Windows
-process ownership and cross-family integration remain unfinished. No fixture is
+client was executed. This is code evidence only. The existing pytest driver now constructs and installs the shared owner only
+after a successful exact collection; native Windows process ownership and
+cross-family integration remain unfinished. No fixture is
 claimed launch-ready, and the user interaction hold remains in force.
+
+
+## Exact collected owner installation milestone (2026-10-17)
+
+The existing destructive test driver accepts an explicit
+`--owned-authoring-batch-root` pytest option for one Mac 2024.1/2025.1 lane.
+It dispatches only the explicitly selected owner-aware layout nodes. The existing
+pytest collection hook waits for all collection hooks to succeed, rejects empty,
+changed, unrelated, filtered or parallel selections, and creates one existing
+ScenarioLifecycle owner. Collect-only and setup-plan allocate nothing. A source
+seal is checked before allocation, again under the lifecycle lock before launch,
+and through existing adapter finalization. Startup or installation failure never
+becomes acceptance; adapter installation failure stops the owner as BLOCKED.
+
+Focused fake-only driver, collection-order, lifecycle, shared-batch, category and
+evidence-reader validation passed 253 cases; 11 native-Windows batch-script
+parity cases were skipped on this Mac. No native process or installed preparation
+tool was executed. This closes the Mac source plumbing milestone for the five
+currently owner-aware layout nodes, with real startup/effect proof still pending.
+Windows ownership and other families remain explicit unsupported integration
+requirements. The five-node roster grants no complete-layout or native credit.
