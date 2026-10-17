@@ -126,9 +126,9 @@ python scripts/run.py gateway.py query-object --exact-id '{GUID}' --relationship
 
 ## Object types, metadata, and fixed reads
 
-Use offline version-pinned `object-types` first; narrow its bounded result. Use live `metadata types` only to re-reflect the running instance; its projection and bound are fixed.
+Use offline version-pinned `object-types` first; narrow its bounded result. Live `metadata types` lists the running instance's complete type inventory in bounded pages. Optional `--meaning` filters match name/type substrings; the response states that filter. Follow its generated `next_command` until `complete`.
 
-`metadata list` lists the actual fields for one existing business scope; follow `next_page` with `--page` until `complete`. Copy a returned `selection` to `metadata detail --selection` with the same scope. Details preserve live type/default/restrictions/dependencies/supports/UI units; unknown units remain unknown. Expired or changed-scope selections require a new list. A single oversized detail returns a named boundary, not a truncated success. These selections do not authorize changes.
+`metadata list` lists actual fields for one business scope; follow its generated `next_command` until `complete`. Copy a returned `selection` to `metadata detail --selection` with the same scope. Details preserve live type/default/restrictions/dependencies/supports/UI units, including absent versus explicit null values; unknown units remain unknown. Large details keep useful field facts in `field`, with typed choice/dependency pages and optional lossless raw-detail pages. Follow the relevant generated `next_command`; ordinary field selection does not require reconstructing raw JSON pointers or reading long descriptions. Expired or changed-scope selections require a new list. These selections do not authorize changes.
 
 `metadata discover` is auxiliary lexical search. It chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss: refine the meaning or use scoped list/detail discovery within the task. A `partial` result permits one broader technical attempt, then clarify unresolved choices. Honor dependencies when authorized, otherwise clarify.
 

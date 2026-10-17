@@ -56,18 +56,47 @@ def test_metadata_selection_rejects_other_scope_and_changed_inventory(tmp_path: 
     assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
 
 
-@pytest.mark.parametrize("size", [33809, 39720])
-def test_metadata_large_single_detail_names_its_boundary(tmp_path: Path, size: int) -> None:
-    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
-    task.metadata["FadeTime"]["display"] = {"name": "x" * size}
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("shell_family", ["native", "windows"])
+def test_large_selected_metadata_is_paged_and_field_can_be_declared(tmp_path: Path, version: str, shell_family: str, monkeypatch) -> None:
+    if shell_family == "windows":
+        import types
+        from tests.unit.test_object_graph_business_gateway import gateway
+        original = gateway.transaction_next_command
+        def windows_continuation(*args, **kwargs):
+            actual_os = gateway.os
+            gateway.os = types.SimpleNamespace(**{**vars(actual_os), "name": "nt"})
+            try:
+                return original(*args, **kwargs)
+            finally:
+                gateway.os = actual_os
+        monkeypatch.setattr(gateway, "transaction_next_command", windows_continuation)
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    text = "声" * 16000
+    task.metadata["FadeTime"]["display"] = {"name": "Fade Time", "description": text}
+    task.metadata["FadeTimeNearby"] = {"name": "FadeTimeNearby", "type": "bool"}
     target = task.bind(FIRST)
     code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
     assert code == 0, listed
     selection = listed["agent_result"]["fields"][0]["selection"]
-    code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
-    assert code == 2 and rejected["error_code"] == "METADATA_DETAIL_TOO_LARGE", rejected
-    assert rejected["details"]["field"] == "FadeTime"
-    assert rejected["details"]["selection"] == selection
+    code, acquired = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 0, json.dumps(acquired, ensure_ascii=False)
+    assert acquired["candidate_count"] == 1
+    field = acquired["field_candidates"][0]
+    assert field["label"] == "Fade Time"
+    pages = [acquired["metadata_detail"]]
+    revision = task.revision
+    while not pages[-1]["complete"]:
+        code, detailed = task.run(*pages[-1]["next_command"]["gateway_argv"])
+        assert code == 0, detailed
+        pages.append(detailed["agent_result"])
+        assert detailed["draft"]["revision"] == revision
+    entries = [entry for page in pages for entry in page["entries"]]
+    assert "".join(row["value"] for row in entries if row["pointer"] == "/display/description") == text
+    assert all(len(json.dumps(page, ensure_ascii=False, indent=2).encode()) <= 28 * 1024 for page in pages)
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field["handle"], "--business-value", "0.5")
+    assert code == 0, declared
 
 
 def test_metadata_pages_obey_utf8_byte_budget(tmp_path: Path) -> None:
@@ -138,3 +167,28 @@ def test_metadata_selection_expires_without_advancing_draft(tmp_path: Path, monk
     code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
     assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_EXPIRED", rejected
     assert task.revision == revision
+
+
+def test_selected_large_enum_exposes_bounded_choices_and_accepts_last_disclosed_value(tmp_path: Path) -> None:
+    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
+    task.metadata = {"Mode": {"name": "Mode", "type": "int32", "restriction": {"type": "enum", "values": [
+        {"value": index, "displayName": f"Mode {index}"} for index in range(1000)]}}}
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    code, acquired = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 0, acquired
+    assert len(json.dumps(acquired, ensure_ascii=False, indent=2).encode()) < 64 * 1024
+    choices = acquired["metadata_detail"]["field"]["choices"]
+    values = list(choices["items"])
+    while not choices["complete"]:
+        code, page = task.run(*choices["next_command"]["gateway_argv"])
+        assert code == 0, page
+        choices = page["agent_result"]["field"]["choices"]
+        values.extend(choices["items"])
+    assert values == [{"value": index, "displayName": f"Mode {index}"} for index in range(1000)]
+    field = acquired["field_candidates"][0]
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field["handle"], "--business-value", "999")
+    assert code == 0, declared

@@ -2055,6 +2055,8 @@ def build_parser() -> argparse.ArgumentParser:
     metadata.add_argument("--page")
     metadata.add_argument("--page-size", type=int, default=20)
     metadata.add_argument("--selection")
+    metadata.add_argument("--detail-page", help="Copy the exact continuation from a metadata detail page")
+    metadata.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
     metadata.add_argument("--platform")
     metadata.add_argument(
         "--curve-role",
@@ -3086,6 +3088,8 @@ def build_parser() -> argparse.ArgumentParser:
     field_mode.add_argument("--selection")
     draft_discover_fields.add_argument("--page")
     draft_discover_fields.add_argument("--page-size", type=int, default=20)
+    draft_discover_fields.add_argument("--detail-page")
+    draft_discover_fields.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
     field_mode.add_argument(
         "--meaning",
         action="append",
@@ -5744,17 +5748,26 @@ def preflight_metadata_input(
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
     args.detail = False
 
+    if (args.detail_page is not None or args.detail_view != "raw") and args.operation != "detail":
+        raise GatewayInputError("metadata --detail-page requires detail --selection")
+
     if args.operation == "types":
         if (
             path_segments
             or semantic_kind is not None
             or custom_kind_meaning is not None
             or exact_id is not None
-            or meanings
             or args.platform
             or args.curve_role
         ):
             raise GatewayInputError("metadata types accepts no business input")
+        if args.selection is not None or not 1 <= args.page_size <= 64:
+            raise GatewayInputError("metadata types accepts --page and --page-size 1..64, not --selection")
+        if len(meanings) > MAX_METADATA_DISCOVERY_QUERIES or any(
+            not meaning.strip() or meaning != meaning.strip()
+            or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS for meaning in meanings
+        ) or sum(map(len, meanings)) > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
+            raise GatewayInputError("metadata types --meaning must contain bounded, trimmed lexical filters")
         return
 
     if args.operation in {"discover", "property-state"}:
@@ -14260,6 +14273,19 @@ def dispatch_command(
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
+        if args.operation == "types":
+            from wwise_waapi.metadata_discovery import browse_metadata_types
+            metadata_calls: list[dict[str, Any]] = []
+            result = browse_metadata_types(
+                read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
+                meanings=args.queries or (), page=args.page, page_size=args.page_size,
+            )
+            if result.get("next_page"):
+                filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
+                result["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", result["next_page"]])
+            return {"ok": True, "status": "ok", **common, "operation": args.operation,
+                    "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls), "agent_result": result}
         if args.operation in {"discover", "property-state", "list", "detail"}:
             custom_kind_clarification = _bind_custom_kind_from_live_types(
                 args,
@@ -14320,7 +14346,27 @@ def dispatch_command(
                     context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
                     object_type=args.object_type, class_id=args.class_id, object=args.object,
                     page_size=args.page_size, page=args.page, selection=args.selection,
+                    complete_detail=True, detail_page=args.detail_page, detail_view=args.detail_view,
                 )
+                scope_argv = []
+                for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
+                    if value is not None:
+                        scope_argv.extend([flag, value])
+                for segment in args.metadata_path_segments or []:
+                    scope_argv.extend(["--path-segment", segment])
+                if result.get("next_page"):
+                    result["next_command"] = transaction_next_command("metadata", ["metadata", "list", *scope_argv, "--page-size", str(args.page_size), "--page", result["next_page"]])
+                def continue_detail(target, view):
+                    if target.get("next_detail_page"):
+                        target["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", args.selection, "--detail-view", view, "--detail-page", target["next_detail_page"]])
+                def decorate_detail(page):
+                    continue_detail(page, args.detail_view)
+                    for key in ("choices", "dependency_page"):
+                        continue_detail(page["field"][key], page["field"][key]["detail_view"])
+                if "field" in result:
+                    from wwise_waapi.metadata_detail import fit_detail_continuations
+                    result = fit_detail_continuations(result, decorate_detail)
+
                 return {"ok": True, "status": "ok", **common, "operation": args.operation,
                         "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls),
                         "agent_result": result}
@@ -18033,6 +18079,9 @@ def dispatch_business_field_discovery(
     )
     if args.page and not args.list_fields:
         raise GatewayInputError("--page requires --list")
+    if (args.detail_page or args.detail_view != "raw") and not args.selection:
+        raise GatewayInputError("--detail-page requires --selection")
+    detail_projection = None
     if args.list_fields or args.selection:
         from wwise_waapi.metadata_discovery import browse_metadata
         browsed = browse_metadata(
@@ -18040,12 +18089,36 @@ def dispatch_business_field_discovery(
             context={"draft": args.draft_id, "context": session.context.as_binding_dict(),
                      "endpoint": dict(common["endpoint"]), "live_info": dict(live_info)},
             **discovery_scope, page_size=args.page_size, page=args.page, selection=args.selection,
+            complete_detail=True, project_detail=False,
         )
-        if args.list_fields:
+        if args.selection:
+            from wwise_waapi.metadata_discovery import MetadataDiscoveryError, MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, _require_result_size
+            try:
+                _require_result_size(browsed, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
+            except MetadataDiscoveryError:
+                from wwise_waapi.metadata_detail import detail_page
+                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view)
+            if (args.detail_page or args.detail_view != "raw") and detail_projection is None:
+                from wwise_waapi.metadata_detail import detail_page
+                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view)
+        def detail_continuation(result, revision, view=None):
+            if result.get("next_detail_page"):
+                scope_flag, scope_handle = (("--object-handle", args.object_handle) if args.object_handle else ("--type-handle", args.type_handle) if args.type_handle else ("--semantic-kind", args.semantic_kind))
+                continuation = ["draft-discover-fields", args.draft_id, "--task-authority", args.task_authority, "--expected-revision", str(revision), scope_flag, scope_handle, "--selection", args.selection, "--detail-view", view or args.detail_view, "--detail-page", result["next_detail_page"]]
+                if args.platform:
+                    continuation.extend(["--platform", args.platform])
+                result["next_command"] = transaction_next_command("draft-discover-fields", continuation, state_dir=args.state_dir)
+            if "field" in result:
+                for key in ("choices", "dependency_page"):
+                    detail_continuation(result["field"][key], revision, result["field"][key]["detail_view"])
+        if args.list_fields or args.detail_page or args.detail_view != "raw":
             payload = operation_draft_payload(args.command, binding.record, offline=False,
                 state_dir=args.state_dir, task_authority=args.task_authority)
             payload.update({"endpoint": dict(common["endpoint"]), "detected_version": detected_version,
-                            "agent_result": browsed})
+                            "agent_result": detail_projection if not args.list_fields else browsed})
+            if not args.list_fields:
+                from wwise_waapi.metadata_detail import fit_detail_continuations
+                payload["agent_result"] = fit_detail_continuations(payload["agent_result"], lambda page: detail_continuation(page, binding.record.revision))
             return payload
         meanings = (browsed["metadata"]["name"],)
         read_call = binding.read_call
@@ -18054,6 +18127,7 @@ def dispatch_business_field_discovery(
         queries=meanings,
         **discovery_scope,
         limit=MAX_METADATA_DISCOVERY_LIMIT,
+        exact_field=meanings[0] if args.selection else None,
     )
     eligible: list[Mapping[str, Any]] = []
     incompatible: list[dict[str, Any]] = []
@@ -18250,6 +18324,21 @@ def dispatch_business_field_discovery(
             and display["name"].strip()
             else bound.token
         )
+        restrictions = dict(bound.restrictions)
+        value_input = field_value_input(session, bound, choice_limit=20 if detail_projection is not None else None)
+        if detail_projection is not None:
+            if len(label.encode("utf-8")) > 1024:
+                label = bound.token
+            for key in ("enum_choices", "enum_labels"):
+                if isinstance(restrictions.get(key), list) and len(restrictions[key]) > 20:
+                    restrictions[key] = restrictions[key][:20]
+                    restrictions["enum_complete"] = False
+                    restrictions["enum_detail"] = "metadata_detail.field.choices"
+            if isinstance(value_input.get("choices"), list) and len(value_input["choices"]) > 20:
+                value_input["total_choice_count"] = len(value_input["choices"])
+                value_input["choices"] = value_input["choices"][:20]
+                value_input["choices_complete"] = False
+                value_input["choice_continuation"] = "metadata_detail.field.choices.next_command"
         field_candidates.append(
             {
                 "handle": bound.handle,
@@ -18257,10 +18346,10 @@ def dispatch_business_field_discovery(
                 "field_kind": bound.field_kind,
                 "value_type": bound.value_type,
                 "platform": bound.platform,
-                "restrictions": dict(bound.restrictions),
-                "metadata": dict(browsed["metadata"] if args.selection else metadata),
+                "restrictions": restrictions,
+                "metadata": (dict(browsed["metadata"] if args.selection else metadata) if detail_projection is None else {"name": bound.token, "type": metadata["type"], "detail_projection": "metadata_detail", "complete": False}),
                 "unit": metadata_unit(metadata),
-                "value_input": field_value_input(session, bound),
+                "value_input": value_input,
                 "matched_meanings": list(candidate.get("matched_queries", [])),
             }
         )
@@ -18324,6 +18413,9 @@ def dispatch_business_field_discovery(
         payload["candidate_projection"] = (
             "meaning_results[].candidates_without_duplicate_top_level_rows"
         )
+    if detail_projection is not None:
+        from wwise_waapi.metadata_detail import fit_detail_continuations
+        payload["metadata_detail"] = fit_detail_continuations(detail_projection, lambda page: detail_continuation(page, record.revision))
     return payload
 
 
