@@ -16132,7 +16132,7 @@ def verify_prepared_operation(
         try:
             observed = inspect_created_project(plan)
         except SoundBankContractError as exc:
-            if exc.error_code not in {'MISSING_ARTIFACT', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+            if exc.error_code not in {'MISSING_ARTIFACT', 'MISSING_PATH', 'INVALID_PATH_KIND', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
             check('Requested saved project artifact is present and valid', False,
                 {'code': exc.error_code, 'message': str(exc), **exc.details})
@@ -16163,7 +16163,7 @@ def verify_prepared_operation(
             try:
                 effect_result = inspect_cli_project_effect(effect)
             except SoundBankContractError as exc:
-                if exc.error_code not in {'MISSING_ARTIFACT', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+                if exc.error_code not in {'MISSING_ARTIFACT', 'MISSING_PATH', 'INVALID_PATH_KIND', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
                     raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
                 check('Requested Console project/file effect is independently observable', False,
                     {'code': exc.error_code, 'message': str(exc), **exc.details})

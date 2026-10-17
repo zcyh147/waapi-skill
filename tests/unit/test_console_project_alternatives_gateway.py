@@ -730,3 +730,167 @@ def test_cli_add_platform_freezes_all_observed_work_units_before_execution(tmp_p
     assert code != 0, payload
     assert not any(row[0] == task.operation for row in task.calls)
     assert '-12' in unit.read_text()
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_dump_reports_independent_json_artifact_without_inventing_model_format(tmp_path, version):
+    class DumpTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text('{"independent_fixture": ["Keep", "Fixture"]}')
+            return super().call(uri, args, options)
+    task = DumpTask(tmp_path, version, 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output), '--value', 'content', 'property_sets',
+        '--toggle', 'include_session_objects', 'disable')
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is False, payload
+    observations = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-object-dump-artifact']
+    assert len(observations) == 1, payload
+    assert observations[0]['json_valid'] is True
+    assert observations[0]['unresolved'] == ['object_model_content_and_session_representation']
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+def test_cli_dump_missing_artifact_cannot_verify_or_retry(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.dumpObjects')
+    output = tmp_path / 'missing.json'
+    tx = task.execute_plan('--value', 'output_file', str(output))
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_migration_observes_target_version_and_preserves_saved_model(tmp_path, version):
+    class MigrateTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                tree.getroot().set('WwiseVersion', 'v' + version + '.0')
+                tree.getroot().set('WwiseBuild', '2')
+                tree.getroot().set('SchemaVersion', {'2021.1': '103', '2022.1': '110',
+                    '2023.1': '119', '2024.1': '123', '2025.1': '133'}[version])
+                tree.write(self.project_file)
+            return super().call(uri, args, options)
+    task = MigrateTask(tmp_path, version)
+    saved_fixture_project(task)
+    tree = ET.parse(task.project_file)
+    tree.getroot().set('WwiseVersion', 'v2021.1.0')
+    tree.getroot().set('SchemaVersion', '103')
+    tree.write(task.project_file)
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-migrated-project-artifact']
+    assert len(observed) == 1 and observed[0]['saved_model_files'] == 2, payload
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+@pytest.mark.parametrize('output', ['{', '{"duplicate":1,"duplicate":2}', 'NaN', '[] trailing', '<xml/>'])
+def test_cli_dump_rejects_malformed_json_output(tmp_path, output):
+    class InvalidDump(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text(output)
+            return super().call(uri, args, options)
+    task = InvalidDump(tmp_path, '2025.1', 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output))
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+
+
+@pytest.mark.parametrize('failure', ['wrong-version', 'lost-workunit', 'wrong-project', 'property-transform', 'unchanged'])
+def test_cli_migration_distinguishes_failed_preservation_and_unresolved_transformation(tmp_path, failure):
+    class MigrateFailure(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                if failure != 'unchanged':
+                    tree.getroot().set('WwiseBuild', '2')
+                    tree.getroot().set('WwiseVersion', 'v2024.1.0' if failure == 'wrong-version' else 'v2025.1.0')
+                    if failure == 'wrong-project':
+                        tree.find('./ProjectInfo/Project').set('ID', '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                    tree.write(self.project_file)
+                if failure == 'lost-workunit':
+                    self.unit.unlink()
+                elif failure == 'property-transform':
+                    self.unit.write_text(self.unit.read_text().replace('-6', '-12'))
+            return super().call(uri, args, options)
+    task = MigrateFailure(tmp_path, '2025.1')
+    task.unit = saved_fixture_project(task)
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is False, payload
+    if failure in {'property-transform', 'unchanged'}:
+        assert code == 0 and payload['state'] == 'result_schema_checked', payload
+        expected = ('migration_model_transformation_semantics' if failure == 'property-transform'
+            else 'migration_save_has_no_observed_write')
+        assert expected in payload['verification']['readbacks'][-1]['unresolved']
+    else:
+        assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+@pytest.mark.parametrize('operation', ['moveMediaIdsToSingleFile', 'moveMediaIdsToWorkUnits', 'updateMediaIdsInSingleFile'])
+def test_cli_media_ids_observe_owned_file_and_work_units_without_inventing_mapping_format(tmp_path, version, operation):
+    class MediaTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                # Deliberately unknown representation: XML validity is not a
+                # native mapping-format or business-completeness assertion.
+                self.media.write_text('<UnestablishedMediaMappingFormat revision="after"/>')
+            return super().call(uri, args, options)
+    task = MediaTask(tmp_path, version, 'ak.wwise.cli.' + operation)
+    saved_fixture_project(task)
+    task.media = task.project_file.with_suffix('.mediaid')
+    task.media.write_text('<UnestablishedMediaMappingFormat revision="before"/>')
+    if version in ('2021.1', '2022.1', '2023.1'):
+        task.result_payload = {}
+    tx = task.execute_plan()
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is False, payload
+    observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-media-id-artifacts']
+    assert len(observed) == 1 and observed[0]['mapping_file']['exists'] is True, payload
+    assert observed[0]['mapping_file']['xml_valid'] is True
+    assert 'central_media_id_mapping_representation' in observed[0]['unresolved']
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+
+
+@pytest.mark.parametrize('failure', ['missing-mapping', 'malformed-mapping', 'lost-workunit', 'unrelated-setting'])
+def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, failure):
+    class MediaFailure(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                if failure == 'malformed-mapping':
+                    self.media.write_text('<broken')
+                elif failure != 'missing-mapping':
+                    self.media.write_text('<UnknownNativeMediaFormat/>')
+                if failure == 'lost-workunit':
+                    self.unit.unlink()
+                elif failure == 'unrelated-setting':
+                    self.unit.write_text(self.unit.read_text().replace('-6', '-12'))
+            return super().call(uri, args, options)
+    task = MediaFailure(tmp_path, '2025.1', 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(tree.find('.//Sound'), 'AudioFileSource', Name='Keep.wav',
+        ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
+    tree.write(task.unit)
+    task.media = task.project_file.with_suffix('.mediaid')
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
