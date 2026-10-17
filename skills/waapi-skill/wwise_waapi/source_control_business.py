@@ -311,6 +311,7 @@ def _get_source_files_request(
         "originals_folder",
         "recursive",
         "include_usage_objects",
+        "usage_outputs",
         "max_results",
     }
     if set(plan) - allowed:
@@ -327,7 +328,19 @@ def _get_source_files_request(
             action="choose all, used, or unused",
         )
     recursive = plan.get("recursive", True)
-    include_usage = plan.get("include_usage_objects", False)
+    from .object_query_outputs import available_query_outputs
+    output_choices = available_query_outputs(version)
+    usage_outputs = plan.get("usage_outputs", [])
+    if (not isinstance(usage_outputs, list) or len(usage_outputs) > len(output_choices)
+            or any(not isinstance(name, str) or name not in output_choices for name in usage_outputs)
+            or len(set(usage_outputs)) != len(usage_outputs)):
+        _repair("SOURCE_CONTROL_USAGE_OUTPUT_INVALID", field="usage_outputs",
+                action="choose distinct disclosed business outputs available in this version",
+                choices=sorted(output_choices))
+    include_usage = plan.get("include_usage_objects", bool(usage_outputs))
+    if usage_outputs and include_usage is False:
+        _repair("SOURCE_CONTROL_USAGE_OUTPUT_CONFLICT", field="include_usage_objects",
+                action="omit --no-usage-objects when selecting usage outputs")
     max_results = plan.get("max_results", 100)
     if not isinstance(recursive, bool) or not isinstance(include_usage, bool):
         _repair(
@@ -354,7 +367,7 @@ def _get_source_files_request(
     options: dict[str, Any] = {"return": fields}
     if include_usage:
         fields.append("usage")
-        options["objectReturn"] = ["id", "name", "type", "path"]
+        options["objectReturn"] = ["id", "name", "type", "path", *[output_choices[name][0] for name in usage_outputs]]
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",

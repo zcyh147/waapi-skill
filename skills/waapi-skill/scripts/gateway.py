@@ -27182,6 +27182,7 @@ def _business_next_action_binding(
                     "include_usage_objects": (
                         "--include-usage-objects | --no-usage-objects"
                     ),
+                    "usage_outputs": "--usage-output <disclosed-business-output> (repeatable)",
                     "max_results": "--max-results <1..1000>",
                 },
                 "submit_once": True,

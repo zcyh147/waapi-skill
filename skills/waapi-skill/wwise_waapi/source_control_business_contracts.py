@@ -27,6 +27,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "originals_folder",
             "recursive",
             "include_usage_objects",
+            "usage_outputs",
             "max_results",
         ),
         "field_types": {
@@ -34,6 +35,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "originals_folder": "safe_originals_relative_folder",
             "recursive": "boolean",
             "include_usage_objects": "boolean",
+            "usage_outputs": "source_file_usage_business_outputs",
             "max_results": "bounded_result_count",
         },
     },
@@ -201,6 +203,20 @@ def source_control_business_contract_data(
             "automatic_retry": False,
         },
     }
+    if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
+        from .object_query_outputs import available_query_outputs
+        payload["declaration"]["usage_output_choices"] = {
+            name: {"result_field": native}
+            for name, (native, _business) in available_query_outputs(version).items()
+        }
+        payload["declaration"]["usage_outputs"] = {
+            "cli": "--usage-output <disclosed-business-output> (repeatable)",
+            "implies_include_usage_objects": True,
+            "explicit_no_usage_objects": "conflicts_with_nonempty_usage_outputs",
+            "identity_fields": ["id", "name", "type", "path"],
+            "result": "native usage fields retained exactly; missing and explicit null remain distinct",
+            "availability": "versioned output vocabulary; applicability to each usage object remains native-observed",
+        }
     if shape == "prohibited_boundary":
         payload["boundary"] = {
             "error_code": "SOURCE_CONTROL_PROVIDER_CONFIGURATION_REQUIRED",

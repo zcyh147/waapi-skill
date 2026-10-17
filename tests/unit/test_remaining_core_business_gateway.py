@@ -719,3 +719,109 @@ def test_undo_members_are_compound_only_and_never_expose_typed_construction(
     assert exit_code == 2
     assert "compound Undo" in payload["message"]
     assert "waapi.undoGroup" in payload["message"]
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_file_usage_outputs_are_disclosed_and_sealed_through_public_draft(tmp_path, version):
+    from tests.unit.test_object_graph_business_gateway import _info
+
+    state_dir = tmp_path / "state"
+    usage = {"id": "{11111111-1111-1111-1111-111111111111}", "name": "Rain", "type": "Sound",
+             "path": "\\Actor-Mixer Hierarchy\\Rain", "shortId": 1, "parent": None}
+    calls = []
+    class Client(_SourceControlDraftClient):
+        def call(self, uri, args=None, options=None):
+            if uri == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
+                calls.append((args, options))
+                return {"return": [{"file": "SFX/Rain.wav", "isMissing": False, "usage": [usage]}]}
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            return super().call(uri, args, options)
+
+    client = Client(tmp_path)
+    env = _env(tmp_path, version=version)
+    code, schema = gateway.execute_gateway(["--version", version, "request-schema", SOURCE_CONTROL_GET_SOURCE_FILES_URI], env=env)
+    assert code == 0, schema
+    declaration = schema["business_adapter"]["declaration"]
+    assert "usage_outputs" in declaration["optional_fields"]
+    choices = declaration["usage_output_choices"]
+    assert choices["short-id"]["result_field"] == "shortId"
+    assert choices["parent"]["result_field"] == "parent"
+
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state_dir), *argv], env=env, client_factory=lambda _url: client)
+    code, phase = run("draft-start", SOURCE_CONTROL_GET_SOURCE_FILES_URI)
+    assert code == 0, phase
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    disclosed = phase["draft"]["next_action_binding"]["declaration"]["stable_scalar_flags"]
+    assert disclosed["usage_outputs"] == "--usage-output <disclosed-business-output> (repeatable)"
+    code, phase = run("draft-declare-source-control-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]),
+        "--usage-output", "short-id", "--usage-output", "parent")
+    assert code == 0, phase
+    code, phase = run("draft-check", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, phase
+    code, previewed = run("preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--apply")
+    assert code == 0, previewed
+    artifact = TransactionStore(state_dir).load_preview(previewed["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["options"] == {
+        "return": ["file", "folder", "isUsed", "isMissing", "usage"],
+        "objectReturn": ["id", "name", "type", "path", "shortId", "parent"],
+    }
+
+    assert calls == []  # Preparation did not perform the sealed external read.
+    code, shown = run("transaction-show", previewed["transaction_id"], "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run(*shown["next_command"]["gateway_argv"])
+    assert code == 0, confirmed
+    code, executed = run("execute", previewed["transaction_id"])
+    assert code == 0, executed
+    assert calls == [({"filter": "all", "recursive": True}, {
+        "return": ["file", "folder", "isUsed", "isMissing", "usage"],
+        "objectReturn": ["id", "name", "type", "path", "shortId", "parent"],
+    })]
+    code, verified = run("verify", previewed["transaction_id"])
+    assert code == 0, json.dumps(verified, ensure_ascii=False)
+    assert verified["agent_result"]["result"]["items"][0]["usage"] == [usage]
+    assert verified["agent_result"]["verified"] is False  # Read result validation is not provider-effect proof.
+    code, repeated = run("execute", previewed["transaction_id"])
+    assert code != 0 and len(calls) == 1
+
+
+@pytest.mark.parametrize("flags,operation,expected", (
+    (("--usage-output", "short-id", "--no-usage-objects"), SOURCE_CONTROL_GET_SOURCE_FILES_URI, "SOURCE_CONTROL_USAGE_OUTPUT_CONFLICT"),
+    (("--usage-output", "parent", "--usage-output", "parent"), SOURCE_CONTROL_GET_SOURCE_FILES_URI, "SOURCE_CONTROL_USAGE_OUTPUT_INVALID"),
+    (("--usage-output", "custom-states"), SOURCE_CONTROL_GET_SOURCE_FILES_URI, "SOURCE_CONTROL_USAGE_OUTPUT_INVALID"),
+    (("--usage-output", "parent", "--project-file", "SampleProject.wproj", "--commit-message", "message"), SOURCE_CONTROL_COMMIT_URI, "File actions do not accept source-file search fields"),
+))
+def test_source_control_usage_output_repair_preserves_the_original_draft(tmp_path, flags, operation, expected):
+    from tests.unit.test_object_graph_business_gateway import _info
+    class Client(_SourceControlDraftClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info("2023.1")
+            return super().call(uri, args, options)
+    client = Client(tmp_path)
+    env, state_dir = _env(tmp_path, version="2023.1"), tmp_path / "state"
+    code, started = gateway.execute_gateway(["--state-dir", str(state_dir), "draft-start", operation], env=env)
+    assert code == 0, started
+    draft, authority = started["draft"]["draft_id"], started["task_authority"]
+    before = OperationDraftStore(state_dir).inspect(draft, task_authority=authority)
+    code, rejected = gateway.execute_gateway(["--state-dir", str(state_dir), "draft-declare-source-control-plan",
+        draft, "--task-authority", authority, "--expected-revision", str(before.revision), *flags],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2, rejected
+    assert expected in json.dumps(rejected, ensure_ascii=False)
+    after = OperationDraftStore(state_dir).inspect(draft, task_authority=authority)
+    assert (before.state, before.revision, before.composition, before.audit, before.check, before.seal) == (
+        after.state, after.revision, after.composition, after.audit, after.check, after.seal)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+def test_source_file_usage_outputs_do_not_advertise_unpinned_source_control_route(tmp_path, version):
+    code, payload = gateway.execute_gateway(["--version", version, "request-schema", SOURCE_CONTROL_GET_SOURCE_FILES_URI],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: pytest.fail("offline schema connected"))
+    assert code == 2 and payload["ok"] is False
+    assert "usage_output_choices" not in json.dumps(payload)
