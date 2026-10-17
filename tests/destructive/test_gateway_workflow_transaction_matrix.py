@@ -134,12 +134,6 @@ class _WorkflowSandboxRuntime:
         command: Sequence[str],
     ) -> tuple[int, dict[str, Any]]:
         argv = [
-            "--host",
-            self.lifecycle.host,
-            "--port",
-            str(self.port),
-            "--version",
-            self.version,
             "--timeout",
             "30",
             "--state-dir",
@@ -156,12 +150,6 @@ class _WorkflowSandboxRuntime:
                 sys.executable,
                 str(REPO_ROOT / "skills" / "waapi-skill" / "scripts" / "run.py"),
                 "gateway.py",
-                "--host",
-                self.lifecycle.host,
-                "--port",
-                str(self.port),
-                "--version",
-                self.version,
                 "--timeout",
                 "30",
                 "status",
@@ -2211,12 +2199,6 @@ def _complete_result_schema_operation(
         live=False,
     )
     execute_argv = [
-        "--host",
-        runtime.lifecycle.host,
-        "--port",
-        str(runtime.port),
-        "--version",
-        runtime.version,
         "--timeout",
         "30",
         "--state-dir",

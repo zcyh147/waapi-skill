@@ -1693,14 +1693,20 @@ def run_expansion_codex_task(
     root.mkdir(parents=True)
     workspace = root / "agent-workspace"
     skill_install = prepare_workspace_skill_install(workspace, options.skill_source)
-    policy = ExpansionBrokerPolicy(prepared=prepared, version=unit.version,
+    repair = unit.unit_id.startswith("REPAIR25-")
+    if repair:
+        from tests.semantic.support.codex_repair_broker_policy import RepairBrokerPolicy
+    policy_type = RepairBrokerPolicy if repair else ExpansionBrokerPolicy
+    policy = policy_type(prepared=prepared, version=unit.version,
                                     skill_source=options.skill_source, scoped_paths=scoped_paths)
     budget = CumulativeAgentBudget()
     prompts = (prepared.prompt,)
     if prepared.policy == "ask_before_changes":
         prompts += ("这一步预览没问题，按当前预览执行并核验结果。",)
+    skill_read_schedule = (("SKILL.md", "references/waapi-query.md"
+        if repair and prepared.policy == "read_only" else "references/waapi-operate.md"),)
     plan = {
-        "contract": "waapi-skill.integration-expansion-task-plan/v1",
+        "contract": "waapi-skill.repair-task-plan/v1" if repair else "waapi-skill.integration-expansion-task-plan/v1",
         "unit_id": unit.unit_id, "version": unit.version, "policy": prepared.policy,
         "operation": prepared.operation, "request_schema_uri": prepared.request_schema_uri,
         "accepted_verification_states": sorted(prepared.accepted_verification_states),
@@ -1714,7 +1720,7 @@ def run_expansion_codex_task(
         "inputs_sha256": options.campaign_inputs_sha256,
         "platform_name": os.name,
         "skill_source": str(options.skill_source.resolve()),
-        "trusted_python": str(Path(sys.executable).resolve()),
+        "trusted_python": str(Path(sys.executable).absolute()),
         "windows_powershell_core_host": (asdict(options.windows_powershell_core_host)
                                          if options.windows_powershell_core_host else None),
         "scoped_paths": dict(scoped_paths),
@@ -1722,6 +1728,8 @@ def run_expansion_codex_task(
         "model": options.model, "reasoning_effort": options.reasoning_effort,
         "service_tier": options.service_tier,
     }
+    if repair:
+        plan["skill_read_schedule"] = [list(turn) for turn in skill_read_schedule]
     from tests.semantic.support.codex_expansion_notice_adjudication import CONTRACT as notice_contract, CASES as notice_cases
     if unit.unit_id.rsplit("-", 1)[-1] in notice_cases:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, reviewer_runtime_identity
@@ -1745,10 +1753,12 @@ def run_expansion_codex_task(
         sandbox_mode="workspace-write", allow_output_write=False, network_access=True,
         developer_instructions=semantic_task_developer_instructions(
             options.skill_source / "scripts" / "run.py", task_skill_source=skill_install,
-            expected_skill_reads=(("SKILL.md", "references/waapi-operate.md"),),
+            expected_skill_reads=skill_read_schedule,
             expansion_modification_policy=prepared.policy,
         ),
     )
+    if repair:
+        from tests.semantic.support.codex_repair_cases import repair_notice
     broker = CodexGatewayBroker(
         skill_source=options.skill_source, invocation_skill_source=skill_install,
         expected_steps=(), expected_wwise_version=unit.version,
@@ -1783,6 +1793,8 @@ def run_expansion_codex_task(
                             reconciliation, {"completed_turn": False}, (str(exc),))
                         _archive_turn(output_dir, prompt=prompt, result=exc.result, grade=grade)
                         raise
+                    if repair:
+                        policy.finish_read()
                     thread_id = task.thread_id
                     cumulative_argvs.extend(_gateway_candidate_argvs(
                         result, skill_source=options.skill_source, alternate_skill_sources=(skill_install,),
@@ -1808,7 +1820,9 @@ def run_expansion_codex_task(
                         "one_target_skill": result.prompt_audit.passed,
                         "no_collaboration": result.collab_call_count == 0,
                         "only_packaged_references": (len(references) <= 12 and set(references).issubset(allowed_references)
-                                                      and (index != 1 or bool(references) and references[0] == "SKILL.md")),
+                                                      and (index != 1 or bool(references) and references[0] == "SKILL.md")
+                                                      and (not repair or references == skill_read_schedule[index - 1]
+                                                           and tuple(record.command for record in records[:len(references)]) == tuple(facts.allowed_read_commands))),
                         "only_authenticated_gateway_and_skill_reads": (
                             effective_count == len(command_rows) + len(facts.allowed_read_commands)
                             and not facts.non_gateway_unexpected_commands),
@@ -1819,7 +1833,7 @@ def run_expansion_codex_task(
                         "broker_provenance": reconciliation.passed,
                         "policy_checkpoint": (policy.transaction.state == "previewed"
                             if prepared.policy == "ask_before_changes" and index == 1 else policy.complete),
-                        "visible_preview_notice": (index != 1 or expansion_preview_notice(
+                        "visible_preview_notice": (index != 1 or (repair and prepared.policy == "read_only") or (repair_notice if repair else expansion_preview_notice)(
                             result, command_rows, version=unit.version,
                             execute_expected=prepared.policy == "allow_changes",
                             preview_artifact=(TransactionStore(broker.state_directory).load_preview(
@@ -1897,7 +1911,7 @@ def run_expansion_codex_task(
                 or reconciliation_receipt.get("subprocesses_reaped") is not True):
             status = "BLOCKED"
         outcome = {
-            "contract": "waapi-skill.integration-expansion-task-result/v1",
+            "contract": "waapi-skill.repair-task-result/v1" if repair else "waapi-skill.integration-expansion-task-result/v1",
             "unit_id": unit.unit_id, "version": unit.version, "thread_id": thread_id,
             "passed": passed, "status": status, "infrastructure": infrastructure,
             "error": None if failure is None else f"{type(failure).__name__}: {failure}",

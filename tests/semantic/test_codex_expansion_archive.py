@@ -107,7 +107,7 @@ def test_boundary_never_counts_as_an_agent_or_business_pass(tmp_path):
             expected_version="2022.1", expected_inputs_sha256=INPUTS)
 
 
-def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault=None):
+def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault=None, repair_metadata=None):
     identifier = "{11111111-1111-1111-1111-111111111111}"
     tx = "tx1-00000000000000000001"
     points = [{"x": 0, "y": 0, "shape": "Linear"}, {"x": 100, "y": -48, "shape": "Linear"}]
@@ -146,6 +146,22 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
     elif notice_fault == "source_alias":
         before["source"]["object"]["id"] = identifier
         after["source"]["object"]["id"] = identifier
+    if repair_metadata is not None:
+        from tests.semantic.support.codex_repair_cases import verify_f1, F1_ASSERTIONS
+        expected = {"name": "Repair_Room", "type": "Effect", "path": r"\Effects\Default Work Unit\Repair_Room",
+                    "parent": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "properties": {"PreDelay": 24}}
+        before = {"objects": {identifier: {"id": identifier, **expected, "properties": {"PreDelay": 25}}},
+                  "source_integrity": {"sha256": "a" * 64, "mtime_ns": 1}, "media": {}, "complete": True}
+        after = deepcopy(before)
+        after["objects"][identifier]["properties"]["PreDelay"] = 24
+        artifact["request"].update(operation="object.setProperty", arguments={
+            "object": {"kind": "id", "value": identifier}, "property": "PreDelay", "value": 24})
+        artifact["prepared_operation"].update(operation="object.setProperty", request=deepcopy(artifact["request"]),
+            dispatch={"uri": "ak.wwise.core.object.setProperty", "args": {"object": identifier, "property": "PreDelay", "value": 24}, "options": {}})
+        artifact["connection_configuration"] = {"config_path": str(root / "fixture-config.json"),
+            "waapi_host": artifact["project_guard"]["endpoint"]["host"],
+            "waapi_port": artifact["project_guard"]["endpoint"]["port"], "wwise_version": "2025.1"}
+    verification_state = "verified" if repair_metadata is not None else "result_schema_checked"
     store = TransactionStore(root / "broker" / "state")
     store.create_preview(tx, artifact)
     authority = "caller_asserted_current_user_change_request"
@@ -154,7 +170,7 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
                          details={"policy": "allow_changes", "authority": authority, "explicit_confirmation": False})
         store.begin_execution(tx, expected_authorization="policy_authorized")
         store.mark_executed_unverified(tx)
-        store.record_verification(tx, outcome="result_schema_checked")
+        store.record_verification(tx, outcome=verification_state)
     scope = ExpansionReadScope(frozenset({identifier}), frozenset({api}))
     plan = {"contract": "waapi-skill.integration-expansion-task-plan/v1", "unit_id": "EXP25-C08",
         "version": "2025.1", "inputs_sha256": INPUTS, "policy": "allow_changes", "prompts": ["Perform this change."],
@@ -165,14 +181,21 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
         "read_scope": {key: sorted(value) if isinstance(value, frozenset) else value for key, value in asdict(scope).items()},
         "read_scope_sha256": scope.digest, "oracle_parameters": {"expected_points": points},
         "preview_parameters": {"version": "2025.1", "object_id": identifier, "expected_points": points}}
+    if repair_metadata is not None:
+        plan.update(contract="waapi-skill.repair-task-plan/v1", model="gpt-5.6-terra", reasoning_effort="medium", service_tier="default", unit_id="REPAIR25-F1", operation="object.setProperty", request_schema_uri=None,
+            required_assertions=sorted(F1_ASSERTIONS), before=before,
+            oracle_parameters={"expected": expected, "target_id": identifier},
+            preview_parameters={"expected": expected, "target_id": identifier, "parent_id": expected["parent"]})
     digest = canonical_digest(plan)
     _write(root / "expansion-plan.json", {**plan, "sha256": digest})
     artifact_hash = canonical_digest(artifact)
     assertions = {} if rejected_preview else verify_c08(before, after, expected_points=points)
+    if repair_metadata is not None:
+        assertions = {**verify_f1(before, after, expected=expected, target_id=identifier), "metadata_list_page_detail": True}
     oracle = {"before": before, "after": None if rejected_preview else after,
         "preview_before": before, "preview_after": before, "assertions": assertions,
         "transaction_id": tx, "artifact_hash": artifact_hash,
-        "gateway_verification_state": None if rejected_preview else "result_schema_checked",
+        "gateway_verification_state": None if rejected_preview else verification_state,
         "authorization": None if rejected_preview else {
             "mode": "policy_authorization", "authority": authority, "explicit_confirmation": False},
         "permit": None if rejected_preview else {
@@ -187,6 +210,11 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
     argv_rows = [["draft-start", api], ["preview-from-draft", "draft", "--task-authority", "auth", "--expected-revision", "1"]]
     if not rejected_preview:
         argv_rows.extend([["execute", tx], ["verify", tx]])
+    if repair_metadata is not None:
+        start = repair_metadata[0][1]
+        argv_rows[1] = ["preview-from-draft", start["draft"]["draft_id"], "--task-authority", start["task_authority"],
+                        "--expected-revision", str(repair_metadata[-1][1]["draft"]["revision"])]
+        argv_rows = [argv for argv, _ in repair_metadata] + argv_rows[1:]
     records, events = [], [{"type": "thread.started", "thread_id": "thread"}, {"type": "turn.started"}]
     skill_path = Path(plan["skill_source"]) / "SKILL.md"
     skill_read = {"id": "read-skill", "type": "command_execution", "command": shlex.join(["cat", str(skill_path)]),
@@ -202,11 +230,13 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
         if argv[0] == "execute":
             payload["state"] = "executed_unverified"
         if argv[0] == "verify":
-            payload["state"] = "result_schema_checked"
+            payload["state"] = verification_state
+        if repair_metadata is not None and index <= len(repair_metadata):
+            payload = deepcopy(repair_metadata[index - 1][1])
         model_argv = ["python", str(Path(plan["skill_source"]) / "scripts" / "run.py"), "gateway.py", *argv]
         semantic = ["runner-owned-version", "2025.1", *argv]
         if "--expected-revision" in argv:
-            semantic[-1] = 1
+            semantic[semantic.index("--expected-revision") + 1] = int(argv[argv.index("--expected-revision") + 1])
         stdout = json.dumps(payload)
         records.append({"sequence": index, "step_name": f"expansion.step.{index:04d}",
             "model_argv": model_argv, "normalized_model_argv": model_argv, "gateway_arguments": argv,
@@ -226,6 +256,7 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
                     "The preview does not match the requested curve; I will not execute it."
                     if rejected_preview else
                     "The preview passed; applying it now." if notice_fault == "missing_effect" else
+                    "I will set Repair_Room PreDelay to 24." if repair_metadata is not None else
                     "I will set FixtureAttenuation's dry volume curve to Custom; points (0, 0), (100, -48), all Linear.")}})
     final_response = ("I did not execute because the immutable Preview did not match the requested curve."
                       if rejected_preview else "Done.")
@@ -245,12 +276,12 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
     _write(root / "expansion-agent-budget.json", {"hard_seconds": 600, "slow_seconds": 420,
         "elapsed_seconds": 12, "slow": False, "turns": turns,
         "turn_measurements": [{"started_monotonic": 100, "finished_monotonic": 112, "elapsed_seconds": 12}]})
-    _write(root / "expansion-task-result.json", {"unit_id": "EXP25-C08", "version": "2025.1",
+    _write(root / "expansion-task-result.json", {"unit_id": plan["unit_id"], "version": "2025.1",
         "passed": passed and not rejected_preview,
         **({"status": "FAIL"} if rejected_preview else {}),
         "thread_id": "thread", "plan_sha256": digest, "assertions": assertions,
         "agent_seconds": 12, "slow": False, "turns": turns,
-        "gateway_verification_state": None if rejected_preview else "result_schema_checked"})
+        "gateway_verification_state": None if rejected_preview else verification_state})
     directory = root / "turns" / "turn-01"
     _write(directory / "turn-grade.json", {"index": 1, "prompt_sha256": hashlib.sha256(plan["prompts"][0].encode()).hexdigest(),
         "common_gates": gates, "broker_prefix_count": len(records),

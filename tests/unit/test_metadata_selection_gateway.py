@@ -1,0 +1,140 @@
+"""Public scoped metadata selection and incompatible-field diagnostics."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from tests.unit.test_field_interface_closure_gateway import FieldTask, FIRST, SECOND, VERSIONS
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_rejected_exact_boolean_rtpc_never_substitutes_nearby_numeric_field(tmp_path: Path, version: str) -> None:
+    task = FieldTask(tmp_path, version, "object.setRTPC")
+    task.metadata = {
+        "Enabled": {"name": "Enabled", "type": "bool", "supports": {"rtpc": "None"}},
+        "EnabledAmount": {"name": "EnabledAmount", "type": "Real32", "supports": {"rtpc": "Additive"}},
+    }
+    target = task.bind(FIRST)
+    code, payload = task.step("draft-discover-fields", "--object-handle", target, "--meaning", "Enabled")
+    assert code == 2, payload
+    rejected = payload["details"]["rejected_candidates"]
+    assert rejected == [{"field": "Enabled", "reason": "RTPC requires a numeric property with live RTPC support", "operation": "object.setRTPC"}]
+    assert all(uri != "ak.wwise.core.object.setRTPC" for uri, _, _ in task.calls)
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_draft_list_selection_preserves_full_supported_metadata(tmp_path: Path, version: str) -> None:
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    task.metadata["FadeTime"].update({"default": 0.25, "supports": {"rtpc": "Additive"},
+                                     "ui": {"dataMeaning": "Frequency"}})
+    target = task.bind(FIRST)
+    revision = task.revision
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    assert task.revision == revision
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    code, detail = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 0, detail
+    field = detail["field_candidates"][0]
+    assert field["metadata"]["default"] == 0.25
+    assert field["metadata"]["restriction"] == {"type": "range", "min": 0, "max": 60}
+    assert field["metadata"]["supports"] == {"rtpc": "Additive"}
+    assert field["unit"] == {"status": "known", "value": "Frequency"}
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_metadata_selection_rejects_other_scope_and_changed_inventory(tmp_path: Path, version: str) -> None:
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    first, second = task.bind(FIRST), task.bind(SECOND)
+    code, listed = task.step("draft-discover-fields", "--object-handle", first, "--list")
+    assert code == 0, listed
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    code, rejected = task.step("draft-discover-fields", "--object-handle", second, "--selection", selection)
+    assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
+    task.metadata["NewParameter"] = {"name": "NewParameter", "type": "bool"}
+    code, rejected = task.step("draft-discover-fields", "--object-handle", first, "--selection", selection)
+    assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
+
+
+@pytest.mark.parametrize("size", [33809, 39720])
+def test_metadata_large_single_detail_names_its_boundary(tmp_path: Path, size: int) -> None:
+    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
+    task.metadata["FadeTime"]["display"] = {"name": "x" * size}
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 2 and rejected["error_code"] == "METADATA_DETAIL_TOO_LARGE", rejected
+    assert rejected["details"]["field"] == "FadeTime"
+    assert rejected["details"]["selection"] == selection
+
+
+def test_metadata_pages_obey_utf8_byte_budget(tmp_path: Path) -> None:
+    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
+    task.metadata = {"声" * 240 + str(i): {"name": "声" * 240 + str(i), "type": "bool"} for i in range(100)}
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list", "--page-size", "64")
+    assert code == 0, listed
+    page = listed["agent_result"]
+    assert 0 < len(page["fields"]) < 64
+    assert page["remaining_count"] + len(page["fields"]) == 100
+    assert len(json.dumps(page, ensure_ascii=False, indent=2).encode("utf-8")) < 28 * 1024
+
+class PropertyTask(FieldTask):
+    def call(self, uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.setProperty":
+            self.calls.append((uri, args, options))
+            self.objects[args["object"]]["@" + args["property"]] = args["value"]
+            return {}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: Path, version: str) -> None:
+    task = PropertyTask(tmp_path, version, "object.setProperty")
+    task.metadata = {"Volume": {"name": "Volume", "type": "Real32",
+                                "restriction": {"type": "range", "min": -96.3, "max": 12}}}
+    task.objects[FIRST].update({"name": "Alarm", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm", "@Volume": 0.0})
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    code, detail = task.step("draft-discover-fields", "--object-handle", target,
+                             "--selection", listed["agent_result"]["fields"][0]["selection"])
+    assert code == 0, detail
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", detail["field_candidates"][0]["handle"], "--business-value", "-4")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, json.dumps(checked)
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, json.dumps(preview)
+    assert task.objects[FIRST]["@Volume"] == 0
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, json.dumps(shown)
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, json.dumps(confirmed)
+    code, executed = task.run("execute", tx)
+    assert code == 0, json.dumps(executed)
+    code, verified = task.run("verify", tx)
+    assert code == 0, json.dumps(verified)
+    assert verified["verified"] is True
+    assert task.objects[FIRST]["@Volume"] == -4
+    assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls) == 1
+    assert list(verified)[-1] == "agent_result"
+
+
+def test_metadata_selection_expires_without_advancing_draft(tmp_path: Path, monkeypatch) -> None:
+    import time
+    task = FieldTask(tmp_path, "2025.1", "object.setProperty")
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    revision = task.revision
+    later = time.time() + 901
+    monkeypatch.setattr(time, "time", lambda: later)
+    code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_EXPIRED", rejected
+    assert task.revision == revision

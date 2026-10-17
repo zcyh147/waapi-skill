@@ -286,11 +286,12 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
     )
+    # Reviewed closure adds exact Boolean conditions and bounded recursive activation.
     assert operation_request_schema_digest("audio.import", "2022.1") == (
-        "8b85af0f82f96125128856aa7d046e776925ce66ef4244dd87d8da0cab36ed68"
+        "07210c0a9f7ca6f9889c92fa69cee39a3279372cec8128823c1395fd5cb40861"
     )
     assert operation_request_schema_digest("audio.import", "2025.1") == (
-        "bfb354132b1a97ddc972b2e24c3f01c2efee78d0be2aac87f99a65390b99652e"
+        "0a35fbdef3e729798483979f9626044c644f9403765d9530681ee854ecc478bc"
     )
     assert operation_request_schema_digest(
         "audio.importTabDelimited", "2022.1"
@@ -650,7 +651,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert "language" in plugin_schema["optional"]
     assert plugin_schema["properties"]["language"]["minLength"] == 1
     assert any(
-        "never guessed" in item
+        "live discovered Type Handle" in item
         for item in create_plugin["constraints"]
     )
     object_set_rows = specs["object.set"]["argument_contract"]["properties"]["objects"]
@@ -961,6 +962,19 @@ def test_audio_import_operation_schema_discloses_compact_batch_composition_contr
                         ),
                         "explicit_conflict": "rejected",
                     },
+                    "conditional_property_shape": {
+                        "dependency_type": "property",
+                        "action": "Enable",
+                        "context": "Self",
+                        "conditions": "one restriction enum containing one exact Boolean value",
+                        "unknown_or_ambiguous_conditions": "rejected",
+                    },
+                    "closure": {
+                        "maximum_depth": 8,
+                        "maximum_fields": 16,
+                        "duplicates": "deduplicated",
+                        "cycles_or_conflicts": "rejected",
+                    },
                     "scope": "same_object_as_reference",
                 },
             },
@@ -1102,7 +1116,20 @@ def test_audio_import_schema_discloses_generic_live_dependency_closure() -> None
             "explicit_required_value": "accepted_and_deduplicated",
             "explicit_conflict": "rejected",
         },
-        "scope": "same_object_as_reference",
+        "conditional_property_shape": {
+                        "dependency_type": "property",
+                        "action": "Enable",
+                        "context": "Self",
+                        "conditions": "one restriction enum containing one exact Boolean value",
+                        "unknown_or_ambiguous_conditions": "rejected",
+                    },
+                    "closure": {
+                        "maximum_depth": 8,
+                        "maximum_fields": 16,
+                        "duplicates": "deduplicated",
+                        "cycles_or_conflicts": "rejected",
+                    },
+                    "scope": "same_object_as_reference",
     }
     assert dependency["failure_policy"]["phase"] == "before_preview"
     assert dependency["failure_policy"]["action"] == "stop"
@@ -5699,7 +5726,8 @@ def test_soundbank_inclusions_use_internal_prestate_exact_poststate_and_drift_gu
         "options": {},
     }
     assert prepared["verification_plan"]["kind"] == "soundbank-inclusions-exact"
-    assert prepared["cleanup"]["kind"] == "restore-soundbank-inclusions-from-prestate"
+    assert prepared["cleanup"]["kind"] == "retain-project-and-outputs"
+    assert prepared["cleanup"]["automatic_rollback"] is False
 
     normalized_after = {"inclusions": [{"object": {"id": TARGET_GUID}, "filter": ["structures", "media"]}]}
     verified = verify_prepared_operation(

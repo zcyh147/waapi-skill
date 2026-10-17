@@ -5,6 +5,24 @@ complete runs from focused follow-ups; broad coverage is summarized by file or
 module instead of listing every item instance. Program and Non-live results
 are not live-Wwise or Fresh Agent evidence.
 
+## 2026-10-17 v1.1 repair checkpoint
+
+Candidate `e8ca72d3` passed Program **6942 / 3 skipped** and Non-live
+**18009 / 127 skipped / 34 deselected**, both exit 0. Later test-framework
+repairs received focused validation, not relabeled full-gate runs. Native
+component tests cover all five GameParameter/dependency lanes and supported
+2022.1–2025.1 standalone ShareSet lanes, with an explicit 2021.1 boundary.
+Ten approved actual Fresh attempts provide cumulative business PASS for all four
+workflows across separately frozen candidates and roots, not one four-case PASS
+root. F4's selected 1/1 root and final F2's selected 1/1 root passed identical
+verify-only. Candidate `0b063181` passed F3 and failed F2 (selected 1/2); the
+unchanged product/harness at evidence-only successor `62d19e1c` then passed F2.
+Final routing-disclosure regression passed 987 tests / 11 Windows-only skips;
+this is not a repeated full gate. See the
+[dated acceptance record](../docs/research/waapi-v11-repairs-acceptance-2026-10-17.md)
+for exact candidates, original failures, retained evidence and review.
+No native-Windows acceptance is claimed.
+
 ## 1.1.0 release validation (2026-10-10)
 
 The seven-workflow `integration_expansion_v1` selection has cumulative business

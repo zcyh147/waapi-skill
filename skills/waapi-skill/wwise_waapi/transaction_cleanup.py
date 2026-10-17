@@ -455,6 +455,87 @@ def _strict_json_copy(value: Any, *, path: str) -> Any:
     )
 
 
+def persistent_project_cleanup(spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep resource pairing separate from retaining ordinary authoring work."""
+    # Terminal host controls deliberately forbid reconnecting or stopping the
+    # host process. These are runtime safety facts, not project cleanup hints.
+    if dict(spec) == {
+        "kind": "none", "automatic": False, "automatic_retry": False,
+        "reconnect": False, "process_cleanup": False,
+    }:
+        return dict(spec)
+    # UI registration owns a runtime companion, not an authoring-project undo.
+    # Unknown registration definitions explicitly disclose that no inverse exists.
+    if spec.get("kind") == "none" and set(spec) == {
+        "automatic", "dispatch", "kind", "reason", "reversible",
+        "runtime_preconditions", "verification",
+    } and spec.get("reversible") is False and spec.get("dispatch") is None:
+        return dict(spec)
+    if spec.get("contract") == CLEANUP_SPEC_CONTRACT or spec.get("kind") in {
+        "same_connection_cancel_on_inner_failure", "end-or-cancel-undo-group",
+        "inverse_ui_command_registration",
+    }:
+        return dict(spec)
+    return {
+        "kind": "retain-project-and-outputs",
+        "project_policy": "retain",
+        "output_policy": "retain",
+        "automatic_cleanup": False,
+        "automatic_retry": False,
+        "automatic_rollback": False,
+        **{key: spec[key] for key in (
+            "irreversible", "irreversible_preexisting_changes", "partial_success_possible",
+        ) if key in spec},
+    }
+
+
+def _project_legacy_guidance(value: Any) -> Any:
+    if isinstance(value, list):
+        return [_project_legacy_guidance(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+    result = {
+        key: item if key in {
+            "request", "dispatch", "args", "options", "agent_result", "result",
+            "resolved_roles", "preflight_reads", "readbacks",
+        } else _project_legacy_guidance(item)
+        for key, item in value.items()
+    }
+    legacy_guidance = {
+        "create one object under the resolved parent; read back created id/name/type/path and delete it during cleanup if still present":
+            "create one object under the resolved parent; read back created id/name/type/path and retain the object",
+        "deleted GUIDs cannot be restored; discard the sandbox or restore a project backup":
+            "retain the project and replacement; deleted GUIDs cannot be restored automatically",
+        "merged preexisting state has no automatic rollback; use an owned sandbox root":
+            "retain merged state; no automatic rollback is available",
+    }
+    for field in ("expectation", "cleanup_boundary"):
+        if isinstance(result.get(field), str) and result[field] in legacy_guidance:
+            result[field] = legacy_guidance[result[field]]
+    if result.get("import_operation") in {"createNew", "useExisting", "replaceExisting"} and "cleanup_policy" in result:
+        result["cleanup_policy"] = "retain_project_and_imported_media"
+        result.pop("disposable_project_required", None)
+        result.pop("owned_project_copy_required_for_clean_test", None)
+    if isinstance(result.get("cleanup"), Mapping):
+        result["cleanup"] = persistent_project_cleanup(result["cleanup"])
+    if result.get("kind") == "cleanup":
+        result = {**persistent_project_cleanup(result), "kind": "cleanup"}
+    return result
+
+
+def project_persistent_artifact(artifact: Mapping[str, Any]) -> dict[str, Any]:
+    """Project historical guidance without rewriting immutable requests/evidence."""
+    result = dict(artifact)
+    raw_prepared = result.get("prepared_operation")
+    if isinstance(raw_prepared, Mapping):
+        prepared = _project_legacy_guidance(raw_prepared)
+        raw_cleanup = prepared.get("cleanup")
+        if isinstance(raw_cleanup, Mapping):
+            prepared["cleanup"] = persistent_project_cleanup(raw_cleanup)
+        result["prepared_operation"] = prepared
+    return result
+
+
 def transaction_cleanup_payload(
     prepared: Mapping[str, Any],
     *,
@@ -464,7 +545,7 @@ def transaction_cleanup_payload(
     """Project one immutable cleanup spec into its deterministic phase result."""
 
     raw_spec = prepared.get("cleanup")
-    spec = dict(raw_spec) if isinstance(raw_spec, Mapping) else {"kind": "none"}
+    spec = persistent_project_cleanup(raw_spec if isinstance(raw_spec, Mapping) else {"kind": "none"})
     if spec.get("contract") == CLEANUP_SPEC_CONTRACT:
         try:
             projection = project_transaction_cleanup(
@@ -488,7 +569,9 @@ def transaction_cleanup_payload(
         }
 
     kind = spec.get("kind")
-    if phase == "indeterminate":
+    if kind == "retain-project-and-outputs":
+        status = "not_required"
+    elif phase == "indeterminate":
         status = "unknown"
     elif kind in {None, "none", "none-after-delete"}:
         status = "not_required"

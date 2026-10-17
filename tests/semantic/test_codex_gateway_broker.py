@@ -10460,7 +10460,7 @@ def test_broker_rejects_non_exact_or_arbitrary_nonzero_structured_error(
     "selector",
     ((), ("--version", "2022.1"), ("--wwise-version=2022.1",)),
 )
-def test_broker_accepts_canonical_step_global_timeout_before_wait_topic(
+def test_wait_topic_accepts_timeout_but_rejects_online_version_selector(
     tmp_path: Path,
     selector: tuple[str, ...],
 ) -> None:
@@ -10497,6 +10497,13 @@ def test_broker_accepts_canonical_step_global_timeout_before_wait_topic(
         transport="tcp",
     ) as broker:
         result = run_model_command(broker, arguments)
+        if selector:
+            assert result.returncode == 126
+            assert "offline catalog/schema" in result.stderr
+            assert broker.evidence().terminal_state == "FAILED"
+            assert broker.evidence().records[0].accepted is False
+            assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+            return
         assert result.returncode == 0, result.stderr
 
         evidence = broker.evidence()
@@ -11083,7 +11090,7 @@ def test_authenticated_rejection_is_terminal_and_never_executes_later_command(tm
         (),
     ),
 )
-def test_matching_optional_model_version_selector_is_sanitized_before_runner(
+def test_online_model_version_selector_is_rejected_before_runner(
     tmp_path: Path,
     selector: tuple[str, ...],
 ) -> None:
@@ -11092,12 +11099,19 @@ def test_matching_optional_model_version_selector_is_sanitized_before_runner(
         skill_source=skill,
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         expected_wwise_version="2022.1",
-        runner_environment={**os.environ, "WWISE_VERSION": "2022.1"},
+        runner_environment=os.environ,
         transport="tcp",
     ) as broker:
         arguments = [*selector, "status"]
         result = run_model_command(broker, arguments)
 
+        if selector:
+            assert result.returncode == 126
+            assert "offline catalog/schema" in result.stderr
+            assert broker.evidence().terminal_state == "FAILED"
+            assert broker.evidence().records[0].accepted is False
+            assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+            return
         assert result.returncode == 0, result.stderr
         evidence = broker.evidence()
         assert evidence.passed is True
@@ -11117,7 +11131,7 @@ def test_matching_optional_model_version_selector_is_sanitized_before_runner(
         ("--wwise-version=2022.1",),
     ),
 )
-def test_runner_level_version_selector_is_canonicalized_and_sanitized(
+def test_runner_level_online_version_selector_is_rejected_before_runner(
     tmp_path: Path,
     selector: tuple[str, ...],
 ) -> None:
@@ -11126,7 +11140,7 @@ def test_runner_level_version_selector_is_canonicalized_and_sanitized(
         skill_source=skill,
         expected_steps=(ExpectedGatewayStep("status", "status"),),
         expected_wwise_version="2022.1",
-        runner_environment={**os.environ, "WWISE_VERSION": "2022.1"},
+        runner_environment=os.environ,
         transport="tcp",
     ) as broker:
         raw = ["python", str(broker.runner_path), *selector, "gateway.py", "status"]
@@ -11144,17 +11158,12 @@ def test_runner_level_version_selector_is_canonicalized_and_sanitized(
             check=False,
         )
 
-        assert result.returncode == 0, result.stderr
+        assert result.returncode == 126
+        assert "offline catalog/schema" in result.stderr
         evidence = broker.evidence()
-        assert evidence.passed is True
-        record = evidence.records[0]
-        assert record.model_argv[1:] == tuple(raw[1:])
-        canonical = ("python", str(broker.runner_path), "gateway.py", *selector, "status")
-        assert record.normalized_model_argv == canonical
-        assert record.gateway_arguments == (*selector, "status")
-        calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(encoding="utf-8").splitlines()
-        assert json.loads(calls[0]) == ["gateway.py", "status"]
-        assert broker.reconcile((raw,)).passed is True
+        assert evidence.terminal_state == "FAILED"
+        assert evidence.records[0].accepted is False
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
 
 
 @pytest.mark.parametrize(
@@ -17615,3 +17624,80 @@ def test_native_windows_forward_runner_preserves_prefix_and_business_arguments(
         assert record.model_argv == ('python', runner, 'gateway.py', 'status', *business)
         assert record.succeeded
         assert record.normalized_model_argv[1] == str(invocation / 'scripts' / 'run.py')
+
+
+def test_continuation_broker_reuses_the_initial_saved_connection(tmp_path):
+    skill = make_fake_skill(tmp_path)
+    environment = {"WWISE_WAAPI_HOST": "localhost", "WWISE_WAAPI_PORT": "41234"}
+    with CodexGatewayBroker(skill_source=skill, expected_steps=(ExpectedGatewayStep("read", "status", ()),), expected_wwise_version="2025.1",
+                            runner_environment=environment, working_root=tmp_path / "first") as first:
+        config = first.config_path
+        state = first.state_directory
+        saved = json.loads(config.read_text())
+        assert saved["waapi_host"] == "localhost"
+        assert saved["waapi_port"] == 41234
+    before = config.read_bytes()
+    with CodexGatewayBroker(skill_source=skill, expected_steps=(ExpectedGatewayStep("read", "status", ()),), expected_wwise_version="2025.1",
+                            runner_environment=environment, existing_state_directory=state,
+                            working_root=tmp_path / "next") as continuation:
+        assert continuation.config_path == config
+        assert config.read_bytes() == before
+
+
+def test_current_broker_provisions_connection_through_public_config_set(tmp_path):
+    skill = make_fake_skill(tmp_path)
+    (skill / "wwise_waapi").mkdir()
+    (skill / "scripts/run.py").write_text('''import json, os, pathlib, sys
+assert sys.argv[1:3] == ["gateway.py", "config-set"]
+values = dict(zip(sys.argv[3::2], sys.argv[4::2]))
+config = {"wwise_version": values["--wwise-version"], "waapi_host": values["--waapi-host"],
+          "waapi_port": int(values["--waapi-port"]), "project_modification_policy": values["--project-modification-policy"]}
+path = pathlib.Path(os.environ["WAAPI_SKILL_CONFIG_PATH"])
+path.write_text(json.dumps(config))
+path.with_suffix(".invocation").write_text(json.dumps(sys.argv[1:]))
+print(json.dumps({"ok": True, "command": "config-set", "effective": config}))
+''', encoding="utf-8")
+    with CodexGatewayBroker(skill_source=skill, expected_steps=(ExpectedGatewayStep("read", "status", ()),),
+                            expected_wwise_version="2025.1", runner_environment={**os.environ,
+                                "WWISE_WAAPI_HOST": "127.0.0.1", "WWISE_WAAPI_PORT": "41234"},
+                            working_root=tmp_path / "broker") as broker:
+        assert broker.config_path.with_suffix(".invocation").is_file()
+        receipt = json.loads((broker.evidence_directory / "config-provisioning.json").read_text())
+        assert receipt["exit_code"] == 0
+        assert receipt["payload"]["command"] == "config-set"
+        assert json.loads(broker.config_path.read_text())["waapi_port"] == 41234
+
+
+def test_current_broker_does_not_strip_a_live_connection_version_override(tmp_path):
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(skill_source=skill,
+                            expected_steps=(ExpectedGatewayStep("read", "status", ()),),
+                            expected_wwise_version="2025.1", working_root=tmp_path / "broker") as broker:
+        result = run_model_command(broker, ["--version", "2025.1", "status"])
+        assert result.returncode != 0
+        assert "offline" in result.stderr.lower()
+        assert not (broker.state_directory / "fake-runner-calls.jsonl").exists()
+
+
+@pytest.mark.parametrize("selector", [("--version", "2022.1"), ("--version=2022.1",),
+                                      ("--wwise-version", "2022.1"), ("--wwise-version=2022.1",)])
+@pytest.mark.parametrize("placement", ["gateway", "runner"])
+def test_offline_catalog_version_selector_remains_authenticated_and_permitted(tmp_path, selector, placement):
+    skill = make_fake_skill(tmp_path)
+    with CodexGatewayBroker(skill_source=skill,
+            expected_steps=(ExpectedGatewayStep("query-schema", "query-schema"),),
+            expected_wwise_version="2022.1", transport="tcp") as broker:
+        tail = ["gateway.py", *selector, "query-schema"] if placement == "gateway" else [*selector, "gateway.py", "query-schema"]
+        raw = ["python", str(broker.runner_path), *tail]
+        environment = broker.model_environment(os.environ)
+        result = run_model_argv(raw, environment=environment,
+            windows_interpreter=Path(environment[SHIM_TRUSTED_PYTHON_ENV]) if os.name == "nt" else None,
+            windows_command_directory=broker.shim_directory, capture_output=True, text=True, check=False)
+        assert result.returncode == 0, result.stderr
+        evidence = broker.evidence()
+        assert evidence.passed is True
+        assert evidence.records[0].accepted is True
+        assert evidence.records[0].gateway_arguments == (*selector, "query-schema")
+        calls = (broker.state_directory / "fake-runner-calls.jsonl").read_text(encoding="utf-8").splitlines()
+        assert json.loads(calls[0]) == ["gateway.py", "query-schema"]
+        assert broker.reconcile((raw,)).passed is True

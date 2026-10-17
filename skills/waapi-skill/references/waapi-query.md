@@ -1,25 +1,23 @@
 # WAAPI query lane
 
-Use this for read-only Wwise queries and bounded Topic waits/streams. Require the unique terminal sentinel required by `SKILL.md` as the final visible line and no truncation or omission marker; otherwise do not reread a range or invoke the Gateway.
+Read-only queries and bounded Topic monitoring. Require the final sentinel and complete read per `SKILL.md`; otherwise stop.
 
 ## Routing and boundaries
 
 - Use only the packaged Gateway. There is no raw-client fallback and do not write Python.
 - Use fixed routes directly: object reads use the business declaration from `query-schema`; Topic facts use `topic-schema`; non-fixed reflected functions use `request-schema <uri>` and its sole continuation. Topic observation never authorizes its publisher.
-- For an ordinary read without a fixed command or exact URI, run `operations` and copy its returned route. This includes business reads and zero-input reads for the configured version.
+- Without a fixed read or exact URI, copy the route from `operations`.
 - Broad catalog: use the coverage reference's host-scoped summary, then narrow with filters. `capabilities`/`describe` default to Console; Authoring inspection adds offline `--profile wwise-authoring-ui`. Neither proves live availability. Use `--limit 0` only when every row is explicitly needed and `--detail` only for audits.
-- Known function URI: `request-schema <uri>` and its sole continuation. `describe` is for an explicit capability/schema audit, with the requested offline host profile.
-- `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; connection errors, invalid responses, and rejected continuations also stop the workflow.
-- The configured exact Wwise version selects every schema. Live work never copies an example `--version`; use it only for a requested offline inspection.
+- Known URI: `request-schema`; `describe` is for offline schema audits.
+- `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; other complete structured failures follow the Skill Recovery rule and their receipt.
+- Saved configuration selects live schemas; `--version` is offline-only.
 
 ## Wwise 2025.1 Media Pool
 
 `ak.wwise.core.mediaPool.getFields` and `.get` are one closed two-call read. Use `request-schema` for each URI and follow only its typed continuation. Run `request-schema ak.wwise.core.mediaPool.getFields` before `request-schema ak.wwise.core.mediaPool.get`; Do not request the `.get` schema first.
 
-Follow the returned business declaration for database selection, field meanings,
-text/number conditions, requested outputs, and result limit. Gateway owns native
-field bindings, filter objects, and the return projection; the Agent supplies
-only disclosed business values. Missing or ambiguous live fields stop the read.
+Supply disclosed database, field, condition, output, and limit values. Gateway owns
+native bindings, filters, and projection. Missing live fields permit scoped discovery refinement; unresolved ambiguity needs an exact choice.
 For case-sensitive matching use the disclosed post-filter; a saturated candidate
 set that cannot prove completeness returns `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
 Preserve returned `Db` and complete `Path` for a later original-file reference
@@ -32,10 +30,10 @@ This is Wwise `2025.1`-only and follows a successful Media Pool read. Run only f
 
 Take each exact returned `Path`, sort those strings lexicographically, and pass each once. Each path is limited to 1024 UTF-8 bytes and must be drive-absolute, an ordinary UNC path, or POSIX-absolute. Reject relative/traversal/device paths. Do not pre-normalize or de-duplicate: the Gateway normalizes slash spelling and drive/UNC case, keeps POSIX case significant, and rejects normalized candidate collisions.
 
-Invoke one command, repeating only the final candidate option:
+Run once, repeating the candidate option:
 
 ```bash
-python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version 2025.1 query-object --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
+python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --max-results 1000 --match-original-file-path '<first-complete-returned-Path>' --match-original-file-path '<second-complete-returned-Path>'
 ```
 
 Do not add predicates, relationships, or extra business outputs. The fixed `id,path,originalFilePath` projection performs the complete join and emits no raw AudioFileSource inventory.
@@ -50,9 +48,9 @@ One Gateway-owned business declaration chooses exactly one source: repeated `--p
 
 Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. Repeated `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
 
-The fixed identity projection is always present: `id,name,type,path`. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
+Identity fields are always `id,name,type,path`. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
 
-The offline version-aware schema command is:
+Offline schema:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <supported-version> query-schema
@@ -66,7 +64,7 @@ python scripts/run.py gateway.py query-object --search-text 'ExactName' --predic
 python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate kind-is all-sounds --max-results 24
 ```
 
-Repeated `--predicate` values mean AND and preserve user condition order. A pure-AND mix query includes every supported conjunct before the bound; presentation sorting/grouping happens only after a complete result.
+Preserve predicate order; apply every AND conjunct before the bound. Sort/group presentation only after a complete result.
 
 ### Relationship-guided next hops
 
@@ -85,7 +83,7 @@ python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version <suppor
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>
 ```
 
-The Gateway fixes read-only `ak.wwise.core.object.get`, projection, final take, timeout, bytes, and grammar. Limits are UTF-8 bytes (not character counts); WAQL is trimmed and single-line, without Query Editor `$`, comments or statement separators, or an unclosed double-quoted string or slash-regex literal. On rejection, report it; never alter-and-retry. There is no generated-code fallback.
+The Gateway fixes read-only `ak.wwise.core.object.get`, projection, final take, timeout, bytes, and grammar. Limits are UTF-8 bytes (not character counts); WAQL is trimmed and single-line, without Query Editor `$`, comments or statement separators, or an unclosed double-quoted string or slash-regex literal. On rejection, report the reason and use the recovery receipt to refine the intended read through the disclosed schema. There is no generated-code fallback.
 
 Final take bounds returned rows, not internal scans; even a one-row result does not prove uniqueness. Never feed an advanced result directly into a mutation. Present candidates, obtain their exact choice, then use the simple `query-object --exact-id` route. A mismatch means the workflow stops for a new choice. Candidate displays keep unaliased identity fields; never alias another advanced expression onto them.
 
@@ -130,7 +128,9 @@ python scripts/run.py gateway.py query-object --exact-id '{GUID}' --relationship
 
 Use offline version-pinned `object-types` first; narrow its bounded result. Use live `metadata types` only to re-reflect the running instance; its projection and bound are fixed.
 
-`metadata discover` chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss; one `partial` result permits one broader technical retry, then clarify. Honor dependencies when authorized, otherwise clarify.
+`metadata list` lists the actual fields for one existing business scope; follow `next_page` with `--page` until `complete`. Copy a returned `selection` to `metadata detail --selection` with the same scope. Details preserve live type/default/restrictions/dependencies/supports/UI units; unknown units remain unknown. Expired or changed-scope selections require a new list. A single oversized detail returns a named boundary, not a truncated success. These selections do not authorize changes.
+
+`metadata discover` is auxiliary lexical search. It chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss: refine the meaning or use scoped list/detail discovery within the task. A `partial` result permits one broader technical attempt, then clarify unresolved choices. Honor dependencies when authorized, otherwise clarify.
 
 Use fixed reads rather than reflected payloads:
 

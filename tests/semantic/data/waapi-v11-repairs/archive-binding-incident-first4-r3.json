@@ -1,0 +1,56 @@
+{
+  "evidence_kind": "framework_archive_consumer_failure_after_business_pass",
+  "candidate": "80b653c0",
+  "original_campaign_root": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-first4-r3",
+  "unit": "REPAIR25-F1",
+  "original_task_passed": true,
+  "independent_assertions": {
+    "complete_snapshots": true,
+    "media_unchanged": true,
+    "metadata_list_page_detail": true,
+    "other_objects_unchanged": true,
+    "source_unchanged": true,
+    "target_cardinality": true,
+    "target_identity": true,
+    "target_values": true
+  },
+  "gateway_verification_state": "verified",
+  "agent_seconds": 51.98068399960175,
+  "campaign_verdict": "BLOCKED; F2-F4 pending",
+  "archive_error": "TransactionSealError: unknown=['connection_configuration']",
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "errors": [],
+    "final_status": "PASS",
+    "quarantine_path": null,
+    "requested_status": "PASS",
+    "sandbox_retained": false,
+    "scenario_id": "REPAIR25-F1",
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_mtime_after_ns": 1785701407051832215,
+    "source_mtime_before_ns": 1785701407051832215,
+    "version": "2025.1"
+  },
+  "files_sha256": {
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/expansion-task-result.json": "3ba87328fa9c2f6c3e0f3a57f91470c3e112a3451447199fe7c3ba8b88bac05a",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/expansion-broker.json": "c3b9058f6dedc27e6cda3a8c474114fa4fe4729f49404fb919f6635a3e4311e6",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/turns/turn-01/events.jsonl": "4fd5b98e6cd76e1d7869525a39d5403d7e580b360709408e57b1cb1d91de445f",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/lifecycle.json": "5ae475e4911d168c46db7472a2a4e50f34948ed38bc7a0b93cf0e7f08b59c4fd",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/matrix-case.json": "3a6d5d06b2f8c34d8bf8627f5bb6af8600cdcd153d4bd4a4171305c6fad4802f",
+    "attempts/attempt-000001/runs/heavy-v3/child-result.json": "f6d5eb7ae6faf4ef880412329a646d58bf5feb4f8a9519c1fffaba7077ff0c67"
+  },
+  "preservation": "Original r3 root unchanged; no verify-only, regrade, or additional Agent launch. F1 business assessment is separate from the original automated campaign verdict."
+}

@@ -1,0 +1,84 @@
+{
+  "contract": "waapi-skill.repair-profile/v1",
+  "profile_id": "waapi_v11_repairs_4",
+  "model": {
+    "name": "gpt-5.6-terra",
+    "reasoning_effort": "medium",
+    "service_tier": "default",
+    "memory": "disabled"
+  },
+  "units": [
+    {
+      "case_id": "F1",
+      "policy": "allow_changes",
+      "operation": "object.setProperty",
+      "version": "2025.1",
+      "prompt": "For the existing Wwise RoomVerb effect at {plugin_path}, show me its available properties in a small first page, fetch the next page, and inspect the exact pre-delay property including its range, default and whether its units are disclosed. Then set its pre-delay to {pre_delay} and verify the result. Keep its other settings and all other objects unchanged.",
+      "fixture": {
+        "plugin_name": "Repair_Metadata_Room",
+        "plugin_type": "Wwise RoomVerb",
+        "parent_path": "\\Effects\\Default Work Unit",
+        "pre_delay": 24,
+        "parent_segments": [
+          "Effects",
+          "Default Work Unit"
+        ]
+      }
+    },
+    {
+      "case_id": "F2",
+      "policy": "read_only",
+      "operation": "ak.wwise.core.object.get",
+      "version": "2025.1",
+      "prompt": "Find the Game Parameter named Repair_WindSpeed and report its exact name, path, range and default. That spelling may be outdated: if there is no exact match, look for the parameter whose name contains Repair_Wind within Game Parameters and use the unique match. This is inspection only; do not change the project.",
+      "fixture": {
+        "name": "Repair_WindVelocity",
+        "missing_name": "Repair_WindSpeed",
+        "type": "GameParameter",
+        "parent_path": "\\Game Parameters\\Default Work Unit",
+        "min": -12,
+        "max": 36,
+        "default": 7,
+        "parent_segments": [
+          "Game Parameters",
+          "Default Work Unit"
+        ]
+      }
+    },
+    {
+      "case_id": "F3",
+      "policy": "allow_changes",
+      "operation": "object.create",
+      "version": "2025.1",
+      "prompt": "Create a Game Parameter named Repair_WindRange under {parent_path}, with minimum -12, maximum 36 and default 7. Verify its identity and all three values, and keep existing objects unchanged.",
+      "fixture": {
+        "name": "Repair_WindRange",
+        "type": "GameParameter",
+        "parent_path": "\\Game Parameters\\Default Work Unit",
+        "min": -12,
+        "max": 36,
+        "default": 7,
+        "parent_segments": [
+          "Game Parameters",
+          "Default Work Unit"
+        ]
+      }
+    },
+    {
+      "case_id": "F4",
+      "policy": "allow_changes",
+      "operation": "object.createPlugin",
+      "version": "2025.1",
+      "prompt": "Create an independent Wwise RoomVerb Effect ShareSet named Repair_Independent_Room under {parent_path}. It should be a reusable ShareSet, not an effect attached to a Sound or Bus. Verify its identity, plugin type and parent; do not attach it to any existing object or alter other objects.",
+      "fixture": {
+        "name": "Repair_Independent_Room",
+        "plugin_type": "Wwise RoomVerb",
+        "parent_path": "\\Effects\\Default Work Unit",
+        "parent_segments": [
+          "Effects",
+          "Default Work Unit"
+        ]
+      }
+    }
+  ]
+}

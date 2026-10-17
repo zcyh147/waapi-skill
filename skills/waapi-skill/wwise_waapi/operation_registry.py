@@ -125,6 +125,7 @@ from .operation_plugin import (
     ValidatedPluginProperty,
     build_plugin_creation_plan,
     normalize_plugin_creation,
+    validate_plugin_target,
     plugin_property_metadata_requests,
     plugin_verification_fields,
     validate_plugin_property_metadata,
@@ -180,7 +181,7 @@ from .object_capabilities import (
     object_identity_semantics,
 )
 from .platform_paths import WWISE_WIRE_PATH_INPUT_AUDIT_CONTRACT
-from .transaction_cleanup import build_transaction_cleanup_spec
+from .transaction_cleanup import build_transaction_cleanup_spec, persistent_project_cleanup
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 from .waql import quote_waql_literal
 
@@ -695,10 +696,11 @@ _PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
 _PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "required": ["kind", "name", "class_id"],
-    "optional": ["notes", "platform", "language", "properties"],
+    "optional": ["notes", "platform", "language", "properties", "placement"],
     "additionalProperties": False,
     "properties": {
         "kind": {"type": "string", "enum": ["source", "effect"]},
+        "placement": {"type": "string", "enum": ["owner", "shareset"], "default": "owner"},
         "name": {"type": "string", "minLength": 1, "maxLength": 255},
         "class_id": {
             "type": "integer",
@@ -1194,6 +1196,13 @@ _LIVE_METADATA_DEPENDENCY_CLOSURE_CONTRACT: Mapping[str, Any] = {
                 "explicit_required_value": "accepted_and_deduplicated",
                 "explicit_conflict": "rejected",
             },
+            "conditional_property_shape": {
+                "dependency_type": "property", "action": "Enable", "context": "Self",
+                "conditions": "one restriction enum containing one exact Boolean value",
+                "unknown_or_ambiguous_conditions": "rejected",
+            },
+            "closure": {"maximum_depth": 8, "maximum_fields": 16,
+                        "duplicates": "deduplicated", "cycles_or_conflicts": "rejected"},
             "scope": "same_object_as_reference",
         },
     },
@@ -2080,7 +2089,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "each row accepts one regular audio_file, one bounded RIFF/WAVE audio_file_base64, or a typed structure-only import",
             "useExisting preserves an existing target GUID; replaceExisting requires the old GUID to disappear",
             "a live non-SFX localized useExisting row uses a Gateway-owned versioned source binding: audioFile/objectPath/importLanguage, plus an exact discovered source GUID importLocation for 2025 reimport; objectType is consumed by live type preflight and other requested row fields are rejected",
-            "replaceExisting is irreversible and must be exercised only in a disposable project copy during tests",
+            "replaceExisting is irreversible; replaced objects and media have no automatic restoration",
             "auto_add_to_source_control is explicit and defaults to false",
             "auto_check_out_to_source_control defaults to false and is accepted only in Wwise 2023.1-2025.1; explicit use on 2021.1/2022.1 fails before connection",
         ),
@@ -2210,7 +2219,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.create",
         "ak.wwise.core.object.create",
         "object-mutation",
-        "Create or merge one bounded recursive object tree under a live-resolved parent, including a guarded replace confined to one explicitly authorized root.",
+        "Create or merge one bounded recursive object tree under a live-resolved parent, including a new GameParameter with discovered Min, Max and InitialValue fields, or a guarded replace confined to one explicitly authorized root.",
         ("parent", "type", "name"),
         (
             "notes",
@@ -2288,6 +2297,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         selection_guidance=_selection_guidance(
             use_when=(
                 "The request creates one wholly new recursive root.",
+                "Create a new GameParameter with its range and default in the same declaration: discover class fields Min, Max and InitialValue, then declare their values; setRange only edits an existing parameter range.",
                 "Exactly one same-name existing root remains unchanged while only a descendant tree is merged below it.",
                 "The request replaces one exact same-name subtree through the guarded on_name_conflict=replace contract.",
             ),
@@ -2462,6 +2472,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
             "a non-null target is live-resolved and checked against live reference type restrictions",
+            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
             "when a prior successful Gateway read returned an exact id for object or target, copy that id exactly; do not retype its path or name",
         ),
         selection_guidance=_selection_guidance(
@@ -2516,8 +2527,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         OBJECT_SET_URI,
         "object-mutation",
         (
-            "Create one Source or Effect plug-in from an exact classId through "
-            "the version-correct Wwise object topology."
+            "Create one owner-local Source/Effect or standalone Effect ShareSet through "
+            "the version-correct Wwise object topology with a live Type Handle."
         ),
         ("target", "plugin"),
         argument_contract=_object_contract(
@@ -2530,18 +2541,19 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         identity_arguments=("target",),
         constraints=(
             "target resolves live to exactly one canonical object before preview",
-            "class_id is an exact caller-supplied uint32 and is never guessed from a plug-in display name",
+            "the Gateway resolves the class_id from a live discovered Type Handle",
             "every requested property is validated by classId-scoped live getPropertyInfo metadata",
             "Source plug-ins are create-only children of Sound or Voice targets",
-            "Wwise 2022.1 Effects use the first proven-empty @Effect0 through @Effect3 reference",
-            "Wwise 2023.1 and later Effects append one EffectSlot and verify its @Effect reference",
+            "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
+            "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
+            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         selection_guidance=_selection_guidance(
             use_when=(
-                "The user asks to create one Source or Effect plug-in from an exact supplied classId.",
+                "The user asks to attach a local Source/Effect or create an independent Effect ShareSet from live plug-in discovery.",
             ),
             avoid_when=(
                 "The request is ordinary object creation with no plug-in semantics.",
@@ -4849,6 +4861,12 @@ def _prepare_object_create(
             ),
         },
     )
+    for spec in node_specs:
+        if spec.get("new_object_default_evidence") and spec.get("preexisting_id"):
+            raise OperationContractError(
+                "NEW_OBJECT_DEPENDENCY_EXISTING_TARGET",
+                "Class defaults cannot authorize fields on an existing object. Bind the existing exact object and select its live Field Handles in a separate Preview.",
+            )
     graph_guard = {
         "kind": "object-create-graph",
         "path_snapshots": path_snapshots,
@@ -4888,8 +4906,8 @@ def _prepare_object_create(
     }
     if conflict == "replace":
         cleanup = {
-            "kind": "discard-case-owned-project-copy-after-replace",
-            "description": "The replaced subtree is not reconstructed; discard the case-owned project copy after collecting evidence.",
+            "kind": "retain-project-and-outputs",
+            "description": "Retain the project and replacement; the replaced subtree is not automatically reconstructed.",
             "automatic": False,
             "automatic_retry": False,
             "replace_owned_root_id": replace_owned_root.object if replace_owned_root is not None else None,
@@ -4897,7 +4915,7 @@ def _prepare_object_create(
         }
     else:
         cleanup = {
-            "kind": "delete-returned-root-guid" if conflict in {"fail", "rename"} else "discard-owned-sandbox-after-merge",
+            "kind": "retain-project-and-outputs",
             "automatic": False,
             "automatic_retry": False,
             "source": "execution_result.id",
@@ -5089,6 +5107,30 @@ def _read_plugin_prestate(
     descriptor: PluginCreationDescriptor,
     read: ReadCall,
 ) -> dict[str, Any]:
+    if descriptor.placement == "shareset":
+        catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
+        plugins = [row for row in catalog if row.class_id == descriptor.class_id and row.type.casefold() == "effect"]
+        if len(plugins) != 1:
+            raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected Effect plug-in is no longer available.")
+        args = {"from": {"id": [target_id]}, "transform": [{"select": ["children"]}]}
+        options = {"return": ["id", "name", "type", "parent"]}
+        rows = _rows(read(OBJECT_GET_URI, args, options))
+        normalized = []
+        for row in rows:
+            child_id = _plugin_guid(row.get("id"), field="shareset_child.id")
+            parent_id = _plugin_guid(row.get("parent"), field="shareset_child.parent")
+            if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
+                raise OperationContractError("INVALID_READBACK", "ShareSet children must expose exact names, types, and parent bindings.")
+            if row["name"].casefold() == descriptor.name.casefold():
+                raise OperationContractError("SHARESET_NAME_CONFLICT", "The Effects Work Unit already contains the requested name.")
+            normalized.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
+        normalized.sort(key=lambda row: row["id"].casefold())
+        ids = [row["id"] for row in normalized]
+        if len({value.casefold() for value in ids}) != len(ids):
+            raise OperationContractError("INVALID_READBACK", "ShareSet children contain duplicate identities.")
+        return {"kind": "shareset_children", "uri": OBJECT_GET_URI, "args": args, "options": options,
+                "rows": normalized, "plugin_type": plugins[0].as_dict(), "preexisting_plugin_ids": ids}
+
     if descriptor.kind == "source":
         fields = ("id", "name", "type", "parent")
         args = {
@@ -5277,6 +5319,11 @@ def _prepare_object_create_plugin(
             details={"target": target.as_dict()},
         )
 
+    try:
+        validate_plugin_target(descriptor, target_type=target_type, target_path=target.row.get("path"))
+    except PluginOperationContractError as exc:
+        _raise_plugin_operation_error(exc)
+
     property_metadata: list[dict[str, Any]] = []
     for metadata_request in plugin_property_metadata_requests(descriptor):
         raw_args = metadata_request["args"]
@@ -5303,6 +5350,7 @@ def _prepare_object_create_plugin(
             version=request.version,
             target_id=target.object,
             target_type=target_type,
+            target_path=target.row.get("path"),
             request=descriptor,
             property_metadata=property_metadata or None,
             effect_slots_2022=(
@@ -5335,6 +5383,7 @@ def _prepare_object_create_plugin(
         "version": request.version,
         "target_id": target.object,
         "target_type": target_type,
+        "target_path": target.row.get("path"),
         "descriptor": descriptor.as_dict(),
         "plan": plan_payload,
         "snapshot": plugin_prestate,
@@ -6063,6 +6112,12 @@ def _prepare_object_set(
                 "rows": snapshot_rows,
             }
         )
+        for property_spec in target_spec["properties"]:
+            if property_spec.get("derived") and _field_value(
+                snapshot_rows[0], property_spec["name"]
+            ) is property_spec["value"]:
+                trusted.pop(f"@{property_spec['name']}", None)
+                property_spec["already_satisfied"] = True
         target_spec["pre_state"] = snapshot_rows[0]
         target_spec["expected_parent_id"] = _parent_value(
             snapshot_rows[0].get("parent")
@@ -6156,6 +6211,12 @@ def _prepare_object_set(
             "partial_success_is_failure": True,
         },
     )
+    for spec in node_specs:
+        if spec.get("new_object_default_evidence") and spec.get("preexisting_id"):
+            raise OperationContractError(
+                "NEW_OBJECT_DEPENDENCY_EXISTING_TARGET",
+                "Class defaults cannot authorize fields on an existing object. Bind the existing exact object and select its live Field Handles in a separate Preview.",
+            )
     graph_guard = {
         "kind": "object-set-batch",
         "path_snapshots": path_snapshots,
@@ -6197,7 +6258,7 @@ def _prepare_object_set(
         "nodes": node_specs,
     }
     cleanup = {
-        "kind": "discard-owned-sandbox-or-restore-captured-fields",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
         "partial_success_possible": len(raw_objects) > 1,
@@ -6450,7 +6511,7 @@ def _prepare_object_set_rtpc(
         "before_rows": before_rows,
     }
     cleanup = {
-        "kind": "restore-rtpc-snapshot-or-discard-owned-sandbox",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
         "action": action,
@@ -6819,6 +6880,26 @@ def _prepare_object_node_specs(
             spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        if canonical_type == "GameParameter":
+            from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
+            supplied_values = {descriptor.name: descriptor.value for descriptor in node.properties}
+            for property_info in tuple(property_info_by_name.values()):
+                if not property_info.dependencies:
+                    continue
+                try:
+                    evidence = game_parameter_default_evidence(
+                        class_name=canonical_type, info=property_info,
+                        scope={"classId": type_info.class_id}, read_call=read,
+                        supplied_values=supplied_values,
+                    )
+                except NewObjectDefaultError as exc:
+                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_CONFLICT", str(exc),
+                        details={"field": property_info.name, "request_path": node.request_path}) from exc
+                if evidence is None:
+                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_UNSUPPORTED",
+                        "This new GameParameter field has an unreviewed class dependency; create then configure the verified object separately.",
+                        details={"field": property_info.name, "request_path": node.request_path})
+                spec.setdefault("new_object_default_evidence", []).append(evidence)
         for descriptor in node.references:
             info = _read_property_info_cached(
                 read,
@@ -7193,8 +7274,10 @@ def _apply_reference_activation_dependencies(
         tuple[str, str, str],
         PropertyInfoMetadataRecord,
     ] | None = None,
+    _activation_path: tuple[str, ...] = (),
+    _activation_fields: set[str] | None = None,
 ) -> tuple[str, ...]:
-    """Materialize the one closed live-metadata dependency shape we support.
+    """Compile bounded same-object Boolean activation requirements.
 
     Wwise references such as ``OutputBus`` can be accepted syntactically while
     remaining inherited unless a same-object Boolean override is enabled.  The
@@ -7205,11 +7288,30 @@ def _apply_reference_activation_dependencies(
     if (object_id is None) == (class_id is None):  # pragma: no cover - internal invariant.
         raise AssertionError("object_id or class_id must be supplied exclusively")
 
+    if len(_activation_path) >= 8:
+        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency depth exceeds 8.")
+    path = (*_activation_path, metadata.name.casefold())
+    all_fields = set() if _activation_fields is None else _activation_fields
     activation_names: list[str] = []
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
+        # Wwise marks the positioning override switch with its own override
+        # descriptor. It is the terminal switch, not another activation edge.
+        if (metadata.name == "OverridePositioning" and metadata.type.casefold() == "bool"
+                and dependency == {"type": "override", "action": "Enable",
+                                   "property": "OverridePositioning", "context": "Self"}):
+            continue
+        # Reflected attenuation metadata also describes UI visibility. This
+        # exact Show rule is not an activation requirement or an implied write.
+        if (dependency.get("value") is False
+                and dependency == {"type": "isMasterBus", "value": False,
+                                   "action": "Show", "context": "Self"}):
+            continue
         fields = set(dependency)
-        if fields != _REFERENCE_ACTIVATION_DEPENDENCY_FIELDS:
+        expected_fields = (_REFERENCE_ACTIVATION_DEPENDENCY_FIELDS | {"conditions"}
+                           if dependency.get("type") == "property"
+                           else _REFERENCE_ACTIVATION_DEPENDENCY_FIELDS)
+        if fields != expected_fields:
             raise OperationContractError(
                 "INVALID_METADATA",
                 "Reference dependency metadata does not match the closed activation shape.",
@@ -7218,7 +7320,7 @@ def _apply_reference_activation_dependencies(
                     "request_path": request_path,
                     "dependency_index": index,
                     "fields": sorted(str(field) for field in fields),
-                    "expected_fields": sorted(_REFERENCE_ACTIVATION_DEPENDENCY_FIELDS),
+                    "expected_fields": sorted(expected_fields),
                 },
             )
 
@@ -7255,14 +7357,36 @@ def _apply_reference_activation_dependencies(
                     "property": property_name,
                 },
             )
+        required_value = True
+        if dependency_type == "property":
+            conditions = dependency.get("conditions")
+            if not (
+                isinstance(conditions, list) and len(conditions) == 1
+                and isinstance(conditions[0], Mapping)
+                and set(conditions[0]) == {"restriction"}
+                and isinstance(conditions[0]["restriction"], Mapping)
+                and set(conditions[0]["restriction"]) == {"type", "values"}
+                and conditions[0]["restriction"]["type"] == "enum"
+                and isinstance(conditions[0]["restriction"]["values"], list)
+                and len(conditions[0]["restriction"]["values"]) == 1
+                and isinstance(conditions[0]["restriction"]["values"][0], Mapping)
+                and set(conditions[0]["restriction"]["values"][0]) <= {"value", "displayName"}
+                and isinstance(conditions[0]["restriction"]["values"][0].get("value"), bool)
+            ):
+                raise OperationContractError(
+                    "CONSTRAINED_REFERENCE_BOUNDARY",
+                    "Reference activation requires one exact Boolean enum condition.",
+                    details={"reference": metadata.name, "property": property_name},
+                )
+            required_value = conditions[0]["restriction"]["values"][0]["value"]
         if not (
-            dependency_type == "override"
+            dependency_type in {"override", "property"}
             and action == "Enable"
             and context == "Self"
         ):
             raise OperationContractError(
                 "CONSTRAINED_REFERENCE_BOUNDARY",
-                "Only a same-object Boolean override that enables the reference is supported.",
+                "Only same-object Enable dependencies with an override or exact Boolean condition are supported.",
                 details={
                     "reference": metadata.name,
                     "request_path": request_path,
@@ -7277,16 +7401,16 @@ def _apply_reference_activation_dependencies(
             )
 
         property_key = property_name.casefold()
+        if property_key in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.", details={"property": property_name})
+        all_fields.add(property_key)
+        if len(all_fields) > 16:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
         if property_key in seen_dependencies:
-            raise OperationContractError(
-                "INVALID_METADATA",
-                "Reference dependency metadata repeats an activation property.",
-                details={
-                    "reference": metadata.name,
-                    "request_path": request_path,
-                    "property": property_name,
-                },
-            )
+            prior = next(spec for spec in property_specs if str(spec["name"]).casefold() == property_key)
+            if prior["value"] is not required_value:
+                raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference activation conditions conflict.", details={"property": property_name})
+            continue
         seen_dependencies.add(property_key)
 
         property_info = property_info_by_name.get(property_key)
@@ -7323,7 +7447,14 @@ def _apply_reference_activation_dependencies(
                     "metadata_type": property_info.type,
                 },
             )
-        _require_object_property_value(property_info, True)
+        _require_object_property_value(property_info, required_value)
+        activation_names.extend(_apply_reference_activation_dependencies(
+            property_info, read=read, property_specs=property_specs,
+            property_info_by_name=property_info_by_name,
+            derived_properties=derived_properties, request_path=request_path,
+            object_id=object_id, class_id=class_id, property_info_cache=property_info_cache,
+            _activation_path=path, _activation_fields=all_fields,
+        ))
 
         matching_specs = [
             spec
@@ -7339,10 +7470,10 @@ def _apply_reference_activation_dependencies(
             )
         if matching_specs:
             property_spec = matching_specs[0]
-            if property_spec.get("value") is not True:
+            if property_spec.get("value") is not required_value:
                 raise OperationContractError(
                     "REFERENCE_DEPENDENCY_CONFLICT",
-                    "An explicitly disabled override conflicts with the requested reference.",
+                    "An explicit property value conflicts with the reference activation requirement.",
                     details={
                         "reference": metadata.name,
                         "request_path": request_path,
@@ -7353,12 +7484,12 @@ def _apply_reference_activation_dependencies(
         else:
             property_spec = {
                 "name": property_info.name,
-                "value": True,
+                "value": required_value,
                 "metadata_type": property_info.type,
                 "derived": True,
             }
             property_specs.append(property_spec)
-            derived_properties[property_info.name] = True
+            derived_properties[property_info.name] = required_value
 
         activators = property_spec.setdefault("activates_references", [])
         if not isinstance(activators, list):  # pragma: no cover - internal invariant.
@@ -7371,7 +7502,7 @@ def _apply_reference_activation_dependencies(
             activators.append(metadata.name)
         activation_names.append(property_info.name)
 
-    return tuple(activation_names)
+    return tuple(dict.fromkeys(activation_names))
 
 
 def _materialize_canonical_object_node(
@@ -7407,7 +7538,7 @@ def _materialize_canonical_object_node(
             if (
                 not isinstance(property_name, str)
                 or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(property_name) is None
-                or value is not True
+                or not isinstance(value, bool)
             ):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
@@ -7415,7 +7546,7 @@ def _materialize_canonical_object_node(
                     details={"request_path": current.request_path},
                 )
             key = f"@{property_name}"
-            if key in row and row[key] is not True:
+            if key in row and row[key] is not value:
                 raise OperationContractError(
                     "REFERENCE_DEPENDENCY_CONFLICT",
                     "A derived reference activation conflicts with an explicit property.",
@@ -7425,7 +7556,7 @@ def _materialize_canonical_object_node(
                         "value": row[key],
                     },
                 )
-            row[key] = True
+            row[key] = value
         for child, child_row in zip(current.children, row.get("children", []), strict=True):
             apply(child, child_row)
 
@@ -8742,11 +8873,20 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 field_name=field_value,
                 platform=platform,
             )
+        activation_requirements: dict[str, bool] = {}
+        if request.operation == "object.setReference" and arguments["target"] is not None:
+            activation_specs: list[dict[str, Any]] = []
+            _apply_reference_activation_dependencies(
+                info, read=read, object_id=source.object,
+                property_specs=activation_specs, property_info_by_name={},
+                derived_properties={}, request_path="$.reference",
+            )
+            activation_requirements = {spec["name"]: spec["value"] for spec in activation_specs}
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
             {
-                "return": ["id", "path", field_value],
+                "return": ["id", "path", field_value, *activation_requirements],
                 **({"platform": platform} if platform is not None else {}),
             },
         )
@@ -8761,11 +8901,35 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 "Property/reference pre-state must return the exact source and requested field.",
                 details={"field": field_value, "rows": field_before_rows},
             )
+        missing_activators = [
+            name for name, value in activation_requirements.items()
+            if not _has_field(field_before_rows[0], name)
+            or _field_value(field_before_rows[0], name) is not value
+        ]
+        if missing_activators:
+            raise OperationContractError(
+                "REFERENCE_ACTIVATION_REQUIRED",
+                "The reference requires separately previewed positioning changes before this single-call reference operation.",
+                details={
+                    "object_id": source.object, "reference": field_value,
+                    "prerequisite_changes": [
+                        {"operation": "object.setProperty", "discovery_meaning": name,
+                         "required_value": activation_requirements[name],
+                         "selection": "live_discovered_Field_Handle",
+                         **({"platform": platform} if platform is not None else {})}
+                        for name in missing_activators
+                    ],
+                    "recovery": "For each prerequisite, open operation-schema object.setProperty, bind this exact object, discover the stated meaning and copy its Field Handle; Preview, authorize, execute and verify each change. Then create a fresh reference Preview.",
+                    "atomic_batch_alternative": "object.set" if request.version != "2021.1" else None,
+                    "mutation_dispatched": False,
+                },
+            )
         metadata["field_before"] = {
             "field": field_value,
             "value": _field_value(field_before_rows[0], field_value),
             "platform": platform,
             "row": field_before_rows[0],
+            **({"activation_requirements": activation_requirements} if activation_requirements else {}),
         }
         if request.operation == "object.setProperty":
             preview = PropertyReferenceBuilder(version=request.version).set_property(
@@ -8805,6 +8969,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             )
             verification = {
                 "kind": "same-guid-reference",
+                **({"activation_requirements": activation_requirements} if activation_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_target_id": (
@@ -8868,7 +9033,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         preflight_reads=tuple(reads),
         pre_state={name: dict(value.row) for name, value in roles.items()} | metadata,
         verification_plan=verification,
-        cleanup=cleanup,
+        cleanup=persistent_project_cleanup(cleanup),
         warnings=tuple(warnings),
     )
 
@@ -11677,7 +11842,7 @@ def _prepare_closed_import_plan(
         else None
     )
     cleanup = {
-        "kind": "discard-case-owned-project-copy",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
         "irreversible": import_operation == "replaceExisting",
@@ -11995,11 +12160,11 @@ def _prepare_closed_soundbank_operation(
     if definition_oracle is not None:
         verification["definition_oracle"] = _json_mapping(definition_oracle)
     cleanup = {
-        "kind": "discard-case-owned-project-copy-and-output-root",
+        "kind": "retain-project-and-outputs",
         "automatic": False,
         "automatic_retry": False,
-        "failure_policy": "seal_or_quarantine_failed_sandbox_and_never_reuse",
-        "success_policy": "discard_the_complete_case_owned_sandbox",
+        "failure_policy": "retain_project_and_outputs_for_diagnosis",
+        "success_policy": "retain_project_and_outputs",
         "io_root": io_root,
     }
     return preview, roles, {"soundbank_guard": guard}, verification, cleanup
@@ -12083,7 +12248,7 @@ def _localize_soundbank_project_info(
     *,
     io_root: str,
 ) -> dict[str, Any]:
-    """Bind live ``getProjectInfo`` paths to one caller-owned sandbox.
+    """Bind live ``getProjectInfo`` paths to the selected project.
 
     Wwise running through Wine reports absolute host paths with ``Y:``/``Z:``
     spellings.  Some builds also report project-setting directories relative to
@@ -13394,7 +13559,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         object_id = source.get("object")
         if isinstance(field_name, str) and object_id is not None:
             args = {"from": {"id": [object_id]}}
-            options = {"return": ["id", "path", field_name]}
+            activation_requirements = field_before.get("activation_requirements", {})
+            options = {"return": ["id", "path", field_name, *activation_requirements]}
             platform = field_before.get("platform")
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
@@ -13416,6 +13582,15 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     "evidence": {"expected": field_before.get("value"), "actual": actual, "rows": rows},
                 }
             )
+
+            for name, expected in activation_requirements.items():
+                actual = _field_value(rows[0], name) if len(rows) == 1 else None
+                assertions.append({
+                    "name": f"reference activation {name} unchanged",
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
+                              and _has_field(rows[0], name) and actual is expected,
+                    "evidence": {"expected": expected, "actual": actual},
+                })
 
     copy_move_collision_guard = (
         pre_state.get("copy_move_collision_guard")
@@ -13645,6 +13820,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 version=version,
                 target_id=target_id,
                 target_type=target_type,
+                target_path=plugin_guard.get("target_path"),
                 request=descriptor,
                 property_metadata=actual_metadata or None,
                 effect_slots_2022=(
@@ -13688,6 +13864,28 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     },
                 ]
             )
+
+    # Class defaults authorize only genuinely new objects. Re-read the exact
+    # metadata sealed at Preview before dispatching their single creation call.
+    if isinstance(pre_state, Mapping):
+        metadata_seen = set()
+        for node_key in ("object_create_nodes", "object_set_nodes"):
+            for node in pre_state.get(node_key, []):
+                for evidence in node.get("new_object_default_evidence", []):
+                    scope = evidence["class_scope"]
+                    for field, expected in evidence["metadata"].items():
+                        key = (scope.get("classId"), field)
+                        if key in metadata_seen:
+                            continue
+                        metadata_seen.add(key)
+                        args = {**scope, "property": field}
+                        result = read_call(GET_PROPERTY_INFO_URI, args, {})
+                        actual = parse_get_property_info_result(result).as_dict()
+                        readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
+                                          "args": args, "options": {}, "result": dict(result)})
+                        assertions.append({"name": f"new object class metadata {field} unchanged",
+                                           "passed": actual == expected,
+                                           "evidence": {"expected": expected, "actual": actual}})
 
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):
@@ -15769,9 +15967,9 @@ def verify_prepared_operation(
             "readback_fields",
             "readback_view",
         }
-        if descriptor.kind == "source":
+        if descriptor.kind == "source" or descriptor.placement == "shareset":
             expected_plan_fields = base_plan_fields
-            expected_placement_kind = "source_child"
+            expected_placement_kind = "effect_shareset_child" if descriptor.placement == "shareset" else "source_child"
             placement_shape_matches = (
                 placement.get("collection") == "children"
             )
@@ -15884,10 +16082,10 @@ def verify_prepared_operation(
 
         created_id = result_binding["created_id"]
         expected_parent_id = target_id
-        if expected_placement_kind == "source_child":
+        if expected_placement_kind in {"source_child", "effect_shareset_child"}:
             plugin_id = created_id
             placement_evidence: dict[str, Any] = {
-                "kind": "source_child"
+                "kind": expected_placement_kind
             }
         elif expected_placement_kind == "fixed_effect_reference":
             target_rows = read_object(
@@ -17188,9 +17386,10 @@ def verify_prepared_operation(
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
         platform = plan.get("platform")
+        activation_requirements = plan.get("activation_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name),
+            fields=("id", "path", field_name, *activation_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
@@ -17223,6 +17422,11 @@ def verify_prepared_operation(
                     projection_matches and _same_identity(actual, expected),
                     {"actual": actual, "expected": expected},
                 )
+        if len(rows) == 1:
+            for name, expected_value in activation_requirements.items():
+                check(f"reference activation {name} remains satisfied",
+                      _has_field(rows[0], name) and _field_value(rows[0], name) is expected_value,
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "ui-capture-screen-result":
         success_status = "result_schema_checked"
         verification_strength = "result_schema_only"

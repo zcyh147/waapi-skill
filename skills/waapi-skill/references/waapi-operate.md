@@ -7,12 +7,12 @@ Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncatio
 - The only normal change path is the packaged transaction CLI: `scripts/run.py gateway.py`. Do not import builders or planners from inline Python, call `WaapiClient`, or use raw WAAPI/XML/generic call. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
 - POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
 - Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
-- A rejected or nonzero Gateway invocation is also a hard stop. Only a successful result whose `fallback_detail_scan.status` is `partial` permits the one metadata retry below.
-- The one complete terminal `verify` result ends the transaction; see Terminal states.
+- For complete structured failures, follow the Skill Recovery rule and the returned receipt. A corrected read or discovery does not need another permission prompt.
+- Terminal `verify` ends the transaction.
 
 ## Choose the phase and first Gateway command
 
-An existing transaction continuation always outranks operation selection.
+Existing transactions outrank operation selection.
 
 ### Existing transaction
 
@@ -22,13 +22,13 @@ Use its transaction id; an artifact hash is not a lookup key. The visible Previe
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
 ```
 
-Do not call `operations`, `operation-schema`, or `request-schema` first. Without complete JSON, stop.
+Skip schema/catalog discovery. Incomplete JSON stops.
 
 ### New transaction
 
-For a prior-query subset, finish the selected-subset identity gate first: exact-ID read back every selected GUID and match name/type/path. These bounded read-only checks precede the transaction contract and never replace schema/metadata.
+For a prior-query subset, exact-ID read every selected GUID and match name/type/path before the transaction contract; schema/metadata remain required.
 
-A prior exact diagnostic identity is not a selected subset: reuse its GUID; do not query it again. Gateway binding revalidates it.
+Reuse a prior exact diagnostic GUID; Gateway revalidates it.
 
 A new natural-language change starts with one compact `operations` lookup; only its returned route selects the first transaction contract. An exact user operation/URI skips it.
 
@@ -42,11 +42,11 @@ A new natural-language change starts with one compact `operations` lookup; only 
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | An exact user-supplied native URI without a named route | `request-schema <uri>` and its sole continuation; never infer a URI from natural-language intent |
 
-Follow the schema's sole `input_mode`. No schema-to-preview shortcut. The business Adapter owns object paths, native types, metadata scopes, enums, order, batching, and Preview change intent. Complete paths use `by_path_segments`; GUIDs use `by_id`; for an exact reflected URI with a complete caller path, keep it as one `path` selector.
+Follow the sole `input_mode`, including Draft steps. Gateway owns native paths/types/metadata/enums/order/batching and Preview. Use `by_path_segments` or `by_id`; an exact reflected-URI contract keeps a complete caller path as one `path` selector.
 
 For `composer`, run only its returned start and action argv. For `business_declaration`, run `draft-start` when returned. Bind exact owners, parents, and references. Supply stable facts such as `volume_db=-4`; Gateway owns native construction. Configure defaults only when requested.
 
-Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
+Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. For dynamic fields, the returned `draft-discover-fields` scope also accepts `--list` (and returned `--page`) or `--selection` from that Draft/scope list; exact selection reads details and binds a Field Handle. `--meaning` remains an auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
@@ -54,13 +54,13 @@ Public mutation identities are closed to `id`, `path`, `exact-type-name`, `direc
 
 ## Choose by business outcome
 
-Select the operation whose postcondition and verifier match the request; `operation.selection_guidance` and `interface.selection_guidance` govern. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`.
+Follow `operation.selection_guidance` and `interface.selection_guidance` for matching postconditions/verifiers. **Media gate:** a request that names Sound/SFX nodes but supplies no media artifact or import intent is a pure object hierarchy and selects `object.create`.
 
 An exact CamelCase Wwise Authoring command ID such as `SaveProject` is not a native URI. It directly selects `operation-schema ui.commands.execute`; screen capture directly selects `operation-schema ui.captureScreen`. Both skip `operations`, and command-ID routing overrides generic connected-project save intent. If a larger request already required the catalog, `operations.routing_precedence` preserves the same choice.
 
 Ordinary save wording such as `save the current project` or `保存当前工程` selects `request-schema ak.wwise.core.project.save`; never infer or translate that wording into `SaveProject`. Only the user's exact literal CamelCase command ID selects the UI-command route.
 
-When media import is primary, use one `audio.import` to replace media on existing Sounds or create a Sound in the same batch; `object.set` is never a preliminary schema for that outcome. New target-container hierarchy and same-row Event/Switch outcomes remain in that transaction; never probe `object.create` or a separate assignment first. From 2023.1, `object.set` may carry media only when import is subordinate to broader existing-target work.
+Primary media import uses one `audio.import`, including new Sounds/containers and same-row Event/Switch outcomes; no preliminary `object.set`, `object.create`, or assignment. From 2023.1, `object.set` carries media only within broader existing-target work.
 
 Existing-root status alone does not select `object.set`. One existing object's single rename, notes, scalar-property, or reference edit uses its dedicated operation; these fixed single-edit routes skip `operations`. Broad `object.set` is only for one larger atomic outcome: several fields/properties/references on one root, an ordinary closed object-list change, multiple roots, a root edit plus a new subtree, or insertion into a named existing descendant. After any required selected-subset identity gate, that batch starts with `operation-schema object.set`. For a batch, bind every target first. Use disclosed fixed fields directly; discover other fields for each exact target and copy the selected handles into `declare_existing_batch`. Plug-in, RTPC, and platform-link changes keep their dedicated operations. An insertion target is not the request root; give each one an `objects[]` row containing only genuinely new direct descendants. Single-edit, plug-in, RTPC, and platform-link operations take precedence; `object.create` owns new structure when those `object.set` conditions are absent.
 
@@ -93,13 +93,13 @@ Keep domains distinct: durable Authoring project edits use `ak.wwise.core.*`; ru
 
 Users never supply internal tokens. Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence.
 
-`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. Binding fixes the metadata scope inside the Draft. No match stops; ambiguity needs one behavior question.
+`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. Binding fixes the metadata scope inside the Draft. No match permits bounded discovery refinement; unresolved ambiguity needs one behavior question.
 
 Business Drafts start before exact object/type binding and returned live discovery. Returned type, restrictions and opaque handle alone authorize values. Remaining Composer lanes follow returned metadata-first start preconditions.
 
 1. Bind the exact existing owner or the disclosed new-object type first.
 2. Run the returned discovery once with short English Wwise UI/technical meanings; separate distinct meanings.
-3. Copy one returned opaque handle per requested field; stop/clarify on no-match/ambiguity.
+3. Copy one returned opaque handle per requested field; refine bounded discovery on no-match and clarify unresolved ambiguity.
 4. Submit business values against those handles. Copy returned enum labels or explicitly select a disclosed value; duplicate labels require a distinct choice. Gateway validates restrictions and activates proven dependencies.
 5. `draft-check` revalidates scope, token, dependencies, and value; do not rediscover just to obtain a token.
 
@@ -170,9 +170,9 @@ The confirmation token binds the exact stored Preview. Never reconstruct/substit
 - `verified`: report actual readback and stop.
 - `result_schema_checked`: schema proof only. Explicitly requested actual readback may use disclosed bounded Gateway read-only routes for exact requested targets; otherwise report the boundary and stop. Transaction stays closed: no execute/reverify/retry, filesystem/raw API/code proof. Current values without a before-state baseline do not prove preservation.
 - `verification_deferred`: later verification is safe; never re-execute.
-- `verification_failed`, `repreview_required`, `execution_cancelled`: report and stop; no retry/proof calls.
+- `verification_failed`, `repreview_required`, `execution_cancelled`: report the actual state, then use permitted independent read-only diagnosis. Any later change needs a new Preview under the current policy; never replay the original write.
 - `execution_succeeded_persistence_failed`: preserve uncertainty; never replay.
-- `indeterminate`: Do not verify, retry, call another Gateway route, or use another tool. A later diagnosis needs a new user request.
+- `indeterminate`: retain the unknown outcome. Follow the recovery receipt for independent read-only diagnosis within the existing task; never verify or replay the original write. Diagnosis does not grant new mutation authority.
 
 `ak.wwise.cli.migrate` ends at complete `execute`; run no later Agent tools/reads. Only the caller-owned harness outside the Skill sequence may reopen/prove it. Managed openers may leave cleanup uncertain; never synthesize code. Work Unit reversal and same-connection Undo stay explicit.
 

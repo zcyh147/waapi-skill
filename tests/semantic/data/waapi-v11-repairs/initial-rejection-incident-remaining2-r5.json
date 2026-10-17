@@ -1,0 +1,71 @@
+{
+  "evidence_kind": "frozen_wrong_route_failure_without_structured_admission_marker",
+  "candidate": "4b64ae3cd80dba4bc261cce83b139d3ae493378b",
+  "original_campaign_root": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-remaining2-r5",
+  "unit": "REPAIR25-F3",
+  "task_status": "FAIL",
+  "business_pass": false,
+  "original_campaign_classification": "BLOCKED; F4 pending",
+  "agent_seconds": 20.854942250065506,
+  "agent_mutation_count": 0,
+  "last_rejection": "expansion policy rejected command: only the sealed operation may start one Draft",
+  "structured_admission_marker_present": false,
+  "catalog_evidence": {
+    "creation_route": {
+      "name": "object.create",
+      "summary": "Create or merge one bounded recursive object tree under a live-resolved parent, including a guarded replace confined to one explicitly authorized root."
+    },
+    "range_route": {
+      "api": "ak.wwise.core.gameParameter.setRange",
+      "intent": "Set one Game Parameter minimum and maximum and choose how dependent curves respond."
+    },
+    "range_selection_guidance": {
+      "choose": [
+        "request-schema",
+        "ak.wwise.core.gameParameter.setRange"
+      ],
+      "never_substitute": [
+        "operation-schema",
+        "object.setProperty",
+        "object.set"
+      ],
+      "use_when": "the user asks to set one Game Parameter minimum and maximum"
+    }
+  },
+  "catalog_assessment": "Creation is explicitly disclosed by object.create. setRange advertises minimum/maximum editing, not object creation or default initialization. Its selection guidance omits an explicit existing-object qualifier, but no missing creation capability is demonstrated; no product/runtime change is included.",
+  "lifecycle": {
+    "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+    "errors": [
+      "scenario:V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint, visible_preview_notice"
+    ],
+    "final_status": "FAIL",
+    "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-remaining2-r5/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/quarantine.json",
+    "requested_status": "FAIL",
+    "sandbox_retained": true,
+    "scenario_id": "REPAIR25-F3",
+    "source_hash_after": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_hash_before": {
+      "algorithm": "sha256",
+      "bytes_hashed": 3943065,
+      "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+      "file_count": 83,
+      "strategy": "full"
+    },
+    "source_mtime_after_ns": 1785701407051832215,
+    "source_mtime_before_ns": 1785701407051832215,
+    "version": "2025.1"
+  },
+  "files_sha256": {
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/expansion-task-result.json": "b265b323cf9d7b2705a12decc590ae5af12a60147385b589307114c7b61e8c9a",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/lifecycle.json": "89d27a365e5f3dcccd8edf208212eff6ffb1a0cc7fd7400f67bd59a44f12177a",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/expansion-broker.json": "460c46b426c6d99b234530d62957ed02613033eaf9913f2e4f4199042d6ee589",
+    "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/turns/turn-01/events.jsonl": "5d653ee13a75042fca4a84fa315cf9d866a4c14890979cdfd544cfb7a6f4490c"
+  },
+  "preservation": "No marker is backfilled. Original r5 root and quarantine remain BLOCKED/frozen; no regrade or rerun. Only F4 remains unattempted and authorized."
+}

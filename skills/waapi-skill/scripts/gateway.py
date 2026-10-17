@@ -27,6 +27,7 @@ GATEWAY_RUNNER_PATH = SKILL_ROOT / "scripts" / "run.py"
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
+from wwise_waapi.recovery import PREWRITE_GUARD_REJECTION, recovery_receipt
 from wwise_waapi.capabilities import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CapabilityCatalog,
     CapabilityNotFoundError,
@@ -505,6 +506,7 @@ from wwise_waapi.transaction_runtime import (  # noqa: E402  # pyright: ignore[r
 )
 from wwise_waapi.transaction_cleanup import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     transaction_cleanup_payload as _transaction_cleanup_payload,
+    project_persistent_artifact,
 )
 from wwise_waapi.transactions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     CONFIRMATION_TOKEN_MATERIAL_CONTRACT,
@@ -1473,13 +1475,11 @@ def build_parser() -> argparse.ArgumentParser:
             "or flushed JSON records for stream-topic."
         ),
     )
-    parser.add_argument("--host", help=f"WAAPI host; defaults to ${ENV_HOST}, then saved config")
-    parser.add_argument("--port", type=int, help=f"WAAPI port; defaults to ${ENV_PORT}, then saved config")
     parser.add_argument(
         "--version",
         "--wwise-version",
         dest="version",
-        help=f"Expected Wwise year.major; defaults to ${ENV_VERSION}, then saved config, then live detection",
+        help="Wwise version for offline catalog/schema browsing only; live operations use config-set values",
     )
     parser.add_argument(
         "--timeout",
@@ -2002,6 +2002,8 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
+            "list",
+            "detail",
             "discover",
             "property-state",
             "attenuation",
@@ -2049,6 +2051,9 @@ def build_parser() -> argparse.ArgumentParser:
             "discovers the exact live field metadata"
         ),
     )
+    metadata.add_argument("--page")
+    metadata.add_argument("--page-size", type=int, default=20)
+    metadata.add_argument("--selection")
     metadata.add_argument("--platform")
     metadata.add_argument(
         "--curve-role",
@@ -3070,11 +3075,15 @@ def build_parser() -> argparse.ArgumentParser:
     discovery_scope.add_argument("--object-handle")
     discovery_scope.add_argument("--type-handle")
     discovery_scope.add_argument("--semantic-kind")
-    draft_discover_fields.add_argument(
+    field_mode = draft_discover_fields.add_mutually_exclusive_group(required=True)
+    field_mode.add_argument("--list", action="store_true", dest="list_fields")
+    field_mode.add_argument("--selection")
+    draft_discover_fields.add_argument("--page")
+    draft_discover_fields.add_argument("--page-size", type=int, default=20)
+    field_mode.add_argument(
         "--meaning",
         action="append",
         dest="meanings",
-        required=True,
         metavar="SEARCH_PHRASE",
     )
     draft_discover_fields.add_argument("--platform")
@@ -3394,9 +3403,22 @@ def _execute_gateway_unconstrained(
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
+    command_routing_started = False
 
     def finish(exit_code: int, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         enriched = dict(payload)
+        try:
+            recovery_policy = load_gateway_config(source_env).config.project_modification_policy
+        except Exception:
+            recovery_policy = "unavailable"
+        recovery = recovery_receipt(enriched, policy=recovery_policy, command_routing_started=command_routing_started)
+        if recovery is not None:
+            if "agent_result" in enriched:
+                agent_result = enriched.pop("agent_result")
+                enriched["recovery"] = recovery
+                enriched["agent_result"] = agent_result
+            else:
+                enriched["recovery"] = recovery
         if args.command == "stream-topic":
             gateway_contract = enriched.get("contract")
             enriched["contract"] = TOPIC_STREAM_RECORD_CONTRACT
@@ -3430,11 +3452,21 @@ def _execute_gateway_unconstrained(
     cleanup_failure: BaseException | None = None
     post_result_cleanup_failed = False
     try:
+        if args.version is not None and args.command not in {
+            "capabilities", "describe", "operations", "operation-schema",
+            "request-schema", "request-map-container", "request-array-item",
+            "topic-schema", "query-schema", "object-types",
+        }:
+            raise GatewayInputError(
+                "--version is only available for offline catalog/schema browsing; "
+                "use config-set --wwise-version for operations."
+            )
         if args.command == "stream-topic" and stream_sink is None:
             raise GatewayInputError(
                 "stream-topic requires a live record sink; use the gateway CLI "
                 "entry point so every streamed record remains observable."
             )
+        require_persisted_connection_binding(args, env=source_env)
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
         elif args.command in {
@@ -3526,6 +3558,7 @@ def _execute_gateway_unconstrained(
                 dispatcher.manifest_store = AuthoringUiRuntimeManifestStore(
                     dispatcher.manifest_store
                 )
+            command_routing_started = True
             payload = dispatch_command(
                 args,
                 env=source_env,
@@ -3741,6 +3774,15 @@ def constrain_live_gateway_result(
     for key in ("executed", "verified", "automatic_retry"):
         if isinstance(payload.get(key), bool):
             result[key] = payload[key]
+    recovery = payload.get("recovery")
+    if (payload.get("write_dispatch") == PREWRITE_GUARD_REJECTION
+            and isinstance(recovery, Mapping)
+            and recovery.get("stage") == "pre_dispatch_rejection"
+            and gateway_json_document_size(recovery) <= 4096):
+        # Keep bounded proof that this rejection preceded any write, even when
+        # bulky guard diagnostics must be replaced by a result-ceiling error.
+        result["write_dispatch"] = dict(PREWRITE_GUARD_REJECTION)
+        result["recovery"] = dict(recovery)
     return 2, result
 
 
@@ -4808,7 +4850,7 @@ def preflight_public_route(
     # could otherwise recommend a fixed command or topic wait for an API that
     # this exact Wwise version does not reflect.
     config = load_gateway_config(env).config
-    version = args.version or env.get(ENV_VERSION) or config.wwise_version
+    version = args.version or config.wwise_version
     if version is not None:
         if version not in SUPPORTED_WWISE_VERSION_KEYS:
             raise GatewayInputError(
@@ -5739,7 +5781,17 @@ def preflight_metadata_input(
                 f"{MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS}-character limit"
             )
 
-    if args.operation == "discover":
+    if args.operation in {"list", "detail"}:
+        if meanings or args.platform or args.curve_role:
+            raise GatewayInputError("metadata list/detail accepts only a scope and pagination/selection")
+        if not 1 <= args.page_size <= 64:
+            raise GatewayInputError("metadata --page-size must be 1..64")
+        if (args.operation == "detail") != (args.selection is not None) or (args.selection and args.page):
+            raise GatewayInputError("metadata detail requires --selection; metadata list accepts --page")
+    elif args.page or args.selection or args.page_size != 20:
+        raise GatewayInputError("metadata pagination/selection requires list or detail")
+
+    if args.operation in {"discover", "list", "detail"}:
         if sum(
             value is not None
             for value in (path_segments, semantic_kind, custom_kind_meaning, exact_id)
@@ -9264,6 +9316,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 f"for Wwise {parent.version}"
             )
         started = store.start(
+            connection_binding=parent.connection_binding,
             operation=args.operation,
             version=parent.version,
             schema_digest=operation_draft_schema_digest(
@@ -9314,6 +9367,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             resolve_transaction_state_directory(args, env=env)
         )
         started = store.start(
+            connection_binding={"configuration": selected_connection_binding(env)},
             operation=args.operation,
             version=request_version,
             schema_digest=schema_digest,
@@ -9817,15 +9871,22 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                         "ui.commands.execute",
                     ],
                 },
+                "game_parameter_creation": {
+                    "choose": ["operation-schema", "object.create"],
+                    "use_when": "the user asks to create a new Game Parameter, including its minimum, maximum and default value",
+                    "field_discovery": "discover GameParameter class fields Min, Max and InitialValue before declaring the new object",
+                    "never_substitute": ["ak.wwise.core.gameParameter.setRange"],
+                },
                 "game_parameter_range": {
                     "choose": [
                         "request-schema",
                         "ak.wwise.core.gameParameter.setRange",
                     ],
                     "use_when": (
-                        "the user asks to set one Game Parameter minimum and "
-                        "maximum"
+                        "the user asks to change one existing Game Parameter minimum and "
+                        "maximum, with dependent-curve handling, on a version that exposes this route"
                     ),
+                    "avoid_when": "creating a new parameter or setting its default InitialValue; setRange does neither",
                     "never_substitute": [
                         "operation-schema",
                         "object.setProperty",
@@ -10000,7 +10061,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                     )
                     raise
             else:
-                payload.update({"artifact": preview.artifact, "events": list(events)})
+                artifact_view = project_persistent_artifact(preview.artifact)
+                payload.update({"artifact": artifact_view, "events": list(events)})
+            if project_persistent_artifact(preview.artifact) != preview.artifact:
+                payload["artifact_projection"] = "persistent_project_guidance; artifact_hash_identifies_unchanged_stored_artifact"
             if record.state is TransactionState.AWAITING_CONFIRMATION:
                 confirmation_token = snapshot.confirmation_token
                 if confirmation_token is None:
@@ -10192,13 +10256,13 @@ def build_gateway_session_context(
             url = candidate_url
 
     if host is None:
-        raw_host = args.host or env.get(ENV_HOST) or effective["waapi_host"] or DEFAULT_HOST
+        raw_host = effective["waapi_host"] or DEFAULT_HOST
         try:
             host = SkillConfig(SKILL_ROOT, waapi_host=str(raw_host)).as_dict()["waapi_host"]
         except ValueError:
             host = None
     if port is None:
-        raw_port: Any = args.port if args.port is not None else env.get(ENV_PORT)
+        raw_port: Any = effective["waapi_port"]
         if raw_port is None:
             raw_port = effective["waapi_port"]
         try:
@@ -10211,7 +10275,7 @@ def build_gateway_session_context(
         url = f"ws://{host}:{port}/waapi"
 
     detected_version = payload.get("detected_version")
-    configured_version = args.version or env.get(ENV_VERSION) or effective["wwise_version"]
+    configured_version = args.version or effective["wwise_version"]
     payload_versions = payload.get("versions")
     command_version = (
         str(payload_versions[0])
@@ -10631,7 +10695,7 @@ def resolve_operation_schema_version(
     """
 
     config = load_gateway_config(env).config
-    version = args.version or env.get(ENV_VERSION) or config.wwise_version
+    version = args.version or config.wwise_version
     if version is None:
         return None
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
@@ -10646,7 +10710,7 @@ def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]
     if bool(getattr(args, "all_versions", False)):
         return tuple(SUPPORTED_WWISE_VERSION_KEYS)
     config = load_gateway_config(env).config
-    version = args.version or env.get(ENV_VERSION) or config.wwise_version or "2022.1"
+    version = args.version or config.wwise_version or "2022.1"
     if version not in SUPPORTED_WWISE_VERSION_KEYS:
         raise GatewayInputError(
             f"Unsupported Wwise version {version!r}; supported versions: {', '.join(SUPPORTED_WWISE_VERSION_KEYS)}"
@@ -10654,19 +10718,82 @@ def resolve_catalog_versions(args: argparse.Namespace, *, env: Mapping[str, str]
     return (str(version),)
 
 
+def selected_connection_binding(env: Mapping[str, str]) -> dict[str, Any]:
+    resolution = load_gateway_config(env)
+    config = resolution.config
+    if config.waapi_port is None or config.wwise_version is None:
+        raise GatewayInputError(
+            "Configure waapi_port and wwise_version with config-set before starting operations."
+        )
+    return {
+        "config_path": str(resolution.external_path),
+        "waapi_host": config.waapi_host,
+        "waapi_port": config.waapi_port,
+        "wwise_version": config.wwise_version,
+    }
+
+
+def require_persisted_connection_binding(
+    args: argparse.Namespace, *, env: Mapping[str, str]
+) -> None:
+    if getattr(args, "draft_id", None) is not None:
+        record = OperationDraftStore(
+            resolve_transaction_state_directory(args, env=env)
+        ).inspect(args.draft_id, task_authority=args.task_authority)
+        binding = record.connection_binding
+        if binding is None:
+            raise GatewayInputError(
+                "This Draft predates durable connection binding; recreate it using the selected configuration."
+            )
+        if binding.get("configuration") != selected_connection_binding(env):
+            raise GatewayInputError(
+                "Selected connection configuration changed after Draft creation; recreate the Draft."
+            )
+    if getattr(args, "transaction_id", None) is not None:
+        artifact = resolve_transaction_store(args, env=env).load_preview(
+            args.transaction_id
+        ).artifact
+        binding = artifact.get("connection_configuration")
+        if binding is None:
+            raise GatewayInputError(
+                "This transaction predates durable connection binding; recreate its Preview using the selected configuration."
+            )
+        if binding != selected_connection_binding(env):
+            raise GatewayInputError(
+                "Selected connection configuration changed after Preview creation; recreate the Preview."
+            )
+
+
+def attest_draft_live_connection(
+    args: argparse.Namespace, *, env: Mapping[str, str],
+    live_info: Mapping[str, Any], project: Mapping[str, Any] | None,
+) -> Any:
+    if getattr(args, "draft_id", None) is None:
+        return None
+    return OperationDraftStore(
+        resolve_transaction_state_directory(args, env=env)
+    ).attest_connection(
+        args.draft_id, task_authority=args.task_authority,
+        configuration=selected_connection_binding(env),
+        live={
+            "version": dict(require_mapping(live_info.get("version"), "getInfo version")),
+            "project_id": project.get("id") if project is not None else None,
+        },
+    )
+
+
 def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> GatewayConnection:
     config = load_gateway_config(env).config
-    host = args.host or env.get(ENV_HOST) or config.waapi_host or DEFAULT_HOST
+    selected_connection_binding(env)
+    host = config.waapi_host or DEFAULT_HOST
     try:
         host = SkillConfig(SKILL_ROOT, waapi_host=str(host)).as_dict()["waapi_host"]
     except ValueError as exc:
         raise GatewayInputError(str(exc)) from exc
-    raw_port: int | str | None = args.port if args.port is not None else env.get(ENV_PORT)
-    if raw_port is None:
-        raw_port = config.waapi_port
+    raw_port: int | str | None = config.waapi_port
     if raw_port is None:
         raise GatewayInputError(
-            f"WAAPI port is required via --port, ${ENV_PORT}, or saved config; "
+            "WAAPI port is required in the selected config; "
             "use config-show/config-set to inspect or change saved values"
         )
     try:
@@ -10675,7 +10802,7 @@ def resolve_connection(args: argparse.Namespace, *, env: Mapping[str, str]) -> G
         raise GatewayInputError(f"WAAPI port must be an integer, got {raw_port!r}") from exc
     if not 1 <= port <= 65535:
         raise GatewayInputError(f"WAAPI port must be between 1 and 65535, got {port}")
-    version_hint = args.version or env.get(ENV_VERSION) or config.wwise_version
+    version_hint = config.wwise_version
     if version_hint is not None and version_hint not in SUPPORTED_WWISE_VERSION_KEYS:
         raise GatewayInputError(
             f"Unsupported Wwise version {version_hint!r}; supported versions: "
@@ -14079,7 +14206,7 @@ def dispatch_command(
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
-        if args.operation in {"discover", "property-state"}:
+        if args.operation in {"discover", "property-state", "list", "detail"}:
             custom_kind_clarification = _bind_custom_kind_from_live_types(
                 args,
                 connection=connection,
@@ -14132,6 +14259,17 @@ def dispatch_command(
                 project=project,
                 state_dir=state_dir,
             )
+            if args.operation in {"list", "detail"}:
+                from wwise_waapi.metadata_discovery import browse_metadata
+                result = browse_metadata(
+                    read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version, call_sink=metadata_calls),
+                    context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
+                    object_type=args.object_type, class_id=args.class_id, object=args.object,
+                    page_size=args.page_size, page=args.page, selection=args.selection,
+                )
+                return {"ok": True, "status": "ok", **common, "operation": args.operation,
+                        "metadata_authority": "live-waapi", **metadata_call_evidence_projection(metadata_calls),
+                        "agent_result": result}
             discovery = discover_metadata(
                 read_call=read_call,
                 queries=tuple(args.queries),
@@ -15060,6 +15198,12 @@ def dispatch_operation_draft_check(
             live_info=live_info,
         )
         if capability.execution_contract["effect"] == "read":
+            project, _ = current_project(
+                dispatcher, connection=connection, version=detected_version,
+            )
+            attest_draft_live_connection(
+                args, env=env, live_info=live_info, project=project,
+            )
             arguments = require_mapping(
                 request_payload.get("arguments"),
                 "typed Draft request arguments",
@@ -15147,6 +15291,9 @@ def dispatch_operation_draft_check(
         connection=connection,
         version=detected_version,
         allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
+    )
+    attest_draft_live_connection(
+        args, env=env, live_info=live_info, project=project,
     )
     if project is not None:
         require_runtime_directory_outside_project(state_dir, project=project)
@@ -17288,6 +17435,9 @@ def _open_business_binding(
         version=detected_version,
         allow_none=allow_no_project,
     )
+    record = attest_draft_live_connection(
+        args, env=env, live_info=live_info, project=project,
+    )
     if project is None:
         if not allow_no_project:  # pragma: no cover - current_project is strict above
             raise GatewayInputError("A live Wwise project is required")
@@ -17735,8 +17885,8 @@ def dispatch_business_field_discovery(
 ) -> dict[str, Any]:
     """Bind bounded live candidates without accepting a model-authored token."""
 
-    meanings = tuple(args.meanings)
-    if (
+    meanings = tuple(args.meanings or ())
+    if not (args.list_fields or args.selection) and (
         not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
         or any(
             not isinstance(value, str)
@@ -17827,6 +17977,24 @@ def dispatch_business_field_discovery(
         project=binding.project,
         state_dir=binding.state_dir,
     )
+    if args.page and not args.list_fields:
+        raise GatewayInputError("--page requires --list")
+    if args.list_fields or args.selection:
+        from wwise_waapi.metadata_discovery import browse_metadata
+        browsed = browse_metadata(
+            read_call=binding.read_call,
+            context={"draft": args.draft_id, "context": session.context.as_binding_dict(),
+                     "endpoint": dict(common["endpoint"]), "live_info": dict(live_info)},
+            **discovery_scope, page_size=args.page_size, page=args.page, selection=args.selection,
+        )
+        if args.list_fields:
+            payload = operation_draft_payload(args.command, binding.record, offline=False,
+                state_dir=args.state_dir, task_authority=args.task_authority)
+            payload.update({"endpoint": dict(common["endpoint"]), "detected_version": detected_version,
+                            "agent_result": browsed})
+            return payload
+        meanings = (browsed["metadata"]["name"],)
+        read_call = binding.read_call
     discovery = discover_metadata(
         read_call=read_call,
         queries=meanings,
@@ -17834,6 +18002,7 @@ def dispatch_business_field_discovery(
         limit=MAX_METADATA_DISCOVERY_LIMIT,
     )
     eligible: list[Mapping[str, Any]] = []
+    incompatible: list[dict[str, Any]] = []
     for candidate in discovery.candidates:
         kind = candidate.get("kind")
         metadata = candidate.get("metadata")
@@ -17887,6 +18056,14 @@ def dispatch_business_field_discovery(
             )
         if accepted:
             eligible.append(candidate)
+        else:
+            incompatible.append({
+                "field": candidate.get("name"),
+                "reason": ("RTPC requires a numeric property with live RTPC support"
+                           if binding.record.operation == "object.setRTPC"
+                           else "Live field kind/type/support is incompatible with this operation"),
+                "operation": binding.record.operation,
+            })
     missing_meanings = [
         meaning
         for meaning in meanings
@@ -17911,6 +18088,7 @@ def dispatch_business_field_discovery(
                     for meaning in missing_meanings
                 ],
                 "candidate_count_scope": "returned_compatible_live_fields",
+                "rejected_candidates": incompatible[:8],
                 "fallback_detail_scan": dict(discovery.fallback_detail_scan),
                 "recovery": "Refine the missing discovery meaning for this bound object; no declaration was changed.",
             },
@@ -17957,10 +18135,13 @@ def dispatch_business_field_discovery(
                     {
                         "error_code": exc.error_code,
                         "field_kind": candidate.get("kind"),
+                        "field": candidate.get("name"),
+                        "reason": str(exc)[:512],
+                        "details": exc.details,
                     }
                 )
         if not captured:
-            raise rejected_errors[0]
+            raise BusinessFieldInputError("Selected live fields could not be bound", details={"rejected_candidates": rejected[:8], "draft_changed": False})
         captured_tokens = {bound.token for bound in captured}
         if any(
             not any(
@@ -17975,7 +18156,7 @@ def dispatch_business_field_discovery(
             )
             for meaning in meanings
         ):
-            raise rejected_errors[0]
+            raise BusinessFieldInputError("Selected live fields could not be bound", details={"rejected_candidates": rejected[:8], "draft_changed": False})
         return current.with_handle_registry(handles)
 
     schema_digest = operation_draft_schema_digest(
@@ -18001,6 +18182,7 @@ def dispatch_business_field_discovery(
         for candidate in eligible
     }
     from wwise_waapi.business_fields import field_value_input
+    from wwise_waapi.metadata_discovery import metadata_unit
 
     field_candidates: list[dict[str, Any]] = []
     for bound in captured:
@@ -18022,6 +18204,8 @@ def dispatch_business_field_discovery(
                 "value_type": bound.value_type,
                 "platform": bound.platform,
                 "restrictions": dict(bound.restrictions),
+                "metadata": dict(browsed["metadata"] if args.selection else metadata),
+                "unit": metadata_unit(metadata),
                 "value_input": field_value_input(session, bound),
                 "matched_meanings": list(candidate.get("matched_queries", [])),
             }
@@ -18064,7 +18248,8 @@ def dispatch_business_field_discovery(
             "candidate_count": len(field_candidates),
             "meaning_results": meaning_results,
             "meaning_count": len(meaning_results),
-            "rejected_candidate_count": len(rejected),
+            "rejected_candidate_count": len(rejected) + len(incompatible),
+            "rejected_candidates": [*incompatible, *rejected][:8],
             "selection_required": selection_required,
             "selection_rule": (
                 "copy_exactly_one_candidate.handle_per_requested_meaning"
@@ -18723,6 +18908,9 @@ def create_transaction_preview(
         version=detected_version,
         allow_none=project_guard_mode != PROJECT_GUARD_INVARIANT,
     )
+    attest_draft_live_connection(
+        args, env=env, live_info=live_info, project=project,
+    )
     state_dir = resolve_transaction_state_directory(args, env=env)
     if project is not None:
         require_runtime_directory_outside_project(state_dir, project=project)
@@ -18811,6 +18999,7 @@ def create_transaction_preview(
         skill_root=SKILL_ROOT,
         ttl_seconds=args.ttl,
     ).as_dict()
+    artifact["connection_configuration"] = selected_connection_binding(env)
     prepared = require_mapping(
         artifact.get("prepared_operation"),
         "prepared operation",
@@ -19324,6 +19513,7 @@ def _dispatch_transaction_command_with_execution_lease(
             return {
                 "ok": False,
                 "status": "repreview_required",
+                "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                 **common,
                 "transaction_id": transaction_id,
                 "state": repreview.state.value,
@@ -19374,6 +19564,7 @@ def _dispatch_transaction_command_with_execution_lease(
             return {
                 "ok": False,
                 "status": "repreview_required",
+                "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                 **common,
                 "transaction_id": transaction_id,
                 "state": repreview.state.value,
@@ -19395,6 +19586,7 @@ def _dispatch_transaction_command_with_execution_lease(
             return {
                 "ok": False,
                 "status": "repreview_required",
+                "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                 **common,
                 "transaction_id": transaction_id,
                 "state": repreview.state.value,
@@ -19736,6 +19928,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -19808,6 +20001,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -19885,6 +20079,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -19941,6 +20136,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -19992,6 +20188,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 return {
                     "ok": False,
                     "status": "repreview_required",
+                    "write_dispatch": dict(PREWRITE_GUARD_REJECTION),
                     **common,
                     "transaction_id": transaction_id,
                     "state": repreview.state.value,
@@ -20376,6 +20573,30 @@ def _dispatch_transaction_command_with_execution_lease(
                 verified=verification.business_state_verified,
                 cleanup=payload["cleanup"],
             )
+            if transaction_request.get("operation") == "object.create":
+                execution_payload = execution_result.get("result")
+                root_id = execution_payload.get("id") if isinstance(execution_payload, Mapping) else None
+                identities: list[dict[str, Any]] = []
+                for readback in verification.readbacks:
+                    result = readback.get("result")
+                    rows = result.get("return") if isinstance(result, Mapping) else None
+                    if not isinstance(rows, list):
+                        continue
+                    for row in rows:
+                        if not isinstance(row, Mapping) or row.get("id") != root_id:
+                            continue
+                        identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                        if (_canonical_guid(identity["id"])
+                                and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
+                                and identity not in identities):
+                            identities.append(identity)
+                agent_result["business_result"] = {
+                    "contract": "waapi-skill.verified-created-root/v1",
+                    "identity_status": "verified" if len(identities) == 1 else "unavailable",
+                    "verified_root": identities[0] if len(identities) == 1 else None,
+                    "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+                    "repeat_creation": False,
+                }
             transaction_arguments = transaction_request.get("arguments")
             transaction_api = (
                 transaction_arguments.get("api")
@@ -23671,6 +23892,23 @@ def operation_draft_exact_copy_binding(
     }
 
 
+def _add_field_browsing(value: Any) -> None:
+    if isinstance(value, dict):
+        prefix = value.get("fixed_argv_prefix", ())
+        if "draft-discover-fields" in prefix or "draft-discover-fields" in str(value.get("fixed_argv_prefix_copy", "")):
+            value["selection_modes"] = {
+                "list": "replace --meaning with --list; optional --page-size 1..64 and returned --page",
+                "exact_detail_and_handle": "replace --meaning with --selection copied from this Draft/scope list",
+                "search": "--meaning is auxiliary lexical discovery",
+                "selection_authority": "read-only until normal Field Handle validation; never a mutation authorization",
+            }
+        for child in tuple(value.values()):
+            _add_field_browsing(child)
+    elif isinstance(value, list):
+        for child in value:
+            _add_field_browsing(child)
+
+
 def _compact_business_binding_continuation(value: Any) -> Any:
     """Remove repeated argv arrays while preserving every copy-ready route."""
 
@@ -23814,7 +24052,15 @@ def _compact_object_set_update_continuation(
     for key in common_actions:
         if key in value:
             action = value[key]
-            if key == "declare_existing" and isinstance(action, Mapping):
+            if key == "field_discovery" and command == "draft-discover-fields":
+                # The selected handles and metadata are the useful result now.
+                # Further discovery keeps its complete copy-ready routes in the
+                # already disclosed exact draft-inspect continuation.
+                action = {
+                    "available_via": "more_actions",
+                    "use_when": "additional_fields_or_other_scopes_are_needed",
+                }
+            elif key == "declare_existing" and isinstance(action, Mapping):
                 action = {
                     **action,
                     "cardinality": "exactly_one_declaration_per_command",
@@ -25803,7 +26049,7 @@ def _business_next_action_binding(
                     "--declaration-id",
                     "plugin",
                     "--object-handle",
-                    "<bound-plugin-owner-handle>",
+                    "<bound-plugin-target-handle>",
                     "--field",
                     "plugin_role",
                     "<source-or-effect>",
@@ -25813,6 +26059,7 @@ def _business_next_action_binding(
                     "--field",
                     "plugin_type_handle",
                     "<selected-plugin-type-handle>",
+                    "[--field plugin_placement owner|shareset]",
                     "[--field notes <exact-user-notes>]",
                     "[--field platform <exact-user-platform>]",
                     "[--field language <exact-source-language>]",
@@ -27521,6 +27768,7 @@ def operation_draft_payload(
             record,
             task_authority=task_authority,
         )
+        _add_field_browsing(next_action_binding)
         adapter = business_adapter(record.operation)
         audio_import_declaration_receipt = (
             record.operation == "audio.import"
@@ -28364,7 +28612,7 @@ def transaction_show_summary(
     byte-truncated.
     """
 
-    artifact_map = dict(artifact) if isinstance(artifact, Mapping) else {}
+    artifact_map = project_persistent_artifact(artifact) if isinstance(artifact, Mapping) else {}
     prepared_raw = artifact_map.get("prepared_operation")
     prepared = dict(prepared_raw) if isinstance(prepared_raw, Mapping) else {}
     project_guard_raw = artifact_map.get("project_guard")
@@ -28412,6 +28660,27 @@ def transaction_show_summary(
         execution_result=execution_result,
     )
     request = artifact_map.get("request")
+    derived_changes = []
+    verification = prepared.get("verification_plan")
+    if isinstance(verification, Mapping):
+        for node in verification.get("nodes", []):
+            if not isinstance(node, Mapping):
+                continue
+            for field in node.get("properties", []):
+                if not isinstance(field, Mapping) or field.get("derived") is not True:
+                    continue
+                if field.get("already_satisfied") is True:
+                    continue
+                derived_changes.append({
+                    "object_id": node.get("target_id"),
+                    "request_path": node.get("request_path"),
+                    "field": field.get("name"),
+                    "value": field.get("value"),
+                    "activates_references": field.get("activates_references", []),
+                })
+    # Required user notice survives every compact variant; the existing byte
+    # ceiling fails closed if the complete change list cannot fit.
+    derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
 
     # ``transaction-show --summary-only`` predates the bounded projections.
     # Preserve that committed public shape exactly for ordinary transactions;
@@ -28424,6 +28693,7 @@ def transaction_show_summary(
             "contract": artifact_map.get("contract"),
             "request": request,
             "dispatch": prepared.get("dispatch"),
+            **derived_notice,
             "resolved_roles": prepared.get("resolved_roles"),
             "pre_state": prepared.get("pre_state"),
             "verification_plan": prepared.get("verification_plan"),
@@ -28490,6 +28760,7 @@ def transaction_show_summary(
                 "contract": artifact_map.get("contract"),
                 "summary_contract": TRANSACTION_SHOW_SUMMARY_CONTRACT,
                 "detail_level": detail_level,
+                **derived_notice,
                 "request": request,
                 "request_canonical_sha256": request_digest,
                 "dispatch": transaction_dispatch_summary(
@@ -29297,6 +29568,10 @@ def metadata_cache_lookup(
             return None
         if uri == CACHE_GET_PROPERTY_INFO_URI:
             if set(args) == {"classId", "property"}:
+                # These class facts can authorize new GameParameter values.
+                # Every discovery/check/Preview must consult current metadata.
+                if args["property"] in {"Min", "Max", "BindToBuiltInParam"}:
+                    return None
                 return MetadataCacheLookup.property_info(
                     class_id=args["classId"],
                     property_name=args["property"],

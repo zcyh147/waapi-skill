@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config, bind_fixture_connection
+
 import importlib.util
 import json
 import os
@@ -730,9 +732,9 @@ def gateway_env(
         config_path.write_text(
             json.dumps(
                 {
-                    "wwise_version": None,
+                    "wwise_version": version,
                     "waapi_host": "127.0.0.1",
-                    "waapi_port": None,
+                    "waapi_port": port,
                     "project_modification_policy": policy,
                 }
             ),
@@ -1743,7 +1745,7 @@ def test_operations_and_operation_schema_are_offline_closed_contracts(tmp_path: 
 
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         exit_code, versioned = execute(
-            ["operation-schema", "object.setNotes"],
+            ["--version", version, "operation-schema", "object.setNotes"],
             tmp_path=tmp_path,
             version=version,
         )
@@ -2133,7 +2135,7 @@ def test_transaction_show_reads_immutable_artifact_and_journal_without_wwise(tmp
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
     artifact = {"contract": "test-preview/v1", "prepared_operation": {"operation": "object.setNotes"}}
-    created = store.create_preview("tx-show", artifact)
+    created = store.create_preview("tx-show", bind_fixture_connection(artifact, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-show")
 
     exit_code, payload = execute(
@@ -2177,10 +2179,10 @@ def test_transaction_show_advertises_exact_confirm_argv_only_while_awaiting(
     store = TransactionStore(state_dir)
     created = store.create_preview(
         "tx-next-command",
-        {
+        bind_fixture_connection({
             "contract": "test-preview/v1",
             "prepared_operation": {"operation": "object.setNotes"},
-        },
+        }, gateway_env(tmp_path)),
     )
 
     exit_code, draft = execute(
@@ -2249,7 +2251,7 @@ def test_transaction_show_summary_omits_raw_artifact_bulk_but_keeps_review_evide
         "runtime_guard": {"fingerprint": "runtime-fingerprint", "files": {"large": "y" * 4096}},
         "expires_at": "2030-01-01T00:00:00Z",
     }
-    created = store.create_preview("tx-summary", artifact)
+    created = store.create_preview("tx-summary", bind_fixture_connection(artifact, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-summary")
 
     exit_code, payload = execute(
@@ -2809,6 +2811,7 @@ def test_preview_uses_bounded_review_for_set04_scale_artifact_without_losing_sta
     )
 
     stored = TransactionStore(state_dir).load_preview(payload["transaction_id"])
+    bind_fixture_connection(artifact, gateway_env(tmp_path))
     assert stored.artifact == artifact
     assert (
         stored.artifact["prepared_operation"]["pre_state"]["object_set_nodes"][-1]
@@ -3111,7 +3114,7 @@ def test_transaction_show_summary_budget_failure_is_structured_and_never_truncat
             "cleanup": {"kind": "none"},
         },
     }
-    store.create_preview("tx-summary-budget", artifact)
+    store.create_preview("tx-summary-budget", bind_fixture_connection(artifact, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-summary-budget")
     monkeypatch.setattr(waapi_gateway, "TRANSACTION_SHOW_SUMMARY_FIXED_BUDGET_BYTES", 32)
 
@@ -3146,7 +3149,7 @@ def test_transaction_show_summary_budget_failure_is_structured_and_never_truncat
 def test_confirm_uses_environment_state_dir_and_never_connects_to_wwise(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
-    created = store.create_preview("tx-confirm", {"operation": "object.setNotes"})
+    created = store.create_preview("tx-confirm", bind_fixture_connection({"operation": "object.setNotes"}, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-confirm")
     token = store.load_snapshot("tx-confirm").confirmation_token
     assert token is not None
@@ -3176,7 +3179,7 @@ def test_confirm_accepts_state_scoped_confirmation_token_without_connecting(
     store = TransactionStore(state_dir)
     created = store.create_preview(
         "tx-confirm-token",
-        {"operation": "object.setNotes"},
+        bind_fixture_connection({"operation": "object.setNotes"}, gateway_env(tmp_path)),
     )
     store.submit_for_confirmation("tx-confirm-token")
     confirmation_token = store.load_snapshot(
@@ -3211,7 +3214,7 @@ def test_confirm_token_mismatch_is_structured_without_echoing_correct_token(
 ) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
-    store.create_preview("tx-token-mismatch", {"operation": "object.setNotes"})
+    store.create_preview("tx-token-mismatch", bind_fixture_connection({"operation": "object.setNotes"}, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-token-mismatch")
     correct_token = store.load_snapshot("tx-token-mismatch").confirmation_token
     assert correct_token is not None
@@ -3266,7 +3269,7 @@ def test_confirm_parser_requires_exactly_one_binding_argument(
 def test_execute_rechecks_external_never_policy_after_prior_confirmation(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
-    created = store.create_preview("tx-policy-drift", {"operation": "object.setNotes"})
+    created = store.create_preview("tx-policy-drift", bind_fixture_connection({"operation": "object.setNotes"}, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-policy-drift")
 
     confirm_code, confirmed = execute(
@@ -3281,9 +3284,9 @@ def test_execute_rechecks_external_never_policy_after_prior_confirmation(tmp_pat
     config_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": "2022.1",
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "never",
             }
         ),
@@ -3879,7 +3882,7 @@ def test_preview_without_apply_stays_review_only_under_allow_changes(
 def test_confirm_rejects_tampered_token_and_preserves_awaiting_state(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
-    store.create_preview("tx-hash", {"operation": "object.setNotes"})
+    store.create_preview("tx-hash", bind_fixture_connection({"operation": "object.setNotes"}, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-hash")
 
     exit_code, payload = execute(
@@ -3897,7 +3900,7 @@ def test_confirm_rejects_tampered_token_and_preserves_awaiting_state(tmp_path: P
 def test_reject_persists_reason_and_is_an_offline_terminal_transition(tmp_path: Path) -> None:
     state_dir = tmp_path / "state"
     store = TransactionStore(state_dir)
-    created = store.create_preview("tx-reject", {"operation": "object.delete"})
+    created = store.create_preview("tx-reject", bind_fixture_connection({"operation": "object.delete"}, gateway_env(tmp_path)))
     store.submit_for_confirmation("tx-reject")
 
     exit_code, payload = execute(
@@ -3986,6 +3989,9 @@ def test_public_gateway_legacy_json_preview_preserves_canonical_ingress_evidence
     prepared = artifact["prepared_operation"]
     assert artifact["request"] == raw_request
     assert prepared["request"] == raw_request
+    # The approved persistent-project policy replaces disposable-project cleanup.
+    assert prepared["cleanup"]["kind"] == "retain-project-and-outputs"
+    assert prepared["cleanup"]["automatic_cleanup"] is False
     assert {
         name: waapi_gateway.canonical_sha256(prepared[name])
         for name in (
@@ -4002,7 +4008,7 @@ def test_public_gateway_legacy_json_preview_preserves_canonical_ingress_evidence
         "resolved_roles": "47338924af9577e18c63efd4be0b0cdaa61e641c06e201ad86f749225e1ede16",
         "pre_state": "f0a2bc467715f31ed8a368bc47571331166ee6137dac1c6fb9730b7cfdf656f5",
         "verification_plan": "1d3f23aafa5c99092c9454e85545de2333365ea7f89d710bd5753117a043fe21",
-        "cleanup": "f934bcfbbee2f0e6c1914e74b14b4b4277a16b493db78d23c2f0dcaee133cb66",
+        "cleanup": "ff0db47b85a2c1a969eae25d3ae48d803d423909c5b53c87281efa34f9ba0903",
     }
     assert artifact["project_guard"] == waapi_gateway.build_project_guard(
         endpoint=payload["endpoint"],
@@ -4405,6 +4411,13 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
         "verified": True,
         "request": create_request(),
         "cleanup": verified["cleanup"],
+        "business_result": {
+            "contract": "waapi-skill.verified-created-root/v1",
+            "identity_status": "verified",
+            "verified_root": {key: created_row()[key] for key in ("id", "name", "type", "path")},
+            "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+            "repeat_creation": False,
+        },
     }
     readback = next(call for call in verify_client.calls if call[0] == "ak.wwise.core.object.get")
     assert readback[1] == {"from": {"id": [CREATED_GUID]}}
@@ -5106,6 +5119,9 @@ def test_verify_transport_cleanup_failure_keeps_full_unprojected_success_boundar
         {"ak.wwise.core.getInfo": [live_info()]}
     )
 
+    TransactionStore(tmp_path / "state").create_preview(
+        "tx-cleanup-boundary", bind_fixture_connection({}, gateway_env(tmp_path))
+    )
     exit_code, payload = execute(
         ["verify", "tx-cleanup-boundary"],
         tmp_path=tmp_path,
@@ -5243,6 +5259,9 @@ def test_verify_projects_only_safe_terminal_success_boundaries(
         lambda *args, **kwargs: business_result,
     )
 
+    TransactionStore(tmp_path / f"state-{status}-{cleanup_status}").create_preview(
+        business_result["transaction_id"], bind_fixture_connection({}, gateway_env(tmp_path))
+    )
     exit_code, payload = execute(
         ["verify", business_result["transaction_id"]],
         tmp_path=tmp_path,
@@ -6773,10 +6792,9 @@ def test_remote_local_filesystem_previews_fail_before_project_or_path_proof(
         else "preview"
     )
 
+    set_gateway_config(gateway_env(tmp_path, version=version), waapi_host="192.0.2.10")
     exit_code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             preview_command,
             "--request-json",
             json.dumps(request),
@@ -6828,10 +6846,9 @@ def test_confirmed_generic_isolated_transaction_stays_confirmed_on_remote_execut
         {"ak.wwise.core.getInfo": [live_info(year=2023)]}
     )
 
+    set_gateway_config(gateway_env(tmp_path, version="2023.1"), waapi_host="192.0.2.10")
     exit_code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             "execute",
             transaction["transaction_id"],
         ],
@@ -6842,15 +6859,13 @@ def test_confirmed_generic_isolated_transaction_stays_confirmed_on_remote_execut
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
+    assert payload["error_code"] == "GatewayInputError"
+    assert "configuration changed" in payload["message"]
     assert payload["command"] == "execute"
-    assert payload["executed"] is False
     assert TransactionStore(state_dir).load(
         transaction["transaction_id"]
     ).state is TransactionState.CONFIRMED
-    assert [call[0] for call in remote_client.calls] == [
-        "ak.wwise.core.getInfo"
-    ]
+    assert remote_client.calls == []
 
 
 def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute(
@@ -6928,10 +6943,9 @@ def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
         {"ak.wwise.core.getInfo": [live_info()]}
     )
 
+    set_gateway_config(gateway_env(tmp_path), waapi_host="192.0.2.10")
     exit_code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             "execute",
             transaction["transaction_id"],
         ],
@@ -6941,19 +6955,12 @@ def test_confirmed_named_soundbank_transaction_stays_confirmed_on_remote_execute
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "LOCAL_WAAPI_HOST_REQUIRED"
-    assert payload["details"]["path_roles"] == [
-        "arguments.io_root",
-        "generated_artifacts",
-        "live_project_path",
-    ]
-    assert payload["executed"] is False
+    assert payload["error_code"] == "GatewayInputError"
+    assert "configuration changed" in payload["message"]
     assert TransactionStore(state_dir).load(
         transaction["transaction_id"]
     ).state is TransactionState.CONFIRMED
-    assert [call[0] for call in remote_client.calls] == [
-        "ak.wwise.core.getInfo"
-    ]
+    assert remote_client.calls == []
 
 
 def test_remote_named_capture_screen_still_requires_authoring(
@@ -6972,10 +6979,9 @@ def test_remote_named_capture_screen_still_requires_authoring(
         }
     )
 
+    set_gateway_config(gateway_env(tmp_path, version="2022.1"), waapi_host="192.0.2.10")
     exit_code, payload = execute(
         [
-            "--host",
-            "192.0.2.10",
             "legacy-preview",
             "--request-json",
             json.dumps(request),
@@ -7757,20 +7763,19 @@ def test_generate_soundbank_verify_rejects_endpoint_drift_without_project_probe(
     )
     verify_client = FakeClient({"ak.wwise.core.getInfo": [live_info()]})
 
+    set_gateway_config(gateway_env(tmp_path), waapi_port=31338)
     verify_exit, payload = execute(
         ["verify", transaction["transaction_id"]],
         tmp_path=tmp_path,
         state_dir=state_dir,
         client=verify_client,
-        port=31338,
     )
 
     assert verify_exit == 2
-    assert payload["status"] == "verification_deferred"
-    assert payload["state"] == TransactionState.EXECUTED_UNVERIFIED.value
-    assert payload["error_code"] == "PROJECT_GUARD_MISMATCH"
-    assert payload["project_call"] is None
-    assert [call[0] for call in verify_client.calls] == ["ak.wwise.core.getInfo"]
+    assert payload["error_code"] == "GatewayInputError"
+    assert "configuration changed" in payload["message"]
+    assert TransactionStore(state_dir).load(transaction["transaction_id"]).state is TransactionState.EXECUTED_UNVERIFIED
+    assert verify_client.calls == []
 
 
 def test_generate_soundbank_verify_rejects_runtime_drift_without_project_probe(

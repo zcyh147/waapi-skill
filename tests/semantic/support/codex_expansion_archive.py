@@ -12,6 +12,7 @@ import hashlib
 import importlib
 import io
 import json
+import os
 import math
 import re
 import sys
@@ -111,12 +112,15 @@ def _finite(value: Any) -> bool:
 
 def _case(plan: Mapping[str, Any]) -> tuple[Any, str]:
     case_id = str(plan["unit_id"]).split("-")[-1]
+    if plan.get("contract") == "waapi-skill.repair-task-plan/v1":
+        _require(case_id in {"F1", "F2", "F3", "F4"}, "unknown repair case")
+        return importlib.import_module("tests.semantic.support.codex_repair_cases"), case_id
     _require(case_id in _CASE_MODULES, "unknown expansion case")
     return importlib.import_module(
         "tests.semantic.support.codex_expansion_" + _CASE_MODULES[case_id] + "_case"), case_id
 
 
-def _transaction(root: Path, transaction_id: str) -> tuple[dict, list[dict], dict]:
+def _transaction(root: Path, transaction_id: str, *, require_connection_configuration: bool = False) -> tuple[dict, list[dict], dict]:
     validate_transaction_id(transaction_id)
     prefix = f"broker/state/transactions/{transaction_id}/"
     preview = _json(root, prefix + "preview.json")
@@ -127,7 +131,7 @@ def _transaction(root: Path, transaction_id: str) -> tuple[dict, list[dict], dic
     artifact = preview.get("artifact")
     _require(isinstance(artifact, dict) and preview.get("transaction_id") == transaction_id
              and preview.get("artifact_hash") == canonical_digest(artifact), "preview artifact digest mismatch")
-    _validate_artifact(artifact)
+    _validate_artifact(artifact, require_connection_configuration=require_connection_configuration)
     previous_hash, previous_state = "", None
     for index, event in enumerate(events, 1):
         _require(isinstance(event, dict), "transaction event must be an object")
@@ -155,6 +159,24 @@ def _public_gateway(plan: Mapping[str, Any]):
     return module
 
 
+def _command_argv(record, plan):
+    """Interpret a receipt without changing its authenticated raw invocation."""
+    argv = record["gateway_arguments"]
+    if (plan.get("contract") == "waapi-skill.repair-task-plan/v1"
+            and argv and argv[0].startswith("-")):
+        from tests.semantic.support.codex_repair_gateway_argv import repair_command_argv
+        try:
+            rejected = record.get("accepted") is False and "admission_rejection" in record
+            if rejected:
+                _validate_initial_admission_rejection(record, argv=argv,
+                    operation=plan.get("request_schema_uri") or plan.get("operation"))
+            return list(repair_command_argv(argv, parser=_public_gateway(plan).build_parser(),
+                version=plan["version"], initial_admission_rejected=rejected))
+        except ValueError as exc:
+            raise ExpansionArchiveError("invalid repair global options") from exc
+    return argv
+
+
 def _scope(plan: Mapping[str, Any]) -> BoundedExpansionReads:
     value = dict(plan["read_scope"])
     for key in ("object_ids", "operations", "includes", "relationship_sources", "fields", "curve_roles", "platforms"):
@@ -166,6 +188,7 @@ def _scope(plan: Mapping[str, Any]) -> BoundedExpansionReads:
     module = _public_gateway(plan)
     parser = module.build_parser()
     def parse(argv):
+        argv = _command_argv({"gateway_arguments": argv}, plan)
         _require(bool(argv) and not argv[0].startswith("-") and len(argv) <= 256, "invalid public read argv")
         try:
             return parser.parse_args(["--version", plan["version"], *argv])
@@ -254,6 +277,28 @@ def _validate_predispatch_rejection(record, rejection):
         "rejected command lacks authenticated pre-dispatch proof")
 
 
+def _validate_initial_admission_rejection(record, *, argv, operation):
+    """Accept a new producer's closed admission decision, never infer it from prose.
+
+    The authenticated marker binds argv and the selected operation while the
+    policy has no Draft, transaction, or execution reservation. Its enclosing
+    receipt proves no runner dispatch; final replay also requires no stored
+    capabilities, only read prefixes, and unchanged reconciled project state.
+    Older unknown rejections have no marker and keep their original boundary.
+    """
+    expected = {"contract": "waapi-skill.gateway-admission-rejection/v1",
+        "stage": "initial_policy_admission", "policy_state": "unprepared",
+        "bound_operation": operation, "gateway_argv_sha256": canonical_digest(argv),
+        "runner_dispatched": False, "execution_reserved": False, "draft_id": None, "transaction_id": None}
+    marker = record.get("admission_rejection")
+    _require(isinstance(marker, dict) and canonical_digest(marker) == canonical_digest(expected),
+        "invalid initial admission rejection marker")
+    reason = record.get("rejection")
+    _require(isinstance(reason, str) and reason.startswith("expansion policy rejected command: ")
+        and len(reason) <= 4096, "initial policy rejection lacks its bounded reason")
+    _validate_predispatch_rejection(record, reason)
+
+
 def _validate_rejected_draft_bind(record, *, argv, gate, draft_id, authority, revision):
     _validate_predispatch_rejection(record,
         "expansion policy rejected command: bound object is outside the approved fixture")
@@ -267,9 +312,9 @@ def _validate_rejected_draft_bind(record, *, argv, gate, draft_id, authority, re
 
 
 def _pristine_rejected_draft(root, plan, records):
-    starts = [row for row in records if row["gateway_arguments"][0] == "draft-start"]
-    _require(len(starts) == 1 and all(row["gateway_arguments"][0] in _READS | {"draft-start", "draft-bind-object"}
-        for row in records) and not any(row.get("accepted") is True and row["gateway_arguments"][0] == "draft-bind-object"
+    starts = [row for row in records if _command_argv(row, plan)[0] == "draft-start"]
+    _require(len(starts) == 1 and all(_command_argv(row, plan)[0] in _READS | {"draft-start", "draft-bind-object"}
+        for row in records) and not any(row.get("accepted") is True and _command_argv(row, plan)[0] == "draft-bind-object"
         for row in records), "rejected binding contains another Draft action")
     payload = starts[0]["payload"]
     draft = payload["draft"]
@@ -299,8 +344,8 @@ def _bound_draft_rejected_read(root, plan, records, *, declaration=False):
     _require((declaration and operation == "ak.wwise.core.object.setAttenuationCurve")
         or (not declaration and plan["read_scope"].get("owned_project_reads") is True
             and operation == "audio.import"), "rejected bound Draft lacks its approved operation scope")
-    starts = [row for row in records if row["gateway_arguments"][0] == "draft-start"]
-    binds = [row for row in records if row["gateway_arguments"][0] == "draft-bind-object"]
+    starts = [row for row in records if _command_argv(row, plan)[0] == "draft-start"]
+    binds = [row for row in records if _command_argv(row, plan)[0] == "draft-bind-object"]
     _require(len(starts) == len(binds) == 1
         and starts[0].get("succeeded") is True and binds[0].get("succeeded") is True
         and starts[0]["sequence"] < binds[0]["sequence"] < records[-1]["sequence"],
@@ -369,8 +414,8 @@ def _declared_import_rejected_check(root, plan, records):
     _require(plan.get("operation") == "audio.import" and plan.get("unit_id", "").endswith("-M01")
         and plan["read_scope"].get("owned_project_reads") is True,
         "rejected check lacks its approved music import scope")
-    drafts = [row for row in records[:-1] if row["gateway_arguments"][0] not in _READS]
-    _require([row["gateway_arguments"][0] for row in drafts] ==
+    drafts = [row for row in records[:-1] if _command_argv(row, plan)[0] not in _READS]
+    _require([_command_argv(row, plan)[0] for row in drafts] ==
         ["draft-start", "draft-bind-object", "draft-declare-import-batch"]
         and all(row.get("accepted") is True and row.get("succeeded") is True for row in drafts),
         "rejected check changed its accepted editable import prefix")
@@ -484,6 +529,10 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
     records = broker.get("records")
     _require(isinstance(records, list) and len(records) <= 128, "broker receipt count is invalid")
     gate = _scope(plan)
+    declarations = _DECLARATIONS
+    if plan.get("contract") == "waapi-skill.repair-task-plan/v1":
+        from tests.semantic.support.codex_repair_broker_policy import RepairBrokerPolicy
+        declarations = RepairBrokerPolicy.declarations
     draft_id = authority = revision = None
     failed_accepted = False
     expected_operation = plan.get("request_schema_uri") or plan.get("operation")
@@ -505,7 +554,11 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
         _require(list(resolved.gateway_arguments) == argv
             and list(resolved.normalized_model_argv) == record["normalized_model_argv"], "recorded Gateway argv differs from actual invocation")
         if record.get("accepted") is not True:
-            if argv[:1] == ["draft-bind-object"]:
+            if "admission_rejection" in record:
+                _validate_initial_admission_rejection(record, argv=argv, operation=expected_operation)
+                _require(draft_id is None and all(_command_argv(prior, plan)[0] in _READS for prior in records[:index - 1]),
+                    "initial admission rejection follows a Draft or transaction")
+            elif argv[:1] == ["draft-bind-object"]:
                 gate.public_parser(argv)
                 _validate_rejected_draft_bind(record, argv=argv, gate=gate,
                     draft_id=draft_id, authority=authority, revision=revision)
@@ -520,6 +573,7 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             _require(index == len(records), "dispatch followed a rejected read")
             failed_accepted = True
             continue
+        argv = _command_argv(record, plan)
         gate.public_parser(argv)  # Admitted receipts must always be public syntax.
         runner = str((Path(plan["skill_source"]) / "scripts" / "run.py").resolve())
         _require(record.get("runner_command_sha256") == canonical_digest(
@@ -538,7 +592,7 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
             _require(bool(argv) and payload.get("command") == argv[0], "receipt command mismatch")
         _require(bool(argv), "receipt has no admitted command")
         command = argv[0]
-        _require(command in (_READS | _DRAFT_READS | _BUSINESS_EDITS | _DECLARATIONS.get(plan.get("operation"), frozenset())
+        _require(command in (_READS | _DRAFT_READS | _BUSINESS_EDITS | declarations.get(plan.get("operation"), frozenset())
             | {"draft-start", "preview-from-draft", "transaction-show", "confirm", "execute", "verify"}),
                  "receipt used an unapproved Gateway command")
         semantic = ["runner-owned-version", plan["version"], *argv]
@@ -561,6 +615,10 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
                              "mutation binding exceeds the sealed object scope")
             draft = payload.get("draft") if isinstance(payload, dict) else None
             if isinstance(draft, dict):
+                if plan.get("contract") == "waapi-skill.repair-task-plan/v1" and command == "draft-discover-fields":
+                    delta = 0 if "--list" in argv else 1
+                    _require(draft.get("draft_id") == draft_id and type(draft.get("revision")) is int
+                        and draft["revision"] == revision + delta, "repair metadata revision transition mismatch")
                 if command == "draft-start":
                     draft_id, authority = draft["draft_id"], payload["task_authority"]
                 revision = draft["revision"]
@@ -684,7 +742,7 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 "Broker receipt order differs from raw Codex Gateway commands")
         c09_notice = None
         if index == 1 and "notice_adjudication" in plan:
-            artifact = (_transaction(root, oracle["transaction_id"])[0]["artifact"]
+            artifact = (_transaction(root, oracle["transaction_id"], require_connection_configuration=plan.get("contract") == "waapi-skill.repair-task-plan/v1")[0]["artifact"]
                         if oracle.get("transaction_id") else {})
             from tests.semantic.support.codex_c09_notice_adjudication import CONTRACT as legacy_notice_contract
             review_contract = plan["notice_adjudication"]["configuration"]["contract"]
@@ -710,7 +768,7 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
         if result["passed"] or rejected_read:
             classified = classify_task_commands(commands, workspace=root / "agent-workspace",
                 skill_source=Path(plan["skill_source"]), expected_wwise_version=plan["version"],
-                expected_gateway_subcommands=tuple(sorted({row["gateway_arguments"][0] for row in records if row["gateway_arguments"]})))
+                expected_gateway_subcommands=tuple(sorted({_command_argv(row, plan)[0] for row in records if row["gateway_arguments"]})))
             references = classified.skill_read_files
             allowed_references = {"SKILL.md", "references/waapi-operate.md", "references/waapi-query.md",
                                   "references/waapi-setup.md", "references/waapi-coverage.md"}
@@ -720,13 +778,25 @@ def _turns(root: Path, plan: Mapping[str, Any], result: Mapping[str, Any],
                 and (index != 1 or bool(references) and references[0] == "SKILL.md")
                 and len(commands) - len(recoverable_preprocess_attempt_indexes(commands))
                     == count - prefix + len(classified.allowed_read_commands), "raw commands violate Skill-only/no-bypass gates")
-            _require(not result["passed"] or index != 1 or (c09_notice if c09_notice is not None else expansion_preview_notice(SimpleNamespace(stdout=events_raw.decode("utf-8")),
+            repair_plan = plan.get("contract") == "waapi-skill.repair-task-plan/v1"
+            if "skill_read_schedule" in plan:
+                expected_schedule = [["SKILL.md", "references/waapi-query.md" if plan["policy"] == "read_only" else "references/waapi-operate.md"]]
+                _require(repair_plan and plan["skill_read_schedule"] == expected_schedule
+                    and list(references) == expected_schedule[index - 1]
+                    and tuple(command.command for command in commands[:len(references)]) == tuple(classified.allowed_read_commands),
+                    "sealed repair Skill read schedule differs from raw reads")
+            from tests.semantic.support.codex_repair_cases import repair_notice
+            _require(not result["passed"] or index != 1 or (repair_plan and plan["policy"] == "read_only") or (c09_notice if c09_notice is not None else (repair_notice if repair_plan else expansion_preview_notice)(SimpleNamespace(stdout=events_raw.decode("utf-8")),
                 commands, version=plan["version"], execute_expected=plan["policy"] == "allow_changes",
-                preview_artifact=_transaction(root, oracle["transaction_id"])[0]["artifact"],
+                preview_artifact=_transaction(root, oracle["transaction_id"], require_connection_configuration=plan.get("contract") == "waapi-skill.repair-task-plan/v1")[0]["artifact"],
                 before_snapshot=oracle.get("preview_before") or plan["before"])),
                      "visible post-Preview notice is missing")
             if rejected_read:
-                false_gates = {"broker_provenance", "policy_checkpoint", "visible_preview_notice"}
+                false_gates = {"broker_provenance", "policy_checkpoint"}
+                # Read-only repair turns have no Preview/notice obligation;
+                # preserve the producer's true gate instead of rewriting FAIL.
+                if not (repair_plan and plan["policy"] == "read_only"):
+                    false_gates.add("visible_preview_notice")
                 _require(result["passed"] is False and grade.get("passed") is False
                     and set(grade.get("errors", [])) == false_gates
                     and all(value is (key not in false_gates) for key, value in grade["common_gates"].items()),
@@ -778,7 +848,8 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     digest = plan.pop("sha256", None)
     _require(digest == canonical_digest(plan), "plan digest mismatch")
     _require(plan.get("inputs_sha256") == inputs_sha256, "immutable campaign inputs mismatch")
-    _require(plan.get("contract") == "waapi-skill.integration-expansion-task-plan/v1"
+    repair = plan.get("contract") == "waapi-skill.repair-task-plan/v1"
+    _require(plan.get("contract") in {"waapi-skill.integration-expansion-task-plan/v1", "waapi-skill.repair-task-plan/v1"}
         and plan.get("unit_id") == unit_id and plan.get("version") == version, "task plan identity mismatch")
     if "notice_adjudication" in plan:
         from tests.semantic.support.codex_c09_notice_adjudication import reviewer_configuration, CONTRACT as legacy_notice_contract
@@ -792,9 +863,17 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
             and review["configuration"] == reviewer_configuration(review_contract)
             and isinstance(review["runtime"], dict), "adjudication is outside the pinned workflow contract")
     module, case_id = _case(plan)
-    _require(unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"}
+    if repair:
+        _require((plan.get("model"), plan.get("reasoning_effort"), plan.get("service_tier"))
+            == ("gpt-5.6-terra", "medium", "default"), "repair executor settings changed")
+        expected_operation = {"F1": "object.setProperty", "F2": "ak.wwise.core.object.get",
+                              "F3": "object.create", "F4": "object.createPlugin"}[case_id]
+        _require(plan.get("operation") == expected_operation and plan.get("request_schema_uri") is None,
+                 "repair operation differs from the approved case")
+    _require((unit_id == f"REPAIR25-{case_id}" and version == "2025.1" if repair else
+              unit_id == f"EXP{version[2:4]}-{case_id}" and version in {"2022.1", "2025.1"})
         and (case_id, version) != ("M05", "2022.1"), "unit is not an Agent case")
-    policy = "ask_before_changes" if case_id in {"C01", "C03"} else "allow_changes"
+    policy = "read_only" if repair and case_id == "F2" else "ask_before_changes" if case_id in {"C01", "C03"} else "allow_changes"
     _require(plan.get("policy") == policy and isinstance(plan.get("prompts"), list)
         and len(plan["prompts"]) == (2 if policy == "ask_before_changes" else 1)
         and all(isinstance(prompt, str) and prompt for prompt in plan["prompts"]), "prompt/policy contract changed")
@@ -812,48 +891,60 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
             and broker.get("complete") is False and broker.get("terminal_state") == _BROKER_INDETERMINATE,
             "query timeout is terminal infrastructure and cannot seal a PASS")
     turns = _turns(root, plan, result, budget, records, oracle)
-    mutations = [row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["execute"]]
+    mutations = [row for row in records if row.get("accepted") is True and _command_argv(row, plan)[:1] == ["execute"]]
     _require(len(mutations) <= 1, "more than one execution was admitted")
     _require(oracle.get("before") == plan["before"], "independent pre-state changed")
     rejected_read = any(record.get("accepted") is False for record in records)
     if rejected_read:
-        rejected_declaration = records[-1]["gateway_arguments"][:1] == ["draft-declare-core-plan"]
-        rejected_check = records[-1]["gateway_arguments"][:1] == ["draft-check"]
+        initial_admission = "admission_rejection" in records[-1]
+        rejected_declaration = _command_argv(records[-1], plan)[:1] == ["draft-declare-core-plan"]
+        rejected_check = _command_argv(records[-1], plan)[:1] == ["draft-check"]
         allowed_prefix = _READS | {"draft-start", "draft-bind-object"}
         if rejected_check:
             allowed_prefix |= {"draft-declare-import-batch"}
-        _require(all(record["gateway_arguments"][0] in allowed_prefix for record in records[:-1]),
+        _require(all(_command_argv(record, plan)[0] in allowed_prefix for record in records[:-1]),
             "rejected command has another mutation or declaration in its accepted prefix")
         _require(result["passed"] is False and result.get("status") == "FAIL"
             and result.get("terminal_state") == "unprepared"
             and len(turns) == 1 and not turns[0].get("incomplete")
-            and (rejected_declaration or rejected_check or records[-1]["gateway_arguments"][0] in allowed_prefix)
+            and (initial_admission or rejected_declaration or rejected_check or _command_argv(records[-1], plan)[0] in allowed_prefix)
             and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
             and oracle.get("authorization") is None and oracle.get("permit") is None
-            and oracle.get("after") is None and result.get("assertions") == {}
+            and ((repair and case_id == "F2" and oracle.get("after") == plan["before"]
+                  and isinstance(result.get("assertions"), dict) and result["assertions"].get("read_refinement") is False)
+                 or oracle.get("after") is None and result.get("assertions") == {})
             and broker.get("passed") is False and broker.get("complete") is False,
             "rejected read cannot carry a Preview, mutation or successful outcome")
-        if rejected_check:
+        if initial_admission:
+            _require(all(key in oracle and oracle[key] is None for key in
+                ("preview_before", "preview_after", "gateway_verification_state"))
+                and result.get("gateway_verification_state") is None,
+                "initial admission rejection claims later phase evidence")
+            _require(all(_command_argv(record, plan)[0] in _READS for record in records[:-1])
+                and not os.path.lexists(root / "broker/state/operation-drafts-v1")
+                and not os.path.lexists(root / "broker/state/transactions"),
+                "initial admission rejection contains persisted Draft or transaction state")
+        elif rejected_check:
             _declared_import_rejected_check(root, plan, records)
             _require(all(key in oracle and oracle[key] is None for key in
                 ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
                 and result.get("gateway_verification_state") is None and oracle.get("assertions") == {},
                 "rejected check carries preparation or verification evidence")
-        elif records[-1]["gateway_arguments"][0] == "draft-bind-object":
+        elif _command_argv(records[-1], plan)[0] == "draft-bind-object":
             _pristine_rejected_draft(root, plan, records)
             _require(all(key in oracle and oracle[key] is None for key in
                 ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
                 and result.get("gateway_verification_state") is None,
                 "rejected binding carries preparation or verification evidence")
         else:
-            if any(record["gateway_arguments"][0] == "draft-start" for record in records):
+            if any(_command_argv(record, plan)[0] == "draft-start" for record in records):
                 _bound_draft_rejected_read(root, plan, records, declaration=rejected_declaration)
                 _require(all(key in oracle and oracle[key] is None for key in
                     ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))
                     and result.get("gateway_verification_state") is None,
                     "rejected bound read carries preparation or verification evidence")
             else:
-                _require(all(record["gateway_arguments"][0] in _READS for record in records), "rejected read contains Draft actions")
+                _require(all(_command_argv(record, plan)[0] in _READS for record in records), "rejected read contains Draft actions")
         accepted_names = [record.get("step_name") for record in records if record.get("accepted") is True]
         _require(all(isinstance(name, str) and name for name in accepted_names)
             and len(accepted_names) == len(set(accepted_names))
@@ -873,7 +964,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         _require({path.name for path in transactions_directory.iterdir()}
             == ({transaction_id} if transaction_id else set()), "unrecorded transaction in the Agent store")
     if transaction_id is not None:
-        preview, events, state = _transaction(root, transaction_id)
+        preview, events, state = _transaction(root, transaction_id, require_connection_configuration=repair)
         _require(oracle.get("artifact_hash") == preview["artifact_hash"], "oracle transaction binding mismatch")
         _require(oracle.get("preview_before") == oracle.get("preview_after")
             and isinstance(oracle.get("preview_before"), dict), "Preview changed business state")
@@ -894,7 +985,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                      "preview approval record differs from the independent adapter")
         else:
             preview_receipts = [row for row in records if row.get("accepted") is True
-                and row["gateway_arguments"][:1] == ["preview-from-draft"]]
+                and _command_argv(row, plan)[:1] == ["preview-from-draft"]]
             _require(not result["passed"] and recorded_approval is False
                 and "preview_approved" in oracle,
                 "rejected Preview lacks an explicit false preview approval record")
@@ -902,7 +993,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                 and preview_receipts[0].get("payload", {}).get("transaction_id") == transaction_id
                 and preview_receipts[0].get("payload", {}).get("artifact_hash") == preview["artifact_hash"],
                 "rejected Preview identity is not bound to its authenticated Gateway receipt")
-            _require(not any(row["gateway_arguments"][:1] in (["confirm"], ["execute"])
+            _require(not any(_command_argv(row, plan)[:1] in (["confirm"], ["execute"])
                     for row in records)
                 and not any(event.get("to_state") in {"confirmed", "executing"} for event in events)
                 and "authorization" in oracle and oracle["authorization"] is None
@@ -931,12 +1022,15 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         if oracle.get("after") is not None:
             assertions = getattr(module, "verify_" + case_id.lower())(
                 oracle["before"], oracle["after"], **plan["oracle_parameters"])
+            if repair and case_id == "F1":
+                assertions["metadata_list_page_detail"] = module.metadata_chain_proven([
+                    {"command": _command_argv(row, plan)[0], "arguments": _command_argv(row, plan)[1:], "payload": row.get("payload", {})} for row in records])
             _require(assertions == oracle.get("assertions") == result.get("assertions")
                 and set(assertions) == required, "independent oracle replay mismatch")
         if result["passed"]:
             expected_state = "result_schema_checked" if case_id == "C08" else "verified"
             verification_receipts = [row for row in records if row.get("accepted") is True
-                and row["gateway_arguments"][:1] == ["verify"]]
+                and _command_argv(row, plan)[:1] == ["verify"]]
             _require(state["state"] == oracle.get("gateway_verification_state")
                 == result.get("gateway_verification_state") == expected_state
                 and len(mutations) == 1 and bool(oracle.get("assertions"))
@@ -944,6 +1038,18 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                 and verification_receipts[0]["sequence"] > mutations[0]["sequence"]
                 and verification_receipts[0]["payload"].get("state") == expected_state
                 and all(value is True for value in oracle["assertions"].values()), "business PASS lacks a complete verified effect")
+    elif repair and case_id == "F2":
+        _require(not mutations and all(_command_argv(row, plan)[0] in _READS for row in records), "read-only repair includes a mutation")
+        if result["passed"] or oracle.get("after") is not None:
+            assertions = module.verify_f2(oracle["before"], oracle["after"], **plan["oracle_parameters"])
+            assertions["read_refinement"] = module.read_refinement_proven([
+                {"command": _command_argv(row, plan)[0], "arguments": _command_argv(row, plan)[1:], "payload": row.get("payload") or {}} for row in records], target_id=plan["oracle_parameters"]["target_id"], expected=plan["oracle_parameters"]["expected"])
+            _require(set(assertions) == required
+                and (not result["passed"] or all(value is True for value in assertions.values()))
+                and all(isinstance(recorded, dict) and recorded == assertions
+                        and all(type(value) is bool for value in recorded.values())
+                        for recorded in (oracle.get("assertions"), result.get("assertions"))),
+                "read-only repair oracle replay mismatch")
     else:
         _require(not result["passed"] and not mutations, "passing/executed archive has no transaction")
     if result["passed"]:
@@ -1014,13 +1120,13 @@ def _authorization(plan, oracle, events, records, turns, preview, prefixes):
         _require(details.get("policy") == "allow_changes" and details.get("explicit_confirmation") is False
             and details.get("authority") == authorization.get("authority") == "caller_asserted_current_user_change_request",
                  "allow configuration is not durable policy authorization")
-    preview_rows = [row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["preview-from-draft"]]
-    execute = next(row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["execute"])
+    preview_rows = [row for row in records if row.get("accepted") is True and _command_argv(row, plan)[:1] == ["preview-from-draft"]]
+    execute = next(row for row in records if row.get("accepted") is True and _command_argv(row, plan)[:1] == ["execute"])
     _require(len(preview_rows) == 1 and preview_rows[0]["sequence"] < execute["sequence"], "execution preceded unique Preview")
     for record in records:
-        if record.get("accepted") is True and record["gateway_arguments"][:1] in (["execute"], ["verify"], ["confirm"], ["transaction-show"]):
-            _require(record["gateway_arguments"][1] == preview["transaction_id"], "receipt refers to another transaction")
-            if record["gateway_arguments"][0] in {"execute", "verify"} and record.get("succeeded") is not False:
+        if record.get("accepted") is True and _command_argv(record, plan)[:1] in (["execute"], ["verify"], ["confirm"], ["transaction-show"]):
+            _require(_command_argv(record, plan)[1] == preview["transaction_id"], "receipt refers to another transaction")
+            if _command_argv(record, plan)[0] in {"execute", "verify"} and record.get("succeeded") is not False:
                 _require(record["payload"].get("transaction_id") == preview["transaction_id"]
                     and record["payload"].get("artifact_hash") == preview["artifact_hash"], "effect receipt is misbound")
     permit = oracle.get("permit")
@@ -1031,7 +1137,7 @@ def _authorization(plan, oracle, events, records, turns, preview, prefixes):
              "runner authorization is not bound to the immutable Preview and user turn")
     if explicit:
         _require(len(turns) == 2, "confirmation has no later user turn")
-        confirms = [row for row in records if row.get("accepted") is True and row["gateway_arguments"][:1] == ["confirm"]]
+        confirms = [row for row in records if row.get("accepted") is True and _command_argv(row, plan)[:1] == ["confirm"]]
         _require(len(confirms) == 1 and confirms[0]["sequence"] < execute["sequence"], "confirmation receipt is missing")
         _require(len(prefixes) == 2 and preview_rows[0]["sequence"] <= prefixes[0]
             < confirms[0]["sequence"] < execute["sequence"] <= prefixes[1], "confirmation is not in the later user turn")

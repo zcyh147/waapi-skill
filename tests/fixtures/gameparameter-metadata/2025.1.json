@@ -1,0 +1,242 @@
+{
+  "provenance": {
+    "candidate": "df8e0610f2e7dbd2a4f5843b7f391667e0ff2727",
+    "evidence": ".waapi-skill-state/gameparameter-native-df8e0610-2025-r3/evidence/gameparameter-native.json",
+    "kind": "isolated-native-registry-feasibility",
+    "public_gateway_pass": false
+  },
+  "metadata": {
+    "Min": {
+      "name": "Min",
+      "type": "Real64",
+      "default": 0.0,
+      "audioEngineId": 4294967295,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Min",
+        "index": 1799,
+        "group": ""
+      },
+      "dependencies": [
+        {
+          "type": "property",
+          "action": "Enable",
+          "property": "BindToBuiltInParam",
+          "context": "Self",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "value": 0,
+                    "displayName": "0"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "restriction": {},
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false,
+          "percentage": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      }
+    },
+    "Max": {
+      "name": "Max",
+      "type": "Real64",
+      "default": 100.0,
+      "audioEngineId": 4294967295,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Max",
+        "index": 1800,
+        "group": ""
+      },
+      "dependencies": [
+        {
+          "type": "property",
+          "action": "Enable",
+          "property": "BindToBuiltInParam",
+          "context": "Self",
+          "conditions": [
+            {
+              "restriction": {
+                "type": "enum",
+                "values": [
+                  {
+                    "value": 0,
+                    "displayName": "0"
+                  },
+                  {
+                    "value": 1,
+                    "displayName": "1"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "restriction": {},
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false,
+          "percentage": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      }
+    },
+    "InitialValue": {
+      "name": "InitialValue",
+      "type": "Real64",
+      "default": 50.0,
+      "audioEngineId": 4294967295,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Default Value",
+        "index": 1802,
+        "group": ""
+      },
+      "dependencies": [],
+      "restriction": {},
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 3,
+          "step": 1.0,
+          "fine": 0.001,
+          "infinity": 0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false,
+          "percentage": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      }
+    },
+    "BindToBuiltInParam": {
+      "name": "BindToBuiltInParam",
+      "type": "int16",
+      "default": 0,
+      "audioEngineId": 4294967295,
+      "supports": {
+        "rtpc": "None",
+        "randomizer": false,
+        "unlink": false
+      },
+      "display": {
+        "name": "Use Built-In Parameter",
+        "index": 1801,
+        "group": ""
+      },
+      "dependencies": [],
+      "restriction": {
+        "type": "enum",
+        "values": [
+          {
+            "value": 0,
+            "displayName": "None"
+          },
+          {
+            "value": 1,
+            "displayName": "Distance"
+          },
+          {
+            "value": 2,
+            "displayName": "Azimuth"
+          },
+          {
+            "value": 3,
+            "displayName": "Elevation"
+          },
+          {
+            "value": 4,
+            "displayName": "Emitter Cone"
+          },
+          {
+            "value": 5,
+            "displayName": "Obstruction"
+          },
+          {
+            "value": 6,
+            "displayName": "Occlusion"
+          },
+          {
+            "value": 7,
+            "displayName": "Listener Cone"
+          },
+          {
+            "value": 8,
+            "displayName": "Diffraction"
+          },
+          {
+            "value": 9,
+            "displayName": "Transmission Loss"
+          }
+        ]
+      },
+      "ui": {
+        "value": {
+          "min": 0.0,
+          "max": 0.0,
+          "decimals": 0,
+          "step": 0.0,
+          "fine": 0.0,
+          "infinity": 0
+        },
+        "displayAs": {
+          "lrMix": false,
+          "musicNote": false,
+          "bitfield": false,
+          "percentage": false
+        },
+        "dataMeaning": "None",
+        "autoUpdate": false
+      }
+    }
+  }
+}

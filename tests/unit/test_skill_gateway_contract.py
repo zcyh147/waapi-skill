@@ -48,7 +48,7 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
         "python scripts/run.py gateway.py query-object --path-segment '<root>' --path-segment '<child>'",
         "python scripts/run.py gateway.py query-object --kind sound-sfx --include volume-db --max-results 100",
         "python scripts/run.py gateway.py --version <supported-version> query-schema [--advanced]",
-        "python scripts/run.py gateway.py --version <supported-version> query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>",
+        "python scripts/run.py gateway.py query-object --advanced-waql '<bounded-single-line-waql>' --include <business-field> --max-results <1..1000>",
         "python scripts/run.py gateway.py metadata types",
         "python scripts/run.py gateway.py wait-topic <topic-uri>",
         "python scripts/run.py gateway.py topic-schema <topic-uri>",
@@ -74,7 +74,6 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "Closed transaction operations include `waapi.undoGroup`" in skill
     assert "FIXED_COMMAND_REQUIRED" in skill
     assert "WAIT_TOPIC_REQUIRED" in skill
-    assert "describe <uri> --full-schema" in skill
     assert "The list defaults to at most 50 compact rows" in skill
     assert "operations --detail" in skill
     assert "never synthesize a route" in skill
@@ -83,39 +82,41 @@ def test_skill_declares_fixed_gateway_before_discovery_and_no_code_fallback() ->
     assert "static schema template" in skill
     assert "typed continuations still require exact copying" in skill
     assert "do not read the query reference before or after it" in skill
-    assert "do not retry a rejected or failed gateway invocation" in skill
+    assert "follow its recovery receipt if the task still needs another bounded read" in skill
     assert "Do not run `describe` or `capabilities` first" in skill
     assert "run `request-schema` and follow its sole typed continuation" in skill
-    assert "The configured exact Wwise version selects every schema" in (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
+    assert "Saved configuration selects live schemas" in (SKILL_ROOT / "references" / "waapi-query.md").read_text(encoding="utf-8")
     compact = " ".join(skill.split())
-    assert "Read only the reference needed for the current task, once, completely and as UTF-8 text" in compact
+    assert "Read the current task reference once, completely as UTF-8" in compact
     assert "A missing or truncated read stops the workflow" in compact
     assert "sentinel must be the final visible line" in compact
     assert (
-        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
-        "2022.1 operation-schema object.copy"
+        "gateway.py --version 2022.1 operation-schema object.copy"
     ) in skill
-    assert "This rule applies to fixed reads as well as transactions" in skill
-    assert "do not run another command after receiving it" in skill
+    assert "For successful fixed reads or transactions" in skill
+    assert "Never reconstruct fields or run another command" in skill
 
 
 def test_loading_uses_supplied_skill_root_and_allows_complete_host_injection() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
     compact = " ".join(skill.split())
-    assert "If they are not already loaded, read `SKILL.md` from the supplied location before running a Gateway command" in compact
-    assert "The Skill root is the directory containing that `SKILL.md`" in compact
-    assert "not the working directory or an assumed installation path" in compact
-    assert "stop instead of searching for another installation" in compact
+    assert "Read the supplied `SKILL.md` completely before Gateway use unless already loaded" in compact
+    assert "The directory containing `SKILL.md` is the Skill root" in compact
+    assert "Resolve `scripts/` and `references/` there" in compact
+    assert "Missing location or incomplete content stops; never search another installation" in compact
     assert "environment's file-reading tool or a compatible shell" in compact
     assert "Get-Content -Raw -Encoding UTF8 '<absolute-file>'" in skill
     assert "Reuse complete instructions already visible in the conversation" in compact
     assert "including for Wwise CLI and project-migration requests" in skill
 
 
-def test_public_skill_stops_on_launch_failure_without_harness_retry_permission() -> None:
+def test_public_skill_distinguishes_structured_recovery_from_incomplete_launch_failure() -> None:
     skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
-    assert "A structured error or shell failure stops the workflow" in skill
-    assert "do not retry the Gateway command" in skill
+    assert "A shell failure without complete JSON remains a stop" in skill
+    assert "read_only_continuation_allowed" in skill
+    assert "without another permission question" in skill
+    assert "never replay the original write" in skill
+    assert "Unresolved cleanup" in skill
     assert "CreateProcessAsUserW" not in skill
 
 
@@ -159,7 +160,7 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "`QUERY_OBJECT_REQUIRED`" in query_reference
     assert "gateway.py --version <supported-version> query-schema" in query_reference
     assert "business declaration" in query_reference
-    assert "`describe` is for an explicit capability/schema audit" in query_reference
+    assert "`describe` is for offline schema audits" in query_reference
     assert "offline `--profile wwise-authoring-ui`" in query_reference
     assert "Use `--limit 0` only when" in query_reference
     assert "--path-segment 'Events' --path-segment 'Default Work Unit'" in query_reference
@@ -213,14 +214,14 @@ def test_query_reference_exposes_only_the_closed_original_file_match_surface() -
     )
     query_flat = " ".join(query_reference.split())
     command = (
-        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py --version "
-        "2025.1 query-object --max-results 1000 "
+        "python /absolute/path/to/waapi-skill/scripts/run.py gateway.py "
+        "query-object --max-results 1000 "
         "--match-original-file-path '<first-complete-returned-Path>' "
         "--match-original-file-path '<second-complete-returned-Path>'"
     )
 
     assert command in query_flat
-    assert "repeating only the final candidate option" in query_flat
+    assert "repeating the candidate option" in query_flat
     assert "Each path is limited to 1024 UTF-8 bytes" in query_flat
     assert "candidate-limit boundary" in query_flat
     assert "do not silently truncate" in query_flat
@@ -240,12 +241,12 @@ def test_existing_transaction_continuation_precedes_named_operation_schema() -> 
     assert "an artifact hash alone is not a transaction lookup key" in skill
     assert "run `transaction-show <transaction-id> --summary-only` first" in skill
     assert "skip schema discovery and start with `transaction-show`" in skill
-    assert "An existing transaction continuation always outranks operation selection" in operate
+    assert "Existing transactions outrank operation selection" in operate
     assert "an artifact hash is not a lookup key" in operate
     assert "transaction-show <transaction-id> --summary-only" in operate
     assert "The visible Preview's `next_command` is authoritative" in operate
     assert "never authorizes reconstruction" in operate
-    assert "Do not call `operations`, `operation-schema`, or `request-schema` first" in operate
+    assert "Skip schema/catalog discovery" in operate
     assert "execute only the field named by `next_command.copy_instruction.source_field`" in operate
     assert "copying the complete string verbatim once" in operate
     assert "Windows normally selects `model_command`" in operate
@@ -268,7 +269,7 @@ def test_metadata_order_follows_the_disclosed_input_mode() -> None:
     assert "`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner" in operate
     assert "copy one handle, never token/scope/type" in operate
     assert "Binding fixes the metadata scope inside the Draft" in operate
-    assert "No match stops; ambiguity needs one behavior question" in operate
+    assert "No match permits bounded discovery refinement; unresolved ambiguity needs one behavior question" in operate
     assert "For business declarations, bind only user-requested custom properties/references" in operate
     assert "common outcomes such as volume, infinite looping, output bus" in operate
     assert "use stable business fields" in operate
@@ -293,8 +294,8 @@ def test_operate_lane_reuses_exact_diagnostics_and_preserves_media_paths() -> No
         encoding="utf-8"
     )
 
-    assert "prior exact diagnostic identity is not a selected subset" in operate
-    assert "reuse its GUID; do not query it again" in operate
+    assert "Reuse a prior exact diagnostic GUID" in operate
+    assert "Gateway revalidates it" in operate
     assert "`media_directory` and `audio_file` are opaque caller paths" in operate
     assert "never derive either from campaign/workspace cwd" in operate
     assert "For a batch, bind every target first" in operate
@@ -309,9 +310,9 @@ def test_normal_change_prose_stays_business_facing() -> None:
         encoding="utf-8"
     )
 
-    assert "Normal prose covers only objects, changes, results, risks, and whether anything changed." in skill
-    assert "Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states, and commands." in skill
-    assert "Keep exact `agent_result` machine-readable" in skill
+    assert "In prose, describe objects, changes, results, and risks." in skill
+    assert "Hide API names, Draft/transaction internals, ids, hashes, tokens, states, and commands" in skill
+    assert "preserve machine `agent_result`" in skill
     assert "Prose covers objects, changes, results, risks and whether anything changed." in operate
     assert "Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands." in operate
     assert "serialize the successful Gateway `agent_result` verbatim" in operate

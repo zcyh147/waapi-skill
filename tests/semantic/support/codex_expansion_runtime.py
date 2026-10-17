@@ -48,7 +48,6 @@ def fixture_gateway(*, skill_source: Path, runtime: Any, version: str, receipts:
         if not arguments or str(arguments[0]).startswith("-"):
             raise CaseBoundaryError("fixture Gateway requires one public command")
         command = [sys.executable, str(skill_source / "scripts" / "run.py"), "gateway.py",
-            "--host", runtime.host, "--port", str(runtime.port), "--version", version,
             "--state-dir", str(runtime.owned_root / "setup-state"), "--timeout", str(min(30, timeout_seconds)), *arguments]
         started = time.monotonic()
         try:
@@ -92,8 +91,16 @@ class ExpansionOutcome:
 
 
 def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> ExpansionOutcome:
-    validate_model_configuration(options.model, options.reasoning_effort, options.service_tier)
-    if unit.case_id not in _ADAPTERS or unit.version not in {"2022.1", "2025.1"}:
+    repair = unit.unit_id.startswith("REPAIR25-")
+    if repair:
+        if sys.platform != "darwin":
+            raise ValueError("the approved repair first batch is macOS only")
+        from tests.semantic.support.codex_repair_cases import prepare_repair_case
+        if (options.model, options.reasoning_effort, options.service_tier) != ("gpt-5.6-terra", "medium", "default"):
+            raise ValueError("repair model configuration drifted")
+    else:
+        validate_model_configuration(options.model, options.reasoning_effort, options.service_tier)
+    if not repair and unit.case_id not in _ADAPTERS or unit.version not in {"2022.1", "2025.1"}:
         raise ValueError("expansion unit is outside its closed adapter registry")
     root = Path(scenario_root).resolve(strict=False)
     private_home = root / "owned" / "wwise-user-home" if sys.platform == "darwin" else None
@@ -136,14 +143,19 @@ def run_expansion_unit(unit: Any, *, scenario_root: Path, options: Any) -> Expan
         checks["fixture_gateway_receipts"] = []
         gateway = fixture_gateway(skill_source=options.skill_source, runtime=runtime,
                                   version=unit.version, receipts=checks["fixture_gateway_receipts"])
-        gateway(["config-set", "--project-modification-policy", "ask_before_changes"])
+        gateway(["config-set", "--wwise-version", unit.version,
+                 "--waapi-host", runtime.host, "--waapi-port", str(runtime.port),
+                 "--project-modification-policy", "ask_before_changes"])
         reconciliation_guard = ExpansionReconciliationGuard(version=unit.version, host=runtime.host, port=runtime.port,
             gateway=gateway, trusted_read=expansion_oracle_reader(version=unit.version, read_call=direct))
         context = ExpansionCaseContext(unit.version, unit.unit_id, runtime.sandbox.sandbox_project,
             runtime.asset_root, reconciliation_guard.gateway, reconciliation_guard.trusted_read)
-        module_name, function_name = _ADAPTERS[unit.case_id]
-        adapter = importlib.import_module(f"tests.semantic.support.codex_expansion_{module_name}_case")
-        prepared = getattr(adapter, function_name)(context)
+        if repair:
+            prepared = prepare_repair_case(context, unit=unit, direct=direct, runtime=runtime)
+        else:
+            module_name, function_name = _ADAPTERS[unit.case_id]
+            adapter = importlib.import_module(f"tests.semantic.support.codex_expansion_{module_name}_case")
+            prepared = getattr(adapter, function_name)(context)
         if prepared.policy != unit.policy:
             raise CaseBoundaryError("prepared case policy differs from frozen profile")
         scoped_paths: dict[str, str] = {}

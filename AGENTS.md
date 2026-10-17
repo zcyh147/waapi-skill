@@ -168,6 +168,13 @@ order:
 3. `$HOME/.config/waapi-skill/config.json`
 
 Use gateway `config-show` and `config-set`; do not hand-edit configuration.
+Normal online commands and Drafts take host, port, and expected Wwise version
+only from the selected config. Root `--version` / `--wwise-version` are limited
+to offline catalog/schema browsing; root `--host` / `--port` and connection
+environment overrides are not supported. Test and campaign launchers must
+provision an explicit isolated config. A copied Skill does not isolate the
+default user config. Draft and transaction continuations reject configuration
+drift and historical state without durable connection bindings.
 `skills/waapi-skill/data/config.json` is ignored legacy fallback data, not the
 normal write target.
 

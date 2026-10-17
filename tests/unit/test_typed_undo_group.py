@@ -29,6 +29,8 @@ def _env(tmp_path: Path) -> dict[str, str]:
         json.dumps(
             {
                 "wwise_version": VERSION,
+                "waapi_host": "127.0.0.1",
+                "waapi_port": 8080,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -36,7 +38,6 @@ def _env(tmp_path: Path) -> dict[str, str]:
     )
     return {
         "WAAPI_SKILL_CONFIG_PATH": str(config),
-        "WWISE_WAAPI_PORT": "8080",
     }
 
 

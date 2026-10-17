@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import argparse
 import json
@@ -311,14 +313,13 @@ def test_cli_console_draft_exposes_one_complete_plan_continuation(
     operation = "ak.wwise.cli.generateSoundbank"
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(tmp_path / "state"),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path, "2025.1"),
+        env=set_gateway_config(_env(tmp_path, "2025.1"), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
 
@@ -381,17 +382,17 @@ def test_cli_console_plan_command_records_only_high_level_business_fields(
     client = _CliConsoleDraftClient(tmp_path)
     code, started = gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-start", operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
 
     code, declared = gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-declare-cli-console-plan",
             started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
@@ -403,7 +404,7 @@ def test_cli_console_plan_command_records_only_high_level_business_fields(
             "--value", "verbosity", "quiet",
             "--toggle", "generate_header", "enable",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -440,10 +441,10 @@ def test_cli_console_plan_rejects_authoring_host_before_project_probe(
     env = _env(tmp_path, "2025.1")
     code, started = gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-start", operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -454,13 +455,13 @@ def test_cli_console_plan_rejects_authoring_host_before_project_probe(
 
     code, rejected = gateway.execute_gateway(
         [
-            "--version", "2025.1", "--state-dir", str(state_dir),
+             "--state-dir", str(state_dir),
             "draft-declare-cli-console-plan", started["draft"]["draft_id"],
             "--task-authority", started["task_authority"],
             "--expected-revision", "1",
             "--value", "project_file", str(client.project_file),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -499,7 +500,7 @@ def test_cli_console_plan_rejects_collection_above_fixed_ceiling(
     "argv",
     (
         [
-            "--version", "2025.1", "typed-call",
+             "typed-call",
             "ak.wwise.cli.generateSoundbank", "--schema-digest", "stale",
         ],
         [
@@ -656,9 +657,16 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
             "use_when": "the user asks to save the connected project without naming a UI command ID",
             "never_substitute": ["operation-schema", "ui.commands.execute"],
         },
+        "game_parameter_creation": {
+            "choose": ["operation-schema", "object.create"],
+            "use_when": "the user asks to create a new Game Parameter, including its minimum, maximum and default value",
+            "field_discovery": "discover GameParameter class fields Min, Max and InitialValue before declaring the new object",
+            "never_substitute": ["ak.wwise.core.gameParameter.setRange"],
+        },
         "game_parameter_range": {
             "choose": ["request-schema", "ak.wwise.core.gameParameter.setRange"],
-            "use_when": "the user asks to set one Game Parameter minimum and maximum",
+            "use_when": "the user asks to change one existing Game Parameter minimum and maximum, with dependent-curve handling, on a version that exposes this route",
+            "avoid_when": "creating a new parameter or setting its default InitialValue; setRange does neither",
             "never_substitute": [
                 "operation-schema",
                 "object.setProperty",

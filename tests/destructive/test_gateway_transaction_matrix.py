@@ -117,12 +117,6 @@ class _GatewaySandboxRuntime:
 
     def gateway_argv(self, command: Sequence[str]) -> list[str]:
         return [
-            "--host",
-            self.lifecycle.host,
-            "--port",
-            str(self.port),
-            "--version",
-            self.version,
             "--timeout",
             "30",
             "--state-dir",

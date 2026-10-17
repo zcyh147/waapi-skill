@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 import sys
@@ -486,8 +488,6 @@ def test_waapi_schema_is_one_bounded_direct_business_read(tmp_path: Path) -> Non
     client = _HostClient(tmp_path, "2025.1")
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
             "waapi-schema",
             "ak.wwise.core.object.get",
             "--include-examples",
@@ -517,14 +517,13 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     output = (tmp_path / "tone.wav").resolve()
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -534,8 +533,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
 
     code, declared = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -566,7 +564,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
             "0.5",
             "Intro",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -595,8 +593,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     check_client = _HostClient(tmp_path, "2025.1", is_command_line=True)
     check_code, checked = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -606,7 +603,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
             "--expected-revision",
             "2",
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda _url: check_client,
     )
     assert check_code == 0, json.dumps(checked, indent=2)
@@ -615,8 +612,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
     preview_client = _HostClient(tmp_path, "2025.1", is_command_line=True)
     preview_code, previewed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -626,7 +622,7 @@ def test_host_plan_draft_records_only_business_fields(tmp_path: Path) -> None:
             "--expected-revision",
             str(checked["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version="2025.1"),
         client_factory=lambda _url: preview_client,
     )
     assert preview_code == 0, previewed
@@ -648,14 +644,13 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
     env = _env(tmp_path, version)
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
@@ -663,8 +658,7 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
 
     code, rejected = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -677,7 +671,7 @@ def test_authoring_project_plan_rejects_console_before_project_probe(
             "project_file",
             str(client.project_file),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: client,
     )
 
@@ -694,21 +688,19 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     authoring = _HostClient(tmp_path, version, is_command_line=False)
     code, started = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda url: pytest.fail(f"offline start connected to {url}"),
     )
     assert code == 0, started
     code, declared = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "--state-dir",
             str(state_dir),
             "draft-declare-host-plan",
@@ -721,7 +713,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
             "project_file",
             str(authoring.project_file),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: authoring,
     )
     assert code == 0, declared
@@ -729,8 +721,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     console = _HostClient(tmp_path, version, is_command_line=True)
     code, rejected = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -740,7 +731,7 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
             "--expected-revision",
             str(declared["draft"]["revision"]),
         ],
-        env=env,
+        env=set_gateway_config(env, wwise_version=version),
         client_factory=lambda _url: console,
     )
 
@@ -753,16 +744,14 @@ def test_authoring_project_draft_rejects_console_during_check(tmp_path: Path, ve
     "argv",
     (
         [
-            "--version",
-            "2025.1",
+
             "typed-call",
             "ak.wwise.debug.generateToneWAV",
             "--schema-digest",
             "stale",
         ],
         [
-            "--version",
-            "2025.1",
+
             "typed-call",
             "ak.wwise.waapi.getSchema",
             "--schema-digest",

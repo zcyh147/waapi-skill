@@ -8,7 +8,8 @@ def test_skill_contract_mentions_scaffold_elements() -> None:
     text = skill_md.read_text(encoding="utf-8")
     assert "name: waapi-skill" in text
     assert "scripts/run.py" in text
-    assert "versioned manifest, semantic, WAQL, and deferred resources" in text
+    assert "packaged Gateway" in text
+    assert "Live operations and Drafts use only the selected saved connection" in text
     assert "references/waapi-setup.md" in text
     assert "references/waapi-query.md" in text
     assert "references/waapi-operate.md" in text

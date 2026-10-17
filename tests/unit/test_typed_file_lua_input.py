@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import argparse
 import importlib.util
 import json
@@ -48,6 +50,8 @@ def _env(tmp_path: Path, version: str = "2025.1") -> dict[str, str]:
         json.dumps(
             {
                 "wwise_version": version,
+                "waapi_host": "127.0.0.1",
+                "waapi_port": 8080,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -55,7 +59,6 @@ def _env(tmp_path: Path, version: str = "2025.1") -> dict[str, str]:
     )
     return {
         "WAAPI_SKILL_CONFIG_PATH": str(config),
-        "WWISE_WAAPI_PORT": "8080",
     }
 
 
@@ -235,14 +238,13 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
     state_dir = tmp_path / "tab-business-state"
     start_code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             "audio.importTabDelimited",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
     assert start_code == 0, started
@@ -250,8 +252,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
 
     missing_role_code, missing_role = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-bind-object",
@@ -263,7 +264,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
             "--object-id",
             client.location_id,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
     assert missing_role_code == 2, missing_role
@@ -271,8 +272,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
 
     bind_code, bound = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-bind-object",
@@ -286,7 +286,7 @@ def test_tab_business_draft_binds_the_disclosed_import_location_role(
             "--object-id",
             client.location_id,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -307,14 +307,13 @@ def test_lua_business_draft_rejects_roleless_object_binding(
     state_dir = tmp_path / "lua-no-object-state"
     start_code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             "lua.executeCoreFile",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
     assert start_code == 0, started
@@ -322,8 +321,7 @@ def test_lua_business_draft_rejects_roleless_object_binding(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-bind-object",
@@ -335,7 +333,7 @@ def test_lua_business_draft_rejects_roleless_object_binding(
             "--object-id",
             "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -352,14 +350,13 @@ def test_cli_lua_declaration_rejects_authoring_before_project_read(
     script.write_text("return true\n", encoding="utf-8")
     start_code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             "lua.executeCliFile",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
     assert start_code == 0, started
@@ -367,8 +364,7 @@ def test_cli_lua_declaration_rejects_authoring_before_project_read(
 
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-declare-artifact-plan",
@@ -380,7 +376,7 @@ def test_cli_lua_declaration_rejects_authoring_before_project_read(
             "--script-file",
             str(script),
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: client,
     )
 
@@ -417,14 +413,13 @@ def test_lua_continuation_discloses_one_bounded_typed_argument_at_a_time(
     state_dir = tmp_path / "lua-null-continuation"
     code, payload = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             "lua.executeCoreInline",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
 
@@ -452,22 +447,20 @@ def test_lua_artifact_plan_accepts_repeated_typed_business_arguments(
     script.write_text("return wa_args.count\n", encoding="utf-8")
     start_code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
     assert start_code == 0, started
 
     declaration_code, declared = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-declare-artifact-plan",
@@ -483,7 +476,7 @@ def test_lua_artifact_plan_accepts_repeated_typed_business_arguments(
             "integer",
             "3",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: _LuaClient(tmp_path),
     )
 
@@ -528,14 +521,13 @@ def _preview_public_cli_lua_file(
     script.write_bytes(b"return wa_args.request_id\n")
     start_code, started = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda url: pytest.fail(f"draft-start connected to {url}"),
     )
     assert start_code == 0, started
@@ -543,8 +535,7 @@ def _preview_public_cli_lua_file(
     authority = started["task_authority"]
     declaration_code, declared = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-declare-artifact-plan",
@@ -562,7 +553,7 @@ def _preview_public_cli_lua_file(
             "--watchdog-seconds",
             "15",
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: _LuaClient(tmp_path),
     )
     assert declaration_code == 0, declared
@@ -580,8 +571,7 @@ def _preview_public_cli_lua_file(
 
     check_code, checked = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "draft-check",
@@ -591,14 +581,13 @@ def _preview_public_cli_lua_file(
             "--expected-revision",
             str(declaration_revision),
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: _LuaClient(tmp_path),
     )
     assert check_code == 0, checked
     preview_code, previewed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "preview-from-draft",
@@ -608,7 +597,7 @@ def _preview_public_cli_lua_file(
             "--expected-revision",
             str(checked["draft"]["revision"]),
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: _LuaClient(tmp_path),
     )
     assert preview_code == 0, previewed
@@ -626,8 +615,6 @@ def test_public_lua_business_draft_executes_once_and_ends_result_schema_only(
     store = TransactionStore(state_dir)
     confirm_code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -642,14 +629,13 @@ def test_public_lua_business_draft_executes_once_and_ends_result_schema_only(
     execution_client = _LuaClient(tmp_path)
     execute_code, executed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "execute",
             previewed["transaction_id"],
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: execution_client,
     )
     assert execute_code == 0, executed
@@ -659,14 +645,13 @@ def test_public_lua_business_draft_executes_once_and_ends_result_schema_only(
     verify_client = _LuaClient(tmp_path)
     verify_code, verified = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "verify",
             previewed["transaction_id"],
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: verify_client,
     )
     assert verify_code == 0, verified
@@ -685,8 +670,6 @@ def test_public_lua_business_draft_rejects_source_drift_before_dispatch(
     store = TransactionStore(state_dir)
     confirm_code, confirmed = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
             "--state-dir",
             str(state_dir),
             "confirm",
@@ -702,14 +685,13 @@ def test_public_lua_business_draft_rejects_source_drift_before_dispatch(
     execution_client = _LuaClient(tmp_path)
     execute_code, rejected = gateway.execute_gateway(
         [
-            "--version",
-            "2025.1",
+
             "--state-dir",
             str(state_dir),
             "execute",
             previewed["transaction_id"],
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version="2025.1"),
         client_factory=lambda _url: execution_client,
     )
     assert execute_code == 2, rejected

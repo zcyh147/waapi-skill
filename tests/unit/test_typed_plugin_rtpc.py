@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from tests.support.gateway_config import set_gateway_config
+
 import importlib.util
 import json
 from pathlib import Path
@@ -43,6 +45,8 @@ def _env(tmp_path: Path) -> dict[str, str]:
         json.dumps(
             {
                 "wwise_version": "2025.1",
+                "waapi_host": "127.0.0.1",
+                "waapi_port": 8080,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -50,7 +54,6 @@ def _env(tmp_path: Path) -> dict[str, str]:
     )
     return {
         "WAAPI_SKILL_CONFIG_PATH": str(config),
-        "WWISE_WAAPI_PORT": "8080",
     }
 
 
@@ -125,14 +128,13 @@ def test_public_schema_and_draft_start_share_one_business_operation(
 
     start_code, started = gateway.execute_gateway(
         [
-            "--version",
-            version,
+
             "--state-dir",
             str(tmp_path / f"{operation}-{version}"),
             "draft-start",
             operation,
         ],
-        env=_env(tmp_path),
+        env=set_gateway_config(_env(tmp_path), wwise_version=version),
         client_factory=lambda url: pytest.fail(
             f"offline command connected to {url}"
         ),

@@ -30,6 +30,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from tests.semantic.support.codex_archive_paths import (
     ArchiveRelativePathError,
     parse_archive_relative_path,
+    parse_archive_absolute_path,
 )
 from tests.semantic.support.codex_gateway_broker import (
     validate_transaction_show_confirmation_payload,
@@ -41,6 +42,7 @@ from tests.semantic.support.codex_filesystem_security import (
     same_regular_file_path_handle_snapshot,
 )
 from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+from wwise_waapi.config import SkillConfig
 from wwise_waapi.operation_registry import OperationContractError, parse_operation_request
 from wwise_waapi.transaction_runtime import (
     PROJECT_GUARD_CONTRACT,
@@ -104,6 +106,9 @@ _ARTIFACT_FIELDS = frozenset(
         "execution_policy",
     }
 )
+_CURRENT_ARTIFACT_FIELDS = _ARTIFACT_FIELDS | frozenset({"connection_configuration"})
+_CONNECTION_CONFIGURATION_FIELDS = frozenset({"config_path", "waapi_host", "waapi_port", "wwise_version"})
+
 _PROJECT_GUARD_FIELDS = frozenset(
     {"contract", "endpoint", "version", "wwise", "project", "fingerprint"}
 )
@@ -532,8 +537,9 @@ def _load_integrity_snapshot(state_directory: Path, transaction_id: str) -> _Int
     )
 
 
-def _validate_artifact(artifact: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
-    _require_exact_fields(artifact, _ARTIFACT_FIELDS, context="transaction preview artifact")
+def _validate_artifact(artifact: Mapping[str, Any], *, require_connection_configuration: bool = False) -> tuple[str, str, str, str, str]:
+    fields = _CURRENT_ARTIFACT_FIELDS if require_connection_configuration or "connection_configuration" in artifact else _ARTIFACT_FIELDS
+    _require_exact_fields(artifact, fields, context="transaction preview artifact")
     if artifact.get("contract") != TRANSACTION_PREVIEW_CONTRACT:
         raise TransactionSealError("Unsupported transaction preview contract")
     if not isinstance(artifact.get("prepared_operation"), Mapping):
@@ -560,6 +566,22 @@ def _validate_artifact(artifact: Mapping[str, Any]) -> tuple[str, str, str, str,
     version = project_guard.get("version")
     if not isinstance(version, str) or runtime_guard.get("version") != version:
         raise TransactionSealError("Project/runtime guard versions do not match")
+    if "connection_configuration" in artifact:
+        configuration = artifact["connection_configuration"]
+        if not isinstance(configuration, Mapping):
+            raise TransactionSealError("connection_configuration must be an object")
+        _require_exact_fields(configuration, _CONNECTION_CONFIGURATION_FIELDS, context="connection_configuration")
+        try:
+            parse_archive_absolute_path(configuration["config_path"])
+            validated = SkillConfig(Path("."), wwise_version=configuration["wwise_version"],
+                waapi_host=configuration["waapi_host"], waapi_port=configuration["waapi_port"]).as_dict()
+        except (ValueError, TypeError) as exc:
+            raise TransactionSealError(f"connection_configuration is invalid: {exc}") from exc
+        endpoint = project_guard["endpoint"]
+        if (validated["wwise_version"] != version or validated["waapi_port"] is None
+                or validated["waapi_host"] != endpoint.get("host")
+                or validated["waapi_port"] != endpoint.get("port")):
+            raise TransactionSealError("connection_configuration does not match the project endpoint/version")
     try:
         parsed_request = parse_operation_request(request, expected_version=version)
     except OperationContractError as exc:

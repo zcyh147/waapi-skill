@@ -75,7 +75,8 @@ def test_2023_object_mutation_preview_is_destructive_gated_with_readback() -> No
 
     assert_2023_preview(preview, family=BuilderFamily.OBJECT_MUTATION, uri=OBJECT_CREATE_URI, destructive=True)
     assert preview.envelope.metadata["destructive_gate"]["required"] is True
-    assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "delete-created-object"
+    assert preview.envelope.metadata["cleanup_expectation"]["kind"] == "retain-project-and-outputs"
+    assert preview.envelope.metadata["cleanup_expectation"]["automatic_cleanup"] is False
     assert preview.readback_plan[0].uri == "ak.wwise.core.object.get"
     assert_destructive_evidence(preview)
 

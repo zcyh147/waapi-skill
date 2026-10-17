@@ -330,10 +330,10 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
-    # Reviewed delta: Bus/AuxBus child pairs in object.create and the versioned
-    # localized Voice import constraint. No operation/route was added or removed.
+    # Reviewed delta: explicit owner/ShareSet placement and Boolean reference
+    # dependency closure. Existing operation/version inventory remains unchanged.
     assert canonical_sha256(non_object_set_digests) == (
-        "f15b651a7ec059d1c9604fe138901ab88c258751d1657e245fcdf5fed41b888f"
+        "4f05743e90078e3d3ca52dc525b000b2fe46bbd4376ba9a701f1fddde5ca246f"
     )
     assert {
         version: operation_input_mode("object.set", version)
@@ -351,10 +351,9 @@ def test_object_set_composer_rejects_unsupported_version_before_state_write(
 ) -> None:
     exit_code, rejected = execute(
         tmp_path,
-        "--version",
-        "2021.1",
         "draft-start",
         "object.set",
+        version="2021.1",
     )
 
     assert exit_code == 2
@@ -389,15 +388,15 @@ class FakeClient:
         self.disconnected = True
 
 
-def gateway_env(tmp_path: Path) -> dict[str, str]:
+def gateway_env(tmp_path: Path, *, version: str = "2022.1") -> dict[str, str]:
     config_path = tmp_path / "config" / "config.json"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
         json.dumps(
             {
-                "wwise_version": None,
+                "wwise_version": version,
                 "waapi_host": "127.0.0.1",
-                "waapi_port": None,
+                "waapi_port": 31337,
                 "project_modification_policy": "ask_before_changes",
             }
         ),
@@ -411,7 +410,7 @@ def gateway_env(tmp_path: Path) -> dict[str, str]:
     }
 
 
-def execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
+def execute(tmp_path: Path, *arguments: str, version: str = "2022.1") -> tuple[int, dict[str, Any]]:
     def fail_if_connected(url: str) -> None:
         raise AssertionError(f"Offline Composer command connected to {url}")
 
@@ -426,7 +425,7 @@ def execute(tmp_path: Path, *arguments: str) -> tuple[int, dict[str, Any]]:
         normalized[index:] = ["--facts", *facts]
     return waapi_gateway.execute_gateway(
         ["--state-dir", str(tmp_path / "state"), *normalized],
-        env=gateway_env(tmp_path),
+        env=gateway_env(tmp_path, version=version),
         client_factory=fail_if_connected,
     )
 
