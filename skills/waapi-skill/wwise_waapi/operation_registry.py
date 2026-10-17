@@ -9062,7 +9062,9 @@ def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
             "final business-outcome verifier.",
             details={"verification_kind": kind},
         )
-    if any(value is None for value in identity.values()):
+    # Preserve legal current-platform omission as a stable key value; do not
+    # invent a platform token. Other outcome identity components must exist.
+    if any(value is None for key, value in identity.items() if key != "platform"):
         raise OperationContractError(
             "UNDO_GROUP_CHILD_VERIFIER_REQUIRED",
             "Compound Undo child verification lacks its complete outcome identity.",

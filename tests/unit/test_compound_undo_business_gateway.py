@@ -711,7 +711,7 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
     assert snapshotted["request"]["arguments"]["value"] == "snapshotted"
 
 
-def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None):
+def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None, property_child=False, duplicate_property=False, parent_check_error=None):
     state_dir = tmp_path / "state"
     env = gateway_env(tmp_path, version=version)
     def run(*argv):
@@ -722,14 +722,26 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
     parent = run("draft-start", "waapi.undoGroup")
     draft, authority, revision = parent["draft"]["draft_id"], parent["task_authority"], str(parent["draft"]["revision"])
     children = []
-    for operation, flag, value in (("object.setNotes", "--notes", "after"), ("object.setName", "--new-name", "Renamed")):
+    child_specs = (("object.setProperty", "--business-value", "2") if property_child else
+                   ("object.setNotes", "--notes", "after"),
+                   ("object.setProperty", "--business-value", "3") if duplicate_property else ("object.setName", "--new-name", "Renamed"))
+    for operation, flag, value in child_specs:
         phase = run("draft-start-undo-child", draft, "--task-authority", authority,
                     "--expected-revision", revision, "--operation", operation)
         child, child_authority = phase["draft"]["draft_id"], phase["task_authority"]
         phase = run("draft-bind-object", child, "--task-authority", child_authority,
                     "--expected-revision", str(phase["draft"]["revision"]), "--object-id", OBJECT_GUID)
-        phase = run("draft-declare-object-change", child, "--task-authority", child_authority,
-                    "--expected-revision", str(phase["draft"]["revision"]), flag, value)
+        if operation == "object.setProperty":
+            object_handle = phase["bound_object"]["handle"]
+            phase = run("draft-discover-fields", child, "--task-authority", child_authority,
+                "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
+                "--meaning", "volume")
+            phase = run("draft-declare-field-change", child, "--task-authority", child_authority,
+                "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
+                "--field-handle", phase["field_candidates"][0]["handle"], flag, value)
+        else:
+            phase = run("draft-declare-object-change", child, "--task-authority", child_authority,
+                        "--expected-revision", str(phase["draft"]["revision"]), flag, value)
         run("draft-check", child, "--task-authority", child_authority, "--expected-revision", str(phase["draft"]["revision"]))
         children.extend(("--child-draft", child, child_authority))
     declaration = ("draft-declare-undo-plan", draft, "--task-authority", authority,
@@ -741,7 +753,13 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
         assert code == 2 and declaration_error in json.dumps(rejected), rejected
         return state_dir, env, rejected
     phase = run(*declaration)
-    phase = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    check = ("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    if parent_check_error:
+        code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *check],
+            env=env, client_factory=lambda _url: client)
+        assert code == 2 and parent_check_error in json.dumps(rejected), rejected
+        return state_dir, env, rejected
+    phase = run(*check)
     preview = run("preview-from-draft", draft, "--task-authority", authority,
         "--expected-revision", str(phase["draft"]["revision"]), "--apply")
     shown = run("transaction-show", preview["transaction_id"], "--summary-only")
@@ -885,3 +903,68 @@ def test_older_compound_rejects_unpinned_cancel_option_before_parent_preview(tmp
         cancellation=cancellation, declaration_error="UNSUPPORTED_CANCELLATION_OPTION")
     assert not (state_dir / "transactions").exists()
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+def _property_cancellation_client(version, *, wrong_scalar=False):
+    client = _cancellation_client(version)
+    client.source["@Volume"] = 1.0
+    client.before = dict(client.source)
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            client.calls.append((uri, args, options))
+            return {"return": ["Volume"]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            client.calls.append((uri, args, options))
+            return {"name": "Volume", "type": "Real32", "default": 0,
+                    "restriction": {"type": "range", "min": -96, "max": 6}}
+        if uri == "ak.wwise.core.object.setProperty":
+            client.calls.append((uri, args, options))
+            client.source["@Volume"] = args["value"]
+            return {}
+        result = original(uri, args, options)
+        if uri.endswith("cancelGroup") and wrong_scalar:
+            client.source["@Volume"] = True
+        return result
+    client.call = call
+    return client
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_property_child_keeps_legal_current_platform_omission(tmp_path, version):
+    client = _property_cancellation_client(version)
+    choice = "native-default" if version in {"2021.1", "2022.1"} else "undo-changes"
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation=choice, property_child=True)
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    native = artifact["prepared_operation"]["pre_state"]["execution_plan"]["calls"][0]["args"]
+    assert native == {"object": OBJECT_GUID, "property": "Volume", "value": 2.0}
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    observed = result["compound_execution"]["cancellation_observation"]
+    assert observed["complete"] is True
+    assert observed["pre_state_restored"] is (version not in {"2021.1", "2022.1"})
+
+
+def test_compound_same_current_platform_field_still_rejects_overlapping_children(tmp_path):
+    client = _property_cancellation_client("2025.1")
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
+        cancellation="undo-changes", property_child=True, duplicate_property=True,
+        parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_compound_numeric_prestate_one_is_not_restored_by_boolean_true(tmp_path, version):
+    client = _property_cancellation_client(version, wrong_scalar=True)
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="undo-changes", property_child=True)
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    observed = result["compound_execution"]["cancellation_observation"]
+    assert observed["complete"] is True
+    assert observed["pre_state_restored"] is False and result["rollback_verified"] is False
+    assert observed["children"][0] == {"index": 0, "complete": True, "pre_state_match": False}
