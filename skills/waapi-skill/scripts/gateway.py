@@ -770,6 +770,7 @@ QUERY_BUSINESS_OUTPUTS: Mapping[str, tuple[str, str]] = {
     "work-unit": ("workunit", "work_unit"),
     "source-duration": ("audioSource:playbackDuration", "source_duration"),
     "max-radius": ("audioSource:maxRadiusAttenuation", "max_radius"),
+    "switch-container-child-context": ("switchContainerChildContext", "switch_container_child_context"),
 }
 MAX_QUERY_BUSINESS_OUTPUTS = 32
 MAX_QUERY_CUSTOM_OUTPUTS = 16

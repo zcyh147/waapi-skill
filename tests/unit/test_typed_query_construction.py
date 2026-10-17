@@ -851,3 +851,43 @@ def test_all_sound_business_alias_compiles_to_the_same_closed_type_filter(
             {"return": ["id", "name", "type", "path"]},
         )
     ]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_public_query_reads_switch_child_context_then_exact_context_identity(tmp_path: Path, version: str) -> None:
+    child_id = "{11111111-1111-1111-1111-111111111111}"
+    context_id = "{22222222-2222-2222-2222-222222222222}"
+    parent_id = "{33333333-3333-3333-3333-333333333333}"
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            if len(self.calls) == 1:
+                return {"return": [{"id": child_id, "name": "Footstep", "type": "Sound", "path": r"\Containers\Footsteps\Footstep", "switchContainerChildContext": {"id": context_id}}]}
+            return {"return": [{"id": context_id, "name": "Context", "type": "ObjectSettingAssoc", "path": r"\Containers\Footsteps\Context", "parent": {"id": parent_id}, "owner": {"id": child_id}}]}
+    env = _env(tmp_path, version)
+    code, schema = gateway.execute_gateway(["query-schema"], env=env)
+    assert code == 0, schema
+    assert "switch-container-child-context" in schema["business_outputs"]
+    client = Client(version)
+    code, child = gateway.execute_gateway(["query-object", "--exact-id", child_id, "--include", "switch-container-child-context"], env=env, client_factory=lambda _: client)
+    assert code == 0, child
+    assert child["agent_result"][0]["switch_container_child_context"] == {"id": context_id}
+    code, context = gateway.execute_gateway(["query-object", "--exact-id", child["agent_result"][0]["switch_container_child_context"]["id"], "--include", "parent", "--include", "owner"], env=env, client_factory=lambda _: client)
+    assert code == 0, context
+    assert context["agent_result"][0]["id"] == context_id
+    assert context["agent_result"][0]["parent"] == {"id": parent_id}
+    assert context["agent_result"][0]["owner"] == {"id": child_id}
+    assert client.calls[0] == ("ak.wwise.core.object.get", {"waql": 'from object "{11111111-1111-1111-1111-111111111111}"'}, {"return": ["id", "name", "type", "path", "switchContainerChildContext"]})
+    assert client.calls[1] == ("ak.wwise.core.object.get", {"waql": 'from object "{22222222-2222-2222-2222-222222222222}"'}, {"return": ["id", "name", "type", "path", "parent", "owner"]})
+    assert list(context)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_switch_context_output_does_not_expose_a_native_accessor_input(tmp_path: Path, version: str, capsys) -> None:
+    with pytest.raises(SystemExit) as rejected:
+        gateway.execute_gateway(["query-object", "--exact-id", "{11111111-1111-1111-1111-111111111111}", "--include", "switchContainerChildContext"],
+            env=_env(tmp_path, version), client_factory=lambda _: pytest.fail("invalid business output connected"))
+    assert rejected.value.code == 2
+    assert "switch-container-child-context" in capsys.readouterr().err
