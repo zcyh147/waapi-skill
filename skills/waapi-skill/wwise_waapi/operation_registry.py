@@ -1974,6 +1974,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "same-connection-compound",
         "Execute 1-32 reviewed project mutations inside one same-session Wwise Undo Group.",
         ("display_name", "calls"),
+        ("failure_cancellation",),
         argument_contract=_object_contract(
             ("display_name", "calls"),
             {
@@ -1982,6 +1983,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     "minLength": 1,
                     "maxLength": UNDO_GROUP_MAX_DISPLAY_NAME_LENGTH,
                 },
+                "failure_cancellation": {"type": "string", "enum": ["undo-changes", "preserve-changes", "native-default"]},
                 "calls": {
                     "type": "array",
                     "minItems": 1,
@@ -1995,6 +1997,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
+            optional=("failure_cancellation",),
         ),
         constraints=(
             "beginGroup, every inner mutation, and endGroup execute on one existing WAAPI client",
@@ -4119,7 +4122,14 @@ def build_undo_group_execution_plan(
                 ),
             }
         )
-    cancel_args = {} if version in {"2021.1", "2022.1"} else {"undo": True}
+    cancellation = arguments.get("failure_cancellation",
+                                 "native-default" if version in {"2021.1", "2022.1"} else "undo-changes")
+    if not isinstance(cancellation, str) or cancellation not in {"undo-changes", "preserve-changes", "native-default"}:
+        raise OperationContractError("INVALID_ARGUMENT", "Unknown failure_cancellation choice.")
+    if version in {"2021.1", "2022.1"} and cancellation != "native-default":
+        raise OperationContractError("UNSUPPORTED_CANCELLATION_OPTION",
+                                     "This pinned cancelGroup schema has no undo option; use native-default.")
+    cancel_args = {} if cancellation == "native-default" else {"undo": cancellation == "undo-changes"}
     def phase(uri: str, args: Mapping[str, Any]) -> dict[str, Any]:
         phase_contract = registry.describe(version, uri)
         return {

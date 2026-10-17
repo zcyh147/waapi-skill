@@ -53,6 +53,10 @@ def add_source_control_arguments(
         choices=("all", "used", "unused"),
     )
     parser.add_argument("--originals-folder")
+    from .object_query_outputs import QUERY_BUSINESS_OUTPUTS
+    parser.add_argument("--usage-output", action="append", default=[],
+                        choices=tuple(QUERY_BUSINESS_OUTPUTS),
+                        help="Disclosed business output for each usage object; repeat for several")
     recursive = parser.add_mutually_exclusive_group()
     recursive.add_argument("--recursive", dest="recursive", action="store_true")
     recursive.add_argument("--no-recursive", dest="recursive", action="store_false")
@@ -85,7 +89,7 @@ def source_control_fields_supplied(args: argparse.Namespace) -> bool:
         )
     ) or any(
         bool(getattr(args, name, ()))
-        for name in ("project_file", "originals_file", "exact_file", "move")
+        for name in ("project_file", "originals_file", "exact_file", "move", "usage_output")
     )
 
 
@@ -114,6 +118,8 @@ def source_control_plan_from_namespace(
             value = getattr(args, name, None)
             if value is not None:
                 plan[name] = value
+        if args.usage_output:
+            plan["usage_outputs"] = list(args.usage_output)
         return plan
     files = _file_locators(args)
     if operation == SOURCE_CONTROL_MOVE_URI:
@@ -144,7 +150,7 @@ def source_control_plan_from_namespace(
             )
     if args.io_root is not None:
         plan["io_root"] = args.io_root
-    if any(
+    if bool(args.usage_output) or any(
         getattr(args, name, None) is not None
         for name in (
             "usage_scope",

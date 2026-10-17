@@ -2719,6 +2719,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_undo_plan)
     draft_declare_undo_plan.add_argument("--display-name", required=True)
+    draft_declare_undo_plan.add_argument("--failure-cancellation",
+        choices=("undo-changes", "preserve-changes", "native-default"))
     draft_declare_undo_plan.add_argument(
         "--child-draft",
         action="append",
@@ -18355,6 +18357,8 @@ def dispatch_business_compound_undo_plan(
                 "undo_plan": {
                     "display_name": args.display_name,
                     "children": snapshots,
+                    **({"failure_cancellation": args.failure_cancellation}
+                       if args.failure_cancellation is not None else {}),
                 }
             }
         )
@@ -21225,7 +21229,8 @@ def _dispatch_transaction_command_with_execution_lease(
                     "project_call": project_call,
                     "executed": True,
                     "cancelled": True,
-                    "rollback_verified": False,
+                    "rollback_verified": compound.get("rollback_verified") is True,
+                    "rollback_verification_scope": "sealed_child_preflight_readbacks_only",
                     "verified": False,
                     "cleanup": transaction_cleanup_payload(prepared, phase="execution_cancelled"),
                     "automatic_retry": False,
@@ -23064,6 +23069,27 @@ def dispatch_undo_group_execution_plan(
                 False,
             )
 
+    def cancellation_observation() -> dict[str, Any]:
+        from wwise_waapi.compound_undo_observation import observe_cancelled_child_state
+        from wwise_waapi.execution_contracts import ExecutionContractRegistry
+
+        def observe(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+            contract = ExecutionContractRegistry().describe(version, uri)
+            if contract.effect != "read":
+                raise ValueError("Sealed cancellation observation is not a catalog-proven read")
+            result = dispatch(dispatcher, uri, connection=connection, version=version,
+                              args=args, options=options, allow_destructive=False,
+                              operation_timeout=min(contract.timeout_seconds, connection.deadline.require_remaining("compound cancellation readback")))
+            summary = dispatch_call_summary(result)
+            if result.get("ok") is not True:
+                return {"call": summary, "error": "Cancellation readback failed: " + str(result.get("error_code"))}
+            try:
+                validate_semantic_result(uri, result.get("result"), version=version)
+            except SemanticValidationError as exc:
+                return {"call": summary, "error": str(exc)}
+            return {"result": result["result"], "call": summary}
+        return observe_cancelled_child_state(inner_calls, observe_read=observe)
+
     try:
         begin_row, begin_ok = run_phase("begin", begin, reserve_cancel_budget=True)
     except Exception as exc:  # noqa: BLE001 - begin may have reached Wwise
@@ -23113,6 +23139,7 @@ def dispatch_undo_group_execution_plan(
             )
         except Exception as exc:  # noqa: BLE001 - inner mutation outcome is uncertain
             cancel_row, cancel_ok = best_effort_cancel()
+            observation = cancellation_observation() if cancel_ok else None
             return {
                 "status": "indeterminate",
                 "same_connection": True,
@@ -23130,6 +23157,9 @@ def dispatch_undo_group_execution_plan(
                 "cancel_phase": cancel_row,
                 "cancel_succeeded": cancel_ok,
                 "phases": phases,
+                **({"cancellation_observation": observation,
+                    "rollback_verified": cancel.get("args", {}).get("undo") is True and observation["pre_state_restored"]}
+                   if observation is not None else {}),
             }
         if inner_ok:
             continue
@@ -23144,6 +23174,7 @@ def dispatch_undo_group_execution_plan(
                 "cancel_phase": cancel_row,
                 "phases": phases,
             }
+        observation = cancellation_observation()
         return {
             "status": "execution_cancelled",
             "same_connection": True,
@@ -23151,8 +23182,9 @@ def dispatch_undo_group_execution_plan(
             "failed_phase": inner_row,
             "cancel_phase": cancel_row,
             "phases": phases,
-            "rollback_verified": False,
-            "message": "The open Undo Group was cancelled on the same connection; rollback state was not verified.",
+            "rollback_verified": cancel.get("args", {}).get("undo") is True and observation["pre_state_restored"],
+            "cancellation_observation": observation,
+            "message": "The group cancellation was acknowledged; scoped pre-state restoration is reported separately.",
         }
 
     try:
@@ -27182,6 +27214,7 @@ def _business_next_action_binding(
                     "include_usage_objects": (
                         "--include-usage-objects | --no-usage-objects"
                     ),
+                    "usage_outputs": "--usage-output <disclosed-business-output> (repeatable)",
                     "max_results": "--max-results <1..1000>",
                 },
                 "submit_once": True,
@@ -27368,6 +27401,7 @@ def _business_next_action_binding(
                     "--display-name <user-facing-Wwise-Undo-step-name>",
                     "--child-draft <checked-child-draft-id> <its-task-authority> [--child-draft ...]",
                 ],
+                "failure_cancellation": business_contract["declaration"]["failure_cancellation"],
                 "order_rule": "repeat_child_draft_in_exact_user_requested_execution_order",
                 "order_ownership": {
                     "business_sequence": "caller_owned_stable_business_value",
