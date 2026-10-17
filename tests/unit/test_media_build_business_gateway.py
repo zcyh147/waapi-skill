@@ -1492,7 +1492,7 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
         result = payload["agent_result"]
         if not page_count:
             observed_capture.update({"gateway": {"argv": list(argv), "payload": payload},
-                "native_call": {"api": operation, "args": dict(client.calls[-1][1]), "options": {}, "result": native}})
+                "native_call": {"uri": operation, "args": dict(client.calls[-1][1]), "options": {}, "result": native}})
         assert result["channel_count"] == 2 and result["peak_pair_count"] == pair_count
         assert result["requested_peak_pair_count"] == pair_count and result["complete_requested_count"] is True
         assert result["normalization_divisor"] == 32768
