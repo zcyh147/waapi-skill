@@ -801,9 +801,11 @@ class OwnedGraphTask(FieldTask):
         if uri.endswith("object.create"):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             self.conflict = args.get("onNameConflict", "fail")
-            result = self._create(args, args["parent"], owned=True)
-            if {"id": ROOT} not in self.objects[args["parent"]]["@CustomList"]:
-                self.objects[args["parent"]]["@CustomList"].append({"id": ROOT})
+            result = self._create(args, args["parent"], owned="list" in args)
+            if "list" in args:
+                members = self.objects[args["parent"]].setdefault("@" + args["list"], [])
+                if {"id": result["id"]} not in members:
+                    members.append({"id": result["id"]})
             if self.bad_result == "owner":
                 self.objects[ROOT]["owner"] = {"id": SECOND}
             elif self.bad_result == "missing-child":
