@@ -305,7 +305,7 @@ def test_near_capacity_public_layout_survives_authenticated_broker_and_archive(t
     damaged_facts[-1]["aggregated_output"] = stdout[:-2]
     with pytest.raises(campaign.CampaignEvidenceError):
         replay_archive(archive_records, damaged_facts)
-    for damage in ("wrong-policy", "stale-revision", "other-flow", "forged-compact", "missing-owed-context", "final-request", "missing-final-result", "journal-summary", "payload-digest"):
+    for damage in ("wrong-policy", "stale-revision", "other-flow", "forged-compact", "missing-owed-context", "final-request", "missing-final-result", "non-mapping-final-result", "final-transaction", "final-artifact", "journal-summary", "payload-digest"):
         corrupt_records, corrupt_facts = deepcopy(archive_records), deepcopy(command_facts)
         index = next(i for i, row in enumerate(corrupt_records) if row["step_name"] == "tx01.declare")
         if damage == "missing-owed-context":
@@ -319,6 +319,13 @@ def test_near_capacity_public_layout_survives_authenticated_broker_and_archive(t
         elif damage == "missing-final-result":
             index = len(corrupt_records) - 1
             corrupt_records[index]["payload"].pop("agent_result")
+        elif damage == "non-mapping-final-result":
+            index = len(corrupt_records) - 1
+            corrupt_records[index]["payload"]["agent_result"] = []
+        elif damage in {"final-transaction", "final-artifact"}:
+            index = len(corrupt_records) - 1
+            field = "transaction_id" if damage == "final-transaction" else "artifact_hash"
+            corrupt_records[index]["payload"]["agent_result"][field] = "changed"
         elif damage == "journal-summary":
             index = len(corrupt_records) - 1
             corrupt_records[index]["payload"]["verification"]["canonical_sha256"] = "0" * 64
@@ -445,6 +452,59 @@ def test_catalog_true_reads_remain_available_under_every_modification_policy(tmp
     fixture_root.mkdir()
     broker, steps, _records, _state = _read_only_draft_evidence_fixture(fixture_root)
     assert broker._operation_draft_step_is_read_only(steps[-1]) is True
+
+
+def test_public_result_schema_success_keeps_exact_terminal_request_binding(tmp_path):
+    """Schema-only success owes agent_result although it does not verify business state."""
+    state = tmp_path / "state"
+    env = set_gateway_config(gateway_env(tmp_path), wwise_version="2025.1")
+    client = LayoutClient(tmp_path)
+    client.responses["ak.wwise.debug.enableAutomationMode"] = {}
+    records, steps = [], []
+
+    def run(name, command, arguments):
+        code, payload = gateway.execute_gateway(["--state-dir", str(state), command, *arguments],
+            env=env, client_factory=lambda _: client)
+        assert code == 0, payload
+        steps.append(ExpectedGatewayStep("tx01." + name, command, tuple(arguments)))
+        records.append({"step_name": "tx01." + name, "succeeded": True,
+                        "gateway_arguments": [command, *arguments], "payload": payload})
+        return payload
+
+    start = run("draft-start", "draft-start", ("debug.setAutomationMode",))
+    def prefix(prior):
+        return (start["draft"]["draft_id"], "--task-authority", start["task_authority"],
+                "--expected-revision", str(prior["draft"]["revision"]))
+    declared = run("declare", "draft-declare-debug-intent", (*prefix(start), "--enable"))
+    checked = run("check", "draft-check", prefix(declared))
+    preview = run("preview", "preview-from-draft", prefix(checked))
+    tx = preview["transaction_id"]
+    shown = run("show", "transaction-show", (tx, "--summary-only"))
+    confirmed = run("confirm", "confirm", (tx, "--confirmation-token", shown["confirmation"]["token"]))
+    executed = run("execute", "execute", (tx,))
+    terminal = run("verify", "verify", (tx,))
+    assert terminal["status"] == terminal["state"] == "result_schema_checked"
+    assert terminal["ok"] is True and terminal["verified"] is False
+    assert terminal["result_schema_checked"] is True
+    assert all("agent_result" not in item for item in (shown, confirmed, executed))
+    assert list(terminal)[-1] == "agent_result"
+    artifact = TransactionStore(state).load_preview(tx).artifact
+    assert terminal["agent_result"]["request"] == artifact["request"]
+    evidence = validate_typed_draft_evidence(state_directory=state, steps=steps, broker_records=records)
+    assert evidence["preview_binding"]["transaction_final_state"] == "result_schema_checked"
+    for damage in ("missing", "non-mapping", "request", "transaction_id", "artifact_hash"):
+        corrupt = deepcopy(records)
+        result = corrupt[-1]["payload"]
+        if damage == "missing":
+            result.pop("agent_result")
+        elif damage == "non-mapping":
+            result["agent_result"] = []
+        elif damage == "request":
+            result["agent_result"]["request"]["arguments"]["enable"] = False
+        else:
+            result["agent_result"][damage] = "changed"
+        with pytest.raises(TypedDraftEvidenceError):
+            validate_typed_draft_evidence(state_directory=state, steps=steps, broker_records=corrupt)
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX copied-command transport proof")
