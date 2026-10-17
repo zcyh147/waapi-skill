@@ -19,12 +19,12 @@
         "special_unique_uris": 52
       },
       "wwise-authoring-ui": {
-        "function_rows": 718,
-        "unique_function_uris": 183,
+        "function_rows": 736,
+        "unique_function_uris": 192,
         "generic_reflected_rows": 458,
         "generic_reflected_unique_uris": 116,
-        "special_rows": 260,
-        "special_unique_uris": 67
+        "special_rows": 278,
+        "special_unique_uris": 76
       }
     },
     "reviewed_generic_restrictions": {
@@ -102,7 +102,16 @@
       "ak.wwise.ui.layout.removeLayout",
       "ak.wwise.ui.layout.setLayout",
       "ak.wwise.ui.layout.switchLayout",
-      "ak.wwise.ui.layout.undockView"
+      "ak.wwise.ui.layout.undockView",
+      "ak.wwise.ui.model.createHandle",
+      "ak.wwise.ui.model.destroyHandle",
+      "ak.wwise.ui.model.getState",
+      "ak.wwise.ui.model.registerWafm",
+      "ak.wwise.ui.model.setState",
+      "ak.wwise.ui.signal.emit",
+      "ak.wwise.ui.window.close",
+      "ak.wwise.ui.window.create",
+      "ak.wwise.ui.window.present"
     ]
   },
   "coverage": {

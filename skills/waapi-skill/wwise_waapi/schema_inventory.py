@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping
 
 from .authoring_layout import LAYOUT_READ_URIS, LAYOUT_VERSIONS, PINNED_SHA256, layout_read_contract, load_layout_read_evidence
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, layout_business_contract_data
+from .authoring_model_business import MODEL_OPERATIONS, model_business_contract
 from .builders.common import DEFAULT_MANIFEST_ROOT
 from .capabilities import CapabilityCatalog
 from .execution_contracts import AUTHORING_UI_EXECUTION_PROFILE
@@ -408,6 +409,7 @@ def build_typed_request_surface(
             route_graph = graph
             closed_layout_read = capability.uri in LAYOUT_READ_URIS
             closed_layout_mutation = capability.uri in LAYOUT_MUTATION_URIS
+            closed_model = capability.uri in MODEL_OPERATIONS
             if closed_layout_read or closed_layout_mutation:
                 native = load_layout_read_evidence(selected_root, version)
                 if native['build'] != graph.wwise_build:
@@ -425,6 +427,10 @@ def build_typed_request_surface(
                     documents=MappingProxyType({**graph.documents, 'waapi_ui_definitions.json': document}),
                     inventory_sha256=_canonical_sha256({'base': graph.inventory_sha256,
                         'native_result_graph': retained['sha256']}))
+            if closed_model:
+                route_graph = load_authoring_definition_graph(version)
+                if route_graph.wwise_build != graph.wwise_build:
+                    raise SchemaInventoryError('Authoring model definitions differ from the exact base graph build')
             schema = capability.schema
             unknown_keywords.extend(
                 validate_schema_envelope(
@@ -515,7 +521,7 @@ def build_typed_request_surface(
                 ),
                 "schema_sha256": _canonical_sha256(schema),
                 "construction_shape": (
-                    "closed_read" if closed_layout_read else "closed_business" if closed_layout_mutation else _function_construction_shape(
+                    "closed_read" if closed_layout_read else "closed_business" if closed_layout_mutation or closed_model else _function_construction_shape(
                         schema,
                         graph=route_graph,
                         execution_policy=capability.execution_contract,
@@ -552,12 +558,16 @@ def build_typed_request_surface(
                         {'pointer': '/definitions/ViewHolder', 'issue': 'holder tag and closed properties conflict with allOf Element'},
                     ] if unresolved else [],
                 }
-            elif closed_layout_mutation:
-                row['business_contract'] = layout_business_contract_data(capability.uri, version)
+            elif closed_layout_mutation or closed_model:
+                row['business_contract'] = (model_business_contract(capability.uri, version) if closed_model
+                                            else layout_business_contract_data(capability.uri, version))
                 row['native_request_schema_is_not_public_construction'] = True
-                row['native_ui_definition_graph_sha256'] = native_result_definition_graphs[version]['sha256']
+                if closed_model:
+                    row['native_authoring_definition_graph_sha256'] = route_graph.inventory_sha256
+                else:
+                    row['native_ui_definition_graph_sha256'] = native_result_definition_graphs[version]['sha256']
                 row['request_semantics'] = {
-                    'status': 'definition_semantics_unresolved' if capability.uri == LAYOUT_SET_URI else 'closed_reflected_fields',
+                    'status': 'definition_semantics_unresolved' if capability.uri == LAYOUT_SET_URI else 'closed_business_constructors' if closed_model else 'closed_reflected_fields',
                     'native_write_acceptance': 'pending_owned_native_observation',
                     'original_native_definitions_retained': True,
                 }

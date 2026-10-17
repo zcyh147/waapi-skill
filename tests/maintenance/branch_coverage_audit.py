@@ -151,7 +151,8 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
                 routes[route_key(version, kind, row["uri"])] = kind
         for filename in ("schemas.json", "authoring-ui-commands-supplement.json",
                          "authoring-ui-topics-supplement.json", "authoring-core-supplement.json",
-                         "authoring-layout-read-supplement.json", "authoring-layout-mutation-supplement.json"):
+                         "authoring-layout-read-supplement.json", "authoring-layout-mutation-supplement.json",
+                         "authoring-model-supplement.json"):
             path = folder / filename
             if not path.exists():
                 continue

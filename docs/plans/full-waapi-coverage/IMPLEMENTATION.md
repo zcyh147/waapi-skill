@@ -356,6 +356,36 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   nodes. Full gate selection remains Root-owned. No native or Fresh launch,
   ticket closure, historical evidence transfer or main merge occurred.
 
+## Tenth combined source checkpoint
+
+The fixed combined inputs are #178 `d7f11bbd` and #189 `fa97c305`, the latter
+already containing #187 `2506eb31` and integration `a8f86530`. The earlier #177
+closure and two #184 increments remain included. Class/default planning and
+root-only staged repair, bounded Topic event handling, and owned Authoring
+window/model/signal contracts remain partial implementation. No native, Fresh,
+Windows or whole-ticket completion is inferred from these fake-client changes.
+
+Reconciliation adds exactly eighteen 2024.1/2025.1 model function rows, yielding
+896 public version rows / 227 unique URIs. Their exact native schemas remain in
+the immutable model supplements; referenced WAFM definitions resolve through the
+original independent Authoring graph. A separate #189 migration group prevents
+historical host/UI family credit. All 272,313 original native identities, shapes,
+owners, requirements and evidence remain intact. Exactly 1,753 obligations move
+from missing implementation to unresolved because the public routes now exist;
+none receives verified/native credit. Ten catalog seals, original definitions,
+detailed selector rules and historical completed-family seals are preserved.
+The actual Program roster is 247 unique nodes, including all four newly added
+public test files, without duplicate or whole-file/node overlap.
+
+The first branch-generation attempt stopped on the retired GameParameter-only
+compiler symbol; current source pointers now name the generalized class compiler.
+The original failure is retained separately. An earlier preparatory surface build
+also exposed missing WAFM reference reachability and stopped before publication;
+linking the original independent Authoring definition graph resolves that gap.
+Central preflight and proportional integrated checks remain pending at this
+source checkpoint. Worker results retain their original candidates and verdicts;
+the coordinated two-version signal check on `24dab99f` is not repeated here.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
