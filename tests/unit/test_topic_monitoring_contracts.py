@@ -49,14 +49,14 @@ class Client:
         self.disconnected = True
 
 
-def run(tmp_path, version, mode, topic, events, *facts):
+def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03):
     config = tmp_path / "config.json"
     config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1",
                                  "waapi_port": 31337, "project_modification_policy": "read_only"}))
     client = Client(version, events)
     records = []
     code, payload = gateway.execute_gateway(
-        ["--timeout", "0.03", mode, topic,
+        ["--timeout", str(timeout_seconds), mode, topic,
          "--topic-contract-digest", topic_business_contract(version, topic).contract_digest,
          *(["--event-count", "1"] if mode == "stream-topic" else []), *facts],
         env={"WAAPI_SKILL_CONFIG_PATH": str(config)},
@@ -176,7 +176,8 @@ def test_monitor_accepts_all_native_property_value_alternatives(tmp_path, versio
 def test_nested_log_definitions_preserve_native_required_and_enum_fields(tmp_path, version, severity):
     event = {"channel": "general", "item": {"severity": severity, "time": 0,
              "messageId": "test", "message": "Test", "platform": {"id": GUID}, "parameters": []}}
-    code, result, client, _ = run(tmp_path, version, "wait-topic", "ak.wwise.core.log.itemAdded", [event])
+    # This checks reflected enum/required fields, not a 30ms scheduler deadline.
+    code, result, client, _ = run(tmp_path, version, "wait-topic", "ak.wwise.core.log.itemAdded", [event], timeout_seconds=1.0)
     assert code == 0, result
     assert result["event"] == event
     assert result["event_validation"]["unresolved_refs"] == []

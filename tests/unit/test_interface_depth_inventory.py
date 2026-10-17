@@ -362,9 +362,14 @@ def test_every_migration_row_has_exactly_one_rollup_and_ticket_family() -> None:
         if row["disposition"] == "migration_required"
     }
     assert set(tickets) == expected
-    assert {family["github_issue"] for family in inventory["ticket_families"]} == {188}
+    assert {family["github_issue"] for family in inventory["ticket_families"]} == {188, 189}
+    model_uris = {
+        "ak.wwise.ui.window.create", "ak.wwise.ui.window.present", "ak.wwise.ui.window.close",
+        "ak.wwise.ui.model.registerWafm", "ak.wwise.ui.model.createHandle", "ak.wwise.ui.model.destroyHandle",
+        "ak.wwise.ui.model.getState", "ak.wwise.ui.model.setState", "ak.wwise.ui.signal.emit",
+    }
     assert all(
-        row["owner_issue"] == 188
+        row["owner_issue"] == (189 if row.get("uri", row.get("operation")) in model_uris else 188)
         for row in (*inventory["native_lanes"], *inventory["operation_lanes"])
         if row["disposition"] == "migration_required"
     )

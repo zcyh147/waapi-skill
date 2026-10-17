@@ -422,7 +422,14 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
     }
     assert authoring_calls == REVIEWED_PUBLIC_CALL_URIS
     assert public_fixed == REVIEWED_FIXED_FUNCTION_URIS
-    assert public_topics == REVIEWED_TOPIC_URIS
+    authoring_owned_signals = {"ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"}
+    assert public_topics == REVIEWED_TOPIC_URIS - authoring_owned_signals
+    for version in ("2024.1", "2025.1"):
+        authoring_topics = {
+            entry.uri for entry in catalog.entries_for_profile(version, profile="wwise-authoring-ui")
+            if entry.item_type == "topic"
+        }
+        assert authoring_owned_signals <= authoring_topics
     assert frozenset(FIXED_COMMANDS_BY_URI) == REVIEWED_FIXED_FUNCTION_URIS
     assert all(
         entry.gateway_commands

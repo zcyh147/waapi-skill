@@ -158,10 +158,14 @@ def test_object_create_root_derives_activation_into_dispatch_and_verification() 
             "value": True,
             "metadata_type": "Boolean",
             "derived": True,
-            "activates_references": ["OutputBus"],
         }
     ]
-    assert spec["references"][0]["activation_properties"] == ["OverrideOutput"]
+    proof = spec["new_object_default_evidence"][0]
+    assert proof["derived_properties"] == {"OverrideOutput": True}
+    assert proof["requirements"][0]["name"] == "OverrideOutput"
+    assert proof["requirements"][0]["effective_value"] is True
+    assert proof["requirements"][0]["source"] == "derived"
+    assert spec["references"] == [{"name": "OutputBus", "target_id": BUS_ID}]
 
 
 def test_object_create_nested_derives_activation_only_on_referencing_child() -> None:
@@ -281,7 +285,12 @@ def test_explicit_true_activation_is_deduplicated() -> None:
     assert prepared["dispatch"]["args"]["@OverrideOutput"] is True
     assert len([row for row in spec["properties"] if row["name"] == "OverrideOutput"]) == 1
     assert "derived" not in spec["properties"][0]
-    assert spec["properties"][0]["activates_references"] == ["OutputBus"]
+    proof = spec["new_object_default_evidence"][0]
+    assert proof["derived_properties"] == {}
+    assert proof["requirements"][0]["name"] == "OverrideOutput"
+    assert proof["requirements"][0]["effective_value"] is True
+    assert proof["requirements"][0]["source"] == "explicit"
+    assert spec["references"] == [{"name": "OutputBus", "target_id": BUS_ID}]
     assert len(reader.calls) == 7
 
 
@@ -298,14 +307,14 @@ def test_explicit_false_activation_is_rejected() -> None:
             read_call=reader,
         )
 
-    assert rejected.value.error_code == "REFERENCE_DEPENDENCY_CONFLICT"
+    assert rejected.value.error_code == "NEW_OBJECT_DEPENDENCY_CONFLICT"
 
 
 @pytest.mark.parametrize(
     ("dependency", "activation_type", "error_code"),
     [
-        ({**_dependency(), "extra": True}, "Boolean", "INVALID_METADATA"),
-        (_dependency(context="Parent"), "Boolean", "CONSTRAINED_REFERENCE_BOUNDARY"),
+        ({**_dependency(), "extra": True}, "Boolean", "NEW_OBJECT_DEPENDENCY_UNSUPPORTED"),
+        (_dependency(context="Parent"), "Boolean", "NEW_OBJECT_DEPENDENCY_UNSUPPORTED"),
         (_dependency(), "Real64", "INVALID_METADATA"),
     ],
 )

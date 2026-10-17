@@ -4419,7 +4419,13 @@ def test_create_execute_persists_result_and_verify_reads_back_returned_guid(tmp_
             "contract": "waapi-skill.verified-created-root/v1",
             "identity_status": "verified",
             "verified_root": {key: created_row()[key] for key in ("id", "name", "type", "path")},
-            "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
+            "configuration_complete": True,
+            "configuration_complete_scope": "this_creation_declaration_only_followup_fields_require_separate_verification",
+            "next_change": "bind_the_verified_creation_transaction_and_revalidate_live_name_type_path",
+            "configuration_binding": {
+                "selector": "--verified-created-from", "transaction_id": transaction["transaction_id"],
+                "scope": "created_root_only", "requires_separate_Draft_and_Preview": True,
+            },
             "repeat_creation": False,
         },
     }

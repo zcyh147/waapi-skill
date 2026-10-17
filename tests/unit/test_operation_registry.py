@@ -469,7 +469,7 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
     assert specs["waapi.call"]["argument_contract"] == {
         "type": "object",
         "required": ["api"],
-        "optional": ["args", "options", "io_root", "result_projection", "layout_binding"],
+        "optional": ["args", "options", "io_root", "result_projection", "layout_binding", "model_binding"],
         "additionalProperties": False,
         "properties": {
             "api": {
@@ -506,6 +506,10 @@ def test_operation_catalog_is_truthful_about_closed_and_boundary_operations() ->
             "layout_binding": {
                 "type": "object",
                 "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded.",
+            },
+            "model_binding": {
+                "type": "object",
+                "description": "Gateway-owned Authoring resource and declaration proof.",
             },
             "result_projection": {
                 "type": "object",

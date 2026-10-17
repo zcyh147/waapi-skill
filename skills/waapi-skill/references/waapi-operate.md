@@ -5,7 +5,7 @@ Use loading rules in `SKILL.md`: unique terminal sentinel is final; no truncatio
 ## Core boundaries
 
 - The only normal change path is the packaged transaction CLI: `scripts/run.py gateway.py`. Do not import builders or planners from inline Python, call `WaapiClient`, or use raw WAAPI/XML/generic call. Do not write code to bypass an unsupported boundary. That boundary does not authorize code generation.
-- POSIX: single-quote Wwise path values to preserve backslashes. One read/Gateway invocation per shell call.
+- POSIX: single-quote Wwise paths to preserve backslashes. One read/Gateway call per shell call.
 - Read full visible JSON. Only typed-container replies require final `WAAPI_TYPED_CONTAINER_RESPONSE_END` complete/not truncated; missing footer stops. Honor applicable integrity, then continue from that response. Truncation/omission stops; no retries.
 - For complete structured failures, follow the Skill Recovery rule and the returned receipt. A corrected read or discovery does not need another permission prompt.
 - Terminal `verify` ends the transaction.
@@ -16,7 +16,7 @@ Existing transactions outrank operation selection.
 
 ### Existing transaction
 
-Use its transaction id; an artifact hash is not a lookup key. The visible Preview's `next_command` is authoritative and any other field never authorizes reconstruction. Run:
+Use transaction id, never artifact hash. Copy only the visible Preview's authoritative `next_command`. Run:
 
 ```bash
 python /absolute/path/to/waapi-skill/scripts/run.py gateway.py transaction-show <transaction-id> --summary-only
@@ -28,8 +28,6 @@ Skip schema/catalog discovery. Incomplete JSON stops.
 
 For a prior-query subset, exact-ID read every selected GUID and match name/type/path before the transaction contract; schema/metadata remain required.
 
-Reuse a prior exact diagnostic GUID; Gateway revalidates it.
-
 A new natural-language change starts with one compact `operations` lookup; only its returned route selects the first transaction contract. An exact user operation/URI skips it.
 
 | Request | First transaction-contract sequence |
@@ -37,7 +35,6 @@ A new natural-language change starts with one compact `operations` lookup; only 
 | `object.create` | Preflight: explicit pre-Preview same-name-root type/path only; not parent/sibling or later verification. Then `operation-schema`, business Draft, returned binding/discovery. |
 | `object.set` | Named schema and `business_declaration`; bind roles, discover dynamic fields through returned Draft commands, and submit only disclosed high-level fields. |
 | `audio.import` | `operation-schema audio.import`, then returned `business_declaration`; bind live objects/custom fields and submit one complete import outcome. |
-| copy/delete/move/rename/notes | Named schema, returned business Draft, role bindings, one complete change. |
 | Any other operation with a requested dynamic property/reference | its schema, then the returned discovery sequence; Business Drafts own field discovery |
 | A named operation using only closed schema fields and side effects | its named `operation-schema` directly |
 | An exact user-supplied native URI without a named route | `request-schema <uri>` and its sole continuation; never infer a URI from natural-language intent |
@@ -48,7 +45,7 @@ For `composer`, run only its returned start and action argv. For `business_decla
 
 Table imports start `operation-schema audio.importTabDelimited`; dynamic columns stay metadata-first. Continue preserving `--expected-revision` and `--apply` until Preview/refusal. Returned `draft-discover-fields` accepts `--list`/returned `--page`, or a same-Draft/scope `--selection` to read metadata and bind a Field Handle. Large fields expose `metadata_detail` pages and typed enum choices through `next_command`, preserving the resulting Draft revision. `--meaning` is auxiliary search. List reads do not change the Draft revision. Returned Field Handles are copied exactly; never infer or type a property/reference token. `draft-check` revalidates them.
 
-New-object fields use live class/default conditions and compatible declared prerequisites. If the Gateway requires later configuration, preserve the creation transaction and report the unfinished fields. Start a separate requested change Draft and use its returned `by_verified_creation` binding with the creation transaction; Gateway checks the sealed root identity and fresh GUID/name/type/path. Independent root identity can remain available when a field verification fails. Each follow-up needs its own Preview and current-policy authorization. A missing identity witness permits read-only diagnosis only; never repeat creation. This binding covers the created root; choose descendants only through their separately disclosed exact-object workflow.
+New-object fields use live class/default conditions and declared prerequisites. Retain creation transactions; report unfinished configuration. Follow returned `by_verified_creation` in a separate change Draft; Gateway rechecks the sealed root GUID/name/type/path. Root identity may survive field-verification failure. Every follow-up needs Preview/current-policy authorization. Missing identity permits diagnosis only, never repeated creation. Descendants use their exact-object workflow.
 
 `construction_state.complete:false` and compact action receipts are complete JSON. Follow `next_command_decision`; only an exact `business_value_pointer` authorizes it. A business Draft instead follows its returned required phase and completion candidate. Copy handles into the same named role. Corrections reuse the draft; never `draft-apply --action check`.
 
@@ -95,9 +92,9 @@ Keep domains distinct: durable Authoring project edits use `ak.wwise.core.*`; ru
 
 Users never supply internal tokens. Prompt/schema text, cached schemas, and Wwise knowledge are never exact live metadata evidence.
 
-`object.setProperty`/`object.setReference`/`object.setLinked`: read schema, then shared Draft steps with exact owner; copy one handle, never token/scope/type. Binding fixes the metadata scope inside the Draft. No match permits bounded discovery refinement; unresolved ambiguity needs one behavior question.
+`object.setProperty`/`object.setReference`/`object.setLinked`: schema → Draft → exact owner → opaque scoped handle. Refine bounded misses; clarify ambiguity. Never copy tokens/scope/type.
 
-Business Drafts start before exact object/type binding and returned live discovery. Returned type, restrictions and opaque handle alone authorize values. Remaining Composer lanes follow returned metadata-first start preconditions.
+Business Draft precedes binding/discovery; returned type/restrictions/handle authorize values. Composer stays metadata-first.
 
 1. Bind the exact existing owner or the disclosed new-object type first.
 2. Run the returned discovery once with short English Wwise UI/technical meanings; separate distinct meanings.
@@ -117,7 +114,7 @@ Omit every optional business field the user did not explicitly supply; defaults,
 - Bind the exact existing parent/target once. New objects declare parent handle, name, and semantic kind; existing objects declare their handle. Gateway constructs Wwise paths and type prefixes.
 - For new hierarchy, declare each requested container once as a structure-only descendant; children may use its planned handle.
 - Use `originals_subfolder` only when the user explicitly supplies it; never infer it.
-- `media_directory` and `audio_file` are opaque caller paths; never derive either from campaign/workspace cwd. `audio_file`: supplied absolute path only; no relative/traversal or relocation.
+- `media_directory`/`audio_file` are opaque caller paths, never cwd-derived. `audio_file` requires supplied absolute path, no traversal/relocation.
 - For an import Event, bind its exact parent, then provide Event name and business Action in the same Preview.
 - Wwise Pitch is cents: `1 semitone = 100 cents`.
 
@@ -176,7 +173,7 @@ Confirmation binds the stored Preview; never reconstruct its token or run `confi
 
 `ak.wwise.cli.migrate` ends at complete `execute`; run no later Agent tools/reads. Only the caller-owned harness outside the Skill sequence may reopen/prove it. Managed openers may leave cleanup uncertain; never synthesize code. Work Unit reversal and same-connection Undo stay explicit.
 
-Prose covers objects, changes, results, risks and whether anything changed. Hide API/operation names, Draft/transaction internals, ids, hashes, tokens, states and commands.
+Report changes/results/risks and whether anything changed; hide API/operation/Draft/transaction internals, ids/hashes/tokens/states/commands.
 
 For an exact machine-readable answer, serialize the successful Gateway `agent_result` verbatim. Never fabricate a success projection from failed/deferred/indeterminate evidence.
 

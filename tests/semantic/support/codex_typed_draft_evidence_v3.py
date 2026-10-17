@@ -89,6 +89,7 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-declare-debug-intent": frozenset({"settings.revised"}),
     "draft-declare-host-plan": frozenset({"settings.revised"}),
     "draft-declare-layout-plan": frozenset({"settings.revised"}),
+    "draft-declare-model-plan": frozenset({"settings.revised"}),
     "draft-declare-soundengine-plan": frozenset({"settings.revised"}),
     "draft-declare-undo-plan": frozenset({"settings.revised"}),
     "draft-declare-project-setting-plan": frozenset({"settings.revised"}),

@@ -7,19 +7,19 @@ Read-only queries and bounded Topic monitoring. Require the final sentinel and c
 - Use only the packaged Gateway. There is no raw-client fallback and do not write Python.
 - Use fixed routes directly: object reads use the business declaration from `query-schema`; Topic facts use `topic-schema`; non-fixed reflected functions use `request-schema <uri>` and its sole continuation. Topic observation never authorizes its publisher.
 - Otherwise copy the route from `operations`.
-- Saved configuration selects live schemas. Catalogs default to Console; offline `--profile wwise-authoring-ui` adds Authoring. Neither proves live availability. Use coverage's host-scoped summary, then filters. `describe` is for offline schema audits. `--limit 0` requires every row.
-- `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; other complete structured failures follow the Skill Recovery rule and their receipt.
+- Config selects live schemas. Offline catalogs default to Console; `--profile wwise-authoring-ui` adds Authoring, not live proof. Coverage owns host summaries/filters; `describe` audits schemas. `--limit 0` requests all rows.
+- `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, `UNSUPPORTED_BY_SKILL_INTERFACE`/`unsupported_by_skill_interface`: boundaries. Other complete failures use Skill Recovery/receipt.
 
 ## Wwise 2025.1 Media Pool
 
 Run `request-schema ak.wwise.core.mediaPool.getFields` before `request-schema ak.wwise.core.mediaPool.get` and follow each typed continuation. Do not request the `.get` schema first.
 
 Supply disclosed database, field, condition, output, and limit values. Gateway owns
-native bindings, filters, and projection. Missing live fields permit scoped discovery refinement; unresolved ambiguity needs an exact choice.
+native bindings, filters, and projection. Refine missing live fields by scoped discovery; clarify ambiguity.
 For case-sensitive matching use the disclosed post-filter; a saturated candidate
 set that cannot prove completeness returns `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
 At the candidate limit, follow `next_command` for a larger prefix reread, with no
-native offset. Gateway verifies the exact preceding prefix and query/config/project/session.
+native offset. Gateway checks the exact prefix and query/config/project/session.
 Append ordinary later rows; `replace_previous_prefix` replaces the prior sorted/filtered
 view. Long queries use an opaque `--media-query` read-plan handle. At 200 rows,
 `complete=false` remains a resource boundary, never proof that the collection ends.
@@ -49,13 +49,13 @@ Classify only when the outer command succeeds and the terminal result says `scan
 
 Choose exactly one business source: repeated `--path-segment`, `--exact-id`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. Custom-kind miss/ambiguity uses returned candidates, never an invented type.
 
-Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
+`--predicate BUSINESS_CONDITION VALUE` repeats flat AND. `--relationship`: `descendants`, `ancestors`, `references-to`, `children`, `parent`. Broad sources need user `--max-results`. `all-sounds`/`sound` includes SFX/Voice; explicit scope uses `sound-sfx`/`sound-voice`. Another source takes type as `--predicate kind-is`.
 
 Identity projections always request `id,name,type,path`. Absent outputs appear in `unavailable_fields`; explicit null stays null. Missing identity facts produce `identity_completeness.complete=false` and bounded `native_observation`, with no mutation authority. Add repeated `--include` values in caller order; `--include-field` adds live fields to custom `properties` and `references` maps. Follow structured metadata repair for missing/ambiguous fields.
 
-Offline schema: `query-schema` lists versioned outputs; `query-schema --output NAME` gives meaning, applicability, shape and versions.
+Offline `query-schema`: versioned outputs; `--output NAME`: meaning/applicability/shape/versions.
 
-Optional `--platform`/`--language` take one exact name or GUID, trimmed and bounded to 512 UTF-8 bytes. Omission keeps the current platform/native language default. Generated continuations retain both.
+`--platform`/`--language`: one trimmed exact name/GUID, ≤512 UTF-8 bytes. Omit for native defaults; continuations retain both.
 
 Success rows are objects in the array; only an explicit empty array is empty. Over-bound, malformed, or truncated results are not empty. Ordinary `query-object` success defaults to compact business fields, sufficient for normal answers. Use `--detail` only for explicit user requests or compile/dispatch diagnosis; never rerun solely for detail. Failures skip compact projection but obey global limits. Keep terminal `agent_result` exact and final.
 
@@ -94,13 +94,6 @@ Use the business declaration for one source and flat AND. Use advanced only for 
 - For an ownership chain from one exact object, use `--relationship ancestors`; do not assume the relationship removes Project. Return nearest parent to farthest ancestor without mixing same-name objects from other branches.
 - For relative depth, derive depth from each returned `path`, counting the root's direct children as relative depth 1; do not add `parent` solely to calculate relative depth. Request `parent` only when the user needs a parent identity or a direct parent-child relationship.
 - When the user supplies a maximum, copy that exact number to `--max-results`. Otherwise ask for a limit instead of inventing one.
-
-Literal path and exact-name search:
-
-```bash
-python scripts/run.py gateway.py query-object --path-segment 'Events' --path-segment 'Default Work Unit'
-python scripts/run.py gateway.py query-object --search-text 'ExactName' --predicate name-is ExactName --max-results 1
-```
 
 For example, a bounded descendant inventory of Sound candidates:
 
@@ -209,8 +202,8 @@ UI reads require the auto-detected Authoring profile and fresh `getCommands`; sn
 For current selection use live `selected`; report rows or explicit empty. The Gateway deduplicates and bounds it. Preserve terminal `agent_result` exactly. Malformed responses never become empty objects/Buses/projects/selections.
 
 Selected files: Wwise 2025.1 Authoring only. Find `getSelectedFiles` through
-`operations` and follow its zero-input continuation. File selection is distinct; empty files say nothing about selected objects.
+`operations`; copy its zero-input continuation. File and object selections are distinct.
 
-Report unsupported Gateway queries as boundaries; only explicit Skill development changes implementation.
+Unsupported queries remain boundaries; only explicit Skill development changes implementation.
 
 <!-- WAAPI_QUERY_REFERENCE_END -->

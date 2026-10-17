@@ -18,7 +18,7 @@
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
     "gateway_parser_sha256": "822dbf5a4a7dd85d7cdd931bb6bb4ea281448937a941a5fc2e4d6d1a3c43b4b6",
-    "operation_contract_sha256": "0e6685a17181b53e0c9b91d63a3cf415dac00d14b93f88f52cd5914f363719a6",
+    "operation_contract_sha256": "f7a277341004448ae18fec67004663e3c6461fd880540ffc4a2b2ac37e63a292",
     "public_continuation_sha256": "0a56e670f852238d6a98662faf7d13f0e8e0a9c9746d12e3680319e5847ce757",
     "typed_request_surface_sha256": "667ce63d93b3a38f1d14d7348ae82fe728e731f24021ec868c687f2a2a5b87c7"
   },
