@@ -21,7 +21,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
             "check_out_from_source_control",
         ],
         "field_types": {
-            "name_conflict": "fail_or_rename",
+            "name_conflict": "fail_or_rename_or_replace",
             "add_to_source_control": "boolean",
             "check_out_from_source_control": "boolean",
         },
@@ -40,7 +40,7 @@ _DECLARATIONS: dict[str, dict[str, Any]] = {
             "check_out_from_source_control",
         ],
         "field_types": {
-            "name_conflict": "fail_or_rename",
+            "name_conflict": "fail_or_rename_or_replace",
             "check_out_from_source_control": "boolean",
         },
     },
@@ -123,6 +123,14 @@ def object_lifecycle_business_contract_data(
             "immutable_preview": True,
             "single_execute": True,
             "object_revalidation": "exact_guid_name_type_path",
+            **({"replace": {
+                "authorization": "explicit_name_conflict_replace_and_exact_destination",
+                "preview": "complete_bounded_source_and_replaced_subtree",
+                "revalidation": "identities_topology_notes_and_discovered_default_view_fields",
+                "verification": "source_copy_or_move_identity_and_topology_values_and_all_replaced_guid_absence",
+                "verification_boundary": "indeterminate_until_unlinked_platform_and_owned_list_plugin_state_are_observed",
+                "maximum_subtree_nodes": 128,
+            }} if operation in {"object.copy", "object.move"} else {}),
         },
         "version_features": {
             "add_to_source_control": add_to_source_control_available,

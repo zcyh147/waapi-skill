@@ -2080,18 +2080,19 @@ def test_object_set_global_settings_materialize_at_request_scope(
         })
     assert materialized.request["arguments"] == expected_arguments
 
-    # object.create's replace choice must not enter object.set or change its draft.
-    before = store.inspect(draft_id, task_authority=authority).composition
-    code, rejected = _offline(
+    # Replacement is a native child/list conflict choice in object.set too.
+    code, replaced = _offline(
         tmp_path, "draft-business-configure", draft_id,
         "--task-authority", authority, "--expected-revision", str(revision),
         "--name-conflict", "replace", version=version,
     )
-    assert code == 2, rejected
-    assert rejected["error_code"] == "FIELD_VALUE_UNAVAILABLE"
-    after = store.inspect(draft_id, task_authority=authority)
-    assert after.revision == revision
-    assert after.composition == before
+    assert code == 0, replaced
+    after = store.materialize_request(
+        draft_id, task_authority=authority, expected_revision=replaced["draft"]["revision"],
+        schema_digest=gateway.operation_draft_schema_digest("object.set", version),
+        composer_digest=operation_composer_digest("object.set", version),
+    )
+    assert after.request["arguments"]["on_name_conflict"] == "replace"
 
 
 def test_gateway_declares_named_object_list_without_native_row_json(
@@ -2271,3 +2272,119 @@ def test_gateway_clears_named_object_list_without_empty_native_dsl(
             "lists": [{"name": "CustomList", "objects": []}],
         }
     ]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("conflict", ("fail", "rename", "merge"))
+def test_gateway_creates_recursive_root_in_owned_list(
+    tmp_path: Path, version: str, conflict: str,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "object.create", version=version)
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    # An owned list does not require its owner to be a hierarchy container.
+    client = _live_client(tmp_path, {
+        "ak.wwise.core.object.get": [
+            *([{"return": [_project(tmp_path)]}] if version == "2021.1" else []),
+            {"return": [{
+            "id": PARENT_ID, "name": "Weather", "type": "Sound",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather",
+        }]}],
+    }, version=version)
+    code, bound = gateway.execute_gateway(
+        ["--state-dir", str(tmp_path / "state"), "draft-bind-object", draft_id,
+         "--task-authority", authority, "--expected-revision", "1",
+         "--object-id", PARENT_ID],
+        env=_env(tmp_path, version), client_factory=lambda _url: client,
+    )
+    assert code == 0, bound
+    code, configured = _offline(
+        tmp_path, "draft-business-configure", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--name-conflict", conflict, version=version,
+    )
+    assert code == 0, configured
+    code, declared = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "3", "--declaration-id", "list-root",
+        "--parent-handle", bound["bound_object"]["handle"], "--name", "Layers",
+        "--kind", "actor-mixer", "--field", "object_list", "CustomList",
+        version=version,
+    )
+    assert code == 0, declared
+    root_handle = declared["draft"]["declared_object"]["result_handle"]
+    code, child = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "4", "--declaration-id", "rain",
+        "--parent-handle", root_handle, "--name", "Rain", "--kind", "sound-sfx",
+        "--field", "notes", "Rain bed", version=version,
+    )
+    assert code == 0, child
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id, task_authority=authority, expected_revision=5,
+        schema_digest=gateway.operation_draft_schema_digest("object.create", version),
+        composer_digest=operation_composer_digest("object.create", version),
+    )
+    assert materialized.request["arguments"] == {
+        "parent": {"kind": "id", "value": PARENT_ID},
+        "type": "ActorMixer", "name": "Layers", "list": "CustomList",
+        "children": [{"type": "Sound", "name": "Rain", "notes": "Rain bed"}],
+        **({} if conflict == "fail" else {"on_name_conflict": conflict}),
+    }
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("conflict", ("fail", "rename", "merge"))
+def test_gateway_set_preserves_global_platform_and_per_target_choices(
+    tmp_path: Path, version: str, conflict: str,
+) -> None:
+    code, started = _offline(tmp_path, "draft-start", "object.set", version=version)
+    assert code == 0, started
+    draft_id = started["draft"]["draft_id"]
+    authority = started["task_authority"]
+    client = _live_client(tmp_path, {
+        "ak.wwise.core.object.get": [{"return": [{
+            "id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+            "path": r"\Actor-Mixer Hierarchy\Default Work Unit",
+        }]}],
+    }, version=version)
+    code, bound = gateway.execute_gateway(
+        ["--state-dir", str(tmp_path / "state"), "draft-bind-object", draft_id,
+         "--task-authority", authority, "--expected-revision", "1",
+         "--object-id", PARENT_ID],
+        env=_env(tmp_path, version), client_factory=lambda _url: client,
+    )
+    assert code == 0, bound
+    code, configured = _offline(
+        tmp_path, "draft-business-configure", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--platform", "Windows", version=version,
+    )
+    assert code == 0, configured
+    code, declared = _offline(
+        tmp_path, "draft-declare-existing", draft_id, "--task-authority", authority,
+        "--expected-revision", "3", "--declaration-id", "owner",
+        "--object-handle", bound["bound_object"]["handle"],
+        "--field", "notes", "Weather layers", "--field", "name_conflict", conflict,
+        "--field", "platform", "Mac", version=version,
+    )
+    assert code == 0, declared
+    code, child = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "4", "--declaration-id", "rain",
+        "--parent-handle", bound["bound_object"]["handle"],
+        "--name", "Rain", "--kind", "sound-sfx", version=version,
+    )
+    assert code == 0, child
+    materialized = OperationDraftStore(tmp_path / "state").materialize_request(
+        draft_id, task_authority=authority, expected_revision=5,
+        schema_digest=gateway.operation_draft_schema_digest("object.set", version),
+        composer_digest=operation_composer_digest("object.set", version),
+    )
+    assert materialized.request["arguments"] == {
+        "platform": "Windows",
+        "objects": [{
+            "object": {"kind": "id", "value": PARENT_ID},
+            "notes": "Weather layers", "platform": "Mac", "on_name_conflict": conflict,
+            "children": [{"type": "Sound", "name": "Rain"}],
+        }],
+    }

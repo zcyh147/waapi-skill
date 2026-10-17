@@ -25,6 +25,7 @@ from .operation_object import (
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
     normalize_object_list_name,
+    normalize_curve_points,
 )
 from .operation_plugin import (
     MAX_PLUGIN_NAME_LENGTH,
@@ -56,6 +57,7 @@ _CREATE_SETTINGS = frozenset(
 )
 _SET_NODE_EXTENSION_FIELDS = frozenset(
     {
+        "clear_object_lists",
         "language",
         "list_behavior",
         "media_files",
@@ -325,7 +327,7 @@ def _compile_set_new_node(
     node = {
         "type": _resolve_native_object_type(session, declaration.target.kind),
         "name": declaration.target.name,
-        **_compile_create_fields(session, base),
+        **_compile_create_fields(session, base, allow_reference_arrays=True),
     }
     platform = extension_fields.get("platform")
     if platform is not None:
@@ -390,7 +392,25 @@ def _compile_set_new_node(
             choices=["append", "replace-all"],
             action="choose one disclosed per-target object-list outcome",
         )
-    if list_behavior is not None and object_list is None:
+    clears = extension_fields.get("clear_object_lists")
+    if clears is not None:
+        if not isinstance(clears, list) or not 1 <= len(clears) <= DEFAULT_MAX_CHILDREN_PER_NODE:
+            raise _repair(session, "OBJECT_SET_LIST_CLEAR_LIMIT_INVALID", field="clear_object_lists",
+                          action="name a bounded nonempty set of owned lists to clear")
+        if list_behavior != "replace-all":
+            raise _repair(session, "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE", field="list_behavior",
+                          action="choose replace-all before clearing an owned list")
+        names = []
+        for name in clears:
+            try:
+                names.append(normalize_object_list_name(name, request_path="$.business.clear_object_lists"))
+            except Exception as exc:
+                raise _repair(session, "OBJECT_SET_LIST_NAME_INVALID", field="clear_object_lists",
+                              action="provide exact owned-list names without an @ prefix") from exc
+        if len({name.casefold() for name in names}) != len(names):
+            raise _repair(session, "OBJECT_SET_LIST_DUPLICATE", field="clear_object_lists", action="name each list once")
+        node["lists"] = [{"name": name, "objects": []} for name in names]
+    if list_behavior is not None and object_list is None and clears is None:
         raise _repair(
             session,
             "OBJECT_SET_LIST_NAME_REQUIRED",
@@ -462,9 +482,34 @@ def _resolve_native_object_type(
     return kind.native_object_type
 
 
+def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *, allow_arrays: bool) -> dict[str, Any]:
+    if isinstance(value, (list, Mapping)) and not allow_arrays:
+        raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
+                      action="object.create accepts one bound reference or null; complex reference values belong to available object.set lanes")
+    if isinstance(value, Mapping):
+        if set(value) != {"curve_points"}:
+            raise _repair(session, "INLINE_CURVE_INPUT_INVALID", field="field_values",
+                          action="provide only curve_points; native type, IDs and field tokens remain Gateway-owned")
+        points = normalize_curve_points(value["curve_points"], request_path="$.business.curve_points")
+        return {"name": field.token, "target": {"curve_points": [point.as_dict() for point in points]}}
+    if value is None:
+        return {"name": field.token, "target": None}
+    values = value if isinstance(value, list) else [value]
+    if len(values) > DEFAULT_MAX_FIELDS_PER_NODE:
+        raise _repair(session, "OBJECT_GRAPH_REFERENCE_LIMIT_EXCEEDED", field="field_values",
+                      action="split the reference array into a bounded request")
+    identities = []
+    for item in values:
+        handle = session.handles.validate_field_value(field, item)
+        target = session.handles.resolve_object(handle)
+        identities.append({"kind": "id", "value": target.object_id})
+    return {"name": field.token, "target": identities if isinstance(value, list) else identities[0]}
+
+
 def _compile_create_fields(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
+    *, allow_reference_arrays: bool = False,
 ) -> dict[str, Any]:
     fields = dict(declaration.fields)
     unexpected = sorted(set(fields) - _CREATE_FIELDS)
@@ -633,17 +678,11 @@ def _compile_create_fields(
                 action="set one business meaning through one field only",
             )
         used_tokens.add(field.token)
-        normalized = session.handles.validate_field_value(field, business_value)
         if field.field_kind == "property":
+            normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            target = session.handles.resolve_object(normalized)
-            references.append(
-                {
-                    "name": field.token,
-                    "target": {"kind": "id", "value": target.object_id},
-                }
-            )
+            references.append(_compile_graph_field_reference(session, field, business_value, allow_arrays=allow_reference_arrays))
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -781,11 +820,38 @@ def _materialize_create(
 
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
+        fields = dict(row.fields)
+        object_list = fields.pop("object_list", None)
+        if object_list is not None and row is not roots[0]:
+            raise _repair(
+                session,
+                "OBJECT_CREATE_DESCENDANT_LIST_UNAVAILABLE",
+                field="object_list",
+                action="object.create accepts list placement only on its root; use object.set for recursive owned lists",
+            )
+        base = BusinessDeclaration(
+            declaration_id=row.declaration_id,
+            result_handle=row.result_handle,
+            target=row.target,
+            fields=fields,
+        )
         node = {
             "type": _resolve_native_object_type(session, row.target.kind),
             "name": row.target.name,
-            **_compile_create_fields(session, row),
+            **_compile_create_fields(session, base),
         }
+        if object_list is not None:
+            try:
+                node["list"] = normalize_object_list_name(
+                    object_list, request_path="$.business.object_list",
+                )
+            except Exception as exc:
+                raise _repair(
+                    session,
+                    "OBJECT_CREATE_LIST_NAME_INVALID",
+                    field="object_list",
+                    action="provide one exact Wwise object-list name without an @ prefix",
+                ) from exc
         child_rows = children.get(row.result_handle, [])
         if child_rows:
             for child in child_rows:
@@ -810,11 +876,12 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
-    _validate_specialized_relationship(
-        session,
-        parent_type=parent.object_type,
-        child_type=root_node["type"],
-    )
+    if "list" not in root_node:
+        _validate_specialized_relationship(
+            session,
+            parent_type=parent.object_type,
+            child_type=root_node["type"],
+        )
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -1029,6 +1096,7 @@ def _compile_existing_set_fields(
         "clear_object_lists",
         "list_behavior",
         "media_files",
+        "name_conflict",
         "new_name",
         "platform",
     }
@@ -1049,6 +1117,7 @@ def _compile_existing_set_fields(
             "field_values",
             "list_behavior",
             "media_files",
+            "name_conflict",
             "new_name",
             "platform",
         }
@@ -1059,7 +1128,18 @@ def _compile_existing_set_fields(
         target=declaration.target,
         fields=stable_fields,
     )
-    compiled = _compile_create_fields(session, stable_declaration)
+    compiled = _compile_create_fields(session, stable_declaration, allow_reference_arrays=True)
+    if "name_conflict" in fields:
+        conflict = fields["name_conflict"]
+        if conflict not in {"fail", "rename", "merge", "replace"}:
+            raise _repair(
+                session,
+                "FIELD_VALUE_UNAVAILABLE",
+                field="name_conflict",
+                choices=["fail", "rename", "merge", "replace"],
+                action="choose one disclosed collision outcome for this target's new children and list members",
+            )
+        compiled["on_name_conflict"] = conflict
     if "new_name" in fields:
         semantics = object_identity_semantics(source.object_type)
         if not semantics.mutable_intrinsic_name:
@@ -1197,17 +1277,11 @@ def _compile_existing_set_fields(
         used_tokens.add(field.token)
         if field.platform is not None:
             platforms.add(field.platform)
-        normalized = session.handles.validate_field_value(field, business_value)
         if field.field_kind == "property":
+            normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            target = session.handles.resolve_object(normalized)
-            references.append(
-                {
-                    "name": field.token,
-                    "target": {"kind": "id", "value": target.object_id},
-                }
-            )
+            references.append(_compile_graph_field_reference(session, field, business_value, allow_arrays=True))
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -1267,36 +1341,29 @@ def _materialize_set(
         else:
             root_new.append(row)
 
-    def compile_node(
-        row: BusinessDeclaration,
-        *,
-        allow_object_list: bool,
-    ) -> tuple[dict[str, Any], str | None, str | None]:
+    def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
-        if not allow_object_list and object_list is not None:
-            raise _repair(
-                session,
-                "OBJECT_SET_NESTED_LIST_UNAVAILABLE",
-                field="object_list",
-                action="put object-list roots directly under one bound existing owner",
-            )
         descendants = planned_children.get(row.result_handle, [])
         if descendants:
             for child in descendants:
                 assert isinstance(child.target, NewDescendantTarget)
-                _validate_specialized_relationship(
-                    session,
-                    parent_type=node["type"],
-                    child_type=_resolve_native_object_type(
-                        session,
-                        child.target.kind,
-                    ),
-                )
-            node["children"] = [
-                compile_node(child, allow_object_list=False)[0]
-                for child in descendants
-            ]
+                child_node, child_list, child_behavior = compile_node(child)
+                if child_behavior is not None:
+                    if list_behavior is not None and list_behavior != child_behavior:
+                        raise _repair(session, "OBJECT_SET_LIST_BEHAVIOR_CONFLICT", field="list_behavior",
+                                      action="use one inherited per-target list behavior for this graph")
+                    list_behavior = child_behavior
+                if child_list is None:
+                    _validate_specialized_relationship(session, parent_type=node["type"], child_type=child_node["type"])
+                    node.setdefault("children", []).append(child_node)
+                else:
+                    lists = node.setdefault("lists", [])
+                    descriptor = next((item for item in lists if item["name"] == child_list), None)
+                    if descriptor is None:
+                        descriptor = {"name": child_list, "objects": []}
+                        lists.append(descriptor)
+                    descriptor["objects"].append(child_node)
         return node, object_list, list_behavior
 
     rows: list[dict[str, Any]] = []
@@ -1328,19 +1395,12 @@ def _materialize_set(
             row = {"object": {"kind": "id", "value": parent.object_id}}
             rows_by_handle[parent_handle] = row
             rows.append(row)
-        node, object_list, list_behavior = compile_node(
-            declaration,
-            allow_object_list=True,
-        )
-        _validate_specialized_relationship(
-            session,
-            parent_type=parent.object_type,
-            child_type=node["type"],
-        )
+        node, object_list, list_behavior = compile_node(declaration)
+        _apply_row_list_behavior(session, row, list_behavior)
         if object_list is None:
+            _validate_specialized_relationship(session, parent_type=parent.object_type, child_type=node["type"])
             row.setdefault("children", []).append(node)
         else:
-            _apply_row_list_behavior(session, row, list_behavior)
             lists = row.setdefault("lists", [])
             existing = next(
                 (item for item in lists if item["name"] == object_list),
@@ -1359,7 +1419,7 @@ def _materialize_set(
                 action="give every exact target at least one requested outcome",
             )
     settings = dict(session.settings)
-    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict"}
+    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict", "platform"}
     unexpected_settings = sorted(set(settings) - allowed_settings)
     if unexpected_settings:
         raise _repair(
@@ -1369,13 +1429,21 @@ def _materialize_set(
             action="use one disclosed object.set batch setting",
         )
     arguments: dict[str, Any] = {"objects": rows}
+    if "platform" in settings:
+        platform = settings["platform"]
+        if not isinstance(platform, str) or not platform.strip():
+            raise _repair(
+                session, "FIELD_VALUE_TYPE_MISMATCH", field="platform",
+                action="provide one exact user-requested Wwise platform",
+            )
+        arguments["platform"] = platform
     conflict = settings.get("name_conflict", "fail")
-    if conflict not in {"fail", "rename", "merge"}:
+    if conflict not in {"fail", "rename", "merge", "replace"}:
         raise _repair(
             session,
             "FIELD_VALUE_UNAVAILABLE",
             field="name_conflict",
-            choices=["fail", "rename", "merge"],
+            choices=["fail", "rename", "merge", "replace"],
             action="choose one disclosed child collision outcome",
         )
     if conflict != "fail":

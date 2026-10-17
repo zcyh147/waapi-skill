@@ -2566,7 +2566,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_object_change.add_argument("--notes")
     draft_declare_object_change.add_argument(
         "--name-conflict",
-        choices=("fail", "rename"),
+        choices=("fail", "rename", "replace"),
     )
     add_source = draft_declare_object_change.add_mutually_exclusive_group()
     add_source.add_argument(
@@ -16785,12 +16785,28 @@ def _parse_object_graph_business_fields(
             if handle in dynamic:
                 raise GatewayInputError("One Field Handle was supplied twice")
             bound = session.handles.bound_field(handle)
-            dynamic[handle] = _parse_bound_field_business_value(
-                bound,
-                raw,
-                field="bound business field",
-                session=session,
-            )
+            if operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.strip() == "null":
+                dynamic[handle] = None
+            elif operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.lstrip().startswith("{"):
+                try:
+                    dynamic[handle] = json.loads(raw)
+                except ValueError as exc:
+                    raise GatewayInputError("Inline curve input requires a closed curve_points document") from exc
+            elif operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.lstrip().startswith("["):
+                try:
+                    value = json.loads(raw)
+                except ValueError as exc:
+                    raise GatewayInputError("Reference arrays require a JSON array of bound object handles") from exc
+                if not isinstance(value, list) or len(value) > 32 or not all(isinstance(item, str) for item in value):
+                    raise GatewayInputError("Reference arrays require at most 32 bound object handles")
+                dynamic[handle] = value
+            else:
+                dynamic[handle] = _parse_bound_field_business_value(
+                    bound,
+                    raw,
+                    field="bound business field",
+                    session=session,
+                )
         fields["field_values"] = dynamic
     return fields
 
@@ -17143,15 +17159,15 @@ def dispatch_offline_business_draft_update(
                 )
             else:
                 row = matches[0]
-                if (
-                    not isinstance(row.target, ExistingObjectTarget)
-                    or row.target.object_handle != args.object_handle
-                ):
+                exact_owner = (
+                    row.target.object_handle if isinstance(row.target, ExistingObjectTarget) else row.result_handle
+                )
+                if exact_owner != args.object_handle:
                     raise business_repair(
                         "DECLARATION_TARGET_MISMATCH",
                         field="object_handle",
                         draft_revision=current.revision,
-                        action="reuse this declaration id only for its exact bound owner",
+                        action="reuse this declaration id only for its exact bound or planned owner",
                     )
                 fields = dict(row.fields)
                 raw_names = fields.get("clear_object_lists", [])
@@ -17308,6 +17324,7 @@ def dispatch_offline_business_draft_update(
                     "add_to_source_control",
                     "list_behavior",
                     "name_conflict",
+                    "platform",
                 )
                 if inspected.operation == "object.set"
                 else (
@@ -19405,6 +19422,21 @@ def dispatch_business_field_discovery(
         )
         restrictions = dict(bound.restrictions)
         value_input = field_value_input(session, bound, choice_limit=20 if detail_projection is not None else None)
+        if binding.record.operation in {"object.create", "object.set"} and bound.field_kind == "reference":
+            value_input["accepted_forms"] = ["bound_object_handle", "null_to_clear_reference"]
+            if binding.record.operation == "object.set":
+                value_input["accepted_forms"].append("json_array_of_bound_object_handles")
+                value_input["maximum_array_members"] = 32
+                from wwise_waapi.object_inline_curve import require_inline_curve_field
+                try:
+                    require_inline_curve_field(metadata.get("restriction", {}))
+                    inline_curve_eligible = True
+                except ValueError:
+                    inline_curve_eligible = False
+                if inline_curve_eligible:
+                    value_input["accepted_forms"].append("json_curve_points")
+                    value_input["curve_points"] = {"keys": ["x", "y", "shape"], "maximum_points": 256,
+                        "applicability": "fresh_explicit_Curve_type_allowance_and_custom_target_restrictions"}
         label_detail = "metadata_detail.field.choices" if detail_projection is not None else "metadata.restriction.values"
         if "enum_labels" in restrictions:
             restrictions["enum_labels"] = [dict(row) for row in restrictions["enum_labels"]]
@@ -26316,7 +26348,7 @@ def _business_next_action_binding(
             declaration_append.extend(["--notes", "<exact-notes>"])
         optional_fields = business_contract["declaration"]["optional_fields"]
         if "name_conflict" in optional_fields:
-            declaration_append.append("[--name-conflict fail|rename]")
+            declaration_append.append("[--name-conflict fail|rename|replace]")
         if "add_to_source_control" in optional_fields:
             declaration_append.append(
                 "[--add-to-source-control|--no-add-to-source-control]"
@@ -27922,8 +27954,9 @@ def _business_next_action_binding(
                 "configure": {
                     **operation_draft_prefix_copy_binding(configure_prefix),
                     "append": [
-                        "[--name-conflict fail|rename|merge]",
+                        "[--name-conflict fail|rename|merge|replace]",
                         "[--list-behavior append|replace-all]",
+                        "[--platform <exact-user-platform>]",
                         "[--add-to-source-control|--no-add-to-source-control]",
                     ],
                 },
