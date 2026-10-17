@@ -196,6 +196,40 @@ def _owned_authoring_requested(pytest_args: Sequence[str]) -> bool:
                for value in pytest_args)
 
 
+_SCALAR_PROGRAM_ENV = ("WAAPI_SCALAR_PROGRAM_BATCH_ROOT", "WAAPI_SCALAR_PROGRAM_SELECTION")
+
+
+def _standalone_scalar_program_requested(arguments: Sequence[str], repo_root: Path) -> bool:
+    """Preserve evidence inputs only for the one explicit standalone pytest file."""
+    expected = (repo_root / "tests/unit/test_scalar_condition_product_gateway.py").resolve()
+    targets = []
+    index = 0
+    while index < len(arguments):
+        value = arguments[index]
+        if value in {"-k", "-m", "--basetemp", "--maxfail", "--tb", "--capture"}:
+            if index + 1 >= len(arguments):
+                return False
+            index += 2
+            continue
+        if value in {"-q", "--quiet", "-v", "--verbose", "-ra", "-rA", "-s", "-x", "--exitfirst",
+                     "--disable-warnings", "--collect-only"} or value.startswith(("--basetemp=", "--maxfail=", "--tb=", "--capture=")):
+            index += 1
+            continue
+        if value.startswith("-"):
+            return False
+        path, separator, node = value.partition("::")
+        selected = Path(path)
+        if not selected.is_absolute():
+            selected = repo_root / selected
+        if selected.resolve() != expected or (separator and node not in {
+                "test_product_self_scalar_source_conditions",
+                *("test_product_self_scalar_source_conditions[" + version + "]" for version in SUPPORTED_VERSIONS)}):
+            return False
+        targets.append(value)
+        index += 1
+    return len(targets) == 1
+
+
 def parse_request(arguments: Sequence[str]) -> TestRequest | None:
     version = ""
     mode = ""
@@ -381,7 +415,7 @@ class TestDriver:
         if request.mode == "program":
             return self._run_program(request.pytest_args)
         if request.mode in {"nonlive", "default"}:
-            return self._run_nonlive(request.pytest_args)
+            return self._run_nonlive(request.pytest_args, allow_scalar_program=True)
         if request.mode == "all":
             result = self._run_nonlive(request.pytest_args)
             if result != 0:
@@ -420,6 +454,8 @@ class TestDriver:
                 "PYTHONUTF8": "1",
             }
         )
+        for name in _SCALAR_PROGRAM_ENV:
+            environment.pop(name, None)
         return environment
 
     def _print_context(
@@ -440,7 +476,7 @@ class TestDriver:
         print(f"pytest args:  {' '.join(pytest_args) if pytest_args else '<none>'}")
         print(flush=True)
 
-    def _run_nonlive(self, pytest_args: Sequence[str]) -> int:
+    def _run_nonlive(self, pytest_args: Sequence[str], *, allow_scalar_program: bool = False) -> int:
         started = time.perf_counter()
         try:
             validate_nonlive_readiness(self.repo_root, tuple(pytest_args))
@@ -450,6 +486,8 @@ class TestDriver:
             return 1
         report_readiness(started, reason="selected Non-live prerequisites ready")
         environment = self._nonlive_environment()
+        if allow_scalar_program and _standalone_scalar_program_requested(pytest_args, self.repo_root):
+            environment.update({name: self.environment[name] for name in _SCALAR_PROGRAM_ENV if name in self.environment})
         self._print_context(
             environment=environment,
             version="none",

@@ -77,11 +77,12 @@ for _version, _build, _index in (("2021.1", "2021.1.14.8108", 160), ("2025.1", "
     }
 
 
-def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show", create_output: bool = True) -> dict:
+def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show", create_output: bool = True,
+                              inventory: dict | None = None) -> dict:
     """Freeze exact source and branch facts before the public workflow executes."""
     if create_output:
         root.mkdir(parents=True, exist_ok=False)
-    inventory = audit.build_inventory()
+    inventory = audit.build_inventory() if inventory is None else inventory
     case = _PROGRAM_CASES[case_name]
     branch = next(row for row in inventory["native_coverage"]["obligations"] if row["id"] == case["branch_id"])
     assert branch["owner_issue"] == 177 and branch["business_dimensions"]["operation_mode"] == "existing-object"
