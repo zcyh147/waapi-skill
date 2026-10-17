@@ -252,3 +252,194 @@ def test_malformed_reference_constraint_cannot_become_an_unrestricted_target(tmp
     code, checked = task.step('draft-check')
     assert code == 2 and checked['error_code'] == 'INVALID_METADATA', checked
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('classifier,value,accepted', [
+    ('category', 'RecordedCategory', True), ('category', 'OtherCategory', False),
+    ('isPlayable', True, True), ('isPlayable', False, False),
+])
+def test_native_target_classifier_controls_the_selected_reference(tmp_path, version, classifier, value, accepted):
+    """RPC schema model; effective instance metadata/native effects remain unverified."""
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = value
+    rows = [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable']
+    task.metadata['Attenuation']['restriction']['restrictions'] = rows
+    task.declare()
+    code, checked = task.step('draft-check')
+    if not accepted:
+        assert code == 2 and checked['error_code'] == 'INVALID_REFERENCE_TARGET', checked
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+    reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')
+             and classifier in options.get('return', [])]
+    assert reads and all(args == {'from': {'id': [SECOND]}} for args, _ in reads)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('classifier,initial,changed', [('category', 'RecordedCategory', 'OtherCategory'),
+                                                      ('isPlayable', True, False)])
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_native_target_classifier_is_revalidated_and_verified(tmp_path, version, classifier, initial, changed, phase):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = initial
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if phase == 'before':
+        task.objects[SECOND][classifier] = changed
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.objects[SECOND][classifier] = changed
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_target_classifier_accessors_are_declared_by_the_exact_version(version):
+    root = Path(__file__).parents[2]
+    definitions = json.loads((root / 'skills/waapi-skill/resources/manifest' / version / 'definitions.json').read_text())
+    properties = definitions['documents']['waapi_definitions.json']['definitions']['objectReturn']['properties']
+    assert properties['category']['type'] == 'string'
+    assert properties['isPlayable']['type'] == 'boolean'
+    assert 'isShared' not in properties
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('classifier,value', [('category', None), ('category', True), ('category', '__missing__'),
+                                              ('isPlayable', None), ('isPlayable', 1), ('isPlayable', '__missing__')])
+def test_unavailable_or_malformed_target_classifier_cannot_authorize_a_write(tmp_path, version, classifier, value):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    if value != '__missing__':
+        task.objects[SECOND][classifier] = value
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    task.declare()
+    code, checked = task.step('draft-check')
+    expected = 'CONSTRAINED_REFERENCE_BOUNDARY' if value == '__missing__' else 'INVALID_READBACK'
+    assert code == 2 and checked['error_code'] == expected, checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('classifier,value', [('category', 'RecordedCategory'), ('isPlayable', True)])
+def test_atomic_reference_assignment_retains_native_classifier_guards(tmp_path, version, classifier, value):
+    task = AttenuationTask(tmp_path, version, operation='object.set')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = value
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    task.declare()
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('matched', ['type', 'category'])
+def test_mixed_type_category_admission_semantics_are_not_guessed(tmp_path, version, matched):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND]['category'] = 'RecordedCategory' if matched == 'category' else 'OtherCategory'
+    task.metadata['Attenuation']['restriction']['restrictions'] = [
+        {'type': ['Attenuation' if matched == 'type' else 'Effect']}, {'category': ['RecordedCategory']}]
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_atomic_target_classifier_drift_cannot_verify_a_changed_target(tmp_path, phase):
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.set')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND].update(category='RecordedCategory', isPlayable=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = [{'category': ['RecordedCategory']}, 'playable']
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if phase == 'before':
+        task.objects[SECOND]['isPlayable'] = False
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.objects[SECOND]['category'] = 'OtherCategory'
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('invalid_rows', [[], [{'id': GROUP, 'category': 'RecordedCategory'}],
+    [{'id': SECOND, 'category': 'RecordedCategory'}, {'id': SECOND, 'category': 'RecordedCategory'}]])
+def test_target_classifier_read_requires_one_exact_selected_guid(tmp_path, invalid_rows):
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = [{'category': ['RecordedCategory']}]
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and 'category' in options.get('return', []):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': invalid_rows}
+        return normal_call(uri, args, options)
+    task.call = call
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'INVALID_READBACK', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_target_classifier_reads_keep_the_selected_platform_scope(tmp_path, version):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    platform = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND]['category'] = 'RecordedCategory'
+    task.metadata['Attenuation']['restriction']['restrictions'] = [{'category': ['RecordedCategory']}]
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return normal_call(uri, args, options)
+    task.call = call
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step('draft-discover-fields', '--object-handle', source,
+                                '--meaning', 'Attenuation', '--platform', platform)
+    assert code == 0, discovered
+    field = discovered['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-field-change', '--object-handle', source,
+                              '--field-handle', field, '--target-handle', target)
+    assert code == 0, declared
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    reads = [options for uri, _, options in task.calls if uri.endswith('object.get') and 'category' in options.get('return', [])]
+    assert reads and all(options['platform'] == platform for options in reads)

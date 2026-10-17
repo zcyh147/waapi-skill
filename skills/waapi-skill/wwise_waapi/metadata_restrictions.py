@@ -16,7 +16,7 @@ class MetadataRestrictionError(ValueError):
         return self.message
 
 
-def reference_allowed_types(restriction: Mapping[str, Any]) -> tuple[str, ...]:
+def reference_allowed_types(restriction: Mapping[str, Any], *, allow_target_classifiers: bool = False) -> tuple[str, ...]:
     """Return exact allowed reference types or reject unproven constraints."""
 
     if not isinstance(restriction, Mapping):
@@ -38,6 +38,8 @@ def reference_allowed_types(restriction: Mapping[str, Any]) -> tuple[str, ...]:
             if row == "notNull":
                 continue
             if row == "playable":
+                if allow_target_classifiers:
+                    continue
                 raise MetadataRestrictionError(
                     "CONSTRAINED_REFERENCE_BOUNDARY",
                     "Playable reference restrictions require a dedicated live target classifier.",

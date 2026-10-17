@@ -27,6 +27,16 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                 "action": "Enable", "context": "Self", "condition": "referenceIsSet_boolean",
                 "target": "explicit_user_selected_bound_object_or_separate_clear_preview",
                 "satisfied_identity": "preserve_and_revalidate_canonical_GUID_or_native_null",
+                "target_classification": {
+                    "scope": "exact_existing_object",
+                    "supported": ["single_category_row", "playable"],
+                    "facts": "fresh_exact_target_category_and_playability",
+                    "matching": "exact_native_category_membership_and_boolean_playability",
+                    "revalidate_and_verify": "preserve_exact_native_classifier_facts",
+                    "unavailable_or_malformed_fact": "stop_before_dispatch",
+                    "mixed_type_category_rows": "explicit_boundary_pending_native_combination_semantics",
+                    "shared_only_and_must_child_of": "explicit_boundary_pending_proven_classifier",
+                },
                 "target_hierarchy": {
                     "restriction": "childOfReference", "scope": "exact_existing_object",
                     "target_parent": "canonical_GUID_of_the_controlling_reference",

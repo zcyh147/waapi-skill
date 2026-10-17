@@ -21621,7 +21621,8 @@ def _require_reference_target_allowed(
     _restriction_context=None,
 ) -> None:
     try:
-        allowed_types = set(reference_allowed_types(metadata.restriction))
+        allowed_types = set(reference_allowed_types(metadata.restriction,
+            allow_target_classifiers=read is not None and conditions is not None))
     except MetadataRestrictionError as exc:
         raise OperationContractError(
             exc.error_code,
@@ -21629,7 +21630,11 @@ def _require_reference_target_allowed(
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         ) from exc
     target_type = target.row.get("type")
-    if allowed_types and (not isinstance(target_type, str) or not target_type):
+    restrictions = metadata.restriction.get("restrictions") or []
+    category_rows = [row for row in restrictions if isinstance(row, Mapping) and "category" in row]
+    ambiguous_categories = len(category_rows) > 1 or bool(category_rows) and any(
+        isinstance(row, Mapping) and "type" in row for row in restrictions)
+    if allowed_types and not ambiguous_categories and (not isinstance(target_type, str) or not target_type):
         raise OperationContractError(
             "INVALID_READBACK",
             "Reference target readback must expose a type when live restrictions are present.",
@@ -21637,7 +21642,7 @@ def _require_reference_target_allowed(
         )
     target_token = reference_type_token(target_type) if isinstance(target_type, str) else None
     allowed_tokens = {reference_type_token(value) for value in allowed_types}
-    if allowed_types and target_token not in allowed_tokens:
+    if allowed_types and not ambiguous_categories and target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
             "Reference target type is not allowed by live getPropertyInfo restrictions.",
@@ -21667,11 +21672,24 @@ def _require_reference_target_allowed(
         elif "category" in row:
             if set(row) != {"category"} or not isinstance(row["category"], list) or not all(isinstance(value, str) for value in row["category"]):
                 raise OperationContractError("INVALID_METADATA", "Reference category restriction must be an exact string array.")
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
-                "Native reference categories require a separately proven target classifier.",
-                details={"reference": metadata.name, "categories": row["category"]})
         elif set(row) != {"childOfReference"}:
             raise OperationContractError("INVALID_METADATA", "Reference restriction has an unknown object shape.")
+    if ambiguous_categories:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+            "Combined native type/category rows require separately established admission semantics.")
+    classifier_fields = (["category"] if category_rows else []) + (["isPlayable"] if "playable" in restrictions else [])
+    if classifier_fields:
+        if read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Target classifiers require an exact existing scoped Preview.")
+        facts = _read_reference_target_classifiers(target.object, classifier_fields, read=read, platform=platform)
+        if (category_rows and facts["category"] not in category_rows[0]["category"]
+                or "isPlayable" in facts and facts["isPlayable"] is not True):
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        classifier_condition = {"kind": "target_classifier", "target_id": target.object,
+            "reference": metadata.name, "classifiers": facts, "platform": platform}
+        if classifier_condition not in conditions:
+            conditions.append(classifier_condition)
     parent_fields = []
     for row in metadata.restriction.get("restrictions", []):
         if not isinstance(row, Mapping) or "childOfReference" not in row:
@@ -21744,10 +21762,37 @@ def _require_reference_target_allowed(
     _restriction_context["validated"].add(validation_key)
 
 
+def _read_reference_target_classifiers(target_id, fields, *, read, platform):
+    options = {"return": ["id", *fields]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Native target classifier must resolve exactly the selected GUID.")
+    facts = {}
+    for field in fields:
+        if field not in rows[0]:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Native target classifier is unavailable for this exact object.",
+                details={"target_id": target_id, "classifier": field})
+        value = rows[0][field]
+        if not (isinstance(value, str) and value if field == "category" else isinstance(value, bool)):
+            raise OperationContractError("INVALID_READBACK", "Native target classifier has an invalid value.",
+                details={"target_id": target_id, "classifier": field})
+        facts[field] = value
+    return facts
+
+
 def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        if condition.get("kind") == "target_classifier":
+            facts = _read_reference_target_classifiers(condition["target_id"], condition["classifiers"],
+                read=read, platform=condition.get("platform"))
+            assertions.append({"name": f"reference {condition['reference']} retains native target classification",
+                "passed": _native_snapshot_equal(facts, condition["classifiers"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classifiers"], "actual": facts}})
+            continue
         source, target, name = condition["source_id"], condition["target_id"], condition["parent_reference"]
         options = {"return": ["id", "parent", name]}
         if condition.get("platform") is not None:

@@ -86,6 +86,10 @@ def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_
     assert scalar["satisfied_value"] == "preserve_exact_native_value"
     assert scalar["multiple_choices"] == "require_explicit_user_value_when_current_value_does_not_satisfy"
     assert condition_contract["conditions"]["reference"]["condition"] == "referenceIsSet_boolean"
+    classification = condition_contract["conditions"]["reference"]["target_classification"]
+    assert classification["supported"] == ["single_category_row", "playable"]
+    assert classification["revalidate_and_verify"] == "preserve_exact_native_classifier_facts"
+    assert classification["mixed_type_category_rows"] == "explicit_boundary_pending_native_combination_semantics"
     assert condition_contract["conditions"]["reference"]["target_hierarchy"]["restriction"] == "childOfReference"
     assert condition_contract["conditions"]["reference"]["target_hierarchy"]["atomic_value"] == "explicit_prospective_controlling_reference"
     assert condition_contract["conditions"]["visibility"]["prerequisite_write"] is False
