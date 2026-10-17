@@ -3,6 +3,32 @@
   "host": "wwise-authoring",
   "native_catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
   "schemas": {
+    "ak.wwise.ui.layout.closeView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "viewID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the view to close."
+          }
+        },
+        "required": [
+          "viewID"
+        ],
+        "type": "object"
+      },
+      "description": "Requests to close a view by its unique id. The view might not yet be closed when returning from this function.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
     "ak.wwise.ui.layout.getOrCreateView": {
       "argsSchema": {
         "additionalProperties": false,

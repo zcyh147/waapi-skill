@@ -15,14 +15,23 @@ from .canonical import canonical_sha256
 LAYOUT_SWITCH_URI = 'ak.wwise.ui.layout.switchLayout'
 LAYOUT_SET_URI = 'ak.wwise.ui.layout.setLayout'
 LAYOUT_REMOVE_URI = 'ak.wwise.ui.layout.removeLayout'
+LAYOUT_CLOSE_URI = 'ak.wwise.ui.layout.closeView'
 LAYOUT_GET_OR_CREATE_URI = 'ak.wwise.ui.layout.getOrCreateView'
-LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI})
+LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI})
 MUTATION_RESOURCE = 'authoring-layout-mutation-supplement.json'
-MUTATION_SHA256: dict[str, str] = {'2024.1': '1ecef85c33081eb228f7648710cd5acdc6087d0c7ca1daad46ad7c52ad8f9b94', '2025.1': 'e442a31a7201a4fd642df304a8eff93b15a6faa8d4bd5c6b060015e906a90200'}
+MUTATION_SHA256: dict[str, str] = {'2024.1': '1ecef85c33081eb228f7648710cd5acdc6087d0c7ca1daad46ad7c52ad8f9b94', '2025.1': '88227d21019ccd3165d9ecc3994d7ce4cc47b9e2398d758ca2c9c0332b5e3297'}
+
+
+def layout_mutation_versions(operation: str) -> tuple[str, ...]:
+    return ('2025.1',) if operation == LAYOUT_CLOSE_URI else LAYOUT_VERSIONS if operation in LAYOUT_MUTATION_URIS else ()
+
+
+def layout_mutation_uris(version: str) -> frozenset[str]:
+    return frozenset(uri for uri in LAYOUT_MUTATION_URIS if version in layout_mutation_versions(uri))
 
 
 def layout_business_contract_data(operation: str, version: str) -> dict[str, Any]:
-    if version not in LAYOUT_VERSIONS or operation not in LAYOUT_MUTATION_URIS:
+    if version not in layout_mutation_versions(operation):
         raise ValueError('Layout mutation requires the exact supported 2024.1/2025.1 Authoring lane')
     result = {'contract': 'waapi-skill.authoring-layout-business/v1', 'operation': operation,
         'version': version, 'input_mode': 'business_declaration', 'execution_shape': 'transaction',
@@ -68,12 +77,21 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
             'preserve omitted coordinate fields', 'get or create once after authorization', 'verify the returned view identity and applicable initial coordinates']
         result['coordinate_scope'] = 'initial positions apply only to a newly created view; an existing view is reused'
         result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent view instances, plus explicit initial coordinate readbacks when created'}
+    elif operation == LAYOUT_CLOSE_URI:
+        result['declaration']['required_fields'].append('view_handle')
+        result['declaration']['public_fields'].append('view_handle')
+        result['declaration']['field_types']['view_handle'] = 'scoped_view_handle'
+        result['declaration']['input_forms']['view_handle'] = {'gateway_flag': '--view-handle', 'shape': 'scalar'}
+        result['responsibility_split']['gateway'] = ['require the selected layout to be current', 'revalidate the exact discovered view',
+            'request close once after authorization', 'poll bounded independent instances for exact disappearance']
+        result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'exact view absent from independently read instances',
+            'maximum_polls': 16, 'poll_interval_seconds': 0.2, 'incomplete_boundary': 'pending_async_close'}
     return result
 
 
 def layout_business_catalog_rows() -> tuple[dict[str, Any], ...]:
-    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view'}[uri],
-                  'supported_versions': list(LAYOUT_VERSIONS)} for uri in sorted(LAYOUT_MUTATION_URIS))
+    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view'}[uri],
+                  'supported_versions': list(layout_mutation_versions(uri))} for uri in sorted(LAYOUT_MUTATION_URIS))
 
 
 def merge_layout_mutations(manifest: Mapping[str, Any], *, root: Path | None, version: str) -> dict[str, Any]:
@@ -83,7 +101,7 @@ def merge_layout_mutations(manifest: Mapping[str, Any], *, root: Path | None, ve
     if root is None:
         raise ValueError('Authoring layout mutations require pinned resources')
     payload = json.loads((root / version / MUTATION_RESOURCE).read_text(encoding='utf-8'))
-    if canonical_sha256(payload) != MUTATION_SHA256[version] or payload.get('version') != version or set(payload.get('schemas', {})) != LAYOUT_MUTATION_URIS:
+    if canonical_sha256(payload) != MUTATION_SHA256[version] or payload.get('version') != version or set(payload.get('schemas', {})) != layout_mutation_uris(version):
         raise ValueError('Authoring layout mutation source identity/digest mismatch')
     known = {row['uri'] for row in result['functions']}
     for uri, schema in sorted(payload['schemas'].items()):
@@ -97,7 +115,8 @@ def merge_layout_mutations(manifest: Mapping[str, Any], *, root: Path | None, ve
 
 
 def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: str | None = None,
-                              view_request: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                              view_request: Mapping[str, Any] | None = None,
+                              view_identity: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body = {key: record[key] for key in ('handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at')}
     body['observation_sha256'] = canonical_sha256(record['observation'])
     if registration_name is not None:
@@ -105,16 +124,21 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
     if view_request is not None:
         native_view_request(view_request)
         body['view_request'] = dict(view_request)
+    if view_identity is not None:
+        body['view_identity'] = layout_binding_descriptor(view_identity)
     return {**body, 'binding_sha256': canonical_sha256(body)}
 
 
-def validate_layout_binding(binding: Any) -> dict[str, Any]:
+def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, Any]:
     expected = {'handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at', 'observation_sha256', 'binding_sha256'}
-    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}):
+    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}, expected | {'view_identity'}):
         raise ValueError('Layout mutation lacks an exact Gateway-owned identity binding')
     body = dict(binding)
     digest = body.pop('binding_sha256')
-    if canonical_sha256(body) != digest or body['role'] != 'layout' or body['native_id'] != body['layout_name']:
+    if (canonical_sha256(body) != digest or body['role'] != role
+            or (role == 'layout' and body['native_id'] != body['layout_name'])
+            or (role == 'view' and (set(binding) != expected or not re.fullmatch(
+                r'\{[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}\}', str(body['native_id']))))):
         raise ValueError('Layout mutation identity binding is malformed')
     if not isinstance(body['context'], Mapping) or not isinstance(body['layout_name'], str):
         raise ValueError('Layout mutation identity binding context is malformed')
@@ -138,6 +162,10 @@ def validate_layout_binding(binding: Any) -> dict[str, Any]:
         validate_new_layout_name(body['registration_name'])
     if 'view_request' in body:
         native_view_request(body['view_request'])
+    if 'view_identity' in body:
+        view = validate_layout_binding(body['view_identity'], role='view')
+        if view['context'] != body['context'] or view['layout_name'] != body['layout_name']:
+            raise ValueError('View and layout identities must share their exact live scope')
     return dict(binding)
 
 
@@ -162,6 +190,11 @@ def materialize_layout_business_request(operation: str, session: Any) -> Mapping
         if binding.get('view_request') != view_request:
             raise ValueError('View declaration differs from its Gateway-owned binding')
         native_args = native_view_request(view_request)
+    elif operation == LAYOUT_CLOSE_URI:
+        view = binding.get('view_identity', {})
+        if plan['view_handle'] != view.get('handle'):
+            raise ValueError('View declaration differs from its Gateway-owned discovered identity')
+        native_args = {'viewID': view['native_id']}
     request = {'contract': 'waapi-skill.operation-request/v1', 'version': session.context.wwise_version,
         'operation': 'waapi.call', 'arguments': {'api': operation, 'args': native_args,
             'options': {}, 'layout_binding': binding}}
@@ -178,6 +211,9 @@ def validate_layout_call(version: str, api: str, args: Mapping[str, Any], option
         expected = {'name': name, 'layout': {'Layout': {'Name': name}}}
     elif api == LAYOUT_GET_OR_CREATE_URI:
         expected = native_view_request(verified.get('view_request'))
+    elif api == LAYOUT_CLOSE_URI:
+        view = validate_layout_binding(verified.get('view_identity'), role='view')
+        expected = {'viewID': view['native_id']}
     if dict(args) != expected or options:
         raise ValueError('Layout native request differs from the Gateway-owned business binding')
     return verified
@@ -282,3 +318,13 @@ def validate_layout_live_binding(binding: Mapping[str, Any], *, read: Any) -> No
     validate_layout_read_result('contents', layout)
     if canonical_sha256(layout) != binding['observation_sha256']:
         raise ValueError('Authoring layout changed since discovery; inspect and preview again')
+
+
+def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any) -> None:
+    view = validate_layout_binding(binding['view_identity'], role='view')
+    if not time.time() < view['expires_at']:
+        raise ValueError('The discovered view identity expired; inspect again')
+    instances = canonical_view_instances(read('ak.wwise.ui.layout.getViewInstances', {'name': binding['layout_name']}, {}))
+    matches = [row for row in instances if row['viewID'].upper() == view['native_id'].upper()]
+    if len(matches) != 1 or canonical_sha256(matches[0]) != view['observation_sha256']:
+        raise ValueError('The discovered view changed or disappeared; inspect and preview again')

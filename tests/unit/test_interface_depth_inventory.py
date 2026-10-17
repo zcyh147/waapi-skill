@@ -667,11 +667,11 @@ def test_closed_layout_mutations_project_business_fields_without_native_typed_in
 
 def test_partial_layout_rows_keep_exact_owner_without_inheriting_completed_family():
     from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
-    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS, layout_mutation_uris
 
     inventory = _inventory()
     expected = {(version, uri) for version in ('2024.1', '2025.1')
-                for uri in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS}
+                for uri in LAYOUT_READ_URIS | layout_mutation_uris(version)}
     rows = [row for row in inventory['native_lanes']
             if row['classification'] == 'authoring-layout-partial']
     assert {(row['version'], row['uri']) for row in rows} == expected

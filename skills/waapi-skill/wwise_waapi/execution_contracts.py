@@ -50,7 +50,7 @@ PACKAGED_INVENTORY_SHA256 = "4644c792fdf55fe498e7dd9fc7de1475831801d1b363be8488f
 CONSOLE_EXECUTION_PROFILE = "wwise-console"
 AUTHORING_UI_EXECUTION_PROFILE = "wwise-authoring-ui"
 PACKAGED_AUTHORING_UI_INVENTORY_SHA256 = (
-    "91272dc2321875e118cb87279df45091236d8560df1f253735af2de2e3dfd5db"
+    "b3f8338934534a98a2e6c52e449519b23049e6b17f372b60ecd15d6ef51ded7f"
 )
 
 EXPECTED_VERSION_COUNTS: Mapping[str, Mapping[str, int]] = MappingProxyType(
@@ -130,18 +130,18 @@ EXPECTED_AUTHORING_UI_VERSION_COUNTS: Mapping[
         ),
         "2025.1": MappingProxyType(
             {
-                "functions": 179,
+                "functions": 180,
                 "topics": 35,
-                "public_functions": 179,
+                "public_functions": 180,
                 "public_topics": 35,
-                "public_total": 214,
+                "public_total": 215,
             }
         ),
     }
 )
-EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 871
-EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 871
-EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 214
+EXPECTED_AUTHORING_UI_MANIFEST_VERSION_ROWS = 872
+EXPECTED_AUTHORING_UI_PUBLIC_VERSION_ROWS = 872
+EXPECTED_AUTHORING_UI_PUBLIC_UNIQUE_URIS = 215
 EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
     MappingProxyType(
         {
@@ -149,7 +149,7 @@ EXPECTED_AUTHORING_UI_VERSION_INVENTORY_SHA256: Mapping[str, str] = (
             "2022.1": "3c7ee729d0e50453bb7b1b04c955f3a94562a9b3e5abcbde8f53f8ab902145df",
             "2023.1": "cb513e3584a00f40fd0998d7a73c4a46ecd2528a1351c6ee4f6c26e88734af33",
             "2024.1": "e2e6d29617c510e34874191b9e5fbf2cd5bf0a463bf3cb639dec9c324c00db89",
-            "2025.1": "2d2917a05051ce45c8dd56aa8ae46c4e6c58cf9b9c1c181b526eccbd387431ad",
+            "2025.1": "b34cc8ea169992fe9e608fe6efcabfa356b7a77e43af66652245ebfebf29a5b6",
         }
     )
 )

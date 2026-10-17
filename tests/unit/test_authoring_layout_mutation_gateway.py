@@ -39,6 +39,10 @@ class LayoutClient(FakeClient):
         if uri == URI + 'getViewInstances':
             self.calls.append((uri, args, options))
             return {'viewInstances': deepcopy(self.views.get(args['name'], []))}
+        if uri == URI + 'closeView':
+            self.calls.append((uri, args, options))
+            self.views[self.current] = [row for row in self.views[self.current] if row['viewID'] != args['viewID']]
+            return {}
         if uri == URI + 'getOrCreateView':
             self.calls.append((uri, args, options))
             existing = next((row for row in self.views[self.current] if row['viewName'] == args['name']), None)
@@ -78,7 +82,7 @@ class LayoutClient(FakeClient):
         return super().call(uri, args, options)
 
 
-def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', operation='switchLayout', fields=(), client_setup=None, expect_check_error=False, layout_name='Profiler'):
+def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', operation='switchLayout', fields=(), client_setup=None, expect_check_error=False, expect_declaration_error=False, layout_name='Profiler'):
     env = gateway_env(tmp_path)
     set_gateway_config(env, wwise_version=version, project_modification_policy=policy)
     state_dir = tmp_path / 'state'
@@ -92,6 +96,8 @@ def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', o
     code, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', layout_name],
         env=env, client_factory=lambda _: client)
     assert code == 0, inspected
+    if callable(fields):
+        fields = fields(inspected)
     code, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env,
         client_factory=lambda _: pytest.fail('Draft start must stay offline'))
     assert code == 0, (started.get('error_code'), started.get('message'), started.get('details'))
@@ -100,6 +106,10 @@ def switch_preview(tmp_path, *, version='2025.1', policy='ask_before_changes', o
     code, declared = gateway.execute_gateway([*state, 'draft-declare-layout-plan', draft['draft_id'],
         '--task-authority', authority, '--expected-revision', str(draft['revision']),
         '--layout-handle', inspected['layout_handle'], *fields], env=env, client_factory=lambda _: client)
+    if expect_declaration_error:
+        assert code != 0, declared
+        assert URI + operation not in [row[0] for row in client.calls]
+        return env, state, client, declared
     assert code == 0, declared
     code, checked = gateway.execute_gateway([*state, 'draft-check', draft['draft_id'],
         '--task-authority', authority, '--expected-revision', str(declared['draft']['revision'])],
@@ -383,3 +393,91 @@ def test_switch_success_result_cannot_substitute_for_business_verification(tmp_p
     assert code != 0, verified
     assert verified['verification']['business_state_verified'] is False
     assert [call[0] for call in client.calls].count(URI + 'switchLayout') == 1
+
+
+def test_close_view_uses_discovered_identity_and_independent_absence_readback(tmp_path):
+    def seed(client):
+        client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
+            'viewDisplayName': 'Project Explorer', 'viewIsDocked': False}]
+    env, state, client, preview = switch_preview(tmp_path, operation='closeView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle']), client_setup=seed)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    assert prepared['dispatch'] == {'uri': URI + 'closeView', 'args': {'viewID': NODE}, 'options': {}}
+    assert URI + 'closeView' not in [row[0] for row in client.calls]
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert client.views['Designer'] == []
+    assert [row[0] for row in client.calls].count(URI + 'closeView') == 1
+
+
+@pytest.mark.parametrize('outcome', ['delayed', 'pending'])
+def test_close_view_polls_bounded_readbacks_without_repeating_mutation(tmp_path, outcome):
+    def seed(client):
+        client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
+            'viewDisplayName': 'Project Explorer', 'viewIsDocked': False}]
+    env, state, client, preview = switch_preview(tmp_path, operation='closeView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle']), client_setup=seed)
+    original = client.call
+    polls = []
+    requested = False
+    def call(uri, args=None, options=None):
+        nonlocal requested
+        if uri == URI + 'closeView':
+            client.calls.append((uri, args, options))
+            requested = True
+            return {}
+        if requested and uri == URI + 'getViewInstances':
+            polls.append(uri)
+            if outcome == 'delayed' and len(polls) == 3:
+                client.views['Designer'] = []
+        return original(uri, args, options)
+    client.call = call
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=outcome == 'pending')
+    assert len(polls) == (3 if outcome == 'delayed' else 16)
+    assert verified['verification']['business_state_verified'] is (outcome == 'delayed')
+    assert [row[0] for row in client.calls].count(URI + 'closeView') == 1
+    if outcome == 'pending':
+        pending_checks = [row for row in verified['verification']['assertions']
+                          if row['evidence'].get('pending_async_close') is True]
+        assert len(pending_checks) == 1
+        assert pending_checks[0]['passed'] is False
+        assert pending_checks[0]['evidence'] == {'view_id': NODE, 'pending_async_close': True, 'polls': 16}
+
+
+@pytest.mark.parametrize('drift', ['view', 'disappeared', 'current'])
+def test_close_view_revalidates_discovered_view_immediately_before_dispatch(tmp_path, drift):
+    def seed(client):
+        client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
+            'viewDisplayName': 'Project Explorer', 'viewIsDocked': False}]
+    env, state, client, preview = switch_preview(tmp_path, operation='closeView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle']), client_setup=seed)
+    if drift == 'view':
+        client.views['Designer'][0]['viewIsDocked'] = True
+    elif drift == 'disappeared':
+        client.views['Designer'] = []
+    else:
+        client.current = 'Profiler'
+    tx = preview['transaction_id']
+    code, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    assert code == 0, shown
+    code, confirmed = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0, confirmed
+    code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert URI + 'closeView' not in [row[0] for row in client.calls]
+
+
+def test_close_view_2024_absence_is_independently_reflected_and_rejected_offline(tmp_path):
+    from wwise_waapi.native_catalog import load_native_catalog
+    assert URI + 'closeView' not in load_native_catalog('2024.1', 'wwise-authoring')['functions']
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version='2024.1')
+    code, schema = gateway.execute_gateway(['request-schema', URI + 'closeView'], env=env,
+        client_factory=lambda _: pytest.fail('unsupported schema must not connect'))
+    assert code != 0, schema
+
+
+@pytest.mark.parametrize('kind', ['layout', 'element'])
+def test_close_view_rejects_other_handle_roles_without_dispatch(tmp_path, kind):
+    switch_preview(tmp_path, operation='closeView', layout_name='Designer', expect_declaration_error=True,
+        fields=lambda inspected: ('--view-handle', inspected['layout_handle'] if kind == 'layout' else inspected['elements'][0]['handle']))

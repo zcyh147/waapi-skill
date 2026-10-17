@@ -64,10 +64,10 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 711,
+        "function_lanes": 712,
         "topic_lanes": 160,
-        "total_lanes": 871,
-        "unique_function_uris": 179,
+        "total_lanes": 872,
+        "unique_function_uris": 180,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -477,8 +477,9 @@ def test_closed_layout_reads_retain_native_definition_graph_and_unresolved_resul
 def test_closed_layout_business_lanes_retain_exact_native_request_definition_obligations():
     result = build_typed_request_surface(root=RESOURCE_ROOT)
     rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business']
-    assert len(rows) == 8
-    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView'}
+    assert len(rows) == 9
+    assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView'}
+    assert {row['version'] for row in rows if row['uri'].endswith('.closeView')} == {'2025.1'}
     assert result['unresolved_references'] == []
     for row in rows:
         assert row['business_contract']['input_mode'] == 'business_declaration'
