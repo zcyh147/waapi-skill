@@ -309,7 +309,8 @@ def media_build_business_contract_data(
             "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",
             "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
             "malformed_present_fields": "bounded structured failure with native call evidence",
-            "partial_projection": "status=partial; projection_complete=false; decode_available=false; native_result retained",
+            "partial_projection": "status=partial; projection_complete=false; decode_available=false; native_result retained or losslessly paged as native_result_fragments",
+            "raw_observation_pages": "native_header preserves available facts; observation_complete marks complete raw-fragment recovery only and never implies decoded projection completion",
         }} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         **({"read_continuation": {
             "flag": "--media-page", "input": "copy returned Gateway continuation only",

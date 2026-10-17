@@ -68,7 +68,7 @@ def finish_peak_capture(capture: dict, reports: dict, observed: dict) -> None:
     unchanged = capture["git_candidate"] == _git_candidate() and capture["relevant_sources"] == source_seals()
     outcome = "PASS" if unchanged and all(reports.get(phase) == "passed" for phase in ("setup", "call", "teardown")) else "FAIL"
     group = capture["witnesses"][capture["version"] + "|" + capture["operation"]]
-    record = {"candidate_sha256": capture["candidate_sha256"], "scope_kind": "product", "evidence_kind": "injected_client_program",
+    record = {"candidate_sha256": capture["candidate_sha256"], "scope_kind": capture.get("scope_kind", "product"), "evidence_kind": "injected_client_program",
         "git_candidate": capture["git_candidate"], "relevant_sources": capture["relevant_sources"],
         "invocation": {"phase": "final", "outcome": outcome, "node_outcomes": [{"nodeid": capture["nodeid"], "outcome": outcome}]},
         **deepcopy(observed), "branch_assertions": {}}

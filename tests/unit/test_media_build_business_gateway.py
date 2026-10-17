@@ -1477,9 +1477,12 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
     info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
     identity = {"return": [{"id": SOURCE_ID, "name": "Alarm_01", "type": "AudioFileSource",
         "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm\Alarm_01"}]}
+    project = _project(tmp_path)
+    project_result = {"return": [{**project, "type": "Project"}]}
+    identity_reads = [project_result, identity] if version == "2021.1" else [identity]
     client = FakeClient({"ak.wwise.core.getInfo": [info] * 32,
-        "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 32,
-        "ak.wwise.core.object.get": [identity] * 32, operation: [native] * 32})
+        "ak.wwise.core.getProjectInfo": [project] * 32,
+        "ak.wwise.core.object.get": identity_reads * 32, operation: [native] * 32})
     env = _env(tmp_path, version=version)
     argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", str(pair_count), "--channel-mode", "per-channel"]
     if operation == PEAKS_REGION_URI:
@@ -1491,8 +1494,9 @@ def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_chann
         assert code == 0, payload
         result = payload["agent_result"]
         if not page_count:
-            observed_capture.update({"gateway": {"argv": list(argv), "payload": payload},
-                "native_call": {"uri": operation, "args": dict(client.calls[-1][1]), "options": {}, "result": native}})
+            from tests.support.media_pool_branch_evidence import public_read_observation
+            observed_capture.update(public_read_observation(gateway_argv=argv, exit_code=code, payload=payload,
+                uri=operation, args=client.calls[-1][1], options=client.calls[-1][2], result=native))
         assert result["channel_count"] == 2 and result["peak_pair_count"] == pair_count
         assert result["requested_peak_pair_count"] == pair_count and result["complete_requested_count"] is True
         assert result["normalization_divisor"] == 32768
@@ -1673,3 +1677,73 @@ def test_peak_multichannel_native_byte_boundary_preserves_requested_resolution_a
     assert payload["business_request"]["peak_pair_count"] == 16384
     assert len([call for call in client.calls if call[0] == operation]) == 1
     assert client.calls[-1][1]["numPeaks"] == 16384 and client.calls[-1][1]["getCrossChannelPeaks"] is False
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+@pytest.mark.parametrize("observation_kind", ["silent", "missing_decode_facts"])
+def test_large_undecodable_peak_observation_pages_preserve_every_native_string_without_false_completion(tmp_path: Path, version: str, operation: str, observation_kind: str) -> None:
+    import base64
+
+    binary = base64.b64encode(b"\0" * (8192 * 4)).decode()
+    native = {"numChannels": 2, "peaksArrayLength": 8192, "peaksBinaryStrings": [binary, binary],
+        "peaksDataSize": 8192 * 4, "maxAbsValue": 0}
+    if observation_kind == "missing_decode_facts":
+        native.pop("peaksArrayLength")
+        native.pop("maxAbsValue")
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    identity = {"return": [{"id": SOURCE_ID, "name": "Silent", "type": "AudioFileSource", "path": r"\Sources\Silent"}]}
+    project = _project(tmp_path)
+    project_result = {"return": [{**project, "type": "Project"}]}
+    identity_reads = [project_result, identity] if version == "2021.1" else [identity]
+    client = FakeClient({"ak.wwise.core.getInfo": [info] * 32,
+        "ak.wwise.core.getProjectInfo": [project] * 32,
+        "ak.wwise.core.object.get": identity_reads * 32, operation: [native] * 32})
+    env = _env(tmp_path, version=version)
+    argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "8192"]
+    if operation == PEAKS_REGION_URI:
+        argv += ["--start-seconds", "0", "--end-seconds", "1"]
+    entries = []
+    first_continuation = None
+    for _ in range(32):
+        code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+        assert code == 0, payload
+        result = payload["agent_result"]
+        assert payload["status"] == "partial" and result["kind"] == "peak_observation"
+        assert result["projection_complete"] is False and result["decode_available"] is False
+        assert result["native_header"]["numChannels"] == 2
+        assert "channels" not in result and "native_result" not in result
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        assert result["page"]["offset"] == len(entries)
+        entries.extend(result["native_result_fragments"])
+        if result["observation_complete"]:
+            assert "next_command" not in result
+            break
+        argv = result["next_command"]["gateway_argv"]
+        if first_continuation is None:
+            first_continuation = list(argv)
+    else:
+        pytest.fail("raw observation did not finish within its bounded fragment count")
+    assert entries[0] == {"pointer": "", "kind": "object", "length": len(native)}
+    strings = {}
+    scalars = {}
+    for entry in entries:
+        if entry["kind"] == "string-fragment":
+            value = strings.setdefault(entry["pointer"], "")
+            assert entry["offset"] == len(value)
+            strings[entry["pointer"]] += entry["value"]
+        elif entry["kind"] == "value":
+            scalars[entry["pointer"]] = entry["value"]
+    assert strings == {"/peaksBinaryStrings/0": binary, "/peaksBinaryStrings/1": binary}
+    assert scalars == {"/" + key: value for key, value in native.items() if key != "peaksBinaryStrings"}
+    assert len([call for call in client.calls if call[0] == operation]) > 1
+    changed_native = {**native, "maxAbsValue": 1}
+    changed_client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [project],
+        "ak.wwise.core.object.get": identity_reads, operation: [changed_native]})
+    code, rejected = gateway.execute_gateway(first_continuation, env=env, client_factory=lambda _: changed_client)
+    assert code == 2 and rejected["error_code"] == "PEAK_CONTINUATION_CHANGED", rejected
+    assert "agent_result" not in rejected
+    assert rejected["details"]["call"]["ok"] is True
+    from wwise_waapi.canonical import canonical_sha256
+    assert rejected["details"]["native_observation_boundary"]["native_result_sha256"] == canonical_sha256(changed_native)

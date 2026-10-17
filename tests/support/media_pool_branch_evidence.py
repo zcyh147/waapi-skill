@@ -39,6 +39,14 @@ WITNESSES = [
 ]
 
 
+def public_read_observation(*, gateway_argv, exit_code, payload, uri, args, options, result):
+    """One shared producer shape consumed by the existing strict program reader."""
+    if type(exit_code) is not int or not isinstance(uri, str) or not uri or not gateway_argv:
+        raise ValueError("A public read observation needs exact argv, exit status and native URI")
+    return {"gateway": {"argv": list(gateway_argv), "exit_code": exit_code, "payload": deepcopy(payload)},
+            "native_call": {"uri": uri, "args": deepcopy(args), "options": deepcopy(options), "result": deepcopy(result)}}
+
+
 def _write(path: Path, value: dict) -> dict:
     data = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
     path.write_bytes(data)
