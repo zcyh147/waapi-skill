@@ -47,8 +47,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 874
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 874
+    assert len(native) == 878
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 878
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -605,7 +605,7 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     baseline = _inventory()["historical_baseline"]
     assert baseline == {
         "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 874,
+        "total_lanes": 878,
         "construction_coverage_is_depth_evidence": False,
     }
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
@@ -661,8 +661,12 @@ def test_closed_layout_mutations_project_business_fields_without_native_typed_in
     assert 'typed' not in continuation
     policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
     fields = _typed_field_rows(lane, policy)
-    assert {row['name'] for row in fields} == {'layout_handle', 'new_layout_name'}
+    assert {row['name'] for row in fields} == {'layout_handle', 'new_layout_name', 'blueprint'}
     assert next(row for row in fields if row['name'] == 'layout_handle')['value_ownership'] == 'live_bound_handle'
+    blueprint = next(row for row in fields if row['name'] == 'blueprint')
+    assert blueprint['value_ownership'] == 'stable_business_declaration'
+    assert blueprint['transport_ownership'] == 'gateway_derivation'
+    assert blueprint['required'] is False
 
 
 def test_partial_layout_rows_keep_exact_owner_without_inheriting_completed_family():
