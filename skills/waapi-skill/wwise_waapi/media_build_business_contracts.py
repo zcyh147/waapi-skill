@@ -269,6 +269,15 @@ def media_build_business_contract_data(
             "result_bound": True,
         },
         "result_shape": row["result_shape"],
+        **({"read_continuation": {
+            "flag": "--media-page", "input": "copy returned Gateway continuation only",
+            "native_offset_supported": False, "mode": "larger bounded prefix reread",
+            "binding": ["query", "configuration", "project", "host_session", "exact preceding native prefix"],
+            "expires_after_seconds": 900, "maximum_prefix_count": 200,
+            "ceiling_hit": "partial; complete=false; useful rows retained",
+            "post_processed_presentation": "larger prefix replaces the preceding presentation",
+            "ultimate_bound": "explicit resource boundary; never evidence that the native collection ends here",
+        }} if operation == MEDIA_POOL_GET_URI else {}),
     }
 
 

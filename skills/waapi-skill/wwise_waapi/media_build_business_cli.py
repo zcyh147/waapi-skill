@@ -18,6 +18,7 @@ from .media_build_business_contracts import (
     SOUNDBANK_GET_INCLUSIONS_URI,
     media_build_business_contract_data,
 )
+from .media_pool_continuation import MediaPoolContinuationError, parse_media_pool_page
 
 
 class MediaBuildBusinessCliError(ValueError):
@@ -41,6 +42,7 @@ def add_media_build_read_arguments(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument("--soundbank-id")
     parser.add_argument("--max-results", type=int)
+    parser.add_argument("--media-page", help="Copy the returned Media Pool prefix continuation verbatim")
     parser.add_argument("--database-scope", action="append", default=[])
     parser.add_argument("--database-id", action="append", default=[])
     parser.add_argument("--search-text")
@@ -77,6 +79,7 @@ def media_build_fields_supplied(args: argparse.Namespace) -> bool:
             "channel_mode",
             "soundbank_id",
             "max_results",
+            "media_page",
             "search_text",
             "exact_name_contains",
             "final_limit",
@@ -184,8 +187,10 @@ def media_build_input_from_namespace(
                 )
             plan = _media_pool_plan(args)
             validate_media_pool_business_plan(plan)
+            if args.media_page is not None:
+                parse_media_pool_page(args.media_page)
             return MediaBuildCliInput(deferred_media_pool_plan=plan)
-    except MediaBuildBusinessError as exc:
+    except (MediaBuildBusinessError, MediaPoolContinuationError) as exc:
         raise MediaBuildBusinessCliError(str(exc)) from exc
     raise MediaBuildBusinessCliError("Unsupported media/build business read")
 
@@ -195,6 +200,7 @@ def _media_pool_fields_supplied(args: argparse.Namespace) -> bool:
         getattr(args, name, None) is not None
         for name in (
             "max_results",
+            "media_page",
             "search_text",
             "exact_name_contains",
             "final_limit",

@@ -20,6 +20,13 @@ Supply disclosed database, field, condition, output, and limit values. Gateway o
 native bindings, filters, and projection. Missing live fields permit scoped discovery refinement; unresolved ambiguity needs an exact choice.
 For case-sensitive matching use the disclosed post-filter; a saturated candidate
 set that cannot prove completeness returns `MEDIA_POOL_POST_FILTER_INCOMPLETE`.
+When a response reaches its candidate limit, follow its generated `next_command`
+to request a larger bounded prefix. Gateway verifies the preceding native rows
+against the same query, configuration, project, and host session. This is a
+prefix reread, with no native offset. Append ordinary later rows; a response
+marked `replace_previous_prefix` replaces the preceding sorted or filtered view.
+At the maximum supported prefix of 200 rows, `complete=false` remains an explicit
+resource boundary. It never proves that the native collection ends there.
 Preserve returned `Db` and complete `Path` for a later original-file reference
 check; never perform this join in model-authored code.
 `contains` takes literal text, never regex syntax or inline modifiers.

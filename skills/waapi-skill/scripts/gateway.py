@@ -11506,6 +11506,7 @@ def dispatch_core_business_read(
     if args.api in media_build_business_operations():
         return dispatch_media_build_business_read(
             args,
+            env=env,
             connection=connection,
             detected_version=detected_version,
             live_info=live_info,
@@ -11941,6 +11942,7 @@ def dispatch_runtime_inspection_business_read(
 def dispatch_media_build_business_read(
     args: argparse.Namespace,
     *,
+    env: Mapping[str, str],
     connection: GatewayConnection,
     detected_version: str,
     live_info: Mapping[str, Any],
@@ -11961,6 +11963,8 @@ def dispatch_media_build_business_read(
         version=detected_version,
     )
     field_discovery_call = None
+    media_page = None
+    media_context_available = False
     if args.api == MEDIA_POOL_GET_URI:
         field_api = "ak.wwise.core.mediaPool.getFields"
         field_capability = live_capability(
@@ -12012,6 +12016,20 @@ def dispatch_media_build_business_read(
             )
         except MediaBuildBusinessError as exc:
             raise GatewayInputError(str(exc)) from exc
+        from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, prepare_media_pool_page
+        media_context_available = (_canonical_guid(live_info.get("sessionId")) and isinstance(live_info.get("processId"), int)
+                                   and not isinstance(live_info.get("processId"), bool) and live_info["processId"] > 0)
+        media_context = {
+            "configuration": selected_connection_binding(env),
+            "modification_policy": load_gateway_config(env).config.project_modification_policy,
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")},
+        }
+        try:
+            media_page = prepare_media_pool_page(request, token=args.media_page, context=media_context)
+        except MediaPoolContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
     if args.api == MEDIA_POOL_GET_URI:
@@ -12154,10 +12172,19 @@ def dispatch_media_build_business_read(
                 details={"media_build_error_code": exc.code},
                 error_code=exc.code,
             ) from exc
+        if args.api == MEDIA_POOL_GET_URI:
+            from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
+            try:
+                normalized, next_page, next_maximum = finish_media_pool_page(media_page, rows=result["result"]["return"],
+                    request=request, normalized=normalized, context_available=media_context_available)
+            except MediaPoolContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details={"call": dispatch_call_summary(result), "native_observation": result["result"]}, error_code=exc.code) from exc
+            if next_page is not None:
+                normalized["next_command"] = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
     incomplete_media_pool = (
         args.api == MEDIA_POOL_GET_URI
         and isinstance(normalized, Mapping)
-        and normalized.get("complete") is False
+        and normalized.get("incomplete_reason") == "candidate_limit_reached_before_exact_case_post_filter"
     )
     effective_ok = bool(result.get("ok")) and not incomplete_media_pool
     return {
@@ -12165,6 +12192,8 @@ def dispatch_media_build_business_read(
         "status": (
             "incomplete_boundary"
             if incomplete_media_pool
+            else "partial"
+            if args.api == MEDIA_POOL_GET_URI and isinstance(normalized, Mapping) and normalized.get("complete") is False
             else "ok"
             if result.get("ok")
             else "error"
@@ -12209,6 +12238,8 @@ def dispatch_media_build_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
+        **({"next_command": normalized["next_command"], "native_observation": result["result"]}
+           if incomplete_media_pool and "next_command" in normalized else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 

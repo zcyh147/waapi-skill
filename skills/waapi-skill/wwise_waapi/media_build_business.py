@@ -867,7 +867,7 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
             code="MEDIA_BUILD_RESULT_INVALID",
         )
     exact_name = plan.get("exact_name_contains")
-    complete = True
+    complete = len(rows) < candidate_limit
     filtered = list(rows)
     if exact_name is not None:
         if len(rows) >= candidate_limit:
@@ -944,6 +944,8 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
         "candidate_limit": candidate_limit,
         "incomplete_reason": (
             "candidate_limit_reached_before_exact_case_post_filter"
+            if not complete and exact_name is not None
+            else "candidate_limit_reached"
             if not complete
             else None
         ),

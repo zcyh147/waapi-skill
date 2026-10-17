@@ -758,3 +758,129 @@ def test_media_pool_finite_weights_reach_native_without_clamping(tmp_path: Path,
     code, payload = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "5", "--weighted-audio-description", "rain", str(weight)], env=_env(tmp_path), client_factory=lambda _: client)
     assert code == 0, payload
     assert client.calls[-1][1] == {"maxResults": 5, "filters": [{"type": "audioDescription", "value": "rain", "weight": weight}]}
+
+
+def _pool_rows(count: int) -> list[dict[str, str]]:
+    return [{"Path": f"/owned/source-{index}.wav", "FileId": str(index)} for index in range(count)]
+
+
+def test_media_pool_prefix_continuations_keep_useful_rows_and_verify_prior_prefix(tmp_path: Path) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 3,
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 3,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 3,
+        MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}, {"return": _pool_rows(4)}, {"return": _pool_rows(5)}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--search-text", ""], env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    assert first["status"] == "partial"
+    page = first["agent_result"]
+    assert page["complete"] is False and page["incomplete_reason"] == "candidate_limit_reached"
+    assert [item["file_id"] for item in page["items"]] == ["0", "1"]
+    command = page["next_command"]
+    assert command["copy_instruction"]["action"] == "execute_verbatim_as_one_shell_tool_call"
+    code, second = gateway.execute_gateway(command["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, second
+    assert [item["file_id"] for item in second["agent_result"]["items"]] == ["2", "3"]
+    assert second["agent_result"]["page"]["mode"] == "larger_bounded_prefix_reread"
+    assert second["agent_result"]["page"]["native_offset_supported"] is False
+    code, last = gateway.execute_gateway(second["agent_result"]["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, last
+    assert [item["file_id"] for item in last["agent_result"]["items"]] == ["4"]
+    assert last["agent_result"]["complete"] is True
+    assert "next_command" not in last["agent_result"]
+    assert [args["maxResults"] for uri, args, _ in client.calls if uri == MEDIA_POOL_GET_URI] == [2, 4, 6]
+
+
+@pytest.mark.parametrize("change", ["prefix", "query", "session", "configuration", "project"])
+def test_media_pool_prefix_continuation_rejects_changed_binding_or_rows(tmp_path: Path, change: str) -> None:
+    changed_info = _info()
+    if change == "session":
+        changed_info["sessionId"] = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    second_rows = _pool_rows(4)
+    if change == "prefix":
+        second_rows[0], second_rows[1] = second_rows[1], second_rows[0]
+    second_project = _project(tmp_path / "other") if change == "project" else _project(tmp_path)
+    client = FakeClient({"ak.wwise.core.getInfo": [_info(), changed_info],
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path), second_project],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 2,
+        MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}, {"return": second_rows}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"], env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    command = first["agent_result"]["next_command"]["gateway_argv"]
+    if change == "query":
+        command += ["--search-text", "changed"]
+    if change == "configuration":
+        set_gateway_config(env, waapi_port=31338)
+    code, stopped = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    assert code == 2, stopped
+    assert stopped["error_code"] == "MEDIA_POOL_CONTINUATION_CHANGED"
+    reads = [call for call in client.calls if call[0] == MEDIA_POOL_GET_URI]
+    assert len(reads) == (2 if change == "prefix" else 1)
+    if change == "prefix":
+        assert stopped["details"]["call"]["ok"] is True
+        assert stopped["details"]["native_observation"] == {"return": second_rows}
+
+
+def test_media_pool_ultimate_prefix_boundary_never_claims_collection_complete(tmp_path: Path) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()],
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}],
+        MEDIA_POOL_GET_URI: [{"return": _pool_rows(200)}]})
+    code, result = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "200"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, result
+    page = result["agent_result"]
+    assert len(page["items"]) == 200
+    assert page["complete"] is False
+    assert page["page"]["resource_boundary_reached"] is True
+    assert "next_command" not in page
+
+
+@pytest.mark.parametrize("change", ["expired", "tampered", "foreign-route"])
+def test_media_pool_continuation_preflight_stops_invalid_reuse(tmp_path: Path, change: str, monkeypatch) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}]})
+    env = _env(tmp_path)
+    code, result = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"], env=env, client_factory=lambda _: client)
+    assert code == 0, result
+    command = result["agent_result"]["next_command"]["gateway_argv"]
+    if change == "expired":
+        import time
+        later = time.time() + 901
+        monkeypatch.setattr(time, "time", lambda: later)
+    elif change == "tampered":
+        command[-1] += "invalid"
+    else:
+        command[1] = PEAKS_REGION_URI
+    code, rejected = gateway.execute_gateway(command, env=env, client_factory=lambda _: pytest.fail("invalid continuation connected"))
+    assert code == 2, rejected
+    assert rejected["error_code"] == "GatewayInputError"
+
+
+def test_media_pool_does_not_issue_unbound_session_continuation(tmp_path: Path) -> None:
+    info = _info()
+    info.pop("sessionId")
+    client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}]})
+    code, result = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, result
+    assert len(result["agent_result"]["items"]) == 2
+    assert result["agent_result"]["page"]["continuation_unavailable_reason"] == "host_session_identity_unavailable"
+    assert "next_command" not in result["agent_result"]
+
+
+def test_media_pool_complete_post_filter_replaces_prior_prefix_presentation(tmp_path: Path) -> None:
+    rows = [{**row, "Filename": f"Rain-{index}.wav", "WAV/Duration": index + 1} for index, row in enumerate(_pool_rows(3))]
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename", "WAV/Duration"]}] * 2,
+        MEDIA_POOL_GET_URI: [{"return": rows[:2]}, {"return": rows}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--exact-name-contains", "Rain",
+        "--sort-by", "duration-seconds", "descending", "--final-limit", "1"], env=env, client_factory=lambda _: client)
+    assert code == 2 and first["error_code"] == "MEDIA_POOL_POST_FILTER_INCOMPLETE", first
+    assert first["native_observation"] == {"return": rows[:2]}
+    code, final = gateway.execute_gateway(first["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, final
+    assert final["agent_result"]["complete"] is True
+    assert [item["file_id"] for item in final["agent_result"]["items"]] == ["2"]
+    assert final["agent_result"]["page"]["presentation"] == "replace_previous_prefix"
