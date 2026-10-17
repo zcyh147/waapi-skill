@@ -16,6 +16,7 @@ An Agent following only the Skill and Gateway discoveries can reach every comple
 - [ ] Audit every public field/enum and wrong-route error for accurate disclosed choices and successor actions; creation/editing, host and scope distinctions must be visible before execution.
 - [ ] Exercise actual parser/schema output through the authenticated Broker, task checks, notice evidence, archive and scheduler with deterministic fakes of external effects; include root/equals option forms, paging, revision behavior, legal refinements and safe rejections.
 - [ ] Retain exact provenance, authorization and copy-integrity checks while preventing harness-only false rejections of public legal commands. Tampered or uncertain evidence still blocks.
+- [ ] Connect the coverage checker to preserved formal Fresh archives and their exact source, suite, harness and option identities. Preserve original verdicts and any separately justified business assessment; reject program/native receipts merely relabeled as Fresh. This implementation belongs here, while the approved small Fresh budget remains separate.
 - [ ] Produce the smallest justified Mac-only Fresh selection by distinct interaction mechanisms, listing cases, turns, transactions, model settings and maximum attempts for explicit approval. No Fresh run or automatic retry is authorized by this ticket draft.
 - [ ] Account explicitly for Wwise 2021.1, 2022.1, 2023.1, 2024.1 and 2025.1, with exact host/build provenance and applicable native shapes. A current packaged boundary is not proof of native absence.
 - [ ] Maintain exact owned branch IDs, public input/routing, construction, result/verification alternatives and required evidence, including reachable shared definitions and newly discovered variants. In-scope omissions must be implemented here or split into linked same-parent implementation children; they never leave the overall scope.
@@ -26,7 +27,7 @@ An Agent following only the Skill and Gateway discoveries can reach every comple
 
 - [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177)
 - [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178)
-- [05: Complete plugin creation for Source, owner Effect and ShareSet placements](https://github.com/zcyh147/waapi-skill/issues/179)
+- [05: Complete all native plugin kinds and placements](https://github.com/zcyh147/waapi-skill/issues/179)
 - [06: Complete generic object graph and lifecycle operations](https://github.com/zcyh147/waapi-skill/issues/180)
 - [07: Complete object queries and metadata discovery projections](https://github.com/zcyh147/waapi-skill/issues/181)
 - [08: Complete audio import, reimport and replacement workflows](https://github.com/zcyh147/waapi-skill/issues/182)
