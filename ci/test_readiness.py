@@ -17,12 +17,23 @@ if __package__:
 else:
     from run_program_tests import PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE
 
-# Reuse the closed launcher options, plus ordinary Non-live selection/path flags.
-_NONLIVE_PYTEST_OPTIONS_REQUIRING_VALUE = PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE | {
+# Identify operands using the locked pytest core option arities plus this repo's
+# Authoring option. This classifies argv only; pytest still validates it, and the
+# Program lane retains its separate closed flag allowlist.
+_PYTEST_OPTIONS_REQUIRING_VALUE = PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE | {
     '-m', '-r', '-c', '-o', '--override-ini', '--ignore', '--ignore-glob',
     '--deselect', '--basetemp', '--rootdir', '--confcutdir', '--junitxml',
     '--junit-xml', '--log-file', '--log-level', '--log-file-level',
+    '--owned-authoring-batch-root',
+    '-p', '-W', '--pythonwarnings', '--config-file', '--import-mode',
+    '--verbosity', '--show-capture', '--code-highlight', '--pdbcls',
+    '--pastebin', '--junitprefix', '--junit-prefix', '--doctest-report',
+    '--doctest-glob', '--lfnf', '--last-failed-no-failures', '--assert',
+    '--log-format', '--log-date-format', '--log-cli-level', '--log-cli-format',
+    '--log-cli-date-format', '--log-file-mode', '--log-file-format',
+    '--log-file-date-format', '--log-auto-indent', '--log-disable',
 }
+_PYTEST_OPTIONS_WITH_OPTIONAL_VALUE = {'--debug', '--cache-show'}
 
 
 class ReadinessBlocked(ValueError):
@@ -224,11 +235,12 @@ _STATIC_AUDIT_FIXTURE_NODES = {
 }
 
 
-def _nonlive_pytest_token_roles(arguments: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
+def pytest_token_roles(arguments: tuple[str, ...]) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Identify positive locators without reinterpreting or validating pytest values."""
     selectors: list[str] = []
     options: list[str] = []
     expects_value = False
+    optional_value = False
     literal_selectors = False
     for argument in arguments:
         if literal_selectors:
@@ -236,13 +248,15 @@ def _nonlive_pytest_token_roles(arguments: tuple[str, ...]) -> tuple[tuple[str, 
             continue
         if expects_value:
             expects_value = False
-            continue
+            if not optional_value or not argument.startswith("-"):
+                continue
         if argument == '--':
             literal_selectors = True
             continue
         if argument.startswith('-'):
             options.append(argument.split('=', 1)[0])
-            expects_value = argument in _NONLIVE_PYTEST_OPTIONS_REQUIRING_VALUE
+            optional_value = argument in _PYTEST_OPTIONS_WITH_OPTIONAL_VALUE
+            expects_value = optional_value or argument in _PYTEST_OPTIONS_REQUIRING_VALUE
             continue
         selectors.append(argument)
     return tuple(selectors), tuple(options)
@@ -250,7 +264,7 @@ def _nonlive_pytest_token_roles(arguments: tuple[str, ...]) -> tuple[tuple[str, 
 
 def validate_nonlive_readiness(repo_root: Path, pytest_args: tuple[str, ...]) -> None:
     """Check bounded known static selections, not general pytest dependencies."""
-    selectors, options = _nonlive_pytest_token_roles(pytest_args)
+    selectors, options = pytest_token_roles(pytest_args)
     if any(option in {'--collect-only', '--co'} for option in options):
         return
     from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
