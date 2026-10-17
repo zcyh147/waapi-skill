@@ -304,27 +304,15 @@ def test_source_control_contracts_close_provider_and_native_request_boundaries()
             contract = source_control_business_contract_data(operation, version)
             assert contract["legacy_typed_call_public"] is False
             assert contract["native_request_input"] == "forbidden"
+            assert contract["execution_shape"] == "isolated_draft_external"
+            assert contract["start"]["gateway_argv"][0] == "draft-start"
             if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
-                assert contract["execution_shape"] == "prohibited_boundary"
-                assert contract["boundary"]["error_code"] == (
-                    "SOURCE_CONTROL_PROVIDER_CONFIGURATION_REQUIRED"
-                )
-                assert "start" not in contract
-            else:
-                assert contract["execution_shape"] in {
-                    "isolated_draft_external",
-                }
-                argv = contract["start"].get(
-                    "gateway_argv_prefix",
-                    contract["start"].get("gateway_argv"),
-                )
-                assert argv[0] == "draft-start"
+                assert contract["declaration"]["provider_profile"]["cli"] == "--provider-profile configured"
+                assert contract["protected_result"]["native_text"] == "never_persisted_or_disclosed"
 
 
 def test_every_executable_source_control_row_uses_one_business_adapter() -> None:
-    for operation in source_control_business_operations() - {
-        SOURCE_CONTROL_SET_PROVIDER_URI
-    }:
+    for operation in source_control_business_operations():
         adapter = business_adapter(operation)
         assert adapter.family == "source-control-business"
         assert adapter.update_commands == frozenset(

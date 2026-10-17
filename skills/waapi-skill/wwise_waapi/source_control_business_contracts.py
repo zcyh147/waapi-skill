@@ -1,4 +1,4 @@
-"""Closed source-control contracts and the credential/provider boundary."""
+"""Closed source-control contracts with protected local provider profiles."""
 
 from __future__ import annotations
 
@@ -104,10 +104,10 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         },
     },
     SOURCE_CONTROL_SET_PROVIDER_URI: {
-        "execution_shape": "prohibited_boundary",
-        "required_fields": (),
+        "execution_shape": "isolated_draft_external",
+        "required_fields": ("provider_profile",),
         "optional_fields": (),
-        "field_types": {},
+        "field_types": {"provider_profile": "configured_private_profile"},
     },
 }
 _INTENTS = {
@@ -218,6 +218,28 @@ def source_control_business_contract_data(
             "binding": "GUID_name_type_path_exact_accessor_and_ordinary_file_stat_rechecked_before_execution",
             "file_stat_scope": "device_inode_size_mtime_mode; not_file_content_or_provider_effect_proof",
         }
+    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+        payload["binding"]["identity"] = "configured_private_profile_and_credential_file_content"
+        payload["declaration"]["file_locator_forms"] = []
+        payload["declaration"]["provider_profile"] = {
+            "cli": "--provider-profile configured", "configuration": "config-set --source-control-profile <absolute-private-profile-file>",
+            "profile_contract": "waapi-skill.source-control-profile/v1", "required": ["label", "selection"],
+            "selection_choices": ["disabled", "provider"],
+            "provider_selection": "exact profile provider name; availability remains native-observed",
+            "connection_fields": ["host", "port", "server", "username", "workspace"],
+            "password_source": "optional password_file basename in same private directory; exact UTF-8 including empty/newlines",
+            "profile_document": {"contract": "waapi-skill.source-control-profile/v1", "label": "<explicit safe public label>",
+                "selection": "provider", "provider": "<exact provider name>",
+                "connection": "optional object with disclosed string fields", "password_file": "optional credential basename"},
+            "disabled_document": {"contract": "waapi-skill.source-control-profile/v1", "label": "<explicit safe public label>", "selection": "disabled"},
+            "perforce_required": ["host", "port", "username", "workspace", "password_file"],
+            "permissions": {"posix": "current owner; directory 0700; profile/credential 0600 or more restrictive",
+                "windows": "current owner and DACL granting access only to that user; no inferred POSIX-mode proof"},
+            "secret_details_in_preview": "withheld; safe label, provider intent and config/profile references remain visible",
+            "secrets_in_argv": "forbidden", "limits": {"profile_bytes": 16384, "credential_bytes": 8192}}
+        payload["protected_result"] = {"native_text": "never_persisted_or_disclosed",
+            "observation": "bounded schema validation, log count and dispatch/timeout category only",
+            "provider_identity_and_effects": "not_verified"}
     if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
         from .object_query_outputs import available_query_outputs
         payload["declaration"]["usage_output_choices"] = {
@@ -232,17 +254,6 @@ def source_control_business_contract_data(
             "result": "native usage fields retained exactly; missing and explicit null remain distinct",
             "availability": "versioned output vocabulary; applicability to each usage object remains native-observed",
         }
-    if shape == "prohibited_boundary":
-        payload["boundary"] = {
-            "error_code": "SOURCE_CONTROL_PROVIDER_CONFIGURATION_REQUIRED",
-            "reason": (
-                "Provider selection and credentials belong to the human-owned "
-                "Wwise Project Settings or an approved local credential workflow."
-            ),
-            "secrets_in_argv": "forbidden",
-            "custom_provider_escape_hatch": "forbidden",
-        }
-        return payload
     if operation == SOURCE_CONTROL_GET_STATUS_URI:
         from .source_control_status_read import MAX_STATUS_FILES, MAX_STATUS_NATIVE_BYTES, MAX_STATUS_REPORT_BYTES, MAX_STATUS_ROWS
         payload["read_alternative"] = {"subcommand": "core-call",

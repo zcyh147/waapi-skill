@@ -180,7 +180,6 @@ def test_game_parameter_draft_exposes_one_copy_ready_exact_name_binding(
         (operation, version)
         for operation in sorted(source_control_business_operations())
         for version in source_control_business_versions(operation)
-        if operation != SOURCE_CONTROL_SET_PROVIDER_URI
     ],
 )
 def test_source_control_rows_expose_only_the_closed_business_contract(
@@ -203,7 +202,7 @@ def test_source_control_rows_expose_only_the_closed_business_contract(
 
 @pytest.mark.parametrize(
     "operation",
-    sorted(source_control_business_operations() - {SOURCE_CONTROL_SET_PROVIDER_URI}),
+    sorted(source_control_business_operations()),
 )
 def test_source_control_rows_block_typed_call_before_connection(
     tmp_path: Path,
@@ -685,7 +684,7 @@ def test_source_control_commit_declaration_seals_live_roots_and_exact_message(
 
 
 @pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
-def test_source_control_provider_configuration_is_an_explicit_boundary(
+def test_source_control_provider_configuration_requires_the_closed_profile_contract(
     tmp_path: Path,
     version: str,
 ) -> None:
@@ -695,9 +694,8 @@ def test_source_control_provider_configuration_is_an_explicit_boundary(
         client_factory=lambda url: pytest.fail(f"provider boundary connected to {url}"),
     )
 
-    assert exit_code == 2
-    assert "provider" in payload["message"].casefold()
-    assert "credential" in payload["message"].casefold()
+    assert exit_code == 0, payload
+    assert payload["business_adapter"]["declaration"]["provider_profile"]["cli"] == "--provider-profile configured"
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
@@ -1230,3 +1228,310 @@ def test_source_control_status_draft_rechecks_exact_object_file_before_terminal_
         check_error="SOURCE_CONTROL_OBJECT_FILE_BINDING_CHANGED")
     assert result["ok"] is False
     assert not any(row[0].endswith("sourceControl.getStatus") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_provider_profile_is_configured_offline_and_disclosed_without_secrets(tmp_path, version):
+    profile = tmp_path / "private-profile.json"
+    code, result = gateway.execute_gateway(["config-set", "--source-control-profile", str(profile)],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail(f"config connected {url}"))
+    assert code == 0 and result["effective"]["source_control_profile"] == str(profile), result
+    code, schema = gateway.execute_gateway(["--version", version, "request-schema", SOURCE_CONTROL_SET_PROVIDER_URI],
+        env={"WAAPI_SKILL_CONFIG_PATH": str(tmp_path / "config.json")},
+        client_factory=lambda url: pytest.fail(f"schema connected {url}"))
+    assert code == 0, schema
+    adapter = schema["business_adapter"]
+    assert adapter["declaration"]["provider_profile"]["cli"] == "--provider-profile configured"
+    assert adapter["protected_result"]["native_text"] == "never_persisted_or_disclosed"
+    assert adapter["start"]["subcommand"] == "draft-start"
+
+
+def _provider_profile_case(tmp_path, *, version="2025.1", selection="provider", native=None, before_preview=None, document_update=None, setup_change=None, declaration_error=False, policy="ask_before_changes"):
+    from tests.unit.test_object_graph_business_gateway import _info
+    secret = 'fake-password-雪-"\\-needle'
+    private = tmp_path / "private"
+    private.mkdir(mode=0o700)
+    credential = private / "credential.txt"
+    credential.write_text(secret, encoding="utf-8")
+    credential.chmod(0o600)
+    profile = private / "profile.json"
+    document = {"contract": "waapi-skill.source-control-profile/v1", "label": "Team test profile", "selection": selection}
+    if selection == "provider":
+        document.update(provider="Perforce", connection={"host": "fake-host", "port": "1666", "server": "fake-server", "username": "fake-user", "workspace": "fake-workspace"}, password_file="credential.txt")
+    if document_update is not None:
+        document_update(document)
+    profile.write_text(json.dumps(document), encoding="utf-8")
+    profile.chmod(0o600)
+    if setup_change is not None:
+        setup_change(profile, credential)
+    class Client(_SourceControlDraftClient):
+        def __init__(self):
+            super().__init__(tmp_path)
+            self.calls = []
+            self.fail_cleanup = False
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == SOURCE_CONTROL_SET_PROVIDER_URI:
+                self.calls.append((args, options))
+                if callable(native):
+                    return native()
+                if isinstance(native, Exception):
+                    raise native
+                return native if native is not None else {"log": [{"severity": "Message", "time": 0, "messageId": secret, "message": secret, "parameters": [secret.encode().hex()]}]}
+            return super().call(uri, args, options)
+        def disconnect(self):
+            if self.fail_cleanup:
+                raise RuntimeError(secret)
+    client = Client()
+    env = _env(tmp_path, version=version)
+    state = tmp_path / "state"
+    evidence = tmp_path / "evidence"
+    code, configured = gateway.execute_gateway(["config-set", "--source-control-profile", str(profile), "--project-modification-policy", policy], env=env)
+    assert code == 0, configured
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), "--evidence-dir", str(evidence), *argv], env=env, client_factory=lambda url: client)
+    code, phase = run("draft-start", SOURCE_CONTROL_SET_PROVIDER_URI)
+    assert code == 0, phase
+    declaration = phase["draft"]["next_action_binding"]["declaration"]
+    assert declaration["append"] == ["--provider-profile", "configured"]
+    assert "--commit-message" not in json.dumps(declaration) and "--exact-file" not in json.dumps(declaration)
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    code, phase = run("draft-declare-source-control-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--provider-profile", "configured")
+    if declaration_error:
+        assert code == 2, phase
+        return client, run, phase, state, evidence, profile, credential, secret
+    assert code == 0, phase
+    code, phase = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, phase
+    if before_preview is not None:
+        before_preview(profile, credential)
+    code, preview = run("preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--apply")
+    assert code == 0, preview
+    return client, run, preview, state, evidence, profile, credential, secret
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_provider_profile_preview_and_execution_never_persist_credentials_or_native_echo(tmp_path, version):
+    client, run, preview, state, evidence, profile, credential, secret = _provider_profile_case(tmp_path, version=version)
+    assert client.calls == []
+    artifact = TransactionStore(state).load_preview(preview["transaction_id"]).artifact
+    rendered = json.dumps(artifact, ensure_ascii=False)
+    assert "Team test profile" in rendered and "Perforce" in rendered and str(profile) in rendered
+    assert secret not in rendered and "fake-user" not in rendered
+    code, shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+    assert code == 0, shown
+    for payload in (preview, shown):
+        public = json.dumps(payload)
+        assert "Team test profile" in public and "Perforce" in public and str(profile) in public, public
+    code, confirmed = run(*shown["next_command"]["gateway_argv"])
+    assert code == 0, confirmed
+    code, executed = run("execute", preview["transaction_id"])
+    assert code == 0 and executed["executed"] is True, executed
+    assert client.calls == [({"provider": "Perforce", "host": "fake-host", "port": "1666", "server": "fake-server", "username": "fake-user", "workspace": "fake-workspace", "password": secret}, {})]
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["agent_result"]["verified"] is False, verified
+    observation = verified["agent_result"]["result"]
+    assert observation["protected_native_result"] is True and observation["native_log_count"] == 1
+    assert observation["provider_effects_verified"] is False
+    for root in (state, evidence):
+        for file in root.rglob("*"):
+            if file.is_file() and file.suffix != ".key":
+                content = file.read_bytes()
+                assert b"fake-password" not in content and secret.encode().hex().encode() not in content, file
+                assert b"fake-user" not in content, file
+    assert secret not in json.dumps([preview, shown, executed, verified], ensure_ascii=False)
+    code, replay = run("execute", preview["transaction_id"])
+    assert code != 0 and len(client.calls) == 1, replay
+
+
+def _authorize_provider_preview(run, preview):
+    code, shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run(*shown["next_command"]["gateway_argv"])
+    assert code == 0, confirmed
+    return confirmed
+
+
+def _assert_no_provider_secret_artifacts(state, evidence, secret, *payloads):
+    for root in (state, evidence):
+        for file in root.rglob("*"):
+            if file.is_file() and file.suffix != ".key":
+                content = file.read_bytes()
+                assert b"fake-password" not in content and secret.encode().hex().encode() not in content, file
+    assert "fake-password" not in json.dumps(payloads, ensure_ascii=False)
+
+
+@pytest.mark.parametrize("native", [
+    RuntimeError('provider echoed fake-password-雪-"\\-needle'),
+    {"log": [{"severity": "Message", "time": 0, "messageId": "id", "message": "fake-password-雪-\"\\-needle", "fake-password-雪-\"\\-needle": "echo"}]},
+    {"log": [{"severity": "Message", "time": 0, "messageId": "id", "message": "x" * 12000}]},
+])
+def test_source_control_provider_native_exception_malformed_or_large_echo_is_protected_before_evidence(tmp_path, native):
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path, native=native)
+    _authorize_provider_preview(run, preview)
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0 and len(client.calls) == 1, result
+    assert result["automatic_retry"] is False
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+    code, replay = run("execute", preview["transaction_id"])
+    assert code != 0 and len(client.calls) == 1, replay
+
+
+@pytest.mark.parametrize("change", ("credential", "profile", "config", "permissions", "key", "key-permissions", "credential-link"))
+def test_source_control_provider_file_or_configuration_drift_cannot_reach_native_provider(tmp_path, change):
+    client, run, preview, state, evidence, profile, credential, secret = _provider_profile_case(tmp_path)
+    _authorize_provider_preview(run, preview)
+    if change == "credential":
+        credential.write_text("changed fake credential", encoding="utf-8")
+    elif change == "profile":
+        document = json.loads(profile.read_text())
+        document["label"] = "Changed profile"
+        profile.write_text(json.dumps(document))
+    elif change == "config":
+        config = tmp_path / "config.json"
+        document = json.loads(config.read_text())
+        document["source_control_profile"] = str(profile.parent / "different.json")
+        config.write_text(json.dumps(document))
+    elif change == "permissions":
+        credential.chmod(0o644)
+    elif change == "key":
+        (state / "provider-profiles" / "content.key").write_bytes(b"x" * 32)
+    elif change == "key-permissions":
+        (state / "provider-profiles" / "content.key").chmod(0o644)
+    else:
+        archived = credential.with_suffix(".preserved")
+        credential.rename(archived)
+        credential.symlink_to(archived)
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0 and client.calls == [], result
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+
+
+def test_source_control_provider_disabled_intent_is_reviewable_and_has_no_connection_arguments(tmp_path):
+    client, run, preview, state, evidence, profile, _credential, secret = _provider_profile_case(tmp_path, selection="disabled", native={"log": []})
+    rendered = json.dumps(TransactionStore(state).load_preview(preview["transaction_id"]).artifact)
+    assert "disabled" in rendered and "Team test profile" in rendered and str(profile) in rendered
+    _authorize_provider_preview(run, preview)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0 and client.calls == [({"provider": ""}, {})], result
+    code, result = run("verify", preview["transaction_id"])
+    assert code == 0 and result["agent_result"]["verified"] is False, result
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+
+
+def test_source_control_provider_cleanup_exception_is_protected_before_gateway_error_projection(tmp_path):
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path)
+    _authorize_provider_preview(run, preview)
+    client.fail_cleanup = True
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0 and len(client.calls) == 1, result
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+    assert "withheld" in result["details"]["cleanup_failure"]["message"], result
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1"))
+def test_source_control_provider_profile_route_does_not_claim_unpinned_old_version_support(tmp_path, version):
+    code, result = gateway.execute_gateway(["--version", version, "request-schema", SOURCE_CONTROL_SET_PROVIDER_URI],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail(f"old route connected {url}"))
+    assert code == 2 and result["ok"] is False
+
+
+@pytest.mark.parametrize("change", ("malformed", "extra-field", "profile-permissions", "directory-permissions", "credential-outside", "missing-credential"))
+def test_source_control_provider_invalid_private_setup_never_echoes_file_contents_or_contacts_provider(tmp_path, change):
+    def update(document):
+        if change == "extra-field":
+            document["args"] = {"password": "fake-password"}
+        if change == "credential-outside":
+            document["password_file"] = "../credential.txt"
+        if change == "missing-credential":
+            document["password_file"] = "missing.txt"
+    def setup(profile, _credential):
+        if change == "malformed":
+            profile.write_text('{"fake-password": broken')
+        elif change == "profile-permissions":
+            profile.chmod(0o644)
+        elif change == "directory-permissions":
+            profile.parent.chmod(0o755)
+    client, _run, failure, state, evidence, _profile, _credential, secret = _provider_profile_case(
+        tmp_path, document_update=update, setup_change=setup, declaration_error=True)
+    assert client.calls == [] and "profile" in failure["message"].lower(), failure
+    _assert_no_provider_secret_artifacts(state, evidence, secret, failure)
+
+
+def test_source_control_custom_provider_omits_all_optional_native_fields_without_inventing_availability(tmp_path):
+    def custom(document):
+        document["provider"] = "User declared provider"
+        del document["connection"]
+        del document["password_file"]
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(
+        tmp_path, document_update=custom, native={"log": []})
+    _authorize_provider_preview(run, preview)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0 and client.calls == [({"provider": "User declared provider"}, {})], result
+    code, result = run("verify", preview["transaction_id"])
+    assert code == 0 and result["agent_result"]["verified"] is False, result
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+
+
+def test_source_control_provider_read_only_policy_blocks_even_an_authorized_preview(tmp_path):
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path)
+    _authorize_provider_preview(run, preview)
+    config = tmp_path / "config.json"
+    document = json.loads(config.read_text())
+    document["project_modification_policy"] = "read_only"
+    config.write_text(json.dumps(document))
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0 and client.calls == [] and "read_only" in json.dumps(result), result
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+
+
+def test_source_control_provider_timeout_and_late_native_exception_remain_confidential(tmp_path):
+    import threading
+    import time
+    finished = threading.Event()
+    def delayed():
+        try:
+            time.sleep(0.2)
+            raise RuntimeError('fake-password-雪-"\\-needle')
+        finally:
+            finished.set()
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path, native=delayed)
+    _authorize_provider_preview(run, preview)
+    code, result = run("--timeout", "0.1", "execute", preview["transaction_id"])
+    assert code != 0 and len(client.calls) == 1, result
+    assert "TIMEOUT" in json.dumps(result)
+    assert finished.wait(1)
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+
+
+def test_source_control_provider_cannot_bypass_failed_file_privacy_proof(tmp_path, monkeypatch):
+    import wwise_waapi.source_control_profiles as profiles
+    original = profiles._private
+    def missing_proof(path, metadata, *, directory):
+        if path.name == "private":
+            raise profiles.ProviderProfileError("Fixed Windows owner/DACL proof unavailable")
+        return original(path, metadata, directory=directory)
+    monkeypatch.setattr(profiles, "_private", missing_proof)
+    client, _run, result, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path, declaration_error=True)
+    assert client.calls == []
+    _assert_no_provider_secret_artifacts(state, evidence, secret, result)
+
+
+def test_source_control_provider_allow_changes_records_policy_authority_before_dispatch(tmp_path):
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path, policy="allow_changes", native={"log": []})
+    assert client.calls == [] and preview["state"] == "policy_authorized", preview
+    code, shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+    assert code == 0 and "policy_authorization" in json.dumps(shown), shown
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0 and len(client.calls) == 1, result
+    _assert_no_provider_secret_artifacts(state, evidence, secret, preview, shown, result)
+
+
+def test_source_control_provider_ask_before_changes_does_not_dispatch_without_confirmation(tmp_path):
+    client, run, preview, state, evidence, _profile, _credential, secret = _provider_profile_case(tmp_path)
+    code, refused = run("execute", preview["transaction_id"])
+    assert code != 0 and client.calls == [], refused
+    _assert_no_provider_secret_artifacts(state, evidence, secret, refused)

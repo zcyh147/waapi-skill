@@ -2031,7 +2031,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding"),
+        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2067,6 +2067,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
                 "source_control_binding": {"type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded."},
+                "provider_profile_binding": {"type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch."},
                 "model_binding": {"type": "object", "description": "Gateway-owned Authoring resource and declaration proof."},
                 "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
                 "result_projection": {
@@ -2077,7 +2078,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -4251,6 +4252,17 @@ def _public_call_arguments(
         authoring_ui_profile=api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS)
     if api in PROJECT_FILE_URIS:
         validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
+    provider_binding = arguments.get("provider_profile_binding")
+    if api == "ak.wwise.core.sourceControl.setProvider":
+        from .source_control_profiles import validate_binding
+        try:
+            bound = validate_binding(provider_binding)
+            if raw_args != {"provider": bound["provider"]} or raw_options != {}:
+                raise ValueError("Protected provider call accepts only its sealed public provider intent")
+        except ValueError as exc:
+            raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", str(exc)) from exc
+    elif provider_binding is not None:
+        raise OperationContractError("INVALID_ARGUMENT", "Provider profile proof belongs only to setProvider")
     source_control_binding = arguments.get("source_control_binding")
     if source_control_binding is not None:
         from .source_control_object_files import validate_object_file_binding
@@ -9403,6 +9415,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 metadata["remote_connection_before"] = remote_connection_snapshot(request.version, read)
             except (ValueError, SemanticValidationError) as exc:
                 raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
+        if arguments.get("provider_profile_binding") is not None:
+            from .source_control_profiles import check_profile
+            try:
+                check_profile(arguments["provider_profile_binding"])
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", str(exc)) from exc
+            metadata["provider_profile_binding"] = dict(arguments["provider_profile_binding"])
+            verification = {"kind": "source-control-provider-protected", "uri": api, "version": request.version}
         if arguments.get("source_control_binding") is not None:
             from .source_control_object_files import observe_object_file_binding
             try:
@@ -14369,6 +14389,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             if not isinstance(before, Mapping) or dict(before) != current:
                 raise OperationContractError("STALE_REMOTE_CONNECTION", "Remote connection changed after Preview; inspect and preview again.",
                     details={"expected": before, "actual": current, "remote_mutation_dispatched": False})
+        if arguments.get("provider_profile_binding") is not None:
+            from .source_control_profiles import check_profile
+            try:
+                check_profile(arguments["provider_profile_binding"])
+            except ValueError as exc:
+                raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", str(exc)) from exc
+            if arguments["provider_profile_binding"] != prepared.get("pre_state", {}).get("provider_profile_binding"):
+                raise OperationContractError("SOURCE_CONTROL_PROFILE_PROOF_REQUIRED", "Provider profile recipe changed after Preview")
         if api in CLI_PROJECT_FILE_URIS:
             try:
                 validate_cli_project_effect(prepared.get('pre_state', {}).get('cli_project_effect'),
@@ -16502,7 +16530,16 @@ def verify_prepared_operation(
               {"expected": expected, "actual": actual})
 
     kind = plan.get("kind")
-    if kind == "ui-command-plan":
+    if kind == "source-control-provider-protected":
+        success_status = "result_schema_checked"
+        verification_strength = "protected_result_schema_only"
+        business_state_verified = False
+        protected = execution_result.get("result")
+        check("protected provider result was validated before publication",
+              isinstance(protected, Mapping) and protected.get("protected_native_result") is True
+              and protected.get("native_result_schema_valid") is True,
+              {"provider_identity_verified": False, "provider_effects_verified": False, "native_text_disclosed": False})
+    elif kind == "ui-command-plan":
         raw_ui_plan = plan.get("plan")
         version = plan.get("version")
         if not isinstance(raw_ui_plan, Mapping) or not isinstance(version, str):

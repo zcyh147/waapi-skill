@@ -1139,6 +1139,7 @@ class GatewayTransport:
         self._abandoned = threading.Event()
         self._client: Any = None
         self._last_timeout: GatewayTimeoutError | None = None
+        self._protected_provider_mode = False
         self._thread = threading.Thread(
             target=self._run,
             name=f"waapi-gateway-owner:{uuid.uuid4().hex[:8]}",
@@ -1223,6 +1224,18 @@ class GatewayTransport:
 
     def unsubscribe(self, subscription: Any) -> Any:
         return self._request("unsubscribe", subscription, phase="WAAPI unsubscribe", cleanup=True)
+
+    def protect_provider_transport(self) -> None:
+        """Keep provider/cleanup exceptions confidential for this connection."""
+        self._protected_provider_mode = True
+
+    def _protected_failure(self, exc: BaseException) -> BaseException:
+        if not self._protected_provider_mode:
+            return exc
+        if isinstance(exc, KeyboardInterrupt):
+            return KeyboardInterrupt()
+        message = "Protected provider transport failed; native exception text is withheld"
+        return TimeoutError(message) if isinstance(exc, TimeoutError) else RuntimeError(message)
 
     def close(self) -> None:
         if self._closed.is_set():
@@ -1391,7 +1404,10 @@ class GatewayTransport:
                 continue
             try:
                 if request.operation == "close":
-                    self._deliver(request, _close_transport_client(client, subscriptions))
+                    outcome = _close_transport_client(client, subscriptions)
+                    if not outcome[0]:
+                        outcome = (False, self._protected_failure(outcome[1]))
+                    self._deliver(request, outcome)
                     return
                 if request.operation == "call":
                     uri, args = request.args
@@ -1429,7 +1445,7 @@ class GatewayTransport:
                     result = method(*request.args, **dict(request.kwargs))
                 self._deliver(request, (True, result))
             except BaseException as exc:  # noqa: BLE001 - transferred to the requesting thread
-                self._deliver(request, (False, exc))
+                self._deliver(request, (False, self._protected_failure(exc)))
 
 
 def _close_transport_client(client: Any, subscriptions: dict[int, Any]) -> tuple[bool, Any]:
@@ -2373,6 +2389,8 @@ def build_parser() -> argparse.ArgumentParser:
     config_set.add_argument("--waapi-port")
     config_set.add_argument("--clear-waapi-port", action="store_true")
     config_set.add_argument("--project-modification-policy")
+    config_set.add_argument("--source-control-profile")
+    config_set.add_argument("--clear-source-control-profile", action="store_true")
 
     draft_start = subparsers.add_parser(
         "draft-start",
@@ -9051,16 +9069,6 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             and capability.preferred_route == "fixed_command"
         ):
             return fixed_command_route_payload(capability)
-        if args.command == "request-schema" and args.api == SOURCE_CONTROL_SET_PROVIDER_URI:
-            boundary = source_control_business_contract_data(args.api, versions[0])[
-                "boundary"
-            ]
-            raise GatewayInputError(
-                "Source-control provider selection and credentials require a "
-                "human-owned Wwise Project Settings or approved local credential "
-                f"workflow ({boundary['error_code']}); credentials are forbidden "
-                "in Gateway arguments."
-            )
         if args.command == "request-schema" and args.api in UNDO_GROUP_MEMBER_URIS:
             raise GatewayInputError(
                 f"{args.api} is a compound Undo member and has no standalone "
@@ -11090,6 +11098,12 @@ def parse_config_set_changes(args: argparse.Namespace) -> dict[str, Any]:
         changes["waapi_port"] = None
     if args.project_modification_policy is not None:
         changes["project_modification_policy"] = args.project_modification_policy
+    if args.source_control_profile is not None and args.clear_source_control_profile:
+        raise GatewayInputError("Choose a profile reference or clear it, not both")
+    if args.source_control_profile is not None:
+        changes["source_control_profile"] = args.source_control_profile
+    elif args.clear_source_control_profile:
+        changes["source_control_profile"] = None
     if not changes and not args.reset:
         raise GatewayInputError("config-set requires at least one public config change")
     return changes
@@ -13736,6 +13750,13 @@ def dispatch_business_source_control_plan(
         )
     except SourceControlBusinessCliError as exc:
         raise GatewayInputError(str(exc)) from exc
+    if binding.record.operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+        from wwise_waapi.source_control_profiles import capture_profile
+        resolution = load_gateway_config(env)
+        configured = resolution.config.source_control_profile
+        plan = {"provider_profile_binding": capture_profile(config_file=resolution.external_path,
+            profile_file=Path(configured) if configured is not None else None,
+            state_root=binding.store.state_dir, project_root=Path(binding.project["path"]).parent)}
     if plan.get("object_files"):
         from wwise_waapi.source_control_object_files import capture_object_file_binding
         try:
@@ -21859,6 +21880,15 @@ def _dispatch_transaction_command_with_execution_lease(
                     raise GatewayInputError('Authoring resource ownership changed after Preview')
             if call_uri == 'ak.wwise.ui.window.close':
                 resource_store.require_no_children(model_binding['plan']['window'], context=context)
+        protected_provider_binding = request_payload.get("arguments", {}).get("provider_profile_binding")
+        if protected_provider_binding is not None:
+            from wwise_waapi.source_control_profiles import check_profile, ProviderProfileError
+            selected = load_gateway_config(env)
+            if (str(store.state_dir) != protected_provider_binding["state_root"]
+                or str(selected.external_path) != protected_provider_binding["config_file"]
+                or selected.config.source_control_profile != protected_provider_binding["profile_file"]):
+                raise ProviderProfileError("Provider profile/configuration binding changed; create a new Draft")
+            check_profile(protected_provider_binding)
         store.begin_execution(
             transaction_id,
             expected_authorization=record.state,
@@ -21926,6 +21956,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 version=detected_version,
                 args=runtime_call_args,
                 options=runtime_call_options,
+                protected_provider_binding=protected_provider_binding,
                 allow_destructive=True,
                 operation_timeout=float(capability.execution_contract["timeout_seconds"]),
                 result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
@@ -23376,6 +23407,7 @@ def dispatch(
     exact_object_lookup: bool = False,
     operation_timeout: float | None = None,
     result_limit_bytes: int = MAX_GATEWAY_RESULT_JSON_BYTES,
+    protected_provider_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     remaining = connection.deadline.require_remaining(f"dispatch {api}")
     dispatch_timeout = (
@@ -23383,6 +23415,11 @@ def dispatch(
         if operation_timeout is None
         else min(remaining, max(0.0, float(operation_timeout)))
     )
+    if protected_provider_binding is not None:
+        if api != SOURCE_CONTROL_SET_PROVIDER_URI:
+            raise GatewayInputError("Protected provider recipe has the wrong fixed URI")
+        if isinstance(dispatcher.client, GatewayTransport):
+            dispatcher.client.protect_provider_transport()
     result = dispatcher.dispatch(
         api,
         version=version,
@@ -23398,6 +23435,7 @@ def dispatch(
         topic_event_validator=topic_event_validator,
         live_behavior=live_behavior,
         result_limit_bytes=result_limit_bytes,
+        protected_provider_binding=protected_provider_binding,
     )
     if result.get("error_code") == "TIMEOUT":
         result = dict(result)
@@ -27280,6 +27318,16 @@ def _business_next_action_binding(
                     "append": [],
                 },
             }
+        if record.operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+            return {**shared, "responsibility_split": {
+                "agent": "explicit_safe_profile_label_and_provider_configuration_intent",
+                "gateway": "private_file_proof_immutable_preview_and_protected_dispatch"},
+                "required_next_phase": "declare_complete_source_control_plan",
+                "declaration": {**operation_draft_prefix_copy_binding(declare_source_control_plan_prefix,
+                    append_action="copy_verbatim_then_append_disclosed_configured_profile_choice"),
+                    "append": ["--provider-profile", "configured"],
+                    "append_fields": business_contract["declaration"],
+                    "submit_once": True, "native_request_input": "forbidden"}}
         return {
             **shared,
             "required_next_phase": "declare_complete_source_control_plan",
@@ -27291,7 +27339,7 @@ def _business_next_action_binding(
                     ),
                 ),
                 "append_fields": business_contract["declaration"],
-                "file_locator_flags": {
+                "file_locator_flags": {} if record.operation == SOURCE_CONTROL_SET_PROVIDER_URI else {
                     "project-relative": "--project-file <exact-relative-path>",
                     "originals-relative": "--originals-file <exact-relative-path>",
                     "exact-user-path-under-io-root": [

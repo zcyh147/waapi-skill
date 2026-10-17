@@ -9,6 +9,7 @@ from .source_control_business_contracts import (
     SOURCE_CONTROL_COMMIT_URI,
     SOURCE_CONTROL_GET_SOURCE_FILES_URI,
     SOURCE_CONTROL_MOVE_URI,
+    SOURCE_CONTROL_SET_PROVIDER_URI,
 )
 
 
@@ -41,6 +42,7 @@ def add_source_control_arguments(
     )
     parser.add_argument("--object-file", action="append", default=[], help="Containing file of an exact bound Object Handle")
     parser.add_argument("--original-media-object", action="append", default=[], help="Original file of an exact AudioFileSource Handle")
+    parser.add_argument("--provider-profile", choices=("configured",))
     parser.add_argument("--io-root")
     parser.add_argument("--commit-message")
     parser.add_argument(
@@ -82,6 +84,7 @@ def source_control_fields_supplied(args: argparse.Namespace) -> bool:
     return any(
         getattr(args, name, None) is not None
         for name in (
+            "provider_profile",
             "io_root",
             "commit_message",
             "usage_scope",
@@ -100,6 +103,15 @@ def source_control_plan_from_namespace(
     *,
     operation: str,
 ) -> dict[str, Any]:
+    selected = getattr(args, "provider_profile", None)
+    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+        others = any(getattr(args, name, None) is not None for name in
+            ("io_root", "commit_message", "usage_scope", "originals_folder", "recursive", "include_usage_objects", "max_results"))
+        if selected != "configured" or others or _locator_fields_supplied(args) or args.move or args.usage_output:
+            raise SourceControlBusinessCliError("Provider configuration accepts only --provider-profile configured; select its private file through config-set")
+        return {"provider_profile": "configured"}
+    if selected is not None:
+        raise SourceControlBusinessCliError("Provider profile selection applies only to setProvider")
     if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
         forbidden = _locator_fields_supplied(args) or any(
             getattr(args, name, None) is not None

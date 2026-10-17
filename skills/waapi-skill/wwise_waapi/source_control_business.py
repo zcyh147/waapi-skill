@@ -399,13 +399,16 @@ def materialize_source_control_business_request(
         operation,
         session.context.wwise_version,
     )
-    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
-        _repair(
-            "SOURCE_CONTROL_PROVIDER_CONFIGURATION_REQUIRED",
-            field="provider",
-            action="configure provider and credentials in human-owned Wwise settings",
-        )
     raw_roots, plan = _settings(session)
+    if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
+        from .source_control_profiles import validate_binding
+        if set(plan) != {"provider_profile_binding"}:
+            _repair("SOURCE_CONTROL_PROFILE_REQUIRED", field="provider_profile", action="select --provider-profile configured")
+        binding = validate_binding(plan["provider_profile_binding"])
+        return parse_operation_request({"contract": "waapi-skill.operation-request/v1",
+            "version": session.context.wwise_version, "operation": "waapi.call", "arguments": {
+                "api": operation, "args": {"provider": binding["provider"]}, "options": {},
+                "provider_profile_binding": binding, "io_root": str(_roots(raw_roots)["project"])}}).as_dict()
     if operation == SOURCE_CONTROL_GET_SOURCE_FILES_URI:
         return _get_source_files_request(plan, version=session.context.wwise_version)
     roots = _roots(raw_roots)

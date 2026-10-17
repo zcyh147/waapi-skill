@@ -203,7 +203,20 @@ def validate_resolved_semantic_payload(
     uri: str, args: Mapping[str, Any], options: Mapping[str, Any], *, version: str,
     authoring_ui_profile: bool = False,
 ) -> SchemaValidationResult:
-    """Validate Gateway-owned native requests against reachable pinned definitions.
+    return _validate_resolved_sections(uri, (("args", dict(args)), ("options", dict(options))),
+                                      version=version, authoring_ui_profile=authoring_ui_profile)
+
+
+def validate_resolved_semantic_result(uri: str, result: Any, *, version: str) -> SchemaValidationResult:
+    """Validate native results in memory before a protected call can publish them."""
+    return _validate_resolved_sections(uri, (("result", result),), version=version)
+
+
+def _validate_resolved_sections(
+    uri: str, sections: tuple[tuple[str, Any], ...], *, version: str,
+    authoring_ui_profile: bool = False,
+) -> SchemaValidationResult:
+    """Validate Gateway-owned native sections against reachable pinned definitions.
 
     Unlike conservative reflection validation, unresolved references cannot
     establish a match here. Reuse the same constraint walker and its budgets.
@@ -263,12 +276,13 @@ def validate_resolved_semantic_payload(
             super().validate(node, value, path=path, depth=depth)
 
     walker = ResolvedWalker(uri=uri, version=version)
-    for section, payload in (("args", args), ("options", options)):
+    for section, payload in sections:
         walker.context = schema.get(section + "Schema", {})
         walker.context_document = "<schema>"
-        walker.validate(walker.context, dict(payload), path=section)
-    return SchemaValidationResult(uri=uri, version=version, section="request", validated_nodes=walker.nodes,
-                                  compatibility_rules=tuple(compatibility_rules))
+        walker.validate(walker.context, payload, path=section)
+    return SchemaValidationResult(uri=uri, version=version,
+        section="result" if sections[0][0] == "result" else "request", validated_nodes=walker.nodes,
+        compatibility_rules=tuple(compatibility_rules))
 
 
 def validate_semantic_result(

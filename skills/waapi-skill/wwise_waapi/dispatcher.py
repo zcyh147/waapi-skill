@@ -94,6 +94,7 @@ class DispatcherRequest:
     live_behavior: bool = False
     result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES
     topic_event_count: int = 1
+    protected_provider_binding: Mapping[str, Any] | None = None
     topic_event_validator: Callable[[Any], Any] | None = None
 
 
@@ -187,6 +188,7 @@ class WwiseDispatcher:
         topic_event_validator: Callable[[Any], Any] | None = None,
         live_behavior: bool = False,
         result_limit_bytes: int = MAX_LIVE_RESULT_JSON_BYTES,
+        protected_provider_binding: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Dispatch one WAAPI function or topic and return a structured result."""
 
@@ -205,7 +207,11 @@ class WwiseDispatcher:
             topic_event_validator=topic_event_validator,
             live_behavior=live_behavior,
             result_limit_bytes=result_limit_bytes,
+            protected_provider_binding=protected_provider_binding,
         )
+        if request.protected_provider_binding is not None and request.api != "ak.wwise.core.sourceControl.setProvider":
+            return self._error_result(request.api, request.version, "PROTECTED_PROVIDER_SCOPE_INVALID",
+                "Protected provider recipe has the wrong fixed URI")
         try:
             result = self._dispatch(request)
         except Exception as exc:  # noqa: BLE001 - callers need structured WAAPI errors
@@ -297,6 +303,20 @@ class WwiseDispatcher:
     def _dispatch_function(self, request: DispatcherRequest, entry: ManifestApiEntry) -> dict[str, Any]:
         if self.client is None:
             return self._error_result(request.api, request.version, "CLIENT_UNAVAILABLE", "A WAAPI client is required for function calls")
+        if request.protected_provider_binding is not None:
+            from .source_control_profiles import SET_PROVIDER
+            from .source_control_protected_dispatch import protected_provider_call
+            if request.api != SET_PROVIDER:
+                return self._error_result(request.api, request.version, "PROTECTED_PROVIDER_SCOPE_INVALID", "Protected provider recipe has the wrong fixed URI")
+            protected = protected_provider_call(request.protected_provider_binding, version=request.version,
+                call=lambda native_args: _call_with_timeout(self.client, request.api, native_args, {}, request.timeout))
+            if protected["ok"]:
+                return self._success_result(request, entry, protected["result"])
+            result = self._error_result(request.api, request.version, protected["error_code"],
+                "Protected provider call did not produce a validated observation; native text is withheld", item_type=entry.item_type)
+            result["protected_native_result"] = True
+            result["native_text_disclosed"] = False
+            return result
         try:
             payload = _call_with_timeout(self.client, request.api, request.args, request.options, request.timeout)
         except TimeoutError as exc:
@@ -602,6 +622,7 @@ class WwiseDispatcher:
             topic_event_validator=kwargs["topic_event_validator"],
             live_behavior=bool(kwargs["live_behavior"]),
             result_limit_bytes=int(kwargs["result_limit_bytes"]),
+            protected_provider_binding=kwargs.get("protected_provider_binding"),
         )
 
     def _destructive_allowed(self, request: DispatcherRequest) -> bool:
