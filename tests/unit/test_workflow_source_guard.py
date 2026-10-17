@@ -731,7 +731,7 @@ def _short_id_probe_runtime(tmp_path, *, version="2021.1", fault=None):
             if "--short-id" in command:
                 payload["source_resolution"] = {"complete": True, "candidate_count": 1}
         code = 0
-        if fault == "missing-dialogue" and "--custom-kind" in command:
+        if fault == "missing-dialogue" and "DialogueEvent" in command:
             payload["agent_result"] = []
         if "--short-id" in command:
             if fault == "native-error":
@@ -896,7 +896,9 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
                 assert args == {"from": {"id": [{"shortId": 123, "type": 10}]},
                                 "transform": [{"range": [0, 65]}]}, args
                 selected = rows[0]
-            assert options == {"return": ["id", "name", "type", "path", "shortId"]}, options
+            source_lookup = "shortId =" in args.get("waql", "") or "from" in args
+            expected_fields = ["id", "name", "type", "path"] + ([] if source_lookup else ["shortId"])
+            assert options == {"return": expected_fields}, options
             return {"return": [{key: selected[key] for key in options["return"]}]}
 
         def disconnect(self):

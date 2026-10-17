@@ -12,7 +12,7 @@ def collect_short_id_typed_read_observations(
     """Keep the original two-kind public read and exact-ID evidence unchanged."""
     observations = evidence["observations"]
     evidence["status"] = gateway(["status"])
-    for kind, native_type, source in (("event", "Event", ["--kind", "event"]),
+    for kind, native_type, source in (("event", "Event", ["--custom-kind", "Event"]),
                                      ("dialogue-event", "DialogueEvent", ["--custom-kind", "DialogueEvent"])):
         discovered = gateway(["query-object", *source, "--include", "short-id", "--max-results", "1"])
         rows = discovered["agent_result"]
