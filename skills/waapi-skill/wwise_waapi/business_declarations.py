@@ -1779,6 +1779,7 @@ def _dependency_field_tokens(
     values = {
         value
         for dependency in dependencies
+        if dependency.get("action") != "Show"
         for value in (dependency.get("property"), dependency.get("reference"))
         if isinstance(value, str) and value
     }

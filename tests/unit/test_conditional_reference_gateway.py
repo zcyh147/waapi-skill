@@ -263,3 +263,130 @@ def test_terminal_override_is_editable_through_separate_property_preview(tmp_pat
     assert task.objects[FIRST]["OverridePositioning"] is True
     assert task.objects[FIRST]["Attenuation"] is None
     assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("restriction,current", [
+    ({"type": "enum", "values": [{"value": 1}, {"value": 2}, {"value": 3}, {"value": 4}]}, 3),
+    ({"type": "range", "min": 1, "max": 100}, 37),
+])
+def test_satisfied_scalar_condition_preserves_value_and_guards_drift(tmp_path, version, restriction, current):
+    task = AttenuationTask(tmp_path, version)
+    task.metadata["Attenuation"]["dependencies"] = [{
+        "type": "property", "action": "Enable", "context": "Self", "property": "Mode",
+        "conditions": [{"restriction": restriction}],
+    }]
+    task.metadata["Mode"] = {"name": "Mode", "type": "int16", "restriction": {"type": "range", "min": 0, "max": 100}}
+    task.objects[FIRST]["Mode"] = current
+    task.declare()
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    assert "@Mode" not in prepared["dispatch"]["args"]["objects"][0]
+    assert any(row["name"] == "Mode" and row["value"] == current for row in prepared["verification_plan"]["nodes"][0]["properties"])
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    task.objects[FIRST]["Mode"] = 0
+    code, executed = task.run("execute", tx)
+    assert code == 2, executed
+    assert not any(uri == "ak.wwise.core.object.set" for uri, _, _ in task.calls)
+
+
+class ScalarPropertyTask(AttenuationTask):
+    def __init__(self, path, version):
+        super().__init__(path, version, operation="object.setProperty")
+        self.metadata = {
+            "LfoSmoothing": {"name": "LfoSmoothing", "type": "Real64", "dependencies": [{
+                "type": "property", "action": "Enable", "context": "Self", "property": "LfoWaveform",
+                "conditions": [{"restriction": {"type": "enum", "values": [{"value": n} for n in (1, 2, 3, 4)]}}],
+            }]},
+            "LfoWaveform": {"name": "LfoWaveform", "type": "int16", "restriction": {"type": "range", "min": 0, "max": 5}},
+        }
+        self.objects[FIRST].update(LfoSmoothing=0.0, LfoWaveform=3)
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith("isPropertyEnabled"):
+            self.calls.append((uri, deepcopy(args), options))
+            return {"return": True}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("context", ["Self", "Parent"])
+def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tmp_path, version, context):
+    task = AttenuationTask(tmp_path, version, operation="object.setProperty")
+    task.metadata = {
+        "SlewRateUp": {"name": "SlewRateUp", "type": "Real64", "dependencies": [{
+            "type": "property", "action": "Show", "context": context,
+            "property": "RTPCRamping", "conditions": [{"restriction": {
+                "type": "enum", "values": [{"value": 1}]}}],
+        }]},
+        "RTPCRamping": {"name": "RTPCRamping", "type": "int16"},
+    }
+    task.objects[FIRST].update(SlewRateUp=0.0, RTPCRamping=0)
+    target = task.bind(FIRST)
+    field = task.discover(target, "SlewRateUp")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "25")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert "derived_changes" not in preview["preview_summary"]
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["SlewRateUp"] == 25
+    assert task.objects[FIRST]["RTPCRamping"] == 0
+    assert task.objects[FIRST]["Volume"] == -7
+    assert [args["property"] for uri, args, _ in task.calls if uri.endswith("setProperty")] == ["SlewRateUp"]
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
+def test_property_condition_is_preserved_revalidated_and_verified(tmp_path, version, drift):
+    task = ScalarPropertyTask(tmp_path, version)
+    target = task.bind(FIRST)
+    field = task.discover(target, "LfoSmoothing")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "50")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "before":
+        task.objects[FIRST]["LfoWaveform"] = 0
+    if drift == "metadata":
+        task.metadata["LfoSmoothing"]["dependencies"][0]["conditions"][0]["restriction"]["values"] = [{"value": 0}]
+    code, executed = task.run("execute", tx)
+    if drift in {"before", "metadata"}:
+        assert code == 2, executed
+        assert not any(uri.endswith("setProperty") for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    if drift == "after":
+        task.objects[FIRST]["LfoWaveform"] = 0
+    code, verified = task.run("verify", tx)
+    assert code == (2 if drift == "after" else 0), verified
+    assert task.objects[FIRST]["LfoSmoothing"] == 50
+    assert task.objects[FIRST]["Volume"] == -7
+    writes = [args for uri, args, _ in task.calls if uri.endswith("setProperty")]
+    assert len(writes) == 1 and writes[0]["property"] == "LfoSmoothing"

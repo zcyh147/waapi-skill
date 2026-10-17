@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Mapping
+import math
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,3 +84,34 @@ __all__ = [
     "reference_allowed_types",
     "reference_type_token",
 ]
+
+
+def condition_restriction(conditions: Any) -> dict[str, Any]:
+    """Validate the native scalar condition without selecting a business value."""
+    if not isinstance(conditions, list) or len(conditions) != 1 or not isinstance(conditions[0], Mapping) or set(conditions[0]) != {"restriction"}:
+        raise MetadataRestrictionError("INVALID_METADATA", "A scalar dependency requires one restriction condition.")
+    restriction = conditions[0]["restriction"]
+    if not isinstance(restriction, Mapping):
+        raise MetadataRestrictionError("INVALID_METADATA", "Condition restriction must be an object.")
+    if restriction.get("type") == "enum" and set(restriction) == {"type", "values"}:
+        values = restriction["values"]
+        if isinstance(values, list) and values and all(
+            isinstance(row, Mapping) and "value" in row and set(row) <= {"value", "displayName"}
+            and isinstance(row["value"], (str, bool, int, float))
+            and (not isinstance(row["value"], float) or math.isfinite(row["value"]))
+            for row in values
+        ):
+            return dict(restriction)
+    if restriction.get("type") == "range" and set(restriction) == {"type", "min", "max"}:
+        if all(isinstance(restriction[key], (int, float)) and not isinstance(restriction[key], bool)
+               and math.isfinite(restriction[key]) for key in ("min", "max")) and restriction["min"] <= restriction["max"]:
+            return dict(restriction)
+    raise MetadataRestrictionError("INVALID_METADATA", "Condition restriction is malformed or has an unimplemented native shape.")
+
+
+def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
+    """Evaluate a validated scalar condition with Boolean/number distinction."""
+    if restriction["type"] == "enum":
+        return any(type(value) is type(row["value"]) and value == row["value"] for row in restriction["values"])
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and restriction["min"] <= value <= restriction["max"])
