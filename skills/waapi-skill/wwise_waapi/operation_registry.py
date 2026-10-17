@@ -7159,7 +7159,7 @@ def _read_property_info(
         raise AssertionError("object_id or class_id is required")
     try:
         result = read(GET_PROPERTY_INFO_URI, args, {})
-        if object_id is not None and "name" not in result:
+        if object_id is not None and isinstance(result, Mapping) and ("name" not in result or "type" not in result):
             names = parse_property_and_reference_names_result(read(
                 GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": object_id}, {},
             ))
@@ -7249,6 +7249,8 @@ def _require_platform_field_enabled(
 
 
 def _require_object_property_value(metadata: PropertyInfoMetadataRecord, value: Any) -> None:
+    if not isinstance(metadata.type, str):
+        raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": metadata.name})
     property_type = metadata.type.casefold()
     if property_type in {"real32", "real64", "float", "double"}:
         valid = _is_finite_waapi_number(value)
@@ -7303,7 +7305,7 @@ def _is_finite_waapi_number(value: Any) -> bool:
 
 def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
     restriction_type = metadata.restriction.get("type")
-    reference = metadata.type.casefold() in {"reference", "objectreference"} or restriction_type == "reference"
+    reference = restriction_type == "reference" or (isinstance(metadata.type, str) and metadata.type.casefold() in {"reference", "objectreference"})
     if not reference:
         raise OperationContractError(
             "INVALID_REFERENCE",
@@ -11228,7 +11230,7 @@ def _materialize_audio_import_dynamic_rows(
 
 def _metadata_is_reference(info: PropertyInfoMetadataRecord) -> bool:
     return (
-        info.type.casefold() in {"reference", "objectreference"}
+        (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or info.restriction.get("type") == "reference"
     )
 

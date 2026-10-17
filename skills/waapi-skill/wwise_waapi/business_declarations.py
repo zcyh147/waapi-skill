@@ -1117,7 +1117,7 @@ def bind_live_field(
         )
     field_kind = (
         "reference"
-        if info.type.casefold() in {"reference", "objectreference"}
+        if (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or info.restriction.get("type") == "reference"
         else "property"
     )

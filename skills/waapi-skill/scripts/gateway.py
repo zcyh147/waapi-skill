@@ -18577,9 +18577,13 @@ def dispatch_business_field_discovery(
         if accepted:
             eligible.append(candidate)
         else:
+            unavailable_type = "type" not in metadata and kind != "reference"
             incompatible.append({
                 "field": candidate.get("name"),
-                "reason": ("RTPC requires a numeric property with live RTPC support"
+                **({"error_code": "FIELD_TYPE_UNAVAILABLE", "unavailable_facts": ["type"]}
+                   if unavailable_type else {}),
+                "reason": ("Native metadata omits the type needed to certify a typed field value"
+                           if unavailable_type else "RTPC requires a numeric property with live RTPC support"
                            if binding.record.operation == "object.setRTPC"
                            else "Live field kind/type/support is incompatible with this operation"),
                 "operation": binding.record.operation,
@@ -18610,7 +18614,11 @@ def dispatch_business_field_discovery(
                 "candidate_count_scope": "returned_compatible_live_fields",
                 "rejected_candidates": incompatible[:8],
                 "fallback_detail_scan": dict(discovery.fallback_detail_scan),
-                "recovery": "Refine the missing discovery meaning for this bound object; no declaration was changed.",
+                "recovery": (
+                    "Inspect the exact field metadata or select a field with a certified type; no declaration was changed."
+                    if any(row.get("error_code") == "FIELD_TYPE_UNAVAILABLE" for row in incompatible)
+                    else "Refine the missing discovery meaning for this bound object; no declaration was changed."
+                ),
             },
         )
     narrowed: list[Mapping[str, Any]] = []

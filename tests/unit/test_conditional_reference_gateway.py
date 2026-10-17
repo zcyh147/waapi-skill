@@ -1299,5 +1299,68 @@ def test_missing_native_scalar_type_stops_field_acquisition_despite_proven_token
     target = task.bind(FIRST)
     code, discovered = task.step("draft-discover-fields", "--object-handle", target, "--meaning", "LfoSmoothing")
     assert code == 2, discovered
+    assert discovered["details"]["rejected_candidates"][0]["error_code"] == "FIELD_TYPE_UNAVAILABLE", discovered
     assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
     assert task.objects[FIRST]["LfoSmoothing"] == 0.0
+
+
+class UntypedReferenceConditionTask(AttenuationTask):
+    def call(self, uri, args=None, options=None):
+        result = super().call(uri, args, options)
+        if uri.endswith("getPropertyInfo"):
+            if not getattr(self, "native_name_present", False):
+                result.pop("name", None)
+            if args["property"] == "Attenuation":
+                result.pop("type", None)
+                if getattr(self, "remove_reference_proof", False):
+                    result.pop("restriction", None)
+        return result
+
+
+@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
+    for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
+@pytest.mark.parametrize("native_name_present", [True, False])
+@pytest.mark.parametrize("drift", ["none", "reference-proof-before"])
+def test_native_reference_restriction_certifies_reference_when_optional_type_is_absent(tmp_path, version, operation, native_name_present, drift):
+    task = UntypedReferenceConditionTask(tmp_path, version, operation=operation)
+    task.native_name_present = native_name_present
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", source, "--meaning", "Attenuation")
+    assert code == 0, discovered
+    candidate = discovered["meaning_results"][0]["candidates"][0]
+    assert candidate["field_kind"] == "reference" and "type" not in candidate["metadata"]
+    assert ("name" in candidate["metadata"]) is native_name_present
+    assert candidate["value_type"] == "reference"
+    field = candidate["handle"]
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", source, "--field-handle", field,
+                               "--target-handle", target) if operation == "object.setReference" else
+                      task.step("draft-declare-existing", "--declaration-id", "attenuation", "--object-handle", source,
+                                "--field-value", field, target))
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    state = shown["artifact"]["prepared_operation"]["pre_state"]
+    groups = state.get("condition_metadata_guards", []) if operation == "object.set" else [state["condition_metadata"]]
+    reference_metadata = next(info for group in groups for info in group["fields"]
+                              if info.get("restriction", {}).get("type") == "reference")
+    assert reference_metadata["type"] is None
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    task.remove_reference_proof = drift != "none"
+    code, executed = task.run("execute", tx)
+    if drift != "none":
+        assert code == 2, executed
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["Attenuation"] == {"id": SECOND}
+    assert task.objects[FIRST]["ListenerRelativeRouting"] is True
+    assert task.objects[FIRST]["OverridePositioning"] is True
