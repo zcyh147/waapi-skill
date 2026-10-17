@@ -400,6 +400,52 @@ tests, divergent create/reuse and stale/foreign authority controls passed 75
 tests. Earlier passing runs remain partial source evidence; no missing case or
 native acceptance was inferred from them.
 
+#193 bounded source slice on exact integration `8dfdcc76` exposes the missing
+tone collection choices through existing host-plan CLI/Draft composition. Only
+`ak.wwise.debug.generateToneWAV` is changed: waveform channel empty sets map to
+explicit zero for 2024.1/2025.1, and explicit marker emptiness maps to [] for
+2025.1. Omission, empty and populated forms remain distinct in request-schema,
+Draft continuation and immutable Preview; waveform choice remains unchanged.
+Conflicting/duplicate/undisclosed/native inputs fail before mutation, and all
+three modification policies retain their existing gates. Original public parser
+RED is retained; the first corrected full public lifecycle control passed, and
+the full host-business selection passed 120 fake tests before final fixture
+format alignment.
+
+A separate source defect remains owned by #193: generic tone verification accepts
+the result schema with verified=false even without an output WAV. Independent
+simulated file observations do not establish product effect proof. The exact
+remote empty-choice and artifact-verifier criteria were copied additively to
+local ticket19; complete bounded artifact/effect verification, matching native
+evidence, complete WAL delivery and remaining host contracts stay open. No
+native/Console/Authoring/Fresh launch or generated inventory update occurred.
+
+The final explicit-collection source selection passed 124 fake tests, including
+the complete host-business file, existing isolated transaction verifier boundary,
+exact adapter registration, operation catalog and reviewed schema seal. It grants
+closed-input construction/policy evidence only; tone artifact/effect and native
+verification remain pending implementation and acceptance under #193.
+
+
+## #193 bounded Tone artifact verifier checkpoint
+
+The successor to host-collection source `4f366334` adds exact-target prestate and
+prewrite guards plus independent bounded RIFF/PCM16/float32/header/frame/silent
+channel/empty-cue observations through the existing public transaction and
+artifact seams. Known incorrect or missing artifacts fail instead of receiving
+schema-only success. Valid unchanged output may verify its requested observable
+state, retaining separate `created`/`changed` facts. Synthetic full-chain tests
+establish implementation behavior only; no native, Fresh, family seal or whole
+#193 credit is asserted. Active signals, fractional rounding, populated marker
+semantics and anonymous/Ambisonic encodings remain explicitly incomplete.
+
+The public large-marker reproduction establishes a further #193 terminal
+capacity defect (`VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED` after one dispatch),
+without changing output allowances. Its implementation follows this coherent
+checkpoint; downstream Broker/archive delivery remains additionally owned by
+#194. Full #193/WAL and #188 state/native scope stay open. Original REDs and
+intermediate compatibility failures are retained in separate `/tmp/waapi-tone-*`
+roots and the worker handoff; no native process or launch was used.
 
 The sixth combined integration preserves every original native ID/shape/owner,
 all ten independent catalog seals, five original definitions, detailed native

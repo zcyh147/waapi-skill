@@ -143,6 +143,18 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **({"tone_artifact_verification": {
+                "owned_output": "one exact regular file inside the existing isolated output directory",
+                "maximum_artifact_bytes": 536870912,
+                "maximum_riff_chunks": 4096,
+                "maximum_marker_count": 128,
+                "maximum_marker_list_bytes": 131072,
+                "sample_inspection": "all frames; bounded blocks; no raw audio in results",
+                "unchanged_valid_output": "observable requested state may verify; created/changed are reported separately",
+                "partial_postconditions": ["active waveform/frequency/envelope", "fractional rate/frame rounding",
+                    "populated marker positions/encoding", "anonymous/Ambisonic or unlabelled multichannel representation"],
+                "limits_are_gateway_resources_not_native_absence": True,
+            }} if operation == 'ak.wwise.debug.generateToneWAV' else {}),
             **(
                 {
                     "discard_unsaved_default": False,
@@ -259,6 +271,10 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         }
         if field_type == "channel_index_list":
             result["range"] = [0, 63]
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "leave the channel selection unspecified; native default uses all channels"
+            result["explicit_empty"] = "apply the requested waveform to no channels; retain the waveform choice"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
         return result
     if field_type == "platform_creation_mappings":
         return {
@@ -272,6 +288,10 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             "flag": "--marker",
             "arguments": ["<position-seconds>", "[exact-label]"],
             "repeatable": True,
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "leave markers unspecified",
+            "explicit_empty": "request an explicit empty marker list",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     result = {
         "flag": "--value",
