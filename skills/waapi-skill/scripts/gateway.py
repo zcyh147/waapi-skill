@@ -19418,8 +19418,10 @@ def dispatch_business_field_discovery(
         restrictions = dict(bound.restrictions)
         value_input = field_value_input(session, bound, choice_limit=20 if detail_projection is not None else None)
         if binding.record.operation in {"object.create", "object.set"} and bound.field_kind == "reference":
-            value_input["accepted_forms"] = ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"]
-            value_input["maximum_array_members"] = 32
+            value_input["accepted_forms"] = ["bound_object_handle", "null_to_clear_reference"]
+            if binding.record.operation == "object.set":
+                value_input["accepted_forms"].append("json_array_of_bound_object_handles")
+                value_input["maximum_array_members"] = 32
         label_detail = "metadata_detail.field.choices" if detail_projection is not None else "metadata.restriction.values"
         if "enum_labels" in restrictions:
             restrictions["enum_labels"] = [dict(row) for row in restrictions["enum_labels"]]

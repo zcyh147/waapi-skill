@@ -31,7 +31,7 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project
 from .canonical import canonical_json_bytes, canonical_sha256
-from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches
+from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
@@ -818,6 +818,12 @@ _OBJECT_CREATE_TYPE_TOKEN_DESCRIPTION = (
     "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, but its "
     "object.create request token remains ActorMixer."
 )
+_OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
+    "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
+                   "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"}]}},
+}
+
 _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
     "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
@@ -874,7 +880,7 @@ _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         "name": {"type": "string", "minLength": 1},
         "notes": {"type": "string"},
         "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-        "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
+        "references": {"type": "array", "items": _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
             "description": "Recursive closed object-node DSL; depth 8 and 128 total nodes.",
@@ -2285,7 +2291,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 },
                 "notes": {"type": "string"},
                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-                "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
+                "references": {"type": "array", "items": _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                 "list": _OBJECT_LIST_NAME_SCHEMA,
                 "auto_add_to_source_control": {"type": "boolean", "default": False},
@@ -14567,7 +14573,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read, version=copy_move_collision_guard.get("snapshot_version"))
             except LifecycleGraphError as exc:
                 observed = {"error": str(exc)}
-            assertions.append({"name": "copy/move " + label + " is unchanged", "passed": observed == expected,
+            assertions.append({"name": "copy/move " + label + " is unchanged", "passed": lifecycle_snapshot_equal(observed, expected),
                                "evidence": {"expected": expected, "actual": observed}})
 
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
@@ -18680,7 +18686,7 @@ def verify_prepared_operation(
                     remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read, version=plan.get("snapshot_version"))
                 except LifecycleGraphError as exc:
                     remaining_source = {"error": str(exc)}
-                check("copy leaves its complete source subtree unchanged", remaining_source == source_snapshot,
+                check("copy leaves its complete source subtree unchanged", lifecycle_snapshot_equal(remaining_source, source_snapshot),
                       {"expected": source_snapshot, "actual": remaining_source})
             old_ids = [row["id"] for row in replaced_snapshot]
             for offset in range(0, len(old_ids), MULTI_IDENTITY_READ_MAX_IDS):
@@ -21256,11 +21262,13 @@ def _validate_nested_request_shape(
             if key in arguments
         }
         try:
-            normalize_object_tree(
+            normalized = normalize_object_tree(
                 node,
                 on_name_conflict=conflict,
                 replace_owned=replace_owned_root_supplied,
             )
+            if any(isinstance(reference.target, tuple) for item in normalized.nodes for reference in item.references):
+                raise OperationContractError("NATIVE_VALUE_UNION_UNAVAILABLE", "Pinned object.create propertyValue accepts scalar references or null, never arrays.")
         except ObjectOperationContractError as exc:
             raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         return

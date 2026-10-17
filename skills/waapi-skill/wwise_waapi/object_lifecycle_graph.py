@@ -1,6 +1,7 @@
 """Bounded native graph snapshots for copy/move preparation and verification."""
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Callable, Mapping
 
@@ -32,6 +33,37 @@ def _rows(result: Mapping[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(rows, list) or not all(isinstance(row, Mapping) for row in rows):
         raise LifecycleGraphError("Lifecycle graph read requires a complete object array")
     return [dict(row) for row in rows]
+
+
+def lifecycle_snapshot_equal(actual: Any, expected: Any) -> bool:
+    """Preserve Boolean identity while allowing numeric int/float equivalence."""
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return isinstance(actual, bool) and isinstance(expected, bool) and actual is expected
+    if isinstance(actual, Mapping) or isinstance(expected, Mapping):
+        return (isinstance(actual, Mapping) and isinstance(expected, Mapping)
+                and actual.keys() == expected.keys()
+                and all(lifecycle_snapshot_equal(actual[key], expected[key]) for key in actual))
+    if isinstance(actual, list) or isinstance(expected, list):
+        return (isinstance(actual, list) and isinstance(expected, list) and len(actual) == len(expected)
+                and all(lifecycle_snapshot_equal(left, right) for left, right in zip(actual, expected)))
+    return actual == expected
+
+
+def _require_scalar_value(value: Any, metadata_type: str) -> None:
+    kind = metadata_typed_value_type(metadata_type)
+    if kind == "number":
+        try:
+            valid = not isinstance(value, bool) and isinstance(value, (int, float)) and math.isfinite(float(value))
+        except (OverflowError, ValueError):
+            valid = False
+    elif kind == "integer":
+        valid = isinstance(value, int) and not isinstance(value, bool)
+    elif kind == "boolean":
+        valid = isinstance(value, bool)
+    else:
+        valid = kind == "string" and isinstance(value, str)
+    if not valid:
+        raise LifecycleGraphError("Lifecycle scalar read does not match its exact live metadata type")
 
 
 def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = None) -> list[dict[str, Any]]:
@@ -139,6 +171,8 @@ def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = N
             for name in chunk:
                 if "@" + name not in observed[0]:
                     raise LifecycleGraphError("Lifecycle field read omitted a discovered field")
+                if name not in reference_fields:
+                    _require_scalar_value(observed[0]["@" + name], field_types[name])
                 values[name] = observed[0]["@" + name]
         row["field_values"] = values
         row["reference_fields"] = reference_fields
@@ -161,6 +195,8 @@ def capture_lifecycle_graph(root_id: str, *, read: Read, version: str | None = N
                     for name in chunk:
                         if "@" + name not in observed[0]:
                             raise LifecycleGraphError("Lifecycle platform read omitted a discovered field")
+                        if name not in reference_fields:
+                            _require_scalar_value(observed[0]["@" + name], field_types[name])
                         platform_values[name] = observed[0]["@" + name]
                 for name in sorted(names):
                     if link_support[name] is False:
@@ -220,7 +256,7 @@ def lifecycle_graph_matches(source: list[dict[str, Any]], actual: list[dict[str,
                            for name, raw in row["field_values"].items()}
         observed_values = {name: (value(raw, translate=False) if name in other["reference_fields"] else raw)
                            for name, raw in other["field_values"].items()}
-        if expected_values != observed_values:
+        if not lifecycle_snapshot_equal(expected_values, observed_values):
             return False
         platform_observation = row.get("platform_observation")
         other_observation = other.get("platform_observation")
@@ -235,7 +271,7 @@ def lifecycle_graph_matches(source: list[dict[str, Any]], actual: list[dict[str,
                           for name, raw in values.items()} for platform, values in platform_observation["values"].items()}
             observed_values = {platform: {name: value(raw, translate=False) if name in other["reference_fields"] else raw
                                for name, raw in values.items()} for platform, values in other_observation.get("values", {}).items()}
-            if translated != observed_values:
+            if not lifecycle_snapshot_equal(translated, observed_values):
                 return False
         elif other_observation is not None:
             return False

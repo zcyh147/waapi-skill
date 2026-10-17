@@ -699,9 +699,18 @@ def test_create_reference_unions_use_class_field_evidence_and_exact_bound_target
     code, declared = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
                                "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList",
                                "--field-value", field, json.dumps(value))
+    if form != "null":
+        if code == 0:
+            _, shown = task.preview()
+            prepared = shown["artifact"]["prepared_operation"]
+            pytest.fail("Unsupported create array accepted: " + json.dumps({"dispatch": prepared["dispatch"],
+                        "semantic_preview": prepared["semantic_preview"]}))
+        assert code == 2 and declared["error_code"] == "NATIVE_VALUE_UNION_UNAVAILABLE", declared
+        assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
+        return
     assert code == 0, declared
     tx, shown = task.preview()
-    expected = [SECOND, FIRST] if form == "array" else [] if form == "empty-array" else None
+    expected = None
     assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["@Targets"] == expected
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, json.dumps(verified)

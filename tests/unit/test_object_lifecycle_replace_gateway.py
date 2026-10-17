@@ -279,6 +279,14 @@ class PlatformReplaceTask(ReplaceTask):
                 self.platform_values[child_id][PLATFORMS[1]["id"]] = -100.0
             elif self.failure == "wrong-platform-link":
                 self.platform_links[child_id][PLATFORMS[1]["id"]] = True
+            elif self.failure == "default-number-bool":
+                self.objects[child_id]["@Volume"] = True
+            elif self.failure == "platform-number-bool":
+                self.platform_values[child_id][PLATFORMS[1]["id"]] = True
+            elif self.failure == "default-number-float":
+                self.objects[child_id]["@Volume"] = 1.0
+            elif self.failure == "platform-number-float":
+                self.platform_values[child_id][PLATFORMS[1]["id"]] = 1.0
         if uri.endswith("object.get") and options.get("platform") is not None:
             for row in result["return"]:
                 row["@Volume"] = self.platform_values[row["id"]][options["platform"]]
@@ -379,3 +387,61 @@ def test_2021_platform_discovery_is_a_bounded_fixed_live_type_read(tmp_path: Pat
                if uri.endswith("object.get") and args.get("from") == {"ofType": ["Platform"]}]
     assert queries and all(args == {"from": {"ofType": ["Platform"]}, "transform": [{"range": [0, 33]}]}
                            and options == {"return": ["id", "name"]} for args, options in queries)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+@pytest.mark.parametrize("view", ("default", "platform"))
+def test_replace_does_not_equate_numeric_one_with_boolean_readback(
+    tmp_path: Path, version: str, operation: str, view: str,
+) -> None:
+    task = PlatformReplaceTask(tmp_path, version, operation)
+    task.objects[SOURCE_CHILD]["@Volume"] = 1
+    task.platform_values[SOURCE_CHILD][PLATFORMS[1]["id"]] = 1
+    task.declare()
+    tx, shown = task.preview()
+    task.failure = view + "-number-bool"
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verification"]["status"] == "verification_failed", verified
+    assert any(not assertion["passed"] for assertion in verified["verification"]["assertions"])
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("view", ("default", "platform"))
+def test_replace_prewrite_guard_rejects_numeric_one_becoming_boolean(
+    tmp_path: Path, version: str, view: str,
+) -> None:
+    task = PlatformReplaceTask(tmp_path, version, "object.copy")
+    task.objects[SOURCE_CHILD]["@Volume"] = 1
+    task.platform_values[SOURCE_CHILD][PLATFORMS[1]["id"]] = 1
+    task.declare()
+    tx, shown = task.preview()
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if view == "default":
+        task.objects[SOURCE_CHILD]["@Volume"] = True
+    else:
+        task.platform_values[SOURCE_CHILD][PLATFORMS[1]["id"]] = True
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("metadata_type", ("Real64", "Int32"))
+@pytest.mark.parametrize("view", ("default", "platform"))
+def test_replace_numeric_equivalence_requires_the_exact_live_scalar_type(
+    tmp_path: Path, metadata_type: str, view: str,
+) -> None:
+    task = PlatformReplaceTask(tmp_path, "2025.1", "object.copy")
+    task.metadata["Volume"]["type"] = metadata_type
+    for row in task.objects.values():
+        row["@Volume"] = 1
+    for values in task.platform_values.values():
+        values.update({platform["id"]: 1 for platform in PLATFORMS})
+    task.declare()
+    tx, shown = task.preview()
+    task.failure = view + "-number-float"
+    code, verified = task.finish(tx, shown)
+    expected_status = "indeterminate" if metadata_type == "Real64" else "verification_failed"
+    assert code == 2 and verified["verification"]["status"] == expected_status, verified
+    assert all(row["passed"] for row in verified["verification"]["assertions"]) is (metadata_type == "Real64")

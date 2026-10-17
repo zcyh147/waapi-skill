@@ -371,8 +371,8 @@ def object_graph_business_contract_data(
             },
             "bound_field_handle_container": "field_values",
             "reference_values": {
-                "forms": ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"],
-                "maximum_array_members": 32,
+                "forms": ["bound_object_handle", "null_to_clear_reference"],
+                "native_value_boundary": "pinned_propertyValue_is_scalar_or_null;_array_inline_and_curve_values_require_an_available_object.set_lane",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
             },
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),

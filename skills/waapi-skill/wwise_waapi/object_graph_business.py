@@ -326,7 +326,7 @@ def _compile_set_new_node(
     node = {
         "type": _resolve_native_object_type(session, declaration.target.kind),
         "name": declaration.target.name,
-        **_compile_create_fields(session, base),
+        **_compile_create_fields(session, base, allow_reference_arrays=True),
     }
     platform = extension_fields.get("platform")
     if platform is not None:
@@ -481,7 +481,10 @@ def _resolve_native_object_type(
     return kind.native_object_type
 
 
-def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any) -> dict[str, Any]:
+def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *, allow_arrays: bool) -> dict[str, Any]:
+    if isinstance(value, list) and not allow_arrays:
+        raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
+                      action="object.create accepts one bound reference or null; reference arrays belong to available object.set lanes")
     if value is None:
         return {"name": field.token, "target": None}
     values = value if isinstance(value, list) else [value]
@@ -499,6 +502,7 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
 def _compile_create_fields(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
+    *, allow_reference_arrays: bool = False,
 ) -> dict[str, Any]:
     fields = dict(declaration.fields)
     unexpected = sorted(set(fields) - _CREATE_FIELDS)
@@ -671,7 +675,7 @@ def _compile_create_fields(
             normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            references.append(_compile_graph_field_reference(session, field, business_value))
+            references.append(_compile_graph_field_reference(session, field, business_value, allow_arrays=allow_reference_arrays))
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -1117,7 +1121,7 @@ def _compile_existing_set_fields(
         target=declaration.target,
         fields=stable_fields,
     )
-    compiled = _compile_create_fields(session, stable_declaration)
+    compiled = _compile_create_fields(session, stable_declaration, allow_reference_arrays=True)
     if "name_conflict" in fields:
         conflict = fields["name_conflict"]
         if conflict not in {"fail", "rename", "merge", "replace"}:
@@ -1270,7 +1274,7 @@ def _compile_existing_set_fields(
             normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            references.append(_compile_graph_field_reference(session, field, business_value))
+            references.append(_compile_graph_field_reference(session, field, business_value, allow_arrays=True))
     _validate_compiled_field_limit(
         session,
         properties=properties,
