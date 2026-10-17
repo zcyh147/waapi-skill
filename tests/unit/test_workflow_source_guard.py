@@ -1088,3 +1088,73 @@ def test_short_id_diagnostic_uses_actual_gateway_and_retains_unsigned_miss(tmp_p
         receipt = next(receipt for receipt in evidence["receipts"] if f"{number}.0" in str(receipt["argv"]))
         assert receipt["exit_code"] == 2
         assert receipt["payload"]["call"]["error_code"] == "RuntimeError"
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("family", ("Switch", "State"))
+def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, workflow, version, family):
+    from copy import deepcopy
+    from tests.unit.test_new_object_conditions_gateway import (
+        ProspectiveReferenceTask, HIERARCHY_GROUP, HIERARCHY_TARGET, CREATED,
+    )
+    from tests.unit.test_field_interface_closure_gateway import FIRST
+
+    class Client(ProspectiveReferenceTask):
+        def call(self, uri, args=None, options=None):
+            if uri.endswith("object.get"):
+                expression = args.get("waql", "")
+                if expression == f"from type {family} take 1":
+                    self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                    rows = [self.objects[HIERARCHY_TARGET]]
+                elif expression.startswith('from object "'):
+                    self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                    rows = [self.objects[expression.split('"')[1]]]
+                else:
+                    result = super().call(uri, args, options)
+                    rows = result["return"]
+                return {"return": [{key: deepcopy(row[key[1:] if key.startswith("@") else key])
+                    for key in options["return"] if (key[1:] if key.startswith("@") else key) in row}
+                    for row in rows]}
+            return super().call(uri, args, options)
+
+    client = Client(tmp_path, version, state=family == "State")
+    client.types += [{"classId": 10, "name": family, "type": "WObject"},
+                     {"classId": 11, "name": family + "Group", "type": "WObject"}]
+    client.objects[FIRST]["path"] = (workflow.CONTAINERS_PARENT if version == "2025.1"
+                                      else workflow.ACTOR_MIXER_PARENT)
+    client.calls.clear()
+    evidence_root = tmp_path / "dispatcher"
+    evidence_root.mkdir()
+    runtime = SimpleNamespace(version=version, candidate="a" * 40, state_dir=tmp_path / "state",
+        category_results=[], env={**client.env, "WWISE_EVIDENCE_DIR": str(evidence_root)},
+        lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"),
+        port=31337, sandbox=SimpleNamespace(metadata=SimpleNamespace(get_info_version={"fixture": version})))
+    commands = []
+
+    def gateway(command):
+        commands.append(list(command))
+        workflow.waapi_gateway.build_parser().parse_args(list(command))
+        return workflow.waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: client)
+
+    runtime.raw_gateway = gateway
+    workflow.test_prospective_group_default_native_acceptance(runtime, family)
+    category, = runtime.category_results
+    evidence = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "PASS"
+    assert evidence["independent_readback"]["id"] == CREATED
+    assert evidence["selected_target"]["id"] == HIERARCHY_TARGET
+    assert evidence["selected_group"]["id"] == HIERARCHY_GROUP
+    assert evidence["source_rule"]["version"] == version
+    assert len(evidence["source_rule"]["sha256"]) == 64
+    writes = [(uri, args) for uri, args, _ in client.calls if uri.endswith(
+        ("object.create", "object.set", "setReference", "setProperty"))]
+    assert len(writes) == 1 and writes[0][0].endswith("object.create")
+    assert writes[0][1]["@SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+    assert writes[0][1]["@DefaultSwitchOrState"] == HIERARCHY_TARGET
+    assert sum(command[0] == "execute" for command in commands) == 1
+    assert any(command[:3] == ["query-object", "--custom-kind", family] for command in commands)
+    independent = next(i for i, command in enumerate(commands) if command[:3] == ["query-object", "--exact-id", CREATED])
+    assert independent > next(i for i, command in enumerate(commands) if command[0] == "verify")
+    assert commands[independent].count("--include-field") == 2
+    assert evidence["lifecycle_acceptance"].startswith("Requires the final")
