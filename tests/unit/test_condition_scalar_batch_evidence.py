@@ -208,3 +208,20 @@ def test_exact_source_model_runs_the_public_field_workflow(tmp_path, version, co
     writes = [args for uri, args, _ in task.calls if uri.endswith("setProperty")]
     assert writes == [{"object": FIRST, "property": model["field"], "value": model["requested"]}]
     assert model["provenance"]["dependent_type"] == "exact_installed_parent_Property_Type"
+
+
+def test_integer_field_with_real_range_uses_an_integer_public_change(tmp_path):
+    from tests.unit.test_scalar_condition_product_gateway import run_scalar_public_group
+    manifest = batch.scalar_manifest(Path(__file__).parents[2])
+    plan = batch.scalar_plan(manifest)
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'GameAuxSendHPF')
+    assert group['model']['metadata']['GameAuxSendHPF']['type'] == 'int16'
+    assert group['model']['metadata']['GameAuxSendHPF']['restriction'] == {'type': 'range', 'min': 0.0, 'max': 100.0}
+    assert type(group['model']['requested']) is int
+    assert group['model']['requested'] == 100
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    assert len(observed['workflows']) == 1
+    actual = next(iter(observed['workflows'].values()))
+    assert actual['native_call']['args']['value'] == 100
+    assert type(actual['native_call']['args']['value']) is int
+    assert actual['gateway']['payload']['verified'] is True

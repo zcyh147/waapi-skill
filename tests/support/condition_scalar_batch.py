@@ -286,7 +286,17 @@ def scalar_model(case: dict) -> dict:
         if limits.get("type") == "enum":
             requested = next((v["value"] for v in limits["values"] if v["value"] != before), before)
         elif limits.get("type") == "range":
-            requested = limits["min"] if before != limits["min"] else limits["max"]
+            minimum, maximum = limits["min"], limits["max"]
+            # A source restriction may use Real64 bounds on an int16 field.
+            # Keep the original restriction and choose an actual field value.
+            if field_type.lower().startswith(("int", "uint")):
+                bits = int(re.search(r"[0-9]+$", field_type)[0])
+                unsigned = field_type.lower().startswith("uint")
+                domain_min, domain_max = (0, 2 ** bits - 1) if unsigned else (-(2 ** (bits - 1)), 2 ** (bits - 1) - 1)
+                minimum, maximum = max(domain_min, math.ceil(minimum)), min(domain_max, math.floor(maximum))
+                if minimum > maximum:
+                    raise ValueError("source field restriction has no representable integer witness")
+            requested = minimum if before != minimum else maximum
         else:
             requested = 1 if before != 1 else 0
     return {"field": field, "controller": controller,
