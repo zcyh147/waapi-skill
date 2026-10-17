@@ -29,3 +29,45 @@ Users can inspect and manipulate the reflected ordinary Authoring layouts and vi
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Partial source milestones (2026-10-17)
+
+All acceptance boxes remain open. The immutable source milestones are
+`bf69ec098a88cf76728a64206a5ba3cc9fd0a302` (seven closed reads, scoped handles,
+switch, empty temporary registration/removal, expired-handle reclamation and
+integration-test repairs), `9c7c15562dc06169ae1faaf65d2acc3fb4d4859f`
+(get-or-create view), and `f414c536867ed5a4ea34586846dc77574c59b78d`
+(2025-only close view). These are implementation milestones, not ticket or native
+write acceptance.
+
+The public path is `request-schema` followed by its disclosed `layout-read` or
+Draft continuation. Mutations take discovered layout/view handles and business
+choices. The Gateway owns native identities, payloads, Preview, authorization,
+execution revalidation and independent readbacks. Get-or-create preserves omitted
+coordinates and verifies reused identities or applicable explicit coordinates.
+Close observes exact disappearance with at most sixteen polls, preserves an
+explicit `pending_async_close` outcome and never repeats the write. Its 2024
+absence is checked against the independently reflected native catalog.
+
+Focused source validation for close passed 179 cases across the full layout
+mutation file, affected UI profiles/catalogs, and source inventory/release seams;
+its final public handle-role and asynchronous controls passed 9 cases. Those
+runs used the same runtime source later committed as `f414c536`; the latter test
+run added handle-role controls and a stronger exact pending-result assertion.
+Stored combined inventories remain the integration owner's regeneration task.
+
+Owned 2024.1/2025.1 public read observations and exact missing-layout errors have
+been captured with original projects and source seals unchanged. They do not
+prove setLayout input acceptance or any layout/view write effect. Contradictory
+native UI definitions, capital `OneOf`, omitted children and mismatched serialized
+fields remain preserved and unresolved. No definition branch has been removed,
+normalized globally or credited as native absence.
+
+Remaining work includes the full nested setLayout grammar, dock/undock/splitter,
+2025 reset omission/empty/list alternatives, exact reviewed interpretation of
+contradictory definitions, owned native write/resource-lifetime observations,
+category-v3 observation linkage and exact #176 branch bindings/requirements.
+The empty-registration seam does not establish complete layout construction.
+Native runs stay sequential and grouped under the existing lifecycle; additional
+Authoring launches are on hold because they require user interaction with access
+permission windows. Fresh semantic execution remains unauthorized.
