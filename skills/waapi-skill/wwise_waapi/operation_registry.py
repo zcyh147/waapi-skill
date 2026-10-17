@@ -292,6 +292,8 @@ PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_
         REMOTE_GET_CONNECTION_STATUS_URI,
         TRANSPORT_GET_LIST_URI,
         TRANSPORT_GET_STATE_URI,
+        "ak.soundengine.getState",
+        "ak.soundengine.getSwitch",
         UI_COMMAND_GET_COMMANDS_URI,
     }
 )
@@ -9176,6 +9178,26 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                         "value_id": roles[value_role].object,
                     },
                 )
+        if api in {"ak.soundengine.setState", "ak.soundengine.setSwitch"}:
+            is_state = api.endswith("setState")
+            if request.version != "2021.1" and (is_state or "gameObject" in call_args):
+                group_field = "stateGroup" if is_state else "switchGroup"
+                verification = {
+                    "kind": "soundengine-state-effect", "uri": api, "version": request.version,
+                    "getter_uri": "ak.soundengine.getState" if is_state else "ak.soundengine.getSwitch",
+                    "getter_args": {group_field: call_args[group_field],
+                        **({"gameObject": call_args["gameObject"]} if not is_state else {})},
+                    "getter_options": {"return": ["id"]},
+                    "expected_value_id": call_args["state" if is_state else "switchState"],
+                    "observation_delay_seconds": 0.01,
+                }
+            else:
+                verification["business_observation_boundary"] = (
+                    "Matching 2021.1 WAAPI state/switch observer remains unresolved; SDK Query APIs exist but are not a Gateway route."
+                    if request.version == "2021.1" else
+                    "The setter's omitted transport-game-object scope is not proven equal to the getter's omitted scope."
+                )
+                warnings.append(verification["business_observation_boundary"])
         metadata["execution_contract"] = execution_contract
     elif request.operation in {
         "lua.executeCliFile",
@@ -16145,6 +16167,32 @@ def verify_prepared_operation(
         business_state_verified = False
         success_status = 'result_schema_checked'
         verification_strength = 'documented_cli_process_outcome'
+    elif kind == "soundengine-state-effect":
+        check_result_schema(plan["uri"], plan["version"])
+        roles = validate_prepared_roles(prepared, read_call=read_call)
+        readbacks.extend(roles.get("readbacks", ()))
+        check("Exact bound group and value identities still match the immutable Preview", roles.get("ok") is True, roles)
+        if roles.get("ok") is True:
+            # The matching getState documentation permits a brief asynchronous
+            # update delay. Observe once after a bounded 10ms settling interval;
+            # neither the original write nor a mismatching observation is retried.
+            time.sleep(plan["observation_delay_seconds"])
+            observed = read_call(plan["getter_uri"], plan["getter_args"], plan["getter_options"])
+            readbacks.append({"uri": plan["getter_uri"], "args": plan["getter_args"],
+                "options": plan["getter_options"], "result": observed})
+            try:
+                validation = validate_semantic_result(plan["getter_uri"], observed, version=plan["version"])
+            except SemanticValidationError as exc:
+                check("Independent SoundEngine observation matches its reflected result contract", False, exc.as_dict())
+            else:
+                check("Independent SoundEngine observation matches its reflected result contract", True, validation.as_dict())
+            value = observed.get("return") if isinstance(observed, Mapping) else None
+            actual_id = value.get("id") if isinstance(value, Mapping) else None
+            check("Independent runtime group value matches the requested State or Switch identity",
+                _valid_object_id(actual_id) and _same_identity(actual_id, plan["expected_value_id"]),
+                {"expected_value_id": plan["expected_value_id"], "actual_value_id": actual_id,
+                    "scope": plan["getter_args"]})
+        verification_strength = "independent_soundengine_state_observation"
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False

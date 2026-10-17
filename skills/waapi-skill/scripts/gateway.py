@@ -22111,6 +22111,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "automatic_retry": False,
             }
         transport_lifetime_error = None
+        soundengine_observation_authority_error = None
         try:
             if request_payload.get("arguments", {}).get("api") == TRANSPORT_CREATE_URI:
                 try:
@@ -22123,6 +22124,17 @@ def _dispatch_transaction_command_with_execution_lease(
                     if exc.error_code not in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}:
                         raise
                     transport_lifetime_error = exc
+            if prepared.get("verification_plan", {}).get("kind") == "soundengine-state-effect":
+                try:
+                    current_authority = soundengine_authority_snapshot(
+                        request_payload, state_dir=store.state_dir,
+                        context=_runtime_game_object_context_from_live(endpoint=common["endpoint"], project=project,
+                            detected_version=detected_version, live_info=live_info))
+                    if prepared.get("pre_state", {}).get("soundengine_authority") != current_authority:
+                        raise RuntimeGameObjectHandleError("SOUNDENGINE_AUTHORITY_GENERATION_DRIFT",
+                            "The executed state/switch scope no longer binds its original runtime capability generation.")
+                except (RuntimeGameObjectHandleError, RuntimePlayingHandleError) as exc:
+                    soundengine_observation_authority_error = exc
             if transport_lifetime_error is not None:
                 verification = VerificationResult(
                     operation="waapi.call", status="verification_failed",
@@ -22131,6 +22143,14 @@ def _dispatch_transaction_command_with_execution_lease(
                             "native_same_id_row_is_not_lifetime_proof": True}},),
                     message="The executed transport lifetime was retired or replaced; its business state is not verified.",
                     verification_strength="gateway_transport_lifetime_invalidated", business_state_verified=False)
+            elif soundengine_observation_authority_error is not None:
+                verification = VerificationResult(
+                    operation="waapi.call", status="verification_failed",
+                    assertions=({"name": "Runtime observation retains the execution-bound game-object generation", "passed": False,
+                        "evidence": {"error_code": soundengine_observation_authority_error.error_code,
+                            "message": str(soundengine_observation_authority_error)}},),
+                    message="The original runtime scope cannot be revalidated; no later getter value certifies its effect.",
+                    verification_strength="soundengine_observation_authority_unavailable", business_state_verified=False)
             else:
                 verification = verify_prepared_operation(
                     prepared,
@@ -22177,6 +22197,8 @@ def _dispatch_transaction_command_with_execution_lease(
             "verification": verification.as_dict(),
             **({"error_code": transport_lifetime_error.error_code, "message": str(transport_lifetime_error)}
                 if transport_lifetime_error is not None else {}),
+            **({"error_code": soundengine_observation_authority_error.error_code, "message": str(soundengine_observation_authority_error)}
+                if soundengine_observation_authority_error is not None else {}),
             "guard_validation": guard_validation,
             "project_call": project_call,
             "executed": True,
