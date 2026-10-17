@@ -66,6 +66,7 @@ from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
     condition_values_equal,
+    is_terminal_override_dependency,
     reference_allowed_types,
     reference_type_token,
 )
@@ -7318,11 +7319,7 @@ def _apply_reference_activation_dependencies(
     activation_names: list[str] = []
     seen_dependencies: set[str] = set()
     for index, dependency in enumerate(metadata.dependencies):
-        # Wwise marks the positioning override switch with its own override
-        # descriptor. It is the terminal switch, not another activation edge.
-        if (metadata.name == "OverridePositioning" and metadata.type.casefold() == "bool"
-                and dependency == {"type": "override", "action": "Enable",
-                                   "property": "OverridePositioning", "context": "Self"}):
+        if is_terminal_override_dependency(metadata.name, metadata.type, dependency):
             continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
@@ -7452,6 +7449,9 @@ def _apply_reference_activation_dependencies(
         if dependency_type == "property":
             from .metadata_restrictions import condition_restriction, condition_matches, intersect_condition_restrictions, MetadataRestrictionError
             try:
+                if action == "Show" and context in {"Self", "Parent", "AssocParent"}:
+                    condition_restriction(dependency.get("conditions"))
+                    continue
                 restriction = intersect_condition_restrictions([
                     condition_restriction(item.get("conditions"))
                     for source in (metadata, *_condition_sources)
@@ -7465,11 +7465,6 @@ def _apply_reference_activation_dependencies(
                 code = "REFERENCE_DEPENDENCY_CONFLICT" if exc.error_code == "CONDITION_CONFLICT" else "CONSTRAINED_REFERENCE_BOUNDARY"
                 raise OperationContractError(code, str(exc),
                     details={"reference": metadata.name, "property": property_name}) from exc
-            # Show controls the native editor's visibility. It conveys no
-            # authority to change the controlling property, on this object or
-            # a related one. Its exact metadata is still sealed and rechecked.
-            if action == "Show" and context in {"Self", "Parent", "AssocParent"}:
-                continue
             supplied = next((spec for spec in property_specs
                              if str(spec.get("name", "")).casefold() == property_name.casefold()), None)
             if supplied is not None:

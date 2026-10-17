@@ -117,6 +117,13 @@ def condition_values_equal(left: Any, right: Any) -> bool:
     return type(left) is type(right) and left == right
 
 
+def is_terminal_override_dependency(name: str, metadata_type: str, dependency: Mapping[str, Any]) -> bool:
+    """A Boolean switch's exact self override is a terminal metadata marker."""
+    return metadata_type.casefold() in {"bool", "boolean"} and dependency == {
+        "type": "override", "action": "Enable", "context": "Self", "property": name,
+    }
+
+
 def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
     """Evaluate a validated scalar condition with Boolean/number distinction."""
     if restriction["type"] == "enum":

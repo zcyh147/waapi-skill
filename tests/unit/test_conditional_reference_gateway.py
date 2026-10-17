@@ -239,12 +239,14 @@ def test_exact_false_condition_is_not_guessed_as_true(tmp_path: Path, version: s
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_terminal_override_is_editable_through_separate_property_preview(tmp_path: Path, version: str):
+@pytest.mark.parametrize("name", ["OverridePositioning", "OverrideOutput"])
+def test_terminal_override_is_editable_through_separate_property_preview(tmp_path: Path, version: str, name: str):
     task = AttenuationTask(tmp_path, version, operation="object.setProperty")
-    task.metadata["OverridePositioning"]["dependencies"] = [{
-        "type": "override", "action": "Enable", "context": "Self", "property": "OverridePositioning"}]
+    task.metadata[name] = {"name": name, "type": "bool", "dependencies": [{
+        "type": "override", "action": "Enable", "context": "Self", "property": name}]}
+    task.objects[FIRST][name] = False
     target = task.bind(FIRST)
-    field = task.discover(target, "OverridePositioning")
+    field = task.discover(target, name)
     code, declared = task.step("draft-declare-field-change", "--object-handle", target,
                               "--field-handle", field, "--business-value", "true")
     assert code == 0, declared
@@ -261,7 +263,7 @@ def test_terminal_override_is_editable_through_separate_property_preview(tmp_pat
     assert code == 0, executed
     code, verified = task.run("verify", tx)
     assert code == 0 and verified["verified"] is True, verified
-    assert task.objects[FIRST]["OverridePositioning"] is True
+    assert task.objects[FIRST][name] is True
     assert task.objects[FIRST]["Attenuation"] is None
     assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls) == 1
 
@@ -655,7 +657,8 @@ def test_satisfied_numeric_condition_preserves_native_value_across_json_reads(tm
 
 @pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("context", ["Self", "Parent"])
-def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tmp_path, version, context):
+@pytest.mark.parametrize("visibility_values", [(1,), (0, 1)])
+def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tmp_path, version, context, visibility_values):
     task = AttenuationTask(tmp_path, version, operation="object.setProperty")
     task.metadata = {
         "SlewRateUp": {"name": "SlewRateUp", "type": "Real64", "dependencies": [{
@@ -665,6 +668,11 @@ def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tm
         }]},
         "RTPCRamping": {"name": "RTPCRamping", "type": "int16"},
     }
+    dependency = task.metadata["SlewRateUp"]["dependencies"][0]
+    task.metadata["SlewRateUp"]["dependencies"] = [
+        {**deepcopy(dependency), "conditions": [{"restriction": {"type": "enum", "values": [{"value": value}]}}]}
+        for value in visibility_values
+    ]
     task.objects[FIRST].update(SlewRateUp=0.0, RTPCRamping=0)
     target = task.bind(FIRST)
     field = task.discover(target, "SlewRateUp")
