@@ -13737,8 +13737,6 @@ def dispatch_command(
                 raise GatewayInputError('This transaction owns no Authoring creation resource')
             boundary = live_authoring_api_boundary(operation, command=args.command, live_info=live_info, common=common)
             if boundary is not None: return boundary
-            if detected_version not in MODEL_VERSIONS or request.get('version') != detected_version:
-                raise GatewayInputError('Resource recovery requires its original supported Authoring version and unchanged configuration/host/session/project')
             events = [event for event in transaction_store.read_events(args.transaction_id) if event.get('event_type') == 'execution_completed']
             if len(events) != 1:
                 raise GatewayInputError('Resource recovery requires exactly one sealed successful native execution; never repeat creation')
