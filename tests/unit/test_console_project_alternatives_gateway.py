@@ -58,6 +58,130 @@ class ConsoleProjectTask(FieldTask):
         self.created_file.write_bytes(ET.tostring(document, encoding='utf-8'))
 
 
+class NewDirectoryProjectTask(ConsoleProjectTask):
+    def write_created_project(self, args):
+        self.created_file.parent.mkdir(parents=True)
+        super().write_created_project(args)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('nested', [False, True])
+def test_console_create_allows_native_creation_of_missing_project_directories(tmp_path, version, nested):
+    task = NewDirectoryProjectTask(tmp_path, version)
+    missing = tmp_path / 'Missing 项目'
+    task.created_file = (missing / 'Nested' if nested else missing) / 'Created.wproj'
+    code, payload = task.step('draft-declare-cli-console-plan',
+        '--value', 'project_file', str(task.created_file))
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    assert not missing.exists()
+    assert not any(uri == CREATE for uri, _, _ in task.calls)
+    code, payload = task.run('transaction-show', tx)
+    assert code == 0, payload
+    code, payload = task.run('confirm', tx, '--confirmation-token', payload['confirmation']['token'])
+    assert code == 0, payload
+    code, payload = task.run('execute', tx)
+    assert code == 0, payload
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    assert task.created_file.is_file()
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('drift', ['ancestor-replaced', 'directory-appears', 'directory-is-file'])
+def test_console_create_missing_directory_boundary_cannot_drift_before_write(tmp_path, version, drift):
+    task = NewDirectoryProjectTask(tmp_path, version)
+    ancestor = tmp_path / 'Destination'
+    ancestor.mkdir()
+    task.created_file = ancestor / 'Missing' / 'Created.wproj'
+    def change_destination():
+        if drift == 'ancestor-replaced':
+            ancestor.rename(tmp_path / 'Retained-destination')
+            ancestor.mkdir()
+        elif drift == 'directory-appears':
+            task.created_file.parent.mkdir()
+        else:
+            task.created_file.parent.write_text('unrelated user file')
+    _, code, payload = execute_console_creation(task, before_execute=change_destination)
+    assert code != 0, payload
+    assert not any(row[0] == CREATE for row in task.calls)
+    if drift == 'directory-is-file':
+        assert task.created_file.parent.read_text() == 'unrelated user file'
+
+
+def test_console_create_missing_directory_symlink_redirect_is_rejected(tmp_path):
+    import os
+    if os.name == 'nt':
+        pytest.skip('POSIX symlink control; native Windows reparse behavior requires its own host evidence')
+    task = NewDirectoryProjectTask(tmp_path, '2025.1')
+    ancestor = tmp_path / 'Destination'
+    ancestor.mkdir()
+    task.created_file = ancestor / 'Missing' / 'Created.wproj'
+    unrelated = tmp_path / 'Unrelated'
+    unrelated.mkdir()
+    marker = unrelated / 'keep.txt'
+    marker.write_text('keep')
+    _, code, payload = execute_console_creation(task,
+        before_execute=lambda: task.created_file.parent.symlink_to(unrelated, target_is_directory=True))
+    assert code != 0, payload
+    assert not any(row[0] == CREATE for row in task.calls)
+    assert list(unrelated.iterdir()) == [marker] and marker.read_text() == 'keep'
+
+
+def test_console_create_without_native_output_directory_cannot_verify_or_retry(tmp_path):
+    class MissingOutputTask(ConsoleProjectTask):
+        def write_created_project(self, args):
+            pass
+    task = MissingOutputTask(tmp_path, '2025.1')
+    task.created_file = tmp_path / 'Missing' / 'Created.wproj'
+    tx, code, payload = execute_console_creation(task)
+    assert code == 0, payload
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    assert not task.created_file.parent.exists()
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+def test_console_create_unreadable_new_directory_remains_unknown(tmp_path, monkeypatch):
+    from pathlib import Path
+    task = NewDirectoryProjectTask(tmp_path, '2025.1')
+    task.created_file = tmp_path / 'Missing' / 'Created.wproj'
+    tx, code, payload = execute_console_creation(task)
+    assert code == 0, payload
+    original_lstat = Path.lstat
+    def unreadable(path, *args, **kwargs):
+        if path == task.created_file.parent:
+            raise PermissionError('Directory metadata is unavailable')
+        return original_lstat(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'lstat', unreadable)
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'executed_unverified', payload
+    assert payload['error_code'] == 'INVALID_IO_ROOT', payload
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+def test_console_create_discloses_and_enforces_missing_directory_budget(tmp_path):
+    task = NewDirectoryProjectTask(tmp_path, '2025.1')
+    code, schema = task.run('--version', '2025.1', 'request-schema', CREATE)
+    assert code == 0, schema
+    assert schema['business_adapter']['effect_verification']['limits']['missing_project_directories'] == 64
+    task.created_file = tmp_path.joinpath(*[f'level_{i}' for i in range(65)], 'Created.wproj')
+    code, payload = task.step('draft-declare-cli-console-plan',
+        '--value', 'project_file', str(task.created_file))
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code != 0 and payload['error_code'] == 'LIMIT_EXCEEDED', payload
+    assert not any(uri == CREATE for uri, _, _ in task.calls)
+    assert not (tmp_path / 'level_0').exists()
+
+
 @pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('shape', ['unnamed', 'same-base-named', 'omitted', 'empty', 'named-first', 'unnamed-first'])
 def test_console_create_preserves_optional_platform_names_and_same_base_rows(tmp_path, version, shape):

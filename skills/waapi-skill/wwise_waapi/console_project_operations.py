@@ -55,6 +55,7 @@ MAX_PROJECT_FILE_BYTES = 8 * 1024 * 1024
 MAX_PROJECT_XML_NODES = 32768
 MAX_PROJECT_XML_DEPTH = 64
 MAX_PROJECT_DECLARATION_ROWS = 128
+MAX_MISSING_PROJECT_DIRECTORIES = 64
 
 
 def _project_io_root_identity(root: str) -> dict[str, Any]:
@@ -72,6 +73,45 @@ def _project_io_root_identity(root: str) -> dict[str, Any]:
         raise SoundBankContractError('INVALID_IO_ROOT', 'Project output root cannot be observed') from exc
 
 
+def _project_creation_ancestor(root: str) -> tuple[dict[str, Any], list[str]]:
+    """Freeze the existing directory above a not-yet-created output root."""
+    from pathlib import Path
+    from .operation_soundbank import SoundBankContractError
+
+    cursor = Path(root)
+    missing = []
+    while True:
+        try:
+            cursor.lstat()
+        except FileNotFoundError:
+            if len(missing) >= MAX_MISSING_PROJECT_DIRECTORIES or cursor == cursor.parent:
+                raise SoundBankContractError('LIMIT_EXCEEDED', 'Project output exceeds its bounded missing-directory chain')
+            missing.append(str(cursor))
+            cursor = cursor.parent
+        except OSError as exc:
+            raise SoundBankContractError('INVALID_IO_ROOT', 'Project output ancestor cannot be observed') from exc
+        else:
+            return _project_io_root_identity(str(cursor)), list(reversed(missing))
+
+
+def _created_project_root_identity(plan: Mapping[str, Any]) -> dict[str, Any]:
+    from .operation_soundbank import SoundBankContractError
+
+    ancestor = plan['root_identity']
+    if _project_io_root_identity(ancestor['resolved_path']) != ancestor:
+        raise SoundBankContractError('FILE_CHANGED', 'Project output ancestor changed after Preview')
+    for path in plan['missing_root_directories']:
+        try:
+            observed = _project_io_root_identity(path)
+        except SoundBankContractError as exc:
+            if exc.__cause__ is not None and not isinstance(exc.__cause__, FileNotFoundError):
+                raise  # An unavailable observation is not proof of a missing artifact.
+            raise SoundBankContractError('MISSING_ARTIFACT', 'Requested project directory was not created as a real directory') from exc
+        if observed['resolved_path'] != path:
+            raise SoundBankContractError('FILE_CHANGED', 'Created project directory resolves outside its frozen path')
+    return _project_io_root_identity(plan['io_root'])
+
+
 def prepare_console_project_creation(args: Mapping[str, Any], audit: Mapping[str, Any], version: str) -> dict[str, Any]:
     from .operation_soundbank import SoundBankContractError, prove_artifact_path
 
@@ -79,11 +119,13 @@ def prepare_console_project_creation(args: Mapping[str, Any], audit: Mapping[str
     if len(paths) != 1:
         raise SoundBankContractError('INVALID_PATH', 'Project creation requires its exact isolated output path')
     path, root = paths[0]['resolved_path'], audit['io_root']
-    before = prove_artifact_path(path, io_root=root, field='new project', must_exist=False, expect_directory=False)
+    ancestor, missing = _project_creation_ancestor(root)
+    before = prove_artifact_path(path, io_root=ancestor['resolved_path'], field='new project', must_exist=False, expect_directory=False)
     if before['exists']:
         raise SoundBankContractError('PROJECT_ALREADY_EXISTS', 'New project creation cannot replace an existing file')
     return {'kind': 'console-project-create', 'uri': CONSOLE_CREATE_URI, 'version': version,
-        'args': dict(args), 'path': path, 'io_root': root, 'root_identity': _project_io_root_identity(root), 'before': before}
+        'args': dict(args), 'path': path, 'io_root': root, 'root_identity': ancestor,
+        'missing_root_directories': missing, 'before': before}
 
 
 def validate_console_project_creation(plan, args, audit, version):
@@ -109,8 +151,7 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
     )
 
     path, root = plan['path'], plan['io_root']
-    if _project_io_root_identity(root) != plan['root_identity']:
-        raise SoundBankContractError('FILE_CHANGED', 'Project output root changed after Preview')
+    observed_root = _created_project_root_identity(plan)
     target = prove_artifact_path(path, io_root=root, field='created project', must_exist=False, expect_directory=False)
     if not target['exists']:
         raise SoundBankContractError('MISSING_ARTIFACT', 'Requested saved project artifact is missing')
@@ -176,7 +217,7 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
         raise
     except (UnicodeError, ValueError, ET.ParseError) as exc:
         raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
-    if _project_io_root_identity(root) != plan['root_identity']:
+    if _created_project_root_identity(plan) != observed_root:
         raise SoundBankContractError('FILE_CHANGED', 'Project output root changed during verification')
     args = plan['args']
     expected_platforms = args.get('platforms', {'basePlatform': 'Windows'})

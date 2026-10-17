@@ -7,7 +7,7 @@ from typing import Any
 
 from .console_project_operations import (
     CLI_PROJECT_FILE_URIS, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
-    MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS,
+    MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
 )
 
 
@@ -697,7 +697,9 @@ def cli_console_business_contract_data(
             'saved_project': 'bounded_UTF8_WPROJ_and_live_transition_identity',
             'requested_fields': ['platforms', 'languages', 'first_language_is_default'],
             'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
-            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS},
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
+                'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
         }} if operation == 'ak.wwise.console.project.create' else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
