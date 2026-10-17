@@ -47,7 +47,7 @@ Classify only when the outer command succeeds and the terminal result says `scan
 
 ## Object queries
 
-Choose exactly one business source: repeated `--path-segment`, `--exact-id`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. Custom-kind miss/ambiguity uses returned candidates, never an invented type.
+Choose exactly one business source: repeated `--path-segment`, `--exact-id`, `--short-id` with the closed `--short-id-kind` and explicit `--max-results`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. `query-schema` discloses the Short ID kinds and version-aware lookup. Short ID collisions remain candidates requiring canonical GUID selection and exact-ID readback before changes. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. Custom-kind miss/ambiguity uses returned candidates, never an invented type.
 
 Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
 

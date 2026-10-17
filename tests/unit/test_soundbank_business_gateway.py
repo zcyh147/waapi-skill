@@ -270,6 +270,14 @@ def test_every_soundbank_schema_exposes_only_the_business_plan(
     assert "typed_operation" not in payload
 
 
+def test_definition_2021_retains_the_actual_native_api_boundary(tmp_path: Path) -> None:
+    """The documented query alternative does not emulate a missing function."""
+    env = set_gateway_config(_env(tmp_path), wwise_version="2021.1")
+    code, result = gateway.execute_gateway(["draft-start", "soundbank.processDefinitionFiles"], env=env,
+        client_factory=lambda _: pytest.fail("unavailable Definition operation connected"))
+    assert code == 2 and result["error_code"] == "UNAVAILABLE_IN_VERSION", result
+
+
 @pytest.mark.parametrize(
     "operation",
     ("soundbank.generate", "soundbank.processDefinitionFiles"),
@@ -1022,3 +1030,92 @@ def test_business_inclusion_plan_checks_and_seals_one_immutable_preview(
         previewed["transaction_id"]
     )
     assert stored.artifact["request"] == expected
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("object_type,directive,native_code", [("DialogueEvent", "-DialogueEvent\t", None),
+    ("Event", "", 10), ("Effect", "-EffectShareset\t", 17), ("AuxBus", "-AuxBus\t", 20)])
+@pytest.mark.parametrize("readback,error", [("unique", None), ("wrong-type", "INVALID_TARGET_TYPE"),
+    ("wrong-short-id", "IDENTITY_MISMATCH"), ("bool", "IDENTITY_MISMATCH"), ("string", "IDENTITY_MISMATCH"),
+    ("missing-short-id", "IDENTITY_MISMATCH"), ("malformed-guid", "IDENTITY_MISMATCH"),
+    ("empty", "AMBIGUOUS_IDENTITY"), ("duplicate", "AMBIGUOUS_IDENTITY"), ("collision", "AMBIGUOUS_IDENTITY")])
+def test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path: Path, version: str, object_type: str,
+    directive: str, native_code: int | None, readback: str, error: str | None) -> None:
+    """The public Definition lifecycle admits documented DialogueEvent IDs."""
+    project = _project(tmp_path)
+    project_root = Path(project["path"]).parent
+    language_id = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    platform_id = "{DDDDDDDD-DDDD-DDDD-DDDD-DDDDDDDDDDDD}"
+    project.update({"isDirty": False, "displayTitle": "SampleProject - Wwise",
+        "currentLanguageId": language_id, "referenceLanguageId": language_id,
+        "languages": [{"id": language_id, "name": "English(US)", "shortId": 1}],
+        "currentPlatformId": platform_id, "platforms": [{"id": platform_id, "name": "Mac", "baseName": "Mac",
+            "baseDisplayName": "Mac", "soundBankPath": str(project_root / "GeneratedSoundBanks/Mac"),
+            "copiedMediaPath": str(project_root / "GeneratedSoundBanks/Mac/Media")}],
+        "defaultConversion": {"id": "{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}", "name": "PCM"},
+        "directories": {"root": str(project_root),
+        "cache": str(project_root / ".cache"), "originals": str(project_root / "Originals"),
+        "soundBankOutputRoot": str(project_root / "GeneratedSoundBanks"),
+        "commands": str(project_root / "Commands"), "properties": str(project_root)}})
+    definition = project_root / "Dialogue.tsv"
+    number = 1 if readback == "bool" else 123
+    filters = "Event\tMedia" if object_type in {"Event", "DialogueEvent"} else "Structure\tMedia"
+    definition.write_text(f"Harbor\t{directive}{number}\t{filters}\n", encoding="utf-8")
+    event = {"id": OBJECT_ID, "name": "Target", "type": object_type, "path": r"\Objects\Target", "shortId": number}
+    if readback == "wrong-type":
+        event["type"] = "Sound"
+    elif readback in {"wrong-short-id", "bool", "string", "missing-short-id"}:
+        event["shortId"] = {"wrong-short-id": 124, "bool": True, "string": "123", "missing-short-id": None}[readback]
+    elif readback == "malformed-guid":
+        event["id"] = "unbound"
+    rows = [] if readback == "empty" else [event]
+    if readback in {"duplicate", "collision"}:
+        rows.append({**event, "id": OBJECT_ID if readback == "duplicate" else BANK_ID})
+    lookup = ({"waql": f"from type {object_type} where shortId = {number} take 2"} if native_code is None else
+              {"from": {"id": [{"shortId": number, "type": native_code}]}, "transform": [{"range": [0, 2]}]})
+    calls = []
+    class Client:
+        def call(self, uri, args=None, options=None):
+            calls.append((uri, args, options))
+            if uri == "ak.wwise.core.getInfo":
+                info = _info()
+                info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+                return info
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project
+            if uri == "ak.wwise.core.object.get":
+                if args == lookup:
+                    return {"return": rows}
+                if args.get("from", {}).get("id") == [OBJECT_ID]:
+                    return {"return": [event]}
+                return {"return": []}
+            raise AssertionError((uri, args, options))
+        def disconnect(self):
+            pass
+    client = Client()
+    env = set_gateway_config(_env(tmp_path), wwise_version=version)
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv], env=env, client_factory=lambda _: client)
+    code, started = run("draft-start", "soundbank.processDefinitionFiles")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, declared = run("draft-declare-soundbank-plan", draft_id, "--task-authority", authority,
+        "--expected-revision", "1", "--definition-file", str(definition), "--io-root", str(tmp_path))
+    assert code == 0, declared
+    code, checked = run("draft-check", draft_id, "--task-authority", authority, "--expected-revision", str(declared["draft"]["revision"]))
+    if error:
+        assert code == 2 and checked["error_code"] == error, checked
+        assert not any(uri == "ak.wwise.core.soundbank.processDefinitionFiles" for uri, _, _ in calls)
+        assert not list((tmp_path / "state" / "transactions").glob("*.json"))
+        return
+    assert code == 0, checked
+    code, previewed = run("preview-from-draft", draft_id, "--task-authority", authority,
+        "--expected-revision", str(checked["draft"]["revision"]))
+    assert code == 0, previewed
+    stored = TransactionStore(tmp_path / "state").load_preview(previewed["transaction_id"])
+    prepared = stored.artifact["prepared_operation"]
+    role = prepared["resolved_roles"]["definition.bank[0].inclusion[0]"]
+    assert role["object"] == OBJECT_ID and role["row"]["shortId"] == 123
+    assert ("ak.wwise.core.object.get", lookup,
+            {"return": ["id", "name", "type", "path", "parent", "notes", "shortId"]}) in calls
+    assert not any(uri == "ak.wwise.core.soundbank.processDefinitionFiles" for uri, _, _ in calls)

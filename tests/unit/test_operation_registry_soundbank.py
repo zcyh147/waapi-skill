@@ -874,6 +874,8 @@ class DefinitionReader:
             ]:
                 return {"return": [self.event, self.control]}
             query = args.get("waql")
+            if query == f"from type DialogueEvent where shortId = {self.event['shortId']} take 2":
+                return {"return": [self.event]}
             if query == 'from type Event where name = "Play_Test" take 2':
                 return {"return": [self.event]}
             if query == 'from type SoundBank where name = "Gameplay_Main" take 2':
@@ -1046,7 +1048,7 @@ def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(
     ]
     assert short_id_calls == [
         (
-            {"from": {"id": [{"shortId": 123, "type": 10}]}},
+            {"from": {"id": [{"shortId": 123, "type": 10}]}, "transform": [{"range": [0, 2]}]},
             {
                 "return": [
                     "id",
@@ -1066,35 +1068,34 @@ def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(
     assert role["row"]["shortId"] == 123
 
 
-def test_process_definition_files_fails_closed_for_short_id_type_without_official_selector(
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("number", [1, 123])
+def test_process_definition_files_resolves_dialogue_short_id_and_guards_guid_readback(
     tmp_path: Path,
+    version: str,
+    number: int,
 ) -> None:
     io_root, project = _project(tmp_path)
     definition = Path(project["directories"]["root"]) / "dialogue-short-id.tsv"
     definition.write_text(
-        "Gameplay_Main\t-DialogueEvent\t123\tEvent\tMedia\n",
+        f"Gameplay_Main\t-DialogueEvent\t{number}\tEvent\tMedia\n",
         encoding="utf-8",
     )
     reader = DefinitionReader(project)
+    reader.event["type"] = "DialogueEvent"
+    reader.event["shortId"] = number
+    request = _request("soundbank.processDefinitionFiles", {"files": [str(definition)], "io_root": str(io_root)})
+    request["version"] = version
     parsed = parse_operation_request(
-        _request(
-            "soundbank.processDefinitionFiles",
-            {"files": [str(definition)], "io_root": str(io_root)},
-        )
+        request
     )
-
-    with pytest.raises(OperationContractError) as rejected:
-        prepare_operation(parsed, read_call=reader)
-
-    assert rejected.value.error_code == "UNSUPPORTED_DEFINITION_SHORT_ID_TYPE"
-    assert rejected.value.details == {
-        "role": "definition.bank[0].inclusion[0]",
-        "expected_type": "DialogueEvent",
-        "supported_types": ["AuxBus", "Effect", "Event"],
-    }
-    assert not any(
-        uri == "ak.wwise.core.object.get"
-        and isinstance(args.get("from"), Mapping)
-        and "id" in args["from"]
-        for uri, args, _options in reader.calls
-    )
+    prepared = prepare_operation(parsed, read_call=reader).as_dict()
+    assert prepared["resolved_roles"]["definition.bank[0].inclusion[0]"]["object"] == EVENT_ID
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is True
+    for changed in (number + 1, True, str(number), None):
+        reader.event["shortId"] = changed
+        guarded = validate_prepared_roles(prepared, read_call=reader)
+        assert guarded["ok"] is False, guarded
+    reader.event["shortId"] = number
+    reader.event["type"] = "Event"
+    assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
