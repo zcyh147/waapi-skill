@@ -1876,6 +1876,7 @@ def build_parser() -> argparse.ArgumentParser:
         all_results=False,
     )
     query_source.add_argument("--exact-id", dest="object_id")
+    query_source.add_argument("--short-id", type=int, help="Read candidates for one unsigned 32-bit Short ID; never a mutation identity")
     query_source.add_argument(
         "--kind",
         choices=QUERY_BUSINESS_KINDS,
@@ -5399,6 +5400,13 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
     """Reject closed query input errors before opening a WAAPI transport."""
 
     relationships = tuple(getattr(args, "relationships", ()) or ())
+    args.object_ids = None
+    if args.short_id is not None:
+        if not 0 <= args.short_id <= 4294967295 or args.max_results is None:
+            raise GatewayInputError("query-object --short-id requires uint32 0..4294967295 and explicit --max-results 1..1000")
+        # Validate all requested business semantics before transport. Live
+        # resolution replaces this compiler-only placeholder with proven GUIDs.
+        args.object_ids = ("{00000000-0000-0000-0000-000000000000}",)
     business_view = getattr(args, "business_view", None)
     if business_view is not None:
         if not (
@@ -5530,7 +5538,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         return
 
     if args.query_custom_field_meanings:
-        exact_object_scope = args.path is not None or args.object_id is not None
+        exact_object_scope = args.path is not None or args.object_id is not None or args.short_id is not None
         type_scope = (
             args.object_type is not None or custom_kind_meaning is not None
         )
@@ -5571,6 +5579,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             args.object_type is not None,
             args.search is not None,
             args.query is not None,
+            args.short_id is not None,
             custom_kind_meaning is not None,
         )
     ):
@@ -5586,6 +5595,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         build_object_get_query(
             path=args.path,
             object_id=args.object_id,
+            object_ids=args.object_ids,
             type=args.object_type,
             search=args.search,
             query=args.query,
@@ -8487,6 +8497,7 @@ def query_business_schema_payload(
         "sources": {
             "object_path": "--path-segment <one literal name> (repeat)",
             "exact_object_id": "--exact-id <canonical GUID>",
+            "short_id_candidates": "--short-id <uint32> --max-results <1..1000>",
             "common_kind": "--kind <closed business kind>",
             "custom_kind": "--custom-kind <user-facing type meaning>",
             "search": "--search-text <literal text>",
@@ -8500,6 +8511,10 @@ def query_business_schema_payload(
             "sound-voice": "only Sound objects whose source language is not SFX",
         },
         "source_rules": {
+            "short_id": {"lookup": "native from.id uint32, at most 65 candidate identities; 65 stops at an explicit 64-source resource boundary",
+                         "combined_semantics": "Gateway resolves canonical GUID candidates before applying all requested predicates, relationships, outputs, platform and language",
+                         "custom_fields": "requires exactly one resolved GUID; nonunique source requires selecting an exact GUID first",
+                         "mutation_authority": False, "later_change": "select and verify canonical GUID through the exact-ID route"},
             "exactly_one_source": True,
             "common_kind_is_a_source": (
                 "--kind is valid only when no path, id, search, or Query Editor "
@@ -14567,6 +14582,30 @@ def dispatch_command(
                 dispatcher=dispatcher,
                 common=common,
             )
+        source_resolution = None
+        if args.short_id is not None:
+            source_call = dispatch(dispatcher, OBJECT_GET_URI, connection=connection, version=detected_version,
+                args={"from": {"id": [args.short_id]}, "transform": [{"range": [0, 65]}]},
+                options={"return": list(SELECTED_REQUIRED_RETURN_FIELDS)}, exact_object_lookup=False)
+            if not source_call.get("ok"):
+                return {"ok": False, "status": "error", **common, "call": dispatch_call_summary(source_call), "agent_result": None}
+            source_rows = strict_object_get_rows(source_call, command="query-object --short-id", maximum_rows=65)
+            ids = [row["id"].upper() for row in source_rows]
+            if len(set(ids)) != len(ids):
+                raise GatewayResultShapeError("Short ID source returned duplicate canonical GUIDs",
+                    details={"native_observation": source_call["result"], "call": dispatch_call_summary(source_call)})
+            source_resolution = {"source": "short-id", "short_id": args.short_id, "candidate_count": len(ids),
+                "complete": len(ids) < 65, "mutation_authority": False, "call": dispatch_call_summary(source_call)}
+            if len(ids) >= 65 or (len(ids) > 1 and args.query_custom_field_meanings):
+                return {"ok": True, "status": "needs_clarification", **common, "source_resolution": source_resolution,
+                    "agent_result": {"candidates": source_rows[:64], "complete": len(ids) < 65, "mutation_authority": False,
+                        "reason": "short_id_source_limit_reached" if len(ids) >= 65 else "custom_fields_require_one_exact_guid",
+                        "repair": "Select a canonical candidate GUID and use query-object --exact-id with the requested read options."}}
+            if not ids:
+                return {"ok": True, "status": "ok", **common, "source_resolution": source_resolution,
+                        "query_bound": _query_bound_summary(args), "count": 0, "objects": [], "agent_result": []}
+            args.object_ids = tuple(ids) if len(ids) > 1 else None
+            args.object_id = ids[0] if len(ids) == 1 else None
         custom_kind_clarification = _bind_custom_kind_from_live_types(
             args,
             connection=connection,
@@ -14601,6 +14640,7 @@ def dispatch_command(
         preview = build_object_get_query(
             path=args.path,
             object_id=args.object_id,
+            object_ids=args.object_ids,
             type=args.object_type,
             search=args.search,
             query=args.query,
@@ -14652,6 +14692,7 @@ def dispatch_command(
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
+            **({"source_resolution": source_resolution} if source_resolution is not None else {}),
             "semantic_preview": preview.as_dict(),
             "query_bound": _query_bound_summary(args),
             "call": dispatch_call_summary(result),
@@ -22956,7 +22997,8 @@ def _query_mutation_selection(
 ) -> dict[str, Any] | None:
     """Expose conditional exact-ID readbacks for a later selected mutation subset."""
 
-    if not 2 <= len(rows) <= MAX_QUERY_MUTATION_SELECTION_CANDIDATES:
+    minimum = 1 if getattr(args, "short_id", None) is not None else 2
+    if not minimum <= len(rows) <= MAX_QUERY_MUTATION_SELECTION_CANDIDATES:
         return None
     relationships = tuple(getattr(args, "relationships", ()) or ())
     if (
@@ -23294,6 +23336,7 @@ def project_successful_query_object_payload(
         "query_layer",
         "query_contract",
         "query_bound",
+        "source_resolution",
         "count",
         "limit_reached",
         "objects",

@@ -480,7 +480,9 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
             "sound-sfx": "only Sound objects whose source language is SFX",
             "sound-voice": "only Sound objects whose source language is not SFX",
         }
-        assert payload["source_rules"] == {
+        assert payload["sources"]["short_id_candidates"] == "--short-id <uint32> --max-results <1..1000>"
+        assert payload["source_rules"]["short_id"]["mutation_authority"] is False
+        assert {key: value for key, value in payload["source_rules"].items() if key != "short_id"} == {
             "exactly_one_source": True,
             "common_kind_is_a_source": (
                 "--kind is valid only when no path, id, search, or Query Editor "
@@ -1101,3 +1103,99 @@ def test_original_file_reference_scan_compiles_requested_return_scope(tmp_path: 
         env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
     assert code == 0, result
     assert client.calls[0][2] == {"return": ["id", "path", "originalFilePath"], "platform": "Windows", "language": "SFX"}
+
+
+@pytest.fixture
+def short_id_product_capture(request, version):
+    import os
+    context = os.environ.get("WAAPI_SHORT_ID_BRANCH_CAPTURE_CONTEXT")
+    observed = {}
+    if context:
+        from tests.support.short_id_query_branch_evidence import load_short_id_capture, finish_short_id_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_short_id_capture(Path(context), request.node.nodeid, version)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_short_id_capture(capture, reports, observed))
+    return observed
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_short_id_source_resolves_native_candidates_then_applies_business_read_semantics(tmp_path: Path, version: str, short_id_product_capture: dict) -> None:
+    object_id = "{11111111-1111-1111-1111-111111111111}"
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": [{"id": object_id, "name": "Rain", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Rain", "notes": "Exterior"}]}
+            return super().call(uri, args, options)
+    client = Client(version)
+    code, payload = gateway.execute_gateway(
+        ["query-object", "--short-id", "123456", "--max-results", "5", "--predicate", "name-is", "Rain",
+         "--include", "notes", "--platform", "Windows", "--language", "English(US)", "--detail"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 0, json.dumps(payload,ensure_ascii=False)
+    queries = [call for call in client.calls if call[0] == "ak.wwise.core.object.get"]
+    assert queries[0][1] == {"from": {"id": [123456]}, "transform": [{"range": [0, 65]}]}
+    assert queries[0][2] == {"return": ["id", "name", "type", "path"]}
+    assert queries[1][1] == {"waql": 'from object "{11111111-1111-1111-1111-111111111111}" where name = "Rain" take 5'}
+    assert queries[1][2] == {"return": ["id", "name", "type", "path", "notes"], "platform": "Windows", "language": "English(US)"}
+    assert payload["agent_result"][0]["notes"] == "Exterior"
+    assert payload["source_resolution"]["candidate_count"] == 1
+    assert payload["source_resolution"]["mutation_authority"] is False
+    assert payload["mutation_selection"]["candidates"][0]["id"] == object_id
+    short_id_product_capture.update({"gateway": {"argv": ["query-object", "--short-id", "123456", "--max-results", "5",
+        "--predicate", "name-is", "Rain", "--include", "notes", "--platform", "Windows", "--language", "English(US)", "--detail"],
+        "exit_code": code, "payload": payload},
+        "native_call": {"uri": queries[0][0], "args": queries[0][1], "options": queries[0][2]},
+        "final_call": {"uri": queries[1][0], "args": queries[1][1], "options": queries[1][2]}})
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_short_id_collision_preserves_all_candidates_for_relationship_reads(tmp_path: Path, version: str) -> None:
+    ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"]
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": [{"id": value, "name": "Rain", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Rain"} for value in ids]}
+            return super().call(uri, args, options)
+    client = Client(version)
+    code, payload = gateway.execute_gateway(["query-object", "--short-id", "0", "--max-results", "4", "--relationship", "parent"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1][1] == {"waql": 'from object "{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}" select parent take 4'}
+    assert payload["source_resolution"]["candidate_count"] == 2
+    assert [row["id"] for row in payload["agent_result"]] == ids
+    assert len(payload["mutation_selection"]["candidates"]) == 2
+
+
+@pytest.mark.parametrize("count,custom_field,reason", [(0, False, None), (2, True, "custom_fields_require_one_exact_guid"),
+                                                       (65, False, "short_id_source_limit_reached")])
+def test_short_id_empty_and_unresolved_sources_do_not_run_a_partial_final_query(
+    tmp_path: Path, count: int, custom_field: bool, reason: str | None,
+) -> None:
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": [{"id": "{%08X-1111-1111-1111-111111111111}" % n} for n in range(count)]}
+            return super().call(uri, args, options)
+    client = Client("2025.1")
+    command = ["query-object", "--short-id", "4294967295", "--max-results", "3"]
+    if custom_field:
+        command.extend(["--include-field", "Volume"])
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
+    if reason is None:
+        assert payload["agent_result"] == [] and payload["source_resolution"]["complete"] is True
+    else:
+        assert payload["status"] == "needs_clarification" and payload["agent_result"]["reason"] == reason
+        assert payload["agent_result"]["mutation_authority"] is False
+
+
+@pytest.mark.parametrize("extra", [["--short-id", "-1", "--max-results", "2"], ["--short-id", "4294967296", "--max-results", "2"],
+                                  ["--short-id", "1"], ["--short-id", "1", "--max-results", "1001"]])
+def test_short_id_source_requires_a_valid_uint32_and_result_bound_before_connecting(tmp_path: Path, extra: list[str]) -> None:
+    code, payload = gateway.execute_gateway(["query-object", *extra], env=_env(tmp_path, "2025.1"),
+        client_factory=lambda _: pytest.fail("invalid Short ID source connected"))
+    assert code == 2, payload
