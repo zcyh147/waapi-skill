@@ -64,9 +64,54 @@ class RuntimePlayingHandleStore:
             raise TypeError("state_dir must be a pathlib.Path")
         self.root = state_dir / "soundengine-playing-handles-v1"
         self.records = self.root / "records"
+        self.lifetimes = self.root / "lifetimes"
         self._ensure_directory(state_dir)
         self._ensure_directory(self.root)
         self._ensure_directory(self.records)
+        self._ensure_directory(self.lifetimes)
+
+    def begin_lifetime(
+        self, *, playing_id: int, context: RuntimeGameObjectContext,
+        source_transaction_id: str, source_artifact_hash: str,
+    ) -> None:
+        """Reserve the native result lifetime in execution order under the lease."""
+        if isinstance(playing_id, bool) or not isinstance(playing_id, int) or not 1 <= playing_id <= 0xFFFFFFFF:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_NOT_STARTED", "SoundEngine did not return a valid playing ID.")
+        path, body = self._lifetime_binding(
+            playing_id=playing_id, context=context,
+            source_transaction_id=source_transaction_id, source_artifact_hash=source_artifact_hash,
+        )
+        if not path.exists() and sum(1 for _ in self.lifetimes.iterdir()) >= _MAX_RECORDS:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_STORE_LIMIT", "Playing lifetime store reached its fixed record ceiling.")
+        self.retire_native_id(playing_id, context=context)
+        self._replace(path, body)
+
+    def _lifetime_binding(
+        self, *, playing_id: int, context: RuntimeGameObjectContext,
+        source_transaction_id: str, source_artifact_hash: str,
+    ) -> tuple[Path, dict[str, object]]:
+        identity = {"playing_id": playing_id, "context": context.binding_dict()}
+        return self.lifetimes / (canonical_sha256(identity) + ".json"), {
+            "contract": "waapi-skill.soundengine-playing-lifetime/v1", **identity,
+            "source_transaction_id": source_transaction_id, "source_artifact_hash": source_artifact_hash,
+        }
+
+    def _require_current_lifetime(self, **binding: Any) -> None:
+        path, expected = self._lifetime_binding(**binding)
+        try:
+            metadata = path.lstat()
+            if not stat.S_ISREG(metadata.st_mode) or path_is_link_or_reparse(path, metadata=metadata) or metadata.st_size > _MAX_RECORD_BYTES:
+                raise ValueError("Playing lifetime is not one bounded regular file.")
+            data = path.read_bytes()
+            if len(data) > _MAX_RECORD_BYTES:
+                raise ValueError("Playing lifetime grew beyond its byte ceiling.")
+            actual = json.loads(data)
+        except FileNotFoundError as exc:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_GENERATION_DRIFT", "The execution-bound playing lifetime is unavailable.") from exc
+        except (OSError, ValueError, UnicodeError) as exc:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_STORE_CORRUPT", "The execution-bound playing lifetime cannot be read safely.") from exc
+        if actual != expected:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_GENERATION_DRIFT", "A later Event replaced this native playing lifetime before verification.")
 
     def issue(
         self,
@@ -77,6 +122,7 @@ class RuntimePlayingHandleStore:
         context: RuntimeGameObjectContext,
         source_transaction_id: str,
         source_artifact_hash: str,
+        require_current_lifetime: bool = False,
     ) -> RuntimePlayingHandleRecord:
         if (
             isinstance(playing_id, bool)
@@ -109,6 +155,15 @@ class RuntimePlayingHandleStore:
             raise RuntimePlayingHandleError(
                 "PLAYING_HANDLE_INVALID", "Playing handle provenance is invalid."
             )
+        # A reused native ID is a new lifetime, never a transfer of the old
+        # capability to the replacement Event. Publication holds the shared
+        # SoundEngine execution lease in the Gateway.
+        if require_current_lifetime:
+            self._require_current_lifetime(
+                playing_id=playing_id, context=context,
+                source_transaction_id=source_transaction_id, source_artifact_hash=source_artifact_hash,
+            )
+        self.retire_native_id(playing_id, context=context)
         paths = self._record_paths()
         if len(paths) >= _MAX_RECORDS:
             self._prune_retired_records(reserve=1)
@@ -186,9 +241,25 @@ class RuntimePlayingHandleStore:
         *,
         context: RuntimeGameObjectContext,
     ) -> tuple[str, ...]:
+        return self.retire_scope(context=context, playing_id=playing_id)
+
+    def retire_scope(
+        self,
+        *,
+        context: RuntimeGameObjectContext,
+        playing_id: int | None = None,
+        event_id: str | None = None,
+        game_object_id: int | None = None,
+    ) -> tuple[str, ...]:
+        """Revoke Gateway control authority, without asserting a native stop."""
         retired: list[str] = []
         for record in self._active_records():
-            if record.playing_id != playing_id or record.context != context:
+            if (
+                record.context != context
+                or (playing_id is not None and record.playing_id != playing_id)
+                or (event_id is not None and record.event_id != event_id)
+                or (game_object_id is not None and record.game_object_id != game_object_id)
+            ):
                 continue
             body = {
                 key: value

@@ -29,3 +29,68 @@ Users can perform every in-scope reflected runtime control through meaningful bu
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Pinned-source findings from the 2026-10-18 implementation batch
+
+This is partial source research and fake-Gateway implementation evidence, not
+completion of this ticket. All 26 owned URI identities and every untouched native
+branch remain assigned here. The exact matching source lanes are:
+
+| Wwise lane | Reflected / local SDK build | Reflected SoundEngine function routes |
+| --- | --- | --- |
+| 2021.1 | 2021.1.14.8108 | 22 |
+| 2022.1 | 2022.1.19.8584 | 24 |
+| 2023.1 | 2023.1.19.8928 | 26 |
+| 2024.1 | 2024.1.13.9056 | 26 |
+| 2025.1 | 2025.1.7.9143 | 26 |
+
+The matching SDK's `SDK/include/AK/SoundEngine/Common/AkTypes.h` and
+`AkSoundEngine.h` establish these meanings in all five builds:
+
+- `AkCurveInterpolation_Constant = 9` is explicitly **not valid for fading
+  values**. The reflected maximum 9 alone therefore does not justify offering
+  Constant for `executeActionOnEvent` or `stopPlayingID`. The named fade choices
+  remain the legal 0–8 set. This is a primary-source semantic restriction, not a
+  guessed enum or a missing-Skill/native-absence claim.
+- Every pinned `seekOnEvent.argsSchema.oneOf` requires `event`, `gameObject`,
+  `playingId`, `seekToNearestMarker`, and exactly one of `position` or `percent`.
+  There is no Event-free native overload in these schemas. A future business
+  convenience using only a playing capability would have to derive and
+  revalidate its Event; it cannot omit the native Event or weaken identity
+  validation.
+- `SetRTPCValue` and `ResetRTPCValue` use `AK_INVALID_GAME_OBJECT` for global
+  values. This is distinct from the WAAPI 2023.1+ omitted `gameObject`, whose
+  reflected default is the transport game object. The explicit global choice is
+  now constructible in all five public lanes.
+- `UnregisterGameObj` accepts the sentinel to unregister all game objects.
+  Unregistering an in-use object is allowed and can leave its sounds playing;
+  the SDK says control over that game object's parameters is lost. Unregister
+  therefore consumes registration authority and preserves independent playing
+  authority; it must not claim that audio stopped.
+- `SetGameObjectOutputBusVolume` and `AkAuxSendValue.listenerID` accept the same
+  sentinel for all connected listeners. Their gain range is 0 through 16
+  (zero is silence, above one amplifies). Closed listener-scope choices and
+  percentage 0–1600 now express those branches without numeric native IDs.
+- Every pinned `setMultiplePositions` schema permits an empty positions array;
+  the SDK uses an unsigned position count. An explicit clear-positions choice
+  now distinguishes empty from omitted or populated frame collections in every
+  named multi-position mode. Native empty-list effects still need acceptance.
+
+The batch consumes stop/unregister authority only after all prewrite checks and
+successful durable `execution_started`, before native dispatch. A failed journal
+start preserves the original authority; an uncertain native stop keeps it
+consumed and prohibits replay. A shared existing transaction-lease mechanism
+serializes SoundEngine control and publication. Immutable exact capability
+snapshots prevent an old Preview from following a recycled numeric native ID;
+execution-ordered playing reservations also reject delayed publication of an
+older lifetime over a newer Event.
+
+These mechanisms attest Gateway ownership and local lifetime transitions. They
+do not attest instantaneous native resource existence, natural playing
+completion, engine restart at the same endpoint/project/build, queued stop or
+fade completion, or native spatial/listener/mix/RTPC/Bank effects. Independent
+observers, correct capture/timing prerequisites and matching sandbox-native
+acceptance remain implementation/evidence work under this ticket. Existing
+Profiler capture reads are not automatically a live-resource oracle. No native
+process, network client, Console/Authoring launch or Fresh task was used for
+this source batch, and no branch/family completion credit is assigned.

@@ -218,6 +218,13 @@ class RuntimeGameObjectHandleStore:
             (self.records / f"{record.handle}.json").unlink(missing_ok=True)
         return tuple(record.handle for record in matches)
 
+    def retire_all(self, *, context: RuntimeGameObjectContext) -> tuple[str, ...]:
+        """Revoke registrations only in the exact live project/build context."""
+        matches = [record for record in self._active_records() if record.context == context]
+        for record in matches:
+            (self.records / f"{record.handle}.json").unlink(missing_ok=True)
+        return tuple(record.handle for record in matches)
+
     def _active_records(self) -> list[RuntimeGameObjectHandleRecord]:
         return [self._load(path) for path in self._record_paths()]
 
