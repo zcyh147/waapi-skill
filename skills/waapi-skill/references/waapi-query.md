@@ -48,7 +48,7 @@ One Gateway-owned business declaration chooses exactly one source: repeated `--p
 
 Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. Repeated `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
 
-Identity fields are always `id,name,type,path`. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
+Identity projections always request `id,name,type,path`. Native rows can omit optional facts: `unavailable_fields` names absent outputs, while explicit null stays null. Missing identity facts also produce `identity_completeness.complete=false` and retain the bounded `native_observation`; those rows cannot certify mutation targets. Add report data through repeated `--include` values in caller order; custom live fields use `--include-field` and appear in custom `properties` and `references` maps. Missing/ambiguous metadata uses the structured repair, never a token guess.
 
 Offline schema:
 

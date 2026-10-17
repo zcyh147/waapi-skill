@@ -55,6 +55,7 @@ def test_media_pool_empty_and_weight_native_observations() -> None:
         cases = [
             ("empty-search", ["--search-text", ""]),
             ("empty-text-filter", ["--text-filter", "filename", "equals", ""]),
+            ("description-control-weight", ["--weighted-audio-description", "rain", "0.5"]),
             ("description-negative-weight", ["--weighted-audio-description", "rain", "-0.25"]),
             ("description-above-one-weight", ["--weighted-audio-description", "rain", "1.25"]),
         ]
@@ -63,6 +64,7 @@ def test_media_pool_empty_and_weight_native_observations() -> None:
             selected = next((path for path in audio_files if path.is_file() and not path.is_symlink()), None)
             if selected is not None:
                 cases.extend([
+                    ("similarity-control-weight", ["--weighted-audio-similarity-file", str(selected), "0.5"]),
                     ("similarity-negative-weight", ["--weighted-audio-similarity-file", str(selected), "-0.25"]),
                     ("similarity-above-one-weight", ["--weighted-audio-similarity-file", str(selected), "1.25"]),
                 ])

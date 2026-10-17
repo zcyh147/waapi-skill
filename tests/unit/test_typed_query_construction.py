@@ -726,6 +726,25 @@ def test_public_advanced_query_exact_expression_dispatches_gateway_owned_request
     assert list(payload)[-1] == "agent_result"
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_exact_query_missing_guid_retains_native_identity_failure(tmp_path: Path, version: str) -> None:
+    native_row = {"name": "Context", "owner": None}
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            return {"return": [native_row]}
+    client = Client(version)
+    code, payload = gateway.execute_gateway(["query-object", "--exact-id", "{22222222-2222-2222-2222-222222222222}", "--include", "owner"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert payload["error_code"] == "INVALID_QUERY_RESULT"
+    assert payload["details"]["call"]["ok"] is True
+    assert payload["details"]["native_observation"] == {"return": [native_row]}
+    assert len(client.calls) == 1
+
+
 def test_public_typed_advanced_query_dispatches_invalid_waql_once(
     tmp_path: Path,
 ) -> None:
@@ -891,3 +910,60 @@ def test_switch_context_output_does_not_expose_a_native_accessor_input(tmp_path:
             env=_env(tmp_path, version), client_factory=lambda _: pytest.fail("invalid business output connected"))
     assert rejected.value.code == 2
     assert "switch-container-child-context" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("advanced", [False, True])
+def test_query_preserves_optional_identity_and_output_absence(tmp_path: Path, version: str, advanced: bool) -> None:
+    context_id = "{22222222-2222-2222-2222-222222222222}"
+    native_row = {"id": context_id, "name": "", "path": "", "owner": None}
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            return {"return": [dict(native_row)]}
+    source = ["--advanced-waql", 'from object "' + context_id + '"', "--max-results", "1"] if advanced else ["--exact-id", context_id]
+    client = Client(version)
+    code, payload = gateway.execute_gateway(["query-object", *source, "--include", "parent", "--include", "owner"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 0, payload
+    row = payload["agent_result"][0]
+    assert {key: row[key] for key in native_row} == native_row
+    assert "type" not in row and "parent" not in row
+    assert row["unavailable_fields"] == ["type", "parent"]
+    assert row["identity_completeness"] == {"complete": False, "unavailable_fields": ["type"], "mutation_authority": False}
+    assert "mutation_selection" not in payload
+    assert payload["call"]["ok"] is True
+    assert payload["native_observation"] == {"return": [native_row]}
+    assert len(client.calls) == 1
+    assert list(payload)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_exact_context_custom_fields_do_not_require_optional_native_type(tmp_path: Path, version: str) -> None:
+    context_id = "{22222222-2222-2222-2222-222222222222}"
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return super().call(uri, args, options)
+            self.calls.append((uri, dict(args or {}), dict(options or {})))
+            if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+                assert args == {"object": context_id}
+                return {"return": ["ContinuePlay", "FadeInTime"]}
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                assert args["object"] == context_id
+                return {"name": args["property"], "type": "bool" if args["property"] == "ContinuePlay" else "Real32"}
+            assert uri == "ak.wwise.core.object.get"
+            assert options["return"] == ["id", "name", "type", "path", "@ContinuePlay", "@FadeInTime"]
+            return {"return": [{"id": context_id, "name": "", "path": "", "@ContinuePlay": False, "@FadeInTime": 0}]}
+    client = Client(version)
+    code, payload = gateway.execute_gateway(["query-object", "--exact-id", context_id,
+        "--include-field", "ContinuePlay", "--include-field", "FadeInTime"], env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 0, payload
+    row = payload["agent_result"][0]
+    assert row["properties"] == {"ContinuePlay": False, "FadeInTime": 0}
+    assert "type" not in row
+    assert row["identity_completeness"]["complete"] is False
+    assert payload["native_observation"]["return"][0]["@ContinuePlay"] is False
+    assert sum(uri == "ak.wwise.core.object.get" for uri, _, _ in client.calls) == 1

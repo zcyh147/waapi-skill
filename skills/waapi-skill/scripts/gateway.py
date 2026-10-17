@@ -8349,6 +8349,7 @@ def query_business_schema_payload(
             "query_contract": ADVANCED_QUERY_CONTRACT,
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+            "result_presence": _query_result_presence_contract(),
             "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
             "custom_outputs": {
                 "available": False,
@@ -8388,6 +8389,7 @@ def query_business_schema_payload(
         "query_contract": BUSINESS_QUERY_CONTRACT,
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+        "result_presence": _query_result_presence_contract(),
         "business_outputs": list(QUERY_BUSINESS_OUTPUTS),
         "custom_outputs": {
             "field_meaning": "--include-field <user-facing property/reference meaning>",
@@ -14166,6 +14168,7 @@ def dispatch_command(
                     len(rows) == maximum_rows if result.get("ok") else None
                 ),
                 "objects": business_rows if result.get("ok") else None,
+                **_query_incomplete_identity_observation(result, business_rows),
                 **(
                     {"mutation_selection": mutation_selection}
                     if mutation_selection is not None
@@ -14245,7 +14248,7 @@ def dispatch_command(
             else []
         )
         if result.get("ok"):
-            validate_exact_query_identity(args, rows)
+            validate_exact_query_identity(args, rows, native_result=result)
             validate_query_business_view_result(args, rows)
         business_rows = (
             _project_query_business_rows(args, rows) if result.get("ok") else []
@@ -14269,6 +14272,7 @@ def dispatch_command(
             "call": dispatch_call_summary(result),
             "count": len(rows) if result.get("ok") else None,
             "objects": business_rows if result.get("ok") else None,
+            **_query_incomplete_identity_observation(result, business_rows),
             **({"continuations": continuations} if continuations else {}),
             **(
                 {"mutation_selection": mutation_selection}
@@ -22326,6 +22330,8 @@ def _query_result_maximum(args: argparse.Namespace) -> int | None:
 def validate_exact_query_identity(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
+    *,
+    native_result: Mapping[str, Any] | None = None,
 ) -> None:
     """Reject a successful exact lookup whose returned identity drifted."""
 
@@ -22365,6 +22371,7 @@ def validate_exact_query_identity(
                 "identity_field": identity_field,
                 "expected": args.path if args.path is not None else args.object_id,
                 "mismatches": mismatches,
+                **({"call": dispatch_call_summary(native_result), "native_observation": native_result["result"]} if native_result is not None else {}),
             },
         )
 
@@ -22411,6 +22418,14 @@ def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     return {"mode": "exact-object"}
 
 
+def _query_result_presence_contract() -> dict[str, Any]:
+    return {
+        "absent_fields": "unavailable_fields; omitted values are never replaced with null",
+        "explicit_null": "preserved",
+        "missing_identity": "identity_completeness.complete=false; native_observation retained; no mutation authority",
+    }
+
+
 def _project_query_business_rows(
     args: argparse.Namespace,
     rows: Sequence[Mapping[str, Any]],
@@ -22420,11 +22435,17 @@ def _project_query_business_rows(
     bindings = tuple(getattr(args, "query_output_bindings", ()) or ())
     projected: list[dict[str, Any]] = []
     for row in rows:
-        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS}
+        item = {field: row[field] for field in SELECTED_REQUIRED_RETURN_FIELDS if field in row}
+        missing_identity = [field for field in SELECTED_REQUIRED_RETURN_FIELDS if field not in row]
+        unavailable = list(missing_identity)
         properties: dict[str, Any] = {}
         references: dict[str, Any] = {}
         for kind, native, output in bindings:
-            value = row.get(native)
+            if native not in row:
+                group = {"property": "properties", "reference": "references"}.get(kind)
+                unavailable.append(f"{group}.{output}" if group else output)
+                continue
+            value = row[native]
             if kind == "property":
                 properties[output] = value
             elif kind == "reference":
@@ -22435,8 +22456,26 @@ def _project_query_business_rows(
             item["properties"] = properties
         if references:
             item["references"] = references
+        if unavailable:
+            item["unavailable_fields"] = unavailable
+        if missing_identity:
+            item["identity_completeness"] = {
+                "complete": False,
+                "unavailable_fields": missing_identity,
+                "mutation_authority": False,
+            }
         projected.append(item)
     return projected
+
+
+def _query_incomplete_identity_observation(
+    result: Mapping[str, Any], rows: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Retain the bounded native reply when identity facts cannot be certified."""
+
+    if any("identity_completeness" in row for row in rows):
+        return {"native_observation": result["result"]}
+    return {}
 
 
 def _query_mutation_selection(
@@ -22765,7 +22804,7 @@ def project_successful_query_object_payload(
     projected because their complete evidence is required for a truthful stop.
     """
 
-    if detail or payload.get("ok") is not True:
+    if detail or payload.get("ok") is not True or "native_observation" in payload:
         return dict(payload)
     compact_keys = (
         "contract",
