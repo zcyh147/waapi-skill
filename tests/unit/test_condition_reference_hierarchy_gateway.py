@@ -443,3 +443,187 @@ def test_target_classifier_reads_keep_the_selected_platform_scope(tmp_path, vers
     assert verified['verified'] is True
     reads = [options for uri, _, options in task.calls if uri.endswith('object.get') and 'category' in options.get('return', [])]
     assert reads and all(options['platform'] == platform for options in reads)
+
+
+class SharedReferenceTask(AttenuationTask):
+    """SDK relationship model; predicate outcome is independent of JSON omission."""
+    def __init__(self, path, version, *, shared=True, operation='object.setReference'):
+        super().__init__(path, version, operation=operation)
+        self.shared = shared
+        self.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+        self.objects[SECOND]['parent'] = {'id': GROUP}
+        self.metadata['Attenuation']['restriction']['restrictions'] = [
+            {'type': ['Attenuation'], 'sharedOnlyTypes': ['Attenuation']}]
+
+    def call(self, uri, args=None, options=None):
+        expected = f'from object "{SECOND}" where owner = null take 1'
+        if uri.endswith('object.get') and args.get('waql') == expected:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert options['return'] == ['id']
+            return {'return': [{'id': SECOND}] if self.shared else []}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('shared', [True, False])
+def test_shared_only_target_uses_an_owned_native_predicate_not_owner_omission(tmp_path, version, shared):
+    task = SharedReferenceTask(tmp_path, version, shared=shared)
+    assert 'owner' not in task.objects[SECOND]
+    task.declare()
+    code, checked = task.step('draft-check')
+    if not shared:
+        assert code == 2 and checked['error_code'] == 'INVALID_REFERENCE_TARGET', checked
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('drift', ['owner-before', 'parent-before', 'owner-after', 'parent-after'])
+def test_shared_only_owner_predicate_and_parent_are_guarded_through_verification(tmp_path, version, drift):
+    task = SharedReferenceTask(tmp_path, version)
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    def change():
+        if drift.startswith('owner'):
+            task.shared = False
+        else:
+            task.objects[SECOND]['parent'] = {'id': OTHER}
+    if drift.endswith('before'):
+        change()
+    code, executed = task.run('execute', tx)
+    if drift.endswith('before'):
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    change()
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('response', [None, [], {}, {'return': None}, {'return': [7]}, {'return': [{}]},
+    {'return': [{'id': GROUP}]}, {'return': [{'id': SECOND}, {'id': SECOND}]},
+    {'return': [{'id': SECOND}, {'id': GROUP}]}])
+def test_shared_only_predicate_rejects_malformed_duplicate_extra_or_wrong_identity(tmp_path, response):
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner = null take 1'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return response
+        return normal_call(uri, args, options)
+    task.call = call
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'INVALID_READBACK', checked
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('parent', [None, {}, {'id': 'not-a-guid'}, 7])
+def test_shared_only_predicate_never_replaces_the_canonical_parent_fact(tmp_path, parent):
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    task.objects[SECOND]['parent'] = parent
+    task.declare()
+    code, checked = task.step('draft-check')
+    expected = 'CONSTRAINED_REFERENCE_BOUNDARY' if parent is None or parent == {} else 'INVALID_READBACK'
+    assert code == 2 and checked['error_code'] == expected, checked
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_shared_only_classification_supports_an_atomic_reference_preview(tmp_path, version):
+    task = SharedReferenceTask(tmp_path, version, operation='object.set')
+    task.declare()
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+
+
+def test_shared_only_2021_metadata_extension_is_not_assumed_to_have_later_semantics(tmp_path):
+    task = SharedReferenceTask(tmp_path, '2021.1')
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+    assert not any(uri.endswith(('setReference', 'object.set')) or 'owner = null' in (args or {}).get('waql', '')
+                   for uri, args, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_shared_only_predicate_keeps_the_selected_platform_and_read_meaning(tmp_path, version):
+    task = SharedReferenceTask(tmp_path, version)
+    platform = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return normal_call(uri, args, options)
+    task.call = call
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step('draft-discover-fields', '--object-handle', source,
+                                '--meaning', 'Attenuation', '--platform', platform)
+    assert code == 0, discovered
+    field = discovered['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-field-change', '--object-handle', source,
+                              '--field-handle', field, '--target-handle', target)
+    assert code == 0, declared
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')
+             and ('parent' in options.get('return', []) or 'owner = null' in args.get('waql', ''))]
+    classification_reads = [(args, options) for args, options in reads
+                            if options.get('return') in (['id', 'parent'], ['id'])]
+    assert classification_reads and all(options['platform'] == platform for _, options in classification_reads)
+    predicates = [args['waql'] for args, options in classification_reads if 'waql' in args]
+    assert predicates and set(predicates) == {f'from object "{SECOND}" where owner = null take 1'}
+
+
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_same_id(tmp_path, monkeypatch, phase):
+    from wwise_waapi.builders.query import WaqlQueryBuilder
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    normal_build = WaqlQueryBuilder.build
+    normal_call = task.call
+    def changed_build(self, request):
+        result = normal_build(self, request)
+        result.envelope.args['waql'] = result.envelope.args['waql'].replace('owner = null', 'owner != null')
+        return result
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner != null take 1'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': SECOND}]}
+        return normal_call(uri, args, options)
+    task.call = call
+    if phase == 'before':
+        monkeypatch.setattr(WaqlQueryBuilder, 'build', changed_build)
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    monkeypatch.setattr(WaqlQueryBuilder, 'build', changed_build)
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified

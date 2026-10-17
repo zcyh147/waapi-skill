@@ -35,7 +35,13 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                     "revalidate_and_verify": "preserve_exact_native_classifier_facts",
                     "unavailable_or_malformed_fact": "stop_before_dispatch",
                     "mixed_type_category_rows": "explicit_boundary_pending_native_combination_semantics",
-                    "shared_only_and_must_child_of": "explicit_boundary_pending_proven_classifier",
+                    "shared_only_types": {
+                        "supported": version in {"2022.1", "2023.1", "2024.1", "2025.1"},
+                        "facts": "Gateway_owned_exact_GUID_owner_null_predicate_and_canonical_parent",
+                        "omitted_owner_fact": "insufficient_without_predicate_membership",
+                        "revalidate_and_verify": ["versioned_query_meaning", "owner_null_membership", "exact_parent_GUID"],
+                    },
+                    "must_child_of": "explicit_boundary_pending_proven_relationship_semantics",
                 },
                 "target_hierarchy": {
                     "restriction": "childOfReference", "scope": "exact_existing_object",
