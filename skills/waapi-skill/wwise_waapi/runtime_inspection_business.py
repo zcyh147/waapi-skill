@@ -156,13 +156,11 @@ def _result_limit(max_results: int | None) -> int:
 def _profiler_time(value: str | None) -> str | int:
     if value in _PROFILER_CURSORS:
         return _PROFILER_CURSORS[str(value)]
-    if isinstance(value, str) and value.isascii() and value.isdecimal():
-        milliseconds = int(value)
-        if milliseconds <= 2_147_483_647:
-            return milliseconds
+    if isinstance(value, str) and len(value) <= 1024 and value.isascii() and value.isdecimal():
+        return int(value)
     raise RuntimeInspectionBusinessError(
         "profiler_position must be capture-latest, user-cursor, or non-negative "
-        "integer milliseconds up to 2147483647"
+        "integer milliseconds encoded in at most 1024 ASCII decimal digits"
     )
 
 
@@ -513,12 +511,12 @@ def materialize_runtime_control_business_request(
         if (
             isinstance(target, bool)
             or not isinstance(target, int)
-            or not 0 <= target <= 2_147_483_647
+            or target < 0
         ):
             raise business_repair(
                 "BUSINESS_VALUE_INVALID",
                 field="cursor_target_ms",
-                action="provide non-negative integer milliseconds up to 2147483647",
+                action="provide non-negative integer milliseconds",
             )
         args = {"time": target}
     elif operation == PROFILER_ENABLE_DATA_URI:

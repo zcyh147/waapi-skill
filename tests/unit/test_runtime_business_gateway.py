@@ -708,7 +708,7 @@ def test_runtime_schema_discloses_accepted_business_meanings_and_position_forms(
         if operation == GET_VOICES_URI:
             assert declaration["input_forms"]["profiler_position"]["value_forms"] == {
                 "named": ["capture-latest", "user-cursor"],
-                "integer_milliseconds": {"minimum": 0, "maximum": 2147483647, "encoding": "ASCII decimal string"},
+                "integer_milliseconds": {"minimum": 0, "encoding": "ASCII decimal string", "maximum_input_bytes": 1024, "bound_owner": "Gateway request resource policy"},
             }
 
 
@@ -818,6 +818,22 @@ def test_profiler_voice_read_rejects_invented_handle_before_connection(
 
     assert code == 2
     assert "copied exactly" in payload["message"]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_read_accepts_native_nonnegative_time_without_int32_ceiling(tmp_path: Path, version: str) -> None:
+    year, major = map(int, version.split("."))
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [{"isCommandLine": True, "version": {
+            "year": year, "major": major, "minor": 0, "build": 1, "displayName": f"v{version}.0.1"}}],
+        GET_VOICES_URI: [{"return": []}],
+    })
+    code, payload = gateway.execute_gateway(
+        ["core-call", GET_VOICES_URI, "--profiler-position", "4294967296"],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client,
+    )
+    assert code == 0, payload
+    assert any(uri == GET_VOICES_URI and args == {"time": 4294967296} for uri, args, _options in client.calls)
 
 
 def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(

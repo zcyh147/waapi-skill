@@ -708,7 +708,7 @@ def runtime_inspection_business_contract_data(
                     **value,
                     **({"value_forms": {
                         "named": list(PROFILER_CURSOR_MEANINGS),
-                        "integer_milliseconds": {"minimum": 0, "maximum": 2147483647, "encoding": "ASCII decimal string"},
+                        "integer_milliseconds": {"minimum": 0, "encoding": "ASCII decimal string", "maximum_input_bytes": 1024, "bound_owner": "Gateway request resource policy"},
                     }} if name == "profiler_position" else {}),
                 }
                 for name, value in row["input_forms"].items()
