@@ -6,8 +6,8 @@ Read-only queries and bounded Topic monitoring. Require the final sentinel and c
 
 - Use only the packaged Gateway. There is no raw-client fallback and do not write Python.
 - Use fixed routes directly: object reads use the business declaration from `query-schema`; Topic facts use `topic-schema`; non-fixed reflected functions use `request-schema <uri>` and its sole continuation. Topic observation never authorizes its publisher.
-- Without a fixed read or exact URI, copy the route from `operations`.
-- Catalogs: use coverage's host-scoped summary, then filters. `capabilities`/`describe` default to Console; offline `--profile wwise-authoring-ui` adds Authoring. Neither proves live availability. `--limit 0` requires every row; `--detail` is for audits.
+- Otherwise copy the route from `operations`.
+- Saved configuration selects live schemas. Catalogs default to Console; offline `--profile wwise-authoring-ui` adds Authoring. Neither proves live availability. Use coverage's host-scoped summary, then filters. `describe` is for offline schema audits. `--limit 0` requires every row.
 - `API_NOT_FOUND`, `MANIFEST_NOT_FOUND`, `FIXED_COMMAND_REQUIRED`, `QUERY_OBJECT_REQUIRED`, `WAIT_TOPIC_REQUIRED`, `TRANSACTION_REQUIRED`, and `UNSUPPORTED_BY_SKILL_INTERFACE` (`unsupported_by_skill_interface`) are boundaries; other complete structured failures follow the Skill Recovery rule and their receipt.
 
 ## Wwise 2025.1 Media Pool
@@ -29,7 +29,7 @@ check; never perform this join in model-authored code.
 
 ### Closed original-file reference classification
 
-This is Wwise `2025.1`-only and follows a successful Media Pool read. Run only for between 1 and 64 candidate rows. With zero candidates report empty. With more than 64 report the candidate-limit boundary; do not silently truncate, split the candidates across repeated scans, or choose a subset.
+Wwise `2025.1`-only, after a successful Media Pool read. Require between 1 and 64 candidate rows. With zero candidates report empty. With more than 64 report the candidate-limit boundary; do not silently truncate, split the candidates across repeated scans, or choose a subset.
 
 Take each exact returned `Path`, sort those strings lexicographically, and pass each once. Each path is limited to 1024 UTF-8 bytes and must be drive-absolute, an ordinary UNC path, or POSIX-absolute. Reject relative/traversal/device paths. Do not pre-normalize or de-duplicate: the Gateway normalizes slash spelling and drive/UNC case, keeps POSIX case significant, and rejects normalized candidate collisions.
 
@@ -41,15 +41,15 @@ python /absolute/path/to/waapi-skill/scripts/run.py gateway.py query-object --ma
 
 Do not add predicates, relationships, or extra business outputs. The fixed `id,path,originalFilePath` projection performs the complete join and emits no raw AudioFileSource inventory.
 
-Success keeps `agent_result` as its final top-level field with `waapi-skill.original-file-reference-match/v1`, `scan_complete: true`, `scanned_audio_source_count`, `scan_limit: 1000`, and one `candidates` entry for every input path in the same order. Each includes the exact full-scan `reference_count` and at most four `{id,path}` details, sorted by path case-insensitively and then id case-insensitively. `references_truncated: true` means only that detail list was shortened. An unreferenced entry has count `0`.
+Success keeps `agent_result` as its final top-level field with `waapi-skill.original-file-reference-match/v1`, `scan_complete: true`, `scanned_audio_source_count`, `scan_limit: 1000`, and one `candidates` entry for every input path in the same order. Each has exact full-scan `reference_count` and at most four `{id,path}` details, sorted by path case-insensitively and then id case-insensitively. `references_truncated: true` means only that detail list was shortened. An unreferenced entry has count `0`.
 
 Classify only when the outer command succeeds and the terminal result says `scan_complete: true`. A 1000-row scan returns `ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE` with no `agent_result`. Any malformed row/path, duplicate id, normalized candidate collision, or WAAPI boundary proves no unreferenced claim. Stop instead of retrying with a broader query, another batch, direct `WaapiClient`, inline Python, or a helper file.
 
 ## Object queries
 
-One business declaration chooses exactly one source: repeated `--path-segment`, `--exact-id`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. A custom-kind miss/ambiguity uses returned candidates, never an invented type.
+Choose exactly one business source: repeated `--path-segment`, `--exact-id`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. Custom-kind miss/ambiguity uses returned candidates, never an invented type.
 
-Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. Repeated `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
+Repeated `--predicate BUSINESS_CONDITION VALUE` means flat AND. `--relationship` selects `descendants`, `ancestors`, `references-to`, `children`, or `parent`. A broad/expanding source requires the user's `--max-results`; there is no unbounded mode. `all-sounds`/`sound` includes SFX and Voice; use `sound-sfx` or `sound-voice` only for that explicit scope. With another source, type is `--predicate kind-is`, not a second source.
 
 Identity projections always request `id,name,type,path`. Absent outputs appear in `unavailable_fields`; explicit null stays null. Missing identity facts produce `identity_completeness.complete=false` and bounded `native_observation`, with no mutation authority. Add repeated `--include` values in caller order; `--include-field` adds live fields to custom `properties` and `references` maps. Follow structured metadata repair for missing/ambiguous fields.
 
@@ -59,7 +59,7 @@ Optional `--platform`/`--language` take one exact name or GUID, trimmed and boun
 
 Success rows are objects in the array; only an explicit empty array is empty. Over-bound, malformed, or truncated results are not empty. Ordinary `query-object` success defaults to compact business fields, sufficient for normal answers. Use `--detail` only for explicit user requests or compile/dispatch diagnosis; never rerun solely for detail. Failures skip compact projection but obey global limits. Keep terminal `agent_result` exact and final.
 
-Preserve predicate order; apply every AND conjunct before the bound. Sort/group presentation only after a complete result.
+Apply every AND conjunct before the bound.
 
 ### Relationship-guided next hops
 
@@ -95,6 +95,13 @@ Use the business declaration for one source and flat AND. Use advanced only for 
 - For relative depth, derive depth from each returned `path`, counting the root's direct children as relative depth 1; do not add `parent` solely to calculate relative depth. Request `parent` only when the user needs a parent identity or a direct parent-child relationship.
 - When the user supplies a maximum, copy that exact number to `--max-results`. Otherwise ask for a limit instead of inventing one.
 
+Literal path and exact-name search:
+
+```bash
+python scripts/run.py gateway.py query-object --path-segment 'Events' --path-segment 'Default Work Unit'
+python scripts/run.py gateway.py query-object --search-text 'ExactName' --predicate name-is ExactName --max-results 1
+```
+
 For example, a bounded descendant inventory of Sound candidates:
 
 ```bash
@@ -121,9 +128,9 @@ python scripts/run.py gateway.py query-object --exact-id '{GUID}' --relationship
 
 ## Object types, metadata, and fixed reads
 
-Start with offline version-pinned `object-types`. Live `metadata types` pages the running type inventory; optional `--meaning` filters name/type substrings. Follow generated `next_command` until `complete`.
+Start with offline `object-types`. Live `metadata types` pages the running type inventory; optional `--meaning` filters name/type substrings. Follow generated `next_command` until `complete`.
 
-`metadata list` pages one scope's fields. Copy a returned `selection` to same-scope `metadata detail --selection`; for a full inventory, follow `next_command` until `complete`. Details preserve type/default/restrictions/dependencies/supports/UI units, absence and null; unknown units stay unknown. Large fields retain useful `field` facts with typed choice/dependency and lossless raw-detail continuations. Follow generated commands; field selection needs no JSON-pointer reconstruction or giant descriptions. Expired/changed-scope selections require a new list and never authorize changes.
+`metadata list` pages one scope's fields. Copy a returned `selection` to same-scope `metadata detail --selection`; for a full inventory, follow `next_command` until `complete`. Details preserve type/default/restrictions/dependencies/supports/UI units, absence/null; unknown units stay unknown. Large fields retain useful `field` facts with typed choice/dependency and lossless raw-detail continuations. Follow generated commands; field selection needs no JSON-pointer reconstruction or giant descriptions. Expired/changed-scope selections require a new list and never authorize changes.
 
 `metadata discover` is auxiliary lexical search. It chooses one scope and repeat `--meaning` for one to eight short English phrases. Gateway owns detail level, search bounds, projection, metadata tokens, and cache scope. Complete `no_match` is a bounded miss: refine the meaning or use scoped list/detail discovery within the task. A `partial` result permits one broader technical attempt, then clarify unresolved choices. Honor dependencies when authorized, otherwise clarify.
 
@@ -133,7 +140,7 @@ Use fixed reads rather than reflected payloads:
 - `profiler-voice-contributions`: all versions; one Voice object GUID and optional game-object/Bus object GUIDs. Gateway resolves volatile pipeline IDs.
 - `project-default-work-units`: bounded default Work Unit facts.
 
-Each returns its stable `agent_result`; do not rebuild it. Remaining reflected reads use `request-schema <uri>` and its exact continuation.
+Other reflected reads use `request-schema <uri>` and its exact continuation.
 
 ## Exact-hop playback diagnosis
 
@@ -187,15 +194,14 @@ matches; never substitute GUIDs. Disclosed Topic facts cover other fields.
 
 Use `ak.wwise.core.soundbank.generated` for per-Bank × platform × language result events. Use `ak.wwise.core.soundbank.generationDone` only for the overall generation-cycle notice; `generationDone` is not proof that every Bank succeeded, so use the generating operation's terminal verification. `interface.selection_guidance` repeats this distinction.
 
-UI-command reads require the auto-detected Authoring profile and fresh `getCommands`; snapshots are not allowlists. `debug-wal-tree` and `debug-validate-call` remain bounded Debug-build routes and never authorize synthesis of an artifact.
+UI reads require the auto-detected Authoring profile and fresh `getCommands`; snapshots are not allowlists. `debug-wal-tree` and `debug-validate-call` remain bounded Debug-build routes and never authorize synthesis of an artifact.
 
 ## Selection and result boundary
 
 For current selection use live `selected`; report rows or explicit empty. The Gateway deduplicates and bounds it. Preserve terminal `agent_result` exactly. Malformed responses never become empty objects/Buses/projects/selections.
 
 Selected files: Wwise 2025.1 Authoring only. Find `getSelectedFiles` through
-`operations` and follow its zero-input continuation. File and object selections
-are distinct; an empty file list says nothing about object selection.
+`operations` and follow its zero-input continuation. File selection is distinct; empty files say nothing about selected objects.
 
 Report unsupported Gateway queries as boundaries; only explicit Skill development changes implementation.
 

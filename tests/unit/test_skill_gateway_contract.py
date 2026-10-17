@@ -162,13 +162,16 @@ def test_query_reference_has_no_raw_client_fallback() -> None:
     assert "business declaration" in query_reference
     assert "`describe` is for offline schema audits" in query_reference
     assert "offline `--profile wwise-authoring-ui`" in query_reference
-    assert "Use `--limit 0` only when" in query_reference
+    assert "`--limit 0` requires every row" in query_reference
     assert "--path-segment 'Events' --path-segment 'Default Work Unit'" in query_reference
     assert "--search-text 'ExactName' --predicate name-is ExactName --max-results 1" in query_reference
     assert "Repeated `--predicate` values mean AND" in query_reference
-    assert "Use `request-schema` for each URI and follow only its typed continuation" in query_reference
-    assert "Use live `metadata types`" in query_reference
-    assert "projection and bound are fixed" in query_reference
+    assert "Run `request-schema ak.wwise.core.mediaPool.getFields` before `request-schema ak.wwise.core.mediaPool.get` and follow each typed continuation" in query_flat
+    assert "Do not request the `.get` schema first" in query_reference
+    assert "Live `metadata types` pages the running type inventory" in query_reference
+    assert "Follow generated `next_command` until `complete`" in query_reference
+    assert "The fixed `id,path,originalFilePath` projection performs the complete join" in query_reference
+    assert "A 1000-row scan returns `ORIGINAL_FILE_REFERENCE_SCAN_INCOMPLETE`" in query_reference
 
 
 def test_topic_wait_policy_is_consistent_across_skill_and_query_reference() -> None:
