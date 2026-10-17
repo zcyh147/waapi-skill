@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 import pytest
 
 from tests.unit.test_conditional_reference_gateway import ScalarPropertyTask, FIRST, SECOND, VERSIONS
+from tests.unit.test_conditional_reference_gateway import AttenuationTask
 from tests.unit.test_time_modulator_range_gateway import finish
 
 GROUP = '{33333333-3333-3333-3333-333333333333}'
@@ -201,3 +202,53 @@ def test_atomic_group_and_default_reference_use_the_explicit_staged_parent(tmp_p
     assert len(writes) == 1
     assert writes[0]['objects'][0]['@SwitchGroupOrStateGroup'] == GROUP
     assert writes[0]['objects'][0]['@DefaultSwitchOrState'] == SECOND
+
+
+@pytest.mark.parametrize('version,rows', [
+    *((version, [{'type': ['Attenuation'], 'sharedOnlyTypes': ['Attenuation']}]) for version in VERSIONS[1:]),
+    *((version, [{'type': ['Attenuation']}, {'category': ['UnclassifiedNativeCategory']}]) for version in VERSIONS),
+    ('2025.1', [{'type': ['Attenuation']}, 'mustChildOf']),
+])
+def test_unclassified_native_target_constraint_is_a_closed_boundary(tmp_path, version, rows):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = deepcopy(rows)
+    if 'mustChildOf' in rows:
+        source = task.bind(FIRST)
+        code, discovered = task.step('draft-discover-fields', '--object-handle', source, '--meaning', 'Attenuation')
+        assert code == 2 and 'CONSTRAINED_REFERENCE_BOUNDARY' in json.dumps(discovered), discovered
+        assert 'INVALID_METADATA' not in json.dumps(discovered), discovered
+        return
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', json.dumps(checked)
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('shared_only', [[], ['Effect']])
+def test_empty_or_inapplicable_shared_only_subset_preserves_valid_targets(tmp_path, version, shared_only):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = [
+        {'type': ['Attenuation', 'Effect'], 'sharedOnlyTypes': shared_only}]
+    task.declare()
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+
+
+@pytest.mark.parametrize('row', [
+    {'type': None},
+    {'type': ['Attenuation'], 'sharedOnlyTypes': 'Attenuation'},
+    {'type': ['Attenuation'], 'sharedOnlyTypes': ['Effect']},
+    {'type': ['Attenuation'], 'unknown': []},
+    {'unknown': []},
+])
+def test_malformed_reference_constraint_cannot_become_an_unrestricted_target(tmp_path, row):
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = [row]
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'INVALID_METADATA', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)

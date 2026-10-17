@@ -21531,6 +21531,31 @@ def _require_reference_target_allowed(
                 "allowed_types": sorted(allowed_types),
             },
         )
+    for row in metadata.restriction.get("restrictions", []):
+        if not isinstance(row, Mapping):
+            continue  # String flags and malformed entries are handled by reference_allowed_types.
+        if "type" in row:
+            if set(row) - {"type", "sharedOnlyTypes"}:
+                raise OperationContractError("INVALID_METADATA", "Reference type restriction has unknown fields.")
+            types = row["type"]
+            if not isinstance(types, list) or not all(isinstance(value, str) and value for value in types):
+                raise OperationContractError("INVALID_METADATA", "Reference type restriction must be a string array.")
+            shared = row.get("sharedOnlyTypes", [])
+            if (not isinstance(shared, list) or not all(isinstance(value, str) and value for value in shared)
+                    or {reference_type_token(value) for value in shared} - {reference_type_token(value) for value in types}):
+                raise OperationContractError("INVALID_METADATA", "Shared-only reference types must be a subset of the allowed type array.")
+            if target_token in {reference_type_token(value) for value in shared}:
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "This chosen target type requires a proven Shared-object classifier; type or path alone is insufficient.",
+                    details={"reference": metadata.name, "target_id": target.object, "shared_only_types": shared})
+        elif "category" in row:
+            if set(row) != {"category"} or not isinstance(row["category"], list) or not all(isinstance(value, str) for value in row["category"]):
+                raise OperationContractError("INVALID_METADATA", "Reference category restriction must be an exact string array.")
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                "Native reference categories require a separately proven target classifier.",
+                details={"reference": metadata.name, "categories": row["category"]})
+        elif set(row) != {"childOfReference"}:
+            raise OperationContractError("INVALID_METADATA", "Reference restriction has an unknown object shape.")
     parent_fields = []
     for row in metadata.restriction.get("restrictions", []):
         if not isinstance(row, Mapping) or "childOfReference" not in row:
@@ -21663,6 +21688,10 @@ def _require_reference_clear_allowed(
             if item == "playable":
                 # A target classifier is unnecessary when no target remains.
                 continue
+            if item == "mustChildOf":
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "The native mustChildOf flag has no proven clear-operation semantics.",
+                    details={"reference": metadata.name, "restriction": dict(metadata.restriction)})
             raise OperationContractError(
                 "INVALID_METADATA",
                 "Reference restriction metadata contains an unknown string flag.",
