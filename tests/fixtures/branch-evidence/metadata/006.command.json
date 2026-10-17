@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/.venv/bin/python",
+    "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill/scripts/run.py",
+    "gateway.py",
+    "--state-dir",
+    "/Users/xiye/Documents/Git/waapi-skills/.waapi-skill-state/full-coverage/condition-metadata-2021-r1/gateway-state",
+    "--timeout",
+    "30",
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "ObjectSettingAssoc",
+    "--selection",
+    "mf1.1792223505.0.c5d9495edb782a6012addee68d34aa9f79bca73fec7a0022870919732e159019"
+  ],
+  "gateway_arguments": [
+    "metadata",
+    "detail",
+    "--custom-kind",
+    "ObjectSettingAssoc",
+    "--selection",
+    "mf1.1792223505.0.c5d9495edb782a6012addee68d34aa9f79bca73fec7a0022870919732e159019"
+  ],
+  "started_at_unix": 1792223505.916777
+}

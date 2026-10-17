@@ -210,3 +210,8 @@ tests/unit/test_persistent_project_cleanup_gateway.py
 tests/unit/test_policy_recovery_gateway.py
 
 tests/unit/test_native_catalog_gateway.py
+
+tests/unit/test_branch_coverage_audit.py
+tests/unit/test_branch_coverage_completion_cli.py
+
+tests/unit/test_branch_evidence_readers.py
