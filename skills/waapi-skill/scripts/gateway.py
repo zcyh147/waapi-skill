@@ -23079,7 +23079,8 @@ def dispatch_undo_group_execution_plan(
                 raise ValueError("Sealed cancellation observation is not a catalog-proven read")
             result = dispatch(dispatcher, uri, connection=connection, version=version,
                               args=args, options=options, allow_destructive=False,
-                              operation_timeout=min(contract.timeout_seconds, connection.deadline.require_remaining("compound cancellation readback")))
+                              operation_timeout=min(contract.timeout_seconds, connection.deadline.require_remaining("compound cancellation readback")),
+                              result_limit_bytes=contract.result_limit_bytes)
             summary = dispatch_call_summary(result)
             if result.get("ok") is not True:
                 return {"call": summary, "error": "Cancellation readback failed: " + str(result.get("error_code"))}
