@@ -7297,6 +7297,7 @@ def _apply_reference_activation_dependencies(
     _activation_path: tuple[str, ...] = (),
     _activation_fields: set[str] | None = None,
     _condition_sources: tuple[PropertyInfoMetadataRecord, ...] = (),
+    reference_requirements: dict[str, Any] | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded same-object Boolean activation requirements.
 
@@ -7327,6 +7328,61 @@ def _apply_reference_activation_dependencies(
         if (dependency.get("value") is False
                 and dependency == {"type": "isMasterBus", "value": False,
                                    "action": "Show", "context": "Self"}):
+            continue
+        if dependency.get("type") == "reference" and reference_requirements is not None:
+            expected_fields = {"type", "action", "context", "property", "conditions"}
+            conditions = dependency.get("conditions")
+            name = dependency.get("property")
+            if (set(dependency) != expected_fields or not isinstance(name, str)
+                    or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None
+                    or not all(isinstance(dependency.get(key), str) for key in ("action", "context"))):
+                raise OperationContractError("INVALID_METADATA", "Reference-presence dependency metadata is malformed.")
+            from .metadata_restrictions import reference_presence_condition, MetadataRestrictionError
+            try:
+                required_presence = reference_presence_condition(conditions)
+            except MetadataRestrictionError as exc:
+                raise OperationContractError("INVALID_METADATA", str(exc)) from exc
+            if dependency["action"] == "Show" and dependency["context"] in {"Self", "Parent", "AssocParent"}:
+                continue
+            if dependency["action"] != "Enable" or dependency["context"] != "Self":
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Reference-presence activation needs its exact object context.")
+            if name.casefold() in path:
+                raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.")
+            all_fields.add(name.casefold())
+            if len(all_fields) > 16:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
+            if object_id is None:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "A reference prerequisite needs an explicit target or a staged object-scoped Preview.")
+            reference_info = property_info_by_name.get(name.casefold())
+            if reference_info is None:
+                reference_info = _read_property_info_cached(read, cache=property_info_cache, name=name, object_id=object_id) if property_info_cache is not None else _read_property_info(read, name=name, object_id=object_id)
+                property_info_by_name[name.casefold()] = reference_info
+            if reference_info.name != name:
+                raise OperationContractError("INVALID_METADATA", "Reference prerequisite metadata names a different field.")
+            _require_object_reference_metadata(reference_info)
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}}, {"return": ["id", name]}))
+            if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], name):
+                raise OperationContractError("INVALID_READBACK", "Reference prerequisite must resolve on the exact object.")
+            value = _field_value(rows[0], name)
+            identity = None if _reference_value_is_null(value) else _reference_identity(value)
+            if not _reference_value_is_null(value) and (not isinstance(identity, str) or _PLUGIN_GUID.fullmatch(identity) is None):
+                raise OperationContractError("INVALID_READBACK", "Reference prerequisite must expose a canonical GUID or native null.")
+            if (identity is not None) != required_presence:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the required reference state before editing this field.", details={
+                    "object_id": object_id, "property": metadata.name, "mutation_dispatched": False,
+                    "prerequisite_changes": [{"operation": "object.setReference", "discovery_meaning": name,
+                        "selection": "live_discovered_Field_Handle", "required_presence": required_presence,
+                        "target_selection": "user_chosen_exact_object" if required_presence else "clear_reference"}],
+                })
+            reference_requirements[name] = identity
+            activation_names.extend(_apply_reference_activation_dependencies(
+                reference_info, read=read, object_id=object_id,
+                property_specs=property_specs, property_info_by_name=property_info_by_name,
+                derived_properties=derived_properties, request_path=request_path,
+                property_info_cache=property_info_cache, _activation_path=path,
+                _activation_fields=all_fields, _condition_sources=_condition_sources,
+                reference_requirements=reference_requirements,
+            ))
             continue
         fields = set(dependency)
         expected_fields = (_REFERENCE_ACTIVATION_DEPENDENCY_FIELDS | {"conditions"}
@@ -7508,6 +7564,7 @@ def _apply_reference_activation_dependencies(
             object_id=object_id, class_id=class_id, property_info_cache=property_info_cache,
             _activation_path=path, _activation_fields=all_fields,
             _condition_sources=_condition_sources,
+            reference_requirements=reference_requirements,
         ))
 
         matching_specs = [
@@ -8928,6 +8985,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 platform=platform,
             )
         activation_requirements: dict[str, Any] = {}
+        activation_reference_requirements: dict[str, Any] = {}
         activation_metadata: dict[str, PropertyInfoMetadataRecord] = {}
         if request.operation == "object.setProperty" or arguments["target"] is not None:
             activation_specs: list[dict[str, Any]] = []
@@ -8935,6 +8993,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 info, read=read, object_id=source.object,
                 property_specs=activation_specs, property_info_by_name=activation_metadata,
                 derived_properties={}, request_path="$.reference",
+                reference_requirements=activation_reference_requirements,
             )
             activation_requirements = {spec["name"]: spec["value"] for spec in activation_specs}
             if info.dependencies:
@@ -8946,7 +9005,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},
             {
-                "return": ["id", "path", field_value, *activation_requirements],
+                "return": ["id", "path", field_value, *activation_requirements, *activation_reference_requirements],
                 **({"platform": platform} if platform is not None else {}),
             },
         )
@@ -8991,6 +9050,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "platform": platform,
             "row": field_before_rows[0],
             **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+            **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
         }
         if request.operation == "object.setProperty":
             preview = PropertyReferenceBuilder(version=request.version).set_property(
@@ -9004,6 +9064,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             verification = {
                 "kind": "same-guid-property",
                 **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+                **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_value": arguments["value"],
@@ -9032,6 +9093,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             verification = {
                 "kind": "same-guid-reference",
                 **({"activation_requirements": activation_requirements} if activation_requirements else {}),
+                **({"activation_reference_requirements": activation_reference_requirements} if activation_reference_requirements else {}),
                 "object_id": source.object,
                 "field": field_value,
                 "expected_target_id": (
@@ -13633,7 +13695,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if isinstance(field_name, str) and object_id is not None:
             args = {"from": {"id": [object_id]}}
             activation_requirements = field_before.get("activation_requirements", {})
-            options = {"return": ["id", "path", field_name, *activation_requirements]}
+            activation_reference_requirements = field_before.get("activation_reference_requirements", {})
+            options = {"return": ["id", "path", field_name, *activation_requirements, *activation_reference_requirements]}
             platform = field_before.get("platform")
             if platform is not None:
                 if not isinstance(platform, str) or not platform:
@@ -13664,6 +13727,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                               and _has_field(rows[0], name) and type(actual) is type(expected) and actual == expected,
                     "evidence": {"expected": expected, "actual": actual},
                 })
+            for name, expected in activation_reference_requirements.items():
+                assertions.append({"name": f"reference prerequisite {name} unchanged",
+                    "passed": len(rows) == 1 and _same_identity(rows[0].get("id"), object_id)
+                              and _reference_requirement_matches(rows[0], name, expected),
+                    "evidence": {"expected": expected, "rows": rows}})
 
     copy_move_collision_guard = (
         pre_state.get("copy_move_collision_guard")
@@ -17441,9 +17509,10 @@ def verify_prepared_operation(
         field_name = str(plan.get("field"))
         platform = plan.get("platform")
         activation_requirements = plan.get("activation_requirements", {})
+        activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name, *activation_requirements),
+            fields=("id", "path", field_name, *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("property target resolves exactly once", len(rows) == 1, rows)
@@ -17462,13 +17531,18 @@ def verify_prepared_operation(
                       _has_field(rows[0], name) and type(_field_value(rows[0], name)) is type(expected_value)
                       and _field_value(rows[0], name) == expected_value,
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
+            for name, expected_value in activation_reference_requirements.items():
+                check(f"reference prerequisite {name} remains satisfied",
+                      _reference_requirement_matches(rows[0], name, expected_value),
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "same-guid-reference":
         field_name = str(plan.get("field"))
         platform = plan.get("platform")
         activation_requirements = plan.get("activation_requirements", {})
+        activation_reference_requirements = plan.get("activation_reference_requirements", {})
         rows = read_object(
             object_id=plan.get("object_id"),
-            fields=("id", "path", field_name, *activation_requirements),
+            fields=("id", "path", field_name, *activation_requirements, *activation_reference_requirements),
             platform=platform if isinstance(platform, str) else None,
         )
         check("reference source resolves exactly once", len(rows) == 1, rows)
@@ -17506,6 +17580,10 @@ def verify_prepared_operation(
                 check(f"reference activation {name} remains satisfied",
                       _has_field(rows[0], name) and type(_field_value(rows[0], name)) is type(expected_value)
                       and _field_value(rows[0], name) == expected_value,
+                      {"expected": expected_value, "actual": _field_value(rows[0], name)})
+            for name, expected_value in activation_reference_requirements.items():
+                check(f"reference prerequisite {name} remains satisfied",
+                      _reference_requirement_matches(rows[0], name, expected_value),
                       {"expected": expected_value, "actual": _field_value(rows[0], name)})
     elif kind == "ui-capture-screen-result":
         success_status = "result_schema_checked"
@@ -21387,6 +21465,16 @@ def _reference_value_is_null(value: Any) -> bool:
         and identity.casefold()
         == "{00000000-0000-0000-0000-000000000000}"
     )
+
+
+def _reference_requirement_matches(row: Mapping[str, Any], name: str, expected: Any) -> bool:
+    if not _has_field(row, name):
+        return False
+    value = _field_value(row, name)
+    if expected is None:
+        return _reference_value_is_null(value)
+    actual = _reference_identity(value)
+    return isinstance(actual, str) and _PLUGIN_GUID.fullmatch(actual) is not None and _same_identity(actual, expected)
 
 
 def _typed_value_equal(actual: Any, expected: Any, metadata_type: str) -> bool:

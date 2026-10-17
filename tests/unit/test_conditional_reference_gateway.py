@@ -447,6 +447,84 @@ def test_atomic_field_conditions_are_combined_before_choosing_a_prerequisite(tmp
     assert task.objects[FIRST]["Volume"] == -7
 
 
+class ReferencePresenceTask(AttenuationTask):
+    def __init__(self, path, version):
+        super().__init__(path, version, operation="object.setProperty")
+        self.metadata = {
+            "UserAuxSendVolume0": {"name": "UserAuxSendVolume0", "type": "Real64", "dependencies": [{
+                "type": "reference", "action": "Enable", "context": "Self", "property": "UserAuxSend0",
+                "conditions": [{"referenceIsSet": True}],
+            }]},
+            "UserAuxSend0": {"name": "UserAuxSend0", "type": "", "restriction": {
+                "type": "reference", "restrictions": [{"type": ["AuxBus"]}],
+            }},
+        }
+        self.objects[FIRST].update(UserAuxSendVolume0=0.0, UserAuxSend0={"id": SECOND})
+
+    def call(self, uri, args=None, options=None):
+        if uri.endswith("isPropertyEnabled"):
+            self.calls.append((uri, deepcopy(args), options))
+            return {"return": getattr(self, "enabled", True)}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
+def test_reference_presence_condition_is_preserved_guarded_and_verified(tmp_path, version, drift):
+    task = ReferencePresenceTask(tmp_path, version)
+    target = task.bind(FIRST)
+    field = task.discover(target, "UserAuxSendVolume0")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "-6")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "before":
+        task.objects[FIRST]["UserAuxSend0"] = None
+    if drift == "metadata":
+        task.metadata["UserAuxSendVolume0"]["dependencies"][0]["conditions"][0]["referenceIsSet"] = False
+    code, executed = task.run("execute", tx)
+    if drift in {"before", "metadata"}:
+        assert code == 2, executed
+        assert not any(uri.endswith("setProperty") for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    if drift == "after":
+        task.objects[FIRST]["UserAuxSend0"] = None
+    code, verified = task.run("verify", tx)
+    assert code == (2 if drift == "after" else 0), verified
+    assert task.objects[FIRST]["UserAuxSendVolume0"] == -6
+    assert task.objects[FIRST]["Volume"] == -7
+    assert sum(uri.endswith("setProperty") for uri, _, _ in task.calls) == 1
+    assert not any(uri.endswith(("object.set", "setReference")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_missing_reference_discloses_target_choice_without_inventing_a_reference(tmp_path, version):
+    task = ReferencePresenceTask(tmp_path, version)
+    task.enabled = False
+    task.objects[FIRST]["UserAuxSend0"] = None
+    target = task.bind(FIRST)
+    field = task.discover(target, "UserAuxSendVolume0")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "-6")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 2 and checked["error_code"] == "REFERENCE_ACTIVATION_REQUIRED", checked
+    repair = checked["details"]["prerequisite_changes"][0]
+    assert repair == {"operation": "object.setReference", "discovery_meaning": "UserAuxSend0",
+                      "selection": "live_discovered_Field_Handle", "required_presence": True,
+                      "target_selection": "user_chosen_exact_object"}
+    assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
+
+
 @pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("context", ["Self", "Parent"])
 def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tmp_path, version, context):

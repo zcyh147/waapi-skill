@@ -143,6 +143,12 @@ def supports_property_prerequisite_workflow(dependencies: Any) -> bool:
             return False
         if item.get("type") == "override" and set(item) == {"type", "action", "context", "property"}:
             continue
+        if item.get("type") == "reference" and set(item) == {"type", "action", "context", "property", "conditions"}:
+            try:
+                reference_presence_condition(item["conditions"])
+            except MetadataRestrictionError:
+                return False
+            continue
         if item.get("type") != "property" or set(item) != {"type", "action", "context", "property", "conditions"}:
             return False
         try:
@@ -150,3 +156,11 @@ def supports_property_prerequisite_workflow(dependencies: Any) -> bool:
         except MetadataRestrictionError:
             return False
     return True
+
+
+def reference_presence_condition(conditions: Any) -> bool:
+    if (not isinstance(conditions, list) or len(conditions) != 1
+            or not isinstance(conditions[0], Mapping) or set(conditions[0]) != {"referenceIsSet"}
+            or type(conditions[0]["referenceIsSet"]) is not bool):
+        raise MetadataRestrictionError("INVALID_METADATA", "Reference-presence condition requires one native Boolean referenceIsSet value.")
+    return conditions[0]["referenceIsSet"]
