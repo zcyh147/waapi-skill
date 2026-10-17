@@ -7174,6 +7174,8 @@ def _read_property_info(
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
+    if info.type is None and info.restriction.get("type") != "reference":
+        raise OperationContractError("FIELD_TYPE_UNAVAILABLE", "Native metadata does not certify a scalar value type.", details={"property": name, "unavailable_facts": ["type"]})
     return info
 
 

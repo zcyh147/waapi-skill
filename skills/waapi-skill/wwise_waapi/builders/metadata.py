@@ -379,14 +379,12 @@ def bind_get_property_info_result(
 ) -> PropertyInfoMetadataRecord:
     """Bind an omitted native name to a separately proven exact live token.
 
-    Read observations remain unchanged. Scalar mutation requires a native type;
-    a native reference restriction can certify a reference. Metadata retains
-    the absent name plus explicit binding
-    provenance rather than presenting the token as a native name observation.
+    Read observations remain unchanged. The caller separately certifies the
+    value kind; this binding invents no type. Serialized metadata retains the
+    absent name plus explicit binding provenance rather than presenting the
+    token as a native name observation.
     """
     info = parse_get_property_info_result(result, require_identity=False)
-    if info.restriction.get("type") != "reference":
-        _require_result_fields(GET_PROPERTY_INFO_URI, result, ("type",))
     if not isinstance(field_token, str) or not field_token or field_token not in available_names:
         raise _result_error(GET_PROPERTY_INFO_URI, "Field binding needs an exact live-discovered token.")
     if info.name is not None:

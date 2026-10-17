@@ -238,3 +238,23 @@ def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path:
     assert rejected["details"]["draft_changed"] is False
     assert rejected["details"]["rejected_candidates"][0]["field"] == "Mode"
     assert task.revision == revision
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_exact_draft_selection_reports_unavailable_scalar_type_without_claiming_bad_metadata(tmp_path, version):
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    selection = listed["agent_result"]["fields"][0]["selection"]
+    task.metadata["FadeTime"].pop("type")
+    revision = task.revision
+    code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", selection)
+    assert code == 2, rejected
+    issue = rejected["details"]["rejected_candidates"][0]
+    assert issue["error_code"] == "FIELD_TYPE_UNAVAILABLE", rejected
+    assert issue["field"] == "FadeTime"
+    assert issue["unavailable_facts"] == ["type"]
+    assert rejected["details"]["draft_changed"] is False
+    assert task.revision == revision
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)

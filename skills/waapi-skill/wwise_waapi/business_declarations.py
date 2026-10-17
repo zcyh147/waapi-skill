@@ -1045,6 +1045,12 @@ class BusinessHandleRegistry:
                 )
 
 
+
+def _require_available_field_value_type(info, token):
+    if info.type is None and info.restriction.get("type") != "reference":
+        raise _error("FIELD_TYPE_UNAVAILABLE", field=token, unavailable_facts=["type"],
+                     action="inspect the exact field metadata or select a field with a certified value type")
+
 def bind_live_field(
     registry: BusinessHandleRegistry,
     *,
@@ -1115,6 +1121,7 @@ def bind_live_field(
             candidates=(info.name,),
             action="refresh live Wwise metadata before continuing",
         )
+    _require_available_field_value_type(info, token)
     field_kind = (
         "reference"
         if (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
@@ -1278,6 +1285,7 @@ def revalidate_live_field(
             rejected_handle=field.handle,
             action="refresh live metadata and use the new field handle",
         )
+    _require_available_field_value_type(info, field.token)
     dependency_fields = _dependency_field_tokens(info.dependencies)
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
