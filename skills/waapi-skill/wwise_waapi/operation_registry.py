@@ -23,8 +23,9 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
+from .layout_blueprint import declared_layout_matches, declared_layout_mismatches
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -8863,6 +8864,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
                 except ValueError as exc:
                     raise OperationContractError('LAYOUT_REGISTRATION_COLLISION', str(exc)) from exc
+                try:
+                    metadata['layout_blueprint_view_catalog'] = blueprint_view_catalog(arguments['layout_binding'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_BLUEPRINT_VIEW_TYPE', str(exc)) from exc
                 verification['expected_layout'] = dict(call_args['layout'])
             elif api == LAYOUT_REMOVE_URI:
                 try:
@@ -8881,7 +8886,19 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 verification.update(expected_name=binding['layout_name'], view_type=call_args['name'],
                     coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args},
                     existing_view_ids=[row['viewID'] for row in observed['instances'] if row['viewName'] == call_args['name']])
-            elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+            elif api == LAYOUT_SPLITTER_URI:
+                binding = arguments['layout_binding']
+                try:
+                    if current['name'] != binding['layout_name']:
+                        raise ValueError('Splitter movement requires its discovered layout to be current')
+                    observed = splitter_state_observation(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_SPLITTER_SCOPE', str(exc)) from exc
+                metadata['layout_splitter_prestate'] = observed
+                verification.update(splitter_id=call_args['id'], axis=observed['axis'], parent_id=observed['parent_id'],
+                    rectangle_before=observed['rectangle'], pixel_delta=call_args['delta'],
+                    preserved_view_identities=layout_view_identities(observed['instances']))
+            elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
                 binding = arguments['layout_binding']
                 if current['name'] != binding['layout_name']:
                     raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Changing a view requires its discovered layout to be current')
@@ -8890,6 +8907,16 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 except ValueError as exc:
                     raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
                 verification.update(expected_name=binding['layout_name'], view_id=call_args['viewID'])
+                if api == LAYOUT_DOCK_URI:
+                    try:
+                        dock_state = dock_state_observation(binding, read=read)
+                    except ValueError as exc:
+                        raise OperationContractError('INVALID_LAYOUT_DOCK_TARGET', str(exc)) from exc
+                    metadata['layout_dock_prestate'] = dock_state
+                    verification.update(view_type=observed_view['viewName'], target_id=call_args['targetID'],
+                        target_kind=dock_state['target']['kind'], dock_side=call_args['side'],
+                        target_previous_ids=layout_subtree_ids(dock_state['target']['observation']),
+                        preserved_view_identities=layout_view_identities(dock_state['instances']))
                 if api == LAYOUT_UNDOCK_URI:
                     verification.update(view_type=observed_view['viewName'],
                         coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args})
@@ -13644,6 +13671,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 if api == LAYOUT_SET_URI:
                     absence = require_layout_absence(call_args['name'], read=read_call)
                     readbacks.append(absence)
+                    if blueprint_view_catalog(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_blueprint_view_catalog'):
+                        raise ValueError('Nested blueprint live view catalog changed after preview')
                 elif api == LAYOUT_REMOVE_URI:
                     require_temporary_layout(call_args['name'], read=layout_guard_read)
                 elif api == LAYOUT_GET_OR_CREATE_URI:
@@ -13651,10 +13680,17 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         raise ValueError('The layout for view creation is no longer current')
                     if view_creation_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_view_prestate'):
                         raise ValueError('View catalog or instances changed after preview; inspect and preview again')
-                elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
+                elif api == LAYOUT_SPLITTER_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for splitter movement is no longer current')
+                    if splitter_state_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_splitter_prestate'):
+                        raise ValueError('Splitter identity, axis or rectangle changed after preview')
+                elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
                     if current.get('name') != arguments['layout_binding']['layout_name']:
                         raise ValueError('The layout for the view mutation is no longer current')
                     validate_layout_view_binding(arguments['layout_binding'], read=layout_guard_read)
+                    if api == LAYOUT_DOCK_URI and dock_state_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_dock_prestate'):
+                        raise ValueError('Dock target, view or rectangles changed after preview')
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
@@ -15922,10 +15958,17 @@ def verify_prepared_operation(
             validate_layout_read_result('contents', registered)
             readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': registered})
             expected_layout = plan.get('expected_layout')
-            # This initial closed registration declares only a name: no canvas or arrangement is claimed.
             check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
                 and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
-                {'expected': expected_layout, 'actual': registered})
+                {'expected_name': expected_layout.get('Layout', {}).get('Name') if isinstance(expected_layout, Mapping) else None,
+                 'actual_name': registered.get('Layout', {}).get('Name')})
+            if isinstance(expected_layout, Mapping) and 'StackPanel' in expected_layout.get('Layout', {}):
+                check('Registered layout retains every declared nested field and child order',
+                    declared_layout_matches(expected_layout, registered),
+                    {'mismatches': declared_layout_mismatches(expected_layout, registered),
+                     'expected_layout_sha256': canonical_sha256(expected_layout),
+                     'observed_layout_sha256': canonical_sha256(registered),
+                     'comparison': 'all declared fields and exact child order; native default fields may be additional'})
         elif uri == LAYOUT_REMOVE_URI:
             try:
                 absent = require_layout_absence(plan['expected_name'], read=read_call)
@@ -15934,6 +15977,79 @@ def verify_prepared_operation(
             else:
                 readbacks.append(absent)
                 check('Temporary layout is absent after unregister', True, absent)
+        elif uri == LAYOUT_SPLITTER_URI:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+            scoped = current.get('name') == plan['expected_name']
+            check('Splitter movement remains in the reviewed current layout', scoped, current)
+            if scoped:
+                instances_raw = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': instances_raw})
+                view_identities = layout_view_identities(canonical_view_instances(instances_raw))
+                check('Splitter movement preserves every existing view identity and type',
+                    view_identities == plan['preserved_view_identities'],
+                    {'before': plan['preserved_view_identities'], 'after': view_identities})
+                layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
+                try:
+                    observed = splitter_element_context(layout, plan['splitter_id'])
+                    same_axis = observed['axis'] == plan['axis'] and observed['parent_id'] == plan['parent_id']
+                    check('The exact splitter retains its reviewed parent and axis', same_axis, observed)
+                    raw = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['splitter_id']}, {})
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['splitter_id']}, 'options': {}, 'result': raw})
+                    rectangle = require_layout_rectangle(raw)
+                    before = require_layout_rectangle(plan['rectangle_before'])
+                    movement_edges = ('left', 'right') if plan['axis'] == 'x' else ('top', 'bottom')
+                    expected = {edge: value + (plan['pixel_delta'] if edge in movement_edges else 0)
+                                for edge, value in before.items()}
+                    check('Splitter moves by the exact signed pixel displacement without resizing or perpendicular drift',
+                        same_axis and rectangle == expected,
+                        {'axis': plan['axis'], 'pixel_delta': plan['pixel_delta'], 'before': before,
+                         'expected': expected, 'actual': rectangle, 'automatic_replay': False})
+                except ValueError as exc:
+                    check('Exact splitter displacement is independently observed', False, {'reason': str(exc)})
+        elif uri == LAYOUT_DOCK_URI:
+            current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            validate_layout_read_result('current', current)
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.extend([
+                {'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current},
+                {'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed}])
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            scoped = current.get('name') == plan['expected_name']
+            docked = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is True
+            check('Docked view remains in the reviewed current layout', scoped, current)
+            view_identities = layout_view_identities(instances)
+            check('Docking preserves every existing view identity and type',
+                view_identities == plan['preserved_view_identities'],
+                {'before': plan['preserved_view_identities'], 'after': view_identities})
+            check('The exact discovered view is independently observed docked', docked, {'view_id': plan['view_id'], 'actual': matches})
+            if scoped and docked:
+                layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
+                try:
+                    target = layout_element_observation(layout, plan['target_id'])
+                    if target['kind'] != plan['target_kind']:
+                        raise ValueError('The exact dock target changed its kind')
+                    topology = docking_topology_proof(layout, view_id=plan['view_id'], target_id=plan['target_id'],
+                        side=plan['dock_side'], previous_target_ids=plan['target_previous_ids'])
+                    rectangles = {}
+                    for role, identity in (('view', plan['view_id']), ('target', plan['target_id']), ('peer', topology['peer_id'])):
+                        raw = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': identity}, {})
+                        readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': identity}, 'options': {}, 'result': raw})
+                        rectangles[role] = require_layout_rectangle(raw)
+                    side_matches = docking_side_matches(rectangles['view'], rectangles['peer'], plan['dock_side'])
+                    if topology['relationship'] == 'container_boundary':
+                        view_rect, target_rect = rectangles['view'], rectangles['target']
+                        side_matches = side_matches and (target_rect['left'] <= view_rect['left'] < view_rect['right'] <= target_rect['right']
+                            and target_rect['top'] <= view_rect['top'] < view_rect['bottom'] <= target_rect['bottom'])
+                    check('Docking matches the exact requested target and side', side_matches,
+                        {'target_id': plan['target_id'], 'side': plan['dock_side'], 'rectangles': rectangles, 'topology': topology,
+                         'unresolved_boundary': None if side_matches else 'requested side not proven; overlapping container topology requires native characterization'})
+                except ValueError as exc:
+                    check('Docking matches the exact requested target and side', False, {'reason': str(exc)})
         elif uri == LAYOUT_UNDOCK_URI:
             observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
             instances = canonical_view_instances(observed)

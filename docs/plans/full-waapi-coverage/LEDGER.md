@@ -278,3 +278,124 @@ native execution, Windows ownership and cross-family proof remain outstanding.
 Definition Short-ID version-proof inconsistency is a new explicit open #183
 acceptance item with shared #181 work, not an exclusion or denominator change.
 No old product receipt is transferred to this integrated source candidate.
+
+
+Ticket #188 has a further code-only partial for exact-target docking/redocking
+and signed splitter movement on 2024.1/2025.1. Docking binds the same scoped
+layout, view and target, preserves floating and already-docked paths, and checks
+serialized parent/child order and orientation plus independent rectangles.
+Splitter movement derives its axis from the exact parent stack and rejects
+clipped, resized, perpendicular or stale effects without replay. The original
+native schemas and contradictory definition graph remain unchanged. Four exact
+version/function rows are added; all 29 layout rows retain migration-required
+ownership under #188. This branch's source inventory is 878 public rows / 218
+unique URIs; combined generated artifacts remain integration-owned.
+
+Focused fake evidence is retained without erasing failures: splitter controls
+passed 25; target-kind docking controls passed 8; the combined product selection
+reported 214 passed / 1 failed / 64 deselected because its exact owner roster
+missed the two new URIs. The corrected owner-only control then passed 1. Existing
+mutation regression reported 65 passed / 1 failed / 40 deselected because the
+Program manifest count needed its new splitter file; that exact manifest control
+then passed together with the owner control (2 passed). These are deterministic contract/effect-oracle tests,
+not owned native observations, branch completion or release acceptance. Nested
+setLayout construction, 2025 reset semantics, exact native interpretations and
+consolidated host-specific validation remain open under the GUI launch hold.
+
+The dock/splitter partial was merged with released integration `dcf0ae11`; its
+post-merge focused selection passed 192 tests, including the additive 230-node
+Program manifest. Review then exposed a missing preservation guard: four new
+public controls all failed because the requested geometry could be certified
+while an unrelated existing view was removed or retagged. Their original RED
+run is retained. The fix snapshots every canonical instance in preview-local
+prestate and verifies exact view identities/types only for dock/moveSplitter.
+Those four controls then passed; three positive controls permit floating/redock,
+old wrapper removal and changed dock flags; the 30-case full positive movement
+matrix plus pre-execute unrelated-view drift controls passed. Container-ID or
+whole-view-state equality is not an extra post-write prerequisite. Original
+native behavior proof and complete nested/reset scope remain outstanding.
+
+A further #188 constructor partial extends the existing setLayout Draft with a
+closed local-key stack/view blueprint. The Gateway generates and freezes unique
+node identities at declaration, validates a bounded single tree, derives native
+keys, checks fresh view-type availability before Preview and execution, and
+verifies all requested nested fields and child order after registration. Empty
+registration remains available. A distinct optional workspace name preserves
+Layout.Name separately from the temporary lookup name; omission uses the lookup
+name as a Gateway convenience. Matching installed SDK documentation supports the
+field distinction, not native divergent-name write or overwrite acceptance.
+
+Focused source validation passed 47 tests across blueprint contracts, existing
+empty registration/removal, profiles, original definition obligations, exact
+owner and additive 231-node Program roster. Original schema/fixture failures are
+retained. A later maximum-depth control exposed a genuine readback mismatch at
+16 stack levels (one failed); the declared business bound was tightened to 14
+without changing the existing native-result limits, and that control passed.
+Native definitions, their capital OneOf/allOf and per-version sidebar enum
+inconsistencies remain untouched. This is a partial constructor, not complete
+nested-layout coverage. Typed editor/sidebar/window/history creation and state
+changes, reset branches and owned effect evidence remain #188 work under the
+unchanged GUI hold. No old native receipt is transferred to this source.
+
+Immutable constructor checkpoint `57d885c2` subsequently passed its complete
+focused selection: 48 tests, including an actual public Preview/execute/readback
+at the advertised 14-level edge. An additional explicit 15-level valid-Draft
+control rejects before opening any client or writing; that control and the
+14-level accepted edge passed together (2 passed). The nesting ceiling is solely
+a Gateway resource bound, never a native Wwise restriction. Legitimate deeper
+native arrangements remain an explicit resource gap requiring reviewed support
+or an approved boundary, without automatic branch-completion credit.
+
+The immutable `ccd743dd` depth successor passed 49 focused tests. A subsequent
+near-byte-bound constructor exposed two independent resource defects: compiled
+layout expansion exceeded bounded readback, and an otherwise accepted request
+could exceed the existing 256 KiB Draft seal or 24 KiB terminal reply. Original
+failed runs remain retained. The constructor now separately discloses 112 KiB
+business-value and compiled-layout bounds, a 256 KiB rendered terminal-request
+ceiling, and a narrowly selected 280 KiB terminal envelope derived from the
+existing Draft allowance plus ordinary framing. Small constructors and other
+operations retain 24 KiB. Exact closed-constructor validation selects the larger
+budget; no caller flag, native schema change, global output increase, truncated
+request or rebuilt agent_result is introduced. Declaration/Preview and stored
+execution requests check rendered fit before writes.
+
+Verification compares every requested field and order independently, retains
+full bounded readback and immutable expected state in the journal/Preview, and
+reports digests plus at most sixteen useful mismatch paths instead of repeating
+whole layouts in assertions. Fake roundtrips cover near-bound ASCII, multibyte,
+quote/backslash and scoped-session enrichment; separate controls reject deep
+rendering before writes and oversized business values before a client. These
+resource ceilings remain Gateway gaps, not Wwise limits or completion of larger
+native branches. Downstream Broker/Fresh acceptance of the larger bounded reply,
+full typed state/window/history/reset construction and owned native effects
+remain outstanding under the absolute GUI/Console/Fresh hold.
+
+The coherent constructor-capacity regression passed 85 focused fake tests,
+including the original verification digest, strong/weak tamper and cleanup
+controls, exact profile/native obligations/owner and 231-node Program roster.
+This validates source behavior only; native effects and downstream reception
+remain pending.
+
+Clean capacity checkpoint `3e7b0b7a` passed 86 tests on its frozen source. An
+immediate public create/verify/inspect control then exposed that layout-inspect
+still equated the native lookup name with serialized Layout.Name. The original
+RED is retained. Inspection now presents separate layout_name/workspace_name
+values; its existing capability keeps the exact lookup identity plus full
+observed workspace document/hash. No capability schema migration or stale/same-
+layout guard was weakened. Both version lanes pass creation, verification, fresh
+inspection and a separately previewed removal by the original lookup name (2
+passed). Workspace/nested-document/lookup drift and foreign lookup authorities
+sharing a serialized workspace name, together with the complete scoped-read
+Gateway file, passed 71 tests. This is deterministic source proof, not native
+divergent-name write acceptance. Larger-output Broker/archive acceptance is
+tracked under the already-dependent OPEN #194; no Fresh run is authorized.
+
+Workspace successor `b5c555d9` passed 86 focused frozen tests. Parent review then
+found that the native contents contract legitimately permits omitted Layout:
+inspection issued a capability before failing with opaque KeyError text. That
+public RED remains retained. A separate availability/type guard now rejects
+omitted contents deliberately before any handle storage/issue, without restoring
+lookup/workspace equality. Both omitted-content version controls, all scoped-read
+tests, divergent create/reuse and stale/foreign authority controls passed 75
+tests. Earlier passing runs remain partial source evidence; no missing case or
+native acceptance was inferred from them.
