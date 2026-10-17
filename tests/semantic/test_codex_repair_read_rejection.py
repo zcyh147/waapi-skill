@@ -159,3 +159,25 @@ def test_current_mutation_task_keeps_operate_reference(tmp_path, monkeypatch):
     assert plan["skill_read_schedule"] == [["SKILL.md", "references/waapi-operate.md"]]
     assert "waapi-operate.md" in held["instructions"]
     assert "waapi-query.md" not in held["instructions"]
+
+
+@pytest.mark.parametrize("copies", [("expansion-task-result.json",), ("expansion-oracle.json",),
+    ("expansion-task-result.json", "expansion-oracle.json")])
+@pytest.mark.parametrize("fault", ["changed", "missing", "extra", "non_boolean"])
+def test_failed_read_assertions_must_replay_exactly_in_both_copies(tmp_path, monkeypatch, copies, fault):
+    root, _, _ = produce_rejected_task(tmp_path, monkeypatch)
+    for name in copies:
+        path = root / name; value = json.loads(path.read_text())
+        if fault == "changed": value["assertions"]["source_unchanged"] = False
+        elif fault == "missing": del value["assertions"]["source_unchanged"]
+        elif fault == "extra": value["assertions"]["unreviewed"] = True
+        else: value["assertions"]["source_unchanged"] = 1
+        path.write_text(json.dumps(value))
+    with pytest.raises(ExpansionArchiveError, match="read-only repair oracle replay mismatch"):
+        verify_expansion_task_archive(root, expected_unit_id="REPAIR25-F2", expected_version="2025.1", expected_inputs_sha256=INPUTS)
+    from tests.semantic.run_codex_skill_matrix import expansion_case_isolated
+    lifecycle = {"scenario_id": "REPAIR25-F2", "version": "2025.1", "source_hash_before": {"sha256": "source"},
+        "source_hash_after": {"sha256": "source"}, "source_mtime_before_ns": 1, "source_mtime_after_ns": 1, "errors": []}
+    record = {"scenario_id": "REPAIR25-F2", "version": "2025.1", "status": "FAIL", "scenario_root": str(tmp_path),
+        "runner_outcome": {"task_root": str(root), "inputs_sha256": INPUTS, "checks": {"trusted_oracle_closed": True}, "lifecycle": lifecycle}}
+    assert not expansion_case_isolated(record)

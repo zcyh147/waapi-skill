@@ -983,12 +983,16 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                 and all(value is True for value in oracle["assertions"].values()), "business PASS lacks a complete verified effect")
     elif repair and case_id == "F2":
         _require(not mutations and all(row["gateway_arguments"][0] in _READS for row in records), "read-only repair includes a mutation")
-        if result["passed"]:
+        if result["passed"] or oracle.get("after") is not None:
             assertions = module.verify_f2(oracle["before"], oracle["after"], **plan["oracle_parameters"])
             assertions["read_refinement"] = module.read_refinement_proven([
-                {"command": row["gateway_arguments"][0], "arguments": row["gateway_arguments"][1:], "payload": row.get("payload", {})} for row in records], target_id=plan["oracle_parameters"]["target_id"], expected=plan["oracle_parameters"]["expected"])
-            _require(set(assertions) == required and all(value is True for value in assertions.values())
-                and assertions == oracle.get("assertions") == result.get("assertions"), "read-only repair oracle replay mismatch")
+                {"command": row["gateway_arguments"][0], "arguments": row["gateway_arguments"][1:], "payload": row.get("payload") or {}} for row in records], target_id=plan["oracle_parameters"]["target_id"], expected=plan["oracle_parameters"]["expected"])
+            _require(set(assertions) == required
+                and (not result["passed"] or all(value is True for value in assertions.values()))
+                and all(isinstance(recorded, dict) and recorded == assertions
+                        and all(type(value) is bool for value in recorded.values())
+                        for recorded in (oracle.get("assertions"), result.get("assertions"))),
+                "read-only repair oracle replay mismatch")
     else:
         _require(not result["passed"] and not mutations, "passing/executed archive has no transaction")
     if result["passed"]:
