@@ -701,6 +701,15 @@ def cli_console_business_contract_data(
                 'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
                 'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
         }} if operation == 'ak.wwise.console.project.create' else {}),
+        **({'effect_verification': {
+            'saved_project': 'bounded_UTF8_WPROJ_without_post_terminal_native_calls',
+            'requested_fields': ['exact_destination_project_name', 'platforms'],
+            'language_default': 'not_inferred_from_Console_create',
+            'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
+                'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
+        }} if operation == 'ak.wwise.cli.createNewProject' else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
             "version_specific_field_availability",

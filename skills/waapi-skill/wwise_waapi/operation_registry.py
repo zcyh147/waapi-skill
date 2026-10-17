@@ -29,7 +29,7 @@ from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
-from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
@@ -8986,6 +8986,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api in CLI_PROJECT_FILE_URIS:
+            try:
+                effect = prepare_cli_project_effect(api, call_args, execution_contract['io_audit'], request.version)
+                if effect is not None:
+                    metadata['cli_project_effect'] = effect
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == CONSOLE_CREATE_URI:
             try:
                 verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version)
@@ -13820,6 +13827,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api in CLI_PROJECT_FILE_URIS:
+            try:
+                validate_cli_project_effect(prepared.get('pre_state', {}).get('cli_project_effect'),
+                    api, call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == CONSOLE_CREATE_URI:
             try:
                 validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version)
@@ -16145,6 +16158,22 @@ def verify_prepared_operation(
         business_state_verified = False
         success_status = 'result_schema_checked'
         verification_strength = 'documented_cli_process_outcome'
+        effect = pre_state.get('cli_project_effect')
+        if effect is not None and not observed.get('reported_errors', False):
+            try:
+                effect_result = inspect_cli_project_effect(effect)
+            except SoundBankContractError as exc:
+                if exc.error_code not in {'MISSING_ARTIFACT', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+                    raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+                check('Requested Console project/file effect is independently observable', False,
+                    {'code': exc.error_code, 'message': str(exc), **exc.details})
+            else:
+                readbacks.extend(effect_result['observations'])
+                for assertion in effect_result['checks']:
+                    check(assertion['name'], assertion['passed'], assertion.get('evidence', {}))
+                business_state_verified = not effect_result['unresolved']
+                success_status = 'verified' if business_state_verified else 'result_schema_checked'
+                verification_strength = 'independent_console_project_file_artifact'
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False

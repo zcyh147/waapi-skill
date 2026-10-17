@@ -251,3 +251,45 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
         'platforms_match': platform_matches if expected_platforms else True,
         'languages_match': language_matches, 'default_language_matches': default_matches,
         'unresolved': unresolved}
+
+
+CLI_CREATE_URI = 'ak.wwise.cli.createNewProject'
+
+
+def prepare_cli_project_effect(uri, args, audit, version):
+    """Freeze independent filesystem evidence without changing the terminal plan."""
+    if uri != CLI_CREATE_URI:
+        return None
+    translated = {'path': args['project']}
+    if 'platform' in args:
+        platforms = args['platform']
+        if isinstance(platforms, str):
+            platforms = [platforms]
+        translated['platforms'] = [{'basePlatform': value, 'name': value} for value in platforms]
+    translated_audit = dict(audit)
+    translated_audit['paths'] = [{**row, 'json_path': '$.args.path'}
+        for row in audit['paths'] if row['json_path'] == '$.args.project']
+    plan = prepare_console_project_creation(translated, translated_audit, version)
+    return {'uri': uri, 'version': version, 'native_args': dict(args), 'creation': plan}
+
+
+def validate_cli_project_effect(effect, uri, args, audit, version):
+    from .operation_soundbank import SoundBankContractError
+    if effect != prepare_cli_project_effect(uri, args, audit, version):
+        raise SoundBankContractError('FILE_CHANGED', 'Console project/file inputs changed after Preview')
+
+
+def inspect_cli_project_effect(effect):
+    from pathlib import Path
+    if effect['uri'] == CLI_CREATE_URI:
+        observed = inspect_created_project(effect['creation'])
+        # CLI create has no language option or documented language default.
+        # Reuse the saved-format proof without assuming Console language semantics.
+        observed['kind'] = 'cli-created-project-artifact'
+        return {'observations': [observed], 'checks': [
+            {'name': 'Created project name matches its exact destination',
+             'passed': observed['project']['name'] == Path(effect['creation']['path']).stem},
+            {'name': 'Created project contains exactly the requested platforms',
+             'passed': observed['platforms_match']}],
+            'unresolved': observed['unresolved']}
+    raise ValueError('Unknown Console project/file effect')

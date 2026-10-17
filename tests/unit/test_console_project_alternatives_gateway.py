@@ -37,7 +37,7 @@ class ConsoleProjectTask(FieldTask):
 
     def write_created_project(self, args):
         document = ET.Element('WwiseDocument', Type='Project',
-            SchemaVersion={'2023.1': '119', '2024.1': '123', '2025.1': '133'}[self.version],
+            SchemaVersion={'2021.1': '103', '2022.1': '110', '2023.1': '119', '2024.1': '123', '2025.1': '133'}[self.version],
             WwiseVersion='v' + self.version + '.0', WwiseBuild='1')
         project = ET.SubElement(ET.SubElement(document, 'ProjectInfo'), 'Project',
             Name='Created', ID='{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}')
@@ -558,3 +558,71 @@ def test_console_create_observation_budget_is_unknown_not_a_proven_bad_effect(tm
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+class CliCreateEffectTask(ConsoleProjectTask):
+    def __init__(self, path, version):
+        self.created_file = path / 'New parent' / 'Created.wproj'
+        self.operation = 'ak.wwise.cli.createNewProject'
+        FieldTask.__init__(self, path, version, self.operation)
+    def call(self, uri, args=None, options=None):
+        if uri == self.operation:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            self.created_file.parent.mkdir(parents=True)
+            self.write_created_project({'platforms': [{'basePlatform': 'Windows'}, {'basePlatform': 'Android'}]})
+            return {'result': 0}
+        return FieldTask.call(self, uri, args, options)
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_create_verifies_saved_project_without_a_post_terminal_native_call(tmp_path, version):
+    task = CliCreateEffectTask(tmp_path, version)
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file',
+        str(task.created_file), '--item', 'platforms', 'Windows', '--item', 'platforms', 'Android')
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    code, payload = task.run('transaction-show', tx)
+    assert code == 0, payload
+    code, payload = task.run('confirm', tx, '--confirmation-token', payload['confirmation']['token'])
+    assert code == 0, payload
+    code, payload = task.run('execute', tx)
+    assert code == 0, payload
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('failure', ['missing', 'malformed', 'wrong-platform', 'wrong-name', 'too-large'])
+def test_cli_create_missing_or_wrong_artifact_never_verifies_or_reexecutes(tmp_path, failure):
+    task = CliCreateEffectTask(tmp_path, '2025.1')
+    original = task.write_created_project
+    def write(args):
+        original(args)
+        if failure == 'missing':
+            task.created_file.unlink()
+        elif failure == 'malformed':
+            task.created_file.write_text('<Project />')
+        elif failure == 'too-large':
+            task.created_file.write_bytes(b' ' * (8 * 1024 * 1024 + 1))
+        else:
+            tree = ET.parse(task.created_file)
+            if failure == 'wrong-platform':
+                tree.find('./ProjectInfo/Project/Platforms/Platform').set('ReferencePlatform', 'Mac')
+            else:
+                tree.find('./ProjectInfo/Project').set('Name', 'Wrong')
+            tree.write(task.created_file)
+    task.write_created_project = write
+    # The common public chain owns authorization and creates no directories.
+    task.project_file = task.created_file
+    tx = CliProjectTask.execute_plan(task, '--item', 'platforms', 'Windows', '--item', 'platforms', 'Android')
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload.get('verified') is not True, payload
+    assert payload['state'] == ('executed_unverified' if failure == 'too-large' else 'verification_failed'), payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
