@@ -159,9 +159,11 @@ def host_ui_debug_business_contract_data(
                 "unchanged_valid_output": "observable requested state may verify; created/changed are reported separately",
                 "populated_marker_checks": "exact count/multiplicity, cue-to-label associations, integral-frame positions and ASCII labels with optional terminal null; no guessed cue order",
                 "marker_evidence": "bounded cue records and label byte digests; complete parsed-file hash; exact label text remains in the immutable request",
+                **({"anonymous_header_checks": "recognized extensible PCM16/float32, exact requested count and zero/direct-out speaker mask; anonymous overrides layout type but preserves count"}
+                   if version in {"2024.1", "2025.1"} else {}),
                 "partial_postconditions": ["active waveform/frequency/envelope", "fractional rate/frame rounding",
                     "fractional marker positions, Unicode label encoding or nonzero cue chunk/block offsets",
-                    "anonymous/Ambisonic or unlabelled multichannel representation"],
+                    "anonymous legacy headers; nonanonymous Ambisonic or unlabelled multichannel representation"],
                 "limits_are_gateway_resources_not_native_absence": True,
             }} if operation == 'ak.wwise.debug.generateToneWAV' else {}),
             **(

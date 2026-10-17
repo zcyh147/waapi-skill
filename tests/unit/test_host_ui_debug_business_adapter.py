@@ -1518,3 +1518,53 @@ def test_tone_partial_marker_interpretations_still_reject_known_wrong_postcondit
         ['--empty', 'waveform_channels', '--marker', position, label])
     client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, frame, actual_label)]))
     _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+@pytest.mark.parametrize('floating', [False, True], ids=['pcm16', 'float32'])
+@pytest.mark.parametrize('layout,channels', [('5.1', 6), ('Ambisonics 1st order', 4)])
+def test_tone_anonymous_extensible_header_proves_unassigned_requested_channel_count(tmp_path, version, floating, layout, channels):
+    import struct
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, version, [],
+        values={'anonymous_channels': 'true', 'channel_layout': layout, 'waveform': 'silence',
+                'bit_depth': 'float32' if floating else 'int16'})
+    width = 4 if floating else 2
+    fmt = struct.pack('<HHIIHHHHI', 65534, channels, 8000, 8000 * channels * width,
+        channels * width, width * 8, 22, width * 8, 0)
+    fmt += bytes.fromhex('0300000000001000800000aa00389b71' if floating else '0100000000001000800000aa00389b71')
+    client.artifact_bytes = _tone_wav_bytes(floating=floating, channels=channels, samples=[0] * channels * 4, fmt_override=fmt)
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['agent_result']['request']['arguments']['args']['setAnonymous'] is True
+
+
+@pytest.mark.parametrize('defect', ['assigned-speakers', 'wrong-count', 'nonzero-last-sample'])
+def test_tone_anonymous_header_proof_rejects_wrong_requested_effect(tmp_path, defect):
+    import struct
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'anonymous_channels': 'true', 'channel_layout': '5.1', 'waveform': 'silence'})
+    channels = 4 if defect == 'wrong-count' else 6
+    mask = 3 if defect == 'assigned-speakers' else 0
+    fmt = struct.pack('<HHIIHHHHI', 65534, channels, 8000, 16000 * channels,
+        channels * 2, 16, 22, 16, mask) + bytes.fromhex('0100000000001000800000aa00389b71')
+    samples = [0] * channels * 4
+    if defect == 'nonzero-last-sample':
+        samples[-1] = 1
+    client.artifact_bytes = _tone_wav_bytes(channels=channels, samples=samples, fmt_override=fmt)
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
+    if defect == 'assigned-speakers':
+        assert 'anonymous' in str(verified)
+        assert 'malformed' not in str(verified)
+
+
+def test_tone_2023_anonymous_field_rejected_before_mutation(tmp_path):
+    rejected = _tone_collection_preview(tmp_path, '2023.1', [],
+        values={'anonymous_channels': 'true', 'waveform': 'silence'}, reject_declaration=True)
+    assert rejected['error_code'] == 'GatewayInputError'
+
+
+def test_tone_legacy_anonymous_header_retains_unresolved_representation(tmp_path):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'anonymous_channels': 'true', 'waveform': 'silence'})
+    client.artifact_bytes = _tone_wav_bytes()
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert 'anonymous' in str(verified)

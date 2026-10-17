@@ -189,3 +189,26 @@ adapter/matrix/transaction selection passed 1011 tests on the pending source;
 focused populated-marker/null/default-label controls passed 24. Original REDs
 remain in distinct `/tmp/tone-markers-193-*` roots. Remaining Tone signal,
 rounding/channel-format work and the rest of the #193/#188 roster stay open.
+
+## Bounded successor: anonymous Tone header state
+
+The pinned anonymous input exists only in 2024.1/2025.1. Recognized extensible
+PCM16/float32 headers can now prove the requested anonymous output state when
+channel count is exact and the speaker mask is zero. The native input explicitly
+makes anonymous override configuration type while retaining count, including a
+count originally selected by Ambisonic order. This does not claim Ambisonic
+identity/normalization. Microsoft documents zero/direct-out as unassigned
+speaker positions in the [WAVEFORMATEXTENSIBLE remarks](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ksmedia/ns-ksmedia-waveformatextensible).
+It is conditional header-state proof, not evidence of Wwise's chosen writer
+representation. Legacy/no-mask headers and nonanonymous Ambisonic output retain
+explicit interpretation gaps.
+
+Public fake controls cover both supported input lanes and PCM/float, requested
+count/type override, assigned-speaker/wrong-count/nonzero-sample effects and the
+2023.1 input boundary before mutation. The oracle does not impose a global
+channel-count/popcount rule: an assigned mask is a requested-anonymous effect
+mismatch. Existing secure IO, full-sample scan, Preview/execute-once/policies and
+terminal capacities remain active. Focused anonymous/remaining-interpretation
+controls passed 17 tests; the original source/older-lane REDs remain separate.
+No native/Fresh launch, actual writer/rounding/signal proof or ticket completion
+credit is asserted. The remaining exact seventeen-URI #193 roster stays owned.

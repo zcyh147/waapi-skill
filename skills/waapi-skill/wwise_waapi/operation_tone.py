@@ -307,21 +307,27 @@ def _check_requested_format(observed: Mapping[str, Any], args: Mapping[str, Any]
     else:
         unresolved.append("fractional segment duration/frame rounding")
     layout = args.get("channelConfig", "1.0")
-    if layout in STANDARD_LAYOUTS:
-        channels, mask = STANDARD_LAYOUTS[layout]
-        if observed["channels"] != channels:
-            raise _invalid("Tone WAV channel count differs from the requested layout.")
-        if args.get("setAnonymous", False):
-            unresolved.append("native anonymous-channel layout representation")
-        elif observed["speaker_mask"] is not None:
-            if observed["speaker_mask"] != mask:
+    standard = STANDARD_LAYOUTS.get(layout)
+    channels = standard[0] if standard else (int(layout.split()[1][0]) + 1) ** 2
+    if observed["channels"] != channels:
+        raise _invalid("Tone WAV channel count differs from the requested layout.")
+    if args.get("setAnonymous", False):
+        # Pinned native input says anonymous overrides the configuration type,
+        # retaining count (also when that count was supplied by Ambisonic order).
+        # Microsoft WAVEFORMATEXTENSIBLE remarks define zero/direct-out as no
+        # assigned speakers. This observes that header state, not writer choice.
+        # https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ksmedia/ns-ksmedia-waveformatextensible
+        if observed["speaker_mask"] is None:
+            unresolved.append("native anonymous-channel layout representation without explicit speaker positions")
+        elif observed["speaker_mask"] != 0:
+            raise _invalid("Tone WAV assigns speaker positions despite the requested anonymous channel configuration.")
+    elif standard:
+        if observed["speaker_mask"] is not None:
+            if observed["speaker_mask"] != standard[1]:
                 raise _invalid("Tone WAV speaker positions differ from the requested layout.")
         elif layout not in {"1.0", "2.0"}:
             unresolved.append("legacy WAV channel layout without explicit speaker positions")
     else:
-        order = int(layout.split()[1][0])
-        if observed["channels"] != (order + 1) ** 2:
-            raise _invalid("Tone WAV channel count differs from the requested Ambisonic order.")
         unresolved.append("native Ambisonic channel representation and normalization")
     return unresolved
 
