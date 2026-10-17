@@ -1136,6 +1136,11 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
+        if change == 'serialization-value':
+            message = payload['verification']['message']
+            assert 'failed verification' in message
+            assert 'passed independent verification' not in message
+            assert 'reported errors' not in message
         code, payload = task.run('execute', tx)
         assert code != 0
         assert len([row for row in task.calls if row[0] == task.operation]) == 1
