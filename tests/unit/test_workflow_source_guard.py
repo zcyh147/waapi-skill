@@ -881,6 +881,10 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
                 return {"return": [{"classId": 100, "name": "Event", "type": "WObject"},
                                    {"classId": 101, "name": "DialogueEvent", "type": "WObject"}]}
             assert uri == "ak.wwise.core.object.get", (uri, args, options)
+            if args == {"waql": "from type Project take 1"}:
+                assert version == "2021.1"
+                assert options == {"return": ["id", "name", "type", "path"]}
+                return {"return": [{**_project(tmp_path), "type": "Project"}]}
             dispatches.append((args, options))
             if "waql" in args:
                 expression = args["waql"]
