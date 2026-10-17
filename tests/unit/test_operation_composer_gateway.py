@@ -337,7 +337,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     )
     # Only object.create adds the internal documented List proof. Remove that
     # exact property and both optional entries to retain every prior seal.
-    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+    def before_documented_create_list_binding(version):
         contract = operation_request_machine_contract("object.create", version)
         contract["optional_arguments"].remove("documented_list_bindings")
         contract["argument_contract"]["optional"].remove("documented_list_bindings")
@@ -345,7 +345,10 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
             "type": "array", "maxItems": 128, "items": {"type": "object"},
             "description": "Gateway-owned documented List source/owner proofs; never forwarded.",
         }
-        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(contract)
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(before_documented_create_list_binding(version))
     assert canonical_sha256(non_object_set_digests) == (
         "e7360fdd277786e360dd0da34e4ac9becf8b78b598384af5893be37c57c5dcec"
     )
@@ -418,7 +421,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
             assert conflict["enum"] == ["fail", "rename", "replace"]
             conflict["enum"] = ["fail", "rename"]
             non_object_set_digests[f"{operation}@{version}"] = canonical_sha256(contract)
-        contract = operation_request_machine_contract("object.create", version)
+        contract = before_documented_create_list_binding(version)
         properties = contract["argument_contract"]["properties"]
         for node in (properties, properties["children"]["items"]["properties"]):
             target = node["references"]["items"]["properties"]["target"]
