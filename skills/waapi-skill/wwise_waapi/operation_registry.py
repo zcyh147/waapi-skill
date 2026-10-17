@@ -7145,6 +7145,70 @@ def _resolve_object_set_import_type(
     return row
 
 
+def _prepare_prospective_reference_hierarchy(
+    references, *, class_id, read, property_info_cache,
+):
+    """Validate new-node reference edges against explicit prospective values."""
+    by_name = {info.name.casefold(): (info, targets) for info, targets in references}
+    conditions, controllers, validated = [], set(), set()
+
+    def visit(info, target, path):
+        key = (info.name.casefold(), _identity_key(target.object))
+        if info.name.casefold() in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Prospective reference hierarchy contains a cycle.")
+        if key in validated:
+            return
+        if len(path) >= MAX_CONDITION_PATH_FIELDS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Prospective reference hierarchy exceeds the field path budget.")
+        rows = info.restriction.get("restrictions") or []
+        parents = []
+        for row in rows:
+            if isinstance(row, Mapping) and "childOfReference" in row:
+                name = row["childOfReference"]
+                if set(row) != {"childOfReference"} or not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+                    raise OperationContractError("INVALID_METADATA", "Prospective parent restriction must name one exact reference field.")
+                if name not in parents:
+                    parents.append(name)
+        # Keep all existing type/classifier boundaries. Only the independently
+        # checked parent edges are removed from this ordinary target check.
+        ordinary = replace(info, restriction={**info.restriction, "restrictions": [
+            row for row in rows if not (isinstance(row, Mapping) and "childOfReference" in row)]})
+        _require_reference_target_allowed(ordinary, target)
+        for name in parents:
+            controllers.add(name.casefold())
+            if len(controllers) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Prospective reference hierarchy exceeds the controller budget.")
+            selected = by_name.get(name.casefold())
+            if selected is None or len(selected[1]) != 1:
+                raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+                    "Declare one exact controlling reference target in this creation or configure the verified object in a separate Preview.",
+                    details={"reference": info.name, "parent_reference": name, "mutation_dispatched": False})
+            controller_info, targets = selected
+            parent = targets[0]
+            _require_object_reference_metadata(controller_info, allow_hierarchy=True)
+            parent_id = _reference_identity(target.row.get("parent"))
+            if (not isinstance(parent.object, str) or _PLUGIN_GUID.fullmatch(parent.object) is None
+                    or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None):
+                raise OperationContractError("INVALID_READBACK", "Prospective hierarchy needs canonical target and controlling parent GUIDs.")
+            if not _same_identity(parent_id, parent.object):
+                raise OperationContractError("INVALID_REFERENCE_TARGET", "Chosen new-object reference target is not a child of its declared controlling reference.",
+                    details={"reference": info.name, "target_id": target.object, "parent_reference": name,
+                             "expected_parent_id": parent.object, "actual_parent_id": parent_id})
+            visit(controller_info, parent, (*path, info.name.casefold()))
+            condition = {"kind": "prospective_reference_parent", "class_id": class_id,
+                "reference": info.name, "target_id": target.object, "parent_reference": name, "parent_id": parent.object,
+                "metadata": {record.name: {"normalized": record.as_dict(), "native": dict(record.raw)}
+                             for record in (info, controller_info)}}
+            if condition not in conditions:
+                conditions.append(condition)
+        validated.add(key)
+
+    for info, targets in references:
+        for target in targets:
+            visit(info, target, ())
+    return conditions
+
+
 def _prepare_object_node_specs(
     nodes: Sequence[ObjectNodeDescriptor],
     *,
@@ -7238,6 +7302,7 @@ def _prepare_object_node_specs(
             spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        reference_targets = []
         for descriptor in node.references:
             info = _read_property_info_cached(
                 read,
@@ -7245,7 +7310,7 @@ def _prepare_object_node_specs(
                 class_id=type_info.class_id,
                 name=descriptor.name,
             )
-            _require_object_reference_metadata(info)
+            _require_object_reference_metadata(info, allow_hierarchy=True)
             property_info_by_name[descriptor.name.casefold()] = info
             if isinstance(descriptor.target, ObjectCurveDescriptor):
                 try:
@@ -7256,16 +7321,21 @@ def _prepare_object_node_specs(
                 resolved_references[descriptor.request_path] = value
                 spec["references"].append({"name": descriptor.name, "curve": value, "curve_proof": proof})
                 continue
-            identities = []
+            identities, targets = [], []
             for offset, target_descriptor in enumerate(descriptor.targets):
                 role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
                 resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
-                _require_reference_target_allowed(info, resolved)
+                targets.append(resolved)
                 roles[role] = resolved
                 identities.append(resolved.object)
+            reference_targets.append((info, targets))
             value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
             resolved_references[descriptor.request_path] = value
             spec["references"].append({"name": descriptor.name, "target_id": value})
+        hierarchy = _prepare_prospective_reference_hierarchy(reference_targets, class_id=type_info.class_id,
+            read=read, property_info_cache=property_info_cache)
+        if hierarchy:
+            spec["reference_target_conditions"] = hierarchy
         if any(info.dependencies for info in property_info_by_name.values()):
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError
             try:
@@ -7760,6 +7830,10 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
                                "passed": _native_snapshot_equal(observed, selected["metadata"]),
                                "evidence": {"expected": selected["metadata"], "actual": observed}})
     assertions.extend(_reference_target_condition_assertions(pre_state, read=read, after_write=after_write))
+    if isinstance(pre_state, Mapping):
+        for key in ("object_create_nodes", "object_set_nodes"):
+            for node in pre_state.get(key, []):
+                assertions.extend(_reference_target_condition_assertions(node, read=read, after_write=after_write))
     return assertions
 
 
@@ -22925,6 +22999,19 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        if condition.get("kind") == "prospective_reference_parent":
+            target = condition["target_id"]
+            options = {"return": ["id", "parent"]}
+            rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target]}}, options))
+            valid = (len(rows) == 1 and _same_identity(rows[0].get("id"), target)
+                     and _same_identity(_reference_identity(rows[0].get("parent")), condition["parent_id"]))
+            for name, expected in condition["metadata"].items():
+                info = _read_property_info(read, class_id=condition["class_id"], name=name)
+                valid = (valid and _native_snapshot_equal(info.as_dict(), expected["normalized"])
+                         and _native_snapshot_equal(dict(info.raw), expected["native"]))
+            assertions.append({"name": f"new reference {condition['reference']} retains its declared {condition['parent_reference']} parent",
+                "passed": valid, "evidence": {"target_id": target, "required_parent_id": condition["parent_id"], "rows": rows}})
+            continue
         if condition.get("kind") == "shared_target":
             facts = _read_shared_reference_target(condition["target_id"], read=read,
                 platform=condition.get("platform"), version=condition["version"], require_match=False)
