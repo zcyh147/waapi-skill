@@ -83,6 +83,35 @@ def test_inner_type_declarations_remain_separate_from_object_field_applicability
         batch.scalar_model(case)
 
 
+def test_batch_predeclares_each_alternative_at_its_actual_metadata_observation():
+    manifest = batch.scalar_manifest(Path(__file__).parents[2])
+    plan = batch.scalar_plan(manifest)
+    assert plan["credit"] == "none_before_original_observation_and_reviewed_requirements"
+    all_ids = [m["id"] for group in plan["groups"] for m in group["members"]]
+    all_ids.extend(row["id"] for row in plan["unresolved"])
+    assert len(all_ids) == len(set(all_ids)) == 5669
+    gain = next(g for g in plan["groups"] if g["version"] == "2025.1" and g["field"] == "GainBand1")
+    assert len(gain["members"]) == 8
+    true_value = next(m for m in gain["members"] if m["id"].endswith("/Enumeration/2/value/0")
+                      and "OnOffBand1" in m["source_attributes"]["Name"])
+    assert true_value["observation_pointer"] == "/observations/metadata/dependencies/0/conditions/0/restriction/values/0/value"
+    assert true_value["expected"] is True
+    assert true_value["source_value"] == "true"
+    range_case = next(g for g in plan["groups"] if g["version"] == "2025.1" and g["field"] == "EnvelopeStopPlayback")
+    range_shape = next(m for m in range_case["members"] if m["alternative"] == "Range/2")
+    assert range_shape["expected"] == {"type": "range", "min": 1, "max": 100}
+    assert all(row["reason"] for row in plan["unresolved"])
+
+
+def test_member_predicate_cannot_be_replaced_by_a_different_same_controller_shape():
+    manifest = batch.scalar_manifest(Path(__file__).parents[2])
+    case = next(c for c in manifest["occurrences"] if c["version"] == "2025.1" and c["receiver"]["field"] == "GainBand1"
+                and c["controller"] == "OnOffBand1")
+    case["predicate"]["values"] = [False]
+    with pytest.raises(ValueError, match="source predicate differs"):
+        batch.scalar_plan(manifest)
+
+
 def test_parent_collector_refuses_a_changed_installed_file_before_extracting_its_type(tmp_path):
     from tests.maintenance.condition_parent_sources import collect
     (tmp_path / "docs").mkdir()

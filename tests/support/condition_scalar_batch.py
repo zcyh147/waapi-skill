@@ -60,7 +60,11 @@ def scalar_manifest(root: Path) -> dict:
         for lane in corpus["lanes"]:
             build = lane["build"]
             version = ".".join(build.split(".")[:2])
+            sibling_positions = defaultdict(int)
             for index, row in enumerate(lane["rows"]):
+                sibling_key = (row["file"], row["path"])
+                sibling_position = sibling_positions[sibling_key]
+                sibling_positions[sibling_key] += 1
                 attrs = row["attributes"]
                 if (row["tag"] != "PropertyDependency" or attrs.get("Action", "Enable") != "Enable"
                         or attrs.get("Context", "Self") != "Self"):
@@ -129,6 +133,7 @@ def scalar_manifest(root: Path) -> dict:
                               "corpus": corpus["name"], "file": row["file"], "pointer": row["path"],
                               "class": deepcopy(row.get("class")), "xml": row["xml"],
                               "source_parent_xml": parent["xml"],
+                              "source_dependency_index": sibling_position,
                               **_source_scope(source_roots["|".join((build, corpus["name"], row["file"]))], row["path"]),
                               "attributes": deepcopy(attrs), "controller": attrs["Name"],
                               "predicate": predicate, "receiver": receiver, "members": members,
@@ -291,3 +296,59 @@ def scalar_model(case: dict) -> dict:
                            "source_inheritance": "source_ObjectBaseRef_composition_only_not_live_applicability",
                            "instance_identity": "explicit_program_model_native_class_applicability_unavailable",
                            "effective_native_metadata": "unobserved", "native_effect": "unverified"}}
+
+
+def scalar_plan(manifest: dict) -> dict:
+    """Assign exact members to original same-field observations before execution.
+
+    This is a source-model plan. It neither borrows a different field's PASS nor
+    declares any requirements reviewed. Native facts stay explicitly unresolved.
+    """
+    parents = defaultdict(list)
+    for case in manifest["occurrences"]:
+        parents[case["receiver"]["source_parent_key"]].append(case)
+    groups, unresolved = [], []
+    for key, cases in parents.items():
+        first = cases[0]
+        try:
+            model = scalar_model(first)
+        except ValueError as exc:
+            unresolved.extend({"id": member["id"], "shape_sha256": member["shape_sha256"], "reason": str(exc)}
+                              for case in cases for member in case["members"])
+            continue
+        group = {"id": audit.digest(key), "source_parent_key": key, "version": first["version"],
+                 "build": first["build"], "field": model["field"], "model": model, "members": []}
+        for case in cases:
+            index = case["source_dependency_index"]
+            source_node = ET.fromstring(case["source_parent_xml"]).findall("./Dependencies/*")[index]
+            if source_node.attrib != case["attributes"] or source_node.tag != "PropertyDependency":
+                raise ValueError("source occurrence does not match its exact parent dependency slot")
+            dependency = model["metadata"][model["field"]]["dependencies"][index]
+            if dependency["property"] != case["controller"]:
+                raise ValueError("modeled dependency does not match the source controller")
+            predicate = case["predicate"]
+            source_restriction = ({"type": "enum", "values": [{"value": v} for v in predicate["values"]]}
+                                  if predicate["kind"] == "enum" else
+                                  {"type": "range", "min": predicate["min"], "max": predicate["max"]})
+            if dependency["conditions"] != [{"restriction": source_restriction}]:
+                raise ValueError("source predicate differs from the exact modeled metadata observation")
+            prefix = f"/observations/metadata/dependencies/{index}"
+            for member in case["members"]:
+                alternative = member["alternative"]
+                expected, pointer = dependency, prefix
+                if alternative != "condition":
+                    expected = dependency["conditions"][0]["restriction"]
+                    pointer += "/conditions/0/restriction"
+                    if "/value/" in alternative:
+                        value_index = int(alternative.rsplit("/", 1)[1])
+                        expected = expected["values"][value_index]["value"]
+                        pointer += f"/values/{value_index}/value"
+                group["members"].append({"id": member["id"], "shape_sha256": member["shape_sha256"],
+                    "source_file_sha256": member["source_file_sha256"], "alternative": alternative,
+                    "source_attributes": deepcopy(case["attributes"]), "source_value": deepcopy(member["value"]),
+                    "observation_pointer": pointer, "expected": deepcopy(expected)})
+        groups.append(group)
+    return {"contract": "waapi-skill.condition-scalar-program-plan/v1",
+            "credit": "none_before_original_observation_and_reviewed_requirements",
+            "requirements_state": "pending_review", "source_manifest_sha256": audit.digest(manifest),
+            "groups": groups, "unresolved": unresolved}
