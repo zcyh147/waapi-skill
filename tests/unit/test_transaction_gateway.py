@@ -1541,7 +1541,17 @@ def execute_migrate_successfully(
 ) -> tuple[dict[str, Any], dict[str, Any], FakeClient, FakeClient]:
     io_root = (tmp_path / "migrate-io").resolve()
     io_root.mkdir()
-    (io_root / "SampleProject.wproj").write_text("<Project/>", encoding="utf-8")
+    # This test owns process/result verification without a project probe. A
+    # migration still requires an independently parseable saved project. Leave
+    # it unchanged during the fake native call, so no migration-effect PASS can
+    # be inferred from result=0. The real saved-model positive lives in the
+    # Console project alternatives tests.
+    (io_root / "SampleProject.wproj").write_text(f'''<WwiseDocument Type="Project" SchemaVersion="110" WwiseVersion="v2022.1.0" WwiseBuild="1">
+<ProjectInfo><Project Name="SampleProject" ID="{PROJECT_GUID}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{PARENT_GUID}" /></Platforms>
+<LanguageList><Language Name="English(US)" ID="{OBJECT_GUID}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>''', encoding="utf-8")
     request = migrate_call_request(io_root)
     active_project = local_project(tmp_path)
     preview_client = FakeClient(
@@ -7709,6 +7719,11 @@ def test_additional_reviewed_explicit_project_cli_calls_verify_without_project_p
     assert verify_payload["result_schema_checked"] is True
     assert verify_payload["verified"] is False
     assert verify_payload["verification"]["business_state_verified"] is False
+    if api == "ak.wwise.cli.migrate":
+        observations = [row for row in verify_payload["verification"]["readbacks"]
+                        if row.get("kind") == "cli-migrated-project-artifact"]
+        assert len(observations) == 1
+        assert observations[0]["unresolved"] == ["migration_save_has_no_observed_write"]
     assert verify_payload["agent_result"]["result"] == expected_result
     assert verify_payload["agent_result"]["verified"] is False
     assert verify_payload["agent_result"]["request"] == request
@@ -8515,12 +8530,18 @@ def test_undo_group_inner_timeout_reserves_budget_cancels_and_never_retries(
     assert payload["state"] == TransactionState.EXECUTION_CANCELLED.value
     assert payload["rollback_verified"] is False
     assert payload["automatic_retry"] is False
-    assert [call[0] for call in execute_client.calls][-3:] == [
+    # The legacy scripted client has no cancellation readback response. That
+    # bounded observation must remain incomplete and cannot certify rollback.
+    observation = payload["compound_execution"]["cancellation_observation"]
+    assert observation["complete"] is False
+    assert observation["pre_state_restored"] is False
+    assert [call[0] for call in execute_client.calls][-4:] == [
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.object.setNotes",
         "ak.wwise.core.undo.cancelGroup",
+        "ak.wwise.core.object.get",
     ]
-    assert execute_client.calls[-1][1] == {"undo": True}
+    assert execute_client.calls[-2][1] == {"undo": True}
     inner_phase = payload["compound_execution"]["failed_phase"]
     assert inner_phase["dispatch_result"]["error_code"] == "TIMEOUT"
     assert inner_phase["cancel_reserve_seconds"] >= 2.0
@@ -8693,7 +8714,15 @@ def test_undo_group_phase_exception_best_effort_cancels_and_remains_indeterminat
     assert payload["state"] == TransactionState.INDETERMINATE.value
     assert payload["automatic_retry"] is False
     assert payload["compound_execution"]["cancel_succeeded"] is True
-    assert [call[0] for call in execute_client.calls][-1] == "ak.wwise.core.undo.cancelGroup"
+    uris = [call[0] for call in execute_client.calls]
+    assert uris.count("ak.wwise.core.undo.cancelGroup") == 1
+    if failing_uri == "ak.wwise.core.object.setNotes":
+        assert uris[-2:] == ["ak.wwise.core.undo.cancelGroup", "ak.wwise.core.object.get"]
+        observation = payload["compound_execution"]["cancellation_observation"]
+        assert observation["complete"] is False
+        assert observation["pre_state_restored"] is False
+    else:
+        assert uris[-1] == "ak.wwise.core.undo.cancelGroup"
 
 
 def test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel(
@@ -8742,9 +8771,15 @@ def test_undo_group_accumulated_result_limit_stops_inner_and_attempts_cancel(
         "compound_result_limit_exceeded"
     )
     assert payload["compound_execution"]["cancel_phase"]["dispatch_result"]["ok"] is True
-    assert [call[0] for call in execute_client.calls][-3:] == [
+    # The legacy scripted client has no cancellation readback response. That
+    # bounded observation must remain incomplete and cannot certify rollback.
+    observation = payload["compound_execution"]["cancellation_observation"]
+    assert observation["complete"] is False
+    assert observation["pre_state_restored"] is False
+    assert [call[0] for call in execute_client.calls][-4:] == [
         "ak.wwise.core.undo.beginGroup",
         "ak.wwise.core.object.setNotes",
         "ak.wwise.core.undo.cancelGroup",
+        "ak.wwise.core.object.get",
     ]
     assert "ak.wwise.core.undo.endGroup" not in [call[0] for call in execute_client.calls]

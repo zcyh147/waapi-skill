@@ -490,7 +490,7 @@ def test_query_shell_examples_never_expose_bare_at_prefixed_argv_values() -> Non
 def test_nested_boolean_query_uses_the_bounded_advanced_contract() -> None:
     query_flat = " ".join(QUERY.split())
     for phrase in (
-        "Offline schema",
+        "Offline `query-schema`",
         "Advanced native WAQL fallback",
         "--advanced-waql",
         "Gateway fixes read-only `ak.wwise.core.object.get`",
@@ -549,7 +549,9 @@ def test_ancestor_ownership_query_keeps_the_explicit_project_exclusion() -> None
         "without mixing same-name objects from other branches",
     ):
         assert phrase in query_flat
-    assert "--relationship ancestors --max-results 8" in query_flat
+    # The relationship is explicit; the user supplies the bound rather than
+    # a sample silently assigning eight rows to every ownership request.
+    assert "copy that exact number to `--max-results`" in query_flat
 
 
 def test_relative_depth_uses_path_without_an_unrequested_parent_projection() -> None:
@@ -563,7 +565,7 @@ def test_relative_depth_uses_path_without_an_unrequested_parent_projection() -> 
         assert phrase in query_flat
 
     example = QUERY.split(
-        "For example, a bounded descendant inventory of Sound candidates", 1
+        "Bounded Sound descendant example:", 1
     )[1].split("```bash", 1)[1].split("```", 1)[0]
     assert "--path-segment" in example
     assert "--include parent" not in example

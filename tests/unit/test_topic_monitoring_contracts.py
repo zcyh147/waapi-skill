@@ -68,10 +68,12 @@ def run(tmp_path, version, mode, topic, events, *facts, timeout_seconds=0.03):
 @pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("mode", ("wait-topic", "stream-topic"))
 def test_monitor_rejects_out_of_range_referenced_transport_id_and_cleans_up(tmp_path, version, mode):
+    # Schema/matching and cleanup control, not a 30ms scheduler benchmark.
     code, result, client, records = run(
         tmp_path, version, mode, "ak.wwise.core.transport.stateChanged",
         [{"transport": -1, "state": "playing", "object": GUID}],
         "--topic-option", "transport", "1",
+        timeout_seconds=1.0,
     )
     assert code != 0, result
     assert client.unsubscribed == 1
@@ -159,9 +161,11 @@ def test_wait_partial_timeout_preserves_matching_count(tmp_path):
 def test_monitor_accepts_all_native_property_value_alternatives(tmp_path, version, value):
     event = {"object": {"id": GUID, "Children": [{"id": GUID, "name": "Child"}]},
              "property": "Volume", "old": None, "new": value, "platform": GUID}
+    # Schema/matching and cleanup control, not a 30ms scheduler benchmark.
     code, result, client, _ = run(
         tmp_path, version, "wait-topic", "ak.wwise.core.object.propertyChanged", [event],
         "--topic-option", "object", GUID, "--topic-option", "property", "Volume",
+        timeout_seconds=1.0,
     )
     assert code == 0, result
     assert result["event"] == event
@@ -216,9 +220,11 @@ def test_2021_implicit_collection_descendants_remain_matchable(tmp_path, collect
     for child in reversed(children):
         expected = {child: [expected]}
     event = {"bankInfo": [expected]}
+    # Schema/matching and cleanup control, not a 30ms scheduler benchmark.
     code, result, _, _ = run(
         tmp_path, "2021.1", "wait-topic", "ak.wwise.core.soundbank.generated", [event],
         "--event-row", f"bank-info-{collection}", ",".join(["0"] * (1 + len(children))), field, value,
+        timeout_seconds=1.0,
     )
     assert code == 0, result
     assert result["event"] == event

@@ -725,7 +725,7 @@ def test_cli_add_platform_rejects_wrong_effect_and_keeps_elided_copy_partial(tmp
 
 def test_cli_add_platform_freezes_all_observed_work_units_before_execution(tmp_path):
     task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
-    unit = saved_fixture_project(task)
+    unit = task.unit  # CliProjectTask already created the saved-model fixture.
     code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
         '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
     assert code == 0, payload

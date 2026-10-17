@@ -280,8 +280,10 @@ def test_operation_request_schema_digest_owns_only_versioned_machine_contract() 
     assert "summary" not in contract_2022
     assert "selection_guidance" not in contract_2022
     assert "next_step" not in contract_2022
+    # Reviewed version projection, Curve proof and documented-list bindings are
+    # machine-owned validity changes; human summaries above remain excluded.
     assert operation_request_schema_digest("object.set", "2022.1") == (
-        "5d1e91f2a3bcce5901c96d36d42794eb2b82913101fc58cade96160d222b1a33"
+        "a98d8c5a047efc931146c394894a3b7709bcb97f0cedf67941f945d303555289"
     )
     assert operation_request_schema_digest("object.set", "2025.1") != (
         operation_request_schema_digest("object.set", "2022.1")
