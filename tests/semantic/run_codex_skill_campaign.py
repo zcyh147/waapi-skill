@@ -6949,27 +6949,34 @@ def _validate_heavy_v3_broker_records(
     if not steps:
         return
     compound_children = any(step.subcommand == "draft-start-undo-child" for step in steps)
+    continuation_groups = (tuple(steps),)
     if compound_children:
-        from tests.semantic.support.codex_gateway_broker import validate_operation_draft_protocol_steps
+        from tests.semantic.support.codex_gateway_broker import (
+            partition_operation_draft_protocol_steps, validate_operation_draft_protocol_steps,
+        )
         # Use the same checked-child handoff reader as the business runner,
         # only after its exact parent/child capability graph is validated.
         try:
             validate_operation_draft_protocol_steps(steps)
+            continuation_groups = partition_operation_draft_protocol_steps(steps)
         except ValueError as exc:
             raise CampaignEvidenceError("compound child continuation protocol is invalid") from exc
-    continuation_errors = gateway_continuation_binding_errors(
-        command_records,
-        records,
-        platform_name=(
-            "nt" if options.windows_powershell_core_host is not None else "posix"
-        ),
-        windows_powershell_core_host=options.windows_powershell_core_host,
-        allow_compound_checked_child_handoff=compound_children,
-    )
-    if continuation_errors:
-        raise CampaignEvidenceError(
-            f"{label} response-derived Gateway continuation binding is invalid"
+    step_indexes = {step.name: index for index, step in enumerate(steps)}
+    for group in continuation_groups:
+        indexes = tuple(step_indexes[step.name] for step in group)
+        continuation_errors = gateway_continuation_binding_errors(
+            tuple(command_records[index] for index in indexes),
+            tuple(records[index] for index in indexes),
+            platform_name=(
+                "nt" if options.windows_powershell_core_host is not None else "posix"
+            ),
+            windows_powershell_core_host=options.windows_powershell_core_host,
+            allow_compound_checked_child_handoff=any(step.subcommand == "draft-start-undo-child" for step in group),
         )
+        if continuation_errors:
+            raise CampaignEvidenceError(
+                f"{label} response-derived Gateway continuation binding is invalid"
+            )
     expected_runner = Path(
         os.path.abspath(os.fspath(options.skill_source / "scripts" / "run.py"))
     )

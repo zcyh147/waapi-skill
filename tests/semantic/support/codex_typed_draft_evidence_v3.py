@@ -13,6 +13,7 @@ from tests.semantic.support.codex_gateway_broker import (
     dependency_free_draft_action_block,
     draft_compact_action_result,
     project_required_metadata_tokens,
+    partition_operation_draft_protocol_steps,
     validate_operation_draft_protocol_steps,
 )
 from tests.semantic.support.codex_gateway_contracts import gateway_payload_contracts
@@ -667,6 +668,26 @@ def _validate_compound_child_draft_evidence(
 
     validate_operation_draft_protocol_steps(steps)
     starts = [step for step in steps if step.subcommand == "draft-start"]
+    if len(starts) > 1:
+        indexes = {step.name: index for index, step in enumerate(steps)}
+        roots = []
+        flows = []
+        for group in partition_operation_draft_protocol_steps(steps):
+            receipts = tuple(broker_records[indexes[step.name]] for step in group)
+            arguments = dict(state_directory=state_directory, steps=group,
+                broker_records=receipts, durable_records=durable_records,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence)
+            result = (_validate_compound_child_draft_evidence(**arguments)
+                      if any(step.subcommand == "draft-start-undo-child" for step in group)
+                      else _validate_typed_draft_evidence(**arguments))
+            roots.append(result)
+            flows.extend(result["flows"] if "flows" in result else (result,))
+        evidence = {"contract": TYPED_DRAFT_EVIDENCE_CONTRACT, "root_count": len(roots),
+                    "flow_count": len(flows), "flows": flows, "flows_sha256": canonical_sha256(flows),
+                    "root_evidence_sha256": canonical_sha256(roots)}
+        if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+            _fail("Independent Draft root evidence exceeds its fixed archive byte ceiling")
+        return evidence
     if len(starts) != 1:
         _fail("Compound child archive requires exactly one owning parent start")
     parent_start = starts[0]

@@ -3400,6 +3400,62 @@ def _validate_compound_undo_draft_protocol_steps(
         raise ValueError("compound Undo Draft command has no owning flow")
 
 
+def partition_operation_draft_protocol_steps(
+    expected_steps: Sequence[ExpectedGatewayStep],
+) -> tuple[tuple[ExpectedGatewayStep, ...], ...]:
+    """Partition independent roots using their explicit issued-capability graph."""
+    steps = tuple(expected_steps)
+    by_name = {step.name: step for step in steps}
+    if len(by_name) != len(steps):
+        raise ValueError("Draft protocol step names must be unique")
+    starts = {step.name: step for step in steps if step.subcommand in DRAFT_START_SUBCOMMANDS}
+    roots = tuple(step.name for step in starts.values() if step.subcommand == "draft-start")
+    owners = {name: name for name in roots}
+    indexes = {step.name: index for index, step in enumerate(steps)}
+    for name, start in starts.items():
+        if start.subcommand == "draft-start":
+            continue
+        parent = start.arguments[0] if start.arguments else None
+        if (not isinstance(parent, ResponseBinding) or parent.pointer != "/draft/draft_id"
+                or parent.step not in roots or indexes[parent.step] >= indexes[name]
+                or starts[parent.step].arguments != ("waapi.undoGroup",)):
+            raise ValueError("compound child start lacks its exact prior ordinary Undo parent")
+        owners[name] = parent.step
+    if not roots:
+        raise ValueError("Draft protocol lacks an ordinary owning root")
+    step_owners: dict[str, str] = dict(owners)
+    prefixes = {name: name[:-len(".draft-start")] for name in starts if name.endswith(".draft-start")}
+    groups: dict[str, list[ExpectedGatewayStep]] = {name: [] for name in roots}
+    for step in steps:
+        owner = step_owners.get(step.name)
+        if step.subcommand in _DRAFT_SUBCOMMANDS and step.name not in starts:
+            capability = step.arguments[0] if step.arguments else None
+            if (not isinstance(capability, ResponseBinding) or capability.pointer != "/draft/draft_id"
+                    or capability.step not in starts):
+                raise ValueError("Draft command lacks its exact issued flow owner")
+            owner = owners[capability.step]
+        if owner is None:
+            matching = {name for name, prefix in prefixes.items()
+                        if step.name == prefix or step.name.startswith(prefix + ".")}
+            if matching:
+                longest = max(len(prefixes[name]) for name in matching)
+                candidates = {owners[name] for name in matching if len(prefixes[name]) == longest}
+                if len(candidates) != 1:
+                    raise ValueError("Draft protocol command has ambiguous flow ownership")
+                owner = candidates.pop()
+            else:
+                dependencies = {step_owners[argument.step] for argument in step.arguments
+                                if isinstance(argument, ResponseBinding) and argument.step in step_owners}
+                if len(dependencies) > 1:
+                    raise ValueError("Draft protocol command crosses independent root capabilities")
+                # Shared initial catalog reads belong to the first root and
+                # still pass its original protocol/payload validation.
+                owner = next(iter(dependencies), roots[0])
+        step_owners[step.name] = owner
+        groups[owner].append(step)
+    return tuple(tuple(groups[root]) for root in roots)
+
+
 def validate_operation_draft_protocol_steps(
     expected_steps: Sequence[ExpectedGatewayStep],
 ) -> None:
@@ -3414,6 +3470,11 @@ def validate_operation_draft_protocol_steps(
         for step in draft_steps
         if step.subcommand in {"draft-start", "draft-start-undo-child"}
     )
+    if (sum(step.subcommand == "draft-start" for step in starts) > 1
+            and any(step.subcommand == "draft-start-undo-child" for step in starts)):
+        for group in partition_operation_draft_protocol_steps(steps):
+            validate_operation_draft_protocol_steps(group)
+        return
     if len(starts) > 1:
         if any(
             step.subcommand == "draft-declare-undo-plan" for step in draft_steps
@@ -15595,6 +15656,7 @@ __all__ = [
     "dependency_free_draft_action_block",
     "reconcile_gateway_commands",
     "project_required_metadata_tokens",
+    "partition_operation_draft_protocol_steps",
     "resolve_gateway_invocation",
     "validate_operation_draft_protocol_steps",
     "validate_transaction_show_confirmation_payload",

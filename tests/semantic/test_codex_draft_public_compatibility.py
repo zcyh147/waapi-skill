@@ -813,3 +813,131 @@ def test_public_owned_lua_input_cleanup_preserves_original_formal_archive(tmp_pa
     replay_original_archive()
     (tmp_path / "lua-command-facts.json").write_text(json.dumps(command_facts, ensure_ascii=False), encoding="utf-8")
     (tmp_path / "lua-original-archive-evidence.json").write_text(json.dumps(after, ensure_ascii=False), encoding="utf-8")
+
+
+@pytest.mark.parametrize("mixed", [False, True], ids=["two-undo-groups", "ordinary-and-undo"])
+@pytest.mark.skipif(os.name == "nt", reason="POSIX developer transport/archive proof")
+def test_public_sequential_drafts_partition_by_original_parent_capabilities(tmp_path, mixed, monkeypatch):
+    from tests.semantic.support.codex_compound_undo_business_agent_runner import prepare_compound_undo_business_runtime
+    from tests.semantic.support.codex_compound_undo_business_profile import load_compound_undo_business_profile
+    from tests.semantic.support.codex_eval_protocol_v3 import (
+        build_compound_undo_business_transaction_steps, build_object_lifecycle_business_transaction_steps,
+    )
+    root = Path(__file__).resolve().parents[2]
+    unit = load_compound_undo_business_profile(root / "tests/semantic/data/compound-undo-business/profile.json").units[0]
+    runtime = prepare_compound_undo_business_runtime(unit, tmp_path / "runtime")
+    def scoped(prefix, group):
+        return tuple(replace(step, name=prefix + "." + step.name, arguments=tuple(
+            replace(argument, step=prefix + "." + argument.step) if isinstance(argument, ResponseBinding) else argument
+            for argument in step.arguments)) for step in group)
+    first = (build_object_lifecycle_business_transaction_steps(runtime.children[0].request, label="tx00")
+             if mixed else build_compound_undo_business_transaction_steps(runtime.children,
+                display_name="First owned group", label="tx03"))
+    second = build_compound_undo_business_transaction_steps(runtime.children,
+        display_name="Second owned group", label="tx03")
+    steps = (*scoped("first", first), *scoped("second", second))
+    env = set_gateway_config(gateway_env(tmp_path), wwise_version=unit.version)
+    state = tmp_path / "public-state"
+    client = LayoutClient(tmp_path, version=unit.version)
+    client.responses["ak.wwise.core.object.get"] = {"return": [dict(unit.object)]}
+    payloads, records = {}, []
+    for step in steps:
+        argv = [step.subcommand]
+        for argument in step.arguments:
+            if isinstance(argument, ResponseBinding):
+                value = payloads[argument.step]
+                for token in argument.pointer.lstrip("/").split("/"):
+                    value = value[token]
+                argv.append(str(value))
+            else:
+                argv.append(argument)
+        code, payload = gateway.execute_gateway(["--state-dir", str(state), *argv],
+            env=env, client_factory=lambda _: client)
+        assert code == 0, (step.name, payload)
+        payloads[step.name] = payload
+        records.append({"step_name": step.name, "succeeded": True,
+                        "gateway_arguments": argv, "payload": payload})
+        (tmp_path / "sequential-public-receipts.json").write_text(json.dumps(records, ensure_ascii=False), encoding="utf-8")
+    # This actual public producer sequence precedes the formal admission check.
+    # It does not claim authenticated Broker evidence until that admission works.
+    validate_operation_draft_protocol_steps(steps)
+    evidence = validate_typed_draft_evidence(state_directory=state, steps=steps, broker_records=records)
+    assert evidence["flow_count"] == (4 if mixed else 6)
+    payloads, command_facts = {}, []
+    workspace = tmp_path / "agent-workspace"
+    installed = prepare_workspace_skill_install(workspace, root / "skills/waapi-skill")
+    monkeypatch.chdir(workspace)
+    with CodexGatewayBroker(skill_source=root / "skills/waapi-skill", expected_steps=steps,
+        invocation_skill_source=installed, expected_wwise_version=unit.version,
+        runner_environment={**os.environ, "PYTHONPATH": os.pathsep.join((str(WAAPI_SHIM_ROOT), str(root), str(root / "skills/waapi-skill"))),
+            FIXTURE_ENV: str(runtime.fixture_path), "WWISE_WAAPI_HOST": "127.0.0.1", "WWISE_WAAPI_PORT": "31337"},
+        working_root=tmp_path / "broker", transport="tcp") as broker:
+        for step in steps:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    value = payloads[argument.step]
+                    for token in argument.pointer.lstrip("/").split("/"):
+                        value = value[token]
+                    argv.append(str(value))
+                else:
+                    argv.append(argument)
+            runner_path = None
+            for previous in reversed(tuple(payloads.values())):
+                binding = previous.get("draft", {}).get("next_action_binding", {})
+                for field in ("declaration", "check"):
+                    selected = binding.get(field, {}).get("fixed_argv_prefix_copy")
+                    if isinstance(selected, str):
+                        copied = shlex.split(selected)
+                        if copied[3:] == argv[:len(copied) - 3]:
+                            runner_path = Path(copied[1])
+                            break
+                if runner_path is not None:
+                    break
+            result = run_model_command(broker, argv, runner_path=runner_path)
+            (tmp_path / "sequential-broker-evidence.json").write_text(json.dumps(broker.evidence().as_dict(include_output=True), ensure_ascii=False), encoding="utf-8")
+            assert result.returncode == 0, (step.name, result.stdout, result.stderr)
+            payloads[step.name] = json.loads(result.stdout)
+            command_facts.append({"argv": list(result.args), "command": shlex.join(result.args),
+                "exit_code": result.returncode, "status": "completed", "has_shell_operators": False,
+                "parse_error": "", "parser_kind": "posix-native", "aggregated_output": result.stdout})
+        broker_evidence = broker.evidence()
+    assert broker_evidence.passed, broker_evidence
+    authenticated = json.loads(json.dumps(broker_evidence.as_dict()))["records"]
+    replayed = validate_typed_draft_evidence(state_directory=tmp_path / "broker/state", steps=steps, broker_records=authenticated)
+    assert replayed["root_count"] == 2 and replayed["flow_count"] == (4 if mixed else 6)
+    from tests.semantic import run_codex_skill_campaign as campaign
+    campaign._validate_heavy_v3_broker_records(authenticated, task_root=tmp_path, steps=steps,
+        command_records=command_facts, options=SimpleNamespace(skill_source=root / "skills/waapi-skill", windows_powershell_core_host=None),
+        version=unit.version, label="developer independent Draft root transport",
+        expected_project_modification_policy="ask_before_changes")
+    first_start = "first.tx00.draft-start" if mixed else "first.tx03.draft-start"
+    child_index = next(index for index, step in enumerate(steps) if step.name == "second.tx01.draft-start")
+    arguments = list(steps[child_index].arguments)
+    for index, pointer in ((0, "/draft/draft_id"), (2, "/task_authority"), (4, "/draft/revision")):
+        arguments[index] = ResponseBinding(first_start, pointer)
+    corrupted_protocol = list(steps)
+    corrupted_protocol[child_index] = replace(steps[child_index], arguments=tuple(arguments))
+    with pytest.raises(ValueError):
+        validate_operation_draft_protocol_steps(corrupted_protocol)
+    from wwise_waapi.operation_drafts import _record_digest
+    for damage in ("cross-parent-child", "cross-parent-snapshot"):
+        copied = tmp_path / damage
+        shutil.copytree(tmp_path / "broker/state", copied)
+        target = payloads["second.tx01.draft-start" if damage == "cross-parent-child" else "second.tx03.draft-start"]["draft"]["draft_id"]
+        path = copied / "operation-drafts-v1/records" / (target + ".json")
+        content = json.loads(path.read_text(encoding="utf-8"))
+        if damage == "cross-parent-child":
+            content["composition"]["compound_parent"] = {
+                "draft_id": payloads[first_start]["draft"]["draft_id"],
+                "task_authority": payloads[first_start]["task_authority"], "expected_revision": 1}
+        else:
+            source = first_start if mixed else "first.tx01.draft-start"
+            content["composition"]["business_session"]["settings"]["undo_plan"]["children"][0]["source_draft_id"] = payloads[source]["draft"]["draft_id"]
+        content.pop("record_digest")
+        content["record_digest"] = _record_digest(content)
+        path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+        with pytest.raises(TypedDraftEvidenceError):
+            validate_typed_draft_evidence(state_directory=copied, steps=steps, broker_records=authenticated)
+    (tmp_path / "sequential-command-facts.json").write_text(json.dumps(command_facts, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "sequential-original-archive-evidence.json").write_text(json.dumps(replayed, ensure_ascii=False), encoding="utf-8")
