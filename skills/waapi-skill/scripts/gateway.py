@@ -2183,8 +2183,9 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     capabilities.add_argument("--all-versions", action="store_true")
-    capabilities.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect complete attested native reflection independently of executable profiles")
-    capabilities.add_argument(
+    capability_source = capabilities.add_mutually_exclusive_group()
+    capability_source.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect complete attested native reflection independently of executable profiles")
+    capability_source.add_argument(
         "--profile",
         choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
         default=CONSOLE_EXECUTION_PROFILE,
@@ -2222,9 +2223,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Describe one URI, its schema, stable route, safety gate, request template when reviewed, and evidence boundary offline",
     )
     describe.add_argument("api")
-    describe.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect host-specific native schema truth without enabling execution")
+    description_source = describe.add_mutually_exclusive_group()
+    description_source.add_argument("--native-host", choices=NATIVE_HOSTS, help="Inspect host-specific native schema truth without enabling execution")
     describe.add_argument("--all-versions", action="store_true")
-    describe.add_argument(
+    description_source.add_argument(
         "--profile",
         choices=(CONSOLE_EXECUTION_PROFILE, AUTHORING_UI_EXECUTION_PROFILE),
         default=CONSOLE_EXECUTION_PROFILE,
@@ -9506,7 +9508,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             native = load_native_catalog(version, args.native_host, root=NATIVE_CATALOG_ROOT)
             summaries[version] = {"functions": len(native["functions"]), "topics": len(native["topics"]), "schema_count": len(native["schemas"]), "evidence_kind": "reflection_only", "build": native["provenance"]["build"], "content_sha256": native["content_sha256"]}
             for uri in sorted(native["schemas"]):
-                row = native_capability(native, uri)
+                row = native_capability(native, uri, compact=not args.detail)
                 if args.item_type and row["item_type"] != args.item_type:
                     continue
                 if args.query and args.query.casefold() not in uri.casefold():
@@ -9575,7 +9577,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             },
             "match_count": total_matches,
             "returned_count": 0 if args.summary_only else len(visible),
-            "truncated": (not args.summary_only) and len(visible) < total_matches,
+            "truncated": (not args.summary_only) and args.offset + len(visible) < total_matches,
         }
         if not args.summary_only:
             payload["capabilities"] = [

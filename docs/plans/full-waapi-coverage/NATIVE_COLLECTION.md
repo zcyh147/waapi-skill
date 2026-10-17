@@ -3,8 +3,8 @@
 The new discovery store is separate from the execution manifests. Reading or
 publishing a native schema does not register a request, mutation, or Topic.
 Until a matching capture is installed, native discovery reports missing evidence.
-Ticket #175 remains incomplete until five independently evidenced host/version
-lanes, shared-schema comparisons, and referenced definitions are reconciled.
+Ticket #175 remains incomplete until ten independently evidenced host/version
+lanes (five versions on each host), shared-schema comparisons, and referenced definitions are reconciled.
 
 For an already-running matching owned project, select an explicit isolated config
 using the public `config-set` route, with the expected version and endpoint and
@@ -49,3 +49,17 @@ The directory returns a continuation for remaining rows. Complete schemas includ
 the exact same-build definition graph. In-scope unwrapped functions report
 `missing_implementation`; only the two approved Authoring Lua/launch additions
 receive `approved_exclusion`. Existing executable profiles remain independent.
+
+
+Native and executable-profile selectors are mutually exclusive. Native directory
+filters use the same namespace category and implemented semantic-family/route
+facts as ordinary discovery; missing routes do not acquire a guessed family.
+Compact rows omit source receipt detail, while `--detail` discloses provenance.
+`describe --full-schema` retains source receipt digests plus catalog-bound JSON
+pointers for the exact schema and definition graph. Branch enumeration and
+business coverage completion remain owned by #176.
+
+Native schemas are compared with the matching existing execution profile. An
+exact difference is `native_schema_drift_pending_review`, even when the URI
+already has an executable wrapper. Neither exact schema equality nor reflection
+counts grant business execution evidence.

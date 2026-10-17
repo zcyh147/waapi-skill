@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .capabilities import CapabilityCatalog, CapabilityCatalogError, CapabilityNotFoundError
+from .deferred_registry import ApiClassifier
 from .execution_contracts import AUTHORING_UI_EXECUTION_PROFILE, CONSOLE_EXECUTION_PROFILE
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
 
@@ -45,26 +46,43 @@ def load_native_catalog(version: str, host: str, *, root: Path = NATIVE_CATALOG_
     return catalog
 
 
-def native_capability(catalog: dict, uri: str, *, full_schema: bool = False) -> dict:
+def native_capability(catalog: dict, uri: str, *, full_schema: bool = False, compact: bool = False) -> dict:
     kind = "function" if uri in catalog["functions"] else "topic"
     if uri not in catalog["schemas"]:
         raise CapabilityNotFoundError(f"{uri} absent from attested native inventory")
     host = catalog["provenance"]["host"]
     profile = AUTHORING_UI_EXECUTION_PROFILE if host == "wwise-authoring" else CONSOLE_EXECUTION_PROFILE
+    comparison = {"status": "not_in_execution_profile", "business_execution_proven": False}
     try:
         implemented = CapabilityCatalog().describe_for_profile(catalog["version"], uri, profile=profile)
     except CapabilityNotFoundError:
         interface = {"status": "missing_implementation", "gateway_commands": [], "transaction_operations": []}
     else:
         interface = implemented.as_dict()["interface"]
+        matches = implemented.schema == catalog["schemas"][uri]
+        comparison = {"status": "identical" if matches else "different", "business_execution_proven": False, "execution_schema_sha256": canonical_digest(implemented.schema), "profile": profile}
+        if not matches:
+            interface = {**interface, "execution_profile_status": interface["status"], "status": "native_schema_drift_pending_review"}
     if uri in APPROVED_EXCLUSIONS:
         interface = {"status": "approved_exclusion", "reason": "Explicit Authoring Lua/launch exclusion", "gateway_commands": [], "transaction_operations": []}
-    return {"version": catalog["version"], "uri": uri, "item_type": kind, "native_status": "present", "host_surface": host,
+    result = {"version": catalog["version"], "uri": uri, "item_type": kind, "native_status": "present", "host_surface": host, "category": ApiClassifier().category_for(uri),
             "interface": {**interface, "execution_enabled_by_catalog": False},
+            "execution_schema_comparison": comparison,
             "schema": {"status": "ok", "sha256": canonical_digest(catalog["schemas"][uri]), **({"full": catalog["schemas"][uri], "definitions": catalog["definitions"]} if full_schema else {})},
             "provenance": {key: value for key, value in catalog["provenance"].items() if key != "sources"},
             "source_receipt_count": len(catalog["provenance"]["sources"]),
             "source_receipts_sha256": canonical_digest(catalog["provenance"]["sources"])}
+    result["schema"]["source"] = {
+        "catalog_sha256": catalog["content_sha256"],
+        "pointer": "/schemas/" + uri.replace("~", "~0").replace("/", "~1"),
+        "definitions_pointer": "/definitions/documents",
+    }
+    if full_schema:
+        result["provenance"] = catalog["provenance"]
+    if compact:
+        result = {key: value for key, value in result.items() if key not in {"provenance", "source_receipt_count", "source_receipts_sha256"}}
+        result["interface"] = {key: value for key, value in result["interface"].items() if key in {"status", "preferred_route", "gateway_commands", "transaction_operations", "semantic_family", "execution_enabled_by_catalog"}}
+    return result
 
 
 def validate_native_catalog(catalog: dict) -> None:
@@ -81,8 +99,19 @@ def validate_native_catalog(catalog: dict) -> None:
             raise ValueError("native catalog host/version mismatch")
         if not re.fullmatch(re.escape(version) + r"\.\d+\.\d+", build):
             raise ValueError("native catalog exact build missing")
-        if not provenance.get("session_id") or not provenance.get("sources") or provenance.get("evidence_kind") != "reflection_only":
-            raise ValueError("native catalog session/source provenance missing")
+        session = provenance.get("session_id")
+        process_id = provenance.get("process_id")
+        sources = provenance.get("sources")
+        if (not isinstance(session, str) or not session.strip() or session != session.strip()
+                or len(session.encode("utf-8")) > 256 or type(process_id) is not int or process_id <= 0
+                or not isinstance(sources, dict) or not sources
+                or provenance.get("evidence_kind") != "reflection_only"):
+            raise ValueError("native catalog session/process/source provenance missing or malformed")
+        for name, source_digest in sources.items():
+            if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_.-]+", name)
+                    or name in {".", ".."} or not isinstance(source_digest, str)
+                    or not re.fullmatch(r"[a-f0-9]{64}", source_digest)):
+                raise ValueError("native catalog source provenance has an invalid name or SHA-256")
         functions, topics, schemas = catalog["functions"], catalog["topics"], catalog["schemas"]
         for entries in (functions, topics):
             if not isinstance(entries, list) or len(entries) > 4096 or any(not isinstance(uri, str) or not re.fullmatch(r"ak\.[A-Za-z0-9_.]+", uri) for uri in entries) or len(set(entries)) != len(entries):
@@ -92,6 +121,23 @@ def validate_native_catalog(catalog: dict) -> None:
         definitions = catalog["definitions"]
         if definitions.get("version") != version or definitions.get("wwise_build") != build:
             raise ValueError("native definition build/version mismatch")
+        documents = definitions.get("documents")
+        names = definitions.get("source_file_names")
+        if (definitions.get("contract") != "waapi-skill.definition-graph/v1"
+                or not isinstance(documents, dict) or not documents
+                or not isinstance(names, list) or any(not isinstance(name, str) for name in names)
+                or len(set(names)) != len(names)):
+            raise ValueError("native definition document inventory malformed")
+        classic_alias = (version in {"2021.1", "2022.1"}
+                         and names == ["WwiseAuthoringAPI.json"]
+                         and set(documents) == {"waapi_definitions.json"})
+        if set(names) != set(documents) and not classic_alias:
+            raise ValueError("native definition document inventory malformed")
+        for name, document in documents.items():
+            if (not re.fullmatch(r"[A-Za-z0-9_.-]+\.json", name)
+                    or not isinstance(document, dict) or not isinstance(document.get("definitions"), dict)
+                    or not document["definitions"]):
+                raise ValueError("native definition document structure malformed")
         unsigned_definitions = {k: v for k, v in definitions.items() if k != "inventory_sha256"}
         if definitions.get("inventory_sha256") != canonical_digest(unsigned_definitions):
             raise ValueError("native definition digest mismatch")
