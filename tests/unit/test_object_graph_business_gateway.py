@@ -2271,3 +2271,157 @@ def test_gateway_clears_named_object_list_without_empty_native_dsl(
             "lists": [{"name": "CustomList", "objects": []}],
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("version", "operation"),
+    [(version, "object.create") for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")]
+    + [(version, "object.set") for version in ("2022.1", "2023.1", "2024.1", "2025.1")],
+)
+@pytest.mark.parametrize("native_case", ["scalar", "null", "empty-array", "malformed-object", "missing-definition"])
+def test_public_graph_preview_validates_reachable_native_definitions(
+    tmp_path: Path, version: str, operation: str, native_case: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    parent = {
+        "id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+        "path": rf"\{root}\Default Work Unit", "@Volume": 0.0,
+    }
+    calls: list[str] = []
+
+    class GraphClient:
+        def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+            calls.append(uri)
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return _project(tmp_path)
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [
+                    {"classId": 1, "name": "PropertyContainer" if version == "2025.1" else "ActorMixer", "type": "WObject"},
+                    {"classId": 2, "name": "Sound", "type": "Sound"},
+                ]}
+            if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+                return {"return": ["Volume"]}
+            if uri == "ak.wwise.core.object.getPropertyInfo":
+                assert args["property"] == "Volume"
+                return {"name": "Volume", "type": "Real64", "supports": {"unlink": True}}
+            if uri == "ak.wwise.core.object.get":
+                if args == {"waql": "from type Project take 1"}:
+                    return {"return": [{**_project(tmp_path), "type": "Project"}]}
+                if args.get("from", {}).get("id") == [PARENT_ID] and not args.get("transform"):
+                    return {"return": [parent]}
+                return {"return": []}
+            raise AssertionError(f"Unexpected native dispatch: {uri} {args!r} {options!r}")
+
+        def disconnect(self) -> None:
+            pass
+
+    def online(*argv: str) -> tuple[int, dict[str, Any]]:
+        return gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path, version), client_factory=lambda _url: GraphClient(),
+        )
+
+    code, started = _offline(tmp_path, "draft-start", operation, version=version)
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    code, bound = online(
+        "draft-bind-object", draft_id, "--task-authority", authority,
+        "--expected-revision", "1", "--object-id", PARENT_ID,
+    )
+    assert code == 0, bound
+    code, declared = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "2", "--declaration-id", "group",
+        "--parent-handle", bound["bound_object"]["handle"],
+        "--name", "Weather", "--kind", "actor-mixer", version=version,
+    )
+    assert code == 0, declared
+    code, child = _offline(
+        tmp_path, "draft-declare-new", draft_id, "--task-authority", authority,
+        "--expected-revision", "3", "--declaration-id", "rain",
+        "--parent-handle", declared["draft"]["declared_object"]["result_handle"],
+        "--name", "Rain", "--kind", "sound-sfx",
+        "--field", "volume_db", "-4", version=version,
+    )
+    assert code == 0, child
+    rejected = native_case in {"malformed-object", "missing-definition"} or (
+        native_case == "empty-array" and operation == "object.create"
+    )
+    injected_rows: list[dict[str, Any]] = []
+
+    def install_compiler_control() -> None:
+        # Test-only native output, never a caller-authored payload route. Legal
+        # shapes stay stable across check and preview; faulty output is added
+        # after the valid check to exercise the Preview gate itself.
+        import wwise_waapi.operation_registry as registry
+        if native_case in {"null", "empty-array", "malformed-object"}:
+            materialize = registry._materialize_canonical_object_node
+
+            def injected_node(*args: Any, **kwargs: Any) -> dict[str, Any]:
+                node = materialize(*args, **kwargs)
+                def inject(row: dict[str, Any]) -> None:
+                    if row.get("type") == "Sound":
+                        row["@OutputBus"] = {
+                            "null": None, "empty-array": [],
+                            "malformed-object": {"unrecognized": True},
+                        }[native_case]
+                        injected_rows.append(dict(row))
+                    for child in row.get("children", []):
+                        inject(child)
+                inject(node)
+                return node
+
+            monkeypatch.setattr(registry, "_materialize_canonical_object_node", injected_node)
+        elif native_case == "missing-definition":
+            import wwise_waapi.schema_inventory as inventory
+            resolve = inventory.resolve_schema_reference
+
+            def missing_object_arg(reference: str, **kwargs: Any) -> Any:
+                if reference.endswith("/objectArg"):
+                    raise inventory.SchemaInventoryError("test dependency loss: objectArg")
+                return resolve(reference, **kwargs)
+
+            monkeypatch.setattr(inventory, "resolve_schema_reference", missing_object_arg)
+
+
+    if not rejected:
+        install_compiler_control()
+    code, checked = online(
+        "draft-check", draft_id, "--task-authority", authority, "--expected-revision", "4",
+    )
+    assert code == 0, json.dumps(checked)
+    if rejected:
+        install_compiler_control()
+    code, previewed = online(
+        "preview-from-draft", draft_id, "--task-authority", authority, "--expected-revision", "5",
+    )
+    if rejected:
+        assert code == 2, json.dumps(previewed)
+        assert previewed["error_code"] == "SemanticValidationError", previewed
+        assert previewed["details"]["uri"] == f"ak.wwise.core.{operation}"
+        assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
+        if native_case != "missing-definition":
+            expected_bad_value: Any = [] if native_case == "empty-array" else {"unrecognized": True}
+            assert injected_rows and injected_rows[-1]["@OutputBus"] == expected_bad_value
+        assert "transaction_id" not in previewed
+        assert not any(uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"} for uri in calls)
+        return
+    assert code == 0, json.dumps(previewed)
+    code, shown = _offline(
+        tmp_path, "transaction-show", previewed["transaction_id"], version=version,
+    )
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    dispatch = prepared["dispatch"]
+    metadata = prepared["semantic_preview"]["envelope"]["metadata"]
+    assert metadata["request_validation_strength"] == "complete_reflected_schema", metadata
+    assert metadata["schema_validation"]["unresolved_refs"] == []
+    group = dispatch["args"] if operation == "object.create" else dispatch["args"]["objects"][0]["children"][0]
+    expected_child: dict[str, Any] = {"type": "Sound", "name": "Rain", "@Volume": -4.0}
+    if native_case in {"null", "empty-array"}:
+        expected_child["@OutputBus"] = None if native_case == "null" else []
+    assert group["children"][0] == expected_child
+    assert not any(uri in {"ak.wwise.core.object.create", "ak.wwise.core.object.set"} for uri in calls)

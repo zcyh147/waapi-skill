@@ -4519,7 +4519,15 @@ def _closed_operation_preview(
 ) -> SemanticPreview:
     """Build a reviewed registry-owned preview and validate its exact dispatch."""
 
-    validation = validate_semantic_payload(uri, args, options, version=version)
+    # These graph requests contain recursive nodes and dynamic @field values
+    # whose native constraints live in the pinned definition documents.  A
+    # conservative inspection result cannot certify the compiled dispatch.
+    validator = (
+        validate_resolved_semantic_payload
+        if uri in {"ak.wwise.core.object.create", OBJECT_SET_URI}
+        else validate_semantic_payload
+    )
+    validation = validator(uri, args, options, version=version)
     return SemanticPreview(
         envelope=SemanticEnvelope(
             uri=uri,
