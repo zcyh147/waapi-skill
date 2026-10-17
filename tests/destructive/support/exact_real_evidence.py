@@ -6,12 +6,13 @@ import hashlib
 import shutil
 import time
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import pytest  # pyright: ignore[reportMissingImports]
 
 from tests.destructive.support.category_evidence import (
     append_category_evidence,
+    build_category_evidence_record,
     exact_transaction_outcomes,
 )
 from tests.destructive.support.sandbox_fixture import (
@@ -221,12 +222,14 @@ def append_finalized_scenario_evidence(
     lifecycle: Mapping[str, Any], sandbox: SandboxProject,
     host: Mapping[str, Any], observation_path: Path,
     transactions: Sequence[Mapping[str, Any]],
+    original_publisher: Callable[[dict[str, Any]], None] | None = None,
 ) -> None:
     """Use the category-v3 writer after an original ScenarioLifecycle is final.
 
     Called by pytest teardown, after its actual call report exists. The caller
     retains the original observation artifact; this never promotes old logs or
-    supplies a new sandbox lifecycle.
+    supplies a new sandbox lifecycle. An original publisher stages its final
+    category snapshot with its wrapper; non-PASS runs retain the category log.
     """
     if (lifecycle.get("contract") != "waapi-skill.codex-semantic-scenario-lifecycle/v3"
             or lifecycle.get("final_status") not in {"PASS", "FAIL", "BLOCKED"}
@@ -255,7 +258,9 @@ def append_finalized_scenario_evidence(
         raise AssertionError("scenario category host requires the original exact getInfo version and host")
     observation = {"artifact": str(observation_path.resolve()),
                    "sha256": hashlib.sha256(observation_path.read_bytes()).hexdigest()}
-    append_category_evidence(
+    publish_original = original_publisher is not None and outcome == "PASS"
+    writer = build_category_evidence_record if publish_original else append_category_evidence
+    record = writer(
         repo_root=repo_root, candidate=candidate, version=version,
         host={"display_name": host.get("displayName"), "is_command_line": host["isCommandLine"],
               "version": dict(native_version)},
@@ -273,6 +278,9 @@ def append_finalized_scenario_evidence(
                     "phase": "final", "outcome": outcome},
         transactions=transactions,
     )
+    if publish_original:
+        assert original_publisher is not None and record is not None
+        original_publisher(record)
 
 
 __all__ = ["finalize_exact_real_evidence", "append_finalized_scenario_evidence"]

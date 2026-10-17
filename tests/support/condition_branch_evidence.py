@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 
 from tests.maintenance import branch_coverage_audit as audit
 
@@ -57,10 +58,19 @@ _PROGRAM_CASES["association-continue-play-2025.1"] = {
     "scalar": {"controller": "SwitchBehavior", "controller_value": 1, "field": "ContinuePlay", "value": True},
 }
 
+for _version, _build, _index in (("2021.1", "2021.1.14.8108", 152), ("2022.1", "2022.1.19.8584", 156),
+        ("2023.1", "2023.1.19.8928", 135), ("2024.1", "2024.1.13.9056", 141), ("2025.1", "2025.1.7.9143", 142)):
+    _PROGRAM_CASES[f"slew-rate-show-{_version}"] = {
+        **deepcopy(_PROGRAM_CASES["slew-rate-show"]),
+        "branch_id": f"{_version}|installed|{_build}|condition|existing-object|WObjects/WObjects.xml|"
+                     f"PluginModule/WwiseObject[GameParameter]/Properties/Property[SlewRateUp]/Dependencies/{_index}/condition",
+    }
 
-def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show") -> dict:
+
+def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show", create_output: bool = True) -> dict:
     """Freeze exact source and branch facts before the public workflow executes."""
-    root.mkdir(parents=True, exist_ok=False)
+    if create_output:
+        root.mkdir(parents=True, exist_ok=False)
     inventory = audit.build_inventory()
     case = _PROGRAM_CASES[case_name]
     branch = next(row for row in inventory["native_coverage"]["obligations"] if row["id"] == case["branch_id"])
@@ -86,6 +96,7 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/fixtures/metadata-conditions/parent-weight-show.json",
         "tests/unit/test_association_condition_product_gateway.py",
         "tests/fixtures/metadata-conditions/association-continue-play-2025.json",
+        "tests/unit/test_condition_native_evidence.py",
     ])
     sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in sorted(set(relevant))}
     return {"root": root, "nodeid": nodeid, "branch": branch, "case": case,
@@ -161,3 +172,130 @@ def finish_condition_capture(capture: dict, phase_reports: dict, observed: dict)
     pending = root / ".program.pending"
     pending.write_bytes(program_bytes)
     pending.replace(program_path)
+
+
+def prepare_condition_native_capture(root: Path, nodeid: str, version: str, relation: str) -> dict:
+    """Freeze a new exact original producer; never create the lifecycle root."""
+    if relation not in {"Self", "Parent"}:
+        raise ValueError("unsupported original condition probe")
+    expected_node = ("tests/destructive/test_condition_visibility_gateway.py::"
+                     f"test_show_visibility_does_not_change_native_prerequisite[{relation}]")
+    if nodeid != expected_node or root.exists():
+        raise ValueError("native capture needs the exact original node and a fresh output")
+    case = f"slew-rate-show-{version}" if relation == "Self" else f"parent-weight-show-{version}"
+    capture = prepare_condition_capture(root, nodeid, case_name=case, create_output=False)
+    # Native category receipts identify a Git object. Working bytes must be that
+    # object, rather than an uncommitted approximation of the candidate.
+    subprocess.run(["git", "ls-files", "--error-unmatch", "--", *capture["relevant_sources"]],
+                   cwd=audit.ROOT, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    subprocess.run(["git", "diff", "--exit-code", "HEAD", "--", *capture["relevant_sources"]],
+                   cwd=audit.ROOT, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return {**capture, "relation": relation, "scope_kind": "product"}
+
+
+def publish_condition_native_capture(capture: dict, category: dict, observation_path: Path) -> None:
+    """Atomically publish one original finalized category and exact branch wrapper.
+
+    Invoked only from the existing post-teardown producer. It does not consume
+    historical category logs, approve source equivalence, or grant family credit.
+    """
+    root, branch, nodeid = capture["root"], capture["branch"], capture["nodeid"]
+    invocation = category["invocation"]
+    if (category.get("contract") != "waapi-skill.host-category-evidence/v3"
+            or invocation.get("phase") != "final" or invocation.get("outcome") != "PASS"
+            or invocation.get("selected_test_nodeids") != [nodeid]
+            or invocation.get("node_outcomes") != [{"nodeid": nodeid, "outcome": "PASS"}]):
+        raise ValueError("native wrapper requires the exact finalized PASS node")
+    if category["candidate"] != capture["git_candidate"]:
+        raise ValueError("native original candidate differs from frozen source")
+    if (not capture["relevant_sources"] or any(
+            hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() != seal
+            for name, seal in capture["relevant_sources"].items())
+            or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=audit.ROOT, text=True).strip() != capture["git_candidate"]):
+        raise ValueError("native frozen source changed")
+    observation_bytes = observation_path.read_bytes()
+    observation = json.loads(observation_bytes)
+    host = category["host"]
+    native_version = host["version"]
+    build = ".".join(str(native_version[key]) for key in ("year", "major", "minor", "build"))
+    if (category["version"] != branch["version"] or build != branch["build"]
+            or host["is_command_line"] is not True or observation["host"]["isCommandLine"] is not True
+            or observation["host"]["version"] != native_version
+            or observation["candidate"] != capture["git_candidate"] or observation["version"] != branch["version"]):
+        raise ValueError("native exact host/build/candidate mismatch")
+    descriptor = {"artifact": str(observation_path.resolve()), "sha256": hashlib.sha256(observation_bytes).hexdigest()}
+    if (len(category["categories"]) != 1 or category["categories"][0].get("observation") != descriptor
+            or category["categories"][0].get("status") != "PASS"):
+        raise ValueError("native original observation link mismatch")
+    scalar = capture["case"]["scalar"]
+    field, controller = scalar["field"], scalar["controller"]
+    if (observation["field"] != field or observation["prerequisite"] != controller
+            or observation["relation"] != capture["relation"]):
+        raise ValueError("native original field/context mismatch")
+    metadata = observation["metadata"]
+    dependencies = metadata["dependencies"]
+    relevant = [(index, row) for index, row in enumerate(dependencies) if row.get("action") == "Show"
+                and row.get("context") == capture["relation"] and row.get("property") == controller]
+    if len(relevant) != 1:
+        raise ValueError("native exact Show metadata occurrence missing")
+    index, dependency = relevant[0]
+    prefix = "/observations/wwise-console"
+    observation_pointer = f"{prefix}/metadata/dependencies/{index}"
+    checks = [{"pointer": observation_pointer, "equals": dependency}]
+    if len(observation["observations"]) != 2:
+        raise ValueError("native Show probe needs both original controller states")
+    for index, row in enumerate(observation["observations"]):
+        before, after = row["controller_before"], row["controller_after"]
+        actual = row["after"][field]
+        if (type(row["mode"]) is not int or row["mode"] != index
+                or type(before[controller]) is not int or before[controller] != index or before != after
+                or type(actual) not in {int, float} or actual != 37 + index
+                or type(row["requested_value"]) is not int or row["requested_value"] != 37 + index
+                or type(row["is_property_enabled"]["return"]) is not bool
+                or row["metadata_before"] != metadata or row["metadata_after"] != metadata
+                or {k: v for k, v in row["before"].items() if k != field} !=
+                   {k: v for k, v in row["after"].items() if k != field}):
+            raise ValueError("native exact readback/controller preservation mismatch")
+        row_pointer = f"{prefix}/observations/{index}"
+        checks.extend([
+            {"pointer": f"{row_pointer}/after/{field}", "equals": actual},
+            {"pointer": f"{row_pointer}/before", "equals": row["before"]},
+            {"pointer": f"{row_pointer}/after", "equals": row["after"]},
+            {"pointer": f"{row_pointer}/controller_before", "equals": before},
+            {"pointer": f"{row_pointer}/controller_after", "equals": before},
+            {"pointer": f"{row_pointer}/is_property_enabled", "equals": row["is_property_enabled"]},
+            {"pointer": f"{row_pointer}/metadata_before", "equals": metadata},
+            {"pointer": f"{row_pointer}/metadata_after", "equals": metadata},
+        ])
+    if root.exists():
+        raise ValueError("native output already exists; original evidence is immutable")
+    root.parent.mkdir(parents=True, exist_ok=True)
+    # Stage sibling files so the category and wrapper become visible together.
+    # Failed stages are retained for diagnosis and never have an accepted path.
+    pending = Path(tempfile.mkdtemp(prefix=f".{root.name}-pending-", dir=root.parent))
+    def write(name, value):
+        payload = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2).encode("utf-8")
+        (pending / name).write_bytes(payload)
+        return {"artifact": str((root / name).resolve()), "sha256": hashlib.sha256(payload).hexdigest()}
+    category_descriptor = {**write("category.json", category), "nodeid": nodeid,
+                           "observation_sha256": [descriptor["sha256"]]}
+    source_descriptor = write("sources.json", {"contract": "waapi-skill.condition-native-source-capture/v1",
+          "git_candidate": capture["git_candidate"], "candidate_sha256": capture["candidate_sha256"],
+          "relevant_sources": capture["relevant_sources"], "source_unchanged": True,
+          "native_host": host, "branch_id": branch["id"], "native_shape_sha256": branch["shape_sha256"]})
+    record = {"candidate_sha256": capture["candidate_sha256"], "scope_kind": capture["scope_kind"],
+              "evidence_kind": "native_execution", "git_candidate": capture["git_candidate"],
+              "invocation": invocation, "native_runs": [category_descriptor], "artifacts": [source_descriptor],
+              "observation_artifacts": {"wwise-console": descriptor},
+              "branch_assertions": {branch["id"]: {"native_shape_sha256": branch["shape_sha256"],
+                                                     "native_route": branch["route"], "checks": checks}}}
+    native_descriptor = {**write("native.json", record), "nodeid": nodeid}
+    write("native-link.json", {"branch_id": branch["id"], "native_shape_sha256": branch["shape_sha256"],
+          "native_hosts": ["wwise-console"], "observation_pointer": observation_pointer,
+          "native_observations_sha256": {"wwise-console": descriptor["sha256"]},
+          "evidence": {"native": native_descriptor}, "native_equivalence": {},
+          "relevant_sources": list(capture["relevant_sources"]), "source_capture": source_descriptor,
+          "status": "original_native_only_source_equivalence_review_required"})
+    if observation_path.read_bytes() != observation_bytes:
+        raise ValueError("original native observation changed before publication")
+    pending.rename(root)
