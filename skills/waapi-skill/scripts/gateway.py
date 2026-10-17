@@ -388,6 +388,7 @@ from wwise_waapi.runtime_transport_handles import (  # noqa: E402  # pyright: ig
     RuntimeTransportHandleError,
     RuntimeTransportHandleStore,
     validate_runtime_transport_handle,
+    runtime_transport_authority_snapshot,
 )
 from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     EXECUTE_ACTION_ON_EVENT_URI,
@@ -12341,8 +12342,8 @@ def dispatch_runtime_inspection_business_read(
                 observation_context = {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
                     "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
             store = RuntimeInspectionObservationStore(state_dir)
-            # The store is immutable. Preallocate its opaque identity by using
-            # the existing token source once, then retain the decorated result.
+            # Retain one immutable observation. Issued selector decoration is
+            # derived from its opaque key without changing the sealed record.
             handle = store.issue(plan={"operation": args.api, "request": request, "result": complete_result,
                 "page_size": args.runtime_inspection_limit, "pipeline_bindings": pipeline_bindings},
                 context=observation_context, issued=int(time.time()))
@@ -12354,7 +12355,7 @@ def dispatch_runtime_inspection_business_read(
             normalized = page_payload["agent_result"]
     return {
         "ok": bool(result.get("ok")),
-        "status": "ok" if result.get("ok") else "error",
+        "status": ("partial" if normalized is not None and normalized.get("complete") is False else "ok") if result.get("ok") else "error",
         **dict(common),
         "api_attempted": args.api,
         "business_request": {
@@ -16674,6 +16675,14 @@ def dispatch_operation_draft_check(
             ),
             declared_settings=business_session.settings,
         )
+    if str(business_operation).startswith("ak.wwise.core.transport."):
+        try:
+            checked_artifact["prepared_operation"]["pre_state"]["transport_authority"] = runtime_transport_authority_snapshot(
+                request_payload, state_dir=state_dir,
+                context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                    detected_version=detected_version, live_info=live_info), declared_settings=business_session.settings)
+        except RuntimeTransportHandleError as exc:
+            raise GatewayResultShapeError(str(exc), details=exc.details, error_code=exc.error_code) from exc
     prepared = require_mapping(
         checked_artifact.get("prepared_operation"),
         "checked prepared operation",
@@ -20406,6 +20415,11 @@ def create_transaction_preview(
                 detected_version=detected_version, live_info=live_info,
             ),
         )
+    if str(canonical_request.get("arguments", {}).get("api")).startswith("ak.wwise.core.transport."):
+        artifact["prepared_operation"]["pre_state"]["transport_authority"] = runtime_transport_authority_snapshot(
+            canonical_request, state_dir=state_dir,
+            context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                detected_version=detected_version, live_info=live_info))
     artifact["connection_configuration"] = selected_connection_binding(env)
     prepared = require_mapping(
         artifact.get("prepared_operation"),
@@ -21299,6 +21313,9 @@ def _dispatch_transaction_command_with_execution_lease(
                     transport_id,
                     context=transport_context,
                 )
+                if prepared.get("pre_state", {}).get("transport_authority") != transport_record.binding_dict():
+                    raise RuntimeTransportHandleError("TRANSPORT_HANDLE_GENERATION_DRIFT",
+                        "The immutable Preview binds an older transport capability; create a new Preview.")
                 transport_list = read_call(
                     "ak.wwise.core.transport.getList",
                     {},

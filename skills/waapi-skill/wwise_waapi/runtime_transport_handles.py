@@ -579,3 +579,17 @@ def validate_runtime_transport_handle(handle: Any) -> str:
     """Validate only the opaque public token shape; resolution stays stateful."""
 
     return RuntimeTransportHandleStore._validate_handle(handle)
+
+
+def runtime_transport_authority_snapshot(request: Mapping[str, Any], *, state_dir: Path,
+        context: RuntimeTransportContext, declared_settings: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
+    """An immutable Preview binds a capability generation, never only its ID."""
+    arguments = request.get("arguments", {})
+    native_id = arguments.get("args", {}).get("transport")
+    if arguments.get("api") not in {"ak.wwise.core.transport.destroy", "ak.wwise.core.transport.executeAction"} or native_id is None:
+        return None
+    record = RuntimeTransportHandleStore(state_dir).resolve_native_id(native_id, context=context)
+    binding = record.binding_dict()
+    if declared_settings is not None and declared_settings.get("runtime_transport_binding") != binding:
+        raise RuntimeTransportHandleError("TRANSPORT_HANDLE_GENERATION_DRIFT", "The declared transport capability was retired or replaced before Draft check.")
+    return binding

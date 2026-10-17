@@ -530,6 +530,13 @@ def test_profiler_voice_read_derives_native_time_projection_and_handle(tmp_path:
     assert code == 0, observed
     handle = observed["agent_result"]["return"][0]["voice_instance_handle"]
     assert handle.startswith("rph1-") and "0000002a" not in handle
+    calls.clear()
+    code, wrong_position = gateway.execute_gateway([
+        "--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+        "--profiler-position", "124", "--voice-instance-handle", handle],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and "another capture position" in wrong_position["message"], wrong_position
+    assert not any(uri == GET_VOICES_URI for uri, _args, _options in calls)
     code, selected = gateway.execute_gateway([*prefix, "--voice-instance-handle", handle],
         env=env, client_factory=lambda _url: client)
     assert code == 0, selected
@@ -831,6 +838,7 @@ def test_runtime_snapshot_fragments_preserve_every_character_under_terminal_boun
     while True:
         assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= gateway.MAX_GATEWAY_RESULT_JSON_BYTES
         result = payload["agent_result"]
+        assert list(payload)[-1] == "agent_result"
         fragments.append(result["row_fragment"]["value"])
         if result["complete"]:
             break
@@ -865,8 +873,9 @@ def _public_runtime_preview(tmp_path, client, state_dir, operation, declaration=
 
 
 @pytest.mark.parametrize("intervention", ("replacement", "destroy"))
-def test_transport_late_creation_verification_cannot_resurrect_prior_lifetime(tmp_path: Path, intervention: str) -> None:
-    client = _RuntimeControlDraftClient(tmp_path)
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_transport_late_creation_verification_cannot_resurrect_prior_lifetime(tmp_path: Path, intervention: str, version: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
     original = client.call
     client.calls = []
     def call(uri, args=None, options=None):
@@ -892,7 +901,7 @@ def test_transport_late_creation_verification_cannot_resurrect_prior_lifetime(tm
         # Native ID has been recycled outside Gateway before the delayed read.
         # Identical rows cannot confer the old transaction's publication right.
     code, result = gateway.execute_gateway(["--state-dir", str(state_dir), "verify", pending["transaction_id"]],
-        env=_env(tmp_path), client_factory=lambda _url: client)
+        env=_env(tmp_path, version=version), client_factory=lambda _url: client)
     assert code == 2, result
     assert result["error_code"] in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}
     assert result["automatic_retry"] is False
@@ -989,18 +998,51 @@ def test_profiler_diagnostics_requests_every_pinned_native_projection_field(tmp_
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
 @pytest.mark.parametrize("view,expected", (("capture-defaults", {}), ("empty-selection", {"return": []})))
-def test_profiler_native_default_and_explicit_empty_projection_remain_distinct(tmp_path: Path, version: str, view: str, expected: dict) -> None:
+@pytest.mark.parametrize("operation", (GET_VOICES_URI, "ak.wwise.core.profiler.getBusses", "ak.wwise.core.profiler.getAudioObjects"))
+def test_profiler_native_default_and_explicit_empty_projection_remain_distinct(tmp_path: Path, version: str, view: str, expected: dict, operation: str) -> None:
     client = _RuntimeControlDraftClient(tmp_path, version=version)
     original = client.call
     calls = []
     def call(uri, args=None, options=None):
         calls.append((uri, args, options))
-        return {"return": []} if uri == GET_VOICES_URI else original(uri, args, options)
+        return {"return": []} if uri == operation else original(uri, args, options)
     client.call = call
-    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", operation,
         "--profiler-position", "123", "--result-view", view], env=_env(tmp_path, version=version), client_factory=lambda _url: client)
     assert code == 0, payload
-    assert next(options for uri, _args, options in calls if uri == GET_VOICES_URI) == expected
+    assert next(options for uri, _args, options in calls if uri == operation) == expected
+
+
+def test_transport_preview_cannot_transfer_to_recycled_identical_native_row(tmp_path: Path) -> None:
+    client = _RuntimeControlDraftClient(tmp_path)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append(uri)
+        if uri == "ak.wwise.core.transport.create":
+            return {"transport": 74}
+        if uri == "ak.wwise.core.transport.destroy":
+            return {}
+        if uri == TRANSPORT_GET_STATE_URI:
+            return {"state": "stopped"}
+        return original(uri, args, options)
+    client.call = call
+    state_dir = tmp_path / "state"
+    first, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", first["transaction_id"]])
+    first_result = invoke(["verify", first["transaction_id"]])
+    handle = first_result["agent_result"]["business_result"]["transport_handle"]
+    old_destroy, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.destroy", ("--transport-handle", handle))
+    replacement, invoke = _public_runtime_preview(tmp_path, client, state_dir, "ak.wwise.core.transport.create")
+    invoke(["execute", replacement["transaction_id"]])
+    invoke(["verify", replacement["transaction_id"]])
+    calls.clear()
+    code, result = gateway.execute_gateway(["--state-dir", str(state_dir), "execute", old_destroy["transaction_id"]],
+        env=_env(tmp_path), client_factory=lambda _url: client)
+    assert code == 2, result
+    assert result["status"] == "repreview_required"
+    assert result["error_code"] == "TRANSPORT_HANDLE_GENERATION_DRIFT"
+    assert "ak.wwise.core.transport.destroy" not in calls
 
 
 def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(
