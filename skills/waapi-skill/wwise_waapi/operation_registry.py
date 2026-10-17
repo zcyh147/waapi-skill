@@ -5462,6 +5462,7 @@ def _prepare_object_set(
     dispatch_objects: list[dict[str, Any]] = []
     node_specs: list[dict[str, Any]] = []
     field_snapshots: list[dict[str, Any]] = []
+    condition_metadata_guards: list[dict[str, Any]] = []
     children_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     list_subtree_snapshots: list[dict[str, Any]] = []
@@ -5657,6 +5658,17 @@ def _prepare_object_set(
             target_spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        for descriptor in properties:
+            _apply_reference_activation_dependencies(
+                property_info_by_name[descriptor.name.casefold()],
+                read=read, object_id=target.object,
+                property_specs=target_spec["properties"],
+                property_info_by_name=property_info_by_name,
+                derived_properties=derived_target_properties,
+                request_path=descriptor.request_path,
+                property_info_cache=property_info_cache,
+                _condition_sources=tuple(property_info_by_name.values()),
+            )
         for descriptor in references:
             info = _read_property_info_cached(
                 read,
@@ -5665,6 +5677,7 @@ def _prepare_object_set(
                 name=descriptor.name,
             )
             _require_object_reference_metadata(info)
+            property_info_by_name[descriptor.name.casefold()] = info
             if platform is not None:
                 _require_platform_field_enabled(
                     read,
@@ -5695,6 +5708,11 @@ def _prepare_object_set(
             if activation_properties:
                 reference_spec["activation_properties"] = list(activation_properties)
             target_spec["references"].append(reference_spec)
+        if any(info.dependencies for info in property_info_by_name.values()):
+            condition_metadata_guards.append({
+                "object_id": target.object,
+                "fields": [info.as_dict() for info in property_info_by_name.values()],
+            })
         for property_name, value in derived_target_properties.items():
             trusted[f"@{property_name}"] = value
 
@@ -6267,6 +6285,8 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
     }
+    if condition_metadata_guards:
+        state["condition_metadata_guards"] = condition_metadata_guards
     if has_imports or requested_languages:
         state["import_guard"] = import_guard
     return preview, roles, state, verification, cleanup
@@ -7276,6 +7296,7 @@ def _apply_reference_activation_dependencies(
     ] | None = None,
     _activation_path: tuple[str, ...] = (),
     _activation_fields: set[str] | None = None,
+    _condition_sources: tuple[PropertyInfoMetadataRecord, ...] = (),
 ) -> tuple[str, ...]:
     """Compile bounded same-object Boolean activation requirements.
 
@@ -7363,7 +7384,8 @@ def _apply_reference_activation_dependencies(
             try:
                 restriction = intersect_condition_restrictions([
                     condition_restriction(item.get("conditions"))
-                    for item in metadata.dependencies
+                    for source in (metadata, *_condition_sources)
+                    for item in source.dependencies
                     if item.get("type") == "property"
                     and item.get("action") == action and item.get("context") == context
                     and isinstance(item.get("property"), str)
@@ -7465,6 +7487,7 @@ def _apply_reference_activation_dependencies(
             property_info_by_name[property_key] = property_info
         if (
             property_info.name != property_name
+            or (dependency_type == "override" and property_info.type.casefold() not in {"bool", "boolean"})
         ):
             raise OperationContractError(
                 "INVALID_METADATA",
@@ -7484,6 +7507,7 @@ def _apply_reference_activation_dependencies(
             derived_properties=derived_properties, request_path=request_path,
             object_id=object_id, class_id=class_id, property_info_cache=property_info_cache,
             _activation_path=path, _activation_fields=all_fields,
+            _condition_sources=_condition_sources,
         ))
 
         matching_specs = [
@@ -13591,7 +13615,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
 
     pre_state = prepared.get("pre_state")
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
+    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
+        condition_metadata_groups.append(condition_metadata)
+    for condition_metadata in condition_metadata_groups:
         for expected in condition_metadata["fields"]:
             args = {"object": condition_metadata["object_id"], "property": expected["name"]}
             observed = parse_get_property_info_result(read_call(GET_PROPERTY_INFO_URI, args, {})).as_dict()

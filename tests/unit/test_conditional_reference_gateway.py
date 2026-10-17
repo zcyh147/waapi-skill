@@ -329,8 +329,8 @@ def test_accumulated_conditions_choose_only_the_unique_shared_value(tmp_path, ve
 
 
 class ScalarPropertyTask(AttenuationTask):
-    def __init__(self, path, version):
-        super().__init__(path, version, operation="object.setProperty")
+    def __init__(self, path, version, operation="object.setProperty"):
+        super().__init__(path, version, operation=operation)
         self.metadata = {
             "LfoSmoothing": {"name": "LfoSmoothing", "type": "Real64", "dependencies": [{
                 "type": "property", "action": "Enable", "context": "Self", "property": "LfoWaveform",
@@ -367,6 +367,84 @@ def test_disabled_scalar_property_discloses_exact_prerequisite_choice_without_wr
     assert "required_value" not in repair
     assert task.objects[FIRST]["LfoWaveform"] == 0
     assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
+def test_atomic_property_condition_is_previewed_guarded_and_verified(tmp_path, version, drift):
+    task = ScalarPropertyTask(tmp_path, version, operation="object.set")
+    task.metadata["LfoPWM"] = {"name": "LfoPWM", "type": "Real64", "dependencies": [{
+        "type": "property", "action": "Enable", "context": "Self", "property": "LfoWaveform",
+        "conditions": [{"restriction": {"type": "enum", "values": [{"value": 2}]}}],
+    }]}
+    task.objects[FIRST].update(LfoPWM=0.0, LfoWaveform=0)
+    source = task.bind(FIRST)
+    field = task.discover(source, "LfoPWM")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "pulse-width",
+                              "--object-handle", source, "--field-value", field, "50")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert [(row["field"], row["value"]) for row in preview["preview_summary"]["derived_changes"]] == [("LfoWaveform", 2)]
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "before":
+        task.objects[FIRST]["LfoWaveform"] = 3
+    if drift == "metadata":
+        task.metadata["LfoPWM"]["dependencies"][0]["conditions"][0]["restriction"]["values"] = [{"value": 3}]
+    code, executed = task.run("execute", tx)
+    if drift in {"before", "metadata"}:
+        assert code == 2, executed
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    if drift == "after":
+        task.objects[FIRST]["LfoWaveform"] = 0
+    code, verified = task.run("verify", tx)
+    assert code == (2 if drift == "after" else 0), verified
+    assert task.objects[FIRST]["LfoPWM"] == 50
+    assert task.objects[FIRST]["Volume"] == -7
+    writes = [args for uri, args, _ in task.calls if uri.endswith("object.set")]
+    assert len(writes) == 1 and writes[0]["objects"][0]["@LfoWaveform"] == 2
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_atomic_field_conditions_are_combined_before_choosing_a_prerequisite(tmp_path, version):
+    task = ScalarPropertyTask(tmp_path, version, operation="object.set")
+    task.metadata["LfoPWM"] = {"name": "LfoPWM", "type": "Real64", "dependencies": [{
+        "type": "property", "action": "Enable", "context": "Self", "property": "LfoWaveform",
+        "conditions": [{"restriction": {"type": "enum", "values": [{"value": 2}]}}],
+    }]}
+    task.objects[FIRST].update(LfoPWM=0.0, LfoWaveform=0)
+    target = task.bind(FIRST)
+    smoothing = task.discover(target, "LfoSmoothing")
+    pwm = task.discover(target, "LfoPWM")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "wave-shape",
+                              "--object-handle", target, "--field-value", smoothing, "50",
+                              "--field-value", pwm, "60")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert [(row["field"], row["value"]) for row in preview["preview_summary"]["derived_changes"]] == [("LfoWaveform", 2)]
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["LfoWaveform"] == 2
+    assert task.objects[FIRST]["LfoSmoothing"] == 50 and task.objects[FIRST]["LfoPWM"] == 60
+    assert task.objects[FIRST]["Volume"] == -7
 
 
 @pytest.mark.parametrize("version", VERSIONS)
