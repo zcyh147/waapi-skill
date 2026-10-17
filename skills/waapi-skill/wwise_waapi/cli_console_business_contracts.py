@@ -7,7 +7,7 @@ from typing import Any
 
 from .console_project_operations import (
     CLI_PROJECT_FILE_URIS, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
-    MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS,
+    MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
 )
 
 
@@ -634,6 +634,13 @@ def cli_console_business_contract_data(
     if operation == "ak.wwise.cli.waapiServer" and version in {"2021.1", "2022.1"}:
         required = ["project_file"]
     optional = list(row["optional_by_version"].get(version, row["optional"]))
+    constraints = deepcopy(row["constraints"])
+    if operation == "ak.wwise.cli.addNewPlatform" and version == "2025.1":
+        # This default is explicit in the pinned 2025 native field description;
+        # earlier lanes do not establish the same omission semantics.
+        required.remove("platform_name")
+        optional.insert(0, "platform_name")
+        constraints["platform_name_when_omitted"] = "use the base_platform name"
     optional = [field for field in optional if field not in required]
     public_fields = [*required, *optional]
     field_types = {
@@ -675,8 +682,8 @@ def cli_console_business_contract_data(
             **({"explicit_empty_collections": list(_EXPLICIT_EMPTY_COLLECTIONS[operation])}
                if operation in _EXPLICIT_EMPTY_COLLECTIONS else {}),
             **(
-                {"constraints": deepcopy(row["constraints"])}
-                if row["constraints"]
+                {"constraints": constraints}
+                if constraints
                 else {}
             ),
         },
@@ -690,7 +697,9 @@ def cli_console_business_contract_data(
             'saved_project': 'bounded_UTF8_WPROJ_and_live_transition_identity',
             'requested_fields': ['platforms', 'languages', 'first_language_is_default'],
             'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
-            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS},
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES,
+                'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
+                'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
         }} if operation == 'ak.wwise.console.project.create' else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
