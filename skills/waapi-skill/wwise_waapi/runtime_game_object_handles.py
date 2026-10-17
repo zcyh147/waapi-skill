@@ -72,6 +72,7 @@ class RuntimeGameObjectHandleStore:
         self.state_dir = state_dir
         self.root = state_dir / "soundengine-game-object-handles-v1"
         self.records = self.root / "records"
+        self.epochs = self.root / "epochs"
         self._ensure_storage_hierarchy()
 
     def issue(
@@ -82,7 +83,17 @@ class RuntimeGameObjectHandleStore:
         context: RuntimeGameObjectContext,
         source_transaction_id: str,
         source_artifact_hash: str,
+        expected_registration_epoch: int | None = None,
     ) -> RuntimeGameObjectHandleRecord:
+        if expected_registration_epoch is not None and (
+            isinstance(expected_registration_epoch, bool)
+            or not isinstance(expected_registration_epoch, int)
+            or expected_registration_epoch != self.registration_epoch(context=context)
+        ):
+            raise RuntimeGameObjectHandleError(
+                "GAME_OBJECT_REGISTRATION_RETIRED",
+                "A later unregister-all consumed this pending registration; verification cannot republish it.",
+            )
         if (
             isinstance(game_object_id, bool)
             or not isinstance(game_object_id, int)
@@ -221,9 +232,47 @@ class RuntimeGameObjectHandleStore:
     def retire_all(self, *, context: RuntimeGameObjectContext) -> tuple[str, ...]:
         """Revoke registrations only in the exact live project/build context."""
         matches = [record for record in self._active_records() if record.context == context]
+        epoch = self.registration_epoch(context=context, create=True)
+        if epoch >= 0x7FFFFFFFFFFFFFFF:
+            raise RuntimeGameObjectHandleError("GAME_OBJECT_HANDLE_STORE_LIMIT", "Registration epoch reached its fixed ceiling.")
+        self._write_epoch(context=context, epoch=epoch + 1)
         for record in matches:
             (self.records / f"{record.handle}.json").unlink(missing_ok=True)
         return tuple(record.handle for record in matches)
+
+    def registration_epoch(self, *, context: RuntimeGameObjectContext, create: bool = False) -> int:
+        """Read the execution-order epoch for pending registrations in one context."""
+        self._ensure_storage_hierarchy()
+        path = self.epochs / (canonical_sha256(context.binding_dict()) + ".json")
+        if not os.path.lexists(path):
+            if not create:
+                raise RuntimeGameObjectHandleError("GAME_OBJECT_REGISTRATION_EVIDENCE_MISSING", "Registration execution epoch is unavailable.")
+            if sum(1 for _ in self.epochs.iterdir()) >= _MAX_RECORDS:
+                raise RuntimeGameObjectHandleError("GAME_OBJECT_HANDLE_STORE_LIMIT", "Registration context store reached its fixed ceiling.")
+            self._write_epoch(context=context, epoch=0)
+            return 0
+        try:
+            metadata = path.lstat()
+            if not stat.S_ISREG(metadata.st_mode) or path_is_link_or_reparse(path, metadata=metadata) or metadata.st_size > _MAX_RECORD_BYTES:
+                raise ValueError("Registration epoch is not a bounded regular file.")
+            data = path.read_bytes()
+            if len(data) > _MAX_RECORD_BYTES:
+                raise ValueError("Registration epoch grew beyond its byte ceiling.")
+            payload = json.loads(data)
+            if not isinstance(payload, dict) or set(payload) != {"contract", "context", "epoch"} or payload["contract"] != "waapi-skill.soundengine-registration-epoch/v1" or payload["context"] != context.binding_dict():
+                raise ValueError("Registration epoch context is invalid.")
+            epoch = payload["epoch"]
+            if isinstance(epoch, bool) or not isinstance(epoch, int) or not 0 <= epoch <= 0x7FFFFFFFFFFFFFFF:
+                raise ValueError("Registration epoch is invalid.")
+            return epoch
+        except (OSError, ValueError, UnicodeError) as exc:
+            raise RuntimeGameObjectHandleError("GAME_OBJECT_HANDLE_STORE_CORRUPT", "Registration epoch cannot be read safely.") from exc
+
+    def _write_epoch(self, *, context: RuntimeGameObjectContext, epoch: int) -> None:
+        from .transactions import _atomic_write_json
+
+        path = self.epochs / (canonical_sha256(context.binding_dict()) + ".json")
+        _atomic_write_json(path, {"contract": "waapi-skill.soundengine-registration-epoch/v1", "context": context.binding_dict(), "epoch": epoch})
 
     def _active_records(self) -> list[RuntimeGameObjectHandleRecord]:
         return [self._load(path) for path in self._record_paths()]
@@ -290,7 +339,7 @@ class RuntimeGameObjectHandleStore:
             ) from exc
 
     def _ensure_storage_hierarchy(self) -> None:
-        for path in (self.state_dir, self.root, self.records):
+        for path in (self.state_dir, self.root, self.records, self.epochs):
             self._ensure_directory(path)
 
     @staticmethod

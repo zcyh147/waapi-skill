@@ -83,9 +83,21 @@ class RuntimePlayingHandleStore:
             source_transaction_id=source_transaction_id, source_artifact_hash=source_artifact_hash,
         )
         if not path.exists() and sum(1 for _ in self.lifetimes.iterdir()) >= _MAX_RECORDS:
-            raise RuntimePlayingHandleError("PLAYING_HANDLE_STORE_LIMIT", "Playing lifetime store reached its fixed record ceiling.")
+            self.require_lifetime_capacity()
         self.retire_native_id(playing_id, context=context)
         self._replace(path, body)
+
+    def require_lifetime_capacity(self) -> None:
+        """Reclaim only retired receipts; their transaction journals remain intact."""
+        paths = tuple(sorted(self.lifetimes.glob("*.json")))
+        if len(paths) > _MAX_RECORDS:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_STORE_LIMIT", "Playing lifetime store exceeds its fixed record ceiling.")
+        remove_count = max(0, len(paths) + 1 - _MAX_RECORDS)
+        retired = [path for path in paths if not self._read_lifetime(path)["publishable"]]
+        for path in retired[:remove_count]:
+            path.unlink()
+        if len(paths) - min(remove_count, len(retired)) >= _MAX_RECORDS:
+            raise RuntimePlayingHandleError("PLAYING_HANDLE_STORE_LIMIT", "Playing lifetime store is full of active or pending authority.")
 
     def _lifetime_binding(
         self, *, playing_id: int, event_id: str, game_object_id: int | None,

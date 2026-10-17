@@ -106,3 +106,23 @@ unregister preserve publication. A retired/replaced lifetime now reports
 `playing_authority_unavailable`, retaining its specific reason, instead of
 mislabeling the condition as a filesystem persistence failure. This is authority
 bookkeeping evidence only; it adds no native stop/effect acceptance.
+
+A further review of `9fe65fc3` found two local lifetime defects, retained as
+separate public REDs. Retired playing lifetime receipts previously accumulated
+until the store ceiling blocked every later post, even after all were stopped.
+The successor reclaims only receipts already marked unpublishable, under the
+same lease, retaining original transaction journals. It checks capacity before
+native post dispatch and preserves every active or pending lifetime; late
+verification of a reclaimed receipt still fails closed. A lowered-ceiling public
+play/stop/capacity control covers both reuse and protection of live authority.
+
+The new all-game-object unregister also needed to invalidate registrations whose
+native call had completed but whose public handle had not yet been issued.
+Registration execution now journals the exact context's durable unregister-all
+epoch. All-game-object unregister advances that epoch only after durable
+execution start; late registration verification refuses a mismatched epoch.
+This uses bounded per-context state rather than an accumulating registration
+receipt per call. A separately executed new registration can bind the new epoch.
+Unregister still preserves independently pending or active playing authority,
+consistent with the SDK. These repairs remain local Gateway evidence and do not
+add native effects or completion credit.

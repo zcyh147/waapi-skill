@@ -3285,3 +3285,127 @@ def test_pending_playing_publication_respects_event_object_and_unregister_lifeti
         )
         assert code == 0, declared
     assert client.soundengine_calls == before
+
+
+def test_retired_playing_lifetimes_release_capacity_without_evicting_active_or_pending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from wwise_waapi import runtime_playing_handles
+
+    monkeypatch.setattr(runtime_playing_handles, "_MAX_RECORDS", 2)
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    emitter, _ = _register_game_object_for_test(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Capacity emitter",
+    )
+    old_pending = []
+    for native_id in (101, 102):
+        client.post_event_return = native_id
+        pending, _ = _preview_soundengine_plan(
+            tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+            operation="ak.soundengine.postEvent",
+            declaration=["--event-handle", "<bound:event>", "--game-object-handle", emitter],
+            role_bindings=(("event", client.event_id),),
+        )
+        code, posted = _execute_soundengine_without_verification(
+            state_dir=state_dir, env=env, client=client, previewed=pending,
+        )
+        assert code == 0, posted
+        old_pending.append(pending)
+        stop, _ = _preview_soundengine_plan(
+            tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+            operation="ak.soundengine.stopAll", declaration=[],
+        )
+        code, stopped = _execute_soundengine_without_verification(
+            state_dir=state_dir, env=env, client=client, previewed=stop,
+        )
+        assert code == 0, stopped
+    active = _post_playing_for_test(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        game_object_handle=emitter, event_id=client.event_id, playing_id=103,
+    )
+    for pending in old_pending:
+        code, rejected = gateway.execute_gateway(
+            ["--state-dir", str(state_dir), "verify", str(pending["transaction_id"])],
+            env=env, client_factory=lambda _url: client,
+        )
+        assert code == 2, rejected
+        assert rejected["error_code"] in {"PLAYING_HANDLE_GENERATION_DRIFT", "PLAYING_HANDLE_LIFETIME_RETIRED"}
+        assert rejected["agent_result"] is None
+    pending, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.postEvent",
+        declaration=["--event-handle", "<bound:event>", "--game-object-handle", emitter],
+        role_bindings=(("event", client.event_id),),
+    )
+    client.post_event_return = 104
+    code, posted = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=pending,
+    )
+    assert code == 0, posted
+    overflow, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.postEvent",
+        declaration=["--event-handle", "<bound:event>", "--game-object-handle", emitter],
+        role_bindings=(("event", client.event_id),),
+    )
+    before = list(client.soundengine_calls)
+    client.post_event_return = 105
+    code, rejected = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=overflow,
+    )
+    assert code == 2, rejected
+    assert rejected["error_code"] == "PLAYING_HANDLE_STORE_LIMIT"
+    assert rejected["executed"] is False
+    assert client.soundengine_calls == before
+    code, valid = _declare_soundengine_plan_result(
+        state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.stopPlayingID", declaration=["--playing-handle", active],
+    )
+    assert code == 0, valid
+    code, issued = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", str(pending["transaction_id"])],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 0, issued
+    assert issued["agent_result"]["business_result"]["playing_handle"] != active
+
+
+def test_unregister_all_prevents_late_publication_of_pending_registration(tmp_path: Path) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    pending, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.registerGameObj", declaration=["--game-object-name", "Pending registration"],
+    )
+    code, registered = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=pending,
+    )
+    assert code == 0, registered
+    unregister, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.unregisterGameObj", declaration=["--all-game-objects"],
+    )
+    code, unregistered = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=unregister,
+    )
+    assert code == 0, unregistered
+    before = list(client.soundengine_calls)
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", str(pending["transaction_id"])],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2, rejected
+    assert rejected["error_code"] == "GAME_OBJECT_REGISTRATION_RETIRED"
+    assert rejected["agent_result"] is None
+    assert client.soundengine_calls == before
+    handle, _ = _register_game_object_for_test(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="New registration",
+    )
+    code, valid = _declare_soundengine_plan_result(
+        state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.unregisterGameObj", declaration=["--game-object-handle", handle],
+    )
+    assert code == 0, valid

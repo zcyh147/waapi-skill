@@ -21208,6 +21208,8 @@ def _dispatch_transaction_command_with_execution_lease(
                         detected_version=detected_version, live_info=live_info,
                     ),
                 )
+                if call_uri == POST_EVENT_URI:
+                    RuntimePlayingHandleStore(store.state_dir).require_lifetime_capacity()
                 if prepared.get("pre_state", {}).get("soundengine_authority") != current_authority:
                     raise RuntimePlayingHandleError(
                         "SOUNDENGINE_AUTHORITY_GENERATION_DRIFT",
@@ -21628,6 +21630,28 @@ def _dispatch_transaction_command_with_execution_lease(
                 "soundengine_authority_revocation": soundengine_authority_revocation,
                 "automatic_retry": False,
             }
+        soundengine_registration_epoch = None
+        if call_uri == REGISTER_GAME_OBJECT_URI:
+            try:
+                soundengine_registration_epoch = RuntimeGameObjectHandleStore(store.state_dir).registration_epoch(
+                    context=_runtime_game_object_context_from_live(
+                        endpoint=common["endpoint"], project=project,
+                        detected_version=detected_version, live_info=live_info,
+                    ), create=True,
+                )
+            except (RuntimeGameObjectHandleError, OSError, ValueError) as exc:
+                failed = store.mark_execution_indeterminate(transaction_id, details={
+                    "phase": "soundengine_registration_epoch_after_native_dispatch",
+                    "dispatch_result": result, "automatic_retry": False, "message": str(exc),
+                })
+                return {
+                    "ok": False, "status": "game_object_handle_persistence_failed", **common,
+                    "transaction_id": transaction_id, "state": failed.state.value,
+                    "error_code": getattr(exc, "error_code", "GAME_OBJECT_HANDLE_PERSISTENCE_FAILED"),
+                    "message": str(exc), "dispatch_result": result,
+                    "executed": True, "verified": False, "automatic_retry": False,
+                    "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate", execution_result=result),
+                }
         if call_uri == POST_EVENT_URI:
             native_playing_id = result.get("result", {}).get("return")
             if isinstance(native_playing_id, int) and not isinstance(native_playing_id, bool) and native_playing_id > 0:
@@ -21668,6 +21692,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     "playing_binding_validation": playing_binding_validation,
                     "game_object_collection_validation": game_object_collection_validation,
                     "soundengine_authority_revocation": soundengine_authority_revocation,
+                    "soundengine_registration_epoch": soundengine_registration_epoch,
                     "automatic_retry": False,
                     **wire_path_output,
                 },
@@ -22159,6 +22184,9 @@ def _dispatch_transaction_command_with_execution_lease(
                     else None
                 )
                 try:
+                    registration_epoch = event_details.get("soundengine_registration_epoch") if isinstance(event_details, Mapping) else None
+                    if isinstance(registration_epoch, bool) or not isinstance(registration_epoch, int):
+                        raise RuntimeGameObjectHandleError("GAME_OBJECT_REGISTRATION_EVIDENCE_MISSING", "Registration execution lacks its immutable epoch binding.")
                     issued = RuntimeGameObjectHandleStore(store.state_dir).issue(
                         game_object_id=game_object_id,
                         game_object_name=game_object_name,
@@ -22170,6 +22198,7 @@ def _dispatch_transaction_command_with_execution_lease(
                         ),
                         source_transaction_id=transaction_id,
                         source_artifact_hash=preview.artifact_hash,
+                        expected_registration_epoch=registration_epoch,
                     )
                     agent_result["business_result"] = {
                         "contract": "waapi-skill.soundengine-control-result/v1",
@@ -22180,7 +22209,11 @@ def _dispatch_transaction_command_with_execution_lease(
                     payload.update(
                         {
                             "ok": False,
-                            "status": "game_object_handle_persistence_failed",
+                            "status": (
+                                "game_object_authority_unavailable"
+                                if getattr(exc, "error_code", None) in {"GAME_OBJECT_REGISTRATION_RETIRED", "GAME_OBJECT_REGISTRATION_EVIDENCE_MISSING"}
+                                else "game_object_handle_persistence_failed"
+                            ),
                             "error_code": getattr(
                                 exc,
                                 "error_code",
