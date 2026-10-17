@@ -85,6 +85,7 @@ def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_
     assert condition_contract["conditions"]["reference"]["condition"] == "referenceIsSet_boolean"
     assert condition_contract["conditions"]["visibility"]["prerequisite_write"] is False
     assert condition_contract["conditions"]["association_owner"]["source_type"] == "ObjectSettingAssociation"
+    assert condition_contract["conditions"]["association_owner"]["recursive_prerequisites"] == ["property", "override", "reference"]
     assert condition_contract["safety"]["related_object_writes"] == "separately_preview_and_authorize"
     assert condition_contract["safety"]["revalidate"] == ["identities", "relationships", "metadata", "prerequisite_values"]
     assert condition_contract["atomic_batch_alternative"] == ("object.set" if version != "2021.1" else None)
@@ -1084,3 +1085,147 @@ def test_property_condition_is_preserved_revalidated_and_verified(tmp_path, vers
     assert task.objects[FIRST]["Volume"] == -7
     writes = [args for uri, args, _ in task.calls if uri.endswith("setProperty")]
     assert len(writes) == 1 and writes[0]["property"] == "LfoSmoothing"
+
+
+@pytest.mark.parametrize("drift", ["none", "before", "after", "metadata-before", "unsatisfied"])
+@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
+    for operation in (["object.setProperty"] if version == "2021.1" else ["object.setProperty", "object.set"])])
+@pytest.mark.parametrize("prerequisite_kind", ["property", "reference", "override"])
+@pytest.mark.parametrize("platform", [None, PlatformConditionTask.platform])
+def test_association_owner_satisfied_recursive_condition_is_guarded_without_owner_writes(tmp_path, drift, operation, prerequisite_kind, version, platform):
+    task = (PlatformConditionTask if platform else ScalarPropertyTask)(tmp_path, version, operation=operation)
+    task.metadata = {
+        "ContinuePlay": {"name": "ContinuePlay", "type": "bool", "dependencies": [{
+            "type": "property", "action": "Enable", "context": "AssocParent", "property": "SwitchBehavior",
+            "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}],
+        }]},
+        "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16", "dependencies": [condition("OverridePlayback")]},
+        "OverridePlayback": {"name": "OverridePlayback", "type": "bool"},
+    }
+    task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
+    task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, OverridePlayback=True)
+    if prerequisite_kind == "reference":
+        task.metadata["SwitchBehavior"]["dependencies"] = [{"type": "reference", "action": "Enable", "context": "Self",
+            "property": "OutputBus", "conditions": [{"referenceIsSet": True}]}]
+        task.metadata["OutputBus"] = {"name": "OutputBus", "type": "Reference"}
+        task.objects[SECOND]["OutputBus"] = {"id": FIRST}
+    if prerequisite_kind == "override":
+        task.metadata["SwitchBehavior"]["dependencies"] = [{"type": "override", "action": "Enable",
+            "context": "Self", "property": "OverridePlayback"}]
+        task.metadata["OverridePlayback"]["default"] = True
+    if platform is not None:
+        task.platform_values = {SECOND: {"SwitchBehavior": 1, "OverridePlayback": True, "OutputBus": {"id": FIRST}}}
+        task.objects[SECOND].update(SwitchBehavior=0, OverridePlayback=False, OutputBus=None)
+    owner_values = task.platform_values[SECOND] if platform else task.objects[SECOND]
+    if drift == "unsatisfied":
+        owner_values["OutputBus" if prerequisite_kind == "reference" else "OverridePlayback"] = None if prerequisite_kind == "reference" else False
+    target = task.bind(FIRST)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", target, "--meaning", "ContinuePlay",
+                                *(["--platform", platform] if platform is not None else []))
+    assert code == 0, discovered
+    field = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", target, "--field-handle", field,
+                               "--business-value", "true") if operation == "object.setProperty" else
+                      task.step("draft-declare-existing", "--declaration-id", "continue-play", "--object-handle", target,
+                                "--field-value", field, "true"))
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    if drift == "unsatisfied":
+        assert code == 2, checked
+        issue = checked.get("details", {}).get("issues", [checked])[0]
+        assert issue["error_code"] == "REFERENCE_ACTIVATION_REQUIRED", checked
+        details = issue.get("details", {})
+        assert details.get("owner_id", details.get("object_id")) == SECOND, checked
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "metadata-before":
+        dependency = task.metadata["SwitchBehavior"]["dependencies"][0]
+        if prerequisite_kind == "override":
+            task.metadata["OverridePlayback"]["default"] = 1
+        elif prerequisite_kind == "reference":
+            dependency["conditions"][0]["referenceIsSet"] = 1
+        else:
+            dependency["conditions"][0]["restriction"]["values"][0]["value"] = 1
+    if drift == "before":
+        owner_values["OutputBus" if prerequisite_kind == "reference" else "OverridePlayback"] = None if prerequisite_kind == "reference" else False
+    code, executed = task.run("execute", tx)
+    if drift.endswith("before"):
+        assert code == 2, executed
+        assert not any(uri.endswith(("setProperty", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    if drift == "after":
+        owner_values["OutputBus" if prerequisite_kind == "reference" else "OverridePlayback"] = None if prerequisite_kind == "reference" else False
+    code, verified = task.run("verify", tx)
+    assert code == (2 if drift == "after" else 0), verified
+    writes = [args for uri, args, _ in task.calls if uri.endswith(("setProperty", "object.set"))]
+    assert len(writes) == 1
+    assert writes[0].get("object", writes[0].get("objects", [{}])[0].get("object")) == FIRST
+    assert owner_values["SwitchBehavior"] == 1
+    reads = [options for uri, _, options in task.calls if uri.endswith("object.get")
+             and any(name in options.get("return", []) for name in ("SwitchBehavior", "OverridePlayback", "OutputBus"))]
+    assert reads and all(options.get("platform") == platform for options in reads)
+
+
+def test_association_owner_condition_depth_budget_includes_the_original_field(tmp_path):
+    task = ScalarPropertyTask(tmp_path, "2025.1")
+    task.metadata = {
+        "ContinuePlay": {"name": "ContinuePlay", "type": "bool", "dependencies": [{
+            "type": "property", "action": "Enable", "context": "AssocParent", "property": "SwitchBehavior",
+            "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}],
+        }]},
+        "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16", "dependencies": [condition("Step0")]},
+    }
+    for index in range(7):
+        name = f"Step{index}"
+        task.metadata[name] = {"name": name, "type": "bool", "dependencies": [condition(f"Step{index + 1}")] if index < 6 else []}
+    task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
+    task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, **{f"Step{index}": True for index in range(7)})
+    target = task.bind(FIRST)
+    field = task.discover(target, "ContinuePlay")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target, "--field-handle", field,
+                              "--business-value", "true")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 2, checked
+    assert checked["error_code"] == "REFERENCE_DEPENDENCY_LIMIT", checked
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+
+
+def test_atomic_related_condition_large_repair_retains_exact_owner_at_output_boundary(tmp_path):
+    task = ScalarPropertyTask(tmp_path, "2025.1", operation="object.set")
+    task.metadata = {
+        "ContinuePlay": {"name": "ContinuePlay", "type": "bool", "dependencies": [{
+            "type": "property", "action": "Enable", "context": "AssocParent", "property": "SwitchBehavior",
+            "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}],
+        }]},
+        "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16", "dependencies": [condition("OwnerMode")]},
+        "OwnerMode": {"name": "OwnerMode", "type": "int16"},
+    }
+    task.metadata["SwitchBehavior"]["dependencies"][0]["conditions"][0]["restriction"]["values"] = [
+        {"value": index + 1, "displayName": "Native enumerated prerequisite " + "x" * 100} for index in range(600)
+    ]
+    task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
+    task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, OwnerMode=0)
+    target = task.bind(FIRST)
+    field = task.discover(target, "ContinuePlay")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "continue-play", "--object-handle", target,
+                              "--field-value", field, "true")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 2, checked
+    issue = checked["details"]["issues"][0]
+    assert issue["error_code"] == "REFERENCE_ACTIVATION_REQUIRED", checked
+    assert issue["details"]["owner_id"] == SECOND, checked
+    assert issue["details"]["mutation_dispatched"] is False
+    assert issue["details"]["repair_details"] == "exceeds_batch_check_budget_use_separate_exact_field_preview"
+    assert len(json.dumps(checked).encode()) < 65536
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)

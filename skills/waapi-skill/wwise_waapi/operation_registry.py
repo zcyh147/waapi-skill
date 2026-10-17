@@ -1822,6 +1822,7 @@ ReadCall = Callable[[str, Mapping[str, Any], Mapping[str, Any]], Mapping[str, An
 
 MAX_OBJECT_SET_BATCH_CHECK_READS = 512
 MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS = 1024
+MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES = 32768
 
 # Positive contract for dedicated operations whose adapters bind paths on the
 # gateway machine. Generic ``waapi.call`` locality is derived separately from
@@ -7311,7 +7312,7 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
         )
 
 
-def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, platform=None):
+def _prepare_association_parent_condition(*, object_id, property_name, restriction, read, requirements, activation_path, platform=None):
     """Bind the observed Switch association context to its exact native owner."""
     from .metadata_restrictions import condition_matches
     if object_id is None:
@@ -7329,8 +7330,25 @@ def _prepare_association_parent_condition(*, object_id, property_name, restricti
     if owner.row.get("type") != "SwitchContainer":
         raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Association owner must be the observed SwitchContainer context.")
     info = _read_property_info(read, name=property_name, object_id=owner.object)
-    if info.name != property_name or info.dependencies:
-        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Association controller metadata requires its exact resolved condition closure.")
+    if info.name != property_name:
+        raise OperationContractError("INVALID_METADATA", "Association controller metadata names a different field.")
+    owner_specs: list[dict[str, Any]] = []
+    owner_metadata = {property_name.casefold(): info}
+    owner_references: dict[str, Any] = {}
+    try:
+        _apply_reference_activation_dependencies(
+            info, read=read, object_id=owner.object, property_specs=owner_specs,
+            property_info_by_name=owner_metadata, derived_properties={},
+            request_path="association_owner", related_conditions=requirements, platform=platform,
+            reference_requirements=owner_references,
+            _activation_path=tuple(f"{object_id}:{name}" for name in activation_path),
+        )
+    except OperationContractError as exc:
+        if exc.error_code != "REFERENCE_ACTIVATION_REQUIRED":
+            raise
+        raise OperationContractError(exc.error_code, str(exc), details={
+            **exc.details, "object_id": object_id, "owner_id": owner.object,
+        }) from exc
     values = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
         "return": ["id", property_name], **({"platform": platform} if platform is not None else {}),
     }))
@@ -7346,10 +7364,42 @@ def _prepare_association_parent_condition(*, object_id, property_name, restricti
                 "discovery_meaning": property_name, "selection": "live_discovered_Field_Handle",
                 "restriction": restriction, **({"required_value": choices[0]["value"]} if len(choices) == 1 else {})}],
         })
-    requirement = {"source_id": object_id, "owner_id": owner.object, "property": property_name, "value": value,
+    # The owner is a separate authorization boundary. Reuse the condition
+    # planner to resolve its closure, then require every planned value to be
+    # already present; never add the owner to this mutation.
+    owner_values = [(property_name, value)]
+    for spec in owner_specs:
+        name = spec["name"]
+        rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [owner.object]}}, {
+            "return": ["id", name], **({"platform": platform} if platform is not None else {}),
+        }))
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), owner.object) or not _has_field(rows[0], name):
+            raise OperationContractError("INVALID_READBACK", "Related prerequisite must resolve on the exact owner.")
+        current = _field_value(rows[0], name)
+        _require_object_property_value(owner_metadata[name.casefold()], current)
+        if not condition_values_equal(current, spec["value"]):
+            raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Separately preview the prerequisite on this exact association owner.", details={
+                "object_id": object_id, "owner_id": owner.object, "mutation_dispatched": False,
+                "prerequisite_changes": [{"operation": "object.setProperty", "object_id": owner.object,
+                    "discovery_meaning": name, "selection": "live_discovered_Field_Handle", "required_value": spec["value"]}],
+            })
+        owner_values.append((name, current))
+    for name, current in owner_values:
+        _append_association_condition(requirements, source=source, owner=owner, property_name=name,
+                                      value=current, info=owner_metadata[name.casefold()], platform=platform)
+    for name, identity in owner_references.items():
+        _append_association_condition(requirements, source=source, owner=owner, property_name=name,
+                                      value=identity, info=owner_metadata[name.casefold()], platform=platform,
+                                      is_reference=True)
+
+
+def _append_association_condition(requirements, *, source, owner, property_name, value, info, platform, is_reference=False):
+    requirement = {"source_id": source["id"], "owner_id": owner.object, "property": property_name, "value": value,
                    "source_identity": {key: source.get(key) for key in ("id", "name", "type", "path")},
                    "owner_identity": {key: owner.row.get(key) for key in ("id", "name", "type", "path")},
                    "metadata": info.as_dict()}
+    if is_reference:
+        requirement["is_reference"] = True
     if platform is not None:
         requirement["platform"] = platform
     if requirement not in requirements:
@@ -7378,10 +7428,13 @@ def _related_condition_assertions(requirements, *, read):
             exact = (all(source.get(key) == value for key, value in requirement["source_identity"].items())
                      and all(owner.get(key) == value for key, value in requirement["owner_identity"].items())
                      and _same_identity(_reference_identity(source.get("owner")), owner_id)
-                     and _has_field(owner, name) and condition_values_equal(_field_value(owner, name), requirement["value"]))
+                     and _has_field(owner, name) and (
+                         _reference_requirement_matches(owner, name, requirement["value"])
+                         if requirement.get("is_reference") else
+                         condition_values_equal(_field_value(owner, name), requirement["value"])))
         args = {"object": owner_id, "property": name}
         metadata = parse_get_property_info_result(read(GET_PROPERTY_INFO_URI, args, {})).as_dict()
-        assertions.append({"name": f"association owner condition {name} unchanged", "passed": exact and metadata == requirement["metadata"],
+        assertions.append({"name": f"association owner condition {name} unchanged", "passed": exact and _native_snapshot_equal(metadata, requirement["metadata"]),
                            "evidence": {"rows": rows, "metadata": metadata, "expected": requirement}})
     return assertions, readbacks
 
@@ -7579,7 +7632,7 @@ def _apply_reference_activation_dependencies(
             if action == "Enable" and context == "AssocParent" and related_conditions is not None:
                 _prepare_association_parent_condition(
                     object_id=object_id, property_name=property_name, restriction=restriction,
-                    read=read, requirements=related_conditions,
+                    read=read, requirements=related_conditions, activation_path=path,
                     platform=platform,
                 )
                 continue
@@ -9365,6 +9418,7 @@ def prepare_object_set_batch_check(
         if key != "objects"
     }
     issues: list[dict[str, Any]] = []
+    repair_bytes_remaining = MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES
     for row_index, row in enumerate(raw_objects):
         row_request = OperationRequest(
             contract=request.contract,
@@ -9375,13 +9429,27 @@ def prepare_object_set_batch_check(
         try:
             prepare_operation(row_request, read_call=cached_read)
         except OperationContractError as exc:
-            issues.append(
-                {
-                    "row_index": row_index,
-                    "error_code": exc.error_code,
-                    "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
-                }
-            )
+            issue = {
+                "row_index": row_index,
+                "error_code": exc.error_code,
+                "message": str(exc)[:MAX_OBJECT_SET_BATCH_CHECK_MESSAGE_CHARS],
+            }
+            if exc.error_code == "REFERENCE_ACTIVATION_REQUIRED":
+                # Preserve the exact owner and staged repair at this public
+                # batch-check boundary, under one aggregate output budget.
+                repair_size = len(canonical_json_bytes(exc.details))
+                if repair_size <= repair_bytes_remaining:
+                    issue["details"] = exc.details
+                    repair_bytes_remaining -= repair_size
+                else:
+                    issue["details"] = {
+                        "mutation_dispatched": False,
+                        "repair_details": "exceeds_batch_check_budget_use_separate_exact_field_preview",
+                        "limit_bytes": MAX_OBJECT_SET_BATCH_CHECK_REPAIR_BYTES,
+                        **{key: exc.details[key] for key in ("object_id", "owner_id")
+                           if isinstance(exc.details.get(key), str) and _PLUGIN_GUID.fullmatch(exc.details[key])},
+                    }
+            issues.append(issue)
     if issues:
         raise OperationContractError(
             "OPERATION_DRAFT_CHECK_FAILED",

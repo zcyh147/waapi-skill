@@ -36,7 +36,9 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
             "association_owner": {
                 "action": "Enable", "context": "AssocParent", "source_type": "ObjectSettingAssociation",
                 "relationship": "live_canonical_owner_GUID", "owner_type": "SwitchContainer",
-                "controller": "exact_live_property_without_unresolved_dependencies",
+                "controller": "exact_live_property_with_satisfied_recursive_Self_closure",
+                "recursive_prerequisites": ["property", "override", "reference"],
+                "owner_values": "preserve_revalidate_and_verify_without_derived_owner_writes",
                 "missing_identity_or_relationship": "stop_without_inference",
             },
         },
