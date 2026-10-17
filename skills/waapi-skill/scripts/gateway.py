@@ -22110,12 +22110,33 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="indeterminate"),
                 "automatic_retry": False,
             }
+        transport_lifetime_error = None
         try:
-            verification = verify_prepared_operation(
-                prepared,
-                execution_result=execution_result,
-                read_call=read_call,
-            )
+            if request_payload.get("arguments", {}).get("api") == TRANSPORT_CREATE_URI:
+                try:
+                    RuntimeTransportHandleStore(store.state_dir).require_current_lifetime(
+                        transport_id=execution_result.get("result", {}).get("transport"),
+                        context=_runtime_transport_context_from_live(endpoint=common["endpoint"], project=project,
+                            detected_version=detected_version, live_info=live_info),
+                        source_transaction_id=transaction_id, source_artifact_hash=preview.artifact_hash)
+                except RuntimeTransportHandleError as exc:
+                    if exc.error_code not in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}:
+                        raise
+                    transport_lifetime_error = exc
+            if transport_lifetime_error is not None:
+                verification = VerificationResult(
+                    operation="waapi.call", status="verification_failed",
+                    assertions=({"name": "Execution-bound transport lifetime still belongs to this transaction", "passed": False,
+                        "evidence": {"error_code": transport_lifetime_error.error_code, "message": str(transport_lifetime_error),
+                            "native_same_id_row_is_not_lifetime_proof": True}},),
+                    message="The executed transport lifetime was retired or replaced; its business state is not verified.",
+                    verification_strength="gateway_transport_lifetime_invalidated", business_state_verified=False)
+            else:
+                verification = verify_prepared_operation(
+                    prepared,
+                    execution_result=execution_result,
+                    read_call=read_call,
+                )
             if project_guard_mode != PROJECT_GUARD_INVARIANT:
                 verification = strengthen_project_transition_verification(
                     verification,
@@ -22154,6 +22175,8 @@ def _dispatch_transaction_command_with_execution_lease(
             "state": final_record.state.value,
             "artifact_hash": preview.artifact_hash,
             "verification": verification.as_dict(),
+            **({"error_code": transport_lifetime_error.error_code, "message": str(transport_lifetime_error)}
+                if transport_lifetime_error is not None else {}),
             "guard_validation": guard_validation,
             "project_call": project_call,
             "executed": True,
