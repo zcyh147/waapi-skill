@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import importlib.util
 import json
@@ -35,6 +36,7 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     exact_git_candidate,
 )
+from tests.destructive.support.console_file_observation import observe_console_file  # noqa: E402
 from tests.destructive.support.exact_real_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     finalize_exact_real_evidence,
 )
@@ -1862,8 +1864,50 @@ def test_cli_console_business_object_dump(
             "category": "cli-console-object-dump",
             "status": "PASS",
             "verifier_strength": "result_schema_plus_exact_file_oracle",
+            "requested_content": "property_sets",
+            "include_session_objects": False,
+            "artifact_observation": observe_console_file(dump_file, io_root=runtime.sandbox.sandbox_root),
         }
     )
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_cli_console_media_id_file_observation(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime,
+) -> None:
+    """Retain the native central-file representation without inventing its format.
+
+    Run this terminal CLI node in its own process/lifecycle. Its capture is
+    prerequisite evidence for the mapping oracle, not business acceptance.
+    """
+    runtime = workflow_sandbox_runtime
+    project = runtime.sandbox.sandbox_project
+    mapping = project.with_suffix(".mediaid")
+    assert not mapping.exists(), "This observation requires the original Work Unit storage fixture"
+    work_units = sorted(project.parent.rglob("*.wwu"))
+    assert len(work_units) <= 512
+    sample = sample_observation = None
+    for path in work_units:
+        candidate = observe_console_file(path, io_root=project.parent)
+        if b"<MediaID " in base64.b64decode(candidate["content_base64"], validate=True):
+            sample, sample_observation = path, candidate
+            break
+    assert sample is not None, "A media-ID-free project cannot establish the central mapping format"
+    observation = {
+        "category": "cli-media-id-file-format-observation", "status": "FAIL",
+        "verifier_strength": "native_file_format_observation_only_not_business_acceptance",
+        "source_work_unit": sample_observation,
+    }
+    runtime.category_results.append(observation)
+    draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
+    _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
+        ["--value", "project_file", str(project)], live=True)
+    result = _complete_core_result_schema_draft(runtime, draft)
+    observation["transaction_id"] = result["verify"]["transaction_id"]
+    observation["mapping_file"] = observe_console_file(mapping, io_root=project.parent)
+    observation["source_work_unit_after"] = observe_console_file(sample, io_root=project.parent)
+    observation["status"] = "PASS"
 
 
 @pytest.mark.live
