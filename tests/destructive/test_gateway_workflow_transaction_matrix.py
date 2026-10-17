@@ -4512,7 +4512,8 @@ def _collect_prospective_group_default_native_acceptance(
         evidence.update(selected_target=target, selected_group=group)
         draft = _start_business_draft(commands, "object.create")
         segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == "2025.1" else ACTOR_MIXER_PARENT_SEGMENTS
-        parent = _bind_business_object(commands, draft, path_segments=segments)
+        parent_row = one([token for segment in segments for token in ("--path-segment", segment)])
+        parent = _bind_business_object(commands, draft, object_id=parent_row["id"])
         target_handle = _bind_business_object(commands, draft, object_id=target["id"])
         group_handle = _bind_business_object(commands, draft, object_id=group["id"])
         kind = _discover_business_type(commands, draft, meaning="SwitchContainer", role="object", expected_label="SwitchContainer")
@@ -4533,6 +4534,7 @@ def _collect_prospective_group_default_native_acceptance(
         assert row["name"] == name and row["type"] == "SwitchContainer", row
         assert row["path"] == "\\" + "\\".join((*segments, name)), row
         assert canonical(row["id"]) == canonical(created)
+        assert canonical(row["parent"]) == canonical(parent_row["id"]), row
         references = row["references"]
         assert canonical(references[SWITCH_GROUP_REFERENCE]) == canonical(group["id"]), row
         assert canonical(references["DefaultSwitchOrState"]) == canonical(target["id"]), row

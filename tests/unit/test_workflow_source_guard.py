@@ -1090,9 +1090,7 @@ def test_short_id_diagnostic_uses_actual_gateway_and_retains_unsigned_miss(tmp_p
         assert receipt["payload"]["call"]["error_code"] == "RuntimeError"
 
 
-@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
-@pytest.mark.parametrize("family", ("Switch", "State"))
-def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, workflow, version, family):
+def _prospective_native_runtime(tmp_path, workflow, version, family, *, fault=None):
     from copy import deepcopy
     from tests.unit.test_new_object_conditions_gateway import (
         ProspectiveReferenceTask, HIERARCHY_GROUP, HIERARCHY_TARGET, CREATED,
@@ -1105,17 +1103,22 @@ def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, wo
                 expression = args.get("waql", "")
                 if expression == f"from type {family} take 1":
                     self.calls.append((uri, deepcopy(args), deepcopy(options)))
-                    rows = [self.objects[HIERARCHY_TARGET]]
+                    rows = [] if fault == "missing-target" else [self.objects[HIERARCHY_TARGET]]
                 elif expression.startswith('from object "'):
                     self.calls.append((uri, deepcopy(args), deepcopy(options)))
-                    rows = [self.objects[expression.split('"')[1]]]
+                    rows = [deepcopy(self.objects[expression.split('"')[1]])]
+                    if fault == "independent-reference" and rows[0]["id"] == CREATED:
+                        rows[0]["DefaultSwitchOrState"] = HIERARCHY_GROUP
                 else:
                     result = super().call(uri, args, options)
                     rows = result["return"]
                 return {"return": [{key: deepcopy(row[key[1:] if key.startswith("@") else key])
                     for key in options["return"] if (key[1:] if key.startswith("@") else key) in row}
                     for row in rows]}
-            return super().call(uri, args, options)
+            result = super().call(uri, args, options)
+            if fault == "ignored-default" and uri.endswith("object.create"):
+                self.objects[CREATED]["DefaultSwitchOrState"] = None
+            return result
 
     client = Client(tmp_path, version, state=family == "State")
     client.types += [{"classId": 10, "name": family, "type": "WObject"},
@@ -1138,6 +1141,15 @@ def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, wo
             env=runtime.env, client_factory=lambda _url: client)
 
     runtime.raw_gateway = gateway
+    return runtime, client, commands
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("family", ("Switch", "State"))
+def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, workflow, version, family):
+    from tests.unit.test_new_object_conditions_gateway import HIERARCHY_GROUP, HIERARCHY_TARGET, CREATED
+
+    runtime, client, commands = _prospective_native_runtime(tmp_path, workflow, version, family)
     workflow.test_prospective_group_default_native_acceptance(runtime, family)
     category, = runtime.category_results
     evidence = json.loads(Path(category["observation_path"]).read_text())
@@ -1158,3 +1170,27 @@ def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, wo
     assert independent > next(i for i, command in enumerate(commands) if command[0] == "verify")
     assert commands[independent].count("--include-field") == 2
     assert evidence["lifecycle_acceptance"].startswith("Requires the final")
+
+
+@pytest.mark.parametrize("fault", ("missing-target", "ignored-default", "independent-reference"))
+def test_prospective_reference_native_collector_retains_failure_without_retry(tmp_path, workflow, fault):
+    runtime, client, commands = _prospective_native_runtime(tmp_path, workflow, "2025.1", "State", fault=fault)
+    with pytest.raises(AssertionError):
+        workflow.test_prospective_group_default_native_acceptance(runtime, "State")
+    category, = runtime.category_results
+    evidence = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "FAIL" and evidence["error"]
+    expected_creates = 0 if fault == "missing-target" else 1
+    assert sum(command[0] == "execute" for command in commands) == expected_creates
+    assert sum(uri.endswith("object.create") for uri, _, _ in client.calls) == expected_creates
+    if fault == "ignored-default":
+        last = evidence["receipts"][-1]
+        assert last["argv"][0] == "verify" and last["exit_code"] == 2
+        assert last["payload"].get("verified") is not True
+    elif fault == "independent-reference":
+        assert any(row["argv"][0] == "verify" and row["payload"].get("state") == "verified"
+                   for row in evidence["receipts"])
+        assert evidence["receipts"][-1]["argv"][0] == "query-object"
+    if expected_creates:
+        assert evidence["lifecycle_final_reference"]["transaction_id"] == category["transaction_id"]
+        assert category["transaction_id"]
