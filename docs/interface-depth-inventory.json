@@ -1590,6 +1590,83 @@
     {
       "model_values": [
         {
+          "name": "api",
+          "path": [
+            "arguments",
+            "api"
+          ],
+          "required": true,
+          "schema_sha256": "1ed1796af95a25bc4bce22323917d0f1b14902b916e271603b8068883d5c6430",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "args",
+          "path": [
+            "arguments",
+            "args"
+          ],
+          "required": false,
+          "schema_sha256": "38f7806618ef78b46d664b702dae5ecd839ff6799a62df81b10ecdfba7be0389",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "arguments",
+            "io_root"
+          ],
+          "required": false,
+          "schema_sha256": "2e9d2baeef7ef41632a29ad8cef4c1fb7b604a5552404e4d1fcce947698a326a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "layout_binding",
+          "path": [
+            "arguments",
+            "layout_binding"
+          ],
+          "required": false,
+          "schema_sha256": "70c6f01036a5f207ec59c8a7eed05764177b4ac3a2d7af575b7aad6ee5fb1fe1",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "options",
+          "path": [
+            "arguments",
+            "options"
+          ],
+          "required": false,
+          "schema_sha256": "8791674b56076efcfc7201dfb713c9a3999ce9db0af68f0bb08100a2b8782f21",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "result_projection",
+          "path": [
+            "arguments",
+            "result_projection"
+          ],
+          "required": false,
+          "schema_sha256": "375640e641f4d641e3110b4f94c483867247738652b067babd7ad43f98e92d17",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        }
+      ],
+      "sha256": "97d00d980ae113c61b99b013173069de73aa78935de32b35e4b9f77442bcb6d0"
+    },
+    {
+      "model_values": [
+        {
           "name": "switch_container_handle",
           "path": [
             "declaration",
@@ -3090,71 +3167,6 @@
         }
       ],
       "sha256": "d8ff8a896f77004e095220b212d1290aa0ba29ffbd7c3946bfb52a79556d6b33"
-    },
-    {
-      "model_values": [
-        {
-          "name": "api",
-          "path": [
-            "arguments",
-            "api"
-          ],
-          "required": true,
-          "schema_sha256": "1ed1796af95a25bc4bce22323917d0f1b14902b916e271603b8068883d5c6430",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "args",
-          "path": [
-            "arguments",
-            "args"
-          ],
-          "required": false,
-          "schema_sha256": "38f7806618ef78b46d664b702dae5ecd839ff6799a62df81b10ecdfba7be0389",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": false,
-          "schema_sha256": "2e9d2baeef7ef41632a29ad8cef4c1fb7b604a5552404e4d1fcce947698a326a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "options",
-          "path": [
-            "arguments",
-            "options"
-          ],
-          "required": false,
-          "schema_sha256": "8791674b56076efcfc7201dfb713c9a3999ce9db0af68f0bb08100a2b8782f21",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "result_projection",
-          "path": [
-            "arguments",
-            "result_projection"
-          ],
-          "required": false,
-          "schema_sha256": "375640e641f4d641e3110b4f94c483867247738652b067babd7ad43f98e92d17",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        }
-      ],
-      "sha256": "d9ac149972cdc094094b99831efa55d1610c7d085dca1bbd8ef36545853a524b"
     },
     {
       "model_values": [
@@ -47990,6 +48002,23 @@
       "model_values": [
         {
           "channel": "request",
+          "name": "name",
+          "path": [
+            "args",
+            "name"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "5e5ab4624fc3b1880801c25a1ef11f4915ca9fc4139084df9b8aae854af767cc"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "request",
           "name": "time",
           "path": [
             "args",
@@ -58367,141 +58396,6 @@
         }
       ],
       "sha256": "693bbede458b767a20158e5f024785146154d4f81f62564038d336c7efa7c9b1"
-    },
-    {
-      "model_values": [
-        {
-          "channel": "fixed.metadata discover",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "page",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "page"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "page-size",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "page-size"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "selection",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "selection"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3"
     },
     {
       "model_values": [
@@ -88274,6 +88168,23 @@
     {
       "model_values": [
         {
+          "channel": "business_read",
+          "name": "view_handle",
+          "path": [
+            "business",
+            "view_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        }
+      ],
+      "sha256": "923acb046868126421b5a0a8f9b71d6e3f88bbf9e4d9ec1756240a6cc0ce3c65"
+    },
+    {
+      "model_values": [
+        {
           "channel": "options",
           "name": "platform",
           "path": [
@@ -96257,6 +96168,180 @@
     {
       "model_values": [
         {
+          "channel": "fixed.metadata property-state",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata property-state",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata property-state",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "992849526ed57f0d4bc18646e0788e4d5753d0cf3599a4d1dc015d43260a5718"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "transport",
           "path": [
@@ -101134,6 +101219,180 @@
         }
       ],
       "sha256": "9e720a06d128e2e76aa3cc69a53a74a157add71016d4e09186ff6d719c6844bc"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata attenuation",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata attenuation",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "9f09f90ab03a4f59d203f33a16075eae6d0b13fc529841f2ea12883ba7dbc850"
     },
     {
       "model_values": [
@@ -120367,6 +120626,23 @@
     {
       "model_values": [
         {
+          "channel": "business_read",
+          "name": "layout_name",
+          "path": [
+            "business",
+            "layout_name"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "files",
           "path": [
@@ -125530,141 +125806,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.metadata property-state",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "page",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "page"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "page-size",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "page-size"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "selection",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "selection"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata property-state",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata property-state",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "c581e57064e0ac3b0b67648c41fba4b97ac3f0de9f4c9527309384902ce6a6ef"
-    },
-    {
-      "model_values": [
-        {
           "channel": "options",
           "name": "platform",
           "path": [
@@ -127984,141 +128125,6 @@
         }
       ],
       "sha256": "c6a63ef72a1b371b5f92d44c79dd2601e7c1ea05a756450fc059ed411fea7704"
-    },
-    {
-      "model_values": [
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "page",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "page"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "page-size",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "page-size"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "selection",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "selection"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata attenuation",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata attenuation",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "c6bb1c9ca633a8fc329830fee8919771203cdb7485f54a8ff475149a5e65949a"
     },
     {
       "model_values": [
@@ -130554,271 +130560,6 @@
         }
       ],
       "sha256": "cb70c889d732b7ed6a5b887de631a023b3a0497f2d2d2bbe3db64b04f6810e22"
-    },
-    {
-      "model_values": [
-        {
-          "channel": "fixed.metadata types",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "page",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "page"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "page-size",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "page-size"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "selection",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "selection"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata types",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata types",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "path-segment",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "path-segment"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "kind",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "custom-kind",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "custom-kind"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "exact-id",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "exact-id"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "meaning",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "meaning"
-          ],
-          "required": false,
-          "shape": "array",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "page",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "page"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "page-size",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "page-size"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "selection",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "selection"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "gateway_derivation"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "platform",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "platform"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "channel": "fixed.metadata discover",
-          "name": "curve-role",
-          "path": [
-            "fixed_command",
-            "metadata discover",
-            "curve-role"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "cb99fe53e4e9f775e45aaccecb60bcdfb910cd986eec84c5c10ea8129c03df7a"
     },
     {
       "model_values": [
@@ -136261,6 +136002,23 @@
         }
       ],
       "sha256": "d4a1cf7be7f920469caa6c59abfff032e1c9baf17f61727a7ec6f31e70499c39"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "business_read",
+          "name": "element_handle",
+          "path": [
+            "business",
+            "element_handle"
+          ],
+          "required": true,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "live_bound_handle"
+        }
+      ],
+      "sha256": "d674220a1a095ce1d47cc02d26acd064f1e042209a02c1a19df4c712be08dd8c"
     },
     {
       "model_values": [
@@ -146411,6 +146169,687 @@
     {
       "model_values": [
         {
+          "channel": "fixed.metadata types",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata types",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata types",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "ea73ecef5b25c139085b785a6e9a98d8c60d2a18fbe71e72ca859d4064fe58d5"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "output",
           "path": [
@@ -148040,6 +148479,518 @@
         }
       ],
       "sha256": "f0f24721c639825e7aa8ab2d67571aab0b56d25aa6ea15a5d64def0191d824b2"
+    },
+    {
+      "model_values": [
+        {
+          "channel": "fixed.metadata discover",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata discover",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata discover",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata list",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata list",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "path-segment",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "path-segment"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "kind",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "custom-kind",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "custom-kind"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "exact-id",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "exact-id"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "meaning",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "meaning"
+          ],
+          "required": false,
+          "shape": "array",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "page",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "page-size",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "page-size"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "selection",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "selection"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "gateway_derivation"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "detail-page",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "detail-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "detail-view",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "detail-view"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "detail-item",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "detail-item"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "platform",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "platform"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.metadata detail",
+          "name": "curve-role",
+          "path": [
+            "fixed_command",
+            "metadata detail",
+            "curve-role"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a"
     },
     {
       "model_values": [
@@ -154333,9 +155284,9 @@
   "historical_baseline": {
     "construction_coverage_is_depth_evidence": false,
     "contract": "waapi-skill.typed-request-surface/v1",
-    "total_lanes": 849
+    "total_lanes": 865
   },
-  "inventory_sha256": "9ccd98e788d5ba34acc03e24087a57756e0aa53d37c0c4743653286fb55346f4",
+  "inventory_sha256": "d4782bef323b8422826e2d5bbe37844dfbedea8964ff66478f484f2692a8082d",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -155783,7 +156734,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "5609902fcb6e457e8231e8a253f9bede851947b0d0b0c5317a93dc0b38ca37fc",
-      "field_contract_sha256": "c6bb1c9ca633a8fc329830fee8919771203cdb7485f54a8ff475149a5e65949a",
+      "field_contract_sha256": "9f09f90ab03a4f59d203f33a16075eae6d0b13fc529841f2ea12883ba7dbc850",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -155812,11 +156763,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "d552a165d3858a34208cecde1b89b37637b0447ecc6f47534d624464a528945a",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "4e1a2c76a2f0bb45be90b87d3af243df63ee5ac3aa84b6d3515f75fc361ccd24",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -155845,11 +156798,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "ca693f60d0cae57bac8acabb4ffe8b1eebee26c68764c5b101c046f31defd693",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "427253b9ab7754209cebe8273c5055ab3a3b4f34fadc769e8963621117154672",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -155879,11 +156834,13 @@
       "construction_shape": "zero",
       "continuation_commands": [
         "metadata types",
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "e56f154d3c5c4c90c9102dd636fd4390b496f939a2e95c3587d0a94715390470",
-      "field_contract_sha256": "cb99fe53e4e9f775e45aaccecb60bcdfb910cd986eec84c5c10ea8129c03df7a",
+      "execution_policy_sha256": "3a05bb65b2b40825b7a6f9d726e394f96852b026cfc54b05db56a7ab302f2e38",
+      "field_contract_sha256": "ea73ecef5b25c139085b785a6e9a98d8c60d2a18fbe71e72ca859d4064fe58d5",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -155916,7 +156873,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "94f64c7d32c9f2ca9c07663a64f2fa24268f59937386b5be1db3fc7a54a2bbc9",
-      "field_contract_sha256": "c581e57064e0ac3b0b67648c41fba4b97ac3f0de9f4c9527309384902ce6a6ef",
+      "field_contract_sha256": "992849526ed57f0d4bc18646e0788e4d5753d0cf3599a4d1dc015d43260a5718",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -160149,7 +161106,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "db670028d882d6196e9da2e03548e4a9d6af56d2253a4dde5a3361b58c28caa8",
-      "field_contract_sha256": "c6bb1c9ca633a8fc329830fee8919771203cdb7485f54a8ff475149a5e65949a",
+      "field_contract_sha256": "9f09f90ab03a4f59d203f33a16075eae6d0b13fc529841f2ea12883ba7dbc850",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -160178,11 +161135,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "9960984c7f1fb6d12119e5a69efc7134f351769856310ee21c268240e8085095",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "381b852749a521d518d958ba143817d066ef13c362734bb3b0144a02ad797983",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -160211,11 +161170,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "9a4c12a37f9ba901f7cb58aa54087f8254071f690f36870886ccd73b6e0a9a62",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "db2022716f70b116013fd7f3b2323117cf9b6a5f619a3f257e958cf51f061b84",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -160245,11 +161206,13 @@
       "construction_shape": "zero",
       "continuation_commands": [
         "metadata types",
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "640a58b5deeb185fbc956eb184cb1c3fe3600be1312709698330deebbba7d6ed",
-      "field_contract_sha256": "cb99fe53e4e9f775e45aaccecb60bcdfb910cd986eec84c5c10ea8129c03df7a",
+      "execution_policy_sha256": "eeb0698b1c6a41bf91075047c027d7307565bca192d097a4461c2f35111dd998",
+      "field_contract_sha256": "ea73ecef5b25c139085b785a6e9a98d8c60d2a18fbe71e72ca859d4064fe58d5",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -160282,7 +161245,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "07b646055ea2c5aeb7c9a52957501ca95ada2749d92990516aa3b793577ae8fa",
-      "field_contract_sha256": "c581e57064e0ac3b0b67648c41fba4b97ac3f0de9f4c9527309384902ce6a6ef",
+      "field_contract_sha256": "992849526ed57f0d4bc18646e0788e4d5753d0cf3599a4d1dc015d43260a5718",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -165378,7 +166341,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "a4d20ee9c79429d128c635f37dddbdfccb7ab687664309c08b109df6e23cef06",
-      "field_contract_sha256": "c6bb1c9ca633a8fc329830fee8919771203cdb7485f54a8ff475149a5e65949a",
+      "field_contract_sha256": "9f09f90ab03a4f59d203f33a16075eae6d0b13fc529841f2ea12883ba7dbc850",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -165407,11 +166370,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "496ddb1d86c7246700b66088afb11e46ed6b05d9013f46f05bd56a9d1721cfc9",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "b6db32d9d5ff1087efa1618a823c993119c13e95d26751c088278a41e01d681b",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -165440,11 +166405,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "dc0776e684e03451404d91f46e15c0e563ca6b630a1874cbfd6d6ac10d002ad5",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "e553ff5ed9622a3d47cb7da7271268d75d261df10bb35de6e156dd4e37101119",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -165474,11 +166441,13 @@
       "construction_shape": "zero",
       "continuation_commands": [
         "metadata types",
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "1be3b2ec76e801ff2e54bda43ba78519ffb52f8be2638d7de52c8e90a850fafa",
-      "field_contract_sha256": "cb99fe53e4e9f775e45aaccecb60bcdfb910cd986eec84c5c10ea8129c03df7a",
+      "execution_policy_sha256": "c494eb6345acb686c060e8296cafe9a5f2f0bf50f27fda89c6de662126ab9cda",
+      "field_contract_sha256": "ea73ecef5b25c139085b785a6e9a98d8c60d2a18fbe71e72ca859d4064fe58d5",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -165545,7 +166514,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "f7fa2185794e7597d8c9f783d2fdfb22572c1e1aebb2cc93063410037fd9af55",
-      "field_contract_sha256": "c581e57064e0ac3b0b67648c41fba4b97ac3f0de9f4c9527309384902ce6a6ef",
+      "field_contract_sha256": "992849526ed57f0d4bc18646e0788e4d5753d0cf3599a4d1dc015d43260a5718",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171636,7 +172605,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "74b2736e34e15e2a4b2fa7513d7bfcbf23524a442ad1ed4206d7265a1aeb84d3",
-      "field_contract_sha256": "c6bb1c9ca633a8fc329830fee8919771203cdb7485f54a8ff475149a5e65949a",
+      "field_contract_sha256": "9f09f90ab03a4f59d203f33a16075eae6d0b13fc529841f2ea12883ba7dbc850",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171665,11 +172634,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "274b9d05bc3a53863a8e32c206573ef54873a7d21c6980314a8454a67a5d9bf5",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "9bff7136866dcc93e30722b43eb58f6d307eff00eb4018350668a99b7bb39650",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171698,11 +172669,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "602509d784bf3e24e8371cd4c3bca544c368663cb3b78bafd20aa0c64d716122",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "c7a5a536f5169df95f1af55a36f643e84cf7b3d9506496b6d17e5ba0a32e558b",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171732,11 +172705,13 @@
       "construction_shape": "zero",
       "continuation_commands": [
         "metadata types",
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "3d5271de106aa4db3d4f7095b097b47c5f99e2919eb28b6f275739459280b2c5",
-      "field_contract_sha256": "cb99fe53e4e9f775e45aaccecb60bcdfb910cd986eec84c5c10ea8129c03df7a",
+      "execution_policy_sha256": "17c579ac9f4fc5248e1da01dae060fb00159a3319da0a2897a39b40954aca2e1",
+      "field_contract_sha256": "ea73ecef5b25c139085b785a6e9a98d8c60d2a18fbe71e72ca859d4064fe58d5",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -171803,7 +172778,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "c70024deb17e10c0a060a8b492a73df3b30fd0cedb00b16674fb1f80e4a9da42",
-      "field_contract_sha256": "c581e57064e0ac3b0b67648c41fba4b97ac3f0de9f4c9527309384902ce6a6ef",
+      "field_contract_sha256": "992849526ed57f0d4bc18646e0788e4d5753d0cf3599a4d1dc015d43260a5718",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -174511,6 +175486,277 @@
       "route": "fixed_command",
       "schema_sha256": "ea3b718b94930a3272715f4238f19cc2d3388cd5240e3440f5e9511816f49b09",
       "uri": "ak.wwise.ui.getSelectedObjects",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "ee2e34e1c582385dc8fcfeaed7f6795a1c61af080400d085fe5d679bb7a5b67f",
+      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "e27f85da443119045960314bc0a167e11cecb46e43e072368a043cd879a37460",
+      "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "6ee587d507363de21d0f01a5d88ba0e86ff27632b68995f9a356eb18c376109b",
+      "field_contract_sha256": "d674220a1a095ce1d47cc02d26acd064f1e042209a02c1a19df4c712be08dd8c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "53c4c5d4a0262e489e6c17c22ba31e0a515030889a86e1f75e456dcd04bb314f",
+      "uri": "ak.wwise.ui.layout.getElementRectangle",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "49372e88c4c7803d419495588fcccd293c5e12e399d221477d0ec9885ccd0fbf",
+      "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "14893302243e7da4686b59998be43da9ea9e18557060fb2a1e2fe8f2a80db788",
+      "uri": "ak.wwise.ui.layout.getLayout",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "dbc77385694dd1f0a67793cb27a04c4ea46527962a3b2936448d75c00d7059f7",
+      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "8abc5c244886f6ba46dd219f025f4c0e75549e6d46a1359fcd1bec12fdc44b59",
+      "uri": "ak.wwise.ui.layout.getLayoutNames",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "a830bb09881de09ef27886277502196dc0df6f10d5778722104d2fc681e57b52",
+      "field_contract_sha256": "923acb046868126421b5a0a8f9b71d6e3f88bbf9e4d9ec1756240a6cc0ce3c65",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "fa65797b4a242e4d9bca5383024149df64ca13a2bb4eb676dbd01de19c4730ab",
+      "uri": "ak.wwise.ui.layout.getViewHandle",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "5187962bbaf27a9c628900ef724583d351731dee661f49301e0311785af0ec32",
+      "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "7f90e37164e6832cde50e3b2f75ef87b54735dc9026f9abd1c31f0e42802e8ba",
+      "uri": "ak.wwise.ui.layout.getViewInstances",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "d0bb3d7372759a1e21f2db23444e84d11119ab87640ffaa4d9b39d0e193ed260",
+      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "f0e7d91f0becb1dc68bd400fbe4db465420b607000197c6b0846065b38430bcc",
+      "uri": "ak.wwise.ui.layout.getViewTypes",
+      "version": "2024.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "inline",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "a294f3e619dad582a7ee4f31d3a92baca1753d629a694233f85838f63e8a700f",
+      "field_contract_sha256": "5e5ab4624fc3b1880801c25a1ef11f4915ca9fc4139084df9b8aae854af767cc",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "1860b63155ffc2e02201cdf1330d038a30f998d38f75c3401e4cd564b1bc9305",
+      "uri": "ak.wwise.ui.layout.switchLayout",
       "version": "2024.1"
     },
     {
@@ -178195,7 +179441,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "3e2c4b39c82210c0a5b72b253f1a45d6fbb4e3dc46a46bf93c6d7e0d76285059",
-      "field_contract_sha256": "c6bb1c9ca633a8fc329830fee8919771203cdb7485f54a8ff475149a5e65949a",
+      "field_contract_sha256": "9f09f90ab03a4f59d203f33a16075eae6d0b13fc529841f2ea12883ba7dbc850",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -178224,11 +179470,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "ef401359e643ecff01b0a1f4d975d02bbffac9f6693c43c21a9ec67092334bb2",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "4aa03d5b0edda3e3f5c7409b6194209ec4646e36d573be9f016b204357b215e9",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -178257,11 +179505,13 @@
       "classification": "generic-fixed-query-metadata",
       "construction_shape": "inline",
       "continuation_commands": [
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "eebf53a9735f78da554e5f6a2689e9060fbf4a3363945105ee98a805512a4098",
-      "field_contract_sha256": "697e11152b7ca20146558d1d89616ab4f06d4bd0eff259b2cf72070c7af945b3",
+      "execution_policy_sha256": "8ac200f8f859b7f85eb871d9e07fcf139ea6f0bf23751eb772a8e77bd7f10c57",
+      "field_contract_sha256": "f1e4daf2ad9694da64770b3be09bd2d5ff071b043530bb515e62dcd770780d0a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -178291,11 +179541,13 @@
       "construction_shape": "zero",
       "continuation_commands": [
         "metadata types",
-        "metadata discover"
+        "metadata discover",
+        "metadata list",
+        "metadata detail"
       ],
       "disposition": "already_deep",
-      "execution_policy_sha256": "b6a88d69ac39f493905310c9586308dbe845a38e252ee8e59396fc47aaac8a2d",
-      "field_contract_sha256": "cb99fe53e4e9f775e45aaccecb60bcdfb910cd986eec84c5c10ea8129c03df7a",
+      "execution_policy_sha256": "b6faac38870ce4eba945d8323487ad5fc7dd0cb931d33e83fc556f27472c5440",
+      "field_contract_sha256": "ea73ecef5b25c139085b785a6e9a98d8c60d2a18fbe71e72ca859d4064fe58d5",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -178362,7 +179614,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "6be2988712b410c71244fd2dffe1f50db2c1cffe85e6ce548981fa9c21b70754",
-      "field_contract_sha256": "c581e57064e0ac3b0b67648c41fba4b97ac3f0de9f4c9527309384902ce6a6ef",
+      "field_contract_sha256": "992849526ed57f0d4bc18646e0788e4d5753d0cf3599a4d1dc015d43260a5718",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -181235,6 +182487,277 @@
       "route": "fixed_command",
       "schema_sha256": "edccc10e505815494cd15e8603276d872f84ad63f04a179a11a2acd91aac247d",
       "uri": "ak.wwise.ui.getSelectedObjects",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "998f9d9892da78f0e5880fe416675466cdb5d7350e195e08ef62385a2aadc06f",
+      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "e27f85da443119045960314bc0a167e11cecb46e43e072368a043cd879a37460",
+      "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "f413615498b8b209ca9858f33735e90864de22aae96f2137f8f9b70bb87b4c71",
+      "field_contract_sha256": "d674220a1a095ce1d47cc02d26acd064f1e042209a02c1a19df4c712be08dd8c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "53c4c5d4a0262e489e6c17c22ba31e0a515030889a86e1f75e456dcd04bb314f",
+      "uri": "ak.wwise.ui.layout.getElementRectangle",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "640e6ed51a5b3e9728d9940ba7d0f61c5067d76554d7775445414497732f4802",
+      "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "14893302243e7da4686b59998be43da9ea9e18557060fb2a1e2fe8f2a80db788",
+      "uri": "ak.wwise.ui.layout.getLayout",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "aa098f8e2506d1e925c83780390b6dd486f1024ab288911eadf5802bbe632ed1",
+      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "8abc5c244886f6ba46dd219f025f4c0e75549e6d46a1359fcd1bec12fdc44b59",
+      "uri": "ak.wwise.ui.layout.getLayoutNames",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "e9323658904f305433e7a5e31d6e8a3ea38a7ae8067d601c27d0d87c5f32d74e",
+      "field_contract_sha256": "923acb046868126421b5a0a8f9b71d6e3f88bbf9e4d9ec1756240a6cc0ce3c65",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "fa65797b4a242e4d9bca5383024149df64ca13a2bb4eb676dbd01de19c4730ab",
+      "uri": "ak.wwise.ui.layout.getViewHandle",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "116595b54c3e3eac78a1db6415438643c53cc817ba5d91f02e2e73d7845ca71d",
+      "field_contract_sha256": "bb935168759ad4c1aa9ab3262815764ac395225366e4993ba434bf5f2091933c",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "7f90e37164e6832cde50e3b2f75ef87b54735dc9026f9abd1c31f0e42802e8ba",
+      "uri": "ak.wwise.ui.layout.getViewInstances",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "closed_read",
+      "continuation_commands": [
+        "request-schema",
+        "layout-read"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "8d7c87c700a7ade31944f3d139d3a1a445a875b6ebbf6ab8c9ee50c14a4b34da",
+      "field_contract_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "bounded_call",
+      "schema_sha256": "f0e7d91f0becb1dc68bd400fbe4db465420b607000197c6b0846065b38430bcc",
+      "uri": "ak.wwise.ui.layout.getViewTypes",
+      "version": "2025.1"
+    },
+    {
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit.",
+      "classification": "authoring-layout-partial",
+      "construction_shape": "inline",
+      "continuation_commands": [
+        "request-schema"
+      ],
+      "disposition": "migration_required",
+      "execution_policy_sha256": "709b8eba750030600057892b1d0e08bb1f9d77924a3df0e5a220e08d3f0ebf67",
+      "field_contract_sha256": "5e5ab4624fc3b1880801c25a1ef11f4915ca9fc4139084df9b8aae854af767cc",
+      "host": "wwise-authoring",
+      "item_type": "function",
+      "leaked_mechanics": [],
+      "mechanic_states": {
+        "ambiguous_continuation_selection": "gateway_owned",
+        "batch_layout": "gateway_owned",
+        "dependency_order": "gateway_owned",
+        "metadata_scope": "gateway_owned",
+        "native_object_path": "gateway_owned",
+        "object_identity_shape": "gateway_owned",
+        "object_name_mutability": "gateway_owned",
+        "property_or_reference_token": "gateway_owned",
+        "request_fragment": "gateway_owned",
+        "revision_arithmetic": "gateway_owned",
+        "shell_quoting": "gateway_owned",
+        "wire_type": "gateway_owned"
+      },
+      "owner_issue": 188,
+      "route": "managed_transaction",
+      "schema_sha256": "1860b63155ffc2e02201cdf1330d038a30f998d38f75c3401e4cd564b1bc9305",
+      "uri": "ak.wwise.ui.layout.switchLayout",
       "version": "2025.1"
     },
     {
@@ -186490,10 +188013,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "d9ac149972cdc094094b99831efa55d1610c7d085dca1bbd8ef36545853a524b",
+      "argument_contract_sha256": "97d00d980ae113c61b99b013173069de73aa78935de32b35e4b9f77442bcb6d0",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "7c2fe19b5255d3c2f3fc499d0474363778d62f4c62dd4b44f2920798cb7c1e93",
+      "contract_sha256": "8dd2c4ec2be8d5fd5187b8991fd3131ec51a66edae8ad8c366927957f8bce61f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -186517,10 +188040,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "d9ac149972cdc094094b99831efa55d1610c7d085dca1bbd8ef36545853a524b",
+      "argument_contract_sha256": "97d00d980ae113c61b99b013173069de73aa78935de32b35e4b9f77442bcb6d0",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "7c2fe19b5255d3c2f3fc499d0474363778d62f4c62dd4b44f2920798cb7c1e93",
+      "contract_sha256": "8dd2c4ec2be8d5fd5187b8991fd3131ec51a66edae8ad8c366927957f8bce61f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -186544,10 +188067,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "d9ac149972cdc094094b99831efa55d1610c7d085dca1bbd8ef36545853a524b",
+      "argument_contract_sha256": "97d00d980ae113c61b99b013173069de73aa78935de32b35e4b9f77442bcb6d0",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "7c2fe19b5255d3c2f3fc499d0474363778d62f4c62dd4b44f2920798cb7c1e93",
+      "contract_sha256": "8dd2c4ec2be8d5fd5187b8991fd3131ec51a66edae8ad8c366927957f8bce61f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -186571,10 +188094,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "d9ac149972cdc094094b99831efa55d1610c7d085dca1bbd8ef36545853a524b",
+      "argument_contract_sha256": "97d00d980ae113c61b99b013173069de73aa78935de32b35e4b9f77442bcb6d0",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "7c2fe19b5255d3c2f3fc499d0474363778d62f4c62dd4b44f2920798cb7c1e93",
+      "contract_sha256": "8dd2c4ec2be8d5fd5187b8991fd3131ec51a66edae8ad8c366927957f8bce61f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -186598,10 +188121,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "d9ac149972cdc094094b99831efa55d1610c7d085dca1bbd8ef36545853a524b",
+      "argument_contract_sha256": "97d00d980ae113c61b99b013173069de73aa78935de32b35e4b9f77442bcb6d0",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "7c2fe19b5255d3c2f3fc499d0474363778d62f4c62dd4b44f2920798cb7c1e93",
+      "contract_sha256": "8dd2c4ec2be8d5fd5187b8991fd3131ec51a66edae8ad8c366927957f8bce61f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -186770,18 +188293,19 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "f3904e09a85028fbff1a1078b381a9f321ad1137b6d9b0059fe15aa4834ba0ea",
-    "operation_contract_sha256": "206b88bf1d1810dbe876745c0c952208b965b92b0e74d69b3ba93878e0243617",
-    "public_continuation_sha256": "2904c6b6e9f45047ba553e786cf3cf4f2424a54edbf67e0f8d5f6180205ded11",
-    "typed_request_surface_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c"
+    "gateway_parser_sha256": "95ef97b4b5da6880295919ffec6cb2c22c1955fbdcba8ba879ace6f7d7ec4e60",
+    "operation_contract_sha256": "6a23d3b55db2a6526be907f7a15680bb1898ca8e01d1f737dc7686d696b93fdb",
+    "public_continuation_sha256": "b71ec601a1328c08db7eef6f40923cd58f6d534b94cd0cbe1f6d02e66727e6af",
+    "typed_request_surface_sha256": "3d88ee827197f529aff3cb264b2dec9db8ad375e2602a050182f754faed8ce7e"
   },
   "summary": {
-    "migration_ticket_families": 0,
+    "migration_ticket_families": 1,
     "native_dispositions": {
       "already_deep": 710,
+      "migration_required": 16,
       "prohibited_boundary": 139
     },
-    "native_lanes": 849,
+    "native_lanes": 865,
     "operation_dispositions": {
       "already_deep": 148,
       "prohibited_boundary": 5
@@ -186789,7 +188313,34 @@
     "operation_lanes": 153,
     "unowned_migration_rows": 0
   },
-  "ticket_families": [],
+  "ticket_families": [
+    {
+      "github_issue": 188,
+      "id": "authoring-layout-partial",
+      "row_count": 16,
+      "rows": [
+        "2024.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
+        "2024.1|function|ak.wwise.ui.layout.getElementRectangle",
+        "2024.1|function|ak.wwise.ui.layout.getLayout",
+        "2024.1|function|ak.wwise.ui.layout.getLayoutNames",
+        "2024.1|function|ak.wwise.ui.layout.getViewHandle",
+        "2024.1|function|ak.wwise.ui.layout.getViewInstances",
+        "2024.1|function|ak.wwise.ui.layout.getViewTypes",
+        "2024.1|function|ak.wwise.ui.layout.switchLayout",
+        "2025.1|function|ak.wwise.ui.layout.getCurrentLayoutName",
+        "2025.1|function|ak.wwise.ui.layout.getElementRectangle",
+        "2025.1|function|ak.wwise.ui.layout.getLayout",
+        "2025.1|function|ak.wwise.ui.layout.getLayoutNames",
+        "2025.1|function|ak.wwise.ui.layout.getViewHandle",
+        "2025.1|function|ak.wwise.ui.layout.getViewInstances",
+        "2025.1|function|ak.wwise.ui.layout.getViewTypes",
+        "2025.1|function|ak.wwise.ui.layout.switchLayout"
+      ],
+      "rows_sha256": "d0fe5a1f6ed94146b78310e3df18ed94c492d645b18823b2fb512789d9e8e610",
+      "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence.",
+      "title": "Complete ordinary Authoring layout business contracts and evidence"
+    }
+  ],
   "uniform_migration_invariant": {
     "allowed_final_dispositions": [
       "deep business or domain declaration",

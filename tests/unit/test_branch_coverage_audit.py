@@ -12,6 +12,29 @@ def frozen_inventory():
     return build_inventory()
 
 
+def test_layout_supplements_retain_exact_routes_definitions_and_unresolved_ownership(frozen_inventory):
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+
+    expected = {f'{version}|function|{uri}' for version in ('2024.1', '2025.1')
+                for uri in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS}
+    routes = {row['id']: row for row in frozen_inventory['routes'] if row['id'] in expected}
+    assert set(routes) == expected
+    assert all(row['family'] == 'authoring-layout-partial' for row in routes.values())
+    assert all(not row['reviewed_snapshot']['current_execution_credit'] for row in routes.values())
+    for version in ('2024.1', '2025.1'):
+        definitions = [row for row in frozen_inventory['branches']
+                       if row['id'].startswith(f'{version}|')
+                       and 'authoring-layout-read-supplement.json|waapi_ui_definitions.json|' in row['id']]
+        assert definitions
+        assert any(row['kind'] == 'native_keyword_semantics' and row['value'] == 'OneOf' for row in definitions)
+    native_routes = {row['id'] for row in frozen_inventory['native_coverage']['routes']
+                     if row['uri'] in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS}
+    native = [row for row in frozen_inventory['native_coverage']['obligations']
+              if row.get('route') in native_routes]
+    assert native and all(row['owner_issue'] == 188 and row['state'] == 'unresolved' for row in native)
+
+
 def test_schema_inventory_retains_optional_enum_union_and_nested_collection_branches():
     schema = {"type": "object", "properties": {
         "mode": {"enum": ["create", "replace"]},

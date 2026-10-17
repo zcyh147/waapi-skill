@@ -32,8 +32,9 @@ from wwise_waapi.schema_inventory import (  # noqa: E402
 REPORT_CONTRACT = "waapi-skill.full-surface-release-report/v1"
 from wwise_waapi.authoring_core_manifest import COMMON_URIS  # noqa: E402
 from wwise_waapi.authoring_layout import LAYOUT_READ_URIS  # noqa: E402
+from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS  # noqa: E402
 
-REVIEWED_AUTHORING_URIS = LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | COMMON_URIS | {"ak.wwise.ui.getSelectedFiles"}
+REVIEWED_AUTHORING_URIS = LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | COMMON_URIS | {"ak.wwise.ui.getSelectedFiles"}
 REPORT_RELATIVE_PATH = Path("docs/full-surface-release-report.json")
 MANIFEST_RELATIVE_PATH = Path("skills/waapi-skill/resources/manifest")
 
