@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "139a8b26fc639071318ccfb08d2a6a0c1098bb64c33cdd556eaf294642ef2eb3",
+  "inventory_sha256": "341f0bc1f8ef9c56181985e4289cccfbdc5492c0f817de8da842331945677456",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -29149,6 +29149,158 @@
       "version": "2024.1"
     },
     {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
+            "layout_handle": "scoped_layout_handle",
+            "position_x": "integer",
+            "position_y": "integer",
+            "view_handle": "scoped_view_handle"
+          },
+          "input_forms": {
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "position_x": {
+              "gateway_flag": "--position-x",
+              "shape": "integer"
+            },
+            "position_y": {
+              "gateway_flag": "--position-y",
+              "shape": "integer"
+            },
+            "view_handle": {
+              "gateway_flag": "--view-handle",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [
+            "position_x",
+            "position_y"
+          ],
+          "public_fields": [
+            "layout_handle",
+            "view_handle",
+            "position_x",
+            "position_y"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "view_handle"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "native name from session-bound handle",
+          "native request envelope",
+          "current-layout verifier"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.undockView",
+        "responsibility_split": {
+          "agent": [
+            "choose the discovered layout"
+          ],
+          "gateway": [
+            "require the selected layout to be current",
+            "revalidate the exact discovered view",
+            "preserve omitted positions",
+            "undock once after authorization",
+            "verify floating identity and explicit positions independently"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.undockView"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "kind": "authoring-layout-state",
+          "observation": "independent floating view identity and explicit position readbacks"
+        },
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.undockView",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "ccdddb2a3761baa17359a5c02425ed312acd86612ad105f21eb343ad08968793",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 1,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "22b298a7c0068aca4731061a9d157315b881da5ab2a0681ea86269d9abc09edf",
+      "uri": "ak.wwise.ui.layout.undockView",
+      "version": "2024.1"
+    },
+    {
       "construction_shape": "inline",
       "correct_host": "wwise-authoring",
       "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
@@ -39803,6 +39955,158 @@
       "version": "2025.1"
     },
     {
+      "business_contract": {
+        "binding": {
+          "available": false,
+          "identity_discovery": [
+            "layout-inspect",
+            "--layout-name",
+            "<observed-layout-name>"
+          ],
+          "role_required": false,
+          "roles": []
+        },
+        "contract": "waapi-skill.authoring-layout-business/v1",
+        "declaration": {
+          "field_types": {
+            "layout_handle": "scoped_layout_handle",
+            "position_x": "integer",
+            "position_y": "integer",
+            "view_handle": "scoped_view_handle"
+          },
+          "input_forms": {
+            "layout_handle": {
+              "gateway_flag": "--layout-handle",
+              "shape": "scalar"
+            },
+            "position_x": {
+              "gateway_flag": "--position-x",
+              "shape": "integer"
+            },
+            "position_y": {
+              "gateway_flag": "--position-y",
+              "shape": "integer"
+            },
+            "view_handle": {
+              "gateway_flag": "--view-handle",
+              "shape": "scalar"
+            }
+          },
+          "optional_fields": [
+            "position_x",
+            "position_y"
+          ],
+          "public_fields": [
+            "layout_handle",
+            "view_handle",
+            "position_x",
+            "position_y"
+          ],
+          "required_fields": [
+            "layout_handle",
+            "view_handle"
+          ],
+          "settings_field": "authoring_layout_plan",
+          "subcommand": "draft-declare-layout-plan",
+          "submit_once": true
+        },
+        "execution_shape": "transaction",
+        "gateway_derivations": [
+          "native name from session-bound handle",
+          "native request envelope",
+          "current-layout verifier"
+        ],
+        "input_mode": "business_declaration",
+        "legacy_native_request_public": false,
+        "legacy_typed_call_public": false,
+        "operation": "ak.wwise.ui.layout.undockView",
+        "responsibility_split": {
+          "agent": [
+            "choose the discovered layout"
+          ],
+          "gateway": [
+            "require the selected layout to be current",
+            "revalidate the exact discovered view",
+            "preserve omitted positions",
+            "undock once after authorization",
+            "verify floating identity and explicit positions independently"
+          ]
+        },
+        "safety": {
+          "authoring_host_required": true,
+          "automatic_retry": false,
+          "immutable_preview": true,
+          "native_request_fields": "gateway_owned",
+          "single_execute": true
+        },
+        "start": {
+          "append_arguments": "forbidden",
+          "copy_exactly": true,
+          "gateway_argv": [
+            "draft-start",
+            "ak.wwise.ui.layout.undockView"
+          ],
+          "subcommand": "draft-start"
+        },
+        "verifier": {
+          "kind": "authoring-layout-state",
+          "observation": "independent floating view identity and explicit position readbacks"
+        },
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_business",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.undockView",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "e30fc4847b157bd18f396c48f04a617b042ead164cbaee80fd53776ad95e55cb",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_request_schema_is_not_public_construction": true,
+      "native_ui_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 1,
+      "request_semantics": {
+        "native_write_acceptance": "pending_owned_native_observation",
+        "original_native_definitions_retained": true,
+        "status": "closed_reflected_fields"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "b98c44e6620cee4d291c88d5d1973b9af884fcc1e14ca8f9074168c24fa703da",
+      "uri": "ak.wwise.ui.layout.undockView",
+      "version": "2025.1"
+    },
+    {
       "construction_shape": "inline",
       "correct_host": "wwise-authoring",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
@@ -42964,10 +43268,10 @@
     }
   },
   "totals": {
-    "function_lanes": 712,
+    "function_lanes": 714,
     "topic_lanes": 160,
-    "total_lanes": 872,
-    "unique_function_uris": 180,
+    "total_lanes": 874,
+    "unique_function_uris": 181,
     "unique_topic_uris": 35
   },
   "unknown_schema_keywords": [],

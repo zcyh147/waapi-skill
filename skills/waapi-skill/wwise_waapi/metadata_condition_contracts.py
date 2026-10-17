@@ -32,6 +32,9 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                 "action": "Show", "contexts": ["Self", "Parent", "AssocParent"],
                 "conditions": "validated_property_or_reference_presence_condition",
                 "prerequisite_write": False,
+                "master_bus": {"action": "Show", "context": "Self", "value": "native_boolean",
+                    "true_predicate": "require_fresh_exact_object_field_enabled_proof_before_and_after_execution",
+                    "topology_changes": False},
             },
             "association_owner": {
                 "action": "Enable", "context": "AssocParent", "source_type": "ObjectSettingAssociation",
@@ -53,6 +56,7 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
             "hidden_followup_writes": False,
             "revalidate": ["identities", "relationships", "metadata", "prerequisite_values"],
             "verify_prerequisites_after_execution": True,
+            "verify_condition_metadata_after_execution": True,
             "unknown_conditions_cycles_or_conflicts": "reject_before_dispatch",
             "maximum_depth": 8, "maximum_fields": 16, "maximum_related_conditions": 16,
         },

@@ -277,15 +277,15 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
                 "special_unique_uris": 52,
             },
             "wwise-authoring-ui": {
-                "function_rows": 712,
-                "unique_function_uris": 180,
+                "function_rows": 714,
+                "unique_function_uris": 181,
                 "generic_reflected_rows": 458,
                 "generic_reflected_unique_uris": 116,
-                "special_rows": 254,
-                "special_unique_uris": 64,
+                "special_rows": 256,
+                "special_unique_uris": 65,
             },
         },
-        "reviewed_special_uri_count": 64,
+        "reviewed_special_uri_count": 65,
         "reviewed_generic_restriction_count": 6,
     }
     assert summary["version_rows"] == 111
@@ -302,6 +302,7 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
     catalog = CapabilityCatalog()
     for version in ("2024.1", "2025.1"):
         layout_uris = LAYOUT_READ_URIS | layout_mutation_uris(version)
+        assert "ak.wwise.ui.layout.undockView" in layout_uris
         rows = [entry for entry in catalog.entries_for_profile(version, profile="wwise-authoring-ui")
                 if entry.uri in layout_uris]
         assert {entry.uri for entry in rows} == layout_uris

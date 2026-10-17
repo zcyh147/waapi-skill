@@ -473,6 +473,11 @@ def test_media_pool_core_call_binds_live_fields_and_returns_business_rows(
     assert payload["agent_result"] == {
         "contract": "waapi-skill.media-build-result/v1",
         "kind": "media_pool_rows",
+        "field_bindings": [
+            {"meaning": "scene", "field": "IXML/Scene"},
+            {"meaning": "filename", "field": "Filename", "value_key": "filename"},
+            {"meaning": "duration-seconds", "field": "WAV/Duration", "value_key": "duration_seconds"},
+        ],
         "complete": True,
         "candidate_count": 3,
         "returned_count": 2,
@@ -693,7 +698,8 @@ def test_media_pool_live_field_miss_stops_before_the_pool_query(tmp_path: Path) 
     )
 
     assert exit_code == 2
-    assert payload["error_code"] == "GatewayInputError"
+    assert payload["error_code"] == "MEDIA_BUILD_FIELD_AMBIGUOUS"
+    assert payload["details"]["field_choices"] == []
     assert [call[0] for call in client.calls][-1] == (
         "ak.wwise.core.mediaPool.getFields"
     )
@@ -1233,3 +1239,206 @@ def test_media_pool_field_browse_rejects_other_version_contracts_before_connecti
         client_factory=lambda _: pytest.fail("unpackaged field discovery version connected"))
     assert code == 2 and payload["error_code"] == "GatewayInputError", payload
     assert "2025.1 contract" in payload["message"]
+
+
+def test_media_pool_can_query_an_exact_field_from_a_repeated_native_inventory(tmp_path: Path) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename", "Filename"]}],
+        MEDIA_POOL_GET_URI: [{"return": [{"Path": "/Audio/Rain.wav", "FileId": "rain", "Filename": "Rain.wav"}]}],
+    })
+    code, payload = gateway.execute_gateway(
+        ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", "filename"],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1] == (MEDIA_POOL_GET_URI, {"maxResults": 2}, {"return": ["Path", "FileId", "Db", "Filename"]})
+    assert payload["agent_result"]["items"][0]["values"] == {"filename": "Rain.wav"}
+
+
+@pytest.mark.parametrize("selected,other", [("scene", "IXML/Scene"), ("IXML/SCENE", "IXML/Scene")])
+def test_media_pool_exact_discovered_field_wins_over_aliases_and_casefold_matches(
+    tmp_path: Path, selected: str, other: str,
+) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": [other, selected]}],
+        MEDIA_POOL_GET_URI: [{"return": [{"Path": "/Audio/Rain.wav", "FileId": "rain", selected: "Exterior"}]}],
+    })
+    code, payload = gateway.execute_gateway(
+        ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--text-filter", selected, "equals", "Exterior",
+         "--include-field", selected], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1] == (MEDIA_POOL_GET_URI,
+        {"maxResults": 2, "filters": [{"type": "field", "field": selected, "operator": "equals", "value": "Exterior"}]},
+        {"return": ["Path", "FileId", "Db", selected]})
+    assert list(payload["agent_result"]["items"][0]["values"].values()) == ["Exterior"]
+
+
+def test_media_pool_projects_unicode_and_colliding_exact_field_names_without_losing_values(tmp_path: Path) -> None:
+    names = ["场景", "A/B", "A B", "标签?!"]
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": names}],
+        MEDIA_POOL_GET_URI: [{"return": [{"Path": "/Audio/Rain.wav", "FileId": "rain",
+                                          "场景": "外景", "A/B": "slash", "A B": "space", "标签?!": "雨"}]}],
+    })
+    code, payload = gateway.execute_gateway(
+        ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", "场景",
+         "--include-field", "A/B", "--include-field", "A B", "--include-field", "标签?!"],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1][2] == {"return": ["Path", "FileId", "Db", "场景", "A/B", "A B", "标签?!"]}
+    assert payload["agent_result"]["items"][0]["values"] == {"场景": "外景", "A/B": "slash", "A B": "space", "标签": "雨"}
+    assert payload["agent_result"]["field_bindings"] == [
+        {"meaning": "场景", "field": "场景", "value_key": "场景"},
+        {"meaning": "A/B", "field": "A/B", "value_key": "A/B"},
+        {"meaning": "A B", "field": "A B", "value_key": "A B"},
+        {"meaning": "标签?!", "field": "标签?!", "value_key": "标签"},
+    ]
+
+
+def test_media_pool_nonexact_ambiguous_field_discloses_exact_choices_without_query_dispatch(tmp_path: Path) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["IXML/Scene", "IXML/SCENE", "Filename"]}],
+    })
+    code, payload = gateway.execute_gateway(
+        ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", "ixml/scene"],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert payload["details"] is not None, json.dumps(payload,ensure_ascii=False)
+    assert payload["details"]["field_choices"] == ["IXML/Scene", "IXML/SCENE"]
+    assert MEDIA_POOL_GET_URI not in [call[0] for call in client.calls]
+
+
+def test_media_pool_continuation_rejects_a_changed_exact_field_binding_before_query(tmp_path: Path) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["IXML/Scene"]}, {"return": ["scene", "IXML/Scene"]}],
+        MEDIA_POOL_GET_URI: [{"return": [{"Path": "/Audio/Rain.wav", "IXML/Scene": "Exterior"}]}],
+    })
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(
+        ["core-call", MEDIA_POOL_GET_URI, "--max-results", "1", "--include-field", "scene"],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    assert first["agent_result"]["field_bindings"] == [{"meaning": "scene", "field": "IXML/Scene", "value_key": "scene"}]
+    code, rejected = gateway.execute_gateway(first["agent_result"]["next_command"]["gateway_argv"],
+        env=env, client_factory=lambda _: client)
+    assert code == 2, rejected
+    assert rejected["error_code"] == "MEDIA_POOL_CONTINUATION_CHANGED"
+    assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
+
+
+@pytest.fixture
+def media_pool_product_capture(request):
+    import os
+    context_path = os.environ.get("WAAPI_MEDIA_POOL_BRANCH_CAPTURE_CONTEXT")
+    observed = {}
+    if context_path:
+        from tests.support.media_pool_branch_evidence import load_media_pool_capture, finish_media_pool_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_media_pool_capture(Path(context_path), request.node.nodeid)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_media_pool_capture(capture, reports, observed))
+    return observed
+
+
+def test_product_media_pool_discovery_to_exact_filtered_projection_preserves_native_field_identity(
+    tmp_path: Path, media_pool_product_capture: dict,
+) -> None:
+    names = ["IXML/Scene", "IXML/SCENE", "scene", "scene", "场景", "A/B", "A B", "Filename"]
+    raw_row = {"Path": "/Audio/Rain.wav", "FileId": "rain", "Db": {"id": MEDIA_DB_ID, "name": "Project Originals"},
+               "scene": "Exterior", "场景": "外景", "A/B": "slash", "A B": "space"}
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()] * 5, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 5,
+        "ak.wwise.core.mediaPool.getFields": [{"return": names}] * 5,
+        MEDIA_POOL_GET_URI: [{"return": [raw_row]}],
+    })
+    env = _env(tmp_path)
+    no_match_argv = ["metadata", "media-pool-fields", "--meaning", "not-a-field"]
+    code, no_match = gateway.execute_gateway(no_match_argv, env=env, client_factory=lambda _: client)
+    assert code == 0 and no_match["agent_result"]["fields"] == [] and no_match["agent_result"]["complete"] is True
+    discovery_argv = ["metadata", "media-pool-fields", "--meaning", "场景"]
+    code, discovery = gateway.execute_gateway(discovery_argv, env=env, client_factory=lambda _: client)
+    assert code == 0, discovery
+    assert discovery["agent_result"]["fields"] == [{"name": "场景", "name_complete": True}]
+    selected = discovery["agent_result"]["fields"][0]["name"]
+    argv = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--text-filter", "scene", "equals", "Exterior",
+            "--include-field", selected, "--include-field", "A/B", "--include-field", "A B", "--include-field", "scene"]
+    code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert code == 0, payload
+    expected_args = {"maxResults": 2, "filters": [{"type": "field", "field": "scene", "operator": "equals", "value": "Exterior"}]}
+    expected_options = {"return": ["Path", "FileId", "Db", "场景", "A/B", "A B", "scene"]}
+    assert client.calls[-1] == (MEDIA_POOL_GET_URI, expected_args, expected_options)
+    assert payload["agent_result"]["items"] == [{"path": "/Audio/Rain.wav", "file_id": "rain", "database_id": MEDIA_DB_ID,
+        "database_name": "Project Originals", "values": {"场景": "外景", "A/B": "slash", "A B": "space", "scene": "Exterior"}}]
+    assert payload["agent_result"]["field_bindings"] == [
+        {"meaning": "scene", "field": "scene", "value_key": "scene"},
+        {"meaning": "场景", "field": "场景", "value_key": "场景"},
+        {"meaning": "A/B", "field": "A/B", "value_key": "A/B"},
+        {"meaning": "A B", "field": "A B", "value_key": "A B"},
+    ]
+    errors = []
+    for requested, expected in [("ixml/scene", ["IXML/Scene", "IXML/SCENE"]), ("unrelated", [])]:
+        rejected_argv = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", requested]
+        rejected_code, rejected = gateway.execute_gateway(rejected_argv, env=env, client_factory=lambda _: client)
+        assert rejected_code == 2 and rejected["error_code"] == "MEDIA_BUILD_FIELD_AMBIGUOUS", rejected
+        assert rejected["details"]["field_choices"] == expected
+        errors.append({"argv": rejected_argv, "exit_code": rejected_code, "payload": rejected})
+    assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
+    media_pool_product_capture.update({
+        "gateway": {"argv": argv, "exit_code": code, "payload": payload},
+        "discovery": {"argv": discovery_argv, "exit_code": 0, "payload": discovery},
+        "no_match": {"argv": no_match_argv, "exit_code": 0, "payload": no_match},
+        "native_call": {"uri": MEDIA_POOL_GET_URI, "args": expected_args, "options": expected_options, "result": {"return": [raw_row]}},
+        "field_discovery_call": {"uri": "ak.wwise.core.mediaPool.getFields", "args": {}, "options": {}, "result": {"return": names}},
+        "rejected_reads": errors, "media_pool_dispatch_count": 1,
+    })
+
+
+def test_media_pool_exact_choice_does_not_hide_malformed_native_inventory_entries(tmp_path: Path) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename", None]}],
+        MEDIA_POOL_GET_URI: [{"return": []}],
+    })
+    code, payload = gateway.execute_gateway(
+        ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", "Filename"],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert MEDIA_POOL_GET_URI not in [call[0] for call in client.calls]
+
+
+def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_discovered_fields(tmp_path: Path, media_pool_product_capture: dict) -> None:
+    schema_code, schema = gateway.execute_gateway(["request-schema", MEDIA_POOL_GET_URI], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("return-only field schema connected"))
+    assert schema_code == 0, schema
+    assert set(schema["business_adapter"]["return_only_fields"]) == {"search-score", "file-size-bytes", "markers", "detected-regions"}
+    raw = {"return": [{"Path": "/Audio/Rain.wav", "FileId": "rain", "Score": 0.75, "Size": 4096,
+        "Markers": [{"name": "Impact", "time": 0.25}], "DetectedRegions": [{"start": 0.1, "end": 0.5}]}]}
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 2,
+        MEDIA_POOL_GET_URI: [raw],
+    })
+    argv = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", "search-score",
+            "--include-field", "file-size-bytes", "--include-field", "markers", "--include-field", "detected-regions"]
+    code, payload = gateway.execute_gateway(argv, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1][2] == {"return": ["Path", "FileId", "Db", "Score", "Size", "Markers", "DetectedRegions"]}
+    assert payload["agent_result"]["items"][0]["values"] == {"search_score": 0.75, "file_size_bytes": 4096,
+        "markers": [{"name": "Impact", "time": 0.25}], "detected_regions": [{"start": 0.1, "end": 0.5}]}
+    assert payload["agent_result"]["field_bindings"] == [
+        {"meaning": "search-score", "field": "Score", "value_key": "search_score"},
+        {"meaning": "file-size-bytes", "field": "Size", "value_key": "file_size_bytes"},
+        {"meaning": "markers", "field": "Markers", "value_key": "markers"},
+        {"meaning": "detected-regions", "field": "DetectedRegions", "value_key": "detected_regions"}]
+    native_call = client.calls[-1]
+    rejected_argv = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--text-filter", "search-score", "equals", "0.75"]
+    rejected_code, rejected = gateway.execute_gateway(rejected_argv, env=_env(tmp_path), client_factory=lambda _: client)
+    assert rejected_code == 2 and "return-only" in rejected["message"], rejected
+    assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
+    media_pool_product_capture.update({"gateway": {"argv": argv, "exit_code": code, "payload": payload},
+        "native_call": {"uri": native_call[0], "args": native_call[1], "options": native_call[2], "result": raw},
+        "media_pool_dispatch_count": 1,
+        "rejected_reads": [{"argv": rejected_argv, "exit_code": rejected_code, "payload": rejected}]})

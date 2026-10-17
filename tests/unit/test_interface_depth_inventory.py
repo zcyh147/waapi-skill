@@ -605,7 +605,7 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     baseline = _inventory()["historical_baseline"]
     assert baseline == {
         "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 872,
+        "total_lanes": 874,
         "construction_coverage_is_depth_evidence": False,
     }
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
