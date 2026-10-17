@@ -250,8 +250,8 @@ The fourth integration adds only these exact public route keys:
 Forty original native obligations move from missing implementation to unresolved.
 All 272,313 ID/shape/owner tuples, ten independent catalog seals, five original
 definition files, detailed native selector policy and completed family seals
-remain unchanged. All25layout rows stay migration required under #188.
-Structured2022–2025ShortID support retains2021mapping as unresolved; original
+remain unchanged. All 25 layout rows stay migration required under #188.
+Structured 2022–2025 Short ID support retains 2021 mapping as unresolved; original
 native alternatives and all remaining requirements remain in the denominator.
 Neither these route linkages nor controlled producer/lifecycle tests establish
 native effects, exact accepted branch evidence or ticket completion. The new

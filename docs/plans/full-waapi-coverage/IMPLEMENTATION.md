@@ -135,7 +135,7 @@ final integrated acceptance:
   2024.1/2025.1 `undockView` route keys are added; forty native obligations move
   from missing implementation to unresolved. Every original native ID, shape,
   owner, independent catalog seal, definition file and historical family seal
-  stays unchanged. All25layout rows retain migration-required #188 ownership.
+  stays unchanged. All 25 layout rows retain migration-required #188 ownership.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
