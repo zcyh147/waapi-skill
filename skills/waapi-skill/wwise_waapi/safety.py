@@ -17,6 +17,7 @@ from .authorization import (
 )
 from .execution_contracts import (
     APPROVED_EXCLUSIONS,
+    AUTHORING_UI_EXECUTION_PROFILE,
     BOUNDED_DIRECT_CALL_URIS,
     ExecutionContractRegistry,
     FIXED_COMMANDS_BY_URI,
@@ -35,7 +36,7 @@ def _reviewed_topic_uris() -> frozenset[str]:
     return frozenset(
         entry.uri
         for version in SUPPORTED_WWISE_VERSION_KEYS
-        for entry in registry.executable_entries(version)
+        for entry in registry.executable_entries_for_profile(version, profile=AUTHORING_UI_EXECUTION_PROFILE)
         if entry.item_type == "topic"
     )
 

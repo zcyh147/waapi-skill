@@ -125,8 +125,17 @@ after that observation.
   transport events, project lifecycle, command/selection and frontend signals.
   Reflection equality permits no automatic host/version behavioral credit.
 - #189 owns model/WAFM/window resource lifetimes and the closed signal-emission
-  trigger. Signal delivery under #187 depends on those owned resources; an
-  invented handle/widget or fake callback cannot satisfy that dependency.
+  trigger. Signal observation consumes its active model/parent receipts via
+  `--signal-model` and `--signal-widget`, bound to the same exact configuration,
+  host/build/session/project. Native options and exact callback identity filters
+  are derived; copied native ID facts are rejected. Any owned widget can receive
+  either fixed Topic: producer descriptions do not prove receiver restrictions.
+  The reviewed safety projection now includes the Authoring profile's fixed
+  Topics while the emitter remains separately authorization-gated and unknown
+  Topics remain unreviewed. For a monitor without total duration, the scope's
+  project read has a separate disclosed ten-second setup budget; the monitor
+  retains its original count/idle policy. Native signal delivery still depends on #189's
+  owned resource/trigger workflow; fake callbacks grant no native credit.
 - Native alternatives not yet exercised retain their exact original #187
   owner and evidence obligations. New scoped tests prove only their selected
   public construction/validation behavior; they do not complete the 115,676

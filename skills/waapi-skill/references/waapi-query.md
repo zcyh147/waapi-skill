@@ -187,6 +187,10 @@ report observed/target counts and the stop reason without automatically restarti
 Subscription acknowledgement proves setup only. Every delivered event is checked
 against its pinned publish schema and reachable definitions before matching;
 malformed events and overflow fail monitoring with separate cleanup evidence.
+For `ui.signal.click/toggle`, copy `topic-schema`'s `--signal-model` and
+`--signal-widget` continuation. Select an active owned frontend model and its
+exact widget key; the Gateway derives subscription and callback identity filters.
+Observation does not authorize `signal.emit` or establish its delivery.
 
 For a vague `ak.wwise.core.soundbank.generated` wait, explicitly pass gateway-global
 `--timeout 120` and announce 120 seconds. This is Skill-selected; Gateway still

@@ -3275,6 +3275,8 @@ def add_topic_business_input_arguments(parser: argparse.ArgumentParser) -> None:
             "a missing or stale business vocabulary before connecting"
         ),
     )
+    parser.add_argument("--signal-model", help="For click/toggle Topics, one Gateway-owned frontend model resource")
+    parser.add_argument("--signal-widget", help="For click/toggle Topics, one exact widget key in that model's owned template")
     parser.add_argument(
         "--include-object-identity",
         action="store_true",
@@ -6289,6 +6291,20 @@ def preflight_typed_topic_input(
             "different topic/version. Run topic-schema again and copy its exact "
             "--topic-contract-digest value."
         )
+    signal_topic = args.api in {"ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"}
+    if signal_topic:
+        if not isinstance(args.signal_model, str) or re.fullmatch(r"ar1-[0-9a-f]{32}", args.signal_model) is None:
+            raise GatewayInputError("Signal observation requires --signal-model with an exact Gateway-owned model handle")
+        if not isinstance(args.signal_widget, str) or not args.signal_widget or len(args.signal_widget.encode("utf-8")) > 4096:
+            raise GatewayInputError("Signal observation requires --signal-widget with one bounded exact owned widget key")
+        if any(getattr(args, name) for name in (
+            "topic_option", "topic_option_as", "topic_option_empty", "event_match", "event_match_as",
+            "event_empty", "event_row", "event_row_as", "event_row_empty", "event_entry", "event_entry_as",
+            "event_entry_empty", "event_entry_object", "event_entry_object_as", "event_entry_row", "event_entry_row_as",
+        )):
+            raise GatewayInputError("Signal Topic identities are derived only from --signal-model and --signal-widget; additional native identity facts are not accepted")
+    elif args.signal_model is not None or args.signal_widget is not None:
+        raise GatewayInputError("--signal-model and --signal-widget are accepted only for click/toggle signal Topics")
     shortcut_requested = (
         args.include_object_identity
         or args.match_platform_name is not None
@@ -6335,7 +6351,7 @@ def preflight_typed_topic_input(
                 kind="text",
             )
         )
-    args.typed_topic_input = materialize_topic_business_inputs(
+    constructor = dict(
         version=version,
         topic=args.api,
         option_facts=tuple(option_facts),
@@ -6369,6 +6385,13 @@ def preflight_typed_topic_input(
         entry_object_facts=_topic_business_entry_object_facts(args, business),
         entry_row_facts=_topic_business_entry_row_facts(args, business),
     )
+    if signal_topic:
+        # Native IDs are available only after attesting the live resource scope.
+        # Nothing from this deferred business declaration can dispatch directly.
+        args.pending_signal_topic_input = constructor
+        args.typed_topic_input = None
+    else:
+        args.typed_topic_input = materialize_topic_business_inputs(**constructor)
 
 
 def _topic_business_facts(
@@ -8870,6 +8893,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             ),
         }
+        if args.api in {"ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"}:
+            payload["continuation"]["owned_signal_observation"] = {
+                "model": "--signal-model <owned-model-resource>",
+                "widget": "--signal-widget <owned-widget-key>",
+                "binding": "configuration_host_build_session_project_and_active_model_parents",
+                "filter": "gateway_derived_native_options_and_exact_callback_identity",
+                "unbounded_monitor_scope_read_timeout_seconds": DEFAULT_TIMEOUT,
+            }
+            payload["continuation"]["business_fact_argv"] = {}
+            payload["business_input"]["options"]["rows"] = []
+            payload["business_input"]["event_match"]["rows"] = []
+            payload["business_input"]["event_match_groups"]["rows"] = []
+            payload["business_input"]["gateway_derived_identity_fields"] = ["handle-id", "widget-id"]
         final_payload = attach_gateway_session_context(
             payload,
             args=args,
@@ -15351,9 +15387,6 @@ def dispatch_command(
             stream_sink=stream_sink,
         )
     if args.command == "wait-topic":
-        typed_topic_input = args.typed_topic_input
-        request_options = dict(typed_topic_input.options)
-        match = dict(typed_topic_input.match)
         authoring_boundary = live_authoring_api_boundary(
             args.api,
             command="wait-topic",
@@ -15382,6 +15415,12 @@ def dispatch_command(
         )
         if route_boundary is not None:
             return route_boundary
+        typed_topic_input = resolve_monitored_topic_input(
+            args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher,
+        )
+        request_options = dict(typed_topic_input.options)
+        match = dict(typed_topic_input.match)
         result = dispatch(
             dispatcher,
             args.api,
@@ -15492,6 +15531,42 @@ def dispatch_command(
     raise GatewayInputError(f"unsupported command: {args.command}")
 
 
+def resolve_monitored_topic_input(
+    args: argparse.Namespace, *, env: Mapping[str, str], connection: GatewayConnection,
+    detected_version: str, live_info: Mapping[str, Any], dispatcher: WwiseDispatcher,
+) -> Any:
+    """Bind signal filters to the same owned frontend authority as emission."""
+    constructor = getattr(args, "pending_signal_topic_input", None)
+    if constructor is None:
+        return args.typed_topic_input
+    from dataclasses import replace
+    from wwise_waapi.authoring_model_business import require_owned_widget
+
+    resource_connection = connection
+    if math.isinf(connection.timeout):
+        # A count/idle-bounded monitor has no total duration, but scope reads
+        # remain finite functions. This budget applies only to resource setup.
+        resource_connection = replace(
+            connection, timeout=DEFAULT_TIMEOUT, deadline=GatewayDeadline.start(DEFAULT_TIMEOUT),
+        )
+    context = authoring_resource_context(
+        args, env=env, connection=resource_connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher,
+    )
+    model = AuthoringResourceStore(resolve_transaction_state_directory(args, env=env)).resolve(
+        args.signal_model, context=context, kind="model",
+    )
+    require_owned_widget(model, args.signal_widget)
+    identities = (
+        TopicBusinessFact("handle-id", model["native_id"]),
+        TopicBusinessFact("widget-id", args.signal_widget),
+    )
+    args.typed_topic_input = materialize_topic_business_inputs(
+        **{**constructor, "option_facts": identities, "match_facts": identities},
+    )
+    return args.typed_topic_input
+
+
 def validate_monitored_topic_event(
     topic: str, event: Any, *, version: str, authoring_ui_profile: bool,
 ) -> Any:
@@ -15522,9 +15597,6 @@ def dispatch_topic_stream(
 ) -> dict[str, Any]:
     """Keep one reviewed topic subscription open and publish events immediately."""
 
-    typed_topic_input = args.typed_topic_input
-    request_options = dict(typed_topic_input.options)
-    match = dict(typed_topic_input.match)
     authoring_boundary = live_authoring_api_boundary(
         args.api,
         command="stream-topic",
@@ -15553,6 +15625,13 @@ def dispatch_topic_stream(
     )
     if route_boundary is not None:
         return route_boundary
+
+    typed_topic_input = resolve_monitored_topic_input(
+        args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher,
+    )
+    request_options = dict(typed_topic_input.options)
+    match = dict(typed_topic_input.match)
 
     result_limit_bytes = int(
         capability.execution_contract["result_limit_bytes"]
