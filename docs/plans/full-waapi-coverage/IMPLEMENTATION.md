@@ -28,10 +28,14 @@ references. No main merge is authorized.
   match; all 48 initially missing ordinary Authoring schema rows are included.
   See [native collection](NATIVE_COLLECTION.md) for builds, provenance, original
   failures, offline derivation and separate cleanup follow-up evidence.
-- #176 is the next frontier: exact native business-branch accounting, functional
-  ownership, candidate-scoped evidence and computed completion. It must retain
-  every missing or unverified use under #174; tool completion is distinct from
-  product completion. Prepared worktree: `waapi-coverage-ledger`.
+- #176 is complete and integrated at `cd9ccae07`. The evidence-driven checker
+  passed the focused 66-test baseline and subsequent affected guard checks;
+  the final-candidate preserved selection passed 9 tests. Post-merge `--check`
+  exited 0 with structural consistency; product completion remains false.
+  [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
+- Next implementation frontier: #177 (conditions), #181 (queries/metadata) and
+  #188 (Authoring layouts/views), in separate prepared worktrees. #180 remains
+  blocked by #178; do not infer readiness from family proximity.
 - Read-only object/plugin condition research is retained for #177/#178/#179.
   It includes integer enums/ranges, parent contexts, reference requirements,
   visibility, Uint16 plugin conditions and expanded 2025 EQ conditions. Installed
