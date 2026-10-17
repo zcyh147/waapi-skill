@@ -158,6 +158,9 @@ def _sealed_c08(root: Path, *, passed=True, rejected_preview=False, notice_fault
             "object": {"kind": "id", "value": identifier}, "property": "PreDelay", "value": 24})
         artifact["prepared_operation"].update(operation="object.setProperty", request=deepcopy(artifact["request"]),
             dispatch={"uri": "ak.wwise.core.object.setProperty", "args": {"object": identifier, "property": "PreDelay", "value": 24}, "options": {}})
+        artifact["connection_configuration"] = {"config_path": str(root / "fixture-config.json"),
+            "waapi_host": artifact["project_guard"]["endpoint"]["host"],
+            "waapi_port": artifact["project_guard"]["endpoint"]["port"], "wwise_version": "2025.1"}
     verification_state = "verified" if repair_metadata is not None else "result_schema_checked"
     store = TransactionStore(root / "broker" / "state")
     store.create_preview(tx, artifact)
