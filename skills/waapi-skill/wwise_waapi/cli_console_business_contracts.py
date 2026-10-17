@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from .console_project_operations import (
-    CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
+    CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_DEPTH, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
     MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
 )
 
@@ -716,7 +716,7 @@ def cli_console_business_contract_data(
             'inherited_or_elided_copy_values': 'unresolved_no_business_acceptance_without_native_evidence',
             'prewrite_inputs': 'all_observed_files_and_root_identity_must_match_Preview',
             'post_terminal_native_calls': 'none',
-            'limits': {'model_files': MAX_MODEL_FILES, 'model_directories': MAX_MODEL_DIRECTORIES,
+            'limits': {'model_files': MAX_MODEL_FILES, 'model_directories': MAX_MODEL_DIRECTORIES, 'model_depth': MAX_MODEL_DEPTH,
                 'model_entries': MAX_MODEL_ENTRIES, 'model_total_bytes': MAX_MODEL_BYTES,
                 'model_snapshot_bytes': MAX_MODEL_SNAPSHOT_BYTES, 'file_bytes': MAX_PROJECT_FILE_BYTES,
                 'xml_nodes_per_file': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH},

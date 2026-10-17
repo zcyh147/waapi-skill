@@ -480,21 +480,30 @@ def inspect_cli_project_effect(effect):
 
 MAX_MODEL_FILES = 512
 MAX_MODEL_DIRECTORIES = 2048
+MAX_MODEL_DEPTH = 64
 MAX_MODEL_ENTRIES = 16384
 MAX_MODEL_BYTES = 32 * 1024 * 1024
 MAX_MODEL_SNAPSHOT_BYTES = 512 * 1024
 
 
 def _read_bounded_artifact(path, root):
-    """Stable, confined UTF-8 XML observation shared by project/file effects."""
+    """Stable, confined byte observation shared by project/file effects."""
     import hashlib
     import os
     from .operation_soundbank import SoundBankContractError, capture_file_proof, open_regular_artifact_file
     proof = capture_file_proof(path, field='project model', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root)
     _, descriptor, before = open_regular_artifact_file(path, field='project model', io_root=root)
-    with os.fdopen(descriptor, 'rb') as opened:
-        raw = opened.read(MAX_PROJECT_FILE_BYTES + 1)
-        after = os.fstat(opened.fileno())
+    try:
+        opened = os.fdopen(descriptor, 'rb')
+    except OSError as exc:
+        os.close(descriptor)
+        raise SoundBankContractError('INVALID_FILE', 'Project artifact reader cannot be opened') from exc
+    try:
+        with opened:
+            raw = opened.read(MAX_PROJECT_FILE_BYTES + 1)
+            after = os.fstat(opened.fileno())
+    except OSError as exc:
+        raise SoundBankContractError('INVALID_FILE', 'Project artifact bytes cannot be observed') from exc
     if (len(raw) != proof['size'] or hashlib.sha256(raw).hexdigest() != proof['sha256']
             or any(getattr(before, key) != getattr(after, key)
                 for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
@@ -541,7 +550,7 @@ def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_med
         return None
     excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
     return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
-        (node.text or '').strip(), [value for child in node
+        (node.text if node.text and node.text.strip() else ''), [value for child in node
             if (value := _xml_value(child, excluded_platform=excluded_platform, exclude_media_storage=exclude_media_storage)) is not None]]
 
 
@@ -555,6 +564,8 @@ def _project_model_paths(project_path, root):
         def walk_error(exc):
             raise SoundBankContractError('INVALID_IO_ROOT', 'Project model directory cannot be enumerated') from exc
         for directory, children, names in os.walk(root, followlinks=False, onerror=walk_error):
+            if len(Path(directory).relative_to(root).parts) > MAX_MODEL_DEPTH:
+                raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its directory depth observation budget')
             directories += 1
             entries += len(children) + len(names)
             if directories > MAX_MODEL_DIRECTORIES or entries > MAX_MODEL_ENTRIES:
