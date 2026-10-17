@@ -107,7 +107,7 @@ def model_business_contract(operation: str, version: str) -> dict[str, Any]:
             'window_effect': 'native_result_does_not_establish_visible_or_closed_window',
             'signal_delivery': 'emit_result_is_not_delivery_proof; start an owned Topic observer before separately authorized emission',
             'exact_topic_semantics': 'native accepts or rejects the selected URI; no availability is inferred from its spelling'},
-        **({'construction': {'widget_kinds': widget_catalog(version),
+        **({'construction': {'widget_kinds': constructors['widget_catalog'],
             'widget': {'required': ['key', 'kind'], 'optional': ['attributes']},
             'attribute': {'required': ['attribute', 'value'], 'value': value_schema()},
             'layout': {'required': ['key', 'kind', 'children'], 'optional': ['attributes', 'splitters'],

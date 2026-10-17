@@ -97,9 +97,9 @@ def _definition(version: str, name: str, document: str = 'wafm_definitions.json'
     return resolve(graph.documents[document]['definitions'][name], document)
 
 
-def widget_catalog(version: str) -> dict[str, Any]:
+def widget_catalog(version: str, *, graph: Any = None) -> dict[str, Any]:
     from .schema_inventory import load_authoring_definition_graph
-    graph = load_authoring_definition_graph(version)
+    graph = load_authoring_definition_graph(version) if graph is None else graph
     definitions = graph.documents['wafm_definitions.json']['definitions']
     result = {}
     for name in definitions:
@@ -124,13 +124,15 @@ def _attributes(value: Any, *, allowed: set[str]) -> dict[str, Any]:
     return result
 
 
-def compile_template(plan: Mapping[str, Any], *, version: str, template_name: str) -> dict[str, Any]:
+def compile_template(plan: Mapping[str, Any], *, version: str, template_name: str, graph: Any = None) -> dict[str, Any]:
     _object(plan, {'template_key', 'root_widget', 'widgets', 'layouts'}, {'registration_form', 'registration_medium', 'template_version', 'metadata'}, 'Template plan')
     text(plan['template_key'], 'Template key')
     root = text(plan['root_widget'], 'Root widget')
     if not isinstance(plan['widgets'], list) or not isinstance(plan['layouts'], list) or len(plan['widgets']) + len(plan['layouts']) > MAX_NODES:
         raise ValueError('Template widgets/layouts exceed their bounded collection')
-    catalog = widget_catalog(version)
+    from .schema_inventory import load_authoring_definition_graph
+    graph = load_authoring_definition_graph(version) if graph is None else graph
+    catalog = widget_catalog(version, graph=graph)
     names = set()
     widgets = []
     for raw in plan['widgets']:
@@ -144,8 +146,6 @@ def compile_template(plan: Mapping[str, Any], *, version: str, template_name: st
     widget_names = set(names)
     kinds = {'AnchorLayout': 'anchorLayoutDefinition', 'BinLayout': 'binLayoutDefinition', 'GroupBox': 'groupBoxDefinition',
              'OverflowHBox': 'overflowHBoxDefinition', 'SplitLayout': 'splitLayoutDefinition', 'DockWidgetArea': 'dockWidgetAreaDefinition'}
-    from .schema_inventory import load_authoring_definition_graph
-    graph = load_authoring_definition_graph(version)
     kinds = {kind: name for kind, name in kinds.items() if name in graph.documents['wafm_definitions.json']['definitions']}
     budget = [MAX_NODES]
     def layout(raw: Any, depth: int = 0) -> dict[str, Any]:
@@ -184,7 +184,7 @@ def compile_template(plan: Mapping[str, Any], *, version: str, template_name: st
                 splitter_name = text(splitter['key'], 'Splitter key')
                 if splitter_name in names: raise ValueError('Template has duplicate splitter/widget/layout keys')
                 names.add(splitter_name)
-                fields = set(widget_catalog(version)['LayoutSplitter']['attributes'])
+                fields = set(catalog['LayoutSplitter']['attributes'])
                 splitters.append({'Name': splitter_name, 'Type': 'LayoutSplitter', **_attributes(splitter['attributes'], allowed=fields)})
             result['Splitters'] = splitters
         return result
@@ -206,9 +206,9 @@ def compile_template(plan: Mapping[str, Any], *, version: str, template_name: st
     return wafm
 
 
-def layout_catalog(version: str) -> dict[str, Any]:
+def layout_catalog(version: str, *, graph: Any = None) -> dict[str, Any]:
     from .schema_inventory import load_authoring_definition_graph
-    graph = load_authoring_definition_graph(version)
+    graph = load_authoring_definition_graph(version) if graph is None else graph
     result = {}
     for name in graph.documents['wafm_definitions.json']['definitions']:
         if name.endswith('Definition') and name not in {'wafmDefinition', 'widgetDefinition', 'layoutDefinition'}:
@@ -226,6 +226,11 @@ def attribute_assignment_schema() -> dict[str, Any]:
 
 
 def template_constructor_schemas(version: str) -> dict[str, Any]:
+    from .schema_inventory import load_authoring_definition_graph
+    # One freshly attested graph per construction; never retained across calls.
+    graph = load_authoring_definition_graph(version)
+    widgets = widget_catalog(version, graph=graph)
+    layouts = layout_catalog(version, graph=graph)
     assignment = attribute_assignment_schema()
     assignments = {'type': 'array', 'maxItems': 128, 'items': assignment}
     child = {'type': 'object', 'additionalProperties': False,
@@ -235,20 +240,22 @@ def template_constructor_schemas(version: str) -> dict[str, Any]:
             'section': {'type': 'integer'}, 'width': {'type': 'integer', 'minimum': 1}, 'minimum_size': {'type': 'integer', 'minimum': 1}},
         'oneOf': [{'required': ['widget']}, {'required': ['layout']}]}
     layout = {'type': 'object', 'additionalProperties': False, 'required': ['key', 'kind', 'children'],
-        'properties': {'key': {'type': 'string', 'minLength': 1}, 'kind': {'enum': sorted(layout_catalog(version))},
+        'properties': {'key': {'type': 'string', 'minLength': 1}, 'kind': {'enum': sorted(layouts)},
             'attributes': assignments, 'children': {'type': 'array', 'maxItems': MAX_NODES, 'items': child},
             'splitters': {'type': 'array', 'maxItems': MAX_NODES, 'items': {'type': 'object', 'additionalProperties': False,
                 'required': ['key', 'attributes'], 'properties': {'key': {'type': 'string'}, 'attributes': assignments}}}}}
     return {'widget': {'type': 'object', 'additionalProperties': False, 'required': ['key', 'kind'],
-        'properties': {'key': {'type': 'string', 'minLength': 1}, 'kind': {'enum': sorted(widget_catalog(version))}, 'attributes': assignments}},
+        'properties': {'key': {'type': 'string', 'minLength': 1}, 'kind': {'enum': sorted(widgets)}, 'attributes': assignments}},
         'layout': layout, 'definitions': {'businessValue': value_schema(), 'businessLayout': layout},
-        'layout_catalog': layout_catalog(version)}
+        'layout_catalog': layouts, 'widget_catalog': widgets}
 
 
 def compile_template_registration(plan: Mapping[str, Any], *, version: str, namespace: str) -> dict[str, Any]:
     from .canonical import canonical_sha256
+    from .schema_inventory import load_authoring_definition_graph
+    graph = load_authoring_definition_graph(version)
     if 'templates' not in plan:
-        return compile_template(plan, version=version, template_name=namespace)
+        return compile_template(plan, version=version, template_name=namespace, graph=graph)
     _object(plan, {'templates'}, {'registration_medium'}, 'Template collection')
     if not isinstance(plan['templates'], list) or len(plan['templates']) > 128:
         raise ValueError('Registration requires at most 128 independently named template constructors')
@@ -260,7 +267,7 @@ def compile_template_registration(plan: Mapping[str, Any], *, version: str, name
         if key in seen: raise ValueError('Template collection keys must be unique')
         seen.add(key)
         name = namespace + '.Template_' + canonical_sha256(key)[:24]
-        result.update(compile_template({**unit, 'registration_form': 'named_template'}, version=version, template_name=name))
+        result.update(compile_template({**unit, 'registration_form': 'named_template'}, version=version, template_name=name, graph=graph))
     from .builders.schema import validate_resolved_semantic_payload
     validate_resolved_semantic_payload('ak.wwise.ui.model.registerWafm', {'wafm': result}, {}, version=version, authoring_ui_profile=True)
     return result
