@@ -815,11 +815,13 @@ class BusinessHandleRegistry:
         platform: str | int | None = None,
         restrictions: Mapping[str, Any],
         metadata_digest: str,
+        trusted_native_token: bool = False,
     ) -> BoundFieldHandle:
         normalized_scope = _normalize_scope(scope_kind, scope_value)
-        if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+        if (not isinstance(token, str) or not token.strip()
+                or not trusted_native_token and not _FIELD_TOKEN.fullmatch(token)):
             raise ValueError("token must be an exact Wwise property/reference token")
-        if len(token.encode("utf-8")) > MAX_FIELD_TOKEN_BYTES:
+        if len(token.encode("utf-8")) > (MAX_FIELD_METADATA_STRING_BYTES if trusted_native_token else MAX_FIELD_TOKEN_BYTES):
             raise ValueError("token exceeds its fixed byte limit")
         if field_kind not in {"property", "reference"}:
             raise ValueError("field_kind must be property or reference")
@@ -1063,7 +1065,7 @@ def bind_live_field(
 ) -> BoundFieldHandle:
     """Issue one Field Handle from exact, bounded live metadata evidence.
 
-    The Agent supplies the exact token selected from Gateway discovery.  This
+    The Gateway resolves the exact token from scoped live discovery. This
     function proves that token in the requested scope, binds the complete
     metadata digest, and performs the dynamic enabled check whenever a
     dependency-bearing object field is bound. An omitted business platform
@@ -1076,7 +1078,8 @@ def bind_live_field(
     if not callable(read_call):
         raise TypeError("read_call must be callable")
     normalized_scope = _normalize_scope(scope_kind, scope_value)
-    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+    if (not isinstance(token, str) or not token.strip()
+            or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise _error(
             "FIELD_TOKEN_INVALID",
             field="token",
@@ -1218,6 +1221,7 @@ def bind_live_field(
             platform=platform,
             restrictions=restrictions,
             metadata_digest=metadata_digest,
+            trusted_native_token=True,
         )
     except ValueError as exc:
         raise _error(
@@ -1959,7 +1963,8 @@ def _bound_field_from_dict(
     value_type = payload.get("value_type")
     platform = _normalize_field_platform(payload.get("platform"))
     metadata_digest = payload.get("metadata_digest")
-    if not isinstance(token, str) or not _FIELD_TOKEN.fullmatch(token):
+    if (not isinstance(token, str) or not token.strip()
+            or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise ValueError("bound field token is invalid")
     if field_kind not in {"property", "reference"} or value_type not in {
         "number",

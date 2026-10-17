@@ -1633,22 +1633,61 @@ def test_peak_pages_preserve_empty_channels_and_native_default(tmp_path: Path) -
         for call in client.calls if call[0] == PEAKS_TRIMMED_URI)
 
 
-def test_peak_header_resource_boundary_retains_native_observation_without_false_completion(tmp_path: Path) -> None:
+@pytest.mark.parametrize("envelope", ["posix", "windows"])
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_decoded_large_header_has_lossless_bounded_continuation(tmp_path: Path, envelope: str, version: str, operation: str, monkeypatch) -> None:
+    if envelope == "windows":
+        class WindowsEnvelopeOS:
+            name = "nt"
+            def __getattr__(self, name):
+                import os
+                return getattr(os, name)
+        monkeypatch.setattr(gateway, "os", WindowsEnvelopeOS())
+    text = "声\\\"" * 6000
     raw = {"numChannels": 1, "peaksArrayLength": 0, "peaksBinaryStrings": [""],
-        "peaksDataSize": 0, "maxAbsValue": 1, "channelConfig": "x" * 24000}
+        "peaksDataSize": 0, "maxAbsValue": 1, "channelConfig": text}
     identity = {"return": [{"id": SOURCE_ID, "name": "Empty", "type": "AudioFileSource", "path": r"\Sources\Empty"}]}
-    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
-        "ak.wwise.core.object.get": [identity], PEAKS_TRIMMED_URI: [raw]})
-    code, rejected = gateway.execute_gateway(["core-call", PEAKS_TRIMMED_URI, "--audio-source-id", SOURCE_ID,
-        "--peak-pair-count", "1"], env=_env(tmp_path), client_factory=lambda _: client)
-    assert code == 2 and rejected["error_code"] == "PEAK_PROJECTION_LIMIT_EXCEEDED", rejected
-    from wwise_waapi.canonical import canonical_sha256
-    assert "native_observation" not in rejected["details"]
-    boundary = rejected["details"]["native_observation_boundary"]
-    assert boundary["complete"] is False and boundary["inline_limit_bytes"] == 4096
-    assert boundary["native_result_sha256"] == canonical_sha256(raw)
-    assert rejected["details"]["call"]["ok"] is True
-    assert "agent_result" not in rejected
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    client = FakeClient({"ak.wwise.core.getInfo": [info] * 32, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 32,
+        "ak.wwise.core.object.get": [identity] * 32, operation: [raw] * 32})
+    argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        argv += ["--start-seconds", "0", "--end-seconds", "1"]
+    env = _env(tmp_path, version=version)
+    recovered = ""
+    channels = []
+    for _ in range(32):
+        code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+        assert code == 0, payload
+        result = payload["agent_result"]
+        assert result["kind"] == "decoded_peaks" and result["normalization_divisor"] == 1
+        assert "channel_config" not in result
+        assert result["header_projection"]["channel_config"]["total_characters"] == len(text)
+        channels.extend(result["channels"])
+        for entry in result["header_fragments"]:
+            if entry["kind"] == "string-fragment":
+                assert entry["pointer"] == "/channel_config" and entry["offset"] == len(recovered)
+                recovered += entry["value"]
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        if result["projection_complete"]:
+            assert "next_command" not in result
+            break
+        continuation = result["next_command"]
+        argv = continuation["gateway_argv"]
+        if envelope == "windows":
+            from wwise_waapi.platform_commands import decode_windows_powershell_argv
+            decoded = decode_windows_powershell_argv(continuation["shell_command"])
+            assert list(decoded[decoded.index("gateway.py") + 1:]) == argv
+    else:
+        pytest.fail("decoded peak header never completed")
+    assert recovered == text
+    assert channels == [{"channel_index": 0, "pair_offset": 0, "pairs_normalized": []}]
+    expected_args = {"object": SOURCE_ID, "numPeaks": 1, "getCrossChannelPeaks": False}
+    if operation == PEAKS_REGION_URI:
+        expected_args.update(timeFrom=0, timeTo=1)
+    assert all(call[1] == expected_args for call in client.calls if call[0] == operation)
 
 
 @pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])

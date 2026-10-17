@@ -310,6 +310,7 @@ def media_build_business_contract_data(
             "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
             "malformed_present_fields": "bounded structured failure with native call evidence",
             "partial_projection": "status=partial; projection_complete=false; decode_available=false; native_result retained or losslessly paged as native_result_fragments",
+            "decoded_header_pages": "large channel configuration text is preserved in header_fragments with exact pointer/string offsets; header_projection marks previews incomplete; projection_complete includes all header fragments",
             "raw_observation_pages": "native_header preserves available facts; observation_complete marks complete raw-fragment recovery only and never implies decoded projection completion",
         }} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         **({"read_continuation": {

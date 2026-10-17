@@ -121,7 +121,16 @@ def finish_peak_page(page: PeakPage, *, raw: Mapping[str, Any], normalized: dict
             context_available=context_available, next_command=next_command)
     count, channels = normalized["peak_pair_count"], normalized["channel_count"]
     stride = max(count, 1)  # Empty channels remain explicit rows, not lost positions.
-    total = stride * channels
+    pair_positions = stride * channels
+    header = {key: value for key, value in normalized.items() if key != "channels"}
+    header_entries = []
+    channel_config = header.get("channel_config")
+    if isinstance(channel_config, str) and len(channel_config.encode("utf-8")) > 4096:
+        from .metadata_detail import detail_entries
+        header_entries = detail_entries({"channel_config": header.pop("channel_config")})
+        header["header_projection"] = {"channel_config": {"total_characters": len(channel_config),
+            "preview": channel_config[:128], "complete": False, "fragment_pointer": "/channel_config"}}
+    total = pair_positions + len(header_entries)
     if not total:
         raise PeakProjectionLimitError("Peak header exceeds the bounded projection; retain native evidence and refine the read")
     if page.offset >= total:
@@ -130,7 +139,7 @@ def finish_peak_page(page: PeakPage, *, raw: Mapping[str, Any], normalized: dict
     while True:
         fragments = []
         position = page.offset
-        while position < end:
+        while position < min(end, pair_positions):
             channel_index, pair_offset = divmod(position, stride)
             stop = min(end, (channel_index + 1) * stride)
             pairs = normalized["channels"][channel_index]["pairs_normalized"]
@@ -138,10 +147,11 @@ def finish_peak_page(page: PeakPage, *, raw: Mapping[str, Any], normalized: dict
                 "pairs_normalized": pairs[pair_offset:pair_offset + stop - position] if count else []})
             position = stop
         complete = end == total
-        result = {**{key: value for key, value in normalized.items() if key != "channels"},
-            "channels": fragments, "projection_complete": complete,
+        result = {**header, "channels": fragments, "projection_complete": complete,
+            **({"header_fragments": header_entries[max(0, page.offset - pair_positions):max(0, end - pair_positions)]}
+               if header_entries else {}),
             "page": {"offset": page.offset, "next_offset": end, "total_positions": total,
-                "position_unit": "channel-major peak pairs; empty channel occupies one position",
+                "position_unit": "channel-major peak pairs; empty channel occupies one position; then lossless header entries",
                 "native_read": "repeat_same_bounded_read_and_verify_entire_result",
                 "native_result_sha256": result_hash, "expires_at": page.issued + 900,
                 "mutation_authority": False}}
