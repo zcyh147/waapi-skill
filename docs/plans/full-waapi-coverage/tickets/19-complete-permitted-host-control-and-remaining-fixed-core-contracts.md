@@ -164,3 +164,28 @@ availability, volatile real observations, platform delivery and remaining Tone
 waveform/markers/rate/envelope semantics still need their own evidence. Full
 #193, #194 downstream delivery and remaining #188 obligations stay open; no
 native, Console, Authoring or Fresh process was launched for this slice.
+
+## Bounded successor: populated Tone marker observations
+
+The 2025.1 populated-marker verifier now retains bounded native cue records and
+cue-ID/label-byte associations in the existing single-descriptor RIFF parser.
+It compares requested count and multiplicity, exact integral-frame positions,
+ASCII labels and their position/label pairs. Duplicate positions survive, cue
+IDs are not invented input indexes, and native cue ordering is not guessed.
+An optional terminal null or an absent label for a requested empty/default label
+is supported by the matching SDK AkWavDefs.h marker structure. Byte digests and
+cue positions remain bounded evidence beside the full parsed-file hash; large
+label text is not duplicated into observation evidence.
+
+Fractional marker/rate rounding, Unicode label encoding and nonzero cue
+chunk/block positioning remain explicit native interpretation questions. Known
+parts still fail on wrong count/position/ASCII label even when another requested
+part is unresolved. No new native fields are sent to older lanes, no input is
+rejected merely to simplify the oracle, and no native writer convention or
+whole-ticket acceptance follows from fake RIFF files. Existing collection and
+capacity fixtures now actually emit their requested markers, retaining exact
+request, execute-once, policy and terminal/journal checks. The first combined
+adapter/matrix/transaction selection passed 1011 tests on the pending source;
+focused populated-marker/null/default-label controls passed 24. Original REDs
+remain in distinct `/tmp/tone-markers-193-*` roots. Remaining Tone signal,
+rounding/channel-format work and the rest of the #193/#188 roster stay open.

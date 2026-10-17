@@ -917,6 +917,8 @@ def test_tone_collection_omission_empty_and_populated_states_stay_distinct(tmp_p
     native = preview['agent_result']['request']['arguments']['args']
     assert native == {'path': str(output), 'waveform': 'whiteNoise', 'channelConfig': '2.0',
         'sampleRate': 8000, 'bitDepth': 'int16', 'attackTime': 0, 'sustainTime': 0.0005, 'releaseTime': 0, **expected}
+    if expected.get('markers'):
+        client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(7, 2000, '入口\\cue'.encode('utf-8'))]))
     verified = _finish_tone_collection(env, state, client, preview,
         expected_state='verified' if expected.get('waveformChannelMask') == 0 else 'result_schema_checked')
     dispatched = [call[1] for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
@@ -1164,6 +1166,7 @@ def test_tone_output_estimate_rejects_resource_overflow_before_dispatch(tmp_path
 def test_tone_large_marker_request_survives_exact_terminal_delivery(tmp_path, monkeypatch, capsys):
     fields = [token for number in range(4) for token in ('--marker', str(number), 'x' * 8192)]
     env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', fields)
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(index, index * 8000, b'x' * 8192) for index in range(4)]))
     verified = _finish_tone_collection(env, state, client, preview)
     rendered = gateway.gateway_stdout_json_encoder(verified).encode(gateway.gateway_stdout_payload(verified)) + '\n'
     with monkeypatch.context() as emitting:
@@ -1357,7 +1360,8 @@ def test_maximum_tone_marker_plan_and_count_survive_artifact_and_actual_stdout(t
         for index, marker in enumerate(markers))
     assert len(adtl) < 131072
     client.artifact_bytes = _tone_wav_bytes(extra=_riff_chunk(b'cue ', cue) + _riff_chunk(b'LIST', adtl))
-    verified = _finish_tone_collection(env, state, client, preview)
+    verified = _finish_tone_collection(env, state, client, preview,
+        expected_state='verified' if unit.isascii() else 'result_schema_checked')
     rendered = gateway.gateway_stdout_json_encoder(verified).encode(gateway.gateway_stdout_payload(verified)) + '\n'
     with monkeypatch.context() as emitting:
         emitting.setattr(gateway, 'execute_gateway', lambda argv: (0, verified))
@@ -1413,6 +1417,7 @@ def test_unowned_tone_shapes_cannot_gain_extra_terminal_capacity(tmp_path, defec
     from copy import deepcopy
     fields = [token for number in range(4) for token in ('--marker', str(number), 'x' * 8192)]
     env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', fields)
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(index, index * 8000, b'x' * 8192) for index in range(4)]))
     verified = _finish_tone_collection(env, state, client, preview)
     payload = deepcopy(verified)
     from wwise_waapi.transactions import TransactionStore
@@ -1444,3 +1449,72 @@ def test_unowned_tone_shapes_cannot_gain_extra_terminal_capacity(tmp_path, defec
     with pytest.raises(gateway.GatewayResultShapeError) as caught:
         gateway.project_successful_transaction_verify_payload(payload)
     assert caught.value.error_code == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
+
+
+def _tone_marker_chunks(rows):
+    import struct
+    # Known RIFF fixture: cue IDs deliberately differ from positions/order.
+    cue = struct.pack('<I', len(rows)) + b''.join(struct.pack('<II4sIII', identity, 0, b'data', 0, 0, frame)
+        for identity, frame, _ in rows)
+    labels = b'adtl' + b''.join(_riff_chunk(b'labl', struct.pack('<I', identity) + label)
+        for identity, _, label in rows if label is not None)
+    return _riff_chunk(b'cue ', cue) + _riff_chunk(b'LIST', labels)
+
+
+def test_tone_populated_ascii_markers_verify_exact_pairs_and_duplicate_positions(tmp_path):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--marker', '0', 'B', '--marker', '0.00025', 'C', '--marker', '0', 'A'])
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(91, 0, b'A\0'), (13, 2, b'C'), (42, 0, b'B\0')]))
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    from wwise_waapi.transactions import TransactionStore
+    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(preview['transaction_id'])
+                   if event['event_type'] == 'verification_recorded')
+    observed = journal['readbacks'][0]['wav']['markers']
+    assert observed['cue_count'] == 3
+    assert observed['label_count'] == 3
+    assert observed['requested_positions_checked'] is True
+    assert observed['requested_labels_checked'] is True
+
+
+@pytest.mark.parametrize('rows', [
+    [(91, 0, b'A'), (13, 2, b'C')],
+    [(91, 0, b'A'), (13, 3, b'C'), (42, 0, b'B')],
+    [(91, 2, b'A'), (13, 0, b'C'), (42, 0, b'B')],
+    [(91, 0, b'A'), (13, 2, b'wrong'), (42, 0, b'B')],
+    [(91, 0, b'A'), (13, 2, b'C'), (42, 2, b'B')],
+    [(91, 0, b'A'), (13, 2, None), (42, 0, b'B')],
+    [(91, 0, b'A'), (13, 2, b'C'), (91, 0, b'B')],
+], ids=['missing', 'wrong-position', 'swapped-associations', 'wrong-label', 'lost-duplicate-position', 'missing-label', 'duplicate-cue-id'])
+def test_tone_populated_markers_reject_wrong_observable_effect_after_one_dispatch(tmp_path, rows):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--marker', '0', 'B', '--marker', '0.00025', 'C', '--marker', '0', 'A'])
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks(rows))
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
+    assert 'marker' in str(verified).lower() or 'cue' in str(verified).lower()
+    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+
+
+@pytest.mark.parametrize('fields', [['--marker', '0'], ['--marker', '0', '']])
+def test_tone_explicit_empty_marker_label_can_be_omitted_in_native_label_chunks(tmp_path, fields):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', *fields])
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, 0, None)]))
+    _finish_tone_collection(env, state, client, preview, expected_state='verified')
+
+
+@pytest.mark.parametrize('position,label', [('0.00013', 'A'), ('0', '界')])
+def test_tone_marker_native_interpretation_gaps_retain_known_checks_and_do_not_claim_completion(tmp_path, position, label):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--marker', position, label])
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, 1 if position != '0' else 0, label.encode('utf-8'))]))
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert verified['verified'] is False
+    assert 'marker' in str(verified).lower()
+
+
+@pytest.mark.parametrize('position,label,frame,actual_label', [('0', '界', 1, '界'.encode('utf-8')), ('0.00013', 'A', 1, b'wrong')])
+def test_tone_partial_marker_interpretations_still_reject_known_wrong_postconditions(tmp_path, position, label, frame, actual_label):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--marker', position, label])
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(77, frame, actual_label)]))
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)

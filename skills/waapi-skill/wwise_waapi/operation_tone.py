@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections import Counter
 import math
 from decimal import Decimal
 import os
@@ -176,7 +177,7 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
                 raise _invalid("Tone artifact must be a complete bounded RIFF/WAVE file.")
             fmt = data = None
             cues = None
-            labels: set[int] = set()
+            labels: dict[int, bytes] = {}
             count = 0
             while reader.offset < reader.size:
                 count += 1
@@ -202,12 +203,13 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
                         raise SoundBankContractError("LIMIT_EXCEEDED", "Tone WAV exceeds the 128 cue Gateway bound.")
                     if size != 4 + cue_count * 24:
                         raise _invalid("Tone WAV cue count does not match its chunk extent.")
-                    cues = set()
+                    cues = {}
                     for _ in range(cue_count):
-                        cue_id, _, target, _, _, _ = struct.unpack("<II4sIII", reader.read(24))
+                        cue_id, position, target, chunk_start, block_start, sample_offset = struct.unpack("<II4sIII", reader.read(24))
                         if cue_id in cues or target != b"data":
                             raise _invalid("Tone WAV cue identities or data association are malformed.")
-                        cues.add(cue_id)
+                        cues[cue_id] = {'cue_id': cue_id, 'position': position,
+                            'chunk_start': chunk_start, 'block_start': block_start, 'sample_offset': sample_offset}
                 elif chunk_id == b"LIST":
                     if size < 4:
                         raise _invalid("Tone WAV LIST chunk omits its list type.")
@@ -223,7 +225,7 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
                     reader.read(1)
             if fmt is None or data is None:
                 raise _invalid("Tone WAV requires both format and audio data chunks.")
-            if labels - (cues or set()):
+            if set(labels) - set(cues or {}):
                 raise _invalid("Tone WAV contains orphan marker labels.")
             if args.get("markers") == [] and (cues or labels):
                 raise _invalid("Tone WAV contains markers despite the explicit empty marker request.")
@@ -231,13 +233,11 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
             if data[1] % observed["block_align"]:
                 raise _invalid("Tone WAV audio data is not frame-aligned.")
             observed["frames"] = data[1] // observed["block_align"]
-            observed["markers"] = {"cue_count": len(cues or ()), "label_count": len(labels)}
-            unresolved = _check_requested_format(observed, args)
+            observed["markers"], marker_unresolved = _check_requested_markers(cues or {}, labels, args)
+            unresolved = _check_requested_format(observed, args) + marker_unresolved
             observed["nonzero_samples_by_channel"] = _scan_samples(stream, data, observed, args)
             if args.get("waveform", "silence") != "silence" and args.get("waveformChannelMask") != 0:
                 unresolved.append("active waveform, frequency and envelope postconditions")
-            if args.get("markers"):
-                unresolved.append("populated marker positions and label encoding")
             after = os.fstat(stream.fileno())
             _require_stable_artifact(path, root, path_proof, before, after)
             return {**observed, "unresolved": unresolved, "path_proof": path_proof,
@@ -354,7 +354,7 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
 
 
 
-def _read_marker_labels(reader: _WavReader, end: int, labels: set[int]) -> None:
+def _read_marker_labels(reader: _WavReader, end: int, labels: dict[int, bytes]) -> None:
     metadata_bytes = end - reader.offset
     if metadata_bytes > MAX_WAV_MARKER_LIST_BYTES:
         raise SoundBankContractError("LIMIT_EXCEEDED", "Tone WAV marker metadata exceeds the 128 KiB Gateway bound.")
@@ -372,9 +372,55 @@ def _read_marker_labels(reader: _WavReader, end: int, labels: set[int]) -> None:
             cue_id = struct.unpack("<I", reader.read(4))[0]
             if cue_id in labels:
                 raise _invalid("Tone WAV marker label has a duplicate cue identity.")
-            labels.add(cue_id)
-            reader.discard(size - 4)
+            labels[cue_id] = reader.read(size - 4)
         else:
             reader.discard(size)
         if size & 1:
             reader.read(1)
+
+
+def _check_requested_markers(cues: Mapping[int, Mapping[str, int]], labels: Mapping[int, bytes],
+                             args: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    # WaveCue/sample offset and AkWaveMarker frame positions are pinned in the
+    # matching SDK AkWavDefs.h. Cue IDs bind labels, never input array indexes.
+    # An optional terminal null is allowed by AkWaveMarker's documented count.
+    actual = [(row['sample_offset'], labels.get(identity, b'').removesuffix(b'\0'))
+              for identity, row in cues.items()]
+    summary = {'cue_count': len(cues), 'label_count': len(labels),
+        'rows': [{**dict(row), 'label_bytes': len(labels.get(identity, b'')),
+                  'label_sha256': hashlib.sha256(labels.get(identity, b'')).hexdigest()}
+                 for identity, row in cues.items()]}
+    requested = args.get('markers')
+    if requested is None:
+        return summary, []
+    if len(cues) != len(requested):
+        raise _invalid('Tone WAV marker count differs from the frozen requested list, including multiplicity.')
+    canonical_positions = all(not row['chunk_start'] and not row['block_start'] for row in cues.values())
+    rate = Decimal(str(args.get('sampleRate', 48000)))
+    expected = []
+    for marker in requested:
+        frame = Decimal(str(marker['position'])) * rate
+        # Source does not specify native fractional-rate/marker rounding. Keep
+        # the valid request and check the known parts without inventing ±frames.
+        position = int(frame) if rate == rate.to_integral_value() and frame == frame.to_integral_value() and canonical_positions else None
+        text = marker.get('label', '')
+        label = text.encode('ascii') if text.isascii() else None
+        expected.append((position, label))
+    positions_checked = all(position is not None for position, _ in expected)
+    labels_checked = all(label is not None for _, label in expected)
+    def require_subset(known, observed, field):
+        if Counter(known) - Counter(observed):
+            raise _invalid(f'Tone WAV requested marker {field} differ from their cue/label associations.')
+    require_subset([position for position, _ in expected if position is not None],
+                   [position for position, _ in actual], 'frame positions')
+    require_subset([label for _, label in expected if label is not None],
+                   [label for _, label in actual], 'labels')
+    require_subset([(position, label) for position, label in expected if position is not None and label is not None],
+                   actual, 'position/label pairs')
+    summary.update(requested_positions_checked=positions_checked, requested_labels_checked=labels_checked)
+    unresolved = []
+    if not positions_checked:
+        unresolved.append('native fractional marker rounding or cue chunk/block position interpretation')
+    if not labels_checked:
+        unresolved.append('native populated marker Unicode label encoding')
+    return summary, unresolved

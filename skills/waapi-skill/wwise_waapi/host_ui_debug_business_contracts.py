@@ -157,8 +157,11 @@ def host_ui_debug_business_contract_data(
                 "maximum_marker_list_bytes": 131072,
                 "sample_inspection": "all frames; bounded blocks; no raw audio in results",
                 "unchanged_valid_output": "observable requested state may verify; created/changed are reported separately",
+                "populated_marker_checks": "exact count/multiplicity, cue-to-label associations, integral-frame positions and ASCII labels with optional terminal null; no guessed cue order",
+                "marker_evidence": "bounded cue records and label byte digests; complete parsed-file hash; exact label text remains in the immutable request",
                 "partial_postconditions": ["active waveform/frequency/envelope", "fractional rate/frame rounding",
-                    "populated marker positions/encoding", "anonymous/Ambisonic or unlabelled multichannel representation"],
+                    "fractional marker positions, Unicode label encoding or nonzero cue chunk/block offsets",
+                    "anonymous/Ambisonic or unlabelled multichannel representation"],
                 "limits_are_gateway_resources_not_native_absence": True,
             }} if operation == 'ak.wwise.debug.generateToneWAV' else {}),
             **(
