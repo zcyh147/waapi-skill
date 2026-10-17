@@ -52,7 +52,8 @@ class AttenuationTask(FieldTask):
             for row in args["objects"]:
                 for key, value in row.items():
                     if key.startswith("@"):
-                        self.objects[row["object"]][key[1:]] = {"id": value} if key == "@Attenuation" else value
+                        is_reference = self.metadata.get(key[1:], {}).get("restriction", {}).get("type") == "reference"
+                        self.objects[row["object"]][key[1:]] = {"id": value} if is_reference else value
             return {"objects": [{"id": FIRST, "name": "Rain", "type": self.objects[FIRST]["type"]}]}
         result = super().call(uri, args, options)
         return deepcopy(result)
@@ -448,8 +449,8 @@ def test_atomic_field_conditions_are_combined_before_choosing_a_prerequisite(tmp
 
 
 class ReferencePresenceTask(AttenuationTask):
-    def __init__(self, path, version):
-        super().__init__(path, version, operation="object.setProperty")
+    def __init__(self, path, version, operation="object.setProperty"):
+        super().__init__(path, version, operation=operation)
         self.metadata = {
             "UserAuxSendVolume0": {"name": "UserAuxSendVolume0", "type": "Real64", "dependencies": [{
                 "type": "reference", "action": "Enable", "context": "Self", "property": "UserAuxSend0",
@@ -460,6 +461,7 @@ class ReferencePresenceTask(AttenuationTask):
             }},
         }
         self.objects[FIRST].update(UserAuxSendVolume0=0.0, UserAuxSend0={"id": SECOND})
+        self.objects[SECOND].update(type="AuxBus", path=r"\Master-Mixer Hierarchy\Default Work Unit\Near")
 
     def call(self, uri, args=None, options=None):
         if uri.endswith("isPropertyEnabled"):
@@ -523,6 +525,75 @@ def test_missing_reference_discloses_target_choice_without_inventing_a_reference
                       "selection": "live_discovered_Field_Handle", "required_presence": True,
                       "target_selection": "user_chosen_exact_object"}
     assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("existing", [None, "{33333333-3333-3333-3333-333333333333}"])
+def test_explicit_reference_satisfies_atomic_property_presence_condition(tmp_path, version, existing):
+    task = ReferencePresenceTask(tmp_path, version, operation="object.set")
+    task.objects[FIRST]["UserAuxSend0"] = None if existing is None else {"id": existing}
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    volume = task.discover(source, "UserAuxSendVolume0")
+    reference = task.discover(source, "UserAuxSend0")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "send",
+                              "--object-handle", source, "--field-value", volume, "-6",
+                              "--field-value", reference, target)
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert "derived_changes" not in preview["preview_summary"]
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["UserAuxSend0"] == {"id": SECOND}
+    assert task.objects[FIRST]["UserAuxSendVolume0"] == -6 and task.objects[FIRST]["Volume"] == -7
+    writes = [args for uri, args, _ in task.calls if uri.endswith("object.set")]
+    assert len(writes) == 1 and writes[0]["objects"][0]["@UserAuxSend0"] == SECOND
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("drift", ["none", "before", "after", "metadata"])
+def test_atomic_presence_guard_preserves_an_existing_reference_without_rewriting_it(tmp_path, version, drift):
+    task = ReferencePresenceTask(tmp_path, version, operation="object.set")
+    target = task.bind(FIRST)
+    field = task.discover(target, "UserAuxSendVolume0")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "send-volume",
+                              "--object-handle", target, "--field-value", field, "-6")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if drift == "before":
+        task.objects[FIRST]["UserAuxSend0"] = None
+    if drift == "metadata":
+        task.metadata["UserAuxSendVolume0"]["dependencies"][0]["conditions"][0]["referenceIsSet"] = False
+    code, executed = task.run("execute", tx)
+    if drift in {"before", "metadata"}:
+        assert code == 2, executed
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    if drift == "after":
+        task.objects[FIRST]["UserAuxSend0"] = None
+    code, verified = task.run("verify", tx)
+    assert code == (2 if drift == "after" else 0), verified
+    writes = [args for uri, args, _ in task.calls if uri.endswith("object.set")]
+    assert len(writes) == 1 and "@UserAuxSend0" not in writes[0]["objects"][0]
+    assert task.objects[FIRST]["UserAuxSendVolume0"] == -6 and task.objects[FIRST]["Volume"] == -7
 
 
 @pytest.mark.parametrize("version", VERSIONS)

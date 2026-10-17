@@ -5658,17 +5658,6 @@ def _prepare_object_set(
             target_spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
-        for descriptor in properties:
-            _apply_reference_activation_dependencies(
-                property_info_by_name[descriptor.name.casefold()],
-                read=read, object_id=target.object,
-                property_specs=target_spec["properties"],
-                property_info_by_name=property_info_by_name,
-                derived_properties=derived_target_properties,
-                request_path=descriptor.request_path,
-                property_info_cache=property_info_cache,
-                _condition_sources=tuple(property_info_by_name.values()),
-            )
         for descriptor in references:
             info = _read_property_info_cached(
                 read,
@@ -5685,16 +5674,6 @@ def _prepare_object_set(
                     field_name=descriptor.name,
                     platform=platform,
                 )
-            activation_properties = _apply_reference_activation_dependencies(
-                info,
-                read=read,
-                object_id=target.object,
-                property_specs=target_spec["properties"],
-                property_info_by_name=property_info_by_name,
-                derived_properties=derived_target_properties,
-                request_path=descriptor.request_path,
-                property_info_cache=property_info_cache,
-            )
             resolved = _resolve_identity(
                 descriptor.target.as_dict(),
                 role=descriptor.request_path,
@@ -5705,9 +5684,29 @@ def _prepare_object_set(
             roles[descriptor.request_path] = resolved
             trusted[f"@{descriptor.name}"] = resolved.object
             reference_spec = {"name": descriptor.name, "target_id": resolved.object}
-            if activation_properties:
-                reference_spec["activation_properties"] = list(activation_properties)
             target_spec["references"].append(reference_spec)
+        desired_references = {row["name"].casefold(): row["target_id"] for row in target_spec["references"]}
+        reference_requirements: dict[str, Any] = {}
+        for descriptor in (*properties, *references):
+            activation_properties = _apply_reference_activation_dependencies(
+                property_info_by_name[descriptor.name.casefold()],
+                read=read, object_id=target.object,
+                property_specs=target_spec["properties"],
+                property_info_by_name=property_info_by_name,
+                derived_properties=derived_target_properties,
+                request_path=descriptor.request_path,
+                property_info_cache=property_info_cache,
+                _condition_sources=tuple(property_info_by_name.values()),
+                reference_requirements=reference_requirements,
+                desired_references=desired_references,
+            )
+            if activation_properties:
+                for row in target_spec["references"]:
+                    if row["name"] == descriptor.name:
+                        row["activation_properties"] = list(activation_properties)
+        for name, identity in reference_requirements.items():
+            if name.casefold() not in desired_references:
+                target_spec["references"].append({"name": name, "target_id": identity, "condition_guard": True})
         if any(info.dependencies for info in property_info_by_name.values()):
             condition_metadata_guards.append({
                 "object_id": target.object,
@@ -7298,6 +7297,7 @@ def _apply_reference_activation_dependencies(
     _activation_fields: set[str] | None = None,
     _condition_sources: tuple[PropertyInfoMetadataRecord, ...] = (),
     reference_requirements: dict[str, Any] | None = None,
+    desired_references: Mapping[str, Any] | None = None,
 ) -> tuple[str, ...]:
     """Compile bounded same-object Boolean activation requirements.
 
@@ -7367,6 +7367,8 @@ def _apply_reference_activation_dependencies(
             identity = None if _reference_value_is_null(value) else _reference_identity(value)
             if not _reference_value_is_null(value) and (not isinstance(identity, str) or _PLUGIN_GUID.fullmatch(identity) is None):
                 raise OperationContractError("INVALID_READBACK", "Reference prerequisite must expose a canonical GUID or native null.")
+            if desired_references is not None and name.casefold() in desired_references:
+                identity = desired_references[name.casefold()]
             if (identity is not None) != required_presence:
                 raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the required reference state before editing this field.", details={
                     "object_id": object_id, "property": metadata.name, "mutation_dispatched": False,
@@ -7382,6 +7384,7 @@ def _apply_reference_activation_dependencies(
                 property_info_cache=property_info_cache, _activation_path=path,
                 _activation_fields=all_fields, _condition_sources=_condition_sources,
                 reference_requirements=reference_requirements,
+                desired_references=desired_references,
             ))
             continue
         fields = set(dependency)
@@ -7565,6 +7568,7 @@ def _apply_reference_activation_dependencies(
             _activation_path=path, _activation_fields=all_fields,
             _condition_sources=_condition_sources,
             reference_requirements=reference_requirements,
+            desired_references=desired_references,
         ))
 
         matching_specs = [
@@ -16590,7 +16594,7 @@ def verify_prepared_operation(
                 actual = _reference_identity(_field_value(row, str(field_name)))
                 check(
                     f"{request_path}.{field_name} reference matches",
-                    _same_identity(actual, field_spec.get("target_id")),
+                    _reference_requirement_matches(row, str(field_name), field_spec.get("target_id")),
                     {"expected": field_spec.get("target_id"), "actual": actual},
                 )
             import_spec = spec.get("import")
