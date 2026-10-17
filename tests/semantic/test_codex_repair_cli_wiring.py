@@ -82,7 +82,7 @@ def test_campaign_child_rejects_partial_repair_selection(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("archive_valid", [True, False])
-@pytest.mark.parametrize("ids", [["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F3", "REPAIR25-F4"]])
+@pytest.mark.parametrize("ids", [["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F4"]])
 def test_remaining_campaign_argv_reaches_exact_selected_executors_and_archive_gates(tmp_path, monkeypatch, archive_valid, ids):
     import json
     from dataclasses import replace
@@ -116,7 +116,7 @@ def test_remaining_campaign_argv_reaches_exact_selected_executors_and_archive_ga
     summary = json.loads((root / "summary.json").read_text())
     assert summary["selected_unit_count"] == len(ids)
     assert summary["expansion_accounting"]["agent_units"]["selected"] == ids
-    assert sum(unit.transaction_count for unit in units) == 2
+    assert sum(unit.transaction_count for unit in units) == len(ids) - int("REPAIR25-F2" in ids)
     assert len(units) * selected.timeout_seconds == 600 * len(ids)
     assert summary["pending_unit_ids"] == ([] if archive_valid else ids[1:])
     assert summary["all_selected_passed"] is archive_valid

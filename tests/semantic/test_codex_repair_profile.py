@@ -78,3 +78,11 @@ def test_unattempted_final_pair_has_two_tasks_two_transactions_and_1200_seconds(
     assert profile.budget == {"fresh_tasks": 2, "user_turns": 2, "model_calls": 2,
         "transactions": 2, "hard_seconds_per_task": 600, "hard_seconds_total": 1200,
         "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}
+
+
+def test_final_unattempted_f4_is_one_task_transaction_and_600_seconds():
+    profile = load_repair_profile(PROFILE, unit_ids=("REPAIR25-F4",))
+    assert [unit.case_id for unit in profile.units] == ["F4"]
+    assert profile.budget == {"fresh_tasks": 1, "user_turns": 1, "model_calls": 1,
+        "transactions": 1, "hard_seconds_per_task": 600, "hard_seconds_total": 600,
+        "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}
