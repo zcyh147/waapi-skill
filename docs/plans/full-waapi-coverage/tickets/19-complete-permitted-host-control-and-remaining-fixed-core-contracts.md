@@ -24,6 +24,10 @@ Users receive complete permitted host-control/fixed Core inputs and truthful ter
 
 - [ ] Remove the Skill-only incomplete delivery boundary in `debug-wal-tree`: candidate `dcf0ae11` rejects a native `return.nodes` map above 256 entries despite no native `maxProperties` constraint, and smaller requested views expose only a prefix with no continuation. Provide complete bounded delivery for valid results within the transport budget through the existing Gateway mechanisms. Test public routing, exact reconstruction, deterministic ordering, stale-result rejection and output ceilings across every reflected 2021.1–2025.1 host/version lane. Keep genuine transport/resource failures and unavailable Debug-build evidence explicit; neither establishes native absence or ticket completion.
 
+- [ ] Expose the missing explicit-empty test-tone choices through the closed business declaration. The `f7dd0f4f` source comparison found that `waveform_channels` requires a nonempty list and cannot emit native `waveformChannelMask=0` (reflected in 2024.1/2025.1), while `markers=[]` is accepted internally but cannot be expressed by the public CLI (reflected in 2025.1). Keep omission, explicit empty/zero and populated values distinct; disclose their forms in the schema/continuation, preserve the requested waveform, and test actual public Preview/execute/verify plus conflicting-input and version-boundary negatives. Establish native effects separately before completion; older unreflected fields are not silently sent.
+
+- [ ] Replace the Skill-origin schema-only verification gap for `generateToneWAV` with an appropriate bounded artifact/effect verifier. The `8dfdcc76` implementation and transaction tests currently accept the returned empty object as `result_schema_checked` even when no output WAV exists. Reuse existing IO/path/artifact mechanisms to establish the requested output and applicable format/channel/rate/marker/silence or waveform/envelope postconditions, with independent positive evidence and missing/stale/malformed/wrong-effect negatives. Preserve exact output ownership, one execution and truthful uncertainty. A simulated file, schema-only success or unimplemented postcondition cannot close this obligation; establish matching native effects before final acceptance.
+
 ## Blocked by
 
 - [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
@@ -31,3 +35,19 @@ Users receive complete permitted host-control/fixed Core inputs and truthful ter
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Bounded implementation checkpoint: explicit tone collections
+
+Exact URI roster for this slice is only `ak.wwise.debug.generateToneWAV`: the
+2024.1/2025.1 waveform channel-set branch and 2025.1 marker-list branch, on the
+existing Console/Authoring public business path. The closed `--empty` collection
+choice preserves explicit zero/empty separately from omission and populated
+`--item`/`--marker` values, while retaining the chosen waveform. Other versions,
+unknown/native fields, conflicting forms and duplicate empty choices fail before
+mutation. The three modification policies and one-execute binding remain intact.
+
+This checkpoint does not implement the tone artifact/effect verifier: the current
+Gateway still reports `result_schema_checked`, `verified=false`, even when the
+fake native call creates no file. Simulated WAV observations grant no native or
+effect acceptance. The additive verifier criterion above remains implementation
+work here, alongside complete WAL delivery and the rest of this ticket.

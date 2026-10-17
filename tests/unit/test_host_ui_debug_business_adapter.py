@@ -771,3 +771,177 @@ def test_host_ui_debug_legacy_typed_ingress_is_blocked_before_connection(
 
     assert code == 2
     assert "business" in rejected["message"].casefold()
+
+
+class _ToneFileClient(_HostClient):
+    """Owned fake side effect; its file is not a Gateway effect verifier."""
+    def __init__(self, *args, write_output=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.write_output = write_output
+
+    def call(self, uri, args=None, options=None):
+        if uri == 'ak.wwise.debug.generateToneWAV':
+            self.calls.append((uri, args, options))
+            if self.write_output:
+                import wave
+                with wave.open(args['path'], 'wb') as output:
+                    output.setnchannels(2)
+                    output.setsampwidth(2)
+                    output.setframerate(8000)
+                    output.writeframes(b'\x00' * 16)
+            return {}
+        return super().call(uri, args, options)
+
+
+def _tone_collection_preview(tmp_path, version, fields, *, policy='ask_before_changes',
+                             is_command_line=True, write_output=True, reject_declaration=False):
+    state = ['--state-dir', str(tmp_path / 'state')]
+    env = set_gateway_config(_env(tmp_path, version), project_modification_policy=policy)
+    output = tmp_path / 'io' / 'tone.wav'
+    output.parent.mkdir(exist_ok=True)
+    client = _ToneFileClient(tmp_path, version, is_command_line=is_command_line, write_output=write_output)
+    code, schema = gateway.execute_gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'],
+        env=env, client_factory=lambda _: pytest.fail('schema is offline'))
+    assert code == 0, schema
+    code, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']],
+        env=env, client_factory=lambda _: pytest.fail('start is offline'))
+    assert code == 0, started
+    declaration = started['draft']['next_action_binding']['declaration']
+    code, declared = gateway.execute_gateway([*state, 'draft-declare-host-plan', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(started['draft']['revision']),
+        '--value', 'output_file', str(output), '--value', 'waveform', 'white_noise',
+        '--value', 'channel_layout', '2.0', '--value', 'sample_rate_hz', '8000',
+        '--value', 'bit_depth', 'int16', '--value', 'attack_seconds', '0',
+        '--value', 'sustain_seconds', '0.0005', '--value', 'release_seconds', '0',
+        *fields], env=env, client_factory=lambda _: client)
+    if reject_declaration:
+        assert code != 0, declared
+        assert not output.exists()
+        assert 'ak.wwise.debug.generateToneWAV' not in [call[0] for call in client.calls]
+        return declared
+    assert code == 0, declared
+    code, checked = gateway.execute_gateway([*state, 'draft-check', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(declared['draft']['revision'])],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, checked
+    code, preview = gateway.execute_gateway([*state, 'preview-from-draft', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(checked['draft']['revision'])],
+        env=env, client_factory=lambda _: client)
+    if policy == 'read_only':
+        assert code != 0, preview
+        assert not output.exists()
+    else:
+        assert code == 0, preview
+    return env, state, client, output, schema, declaration, preview
+
+
+def _finish_tone_collection(env, state, client, preview):
+    tx = preview['transaction_id']
+    if preview['state'] == 'awaiting_confirmation':
+        _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+        code, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+            '--confirmation-token', shown['confirmation']['token']], env=env)
+        assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    code, verified = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, verified
+    assert verified['state'] == 'result_schema_checked'
+    assert verified['verified'] is False
+    assert verified['agent_result']['verified'] is False
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    return verified
+
+
+def test_tone_explicit_empty_choices_survive_public_draft_preview_execute_verify(tmp_path):
+    env, state, client, output, schema, declaration, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], is_command_line=False)
+    for field in ('waveform_channels', 'markers'):
+        expected = {'flag': '--empty', 'arguments': [field], 'repeatable': False}
+        assert schema['business_adapter']['declaration']['input_forms'][field]['empty_form'] == expected
+        assert declaration['input_forms'][field]['empty_form'] == expected
+    request = preview['agent_result']['request']
+    assert request['arguments']['args'] == {'path': str(output), 'waveform': 'whiteNoise',
+        'channelConfig': '2.0', 'sampleRate': 8000, 'bitDepth': 'int16',
+        'attackTime': 0, 'sustainTime': 0.0005, 'releaseTime': 0, 'waveformChannelMask': 0, 'markers': []}
+    assert not output.exists()
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert verified['agent_result']['request'] == request
+    import wave
+    with wave.open(str(output), 'rb') as artifact:
+        assert (artifact.getnchannels(), artifact.getsampwidth(), artifact.getframerate(), artifact.getnframes()) == (2, 2, 8000, 4)
+        assert artifact.readframes(4) == b'\x00' * 16
+    # This independent fake file observation does not close the product's
+    # missing artifact/effect oracle; the Gateway truthfully remains weak.
+    assert verified['verification']['business_state_verified'] is False
+
+
+@pytest.mark.parametrize('is_command_line', [False, True], ids=['authoring', 'console'])
+@pytest.mark.parametrize('version,fields,expected', [
+    ('2023.1', [], {}),
+    ('2024.1', ['--empty', 'waveform_channels'], {'waveformChannelMask': 0}),
+    ('2025.1', [], {}),
+    ('2025.1', ['--empty', 'waveform_channels', '--empty', 'markers'], {'waveformChannelMask': 0, 'markers': []}),
+    ('2025.1', ['--item', 'waveform_channels', '0', '--item', 'waveform_channels', '1', '--marker', '0.25', '入口\\cue'],
+        {'waveformChannelMask': 3, 'markers': [{'position': 0.25, 'label': '入口\\cue'}]}),
+])
+def test_tone_collection_omission_empty_and_populated_states_stay_distinct(tmp_path, version, fields, expected, is_command_line):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, version, fields,
+        is_command_line=is_command_line)
+    native = preview['agent_result']['request']['arguments']['args']
+    assert native == {'path': str(output), 'waveform': 'whiteNoise', 'channelConfig': '2.0',
+        'sampleRate': 8000, 'bitDepth': 'int16', 'attackTime': 0, 'sustainTime': 0.0005, 'releaseTime': 0, **expected}
+    verified = _finish_tone_collection(env, state, client, preview)
+    dispatched = [call[1] for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
+    assert dispatched == [native]
+    assert verified['agent_result']['request'] == preview['agent_result']['request']
+    assert output.is_file()
+
+
+@pytest.mark.parametrize('version,fields', [
+    ('2023.1', ['--empty', 'waveform_channels']),
+    ('2023.1', ['--empty', 'markers']),
+    ('2024.1', ['--empty', 'markers']),
+    ('2025.1', ['--empty', 'waveform_channels', '--item', 'waveform_channels', '0']),
+    ('2025.1', ['--item', 'waveform_channels', '0', '--empty', 'waveform_channels']),
+    ('2025.1', ['--empty', 'markers', '--marker', '0.5']),
+    ('2025.1', ['--marker', '0.5', '--empty', 'markers']),
+    ('2025.1', ['--empty', 'markers', '--empty', 'markers']),
+    ('2025.1', ['--empty', 'waveform_channels', '--empty', 'waveform_channels']),
+    ('2025.1', ['--item', 'waveform_channels', '0', '--item', 'waveform_channels', '0']),
+    ('2025.1', ['--empty', 'waveform']),
+    ('2025.1', ['--value', 'waveformChannelMask', '0']),
+    ('2025.1', ['--value', 'markers', '[]']),
+    ('2025.1', ['--empty', 'languages']),
+])
+def test_tone_empty_choices_reject_conflicts_duplicates_native_fields_and_wrong_versions_before_mutation(tmp_path, version, fields):
+    rejected = _tone_collection_preview(tmp_path, version, fields, reject_declaration=True)
+    assert rejected['ok'] is False
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_tone_empty_choices_keep_all_three_modification_policies(tmp_path, policy):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], policy=policy)
+    if policy == 'read_only':
+        assert not output.exists()
+        assert 'ak.wwise.debug.generateToneWAV' not in [call[0] for call in client.calls]
+        assert 'read_only' in preview['message']
+        return
+    assert (preview['state'] == 'awaiting_confirmation') is (policy == 'ask_before_changes')
+    _finish_tone_collection(env, state, client, preview)
+    code, repeated = gateway.execute_gateway([*state, 'execute', preview['transaction_id']],
+        env=env, client_factory=lambda _: client)
+    assert code != 0, repeated
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+
+
+def test_tone_current_verifier_discloses_missing_artifact_effect_gap(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], write_output=False)
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert not output.exists()
+    assert verified['verification']['business_state_verified'] is False
+    assert verified['verification_strength'] == 'complete_reflected_schema'
+    # Pending #193 artifact verifier must replace this weak boundary with a
+    # meaningful missing-effect failure. This control grants no effect credit.

@@ -399,3 +399,29 @@ lookup/workspace equality. Both omitted-content version controls, all scoped-rea
 tests, divergent create/reuse and stale/foreign authority controls passed 75
 tests. Earlier passing runs remain partial source evidence; no missing case or
 native acceptance was inferred from them.
+
+#193 bounded source slice on exact integration `8dfdcc76` exposes the missing
+tone collection choices through existing host-plan CLI/Draft composition. Only
+`ak.wwise.debug.generateToneWAV` is changed: waveform channel empty sets map to
+explicit zero for 2024.1/2025.1, and explicit marker emptiness maps to [] for
+2025.1. Omission, empty and populated forms remain distinct in request-schema,
+Draft continuation and immutable Preview; waveform choice remains unchanged.
+Conflicting/duplicate/undisclosed/native inputs fail before mutation, and all
+three modification policies retain their existing gates. Original public parser
+RED is retained; the first corrected full public lifecycle control passed, and
+the full host-business selection passed 120 fake tests before final fixture
+format alignment.
+
+A separate source defect remains owned by #193: generic tone verification accepts
+the result schema with verified=false even without an output WAV. Independent
+simulated file observations do not establish product effect proof. The exact
+remote empty-choice and artifact-verifier criteria were copied additively to
+local ticket19; complete bounded artifact/effect verification, matching native
+evidence, complete WAL delivery and remaining host contracts stay open. No
+native/Console/Authoring/Fresh launch or generated inventory update occurred.
+
+The final explicit-collection source selection passed 124 fake tests, including
+the complete host-business file, existing isolated transaction verifier boundary,
+exact adapter registration, operation catalog and reviewed schema seal. It grants
+closed-input construction/policy evidence only; tone artifact/effect and native
+verification remain pending implementation and acceptance under #193.

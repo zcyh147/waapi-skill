@@ -259,6 +259,10 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         }
         if field_type == "channel_index_list":
             result["range"] = [0, 63]
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "leave the channel selection unspecified; native default uses all channels"
+            result["explicit_empty"] = "apply the requested waveform to no channels; retain the waveform choice"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
         return result
     if field_type == "platform_creation_mappings":
         return {
@@ -272,6 +276,10 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             "flag": "--marker",
             "arguments": ["<position-seconds>", "[exact-label]"],
             "repeatable": True,
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "leave markers unspecified",
+            "explicit_empty": "request an explicit empty marker list",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     result = {
         "flag": "--value",
