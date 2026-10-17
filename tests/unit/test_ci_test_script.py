@@ -95,6 +95,38 @@ def test_real_driver_flags_and_option_operands_keep_version_defaults(tmp_path, m
         assert options["env"]["WWISE_VERSION"] == version
 
 
+@pytest.mark.parametrize("mode", ("live", "destructive"))
+@pytest.mark.parametrize("pytest_args", (
+    ("--cov", "skills/waapi-skill"),
+    ("--cov-report", "xml:coverage.py::report.xml"),
+    ("--cov-config", "coverage.py::config"),
+    ("--cov-fail-under", "85"),
+    ("--cov-context", "test"),
+    ("--cov", "--cov-report", "term-missing"),
+    ("--cov", "-k", "test_fake.py::filter"),
+    ("--cov=skills/waapi-skill", "--cov-report=xml:coverage.py::report.xml"),
+    ("--cov-reset", "--cov-append", "--cov-branch", "--no-cov", "--no-cov-on-fail"),
+))
+def test_real_driver_locked_coverage_options_keep_version_defaults(tmp_path, monkeypatch, mode, pytest_args):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode=mode, version="all", pytest_args=pytest_args)
+    assert code == 0 and len(calls) == 5
+    for version, (command, options) in zip(SUPPORTED_VERSIONS, calls, strict=True):
+        defaults = LIVE_TEST_NODES[version] if mode == "live" else DESTRUCTIVE_TEST_NODES[version]
+        assert command == (sys.executable, "-m", "pytest", *defaults, *pytest_args)
+        assert options["env"]["WWISE_VERSION"] == version
+
+
+@pytest.mark.parametrize("pytest_args", (
+    ("--cov", "--cov-report", "term-missing", "tests/live/test_exact.py::test_one"),
+    ("--cov", "skills/waapi-skill", "tests/live/test_exact.py::test_one"),
+    ("--cov-config", "coverage.py::config", "--", "tests/live/test_exact.py::test_one"),
+))
+def test_real_driver_coverage_options_preserve_explicit_selection(tmp_path, monkeypatch, pytest_args):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode="live", version="2025.1", pytest_args=pytest_args)
+    assert code == 0 and len(calls) == 1
+    assert calls[0][0] == (sys.executable, "-m", "pytest", *pytest_args)
+
+
 @pytest.mark.parametrize("pytest_args", (
     ("-k", "test_fake.py::operand", "tests/live/test_exact.py::test_one", "-q"),
     ("--", "tests/live/test_exact.py::test_one"),

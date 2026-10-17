@@ -17,9 +17,9 @@ if __package__:
 else:
     from run_program_tests import PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE
 
-# Identify operands using the locked pytest core option arities plus this repo's
-# Authoring option. This classifies argv only; pytest still validates it, and the
-# Program lane retains its separate closed flag allowlist.
+# Identify operands using the locked pytest core and pytest-cov option arities
+# plus this repo's Authoring option. This classifies argv only; pytest still
+# validates it, and Program retains its separate closed flag allowlist.
 _PYTEST_OPTIONS_REQUIRING_VALUE = PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE | {
     '-m', '-r', '-c', '-o', '--override-ini', '--ignore', '--ignore-glob',
     '--deselect', '--basetemp', '--rootdir', '--confcutdir', '--junitxml',
@@ -32,8 +32,9 @@ _PYTEST_OPTIONS_REQUIRING_VALUE = PROGRAM_PYTEST_OPTIONS_REQUIRING_VALUE | {
     '--log-format', '--log-date-format', '--log-cli-level', '--log-cli-format',
     '--log-cli-date-format', '--log-file-mode', '--log-file-format',
     '--log-file-date-format', '--log-auto-indent', '--log-disable',
+    '--cov-report', '--cov-config', '--cov-fail-under', '--cov-context',
 }
-_PYTEST_OPTIONS_WITH_OPTIONAL_VALUE = {'--debug', '--cache-show'}
+_PYTEST_OPTIONS_WITH_OPTIONAL_VALUE = {'--debug', '--cache-show', '--cov'}
 
 
 class ReadinessBlocked(ValueError):
