@@ -15,11 +15,12 @@ from .canonical import canonical_sha256
 LAYOUT_SWITCH_URI = 'ak.wwise.ui.layout.switchLayout'
 LAYOUT_SET_URI = 'ak.wwise.ui.layout.setLayout'
 LAYOUT_REMOVE_URI = 'ak.wwise.ui.layout.removeLayout'
+LAYOUT_UNDOCK_URI = 'ak.wwise.ui.layout.undockView'
 LAYOUT_CLOSE_URI = 'ak.wwise.ui.layout.closeView'
 LAYOUT_GET_OR_CREATE_URI = 'ak.wwise.ui.layout.getOrCreateView'
-LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI})
+LAYOUT_MUTATION_URIS = frozenset({LAYOUT_SWITCH_URI, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI})
 MUTATION_RESOURCE = 'authoring-layout-mutation-supplement.json'
-MUTATION_SHA256: dict[str, str] = {'2024.1': '1ecef85c33081eb228f7648710cd5acdc6087d0c7ca1daad46ad7c52ad8f9b94', '2025.1': '88227d21019ccd3165d9ecc3994d7ce4cc47b9e2398d758ca2c9c0332b5e3297'}
+MUTATION_SHA256: dict[str, str] = {'2024.1': '9f2ec68caecb598ae96cbb6a46840046ea21871c942cf745dade7c86589aab20', '2025.1': '14c085f77d5c2c0cf6474733f7db15129446caf7eb46e7329c1916671dd65413'}
 
 
 def layout_mutation_versions(operation: str) -> tuple[str, ...]:
@@ -77,7 +78,7 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
             'preserve omitted coordinate fields', 'get or create once after authorization', 'verify the returned view identity and applicable initial coordinates']
         result['coordinate_scope'] = 'initial positions apply only to a newly created view; an existing view is reused'
         result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent view instances, plus explicit initial coordinate readbacks when created'}
-    elif operation == LAYOUT_CLOSE_URI:
+    elif operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
         result['declaration']['required_fields'].append('view_handle')
         result['declaration']['public_fields'].append('view_handle')
         result['declaration']['field_types']['view_handle'] = 'scoped_view_handle'
@@ -86,11 +87,20 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
             'request close once after authorization', 'poll bounded independent instances for exact disappearance']
         result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'exact view absent from independently read instances',
             'maximum_polls': 16, 'poll_interval_seconds': 0.2, 'incomplete_boundary': 'pending_async_close'}
+        if operation == LAYOUT_UNDOCK_URI:
+            result['declaration']['optional_fields'] = ['position_x', 'position_y']
+            for field in ('position_x', 'position_y'):
+                result['declaration']['public_fields'].append(field)
+                result['declaration']['field_types'][field] = 'integer'
+                result['declaration']['input_forms'][field] = {'gateway_flag': '--' + field.replace('_', '-'), 'shape': 'integer'}
+            result['responsibility_split']['gateway'] = ['require the selected layout to be current', 'revalidate the exact discovered view',
+                'preserve omitted positions', 'undock once after authorization', 'verify floating identity and explicit positions independently']
+            result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent floating view identity and explicit position readbacks'}
     return result
 
 
 def layout_business_catalog_rows() -> tuple[dict[str, Any], ...]:
-    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view'}[uri],
+    return tuple({'api': uri, 'intent': {LAYOUT_SWITCH_URI: 'switch layout', LAYOUT_SET_URI: 'register temporary layout', LAYOUT_REMOVE_URI: 'remove temporary layout', LAYOUT_GET_OR_CREATE_URI: 'get or create a live view', LAYOUT_CLOSE_URI: 'close a discovered view', LAYOUT_UNDOCK_URI: 'float a discovered view'}[uri],
                   'supported_versions': list(layout_mutation_versions(uri))} for uri in sorted(LAYOUT_MUTATION_URIS))
 
 
@@ -116,7 +126,8 @@ def merge_layout_mutations(manifest: Mapping[str, Any], *, root: Path | None, ve
 
 def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: str | None = None,
                               view_request: Mapping[str, Any] | None = None,
-                              view_identity: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                              view_identity: Mapping[str, Any] | None = None,
+                              position_request: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body = {key: record[key] for key in ('handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at')}
     body['observation_sha256'] = canonical_sha256(record['observation'])
     if registration_name is not None:
@@ -126,12 +137,15 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
         body['view_request'] = dict(view_request)
     if view_identity is not None:
         body['view_identity'] = layout_binding_descriptor(view_identity)
+    if position_request is not None:
+        native_position_request(position_request)
+        body['position_request'] = dict(position_request)
     return {**body, 'binding_sha256': canonical_sha256(body)}
 
 
 def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, Any]:
     expected = {'handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at', 'observation_sha256', 'binding_sha256'}
-    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}, expected | {'view_identity'}):
+    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}):
         raise ValueError('Layout mutation lacks an exact Gateway-owned identity binding')
     body = dict(binding)
     digest = body.pop('binding_sha256')
@@ -162,6 +176,8 @@ def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, 
         validate_new_layout_name(body['registration_name'])
     if 'view_request' in body:
         native_view_request(body['view_request'])
+    if 'position_request' in body:
+        native_position_request(body['position_request'])
     if 'view_identity' in body:
         view = validate_layout_binding(body['view_identity'], role='view')
         if view['context'] != body['context'] or view['layout_name'] != body['layout_name']:
@@ -190,11 +206,16 @@ def materialize_layout_business_request(operation: str, session: Any) -> Mapping
         if binding.get('view_request') != view_request:
             raise ValueError('View declaration differs from its Gateway-owned binding')
         native_args = native_view_request(view_request)
-    elif operation == LAYOUT_CLOSE_URI:
+    elif operation in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
         view = binding.get('view_identity', {})
         if plan['view_handle'] != view.get('handle'):
             raise ValueError('View declaration differs from its Gateway-owned discovered identity')
         native_args = {'viewID': view['native_id']}
+        if operation == LAYOUT_UNDOCK_URI:
+            position = {key: value for key, value in plan.items() if key not in {'layout_handle', 'view_handle'}}
+            if position != binding.get('position_request'):
+                raise ValueError('Floating position differs from its Gateway-owned declaration binding')
+            native_args.update(name=binding['layout_name'], **native_position_request(position))
     request = {'contract': 'waapi-skill.operation-request/v1', 'version': session.context.wwise_version,
         'operation': 'waapi.call', 'arguments': {'api': operation, 'args': native_args,
             'options': {}, 'layout_binding': binding}}
@@ -211,9 +232,11 @@ def validate_layout_call(version: str, api: str, args: Mapping[str, Any], option
         expected = {'name': name, 'layout': {'Layout': {'Name': name}}}
     elif api == LAYOUT_GET_OR_CREATE_URI:
         expected = native_view_request(verified.get('view_request'))
-    elif api == LAYOUT_CLOSE_URI:
+    elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
         view = validate_layout_binding(verified.get('view_identity'), role='view')
         expected = {'viewID': view['native_id']}
+        if api == LAYOUT_UNDOCK_URI:
+            expected.update(name=verified['layout_name'], **native_position_request(verified.get('position_request')))
     if dict(args) != expected or options:
         raise ValueError('Layout native request differs from the Gateway-owned business binding')
     return verified
@@ -223,6 +246,18 @@ def validate_new_layout_name(name: Any) -> str:
     if not isinstance(name, str) or not name or '\x00' in name or len(name.encode('utf-8')) > 4096:
         raise ValueError('A new temporary layout requires an exact nonempty bounded name')
     return name
+
+
+def native_position_request(plan: Any) -> dict[str, Any]:
+    if not isinstance(plan, Mapping) or not set(plan) <= {'position_x', 'position_y'}:
+        raise ValueError('Floating placement accepts only the disclosed optional position choices')
+    result = {}
+    for field, native in (('position_x', 'posX'), ('position_y', 'posY')):
+        if field in plan:
+            if type(plan[field]) is not int:
+                raise ValueError('Floating positions must be JSON integers')
+            result[native] = plan[field]
+    return result
 
 
 def native_view_request(plan: Any) -> dict[str, Any]:
@@ -320,7 +355,7 @@ def validate_layout_live_binding(binding: Mapping[str, Any], *, read: Any) -> No
         raise ValueError('Authoring layout changed since discovery; inspect and preview again')
 
 
-def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any) -> None:
+def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any) -> Mapping[str, Any]:
     view = validate_layout_binding(binding['view_identity'], role='view')
     if not time.time() < view['expires_at']:
         raise ValueError('The discovered view identity expired; inspect again')
@@ -328,3 +363,4 @@ def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any) -> No
     matches = [row for row in instances if row['viewID'].upper() == view['native_id'].upper()]
     if len(matches) != 1 or canonical_sha256(matches[0]) != view['observation_sha256']:
         raise ValueError('The discovered view changed or disappeared; inspect and preview again')
+    return matches[0]

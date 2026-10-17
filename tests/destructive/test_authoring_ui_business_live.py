@@ -44,6 +44,98 @@ sys.modules[GATEWAY_SPEC.name] = gateway
 GATEWAY_SPEC.loader.exec_module(gateway)
 
 
+@pytest.fixture(scope='module')
+def owned_authoring_layout_batch(request):
+    from tests.destructive.support.authoring_batch import AuthoringBatchAdapter
+    batch = getattr(request.config, '_waapi_authoring_batch', None)
+    if not isinstance(batch, AuthoringBatchAdapter):
+        pytest.fail('Layout effects require an actual owner-supplied ScenarioLifecycle batch; environment labels are insufficient')
+    yield batch
+    batch.prepare_stop(request.session.items)
+
+
+@pytest.fixture
+def owned_authoring_layout_node(owned_authoring_layout_batch, request):
+    batch = owned_authoring_layout_batch
+    return batch, batch.node_gateway(request.node.nodeid)
+
+
+def _layout_effect(call, suffix, *, layout_handle, fields=()):
+    schema = call(['request-schema', 'ak.wwise.ui.layout.' + suffix])
+    started = call(schema['continuation']['gateway_argv'])
+    draft, authority = started['draft'], started['task_authority']
+    declared = call(['draft-declare-layout-plan', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(draft['revision']), '--layout-handle', layout_handle, *fields])
+    checked = call(['draft-check', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision'])])
+    preview = call(['preview-from-draft', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])])
+    tx = preview['transaction_id']
+    shown = call(['transaction-show', tx])
+    call(['confirm', tx, '--confirmation-token', shown['confirmation']['token']])
+    call(['execute', tx])
+    verified = call(['verify', tx])
+    assert verified['verification']['business_state_verified'] is True, verified
+    return verified
+
+
+def _owned_layout_start(call):
+    original = call(['layout-read', 'current'])['result']['name']
+    assert original, 'Owned layout fixture needs a named current layout for restoration'
+    anchor = call(['layout-inspect', '--layout-name', original])
+    name = 'WAAPI_Skill_Owned_' + uuid.uuid4().hex
+    _layout_effect(call, 'setLayout', layout_handle=anchor['layout_handle'], fields=['--new-layout-name', name])
+    observed = call(['layout-read', 'contents', '--layout-name', name])['result']
+    assert observed['Layout']['Name'] == name
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'switchLayout', layout_handle=owned['layout_handle'])
+    assert call(['layout-read', 'current'])['result']['name'] == name
+    return original, name
+
+
+def _owned_layout_remove(call, original, name):
+    restore = call(['layout-inspect', '--layout-name', original])
+    _layout_effect(call, 'switchLayout', layout_handle=restore['layout_handle'])
+    assert call(['layout-read', 'current'])['result']['name'] == original
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'removeLayout', layout_handle=owned['layout_handle'])
+
+
+def test_authoring_layout_owned_registration_and_switch(owned_authoring_layout_node):
+    _, call = owned_authoring_layout_node
+    original, name = _owned_layout_start(call)
+    assert call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances'] == []
+    _owned_layout_remove(call, original, name)
+
+
+@pytest.mark.parametrize('initial_position', [(), ('--initial-x', '17'), ('--initial-y', '29'),
+    ('--initial-x', '17', '--initial-y', '29')], ids=['omitted', 'x-only', 'y-only', 'both'])
+def test_authoring_layout_owned_view_lifecycle(owned_authoring_layout_node, initial_position):
+    batch, call = owned_authoring_layout_node
+    original, name = _owned_layout_start(call)
+    assert call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances'] == []
+    types = call(['layout-read', 'types'])['result']['viewTypes']
+    assert any(row.get('viewName') == 'ProjectExplorer' for row in types), 'Owned fixture requires the live ProjectExplorer type'
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'getOrCreateView', layout_handle=owned['layout_handle'],
+        fields=['--view-type', 'ProjectExplorer', *initial_position])
+    created = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+    identities = {row['viewID'] for row in created if row.get('viewName') == 'ProjectExplorer'}
+    assert len(identities) == 1
+    owned = call(['layout-inspect', '--layout-name', name])
+    _layout_effect(call, 'getOrCreateView', layout_handle=owned['layout_handle'], fields=['--view-type', 'ProjectExplorer'])
+    reused = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+    assert {row['viewID'] for row in reused if row.get('viewName') == 'ProjectExplorer'} == identities
+    if batch.runtime.version == '2025.1':
+        owned = call(['layout-inspect', '--layout-name', name])
+        views = [row for row in owned['views'] if row['kind'] == 'ProjectExplorer']
+        assert len(views) == 1
+        _layout_effect(call, 'closeView', layout_handle=owned['layout_handle'], fields=['--view-handle', views[0]['handle']])
+        closed = call(['layout-read', 'instances', '--layout-name', name])['result']['viewInstances']
+        assert not identities.intersection(row.get('viewID') for row in closed)
+    _owned_layout_remove(call, original, name)
+
+
 def _gateway_env(tmp_path: Path, *, version: str) -> dict[str, str]:
     sandbox = Path(os.environ["WWISE_AUTHORING_SANDBOX_PROJECT"]).resolve(
         strict=True

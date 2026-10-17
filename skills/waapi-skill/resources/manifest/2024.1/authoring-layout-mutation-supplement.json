@@ -124,6 +124,45 @@
         "properties": {},
         "type": "object"
       }
+    },
+    "ak.wwise.ui.layout.undockView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout from which to undock the view",
+            "type": "string"
+          },
+          "posX": {
+            "description": "Position of the undocked view on the horizontal axis. Defaults to 0.",
+            "type": "integer"
+          },
+          "posY": {
+            "description": "Position of the undocked view on the vertical axis. Defaults to 0.",
+            "type": "integer"
+          },
+          "viewID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the view to undock."
+          }
+        },
+        "required": [
+          "name",
+          "viewID"
+        ],
+        "type": "object"
+      },
+      "description": "Undock a view from a layout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
     }
   },
   "version": "2024.1"

@@ -788,20 +788,27 @@ class HeadlessLifecycle:
                 residuals.append(ResidualProcess(pid=pid, command=command_line))
         return residuals
 
-    def _process_rows(self, *, include_env: bool) -> list[tuple[int, str]]:
+    def _process_rows(self, *, include_env: bool, require_env: bool = False) -> list[tuple[int, str]]:
+        if require_env and not include_env:
+            raise ValueError('Required process environment proof must include environments')
         commands: list[list[str]] = []
         if include_env:
             commands.append(["ps", "eww", "-axo", "pid=,command="])
-        commands.append(["ps", "-axo", "pid=,command="])
+        if not require_env:
+            commands.append(["ps", "-axo", "pid=,command="])
         for command in commands:
             try:
-                result = subprocess.run(command, capture_output=True, text=True, check=False)
+                result = subprocess.run(command, capture_output=True, text=True, check=False,
+                                        **({'timeout': 10} if require_env else {}))
             except (OSError, subprocess.SubprocessError):
                 continue
             if getattr(result, "returncode", 1) != 0:
                 continue
+            output = getattr(result, "stdout", "") or ""
+            if require_env and (len(output.encode('utf-8')) > 8 * 1024 * 1024 or len(output.splitlines()) > 32768):
+                continue
             rows: list[tuple[int, str]] = []
-            for line in (getattr(result, "stdout", "") or "").splitlines():
+            for line in output.splitlines():
                 pid_text, separator, command_line = line.strip().partition(" ")
                 if not separator:
                     continue
