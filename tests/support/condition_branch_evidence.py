@@ -38,6 +38,16 @@ for _version, _build in (("2022.1", "2022.1.19.8584"), ("2025.1", "2025.1.7.9143
         "reason": "Exact installed existing-plugin condition, with sealed class-scoped metadata facts from this version: Uint16 SystemAudioObjectLimit requires SystemAudioObjectsPolicy in0/1. Injected existing-instance behavior preserves policy1. Native existing-instance/class applicability and effects remain unverified.",
         "scalar": {"controller": "SystemAudioObjectsPolicy", "controller_value": 1, "field": "SystemAudioObjectLimit", "value": 128},
     }
+for _version, _build, _index in (("2021.1", "2021.1.14.8108", 4), ("2022.1", "2022.1.19.8584", 4),
+        ("2023.1", "2023.1.19.8928", 4), ("2024.1", "2024.1.13.9056", 7), ("2025.1", "2025.1.7.9143", 7)):
+    _PROGRAM_CASES[f"parent-weight-show-{_version}"] = {
+        "branch_id": f"{_version}|installed|{_build}|condition|existing-object|WObjects/WObjects.xml|"
+                     f"PluginModule/ObjectBase[Weight]/Properties/Property[Weight]/Dependencies/{_index}/condition",
+        "public_uri": "ak.wwise.core.object.setProperty",
+        "selector": "exact_bound_Sound_Weight_Field_Handle_value_37_with_parent_RandomOrSequence_0_unchanged",
+        "reason": "Exact Parent Show occurrence: injected public mutation changes only Weight while parent RandomOrSequence remains0. Original exploratory native captures supply recorded metadata input facts only; they grant no final native category or Fresh acceptance credit.",
+        "scalar": {"controller": "RandomOrSequence", "controller_value": 0, "field": "Weight", "value": 37},
+    }
 
 
 def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show") -> dict:
@@ -64,6 +74,8 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "docs/branch-coverage-condition-sources.json",
         "tests/unit/test_existing_plugin_conditions_gateway.py",
         "tests/fixtures/metadata-conditions/3d-audio-bed-mixer.json",
+        "tests/unit/test_parent_show_conditions_gateway.py",
+        "tests/fixtures/metadata-conditions/parent-weight-show.json",
     ])
     sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in sorted(set(relevant))}
     return {"root": root, "nodeid": nodeid, "branch": branch, "case": case,
