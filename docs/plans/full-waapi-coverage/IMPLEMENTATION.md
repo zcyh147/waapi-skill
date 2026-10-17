@@ -712,6 +712,54 @@ preservation failed. Representation-equivalence repair and later history work
 remain outside R20. No native, Fresh or broad gate was launched by this merger;
 program controls do not supply native effect credit.
 
+## Twenty-first integration checkpoint
+
+R21 combines fixed Console serialization and verdict messages `69d3439d`, optional
+history expectations and scalar-property/ancestor observers `39b9fc4c`, separate
+migrated-fixture preparation `bad546b1`, and same-graph result references
+`d3184b8a`/`81a8f5f5`. R19 already contains `9ee53e9a`; it was not merged again.
+Reference result handles remain prospective declarations until independent actual
+GUID/class/parent/owner readback. Preview discloses proven free rename candidates;
+execution rechecks their availability and the observed collision state. Native
+rename policy remains intact. No same-graph native effect is inferred from fakes.
+
+Without an optional history receipt, verification explicitly remains result-schema
+only, with no observed stack head, effect or preservation. A selected invalid or
+changed receipt never falls back to that weaker mode. Typed scalar-property
+expectations refresh metadata and bind the original explicit platform GUID;
+current/named-platform certification and other observers remain implementation
+work. Compound ancestor paths derive from sealed hierarchy segments.
+
+The suspected Console message issue from the merger's initial trace was disproved
+by the existing `VerificationResult.__post_init__` guard. A public preservation-
+failure summary regression passed **1 in 1.02 seconds** on `8e4827e6`; no product
+RED or redundant runtime repair is claimed. R20's dual-encoding guards and prior
+current-platform, provider, callback and URI-free observer fixes remain intact.
+
+Reviewed seals and serial interface/branch generation/checks preserved **896
+public rows / 227 URIs / 251 Program roster entries**, 514 current contracts and
+the byte-exact 272,313 native obligations with original owners/requirements/states.
+The exact create result-binding inverse reproduces the prior named-contract seal;
+all historical seals remain checked. On frozen `01b63248`, the single central
+preflight passed **825 in 27.61 seconds**, and the proportional cross-focus passed
+**20 in 13.25 seconds** with `--durations=20`. Both runs preserved all 1,856 tracked
+hashes and ended without owned processes. The focus covers migrated/direct
+collector ordering, serialization negatives, optional/property/ancestor history,
+new-reference identity/metadata drift, 2021 create, controlled rename, planned
+hierarchy, scalar/List separation and the real child effective-view guard.
+Whole worker 55/65 selections and broad gates were not repeated. Original worker
+REDs and receipts remain in ignored `integration-partials-r21`.
+
+Root's exact `69d3439d` native direct case passed only on 2025.1; 2021.1–2024.1
+remain FAIL despite matching media mappings and storage mode because other saved
+model content changed. The separate `bad546b1` migrated 2023 case also remains
+FAIL: migration closed the project, so the new media Draft stopped at
+`getProjectInfo` before its target write. Migration preparation has no effect
+credit. The later lifecycle-reload fix `76a7efc6`, ledger capture and moving worker
+successors are outside this batch. This merger launched no native/Fresh or full
+Program/Non-live gate; these results do not close any ticket or transfer native
+acceptance to R21.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
