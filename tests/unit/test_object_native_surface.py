@@ -1292,3 +1292,106 @@ def test_object_set_rejects_fictitious_list_instead_of_certifying_sound_list_mem
     assert rejected.value.error_code == "DOCUMENTED_LIST_SELECTION_REQUIRED"
     assert rejected.value.details["choices"] == ["Effects", "Metadata", "RTPC"]
     assert {uri for uri, _, _ in calls} <= {"ak.wwise.core.object.getTypes", "ak.wwise.core.object.get"}
+
+
+def test_object_set_merge_seals_effective_node_views_for_preview_and_guard(
+    tmp_path: Path,
+) -> None:
+    # Retained from fixed R17: real child effective-view proof survives the
+    # documented-list fixture migration; no fictional List membership is used.
+    child_id = "{42000000-0000-0000-0000-000000000001}"
+    child_path = OWNER_PATH + r"\MergedChild"
+    child_row = {
+        "id": child_id,
+        "name": "MergedChild",
+        "type": "Sound",
+        "path": child_path,
+        "parent": {"id": OWNER_ID},
+        "notes": None,
+        "activeSource": None,
+        "audioSource:language": {"name": "Japanese"},
+    }
+    project_info = _project_info(tmp_path / "MergeProject")
+
+    class ViewReader:
+        def __init__(self) -> None:
+            self.calls: list[
+                tuple[str, Mapping[str, Any], Mapping[str, Any]]
+            ] = []
+
+        def __call__(
+            self,
+            uri: str,
+            args: Mapping[str, Any],
+            options: Mapping[str, Any],
+        ) -> Mapping[str, Any]:
+            self.calls.append((uri, dict(args), dict(options)))
+            if uri == "ak.wwise.core.object.getTypes":
+                return _types()
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project_info
+            source = args.get("from", {})
+            if isinstance(source, Mapping) and "path" in source:
+                return {"return": [child_row]}
+            ids = source.get("id", []) if isinstance(source, Mapping) else []
+            object_id = ids[0] if isinstance(ids, list) and ids else None
+            transforms = args.get("transform", [])
+            selected = (
+                transforms[0].get("select", [])
+                if isinstance(transforms, list)
+                and transforms
+                and isinstance(transforms[0], Mapping)
+                else []
+            )
+            return_fields = options.get("return", [])
+            if object_id == OWNER_ID and selected == ["children"]:
+                return {"return": [child_row]}
+            if object_id == child_id and selected == ["children"]:
+                return {"return": []}
+            if object_id == OWNER_ID:
+                return {"return": [_owner_row()]}
+            raise AssertionError((uri, args, options))
+
+    request = parse_operation_request({
+        "contract": OPERATION_REQUEST_CONTRACT, "version": "2023.1", "operation": "object.set",
+        "arguments": {"platform": "Mac", "on_name_conflict": "merge", "objects": [{
+            "object": {"kind": "id", "value": OWNER_ID},
+            "children": [{"type": "Sound", "name": "MergedChild", "platform": "Windows", "language": "Japanese"}],
+        }]},
+    })
+    preview_reader = ViewReader()
+    prepared = prepare_operation(
+        request,
+        read_call=preview_reader,
+    ).as_dict()
+
+    path_snapshot = next(
+        row
+        for row in prepared["pre_state"]["object_graph_guard"][
+            "path_snapshots"
+        ]
+        if row["path"] == child_path
+    )
+    assert path_snapshot["platform"] == "Windows"
+    assert path_snapshot["language"] == "Japanese"
+    preview_path_call = next(
+        call
+        for call in preview_reader.calls
+        if call[0] == "ak.wwise.core.object.get"
+        and call[1].get("from", {}).get("path") == [child_path]
+    )
+    assert preview_path_call[2]["platform"] == "Windows"
+    assert preview_path_call[2]["language"] == "Japanese"
+    guard_reader = ViewReader()
+    validation = validate_prepared_roles(
+        prepared,
+        read_call=guard_reader,
+    )
+    assert validation["status"] == "valid"
+    guard_path_call = next(
+        call
+        for call in guard_reader.calls
+        if call[1].get("from", {}).get("path") == [child_path]
+    )
+    assert guard_path_call[2]["platform"] == "Windows"
+    assert guard_path_call[2]["language"] == "Japanese"
