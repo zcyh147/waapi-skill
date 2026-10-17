@@ -64,7 +64,7 @@
     },
     {
       "draft_id": "05",
-      "title": "Complete plugin creation for Source, owner Effect and ShareSet placements",
+      "title": "Complete all native plugin kinds and placements",
       "blocked_by": [
         "04"
       ],

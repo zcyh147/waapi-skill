@@ -1,6 +1,6 @@
-# 05: Complete plugin creation for Source, owner Effect and ShareSet placements
+# 05: Complete all native plugin kinds and placements
 
-Status: approved for implementation on 2026-10-17. Published as [05: Complete plugin creation for Source, owner Effect and ShareSet placements](https://github.com/zcyh147/waapi-skill/issues/179).
+Status: approved for implementation on 2026-10-17. Published as [05: Complete all native plugin kinds and placements](https://github.com/zcyh147/waapi-skill/issues/179).
 
 ## Parent
 
@@ -13,6 +13,8 @@ Users can create every in-scope native-supported plugin placement with the corre
 ## Acceptance criteria
 
 - [ ] Treat Source children, owner-local effects and independent Effect ShareSets as distinct business branches, including applicable parent types, platform behavior, conflict modes and class properties.
+- [ ] Account explicitly for the installed SourcePlugin, EffectPlugin, SinkPlugin, ConversionPlugin and MetadataPlugin class kinds across all five builds. Determine each native-supported creation/attachment/configuration placement, including Wwise System Output Settings metadata (CompanyID 0 / PluginID 900 observed in installed XML), from matching native evidence. Installed class definitions alone prove neither creatability nor native absence; unsupported Skill discovery or placement remains implementation work.
+- [ ] Coordinate plugin-class and placement mechanics with #178/#180 and field discovery/conditions with #177/#181. #183 retains the conversion/build workflow itself; its existence does not substitute for plugin-class placement coverage.
 - [ ] Resolve live plugin kinds and fields through Type/Field Handles and expose complete placement guidance through compact catalogs, schemas and continuations.
 - [ ] Investigate 2021 alternatives with matching native evidence. One rejected classic-create spelling or an absent newer backend does not justify closing 2021 support as impossible.
 - [ ] Implement a supported native alternative where available; reject incompatible targets, stale classes, unavailable plugins and conflicting placements before writing.
