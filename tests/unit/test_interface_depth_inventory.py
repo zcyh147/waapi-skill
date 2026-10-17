@@ -646,3 +646,20 @@ def test_closed_layout_reads_project_scoped_business_fields_and_preserve_result_
     assert _typed_field_rows(lane, policy) == [{'channel': 'business_read',
         'path': ['business', 'element_handle'], 'name': 'element_handle', 'shape': 'scalar',
         'required': True, 'value_ownership': 'live_bound_handle', 'transport_ownership': 'gateway_derivation'}]
+
+
+def test_closed_layout_mutations_project_business_fields_without_native_typed_inputs():
+    from tests.maintenance.interface_depth_inventory import _public_continuation_rows, _typed_field_rows
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    surface = build_typed_request_surface()
+    lane = next(row for row in surface['lanes'] if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.layout.setLayout')
+    continuation = next(row for row in _public_continuation_rows(surface)
+                        if row['version'] == lane['version'] and row['uri'] == lane['uri'])
+    assert continuation['business_declaration']['declaration']['subcommand'] == 'draft-declare-layout-plan'
+    assert continuation['native_request_semantics']['status'] == 'definition_semantics_unresolved'
+    assert 'typed' not in continuation
+    policy = json.loads(REVIEW_POLICY_PATH.read_text(encoding='utf-8'))
+    fields = _typed_field_rows(lane, policy)
+    assert {row['name'] for row in fields} == {'layout_handle', 'new_layout_name'}
+    assert next(row for row in fields if row['name'] == 'layout_handle')['value_ownership'] == 'live_bound_handle'

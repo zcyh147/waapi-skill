@@ -20,14 +20,15 @@ def test_committed_full_surface_release_report_matches_packaged_truth() -> None:
 
     assert report["contract"] == "waapi-skill.full-surface-release-report/v1"
     assert report["coverage"] == {
-        "construction_covered_lanes": 863,
-        "function_lanes": 703,
+        "construction_covered_lanes": 869,
+        "function_lanes": 709,
         "topic_lanes": 160,
-        "total_lanes": 863,
-        "unique_function_uris": 175,
+        "total_lanes": 869,
+        "unique_function_uris": 178,
         "unique_topic_uris": 35,
     }
     assert report["construction_shapes"] == {
+        "closed_business": 6,
         "closed_read": 14,
         "draft": 116,
         "inline": 471,
@@ -92,7 +93,7 @@ def test_release_report_rejects_invented_continuation_or_semantic_binding(
 
     assert len(report["audit"][expected_audit]) == 1
     assert report["coverage"]["construction_covered_lanes"] == (
-        862 if expected_audit == "missing_continuations" else 863
+        868 if expected_audit == "missing_continuations" else 869
     )
 
 
@@ -111,3 +112,4 @@ def test_release_report_reaches_closed_layout_reads_without_typed_codec_fallback
     assert report['audit']['missing_continuations'] == []
     assert report['audit']['missing_host_overlays'] == []
     assert report['construction_shapes']['closed_read'] == 14
+    assert report['construction_shapes']['closed_business'] == 6
