@@ -12120,6 +12120,13 @@ def dispatch_media_build_business_read(
                 available_media_fields=available_fields,
             )
         except MediaBuildBusinessError as exc:
+            details = None
+            if exc.field_choices is not None:
+                choices = [name for name in exc.field_choices if len(name) <= 256][:20]
+                details = {"field_choices": choices, "field_choices_complete": len(choices) == len(exc.field_choices),
+                           "next_command": transaction_next_command("metadata", ["metadata", "media-pool-fields"])}
+            if details is not None:
+                raise BusinessFieldInputError(str(exc), details=details, error_code=exc.code) from exc
             raise GatewayInputError(str(exc)) from exc
         from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, prepare_media_pool_page
         media_context_available = (_canonical_guid(live_info.get("sessionId")) and isinstance(live_info.get("processId"), int)

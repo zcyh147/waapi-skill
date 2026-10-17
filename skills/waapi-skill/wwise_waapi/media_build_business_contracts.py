@@ -179,6 +179,8 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             },
         },
         "result_shape": "bounded_business_media_rows",
+        "field_binding": "copied exact live field names take precedence over business aliases and fuzzy matches; repeated identical native tokens identify one field",
+        "value_keys": "lowercase Unicode letters/digits with punctuation replaced by underscores; colliding or empty keys use the exact requested field meaning",
     },
 }
 

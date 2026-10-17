@@ -76,9 +76,11 @@ _FIXED_MEDIA_FIELDS = ("Path", "FileId", "Db")
 class MediaBuildBusinessError(ValueError):
     """One high-level media/build declaration cannot be closed safely."""
 
-    def __init__(self, message: str, *, code: str = "MEDIA_BUILD_INPUT_INVALID") -> None:
+    def __init__(self, message: str, *, code: str = "MEDIA_BUILD_INPUT_INVALID",
+                 field_choices: Sequence[str] | None = None) -> None:
         super().__init__(message)
         self.code = code
+        self.field_choices = field_choices
 
 
 def _canonical_guid(value: Any, *, field: str) -> str:
@@ -116,10 +118,7 @@ def _normalize_token(value: str) -> str:
 
 
 def _business_key(value: str) -> str:
-    key = re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
-    if not key:
-        raise MediaBuildBusinessError("Media Pool field meaning has no stable key")
-    return key
+    return re.sub(r"[\W_]+", "_", value.casefold()).strip("_")
 
 
 def _resolve_media_field(meaning: str, available_fields: Sequence[str]) -> str:
@@ -129,19 +128,26 @@ def _resolve_media_field(meaning: str, available_fields: Sequence[str]) -> str:
             f"field meaning exceeds {MAX_MEDIA_POOL_FIELD_TOKEN_CHARS} characters"
         )
     alias = _FIELD_ALIASES.get(meaning.casefold())
+    available = tuple(available_fields)
+    if available and not all(isinstance(item, str) and item for item in available):
+        raise MediaBuildBusinessError(
+            "Media Pool field discovery returned malformed exact-case fields",
+            code="MEDIA_BUILD_FIELD_DISCOVERY_INVALID",
+        )
+    # A token copied from live discovery is already exact. Business aliases
+    # and fuzzy matches must never substitute another surviving native field.
+    if meaning in available:
+        return meaning
     if alias in _FIXED_MEDIA_FIELDS:
         return alias
-    available = tuple(available_fields)
     if not available or not all(isinstance(item, str) and item for item in available):
         raise MediaBuildBusinessError(
             "Media Pool field discovery returned no usable exact-case fields",
             code="MEDIA_BUILD_FIELD_DISCOVERY_INVALID",
         )
-    if len(set(available)) != len(available):
-        raise MediaBuildBusinessError(
-            "Media Pool field discovery returned duplicate fields",
-            code="MEDIA_BUILD_FIELD_DISCOVERY_INVALID",
-        )
+    # The native list has no uniqueness constraint. Repeated identical tokens
+    # describe one usable field; retain the unmodified inventory in discovery.
+    available = tuple(dict.fromkeys(available))
     if alias is not None and alias in available:
         return alias
     casefold_matches = [item for item in available if item.casefold() == meaning.casefold()]
@@ -162,7 +168,7 @@ def _resolve_media_field(meaning: str, available_fields: Sequence[str]) -> str:
     raise MediaBuildBusinessError(
         "Media Pool field meaning must resolve to one live exact-case field; "
         f"meaning={meaning!r}, candidate_count={len(candidates)}",
-        code="MEDIA_BUILD_FIELD_AMBIGUOUS",
+        code="MEDIA_BUILD_FIELD_AMBIGUOUS", field_choices=candidates,
     )
 
 
@@ -564,14 +570,12 @@ def _materialize_media_pool(
         dict.fromkeys((*requested_meanings, *(row["meaning"] for row in sort_bindings)))
     )
     output_bindings: list[dict[str, str]] = []
-    output_keys: set[str] = set()
-    for meaning in return_meanings:
-        key = _business_key(meaning)
-        if key in output_keys:
-            raise MediaBuildBusinessError(
-                "Media Pool return field meanings collapse to the same business key"
-            )
-        output_keys.add(key)
+    keys = [_business_key(meaning) for meaning in return_meanings]
+    for meaning, key in zip(return_meanings, keys):
+        # Keep ordinary readable keys, but preserve the exact requested token
+        # when normalization would lose its identity or overwrite another value.
+        if not key or keys.count(key) > 1:
+            key = meaning
         output_bindings.append(
             {"meaning": meaning, "field": bind(meaning), "key": key}
         )
@@ -624,6 +628,12 @@ def _materialize_media_pool(
             "kind": "media_pool_rows",
             "candidate_limit": max_results,
             "output_bindings": output_bindings,
+            "field_bindings": [
+                {"meaning": meaning, "field": exact,
+                 **({"value_key": output["key"]} if (output := next(
+                     (row for row in output_bindings if row["meaning"] == meaning), None)) is not None else {})}
+                for meaning, exact in field_bindings.items()
+            ],
             "exact_name_field": field_bindings.get("filename"),
             "exact_name_contains": exact_name,
             "final_limit": final_limit,
@@ -979,6 +989,7 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
     return {
         "contract": MEDIA_BUILD_RESULT_CONTRACT,
         "kind": "media_pool_rows",
+        "field_bindings": [dict(binding) for binding in plan.get("field_bindings", ())],
         **({"projection_complete": False} if not identity_projection_complete else {}),
         "complete": complete,
         "candidate_count": len(rows),
