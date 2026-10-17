@@ -333,6 +333,22 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "cced6997d5ad93b10d934d95b76890cd535e55678fbd50b870cdef1fe8fa21b1"
+    )
+    # Only five internal waapi.call contracts add the history expectation proof.
+    # Remove that exact field and reuse this inverse in later historical checks.
+    def before_history_binding(version):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("history_binding")
+        contract["argument_contract"]["optional"].remove("history_binding")
+        assert contract["argument_contract"]["properties"].pop("history_binding") == {
+            "type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_history_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
         "b0dd7d647d234d61ba4a4771336fe742839e1d2476712ecca09a3cf3f8b88fa3"
     )
     # Only object.create adds the internal documented List proof. Remove that
@@ -355,7 +371,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Only the five internal waapi.call contracts add the protected provider
     # proof. Remove that exact field before checking every historical seal.
     def before_provider_profile_binding(version):
-        contract = operation_request_machine_contract("waapi.call", version)
+        contract = before_history_binding(version)
         contract["optional_arguments"].remove("provider_profile_binding")
         contract["argument_contract"]["optional"].remove("provider_profile_binding")
         assert contract["argument_contract"]["properties"].pop("provider_profile_binding") == {
