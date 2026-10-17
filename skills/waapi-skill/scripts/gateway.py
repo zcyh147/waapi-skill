@@ -11545,6 +11545,8 @@ def dispatch_soundengine_business_read(
         except RuntimeGameObjectHandleError as exc:
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "handle_kind": "game_object", "handle": handle,
+                    "required_identity": "live scoped runtime game object", "operation_dispatched": False},
                 error_code=exc.error_code,
             ) from exc
         native_args["gameObject"] = game_object_record.game_object_id
@@ -11725,18 +11727,22 @@ def dispatch_core_business_read(
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     by_id: dict[str, Mapping[str, Any]] = {}
-    for row in rows:
+    for row_index, row in enumerate(rows):
         try:
             identity = normalize_live_object_identity(row)
         except ValueError as exc:
             raise GatewayResultShapeError(
                 "Core business identity row is malformed.",
+                details={"api": args.api, "reason": "malformed_identity", "row_index": row_index,
+                    "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             ) from exc
         key = identity.object_id
         if key in by_id:
             raise GatewayResultShapeError(
                 "Core business identity read returned a duplicate object.",
+                details={"api": args.api, "reason": "duplicate_identity", "row_index": row_index,
+                    "object_id": key, "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             )
         by_id[key] = {
@@ -11749,6 +11755,8 @@ def dispatch_core_business_read(
     if set(by_id) != {value.upper() for value in requested.values()}:
         raise GatewayResultShapeError(
             "Core business identity read did not match the requested objects.",
+            details={"api": args.api, "reason": "identity_set_mismatch", "requested_ids": list(requested.values()),
+                "actual_ids": sorted(by_id), "operation_dispatched": False},
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     authority = "da1-" + canonical_sha256(
@@ -11944,6 +11952,9 @@ def dispatch_runtime_inspection_business_read(
         except RuntimeInspectionBusinessError as exc:  # pragma: no cover - store invariant
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "transport_handle": transport_record.handle,
+                    "binding_stage": "materialize_stored_transport_binding", "cause_type": type(exc).__name__,
+                    "operation_dispatched": False},
                 error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
             ) from exc
     else:
@@ -13273,6 +13284,8 @@ def _source_control_roots_from_project(
     if not isinstance(directories, Mapping):
         raise GatewayResultShapeError(
             "Live project information lacks source-control directory roots.",
+            details={"reason": "directory_map_missing", "required_fields": ["directories.root", "directories.originals"],
+                "actual_directories_type": type(directories).__name__, "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     project_root = directories.get("root")
@@ -13283,6 +13296,9 @@ def _source_control_roots_from_project(
     ):
         raise GatewayResultShapeError(
             "Live project information contains invalid source-control roots.",
+            details={"reason": "directory_roots_invalid", "required_fields": ["directories.root", "directories.originals"],
+                "invalid_fields": ["directories." + key for key, value in (("root", project_root), ("originals", originals_root))
+                    if not isinstance(value, str) or not value], "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     return {
@@ -17898,12 +17914,15 @@ def _runtime_transport_context_from_live(
         if not isinstance(host, str) or isinstance(port, bool) or not isinstance(port, int):
             raise GatewayResultShapeError(
                 "Live endpoint identity is unavailable for transport handle binding.",
+                details={"required_fields": ["endpoint.url", "endpoint.host", "endpoint.port"],
+                    "binding": "runtime_transport_context"},
                 error_code="INVALID_STATUS_RESULT",
             )
         endpoint_url = f"ws://{host}:{port}/waapi"
     if not isinstance(display_name, str) or not display_name:
         raise GatewayResultShapeError(
             "Live Wwise build identity is unavailable for transport handle binding.",
+            details={"required_field": "version.displayName", "binding": "runtime_transport_context"},
             error_code="INVALID_STATUS_RESULT",
         )
     return RuntimeTransportContext(
@@ -19313,6 +19332,9 @@ def dispatch_business_type_discovery(
     except (TypeError, ValueError) as exc:
         raise GatewayResultShapeError(
             "Live object type discovery returned an invalid catalog.",
+            details={"api": CACHE_GET_TYPES_URI, "requested_role": str(args.role),
+                "required_result": "return array of native type metadata", "cause_type": type(exc).__name__,
+                "selection_advanced": False},
             error_code="INVALID_METADATA_RESULT",
         ) from exc
     role = str(args.role)
@@ -21425,6 +21447,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "Transport verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 transport_context = _runtime_transport_context_from_live(
@@ -21516,6 +21544,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 execution_payload = execution_result.get("result")
@@ -21578,6 +21612,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21629,6 +21669,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21673,6 +21719,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
