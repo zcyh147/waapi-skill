@@ -15,11 +15,131 @@ from ci.run_live_test_command import (
     main as run_live_test_command,
     resolve_live_python_command,
 )
+from ci.test_driver import (
+    DESTRUCTIVE_TEST_NODES, LIVE_TEST_NODES, SUPPORTED_VERSIONS,
+    main as developer_launch,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CI_TEST_SH = REPO_ROOT / "ci" / "test.sh"
 CI_TEST_BAT = REPO_ROOT / "ci" / "test.bat"
+
+
+def _record_driver_selection(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *,
+                             mode: str, version: str, pytest_args: tuple[str, ...], status: int = 0, windows: bool = False):
+    from ci import test_readiness
+
+    # Routing-only child: no real process runs; readiness has separate guard controls.
+    monkeypatch.setattr(test_readiness, "scoped_process_snapshot", lambda: "")
+    (tmp_path / "pyproject.toml").write_bytes((REPO_ROOT / "pyproject.toml").read_bytes())
+    console = tmp_path / "WwiseConsole"
+    console.write_text("fake console", encoding="utf-8")
+    console.chmod(0o755)
+    project = tmp_path / "source" / "SampleProject.wproj"
+    project.parent.mkdir()
+    project.write_text("<Project />", encoding="utf-8")
+    calls = []
+
+    def record_child(command, **options):
+        calls.append((tuple(command), options))
+        return subprocess.CompletedProcess(command, status)
+
+    code = developer_launch(("--version", version, "--mode", mode, "--", *pytest_args),
+        repo_root=tmp_path, python_executable=sys.executable, command_runner=record_child, windows=windows,
+        environment={"WWISE_CONSOLE": str(console), "WWISE_SAMPLE_PROJECT_PATH": str(project),
+                     "WWISE_SANDBOX_ROOT": str(tmp_path / "sandbox")})
+    return code, calls
+
+
+@pytest.mark.parametrize("version", SUPPORTED_VERSIONS)
+@pytest.mark.parametrize("mode", ("live", "destructive"))
+@pytest.mark.parametrize("selection", (
+    ("tests/live/test_exact.py",),
+    ("tests/destructive/test_exact.py::test_one",),
+    ("tests/destructive/test_exact.py::test_one", "tests/destructive/test_other.py::test_two", "-q"),
+))
+def test_real_driver_explicit_selection_never_adds_version_defaults(tmp_path, monkeypatch, version, mode, selection):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode=mode, version=version,
+                                           pytest_args=selection, status=7)
+    assert code == 7 and len(calls) == 1
+    command, options = calls[0]
+    assert command == (sys.executable, "-m", "pytest", *selection)
+    assert options["shell"] is False
+    assert options["env"]["WWISE_VERSION"] == version
+    assert options["env"]["WWISE_STRICT_REAL"] == "1"
+    assert options["env"]["WWISE_DESTRUCTIVE"] == ("1" if mode == "destructive" else "0")
+
+
+@pytest.mark.parametrize("mode", ("live", "destructive"))
+@pytest.mark.parametrize("pytest_args", (
+    (), ("-q",), ("-k", "test_exact.py::test_one"),
+    ("-m", "test_exact.py"), ("-k=test_exact.py::test_one",),
+    ("-o", "cache_dir=test_exact.py"),
+    ("--deselect", "tests/live/test_exact.py::test_one"),
+    ("--ignore=tests/live/test_exact.py",),
+    ("-W", "test_fake.py::warning"), ("-p", "test_fake.py::plugin"),
+    ("--log-format", "test_fake.py::format"),
+    ("--config-file", "test_fake.py"), ("--import-mode", "importlib"),
+    ("--debug", "test_fake.py::debug"),
+    ("--debug", "-k", "test_fake.py::filter"),
+    ("--cache-show", "-m", "test_fake.py"),
+))
+def test_real_driver_flags_and_option_operands_keep_version_defaults(tmp_path, monkeypatch, mode, pytest_args):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode=mode, version="all",
+                                           pytest_args=pytest_args)
+    assert code == 0 and len(calls) == 5
+    for version, (command, options) in zip(SUPPORTED_VERSIONS, calls, strict=True):
+        defaults = LIVE_TEST_NODES[version] if mode == "live" else DESTRUCTIVE_TEST_NODES[version]
+        assert command == (sys.executable, "-m", "pytest", *defaults, *pytest_args)
+        assert options["env"]["WWISE_VERSION"] == version
+
+
+@pytest.mark.parametrize("pytest_args", (
+    ("-k", "test_fake.py::operand", "tests/live/test_exact.py::test_one", "-q"),
+    ("--", "tests/live/test_exact.py::test_one"),
+    ("--debug", "-q", "tests/live/test_exact.py::test_one"),
+))
+def test_real_driver_matrix_preserves_exact_selection_and_sequential_lane_bindings(tmp_path, monkeypatch, pytest_args):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode="matrix", version="all",
+                                           pytest_args=pytest_args)
+    assert code == 0 and len(calls) == 10
+    expected_lanes = [(version, destructive) for version in SUPPORTED_VERSIONS for destructive in ("0", "1")]
+    assert [(options["env"]["WWISE_VERSION"], options["env"]["WWISE_DESTRUCTIVE"])
+            for _, options in calls] == expected_lanes
+    assert all(command == (sys.executable, "-m", "pytest", *pytest_args) for command, _ in calls)
+    assert all(options["shell"] is False and options["env"]["WWISE_STRICT_REAL"] == "1"
+               for _, options in calls)
+
+
+def test_real_driver_matrix_selection_stops_on_first_child_failure(tmp_path, monkeypatch):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode="matrix", version="all",
+        pytest_args=("tests/live/test_exact.py::test_one",), status=9)
+    assert code == 9 and len(calls) == 1
+    assert calls[0][1]["env"]["WWISE_VERSION"] == "2021.1"
+
+
+@pytest.mark.parametrize("version", ("2024.1", "2025.1"))
+@pytest.mark.parametrize("selection", ((), ("tests/destructive/test_exact.py::test_one",)))
+def test_real_driver_owned_authoring_retains_explicit_only_collection(tmp_path, monkeypatch, version, selection):
+    args = ("--owned-authoring-batch-root", str(tmp_path / "owned.py::batch"), *selection, "-q")
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode="destructive", version=version,
+                                           pytest_args=args)
+    assert code == 0 and len(calls) == 1
+    assert calls[0][0] == (sys.executable, "-m", "pytest", *args)
+    assert calls[0][1]["env"]["WWISE_AUTHORING_LIVE"] == "1"
+    assert calls[0][1]["env"]["WWISE_DESTRUCTIVE"] == "1"
+
+
+@pytest.mark.parametrize("version,mode,windows", (
+    ("2021.1", "destructive", False), ("2022.1", "destructive", False),
+    ("2023.1", "destructive", False), ("2025.1", "live", False),
+    ("2025.1", "destructive", True), ("all", "destructive", False),
+))
+def test_real_driver_owned_authoring_preserves_host_version_mode_guards(tmp_path, monkeypatch, version, mode, windows):
+    code, calls = _record_driver_selection(tmp_path, monkeypatch, mode=mode, version=version, windows=windows,
+        pytest_args=("tests/destructive/test_exact.py::test_one", "--owned-authoring-batch-root", str(tmp_path / "owned")))
+    assert code == (2 if windows else 1) and calls == []
 
 
 def test_live_config_resolver_uses_host_native_pathlib_and_aliases(tmp_path: Path) -> None:
@@ -563,6 +683,9 @@ def test_ci_test_help_mentions_all_mode() -> None:
     assert "all          Run non-live suite first, then strict real matrix" in result.stdout
     expected_example = "ci\\test.bat --version all --mode all -- -q -ra" if os.name == "nt" else "ci/test.sh --version all --mode all -- -q -ra"
     assert expected_example in result.stdout
+    assert "explicit pytest paths or nodes replace the version defaults" in result.stdout
+    assert "Flags alone (including -k/-m filters) apply to the version default selection" in result.stdout
+    assert "--mode live -- tests/live/test_gateway_live_matrix.py -q" in result.stdout
 
 
 def test_ci_test_all_runs_nonlive_before_matrix(tmp_path: Path) -> None:

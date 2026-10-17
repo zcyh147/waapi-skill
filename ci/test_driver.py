@@ -18,11 +18,11 @@ if str(SKILL_DIR) not in sys.path:
     sys.path.insert(0, str(SKILL_DIR))
 
 if __package__:
-    from .test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness
+    from .test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness, pytest_token_roles
     from .resolve_live_test_config import LiveTestConfigError
     from .run_live_test_command import main as run_live_test_command
 else:  # Executed directly by ci/test.sh or ci/test.bat.
-    from test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness
+    from test_readiness import report_readiness, ReadinessBlocked, validate_nonlive_readiness, pytest_token_roles
     from resolve_live_test_config import LiveTestConfigError
     from run_live_test_command import main as run_live_test_command
 
@@ -171,6 +171,8 @@ Notes:
       WWISE_PROBE_TIMEOUT, WWISE_SHUTDOWN_TIMEOUT
       WAAPI_TEST_PYTHON (exact pre-provisioned developer Python)
 {default_note}
+  - Live/destructive explicit pytest paths or nodes replace the version defaults.
+    Flags alone (including -k/-m filters) apply to the version default selection.
   - Default sandbox root if not set:
       .waapi-skill-state/runtime/wwise-waapi-sandboxes/<version>-<mode>
 
@@ -182,6 +184,7 @@ Examples:
   {launcher} --version all --mode all -- -q -ra
   {launcher} -v all -m matrix
   {launcher} --version 2024.1 --mode live -- -k object_topics -q
+  {launcher} --version 2025.1 --mode live -- tests/live/test_gateway_live_matrix.py -q
   {launcher} 2021.1 live
   {launcher} 2025.1 destructive
   {launcher} all matrix
@@ -566,12 +569,13 @@ class TestDriver:
             repo_root=self.repo_root,
             windows=self.windows,
         )
+        selectors, _ = pytest_token_roles(tuple(pytest_args))
         if mode == "smoke":
             child = (str(self.repo_root / "ci" / "wwise_smoke.py"),)
         elif mode == "live":
-            child = ("-m", "pytest", *LIVE_TEST_NODES[version], *pytest_args)
+            child = ("-m", "pytest", *(() if selectors else LIVE_TEST_NODES[version]), *pytest_args)
         elif mode == "destructive":
-            child = ("-m", "pytest", *(() if owned_authoring else DESTRUCTIVE_TEST_NODES[version]), *pytest_args)
+            child = ("-m", "pytest", *(() if owned_authoring or selectors else DESTRUCTIVE_TEST_NODES[version]), *pytest_args)
         else:
             raise TestDriverError(f"Unsupported real-test mode: {mode}")
         # The live helper treats this fixed prefix only as an argv schema and
