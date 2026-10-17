@@ -747,7 +747,7 @@ def test_short_id_probe_reuses_shared_runtime_without_policy_change(tmp_path, wo
     import hashlib
     runtime, commands, config = _short_id_probe_runtime(tmp_path, version=version)
     config_before = config.read_bytes()
-    workflow.test_read_only_short_id_typed_native_read_observations(runtime)
+    workflow.test_read_only_short_id_native_observation(runtime)
     category, = runtime.category_results
     assert category["status"] == "PASS", category
     body = Path(category["observation_path"]).read_bytes()

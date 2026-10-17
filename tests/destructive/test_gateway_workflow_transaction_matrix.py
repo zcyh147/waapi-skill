@@ -4340,3 +4340,73 @@ def test_read_only_owned_list_native_metadata_observation(workflow_sandbox_runti
     if category["status"] == "blocked":
         pytest.skip(f"Owned-list observation incomplete; retained exact evidence: {category}")
     assert category["status"] == "PASS", category
+
+
+def _collect_short_id_native_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Reuse the original read body inside this module's already-owned sandbox."""
+    from tests.support.short_id_native_observation import collect_short_id_typed_read_observations
+
+    output = runtime.state_dir / "short-id-native-observations.json"
+    config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
+    config_sha256 = hashlib.sha256(config.read_bytes()).hexdigest()
+    evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous = set(evidence_root.glob("*.json"))
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port,
+                "url": runtime.lifecycle.waapi_url}
+    evidence: dict[str, Any] = {
+        "agent_started": False, "project_mutation_count": 0, "version": runtime.version,
+        "scope": "typed Short ID read observations only; no Definition mutation acceptance",
+        "candidate": runtime.candidate, "endpoint": endpoint,
+        "config_path": str(config), "config_sha256": config_sha256,
+        "receipts": [], "observations": [], "native_evidence": [],
+        "mutation_authority": False, "business_effect_verified": False,
+    }
+    category = {"category": "short-id-native-read-observation", "status": "FAIL",
+                "verifier_strength": "bounded_typed_short_id_read_and_exact_guid_observation_only",
+                "observation_path": str(output), "reason": "observation incomplete"}
+    runtime.category_results.append(category)
+
+    def read(command: Sequence[str]) -> dict[str, Any]:
+        assert command[0] in {"status", "query-object"}, command
+        assert len(evidence["receipts"]) < 7, "Short ID observation public call bound exceeded"
+        code, payload = runtime.raw_gateway(command)
+        evidence["receipts"].append({"argv": list(command), "exit_code": code, "payload": payload})
+        assert code == 0 and payload.get("ok") is True, payload
+        assert payload.get("endpoint") == endpoint, payload
+        assert payload.get("detected_version") == runtime.version, payload
+        return payload
+
+    status, reason = "FAIL", "Short ID native observation did not finish"
+    try:
+        collect_short_id_typed_read_observations(read, evidence=evidence)
+        status, reason = "PASS", "public bounded typed Short ID reads and exact-ID readbacks succeeded"
+        return category
+    except BaseException as exc:
+        reason = f"{type(exc).__name__}: {exc}"
+        evidence["error"] = reason
+        raise
+    finally:
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_sha256, "Short ID observation changed config"
+        paths = sorted(set(evidence_root.glob("*.json")) - previous)
+        assert len(paths) <= 512, "Short ID dispatcher evidence exceeded file bound"
+        total_bytes = 0
+        for path in paths:
+            body = path.read_bytes()
+            total_bytes += len(body)
+            assert total_bytes <= 32 * 1024 * 1024, "Short ID dispatcher evidence exceeded byte bound"
+            evidence["native_evidence"].append({"path": str(path), "bytes": len(body),
+                                                 "sha256": hashlib.sha256(body).hexdigest()})
+        body = json.dumps(evidence, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024, "Short ID retained observation byte bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category.update(status=status, reason=reason,
+                        observation_sha256=hashlib.sha256(body).hexdigest())
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_short_id_native_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Observe Event/DialogueEvent Short IDs without a second lifecycle or config write."""
+    category = _collect_short_id_native_probe(workflow_sandbox_runtime)
+    assert category["status"] == "PASS", category

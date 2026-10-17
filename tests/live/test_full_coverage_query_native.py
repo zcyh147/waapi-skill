@@ -15,6 +15,7 @@ import pytest
 from tests.semantic.support.codex_expansion_case_helpers import CaseBoundaryError
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
+from tests.support.short_id_native_observation import collect_short_id_typed_read_observations
 
 
 @pytest.mark.live
@@ -132,25 +133,7 @@ def test_short_id_typed_native_read_observations() -> None:
             runtime=runtime, version=version, receipts=receipts)
         gateway(["config-set", "--wwise-version", version, "--waapi-host", runtime.host,
             "--waapi-port", str(runtime.port), "--project-modification-policy", "read_only"])
-        evidence["status"] = gateway(["status"])
-        for kind, native_type, source in (("event", "Event", ["--kind", "event"]),
-                                         ("dialogue-event", "DialogueEvent", ["--custom-kind", "DialogueEvent"])):
-            discovered = gateway(["query-object", *source, "--include", "short-id", "--max-results", "1"])
-            rows = discovered["agent_result"]
-            assert isinstance(rows, list) and len(rows) == 1, f"{native_type} populated fixture prerequisite missing"
-            chosen = rows[0]
-            number = chosen.get("short_id")
-            assert type(number) is int and 0 <= number <= 0xFFFFFFFF, chosen
-            assert chosen["type"] == native_type
-            result = gateway(["query-object", "--short-id", str(number), "--short-id-kind", kind,
-                "--max-results", "64", "--include", "short-id", "--detail"])
-            assert result["source_resolution"]["complete"] is True
-            matches = [row for row in result["agent_result"] if row["id"] == chosen["id"]]
-            assert len(matches) == 1 and matches[0]["type"] == native_type and matches[0]["short_id"] == number
-            exact = gateway(["query-object", "--exact-id", chosen["id"], "--include", "short-id"])
-            assert exact["agent_result"] == [chosen]
-            observations.append({"kind": kind, "short_id": number, "canonical_id": chosen["id"],
-                "outcome": "NATIVE_SUCCESS", "candidate_count": result["source_resolution"]["candidate_count"]})
+        collect_short_id_typed_read_observations(gateway, evidence=evidence)
         status, reason = "PASS", "public bounded typed Short ID reads and exact-ID readbacks succeeded"
     except BaseException as exc:
         reason = f"{type(exc).__name__}: {exc}"
