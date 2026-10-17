@@ -400,6 +400,52 @@ tests, divergent create/reuse and stale/foreign authority controls passed 75
 tests. Earlier passing runs remain partial source evidence; no missing case or
 native acceptance was inferred from them.
 
+#193 bounded source slice on exact integration `8dfdcc76` exposes the missing
+tone collection choices through existing host-plan CLI/Draft composition. Only
+`ak.wwise.debug.generateToneWAV` is changed: waveform channel empty sets map to
+explicit zero for 2024.1/2025.1, and explicit marker emptiness maps to [] for
+2025.1. Omission, empty and populated forms remain distinct in request-schema,
+Draft continuation and immutable Preview; waveform choice remains unchanged.
+Conflicting/duplicate/undisclosed/native inputs fail before mutation, and all
+three modification policies retain their existing gates. Original public parser
+RED is retained; the first corrected full public lifecycle control passed, and
+the full host-business selection passed 120 fake tests before final fixture
+format alignment.
+
+A separate source defect remains owned by #193: generic tone verification accepts
+the result schema with verified=false even without an output WAV. Independent
+simulated file observations do not establish product effect proof. The exact
+remote empty-choice and artifact-verifier criteria were copied additively to
+local ticket19; complete bounded artifact/effect verification, matching native
+evidence, complete WAL delivery and remaining host contracts stay open. No
+native/Console/Authoring/Fresh launch or generated inventory update occurred.
+
+The final explicit-collection source selection passed 124 fake tests, including
+the complete host-business file, existing isolated transaction verifier boundary,
+exact adapter registration, operation catalog and reviewed schema seal. It grants
+closed-input construction/policy evidence only; tone artifact/effect and native
+verification remain pending implementation and acceptance under #193.
+
+
+## #193 bounded Tone artifact verifier checkpoint
+
+The successor to host-collection source `4f366334` adds exact-target prestate and
+prewrite guards plus independent bounded RIFF/PCM16/float32/header/frame/silent
+channel/empty-cue observations through the existing public transaction and
+artifact seams. Known incorrect or missing artifacts fail instead of receiving
+schema-only success. Valid unchanged output may verify its requested observable
+state, retaining separate `created`/`changed` facts. Synthetic full-chain tests
+establish implementation behavior only; no native, Fresh, family seal or whole
+#193 credit is asserted. Active signals, fractional rounding, populated marker
+semantics and anonymous/Ambisonic encodings remain explicitly incomplete.
+
+The public large-marker reproduction establishes a further #193 terminal
+capacity defect (`VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED` after one dispatch),
+without changing output allowances. Its implementation follows this coherent
+checkpoint; downstream Broker/archive delivery remains additionally owned by
+#194. Full #193/WAL and #188 state/native scope stay open. Original REDs and
+intermediate compatibility failures are retained in separate `/tmp/waapi-tone-*`
+roots and the worker handoff; no native process or launch was used.
 
 The sixth combined integration preserves every original native ID/shape/owner,
 all ten independent catalog seals, five original definitions, detailed native
@@ -412,3 +458,26 @@ The original f72 scalar batch and strict-reader program milestone remains tied
 to its original source; it is not loaded into this default ledger. Contextual
 query failures, source closure/admission and partial layout constructors retain
 all unproven applicability, native effects and downstream delivery obligations.
+
+
+The seventh combined partial merges only fixed query `b95bddbb`, reference
+hierarchy/classifier safety `7ed7a105` and Tone artifact verification `c253c5ae`.
+Reconciliation retains every original 272,313 native ID/shape/owner tuple,
+independent catalog/definition, detailed native policy and historical family
+seal. All 878 public route keys remain unchanged; there is no branch-state
+transition or native/Fresh acceptance credit. The actual Program roster is 241
+unique entries without whole-file/exact-node overlap. Unknown reference target
+classifiers, native query type spelling/2021 Short-ID mapping, Tone waveform and
+populated-marker semantics, larger terminal delivery and all other original
+scope remain owned. Source-level artifact verification and explicit boundaries
+are partial implementation, not completion of those obligations. Existing
+product receipts are not transferred to this successor.
+
+
+The r7 reproducibility checks pass for depth and release; branch
+`--check --require-complete` exits 2 because the unchanged product scope remains
+incomplete. Original focused `9cfa110f` reports 372 passed / 1 stale schema-seal
+failure / 11 Windows-only skips; the exact five-version guidance-seal repair
+`b1fadd6e` passes its entire 16-test file separately. Original failures stay
+preserved, no runtime changes follow the combined source run, and no broad or
+native acceptance is inferred from these focused results.

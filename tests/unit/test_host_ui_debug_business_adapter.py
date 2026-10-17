@@ -771,3 +771,497 @@ def test_host_ui_debug_legacy_typed_ingress_is_blocked_before_connection(
 
     assert code == 2
     assert "business" in rejected["message"].casefold()
+
+
+class _ToneFileClient(_HostClient):
+    """Synthetic owned effect for the public oracle; no native Wwise evidence."""
+    def __init__(self, *args, write_output=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.write_output = write_output
+        self.artifact_bytes = None
+        self.after_write = None
+
+    def call(self, uri, args=None, options=None):
+        if uri == 'ak.wwise.debug.generateToneWAV':
+            self.calls.append((uri, args, options))
+            if self.write_output and self.artifact_bytes is not None:
+                Path(args['path']).write_bytes(self.artifact_bytes)
+            elif self.write_output:
+                import wave
+                with wave.open(args['path'], 'wb') as output:
+                    output.setnchannels(2)
+                    output.setsampwidth(2)
+                    output.setframerate(8000)
+                    output.writeframes(b'\x00' * 16)
+            if self.after_write is not None:
+                self.after_write(Path(args['path']))
+            return {}
+        return super().call(uri, args, options)
+
+
+def _tone_collection_preview(tmp_path, version, fields, *, policy='ask_before_changes',
+                             is_command_line=True, write_output=True, reject_declaration=False, values=None, existing_bytes=None, declaration_only=False, reject_preparation=False):
+    state = ['--state-dir', str(tmp_path / 'state')]
+    env = set_gateway_config(_env(tmp_path, version), project_modification_policy=policy)
+    output = tmp_path / 'io' / 'tone.wav'
+    output.parent.mkdir(exist_ok=True)
+    if existing_bytes is not None:
+        output.write_bytes(existing_bytes)
+    business_values = {'waveform': 'white_noise', 'channel_layout': '2.0', 'sample_rate_hz': '8000',
+        'bit_depth': 'int16', 'attack_seconds': '0', 'sustain_seconds': '0.0005', 'release_seconds': '0'}
+    business_values.update(values or {})
+    value_argv = [token for field, value in business_values.items() if value is not None for token in (('--toggle', field, 'enable' if value == 'true' else 'disable') if field == 'anonymous_channels' else ('--value', field, value))]
+    client = _ToneFileClient(tmp_path, version, is_command_line=is_command_line, write_output=write_output)
+    code, schema = gateway.execute_gateway(['request-schema', 'ak.wwise.debug.generateToneWAV'],
+        env=env, client_factory=lambda _: pytest.fail('schema is offline'))
+    assert code == 0, schema
+    code, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']],
+        env=env, client_factory=lambda _: pytest.fail('start is offline'))
+    assert code == 0, started
+    declaration = started['draft']['next_action_binding']['declaration']
+    code, declared = gateway.execute_gateway([*state, 'draft-declare-host-plan', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(started['draft']['revision']),
+        '--value', 'output_file', str(output), *value_argv,
+        *fields], env=env, client_factory=lambda _: client)
+    if declaration_only:
+        return code, declared, client
+    if reject_declaration:
+        assert code != 0, declared
+        assert not output.exists()
+        assert 'ak.wwise.debug.generateToneWAV' not in [call[0] for call in client.calls]
+        return declared
+    assert code == 0, declared
+    code, checked = gateway.execute_gateway([*state, 'draft-check', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(declared['draft']['revision'])],
+        env=env, client_factory=lambda _: client)
+    if reject_preparation:
+        assert code != 0, checked
+        return checked, client
+    assert code == 0, checked
+    code, preview = gateway.execute_gateway([*state, 'preview-from-draft', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(checked['draft']['revision'])],
+        env=env, client_factory=lambda _: client)
+    if policy == 'read_only':
+        assert code != 0, preview
+        assert not output.exists()
+    else:
+        assert code == 0, preview
+    return env, state, client, output, schema, declaration, preview
+
+
+def _finish_tone_collection(env, state, client, preview, *, expect_failure=False, expected_state='result_schema_checked', return_verify_outcome=False):
+    tx = preview['transaction_id']
+    if preview['state'] == 'awaiting_confirmation':
+        _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+        code, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+            '--confirmation-token', shown['confirmation']['token']], env=env)
+        assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    code, verified = gateway.execute_gateway([*state, 'verify', tx], env=env, client_factory=lambda _: client)
+    if return_verify_outcome:
+        return code, verified
+    if expect_failure:
+        assert code != 0, verified
+        assert verified['state'] == 'verification_failed'
+        assert verified['verified'] is False
+        return verified
+    assert code == 0, verified
+    assert verified['state'] == expected_state
+    assert verified['verified'] is (expected_state == 'verified')
+    assert verified['agent_result']['verified'] is (expected_state == 'verified')
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    return verified
+
+
+def test_tone_explicit_empty_choices_survive_public_draft_preview_execute_verify(tmp_path):
+    env, state, client, output, schema, declaration, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], is_command_line=False)
+    for field in ('waveform_channels', 'markers'):
+        expected = {'flag': '--empty', 'arguments': [field], 'repeatable': False}
+        assert schema['business_adapter']['declaration']['input_forms'][field]['empty_form'] == expected
+        assert declaration['input_forms'][field]['empty_form'] == expected
+    request = preview['agent_result']['request']
+    assert request['arguments']['args'] == {'path': str(output), 'waveform': 'whiteNoise',
+        'channelConfig': '2.0', 'sampleRate': 8000, 'bitDepth': 'int16',
+        'attackTime': 0, 'sustainTime': 0.0005, 'releaseTime': 0, 'waveformChannelMask': 0, 'markers': []}
+    assert not output.exists()
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['agent_result']['request'] == request
+    import wave
+    with wave.open(str(output), 'rb') as artifact:
+        assert (artifact.getnchannels(), artifact.getsampwidth(), artifact.getframerate(), artifact.getnframes()) == (2, 2, 8000, 4)
+        assert artifact.readframes(4) == b'\x00' * 16
+    # Synthetic output checks the public artifact oracle, not native Wwise behavior.
+    assert verified['verification']['business_state_verified'] is True
+
+
+@pytest.mark.parametrize('is_command_line', [False, True], ids=['authoring', 'console'])
+@pytest.mark.parametrize('version,fields,expected', [
+    ('2023.1', [], {}),
+    ('2024.1', ['--empty', 'waveform_channels'], {'waveformChannelMask': 0}),
+    ('2025.1', [], {}),
+    ('2025.1', ['--empty', 'waveform_channels', '--empty', 'markers'], {'waveformChannelMask': 0, 'markers': []}),
+    ('2025.1', ['--item', 'waveform_channels', '0', '--item', 'waveform_channels', '1', '--marker', '0.25', '入口\\cue'],
+        {'waveformChannelMask': 3, 'markers': [{'position': 0.25, 'label': '入口\\cue'}]}),
+])
+def test_tone_collection_omission_empty_and_populated_states_stay_distinct(tmp_path, version, fields, expected, is_command_line):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, version, fields,
+        is_command_line=is_command_line)
+    native = preview['agent_result']['request']['arguments']['args']
+    assert native == {'path': str(output), 'waveform': 'whiteNoise', 'channelConfig': '2.0',
+        'sampleRate': 8000, 'bitDepth': 'int16', 'attackTime': 0, 'sustainTime': 0.0005, 'releaseTime': 0, **expected}
+    verified = _finish_tone_collection(env, state, client, preview,
+        expected_state='verified' if expected.get('waveformChannelMask') == 0 else 'result_schema_checked')
+    dispatched = [call[1] for call in client.calls if call[0] == 'ak.wwise.debug.generateToneWAV']
+    assert dispatched == [native]
+    assert verified['agent_result']['request'] == preview['agent_result']['request']
+    assert output.is_file()
+
+
+@pytest.mark.parametrize('version,fields', [
+    ('2023.1', ['--empty', 'waveform_channels']),
+    ('2023.1', ['--empty', 'markers']),
+    ('2024.1', ['--empty', 'markers']),
+    ('2025.1', ['--empty', 'waveform_channels', '--item', 'waveform_channels', '0']),
+    ('2025.1', ['--item', 'waveform_channels', '0', '--empty', 'waveform_channels']),
+    ('2025.1', ['--empty', 'markers', '--marker', '0.5']),
+    ('2025.1', ['--marker', '0.5', '--empty', 'markers']),
+    ('2025.1', ['--empty', 'markers', '--empty', 'markers']),
+    ('2025.1', ['--empty', 'waveform_channels', '--empty', 'waveform_channels']),
+    ('2025.1', ['--item', 'waveform_channels', '0', '--item', 'waveform_channels', '0']),
+    ('2025.1', ['--empty', 'waveform']),
+    ('2025.1', ['--value', 'waveformChannelMask', '0']),
+    ('2025.1', ['--value', 'markers', '[]']),
+    ('2025.1', ['--empty', 'languages']),
+])
+def test_tone_empty_choices_reject_conflicts_duplicates_native_fields_and_wrong_versions_before_mutation(tmp_path, version, fields):
+    rejected = _tone_collection_preview(tmp_path, version, fields, reject_declaration=True)
+    assert rejected['ok'] is False
+
+
+@pytest.mark.parametrize('policy', ['read_only', 'ask_before_changes', 'allow_changes'])
+def test_tone_empty_choices_keep_all_three_modification_policies(tmp_path, policy):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], policy=policy)
+    if policy == 'read_only':
+        assert not output.exists()
+        assert 'ak.wwise.debug.generateToneWAV' not in [call[0] for call in client.calls]
+        assert 'read_only' in preview['message']
+        return
+    assert (preview['state'] == 'awaiting_confirmation') is (policy == 'ask_before_changes')
+    _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    code, repeated = gateway.execute_gateway([*state, 'execute', preview['transaction_id']],
+        env=env, client_factory=lambda _: client)
+    assert code != 0, repeated
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+
+
+def test_tone_verifier_rejects_missing_artifact_after_one_native_dispatch(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], write_output=False)
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
+    assert not output.exists()
+    assert verified['verification']['business_state_verified'] is False
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    assert 'artifact' in str(verified['verification']).lower()
+
+
+def test_tone_verifier_rejects_malformed_artifact_despite_success_reply(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'])
+    client.artifact_bytes = b'not a wave artifact'
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=True)
+    assert output.read_bytes() == b'not a wave artifact'
+    assert verified['verification']['business_state_verified'] is False
+
+
+
+def _tone_wav_bytes(*, floating=False, samples=None, rate=8000, channels=2, extra=b'', fmt_override=None):
+    import struct
+    # Four known audio frames. This fixture is independent of the Gateway compiler.
+    if samples is None:
+        samples = [0.0 if floating else 0] * 8
+    audio = struct.pack('<' + ('f' if floating else 'h') * len(samples), *samples)
+    width = 4 if floating else 2
+    fmt = fmt_override if fmt_override is not None else struct.pack('<HHIIHH',
+        3 if floating else 1, channels, rate, rate * channels * width, channels * width, width * 8)
+    body = b'WAVEfmt ' + struct.pack('<I', len(fmt)) + fmt + (b'\0' if len(fmt) % 2 else b'')
+    body += b'data' + struct.pack('<I', len(audio)) + audio + extra
+    return b'RIFF' + struct.pack('<I', len(body)) + body
+
+
+@pytest.mark.parametrize('floating', [False, True], ids=['pcm16', 'float32'])
+def test_tone_verifier_checks_all_silent_samples_and_exact_format(tmp_path, floating):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'],
+        values={'bit_depth': 'float32' if floating else 'int16'})
+    client.artifact_bytes = _tone_wav_bytes(floating=floating)
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['verification']['business_state_verified'] is True
+    assert verified['agent_result']['request'] == preview['agent_result']['request']
+
+
+@pytest.mark.parametrize('defect', ['rate', 'frames', 'last_off_channel', 'format'])
+def test_tone_verifier_rejects_wrong_requested_artifact_state(tmp_path, defect):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'])
+    kwargs = {'rate': 16000} if defect == 'rate' else {'samples': [0] * 10} if defect == 'frames' else (
+        {'samples': [0] * 7 + [1]} if defect == 'last_off_channel' else {'floating': True})
+    client.artifact_bytes = _tone_wav_bytes(**kwargs)
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+
+def _riff_chunk(kind, payload):
+    import struct
+    return kind + struct.pack('<I', len(payload)) + payload + (b'\0' if len(payload) % 2 else b'')
+
+
+@pytest.mark.parametrize('metadata', ['cue', 'orphan-label'])
+def test_tone_explicit_empty_markers_rejects_unrequested_cues_and_labels(tmp_path, metadata):
+    import struct
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'])
+    if metadata == 'cue':
+        extra = _riff_chunk(b'cue ', struct.pack('<I', 1) + struct.pack('<II4sIII', 7, 0, b'data', 0, 0, 0))
+    else:
+        extra = _riff_chunk(b'LIST', b'adtl' + _riff_chunk(b'labl', struct.pack('<I', 7) + b'unrequested\0'))
+    client.artifact_bytes = _tone_wav_bytes(extra=extra)
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+
+def test_tone_prewrite_rejects_replaced_isolated_root_before_dispatch(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'])
+    output.parent.rename(tmp_path / 'old-io')
+    output.parent.mkdir()
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+        '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0, confirmed
+    code, stopped = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, stopped
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
+
+
+
+@pytest.mark.parametrize('overwrite', [False, True], ids=['unchanged-valid', 'rewritten-identical'])
+def test_tone_existing_valid_output_verifies_state_without_claiming_content_change(tmp_path, overwrite):
+    expected_bytes = _tone_wav_bytes()
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'], existing_bytes=expected_bytes,
+        write_output=overwrite)
+    client.artifact_bytes = expected_bytes
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    readback = verified['verification']['readbacks'][0]
+    assert readback['created'] is False
+    assert readback['changed'] is False
+    assert output.read_bytes() == expected_bytes
+
+
+@pytest.mark.parametrize('change', ['appeared', 'replaced', 'symlink'])
+def test_tone_prewrite_rejects_changed_output_before_mutation(tmp_path, change):
+    existing = _tone_wav_bytes() if change == 'replaced' else None
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'], existing_bytes=existing)
+    if change == 'symlink':
+        target = tmp_path / 'outside.wav'
+        target.write_bytes(_tone_wav_bytes())
+        output.symlink_to(target)
+    else:
+        output.write_bytes(b'changed output')
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    _, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+        '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert confirmed['ok'] is True
+    code, stopped = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, stopped
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
+
+
+@pytest.mark.parametrize('effect', ['directory', 'symlink', 'unchanged-wrong'])
+def test_tone_artifact_verification_rejects_wrong_existing_or_nonregular_effect(tmp_path, effect):
+    existing = b'old malformed artifact' if effect == 'unchanged-wrong' else None
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'], existing_bytes=existing, write_output=False)
+    if effect == 'directory':
+        client.after_write = lambda path: path.mkdir()
+    elif effect == 'symlink':
+        target = tmp_path / 'unowned.wav'
+        target.write_bytes(_tone_wav_bytes())
+        client.after_write = lambda path: path.symlink_to(target)
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+@pytest.mark.parametrize('sample', [float('nan'), float('inf'), -float('inf')])
+def test_tone_float_verification_rejects_nonfinite_samples_anywhere(tmp_path, sample):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'], values={'bit_depth': 'float32'})
+    client.artifact_bytes = _tone_wav_bytes(floating=True, samples=[0.0] * 7 + [sample])
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+@pytest.mark.parametrize('defect', ['truncated', 'chunk-extent', 'duplicate-data', 'byte-rate', 'block-align', 'unknown-subtype', 'wrong-speakers', 'short-list'])
+def test_tone_parser_rejects_bounded_malformed_or_wrong_format_artifacts(tmp_path, defect):
+    import struct
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'])
+    if defect == 'truncated':
+        blob = _tone_wav_bytes()[:-1]
+    elif defect == 'chunk-extent':
+        blob = bytearray(_tone_wav_bytes())
+        blob[40:44] = struct.pack('<I', 0xffffffff)
+    elif defect == 'duplicate-data':
+        blob = _tone_wav_bytes(extra=_riff_chunk(b'data', b''))
+    elif defect == 'short-list':
+        blob = _tone_wav_bytes(extra=_riff_chunk(b'LIST', b'x'))
+    elif defect in {'byte-rate', 'block-align'}:
+        fmt = struct.pack('<HHIIHH', 1, 2, 8000, 42 if defect == 'byte-rate' else 32000,
+            2 if defect == 'block-align' else 4, 16)
+        blob = _tone_wav_bytes(fmt_override=fmt)
+    else:
+        subtype = bytes.fromhex('0100000000001000800000aa00389b71') if defect == 'wrong-speakers' else b'\0' * 16
+        fmt = struct.pack('<HHIIHHHHI', 65534, 2, 8000, 32000, 4, 16, 22, 16, 4) + subtype
+        blob = _tone_wav_bytes(fmt_override=fmt)
+    client.artifact_bytes = bytes(blob)
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+@pytest.mark.parametrize('floating', [False, True])
+def test_tone_extensible_exact_pcm_float_subtype_and_empty_cue_are_verified(tmp_path, floating):
+    import struct
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels', '--empty', 'markers'],
+        values={'bit_depth': 'float32' if floating else 'int16'})
+    subtype = bytes.fromhex(('03000000' if floating else '01000000') + '00001000800000aa00389b71')
+    bits, align = (32, 8) if floating else (16, 4)
+    fmt = struct.pack('<HHIIHHHHI', 65534, 2, 8000, 8000 * align, align, bits, 22, bits, 3) + subtype
+    extra = _riff_chunk(b'cue ', struct.pack('<I', 0)) + _riff_chunk(b'JUNK', b'abc')
+    client.artifact_bytes = _tone_wav_bytes(floating=floating, fmt_override=fmt, extra=extra)
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['verification']['readbacks'][0]['wav']['markers']['cue_count'] == 0
+
+
+
+def test_tone_output_estimate_rejects_resource_overflow_before_dispatch(tmp_path):
+    rejected, client = _tone_collection_preview(tmp_path, '2025.1', [],
+        values={'sustain_seconds': '1000000'}, reject_preparation=True)
+    assert '512 MiB' in str(rejected)
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 0
+
+
+def test_tone_large_marker_terminal_gap_is_explicit_without_replaying_native_write(tmp_path):
+    fields = [token for number in range(4) for token in ('--marker', str(number), 'x' * 8192)]
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', fields)
+    code, failed_delivery = _finish_tone_collection(env, state, client, preview, return_verify_outcome=True)
+    assert code != 0, failed_delivery
+    assert failed_delivery['error_code'] == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
+    assert failed_delivery['details']['agent_result_exact'] is True
+    assert [call[0] for call in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    # OPEN #194: this retained reproduction is not delivery/effect acceptance.
+
+
+
+@pytest.mark.parametrize('version', ['2023.1', '2024.1', '2025.1'])
+def test_tone_pinned_omitted_defaults_bind_to_independently_generated_audio(tmp_path, version):
+    values = {field: None for field in ('waveform', 'channel_layout', 'sample_rate_hz', 'bit_depth',
+        'attack_seconds', 'sustain_seconds', 'release_seconds')}
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, version, [], values=values)
+    assert preview['agent_result']['request']['arguments']['args'] == {'path': str(output)}
+    client.artifact_bytes = _tone_wav_bytes(channels=1, rate=48000, samples=[0] * 48000)
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['verification']['readbacks'][0]['wav']['frames'] == 48000
+
+
+@pytest.mark.parametrize('layout,channels,mask', [('0.1', 1, 8), ('1.0', 1, 4), ('2.1', 3, 11), ('3.0', 3, 7)])
+def test_tone_layout_verification_uses_exact_speaker_positions_not_just_channel_count(tmp_path, layout, channels, mask):
+    import struct
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'], values={'channel_layout': layout})
+    fmt = struct.pack('<HHIIHHHHI', 65534, channels, 8000, 16000 * channels, channels * 2, 16, 22, 16, mask)
+    fmt += bytes.fromhex('0100000000001000800000aa00389b71')
+    client.artifact_bytes = _tone_wav_bytes(channels=channels, samples=[0] * channels * 4, fmt_override=fmt)
+    _finish_tone_collection(env, state, client, preview, expected_state='verified')
+
+
+@pytest.mark.parametrize('negative', [False, True])
+def test_tone_partial_mask_scans_silent_channel_while_active_waveform_stays_unproven(tmp_path, negative):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--item', 'waveform_channels', '0'])
+    client.artifact_bytes = _tone_wav_bytes(samples=[1, 0, -1, 0, 1, 0, -1, 1 if negative else 0])
+    verified = _finish_tone_collection(env, state, client, preview, expect_failure=negative)
+    if not negative:
+        assert verified['verification_strength'] == 'partial_tone_artifact'
+        assert 'active waveform' in str(verified['verification']['readbacks'][0]['unresolved'])
+
+
+@pytest.mark.parametrize('branch', ['fractional-rate', 'fractional-segment', 'anonymous', 'ambisonic'])
+def test_tone_unresolved_native_interpretations_remain_explicit_without_fabricated_success(tmp_path, branch):
+    values, wav = {}, {}
+    if branch == 'fractional-rate':
+        values['sample_rate_hz'] = '8000.5'
+    elif branch == 'fractional-segment':
+        values['sustain_seconds'] = '0.00051'
+    elif branch == 'anonymous':
+        values['anonymous_channels'] = 'true'
+    else:
+        values.update(channel_layout='Ambisonics 1st order', waveform='silence')
+        wav = {'channels': 4, 'samples': [0] * 16}
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'], values=values)
+    client.artifact_bytes = _tone_wav_bytes(**wav)
+    verified = _finish_tone_collection(env, state, client, preview)
+    assert verified['verification_strength'] == 'partial_tone_artifact'
+    assert verified['verification']['readbacks'][0]['unresolved']
+
+
+def test_tone_zero_duration_is_a_valid_empty_audio_state(tmp_path):
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'], values={'sustain_seconds': '0'})
+    client.artifact_bytes = _tone_wav_bytes(samples=[])
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert verified['verification']['readbacks'][0]['wav']['frames'] == 0
+
+
+
+def test_tone_verification_digest_comes_from_one_confined_opened_artifact(tmp_path, monkeypatch):
+    import hashlib
+    import os
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'])
+    literal = _tone_wav_bytes()
+    client.artifact_bytes = literal
+    real_open, target_opens = os.open, []
+    def recording_open(path, *args, **kwargs):
+        if Path(path) == output:
+            target_opens.append(str(path))
+        return real_open(path, *args, **kwargs)
+    monkeypatch.setattr(os, 'open', recording_open)
+    verified = _finish_tone_collection(env, state, client, preview, expected_state='verified')
+    assert target_opens == [str(output)]
+    observed = verified['verification']['readbacks'][0]
+    assert observed['artifact']['file']['sha256'] == hashlib.sha256(literal).hexdigest()
+    assert observed['wav']['nonzero_samples_by_channel'] == [0, 0]
+
+
+def test_tone_verification_rejects_owned_root_replacement_during_native_effect(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'])
+    def replace_root(path):
+        path.parent.rename(tmp_path / 'executed-old-root')
+        path.parent.mkdir()
+        path.write_bytes(_tone_wav_bytes())
+    client.after_write = replace_root
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)
+
+
+
+def test_tone_removed_output_root_is_a_recorded_verification_failure(tmp_path):
+    env, state, client, output, _, _, preview = _tone_collection_preview(tmp_path, '2025.1',
+        ['--empty', 'waveform_channels'])
+    client.after_write = lambda path: path.parent.rename(tmp_path / 'removed-owned-root')
+    _finish_tone_collection(env, state, client, preview, expect_failure=True)

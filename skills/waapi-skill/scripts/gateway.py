@@ -1886,6 +1886,8 @@ def build_parser() -> argparse.ArgumentParser:
     query_object.add_argument("--result-query", help="Copy the Gateway-issued bounded query read handle")
     query_object.add_argument("--result-page", help="Copy the exact-result projection continuation")
     query_source.add_argument("--exact-id", dest="object_id")
+    query_source.add_argument("--type-selection", dest="query_type_selection",
+        help="Copy a Gateway-disclosed exact live type selection; native queryability is not implied")
     query_source.add_argument("--short-id", type=int, help="Read candidates for one unsigned 32-bit Short ID; never a mutation identity")
     from wwise_waapi.short_id_query_sources import SHORT_ID_KIND_CODES
     query_object.add_argument("--short-id-kind", choices=tuple(SHORT_ID_KIND_CODES), help="Business kind required by the native typed Short ID selector")
@@ -5533,6 +5535,9 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
         args.object_type = kind_predicates[0][3]
         args.where.extend(kind_predicates[1:])
     custom_kind_meaning = getattr(args, "custom_kind_meaning", None)
+    type_selection = getattr(args, "query_type_selection", None)
+    if type_selection is not None and (not isinstance(type_selection, str) or len(type_selection) > 256):
+        raise GatewayInputError("--type-selection requires one bounded Gateway-disclosed type selection")
     if custom_kind_meaning is not None and (
         not isinstance(custom_kind_meaning, str)
         or not custom_kind_meaning
@@ -5591,7 +5596,7 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
     if args.query_custom_field_meanings:
         exact_object_scope = args.path is not None or args.object_id is not None or args.short_id is not None
         type_scope = (
-            args.object_type is not None or custom_kind_meaning is not None
+            args.object_type is not None or custom_kind_meaning is not None or type_selection is not None
         )
         if args.select:
             raise GatewayInputError(
@@ -5632,13 +5637,14 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             args.query is not None,
             args.short_id is not None,
             custom_kind_meaning is not None,
+            type_selection is not None,
         )
     ):
         raise GatewayInputError(
             "query-object requires one business source or --advanced-waql"
         )
 
-    if custom_kind_meaning is None:
+    if custom_kind_meaning is None and type_selection is None:
         where = typed_query_predicates(args)
         return_fields = args.query_return_fields
         _require_exact_identity_return_field(args, return_fields)
@@ -5752,6 +5758,7 @@ def validate_original_file_reference_match_input(
             args.object_id is not None,
             args.object_type is not None,
             getattr(args, "custom_kind_meaning", None) is not None,
+            getattr(args, "query_type_selection", None) is not None,
             args.search is not None,
             args.query is not None,
         )
@@ -8562,6 +8569,7 @@ def query_business_schema_payload(
             "short_id_candidates": "--short-id <uint32> --short-id-kind <business-kind> --max-results <1..1000>",
             "common_kind": "--kind <closed business kind>",
             "custom_kind": "--custom-kind <user-facing type meaning>",
+            "selected_native_kind": "--type-selection <Gateway-issued live type selection>",
             "search": "--search-text <literal text>",
             "query_id": "--query-id <canonical GUID>",
             "query_path": "--query-path-segment <one literal name> (repeat)",
@@ -8573,6 +8581,10 @@ def query_business_schema_payload(
             "sound-voice": "only Sound objects whose source language is not SFX",
         },
         "source_rules": {
+            "selected_native_kind": {"discovery": "metadata types; copy the disclosed selection, including when a native name is too large to inline",
+                "binding": "exact current native name, inventory, endpoint, build, session and 900-second expiry",
+                "native_queryability": "getTypes membership does not prove WAQL type support; native errors are retained without alias inference or retry",
+                "class_id_and_category": "optional catalog facts are not WAQL type names", "mutation_authority": False},
             "short_id": {"lookup": "native from.id structured Short ID and Gateway-derived type code, at most 65 candidate identities; 65 stops at an explicit 64-source resource boundary",
                          "kind_choices": ["event", "switch-group", "state-group", "effect", "soundbank", "bus", "aux-bus", "game-parameter", "trigger", "audio-device"],
                          "mapped_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
@@ -14772,6 +14784,7 @@ def dispatch_command(
             connection=connection,
             detected_version=detected_version,
             dispatcher=dispatcher,
+            context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
         )
         if custom_kind_clarification is not None:
             if args.result_page is not None:
@@ -14941,6 +14954,7 @@ def dispatch_command(
                     page["next_command"] = transaction_next_command("metadata", ["metadata", "types", *filters, "--page-size", str(args.page_size), "--page", page["next_page"]])
                 for row in page["types"]:
                     if row.get("details_complete") is False:
+                        row["query_command"] = transaction_next_command("query-object", ["query-object", "--type-selection", row["selection"], "--max-results", "20"])
                         row["detail_command"] = transaction_next_command("metadata", ["metadata", "types", "--selection", row["selection"]])
                         if isinstance(row.get("classId"), int):
                             row["fields_command"] = transaction_next_command("metadata", ["metadata", "list", "--type-selection", row["selection"]])
@@ -14964,6 +14978,7 @@ def dispatch_command(
                 connection=connection,
                 detected_version=detected_version,
                 dispatcher=dispatcher,
+                context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info)},
             )
             if custom_kind_clarification is not None:
                 return {
@@ -22734,6 +22749,7 @@ def _require_explicit_query_bound(args: argparse.Namespace) -> None:
     broad_source = (
         args.object_type is not None
         or getattr(args, "custom_kind_meaning", None) is not None
+        or getattr(args, "query_type_selection", None) is not None
         or args.search is not None
         or args.query is not None
     )
@@ -23428,9 +23444,17 @@ def _bind_custom_kind_from_live_types(
     connection: GatewayConnection,
     detected_version: str,
     dispatcher: WwiseDispatcher,
+    context: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     """Resolve one user-facing custom kind against the live type inventory."""
 
+    selection = getattr(args, "query_type_selection", None)
+    if selection is not None:
+        from wwise_waapi.metadata_discovery import resolve_metadata_type_name_selection
+        args.object_type = resolve_metadata_type_name_selection(
+            read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version),
+            context=context, selection=selection)
+        return None
     meaning = getattr(args, "custom_kind_meaning", None) or getattr(
         args,
         "metadata_custom_kind_meaning",

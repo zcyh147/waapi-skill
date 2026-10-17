@@ -175,6 +175,7 @@ from .operation_ui_commands import (
     validate_ui_command_runtime_preconditions,
     verify_ui_command_inventory_postcondition,
 )
+from .operation_tone import TONE_URI, prepare_tone_verification, validate_tone_binding, verify_tone_artifact
 from .operation_soundbank import (
     SoundBankContractError,
     build_external_sources_operation_plan,
@@ -8858,6 +8859,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api == TONE_URI:
+            try:
+                verification = prepare_tone_verification(call_args, execution_contract['io_audit'], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api in LAYOUT_MUTATION_URIS:
             try:
                 validate_layout_live_binding(arguments['layout_binding'], read=read)
@@ -13670,6 +13676,12 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == TONE_URI:
+            plan = prepared.get('verification_plan', {})
+            try:
+                validate_tone_binding(plan, call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api in LAYOUT_MUTATION_URIS:
             def layout_guard_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
                 result = read_call(uri, args, options)
@@ -15927,6 +15939,22 @@ def verify_prepared_operation(
                 else "complete_reflected_schema"
             )
         )
+    elif kind == 'tone-wav-artifact':
+        check_result_schema(TONE_URI, plan['version'])
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'partial_tone_artifact'
+        try:
+            observed = verify_tone_artifact(plan)
+        except SoundBankContractError as exc:
+            check('Requested Tone WAV artifact exists and matches its observable postconditions', False,
+                {'code': exc.error_code, 'message': str(exc), **exc.details})
+        else:
+            business_state_verified = not observed['unresolved']
+            success_status = 'verified' if business_state_verified else 'result_schema_checked'
+            verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
+            readbacks.append(observed)
+            check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
     elif kind == "result-schema":
         success_status = "result_schema_checked"
         business_state_verified = False
@@ -19812,7 +19840,7 @@ def verify_prepared_operation(
             )
     else:
         raise OperationContractError("INVALID_PREVIEW", f"Unknown verification plan kind {kind!r}.")
-    return _verification(
+    outcome = _verification(
         operation,
         assertions,
         readbacks,
@@ -19820,6 +19848,16 @@ def verify_prepared_operation(
         verification_strength=verification_strength,
         business_state_verified=business_state_verified,
     )
+
+    if kind == 'tone-wav-artifact':
+        message = ('The requested Tone WAV artifact failed independent verification.'
+            if outcome.status == 'verification_failed' else
+            'The requested observable Tone WAV artifact state passed independent verification.'
+            if outcome.business_state_verified else
+            'Applicable Tone WAV artifact checks passed; requested postconditions remain explicitly unresolved.')
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    return outcome
 
 
 def _soundbank_input_file_proofs(

@@ -264,6 +264,35 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   remain unchanged. Sixty-four missing-route obligations move only to unresolved;
   all 29 layout rows remain migration_required under #188.
 
+
+- Seventh partial integration consumes only fixed #181 `b95bddbb`, #177
+  `7ed7a105` and #193 `c253c5ae`. Exact discovered-type selections now enter
+  bounded object queries with inventory/endpoint/build/session/expiry binding;
+  reference target hierarchy checks use the exact current or explicitly declared
+  controlling reference, retaining unknown classifiers as unfinished work.
+  Tone WAV verification independently checks owned artifacts and reports active
+  waveform, populated-marker and native representation gaps explicitly; legal
+  empty channels/markers remain distinct from omission. The shared regular-file
+  opener retains existing source-proof callers and bounds hashing to the initial
+  extent. No native/Authoring/Console/Fresh process was launched.
+  Reconciliation retains 878 public rows / 218 unique URIs and all 272,313 native
+  ID/shape/owner tuples, ten independent catalogs, five original definitions,
+  detailed native policy and historical completed-family seals. There are no
+  route additions/removals, coverage-state transitions or new native/Fresh credit.
+  The actual Program union has 241 unique nodes without file/node overlap.
+  #194 now explicitly owns missing layout Draft taxonomy and the broader exact
+  command/event replay policies; the larger Tone terminal gap remains #193 work.
+  Original worker runs, r6 failures and original scalar evidence remain bound
+  to their original candidates. Focused validation on clean `9cfa110f` retained
+  **372 passed, 1 failed and 11 Windows-only skips** in 157.38 seconds, exit 1;
+  the sole failure was a stale aggregate operation-schema seal after the five
+  `object.setReference` guidance changes. No runtime changed after that run.
+  Exact seal repair `b1fadd6e` restores the original aggregate by reverting only
+  those reviewed words and preserves the earlier layout-proof seal; its entire
+  affected digest file passed **16 tests** in 0.31 seconds, exit 0. Both original
+  results and empty process-group receipts remain separate. Full Program and
+  Non-live gates remain pending on the final integrated candidate.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.

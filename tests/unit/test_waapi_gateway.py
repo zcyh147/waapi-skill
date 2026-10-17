@@ -4878,7 +4878,8 @@ def test_metadata_types_uses_fixed_builder_and_result_parser(tmp_path: Path) -> 
     assert payload["operation"] == "types"
     result = payload["agent_result"]
     assert result["contract"] == "waapi-skill.metadata-types-page/v1"
-    assert result["types"] == [{"classId": 1, "name": "Sound", "type": "Sound", "extra": "preserved"}]
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in result["types"]] == [{"classId": 1, "name": "Sound", "type": "Sound", "extra": "preserved"}]
+    assert result["types"][0]["selection"].startswith("mts1.")
     assert result["available_count"] == result["total_count"] == 1
     assert result["offset"] == result["remaining_count"] == 0
     assert result["complete"] is True and result["next_page"] is None
