@@ -220,12 +220,12 @@ Repeat with the same arguments plus `--check` to verify the saved result. A
 finished ticket can still produce exit 2 because other product obligations
 remain open. Use controlled scope only for checker tests, never to rename a
 partial product result complete. The committed inventory currently has 272,313
-obligations: 270,363 unresolved, 1,834 missing implementation and 116 exact
+obligations: 270,427 unresolved, 1,770 missing implementation and 116 exact
 approved exclusions. These are accounting rows, not distinct API or bug counts.
 
 The integrated #177/#181/#188 partials retain every original native obligation
-identity, shape and owner. The public source partition now contains 874 exact
-version/function/Topic rows; the 25 new 2024.1/2025.1 layout read and mutation rows
+identity, shape and owner. The public source partition now contains 878 exact
+version/function/Topic rows; the 29 new 2024.1/2025.1 layout read and mutation rows
 remain explicitly assigned to #188 as migration required in the interface-depth
 policy. Existing completed family seals remain unchanged. Public route presence
 reduces missing-route accounting only; no branch bindings, evidence requirements,
@@ -446,3 +446,15 @@ checkpoint; downstream Broker/archive delivery remains additionally owned by
 #194. Full #193/WAL and #188 state/native scope stay open. Original REDs and
 intermediate compatibility failures are retained in separate `/tmp/waapi-tone-*`
 roots and the worker handoff; no native process or launch was used.
+
+The sixth combined integration preserves every original native ID/shape/owner,
+all ten independent catalog seals, five original definitions, detailed native
+selector policy and historical completed-family seals. Exactly four public keys
+are added: 2024.1/2025.1 function ak.wwise.ui.layout.dockView and
+ak.wwise.ui.layout.moveSplitter. No key is removed; 64 original native obligations
+move only from missing implementation to unresolved. All 29 layout rows remain
+migration_required under #188. No verified/native/Fresh branch credit is added.
+The original f72 scalar batch and strict-reader program milestone remains tied
+to its original source; it is not loaded into this default ledger. Contextual
+query failures, source closure/admission and partial layout constructors retain
+all unproven applicability, native effects and downstream delivery obligations.

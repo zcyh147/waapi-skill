@@ -64,10 +64,10 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 714,
+        "function_lanes": 718,
         "topic_lanes": 160,
-        "total_lanes": 874,
-        "unique_function_uris": 181,
+        "total_lanes": 878,
+        "unique_function_uris": 183,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []

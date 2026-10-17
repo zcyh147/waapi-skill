@@ -19,12 +19,12 @@
         "special_unique_uris": 52
       },
       "wwise-authoring-ui": {
-        "function_rows": 714,
-        "unique_function_uris": 181,
+        "function_rows": 718,
+        "unique_function_uris": 183,
         "generic_reflected_rows": 458,
         "generic_reflected_unique_uris": 116,
-        "special_rows": 256,
-        "special_unique_uris": 65
+        "special_rows": 260,
+        "special_unique_uris": 67
       }
     },
     "reviewed_generic_restrictions": {
@@ -89,6 +89,7 @@
       "ak.wwise.ui.commands.unregister",
       "ak.wwise.ui.getSelectedObjects",
       "ak.wwise.ui.layout.closeView",
+      "ak.wwise.ui.layout.dockView",
       "ak.wwise.ui.layout.getCurrentLayoutName",
       "ak.wwise.ui.layout.getElementRectangle",
       "ak.wwise.ui.layout.getLayout",
@@ -97,6 +98,7 @@
       "ak.wwise.ui.layout.getViewHandle",
       "ak.wwise.ui.layout.getViewInstances",
       "ak.wwise.ui.layout.getViewTypes",
+      "ak.wwise.ui.layout.moveSplitter",
       "ak.wwise.ui.layout.removeLayout",
       "ak.wwise.ui.layout.setLayout",
       "ak.wwise.ui.layout.switchLayout",
