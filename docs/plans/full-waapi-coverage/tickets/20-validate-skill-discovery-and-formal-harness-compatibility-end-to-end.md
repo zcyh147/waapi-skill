@@ -23,6 +23,8 @@ An Agent following only the Skill and Gateway discoveries can reach every comple
 - [ ] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved.
 - [ ] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage.
 
+- [ ] Prove that the declared larger closed-layout constructor terminal response is delivered intact through the existing deterministic Gateway/Broker/archive chain before spending Fresh quota. Candidate `3e7b0b7a` emits roughly 264 KiB for accepted near-limit requests under a narrow 280 KiB ceiling while retaining exact `agent_result`; CLI byte-fit tests alone do not prove broker or Agent delivery. Test complete Unicode/escaped payloads, terminal state and exact final machine result. If the existing chain truncates or rejects them, implement a compatible bounded delivery contract in this project instead of counting a local stdout pass as acceptance. Ordinary responses retain their compact budget.
+
 ## Blocked by
 
 - [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177)
