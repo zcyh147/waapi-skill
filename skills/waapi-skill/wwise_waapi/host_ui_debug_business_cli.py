@@ -82,7 +82,7 @@ def host_ui_debug_plan_from_namespace(
 
     empty_fields: set[str] = set()
     for name in args.empty:
-        if field_type(name) not in {"channel_index_list", "tone_marker_list"}:
+        if field_type(name) not in {"channel_index_list", "tone_marker_list", "language_name_list", "platform_creation_mappings"}:
             raise HostUiDebugBusinessCliError(
                 f"{name} does not disclose an explicit empty collection choice"
             )
@@ -135,11 +135,13 @@ def host_ui_debug_plan_from_namespace(
         if name in empty_fields:
             raise HostUiDebugBusinessCliError(f"{name} uses conflicting empty and populated forms")
         value_type = field_type(name)
-        if value_type not in {"language_name_list", "channel_index_list"}:
+        if value_type not in {"language_name_list", "channel_index_list", "platform_creation_mappings"}:
             raise HostUiDebugBusinessCliError(
                 f"{name} does not use the --item input form"
             )
         value: Any = raw
+        if value_type == "platform_creation_mappings":
+            value = [raw]
         if value_type == "channel_index_list":
             try:
                 value = int(raw)
@@ -156,6 +158,8 @@ def host_ui_debug_plan_from_namespace(
             raise HostUiDebugBusinessCliError(f"{name} uses conflicting input forms")
         current.append(value)
     for name, key, value in args.mapping:
+        if name in empty_fields:
+            raise HostUiDebugBusinessCliError(f"{name} uses conflicting empty and populated forms")
         if field_type(name) != "platform_creation_mappings":
             raise HostUiDebugBusinessCliError(
                 f"{name} does not use the --mapping input form"

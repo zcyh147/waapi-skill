@@ -143,6 +143,16 @@ def host_ui_debug_business_contract_data(
                 "ak.wwise.ui.project.open",
             },
             "native_request_fields": "gateway_owned",
+            **({"no_open_project": "supported observed no-op transition; verify that no Project exists after the single close call"}
+               if operation == "ak.wwise.ui.project.close" else {}),
+            **({"creation_verification": {
+                "target": "matching project-file and parent-directory names; new regular project file only",
+                "before_execute": "freeze destination absence and existing output ancestor; reject replacement or drift",
+                "effect_observer": "bounded saved project artifact plus exact live opened-project identity/path",
+                "checked_effects": ["project GUID/name", "requested platforms", "requested languages", "first requested language is default"],
+                "explicit_empty_collections": "preserved; native default semantics remain unresolved, so never complete business verification",
+                "resource_limits": {"artifact_bytes": 8388608, "xml_nodes": 32768, "xml_depth": 64, "collection_rows": 128},
+            }} if operation == "ak.wwise.ui.project.create" else {}),
             **({"tone_artifact_verification": {
                 "owned_output": "one exact regular file inside the existing isolated output directory",
                 "maximum_artifact_bytes": 536870912,
@@ -286,6 +296,11 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             result["omission"] = "leave the channel selection unspecified; native default uses all channels"
             result["explicit_empty"] = "apply the requested waveform to no channels; retain the waveform choice"
             result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
+        else:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+            result["omission"] = "native default creates English(US)"
+            result["explicit_empty"] = "preserve an empty language request; native default semantics remain an observation obligation"
+            result["conflicting_forms"] = "empty and populated choices are mutually exclusive"
         return result
     if field_type == "platform_creation_mappings":
         return {
@@ -293,6 +308,12 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
             "arguments": [field, "<base-platform>", "<project-platform-name>"],
             "repeatable": True,
             "key_choices": list(BASE_PLATFORM_CHOICES),
+            "base_only_form": {"flag": "--item", "arguments": [field, "<base-platform>"], "repeatable": True,
+                "meaning": "request the base platform while leaving the native optional project-platform name omitted"},
+            "empty_form": {"flag": "--empty", "arguments": [field], "repeatable": False},
+            "omission": "native default creates Windows",
+            "explicit_empty": "preserve an empty platform request; native default semantics remain an observation obligation",
+            "conflicting_forms": "empty and populated choices are mutually exclusive",
         }
     if field_type == "tone_marker_list":
         return {

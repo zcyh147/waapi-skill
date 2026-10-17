@@ -17993,6 +17993,7 @@ def dispatch_business_host_ui_debug_plan(
         allow_no_project=pending.operation in {
             "ak.wwise.ui.project.create",
             "ak.wwise.ui.project.open",
+            "ak.wwise.ui.project.close",
         },
     )
     adapter = business_adapter(binding.record.operation)
@@ -18763,8 +18764,8 @@ def _open_business_binding(
             detected_version=detected_version,
             live_info=live_info,
         )
-        # Only project open/create business adapters can reach this sentinel,
-        # and neither consumes ``binding.project``. Keeping the dataclass shape
+        # Only project transition business adapters can reach this sentinel,
+        # and none consumes ``binding.project``. Keeping the dataclass shape
         # closed avoids making project identity optional for every other adapter.
         bound_project: Mapping[str, Any] = {
             "id": context.project_id,
@@ -22225,7 +22226,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     verification,
                     guard_validation=guard_validation,
                     project_call=project_call,
-                    project_creation=(request_payload.get('arguments', {}).get('api') == 'ak.wwise.console.project.create'),
+                    project_creation=(request_payload.get('arguments', {}).get('api') in {'ak.wwise.console.project.create', 'ak.wwise.ui.project.create'}),
                 )
         except Exception as exc:  # noqa: BLE001 - read-only verification may be retried manually
             return verification_deferred_payload(
@@ -31325,7 +31326,7 @@ def strengthen_project_transition_verification(
     business_verified = True
     if project_creation:
         artifacts = [row for row in verification.readbacks
-            if row.get('kind') == 'console-created-project-artifact']
+            if row.get('kind') in {'console-created-project-artifact', 'authoring-created-project-artifact'}]
         if len(artifacts) != 1:
             raise GatewayInputError('Project creation requires its independent saved artifact observation')
         saved = artifacts[0]['project']

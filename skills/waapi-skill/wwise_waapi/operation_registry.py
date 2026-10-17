@@ -29,7 +29,7 @@ from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
-from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, AUTHORING_CREATE_URI, PROJECT_CREATE_URIS, prepare_console_project_creation, validate_console_project_creation, inspect_created_project, prepare_cli_project_effect, validate_cli_project_effect, inspect_cli_project_effect
 from .canonical import canonical_json_bytes, canonical_sha256
 from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
 from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
@@ -9324,9 +9324,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     metadata['cli_project_effect'] = effect
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
-        if api == CONSOLE_CREATE_URI:
+        if api in PROJECT_CREATE_URIS:
             try:
-                verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version)
+                verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version, uri=api)
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == TONE_URI:
@@ -14275,9 +14275,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     api, call_args, execution_contract['io_audit'], version)
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
-        if api == CONSOLE_CREATE_URI:
+        if api in PROJECT_CREATE_URIS:
             try:
-                validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version)
+                validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version, uri=api)
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == TONE_URI:
@@ -16630,9 +16630,9 @@ def verify_prepared_operation(
             verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
             readbacks.append(observed)
             check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
-    elif kind == 'console-project-create':
+    elif kind in {'console-project-create', 'authoring-project-create'}:
         business_state_verified = False
-        check_result_schema(CONSOLE_CREATE_URI, plan['version'])
+        check_result_schema(plan['uri'], plan['version'])
         try:
             observed = inspect_created_project(plan)
         except SoundBankContractError as exc:
@@ -16642,6 +16642,10 @@ def verify_prepared_operation(
                 {'code': exc.error_code, 'message': str(exc), **exc.details})
         else:
             readbacks.append(observed)
+            if plan['uri'] == AUTHORING_CREATE_URI:
+                from pathlib import Path
+                check('Saved project name matches its requested project-file name',
+                    observed['project']['name'] == Path(plan['path']).stem, observed['project'])
             check('Requested project platforms were saved', observed['platforms_match'], observed['platforms'])
             check('Requested project languages were saved', observed['languages_match'], observed['languages'])
             check('Requested default language was saved', observed['default_language_matches'], observed['default_language'])
@@ -20871,6 +20875,14 @@ def verify_prepared_operation(
             'The requested observable Tone WAV artifact state passed independent verification.'
             if outcome.business_state_verified else
             'Applicable Tone WAV artifact checks passed; requested postconditions remain explicitly unresolved.')
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
+    if kind == "authoring-project-create":
+        message = ("The saved project artifact does not match the requested creation; do not replay the executed call."
+            if outcome.status == "verification_failed" else
+            "The saved project artifact matches the requested observable creation fields."
+            if outcome.business_state_verified else
+            "The saved project was observed; explicit-empty collection effects remain unresolved. Do not replay the executed call.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
     if kind == "remote-connection-state" and not outcome.business_state_verified:

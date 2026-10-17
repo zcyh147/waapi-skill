@@ -157,7 +157,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             with wave.open(str(output), "wb") as stream:
                 stream.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
                 stream.writeframes(b"\x00\x00" * 48000)
-    elif entry.uri == "ak.wwise.console.project.create":
+    elif entry.uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
         io_root = (tmp_path / "ProgramProbe").resolve()
         io_root.mkdir()
         output = io_root / "ProgramProbe.wproj"
@@ -504,7 +504,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert observed["wav"]["frames"] == 48000
         assert observed["wav"]["nonzero_samples_by_channel"] == [0]
         assert len(observed["artifact"]["file"]["sha256"]) == 64
-    elif entry.uri == "ak.wwise.console.project.create":
+    elif entry.uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
         assert verification.status == "verified"
         assert verification.business_state_verified is True
         assert verification.verification_strength == "saved_project_artifact"

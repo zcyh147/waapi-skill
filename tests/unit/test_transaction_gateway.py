@@ -7863,8 +7863,8 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     year = int(version.split(".", 1)[0])
     is_command_line = not api.startswith("ak.wwise.ui.")
     state_dir = tmp_path / "state"
-    io_root = (tmp_path / ("TargetProject" if api == "ak.wwise.console.project.create" else "io-root")).resolve()
-    if api == "ak.wwise.console.project.create":
+    io_root = (tmp_path / ("TargetProject" if api in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"} else "io-root")).resolve()
+    if api in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
         # Native creation requires a matching folder/file basename. The owned
         # existing directory and saved artifact are independent of transition.
         io_root.mkdir()
@@ -7924,7 +7924,7 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     class TransitionClient(FakeClient):
         def call(self, uri, args=None, options=None):
             returned = super().call(uri, args, options)
-            if uri == "ak.wwise.console.project.create":
+            if uri in {"ak.wwise.console.project.create", "ak.wwise.ui.project.create"}:
                 schema_version = {"2023.1": 119, "2024.1": 123, "2025.1": 133}[version]
                 target_path.write_text(f'''<WwiseDocument Type="Project" SchemaVersion="{schema_version}" WwiseVersion="v{version}.0" WwiseBuild="1">
 <ProjectInfo><Project Name="TargetProject" ID="{PROJECT_GUID}">
@@ -8010,7 +8010,12 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     assert verify_payload["verified"] is True
     assert verify_payload["result_schema_checked"] is False
     assert verify_payload["verification"]["business_state_verified"] is True
-    assert verify_payload["verification"]["readbacks"][-1]["kind"] == "project-transition-observation"
+    retained_verification = next(
+        event["details"]["verification"]
+        for event in TransactionStore(state_dir).read_events(transaction["transaction_id"])
+        if event["event_type"] == "verification_recorded"
+    )
+    assert retained_verification["readbacks"][-1]["kind"] == "project-transition-observation"
     assert verify_payload["guard_validation"]["project_transition"]["matched"] is True
     assert verify_payload["agent_result"]["verified"] is True
 

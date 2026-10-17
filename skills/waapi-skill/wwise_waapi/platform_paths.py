@@ -290,16 +290,17 @@ def adapt_cli_dispatch_paths(
                 uri == "ak.wwise.ui.project.open"
                 and not anchor_host.is_file()
             )
-            or (
-                uri == "ak.wwise.ui.project.create"
-                and not anchor_host.parent.is_dir()
-            )
         ):
             raise WwiseWirePathError(
                 "WIRE_PATH_ANCHOR_INVALID",
                 "The Authoring project transition target is not a valid local .wproj anchor.",
                 details={"target_project_path": str(anchor_host)},
             )
+        # Authoring create may create its target directory. Its immutable
+        # creation plan independently pins the existing ancestor/destination
+        # absence and revalidates both before this transient wire adaptation.
+        # The mapping still belongs to the existing account/root and the exact
+        # audited target must round-trip; no new drive mapping is inferred.
         drive, mapping_root = _mapping_for_host_path(
             anchor_host,
             account_home=home,

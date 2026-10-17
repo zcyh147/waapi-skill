@@ -51,6 +51,8 @@ def observe_cli_project_outcome(uri: str, version: str, result: Any) -> dict[str
 
 
 CONSOLE_CREATE_URI = 'ak.wwise.console.project.create'
+AUTHORING_CREATE_URI = 'ak.wwise.ui.project.create'
+PROJECT_CREATE_URIS = frozenset({CONSOLE_CREATE_URI, AUTHORING_CREATE_URI})
 MAX_PROJECT_FILE_BYTES = 8 * 1024 * 1024
 MAX_PROJECT_XML_NODES = 32768
 MAX_PROJECT_XML_DEPTH = 64
@@ -112,26 +114,31 @@ def _created_project_root_identity(plan: Mapping[str, Any]) -> dict[str, Any]:
     return _project_io_root_identity(plan['io_root'])
 
 
-def prepare_console_project_creation(args: Mapping[str, Any], audit: Mapping[str, Any], version: str) -> dict[str, Any]:
+def prepare_console_project_creation(args: Mapping[str, Any], audit: Mapping[str, Any], version: str, *, uri: str = CONSOLE_CREATE_URI) -> dict[str, Any]:
+    from pathlib import Path
     from .operation_soundbank import SoundBankContractError, prove_artifact_path
 
+    if uri not in PROJECT_CREATE_URIS:
+        raise ValueError('Not a reviewed saved-project creation URI')
     paths = [row for row in audit['paths'] if row['json_path'] == '$.args.path']
     if len(paths) != 1:
         raise SoundBankContractError('INVALID_PATH', 'Project creation requires its exact isolated output path')
     path, root = paths[0]['resolved_path'], audit['io_root']
+    if uri == AUTHORING_CREATE_URI and Path(path).stem != Path(path).parent.name:
+        raise SoundBankContractError('INVALID_PROJECT_PATH', 'Authoring creation requires matching project-file and parent-directory names')
     ancestor, missing = _project_creation_ancestor(root)
     before = prove_artifact_path(path, io_root=ancestor['resolved_path'], field='new project', must_exist=False, expect_directory=False)
     if before['exists']:
         raise SoundBankContractError('PROJECT_ALREADY_EXISTS', 'New project creation cannot replace an existing file')
-    return {'kind': 'console-project-create', 'uri': CONSOLE_CREATE_URI, 'version': version,
+    return {'kind': 'authoring-project-create' if uri == AUTHORING_CREATE_URI else 'console-project-create', 'uri': uri, 'version': version,
         'args': dict(args), 'path': path, 'io_root': root, 'root_identity': ancestor,
         'missing_root_directories': missing, 'before': before}
 
 
-def validate_console_project_creation(plan, args, audit, version):
+def validate_console_project_creation(plan, args, audit, version, *, uri=CONSOLE_CREATE_URI):
     from .operation_soundbank import SoundBankContractError
 
-    if dict(plan) != prepare_console_project_creation(args, audit, version):
+    if dict(plan) != prepare_console_project_creation(args, audit, version, uri=uri):
         raise SoundBankContractError('FILE_CHANGED', 'Project destination or its isolated path changed after Preview')
 
 
@@ -245,7 +252,7 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
     for field in ('platforms', 'languages'):
         if args.get(field) == []:
             unresolved.append(f'{field}_explicit_empty_native_semantics')
-    return {'kind': 'console-created-project-artifact', 'file_proof': proof,
+    return {'kind': 'authoring-created-project-artifact' if plan['uri'] == AUTHORING_CREATE_URI else 'console-created-project-artifact', 'file_proof': proof,
         'project': {'id': project.get('ID'), 'name': project.get('Name')},
         'platforms': platforms, 'languages': languages, 'default_language': defaults[0].get('Value'),
         'platforms_match': platform_matches if expected_platforms else True,
