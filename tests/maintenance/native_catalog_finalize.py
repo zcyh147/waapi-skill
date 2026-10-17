@@ -150,6 +150,8 @@ def finalize_native_capture(args, *, skill_root: Path) -> int:
     definitions = json.loads(definitions_raw)
     if definitions["wwise_build"] != args.build:
         raise ValueError("Retained definition build mismatch")
+    if definitions.get("inventory_sha256") != canonical_digest({k: v for k, v in definitions.items() if k != "inventory_sha256"}):
+        raise ValueError("Retained definition inventory digest mismatch before extension")
     definition_evidence = _extend_definitions(definitions, args)
     catalog = {"contract": "waapi-skill.native-catalog/v1", "version": args.version,
                **inventories, "schemas": schemas, "definitions": definitions,

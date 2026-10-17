@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .capabilities import CapabilityCatalog, CapabilityCatalogError, CapabilityNotFoundError
+from .authoring_ui_commands_manifest import AUTHORING_UI_COMMAND_URIS
 from .deferred_registry import ApiClassifier
 from .execution_contracts import AUTHORING_UI_EXECUTION_PROFILE, CONSOLE_EXECUTION_PROFILE
 from .versions import SUPPORTED_WWISE_VERSION_KEYS
@@ -46,7 +47,7 @@ def load_native_catalog(version: str, host: str, *, root: Path = NATIVE_CATALOG_
     return catalog
 
 
-def native_capability(catalog: dict, uri: str, *, full_schema: bool = False, compact: bool = False) -> dict:
+def native_capability(catalog: dict, uri: str, *, full_schema: bool = False, compact: bool = False, execution_records: dict | None = None) -> dict:
     kind = "function" if uri in catalog["functions"] else "topic"
     if uri not in catalog["schemas"]:
         raise CapabilityNotFoundError(f"{uri} absent from attested native inventory")
@@ -54,7 +55,10 @@ def native_capability(catalog: dict, uri: str, *, full_schema: bool = False, com
     profile = AUTHORING_UI_EXECUTION_PROFILE if host == "wwise-authoring" else CONSOLE_EXECUTION_PROFILE
     comparison = {"status": "not_in_execution_profile", "business_execution_proven": False}
     try:
-        implemented = CapabilityCatalog().describe_for_profile(catalog["version"], uri, profile=profile)
+        implemented = (CapabilityCatalog().describe_for_profile(catalog["version"], uri, profile=profile)
+                       if execution_records is None else execution_records.get(uri))
+        if implemented is None:
+            raise CapabilityNotFoundError(uri)
     except CapabilityNotFoundError:
         interface = {"status": "missing_implementation", "gateway_commands": [], "transaction_operations": []}
     else:
@@ -63,6 +67,8 @@ def native_capability(catalog: dict, uri: str, *, full_schema: bool = False, com
         comparison = {"status": "identical" if matches else "different", "business_execution_proven": False, "execution_schema_sha256": canonical_digest(implemented.schema), "profile": profile}
         if not matches:
             interface = {**interface, "execution_profile_status": interface["status"], "status": "native_schema_drift_pending_review"}
+    if host == "wwise-console" and uri in AUTHORING_UI_COMMAND_URIS:
+        interface = {**interface, "status": "host_boundary", "required_host": "wwise-authoring"}
     if uri in APPROVED_EXCLUSIONS:
         interface = {"status": "approved_exclusion", "reason": "Explicit Authoring Lua/launch exclusion", "gateway_commands": [], "transaction_operations": []}
     result = {"version": catalog["version"], "uri": uri, "item_type": kind, "native_status": "present", "host_surface": host, "category": ApiClassifier().category_for(uri),
@@ -81,7 +87,7 @@ def native_capability(catalog: dict, uri: str, *, full_schema: bool = False, com
         result["provenance"] = catalog["provenance"]
     if compact:
         result = {key: value for key, value in result.items() if key not in {"provenance", "source_receipt_count", "source_receipts_sha256"}}
-        result["interface"] = {key: value for key, value in result["interface"].items() if key in {"status", "preferred_route", "gateway_commands", "transaction_operations", "semantic_family", "execution_enabled_by_catalog"}}
+        result["interface"] = {key: value for key, value in result["interface"].items() if key in {"status", "preferred_route", "gateway_commands", "transaction_operations", "semantic_family", "required_host", "execution_enabled_by_catalog"}}
     return result
 
 

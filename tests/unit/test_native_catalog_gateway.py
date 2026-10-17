@@ -345,8 +345,8 @@ def test_full_native_schema_discloses_content_bound_source_pointers(tmp_path, mo
     assert row["provenance"]["sources"] == {"capture.json": "a" * 64}
 
 
-@pytest.mark.parametrize("damage", [None, "receipt-digest", "definition-digest", "bundle-build", "wrong-schema-target", "wrong-session"])
-def test_sealed_capture_finalizes_offline_with_attested_missing_ui_definitions(tmp_path, damage):
+@pytest.mark.parametrize("damage", [None, "receipt-digest", "definition-digest", "retained-definition-digest", "bundle-build", "wrong-schema-target", "wrong-session"])
+def test_sealed_capture_finalizes_offline_with_attested_missing_ui_definitions(tmp_path, monkeypatch, damage):
     import hashlib
     import plistlib
     config = tmp_path / "config.json"
@@ -388,6 +388,14 @@ def test_sealed_capture_finalizes_offline_with_attested_missing_ui_definitions(t
             (source / f"{URI}.json").write_bytes(original_bytes[f"{URI}.json"] + b" ")
         elif damage == "definition-digest":
             ui_file.write_bytes(ui_file.read_bytes() + b" ")
+        elif damage == "retained-definition-digest":
+            retained = json.loads((collector.SKILL_ROOT / "resources/manifest/2025.1/definitions.json").read_text())
+            retained["documents"]["common_definitions.json"]["definitions"]["uint32"]["maximum"] = 1
+            isolated_skill = tmp_path / "isolated-skill"
+            destination = isolated_skill / "resources/manifest/2025.1/definitions.json"
+            destination.parent.mkdir(parents=True)
+            destination.write_text(json.dumps(retained))
+            monkeypatch.setattr(collector, "SKILL_ROOT", isolated_skill)
         elif damage == "bundle-build":
             info.write_bytes(plistlib.dumps({"CFBundleVersion": "2024.1.13.9056"}))
             proof = json.loads(attestation.read_text())
@@ -415,3 +423,37 @@ def test_sealed_capture_finalizes_offline_with_attested_missing_ui_definitions(t
     assert derived["provenance"]["derivation"]["source_seal_sha256"] == hashlib.sha256(seal.read_bytes()).hexdigest()
     assert derived["provenance"]["derivation"]["original_outcome"]["status"] == "BLOCKED"
     assert {p.name: p.read_bytes() for p in source.iterdir()} == original_bytes
+
+
+@pytest.mark.parametrize("host, expected", [
+    ("wwise-console", {"2021.1": (99, 27), "2022.1": (112, 32), "2023.1": (149, 32), "2024.1": (148, 30), "2025.1": (154, 31)}),
+    ("wwise-authoring", {"2021.1": (99, 27), "2022.1": (112, 32), "2023.1": (149, 32), "2024.1": (170, 34), "2025.1": (179, 35)}),
+])
+def test_packaged_native_discovery_accounts_for_all_five_attested_versions(host, expected):
+    code, result = gateway.execute_gateway(["capabilities", "--all-versions", "--native-host", host, "--summary-only"], env={}, client_factory=lambda url: pytest.fail("packaged discovery must stay offline"))
+    assert code == 0, result
+    assert result["versions"] == list(expected)
+    assert {version: (row["functions"], row["topics"]) for version, row in result["summary"].items()} == expected
+    assert result["returned_count"] == 0
+    assert result["truncated"] is False
+    assert result["continuation"] is None
+    assert all(row["evidence_kind"] == "reflection_only" for row in result["summary"].values())
+
+
+def test_console_native_reflection_keeps_authoring_command_execution_boundary():
+    code, payload = gateway.execute_gateway(["--version", "2021.1", "describe", "ak.wwise.ui.commands.getCommands", "--native-host", "wwise-console"], env={})
+    assert code == 0, payload
+    row = payload["availability"]["2021.1"]["capability"]
+    assert row["native_status"] == "present"
+    assert row["interface"]["status"] == "host_boundary"
+    assert row["interface"]["required_host"] == "wwise-authoring"
+
+
+def test_real_authoring_discovery_exposes_new_shapes_and_exact_version_absence():
+    code, payload = gateway.execute_gateway(["describe", "ak.wwise.ui.layout.resetLayouts", "--all-versions", "--native-host", "wwise-authoring", "--full-schema"], env={})
+    assert code == 0, payload
+    assert {version: row["available"] for version, row in payload["availability"].items()} == {"2021.1": False, "2022.1": False, "2023.1": False, "2024.1": False, "2025.1": True}
+    row = payload["availability"]["2025.1"]["capability"]
+    assert row["interface"]["status"] == "missing_implementation"
+    assert row["schema"]["full"]["argsSchema"]["properties"]["layouts"]["type"] == "array"
+    assert set(row["schema"]["definitions"]["documents"]) == {"common_definitions.json", "waapi_definitions.json", "waapi_ui_definitions.json", "wafm_definitions.json"}

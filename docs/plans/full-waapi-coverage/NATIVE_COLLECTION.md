@@ -94,3 +94,83 @@ mutual exclusion with execution profiles, and directory `--offset`. The first
 full Program run retained two expected stale-seal failures (7001 passed, three
 platform skips); the review policy and generated inventory were then refreshed.
 That run is not passing gate evidence.
+
+## Completed native input set (2026-10-17)
+
+All ten host/version catalogs are packaged under
+`skills/waapi-skill/resources/native-catalog/`, independent of execution
+manifests. `index.json` pins each complete file; `capture-provenance.json` binds
+its external lifecycle seal and original outcome. `definition-provenance.json`
+records the independently checked installed sources of retained core definitions.
+The two newer Authoring graphs additionally retain exact UI and WAFM documents
+and their installed bundle/executable/source-file attestations.
+
+| Build | Console functions / Topics | Authoring functions / Topics | Shared schemas, all exactly equal |
+| --- | ---: | ---: | ---: |
+| 2021.1.14.8108 | 99 / 27 | 99 / 27 | 126 |
+| 2022.1.19.8584 | 112 / 32 | 112 / 32 | 144 |
+| 2023.1.19.8928 | 149 / 32 | 149 / 32 | 181 |
+| 2024.1.13.9056 | 148 / 30 | 170 / 34 | 162 |
+| 2025.1.7.9143 | 154 / 31 | 179 / 35 | 169 |
+
+`host-schema-parity.json` records every shared URI and exact source catalog
+hashes, plus each host-only partition. All 782 shared schema pairs match. The
+2024.1 and 2025.1 Authoring additions are respectively 38 and 41 functions plus
+four Topics each; both versions omit 16 Console functions. This is independently
+captured schema parity, not URI-based inference, execution credit, or a promise
+about unexamined patch builds. The two approved Authoring Lua/launch exclusions
+remain visible. All 48 previously missing ordinary Authoring version/schema rows
+are now present, along with all shared schemas and referenced definitions.
+
+Capture candidate was `3c8406f3f5748f4107f5a11c78094c850a728d39` on macOS;
+Authoring used the packaged Windows executable through its shipped Wine runtime.
+These are genuine Wwise reflection reads, not native-Windows host acceptance.
+No Fresh Agent was launched. Root-owned lifecycle records preserve the full
+source-project hashes/mtimes, owned process checks and port-release evidence.
+
+- All five Console roots `console-2021-r1` through `console-2025-r1` completed
+  reflection and cleanup using the existing scenario lifecycle. Their owned
+  passing sandboxes were removed.
+- Authoring `authoring-2021-r1` and `authoring-2022-r1` completed capture and
+  cleanup. Authoring `authoring-2023-r1` completed its catalog but retained an
+  original `BLOCKED` cleanup verdict from an immediate port-bind check; its
+  independent seal separately records the subsequent bounded port-release
+  guard, no residual processes, and unchanged source.
+- Authoring `authoring-2024-r1` and `authoring-2025-r2` saved every schema and
+  final inventory/status but retained original `BLOCKED` definition-closure
+  verdicts. New derived roots complete them offline from externally sealed
+  receipts and installed UI/WAFM source attestations. Original roots and
+  verdicts remain intact; no schema was recollected to hide those failures.
+- `waapi_ui_definitions.json` adds 20 definitions per newer lane;
+  `wafm_definitions.json` adds 28 for 2024.1 and 32 for 2025.1. Capital `OneOf`
+  remains native source data. Its branch semantics and all ordinary Authoring
+  implementations remain obligations of [#176](https://github.com/zcyh147/waapi-skill/issues/176),
+  [#188](https://github.com/zcyh147/waapi-skill/issues/188), and
+  [#189](https://github.com/zcyh147/waapi-skill/issues/189), not claimed as
+  business coverage by this catalog work.
+
+## Maintainer launch and cleanup lessons
+
+The first 2025 Authoring attempt never reached WAAPI. Its copied native-wrapper
+option bundle (`--enable-alt-loader macdrv --wait-children`) did not reproduce
+the wrapper parent's launch context. A separate root succeeded with the reduced
+packaged Wine invocation: `start.exe /wait`, the explicit matching `Wwise.exe`,
+and the exact private sandbox project. Private HOME/prefix, project identity
+checks and source protection remained intact. Because all three added options
+were removed together, the evidence attributes the failure to that bundle and
+does not isolate an individual option as the cause. The failed attempt remains
+sealed. Do not replace this observed route with app association or user-preference
+copying based on that failure.
+
+After terminating only owned processes, use the existing bounded
+`wait_for_port_release` guard before judging the endpoint reusable. An immediate
+bind check was premature in the 2023 run. Preserve that original verdict and
+record later cleanup proof separately; do not relabel it as a clean first pass.
+These are developer lifecycle lessons, not extra steps in Skill user workflows.
+
+Final T01 focused validation ran the public native collector/discovery tests,
+existing typed Gateway/catalog regressions, and the reviewed interface-depth
+seal tests: **140 passed**. The root merger owns a fresh fixed Program gate on
+the integrated T01 candidate before #175 closes. Broader Non-live remains the
+combined substantial runtime PR gate. The earlier full Program result remains
+7001 passed / 3 skipped / 2 stale-parser-seal failures, not a passing run.

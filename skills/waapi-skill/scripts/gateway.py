@@ -9507,8 +9507,10 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
         for version in versions:
             native = load_native_catalog(version, args.native_host, root=NATIVE_CATALOG_ROOT)
             summaries[version] = {"functions": len(native["functions"]), "topics": len(native["topics"]), "schema_count": len(native["schemas"]), "evidence_kind": "reflection_only", "build": native["provenance"]["build"], "content_sha256": native["content_sha256"]}
+            execution_profile = AUTHORING_UI_EXECUTION_PROFILE if args.native_host == "wwise-authoring" else CONSOLE_EXECUTION_PROFILE
+            execution_records = {entry.uri: entry for entry in CapabilityCatalog().entries_for_profile(version, profile=execution_profile)}
             for uri in sorted(native["schemas"]):
-                row = native_capability(native, uri, compact=not args.detail)
+                row = native_capability(native, uri, compact=not args.detail, execution_records=execution_records)
                 if args.item_type and row["item_type"] != args.item_type:
                     continue
                 if args.query and args.query.casefold() not in uri.casefold():
