@@ -258,6 +258,20 @@ CLI_CREATE_URI = 'ak.wwise.cli.createNewProject'
 
 def prepare_cli_project_effect(uri, args, audit, version):
     """Freeze independent filesystem evidence without changing the terminal plan."""
+    if uri == 'ak.wwise.cli.addNewPlatform':
+        from .operation_soundbank import SoundBankContractError
+        path, root = args['project'], audit['io_root']
+        name = args.get('new-platform-name', args['new-platform-base'])
+        before = _saved_project_snapshot(path, root, version)
+        if any(row['Name'] == name for row in before['platforms']):
+            raise SoundBankContractError('PLATFORM_ALREADY_EXISTS', 'The new platform must not already exist')
+        source = args.get('copy-from-platform')
+        if source is not None and not any(row['Name'] == source for row in before['platforms']):
+            raise SoundBankContractError('MISSING_PLATFORM', 'The platform to copy settings from must exist')
+        return {'uri': uri, 'version': version, 'native_args': dict(args), 'path': path, 'io_root': root,
+            'name': name, 'project_before': before,
+            'model_before': _model_snapshot(path, root, excluded_platform=name,
+                selected_platforms=(source, name) if source is not None else ())}
     if uri != CLI_CREATE_URI:
         return None
     translated = {'path': args['project']}
@@ -292,4 +306,177 @@ def inspect_cli_project_effect(effect):
             {'name': 'Created project contains exactly the requested platforms',
              'passed': observed['platforms_match']}],
             'unresolved': observed['unresolved']}
+    if effect['uri'] == 'ak.wwise.cli.addNewPlatform':
+        args, name = effect['native_args'], effect['name']
+        before = effect['project_before']
+        after = _saved_project_snapshot(effect['path'], effect['io_root'], effect['version'])
+        source = args.get('copy-from-platform')
+        old_model = effect['model_before']
+        model = _model_snapshot(effect['path'], effect['io_root'], excluded_platform=name,
+            selected_platforms=(source, name) if source is not None else ())
+        added = [row for row in after['platforms'] if row['Name'] == name]
+        checks = [
+            {'name': 'Requested platform name and base were saved exactly once',
+             'passed': len(added) == 1 and added[0]['ReferencePlatform'] == args['new-platform-base']},
+            {'name': 'Existing project identity, platforms and languages were preserved',
+             'passed': before['project'] == after['project'] and before['languages'] == after['languages']
+                and before['default_language'] == after['default_language']
+                and before['platforms'] == [row for row in after['platforms'] if row['Name'] != name]},
+            {'name': 'Existing saved model was preserved outside the new platform',
+             'passed': model['root_identity'] == old_model['root_identity']
+                and {key: row['preserved_model_sha256'] for key, row in model['files'].items()}
+                 == {key: row['preserved_model_sha256'] for key, row in old_model['files'].items()}}]
+        unresolved = []
+        if source is not None:
+            expected = old_model['platform_settings'][source]
+            actual = model['platform_settings'][name]
+            if expected and expected == actual:
+                checks.append({'name': 'Explicit source platform settings were copied throughout the saved model', 'passed': True})
+            else:
+                # Native may elide inherited values. That representation needs
+                # matching native evidence; absence alone is not failure proof.
+                conflicts = any(key in actual and actual[key] != rows for key, rows in expected.items())
+                checks.append({'name': 'Copied settings contain no observed conflicting explicit values', 'passed': not conflicts})
+                unresolved.append('copy_settings_inherited_or_elided_native_representation' if expected
+                    else 'copy_settings_no_explicit_source_values')
+        return {'observations': [{'kind': 'cli-added-platform-artifact', 'project': after,
+            'saved_model_files': len(model['files']), 'copy_settings_source': source,
+            'unresolved': unresolved}], 'checks': checks, 'unresolved': unresolved}
     raise ValueError('Unknown Console project/file effect')
+
+
+MAX_MODEL_FILES = 512
+MAX_MODEL_DIRECTORIES = 2048
+MAX_MODEL_ENTRIES = 16384
+MAX_MODEL_BYTES = 32 * 1024 * 1024
+MAX_MODEL_SNAPSHOT_BYTES = 512 * 1024
+
+
+def _read_xml_artifact(path, root):
+    """Stable, confined UTF-8 XML observation shared by project/file effects."""
+    import hashlib
+    import os
+    from xml.etree import ElementTree as ET
+    from .operation_soundbank import SoundBankContractError, capture_file_proof, open_regular_artifact_file
+    proof = capture_file_proof(path, field='project model', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root)
+    _, descriptor, before = open_regular_artifact_file(path, field='project model', io_root=root)
+    with os.fdopen(descriptor, 'rb') as opened:
+        raw = opened.read(MAX_PROJECT_FILE_BYTES + 1)
+        after = os.fstat(opened.fileno())
+    if (len(raw) != proof['size'] or hashlib.sha256(raw).hexdigest() != proof['sha256']
+            or any(getattr(before, key) != getattr(after, key)
+                for key in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
+            or capture_file_proof(path, field='project model', max_bytes=MAX_PROJECT_FILE_BYTES, io_root=root) != proof):
+        raise SoundBankContractError('FILE_CHANGED', 'Project model changed during its bounded observation')
+    try:
+        text = raw.decode('utf-8-sig')
+        if '\x00' in text or '<!DOCTYPE' in text.upper() or '<!ENTITY' in text.upper():
+            raise ValueError('Project model must be UTF-8 XML without DTD/entities')
+        parser = ET.XMLPullParser(events=('start', 'end'))
+        document, count, depth = None, 0, 0
+        for offset in range(0, len(text), 65536):
+            parser.feed(text[offset:offset + 65536])
+            for event, node in parser.read_events():
+                if event == 'start':
+                    count, depth = count + 1, depth + 1
+                    if document is None:
+                        document = node
+                    if count > MAX_PROJECT_XML_NODES or depth > MAX_PROJECT_XML_DEPTH:
+                        raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model XML exceeds its node/depth limit')
+                else:
+                    depth -= 1
+        parser.close()
+        if document is None or document.tag != 'WwiseDocument':
+            raise ValueError('Project model lacks WwiseDocument')
+        return document, proof
+    except (UnicodeError, ValueError, ET.ParseError) as exc:
+        raise SoundBankContractError('INVALID_PROJECT_ARTIFACT', str(exc)) from exc
+
+
+def _xml_value(node, *, excluded_platform=None, document_root=False):
+    if excluded_platform is not None and (node.get('Platform') == excluded_platform
+            or node.tag == 'Platform' and node.get('Name') == excluded_platform):
+        return None
+    excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
+    return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
+        (node.text or '').strip(), [value for child in node
+            if (value := _xml_value(child, excluded_platform=excluded_platform)) is not None]]
+
+
+def _model_snapshot(project_path, root, *, excluded_platform=None, selected_platforms=()):
+    import hashlib
+    import json
+    import os
+    from pathlib import Path
+    from .filesystem_security import metadata_is_link_or_reparse
+    from .operation_soundbank import SoundBankContractError, prove_artifact_path
+    def digest(value):
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    identity = _project_io_root_identity(root)
+    files, directories, entries = [str(project_path)], 0, 0
+    try:
+        def walk_error(exc):
+            raise SoundBankContractError('INVALID_IO_ROOT', 'Project model directory cannot be enumerated') from exc
+        for directory, children, names in os.walk(root, followlinks=False, onerror=walk_error):
+            directories += 1
+            entries += len(children) + len(names)
+            if directories > MAX_MODEL_DIRECTORIES or entries > MAX_MODEL_ENTRIES:
+                raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its directory/entry observation budget')
+            for child in children:
+                path = Path(directory) / child
+                if metadata_is_link_or_reparse(path.lstat()):
+                    raise SoundBankContractError('SYMLINK_NOT_ALLOWED', 'Project model cannot traverse linked directories')
+            for name in names:
+                if name.casefold().endswith('.wwu'):
+                    files.append(str(Path(directory) / name))
+                    if len(files) > MAX_MODEL_FILES:
+                        raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its Work Unit observation budget')
+    except OSError as exc:
+        raise SoundBankContractError('INVALID_IO_ROOT', 'Project model directory metadata cannot be observed') from exc
+    summary = {'files': {}, 'platform_settings': {name: {} for name in selected_platforms}, 'anchors': {}, 'media_ids': {}}
+    total_bytes = 0
+    for path in sorted(files):
+        prove_artifact_path(path, io_root=root, field='project model', must_exist=True, expect_directory=False)
+        document, proof = _read_xml_artifact(path, root)
+        total_bytes += proof['size']
+        if total_bytes > MAX_MODEL_BYTES:
+            raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model exceeds its total byte observation budget')
+        relative = str(Path(path).relative_to(root))
+        summary['files'][relative] = {'proof': proof,
+            'preserved_model_sha256': digest(_xml_value(document, excluded_platform=excluded_platform, document_root=True)),
+            'wwise_version': document.get('WwiseVersion')}
+        def visit(node, context, owner):
+            label = (node.tag, node.get('ID', ''), node.get('Name', ''))
+            current = [*context, label]
+            if node.get('ID', '').startswith('{') and node.tag not in {'ObjectRef', 'MediaID', 'Platform'}:
+                owner = node.get('ID').upper()
+                summary['anchors'].setdefault(relative, []).append([node.tag, owner, node.get('Name')])
+            platform = node.get('Platform')
+            if platform in selected_platforms:
+                key = digest([relative, context, node.tag, sorted((k, v) for k, v in node.attrib.items() if k != 'Platform')])
+                value = _xml_value(node)
+                value[1] = [(k, v) for k, v in value[1] if k != 'Platform']
+                summary['platform_settings'][platform].setdefault(key, []).append(digest(value))
+            if node.tag == 'MediaID':
+                summary['media_ids'].setdefault(relative, []).append([owner, sorted(node.attrib.items())])
+            for child in node:
+                visit(child, current, owner)
+        visit(document, [], None)
+    for rows in summary['anchors'].values():
+        rows.sort(key=repr)
+    for rows in summary['media_ids'].values():
+        rows.sort(key=repr)
+    for values in summary['platform_settings'].values():
+        for rows in values.values():
+            rows.sort()
+    if _project_io_root_identity(root) != identity:
+        raise SoundBankContractError('FILE_CHANGED', 'Project model root changed during observation')
+    if len(json.dumps(summary, ensure_ascii=False).encode()) > MAX_MODEL_SNAPSHOT_BYTES:
+        raise SoundBankContractError('LIMIT_EXCEEDED', 'Project model snapshot exceeds its bounded evidence budget')
+    return {'root_identity': identity, **summary}
+
+
+def _saved_project_snapshot(path, root, version):
+    observed = inspect_created_project({'path': path, 'io_root': root, 'root_identity': _project_io_root_identity(root),
+        'missing_root_directories': [], 'version': version, 'args': {}})
+    return {key: observed[key] for key in ('project', 'platforms', 'languages', 'default_language')}

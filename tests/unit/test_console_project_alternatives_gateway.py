@@ -626,3 +626,107 @@ def test_cli_create_missing_or_wrong_artifact_never_verifies_or_reexecutes(tmp_p
     code, payload = task.run('execute', tx)
     assert code != 0, payload
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def saved_fixture_project(task):
+    task.created_file = task.project_file
+    ConsoleProjectTask.write_created_project(task, {})
+    tree = ET.parse(task.project_file)
+    tree.find('./ProjectInfo/Project').set('Name', 'Fixture')
+    tree.write(task.project_file)
+    unit = task.project_file.parent / 'Actor-Mixer Hierarchy' / 'Default Work Unit.wwu'
+    unit.parent.mkdir()
+    unit.write_text('''<WwiseDocument Type="WorkUnit" SchemaVersion="1" WwiseVersion="v2025.1.0">
+<ActorMixerHierarchy><WorkUnit Name="Default Work Unit" ID="{11111111-1111-1111-1111-111111111111}" PersistMode="Standalone">
+<ChildrenList><Sound Name="Keep" ID="{22222222-2222-2222-2222-222222222222}"><PropertyList><Property Name="Volume" Type="Real64"><ValueList><Value Platform="Windows">-6</Value></ValueList></Property></PropertyList></Sound></ChildrenList>
+</WorkUnit></ActorMixerHierarchy></WwiseDocument>'''.replace('v2025.1.0', 'v' + task.version + '.0'))
+    return unit
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+@pytest.mark.parametrize('copy_settings', [False, True])
+def test_cli_add_platform_checks_saved_platform_and_preserved_settings(tmp_path, version, copy_settings):
+    class AddTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find('./ProjectInfo/Project/Platforms'), 'Platform', Name='Studio',
+                    ReferencePlatform='Windows', ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                tree.write(self.project_file)
+                if copy_settings:
+                    unit_tree = ET.parse(self.unit)
+                    ET.SubElement(unit_tree.find('.//ValueList'), 'Value', Platform='Studio').text = '-6'
+                    unit_tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = AddTask(tmp_path, version, 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    extra = ['--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio']
+    if copy_settings:
+        extra += ['--value', 'copy_settings_from_platform', 'Windows']
+    tx = task.execute_plan(*extra)
+    before = len(task.calls)
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    assert not any(row[0].endswith('object.get') for row in task.calls[before:])
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('failure', ['missing-platform', 'wrong-base', 'wrong-name', 'existing-platform-lost',
+    'existing-setting-changed', 'wrong-copy', 'elided-copy'])
+def test_cli_add_platform_rejects_wrong_effect_and_keeps_elided_copy_partial(tmp_path, failure):
+    class AddFailureTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.project_file)
+                platforms = tree.find('./ProjectInfo/Project/Platforms')
+                if failure != 'missing-platform':
+                    ET.SubElement(platforms, 'Platform', Name='Other' if failure == 'wrong-name' else 'Studio',
+                        ReferencePlatform='Mac' if failure == 'wrong-base' else 'Windows',
+                        ID='{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+                if failure == 'existing-platform-lost':
+                    platforms.remove(platforms[0])
+                tree.write(self.project_file)
+                tree = ET.parse(self.unit)
+                values = tree.find('.//ValueList')
+                if failure == 'existing-setting-changed':
+                    values[0].text = '-99'
+                if failure not in {'elided-copy', 'missing-platform'}:
+                    ET.SubElement(values, 'Value', Platform='Studio').text = '-99' if failure == 'wrong-copy' else '-6'
+                tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = AddFailureTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    task.unit = saved_fixture_project(task)
+    tx = task.execute_plan('--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio',
+        '--value', 'copy_settings_from_platform', 'Windows')
+    code, payload = task.run('verify', tx)
+    assert payload['verified'] is False, payload
+    if failure == 'elided-copy':
+        assert code == 0 and payload['state'] == 'result_schema_checked', payload
+        assert payload['verification']['readbacks'][-1]['unresolved'] == ['copy_settings_inherited_or_elided_native_representation']
+    else:
+        assert code != 0 and payload['state'] == 'verification_failed', payload
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+def test_cli_add_platform_freezes_all_observed_work_units_before_execution(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    unit = saved_fixture_project(task)
+    code, payload = task.step('draft-declare-cli-console-plan', '--value', 'project_file', str(task.project_file),
+        '--value', 'base_platform', 'Windows', '--value', 'platform_name', 'Studio')
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    code, payload = task.run('transaction-show', tx)
+    assert code == 0, payload
+    code, payload = task.run('confirm', tx, '--confirmation-token', payload['confirmation']['token'])
+    assert code == 0, payload
+    unit.write_text(unit.read_text().replace('-6', '-12'))
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert not any(row[0] == task.operation for row in task.calls)
+    assert '-12' in unit.read_text()

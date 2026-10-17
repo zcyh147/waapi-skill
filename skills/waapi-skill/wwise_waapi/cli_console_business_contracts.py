@@ -6,7 +6,7 @@ from copy import deepcopy
 from typing import Any
 
 from .console_project_operations import (
-    CLI_PROJECT_FILE_URIS, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
+    CLI_PROJECT_FILE_URIS, MAX_MODEL_FILES, MAX_MODEL_DIRECTORIES, MAX_MODEL_ENTRIES, MAX_MODEL_BYTES, MAX_MODEL_SNAPSHOT_BYTES, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
     MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS, MAX_MISSING_PROJECT_DIRECTORIES,
 )
 
@@ -710,6 +710,17 @@ def cli_console_business_contract_data(
                 'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS,
                 'missing_project_directories': MAX_MISSING_PROJECT_DIRECTORIES},
         }} if operation == 'ak.wwise.cli.createNewProject' else {}),
+        **({'effect_verification': {
+            'saved_project_and_work_units': 'bounded_UTF8_XML_exact_name_base_and_preserved_model',
+            'copy_settings': 'compare_explicit_platform_values_in_all_observed_WPROJ_and_WWU_files',
+            'inherited_or_elided_copy_values': 'unresolved_no_business_acceptance_without_native_evidence',
+            'prewrite_inputs': 'all_observed_files_and_root_identity_must_match_Preview',
+            'post_terminal_native_calls': 'none',
+            'limits': {'model_files': MAX_MODEL_FILES, 'model_directories': MAX_MODEL_DIRECTORIES,
+                'model_entries': MAX_MODEL_ENTRIES, 'model_total_bytes': MAX_MODEL_BYTES,
+                'model_snapshot_bytes': MAX_MODEL_SNAPSHOT_BYTES, 'file_bytes': MAX_PROJECT_FILE_BYTES,
+                'xml_nodes_per_file': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH},
+        }} if operation == 'ak.wwise.cli.addNewPlatform' else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
             "version_specific_field_availability",
