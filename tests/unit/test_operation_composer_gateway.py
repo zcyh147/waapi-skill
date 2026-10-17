@@ -333,12 +333,28 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "e7360fdd277786e360dd0da34e4ac9becf8b78b598384af5893be37c57c5dcec"
+    )
+    # Only the five internal waapi.call contracts add the protected provider
+    # proof. Remove that exact field before checking every historical seal.
+    def before_provider_profile_binding(version):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("provider_profile_binding")
+        contract["argument_contract"]["optional"].remove("provider_profile_binding")
+        assert contract["argument_contract"]["properties"].pop("provider_profile_binding") == {
+            "type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_provider_profile_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
         "a4f68b59f0d6b6646f5b18d09521e6b126e06364ebd1b06946e8d64e62911c82"
     )
     # Only the internal waapi.call contracts add the exact object-file proof.
     # Removing that one reviewed field must retain every earlier contract seal.
     def before_source_file_binding(version):
-        contract = operation_request_machine_contract("waapi.call", version)
+        contract = before_provider_profile_binding(version)
         contract["optional_arguments"].remove("source_control_binding")
         contract["argument_contract"]["optional"].remove("source_control_binding")
         assert contract["argument_contract"]["properties"].pop("source_control_binding") == {
