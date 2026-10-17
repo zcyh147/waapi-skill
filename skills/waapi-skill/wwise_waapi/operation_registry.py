@@ -7421,6 +7421,23 @@ def _append_association_condition(requirements, *, source, owner, property_name,
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
 
 
+def _condition_metadata_assertions(pre_state, *, read):
+    """Keep the exact selected condition metadata valid through verification."""
+    assertions = []
+    condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
+    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
+    if isinstance(condition_metadata, Mapping):
+        condition_metadata_groups.append(condition_metadata)
+    for condition_metadata in condition_metadata_groups:
+        for expected in condition_metadata["fields"]:
+            name = expected.get("field_binding", {}).get("token", expected["name"])
+            observed = _read_property_info(read, object_id=condition_metadata["object_id"], name=name).as_dict()
+            assertions.append({"name": f"condition metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, expected),
+                               "evidence": {"expected": expected, "actual": observed}})
+    return assertions
+
+
 def _related_condition_assertions(requirements, *, read):
     assertions = []
     readbacks = []
@@ -13940,18 +13957,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
-    condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
-    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
-    if isinstance(condition_metadata, Mapping):
-        condition_metadata_groups.append(condition_metadata)
-    for condition_metadata in condition_metadata_groups:
-        for expected in condition_metadata["fields"]:
-            name = expected.get("field_binding", {}).get("token", expected["name"])
-            args = {"object": condition_metadata["object_id"], "property": name}
-            observed = _read_property_info(read_call, object_id=condition_metadata["object_id"], name=name).as_dict()
-            assertions.append({"name": f"condition metadata {name} unchanged",
-                               "passed": _native_snapshot_equal(observed, expected),
-                               "evidence": {"expected": expected, "actual": observed}})
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
     source = roles.get("object") if isinstance(roles, Mapping) else None
     if isinstance(field_before, Mapping) and isinstance(source, Mapping):
@@ -15529,6 +15535,7 @@ def verify_prepared_operation(
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
 
     def check_result_schema(uri: str, version: str) -> None:
         try:

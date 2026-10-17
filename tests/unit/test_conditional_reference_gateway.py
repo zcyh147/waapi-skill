@@ -87,6 +87,7 @@ def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_
     assert condition_contract["conditions"]["association_owner"]["source_type"] == "ObjectSettingAssociation"
     assert condition_contract["conditions"]["association_owner"]["recursive_prerequisites"] == ["property", "override", "reference"]
     assert condition_contract["safety"]["related_object_writes"] == "separately_preview_and_authorize"
+    assert condition_contract["safety"]["verify_condition_metadata_after_execution"] is True
     assert condition_contract["safety"]["revalidate"] == ["identities", "relationships", "metadata", "prerequisite_values"]
     assert condition_contract["atomic_batch_alternative"] == ("object.set" if version != "2021.1" else None)
     assert task.calls == []
@@ -1369,7 +1370,8 @@ def test_native_reference_restriction_certifies_reference_when_optional_type_is_
 @pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
     for operation in (["object.setReference"] if version == "2021.1" else ["object.setReference", "object.set"])])
 @pytest.mark.parametrize("original,current,metadata_type,expected_code", [(True, 1, "bool", 2), (1, 1.0, "int16", 0)])
-def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_path, version, operation, original, current, metadata_type, expected_code):
+@pytest.mark.parametrize("stage", ["before", "after"])
+def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_path, version, operation, original, current, metadata_type, expected_code, stage):
     task = AttenuationTask(tmp_path, version, operation=operation)
     task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True, ControllerMode=original)
     task.metadata["ControllerMode"] = {"name": "ControllerMode", "type": metadata_type}
@@ -1384,13 +1386,18 @@ def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_pa
     assert code == 0, shown
     code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
     assert code == 0, confirmed
-    task.metadata["Attenuation"]["dependencies"][0]["conditions"][0]["restriction"]["values"][0]["value"] = current
+    if stage == "before":
+        task.metadata["Attenuation"]["dependencies"][0]["conditions"][0]["restriction"]["values"][0]["value"] = current
     code, executed = task.run("execute", tx)
-    assert code == expected_code, executed
-    if expected_code == 2:
+    assert code == (expected_code if stage == "before" else 0), executed
+    if expected_code == 2 and stage == "before":
         assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
         assert task.objects[FIRST]["Attenuation"] is None
         return
+    if stage == "after":
+        task.metadata["Attenuation"]["dependencies"][0]["conditions"][0]["restriction"]["values"][0]["value"] = current
     code, verified = task.run("verify", tx)
-    assert code == 0 and verified["verified"] is True, verified
+    assert code == (expected_code if stage == "after" else 0), verified
+    assert verified["verified"] is (expected_code == 0 or stage == "before"), verified
     assert task.objects[FIRST]["Attenuation"] == {"id": SECOND}
+    assert sum(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls) == 1
