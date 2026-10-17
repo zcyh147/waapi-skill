@@ -36,6 +36,13 @@ references. No main merge is authorized.
   It includes integer enums/ranges, parent contexts, reference requirements,
   visibility, Uint16 plugin conditions and expanded 2025 EQ conditions. Installed
   XML facts still require matching live metadata and behavior evidence.
+- Five sequential Console condition-metadata captures on frozen `e0f2d295`
+  completed: 37 targeted field details through 101 public Gateway calls. All
+  five source full hashes and project mtimes were unchanged, successful sandboxes
+  were removed, and no owned Wwise process remained. These establish native
+  metadata shapes for #177/#178/#179; they are not edit, Authoring or Fresh proof.
+  Exact receipts and independent seals are under the ignored coordination root
+  in `condition-metadata-2021-r1` through `condition-metadata-2025-r1`.
 - No Fresh run has been authorized or started for this specification.
 
 Ignored durable coordination state is under `.waapi-skill-state/full-coverage/`:
