@@ -116,15 +116,30 @@ class PropertyTask(FieldTask):
             self.calls.append((uri, args, options))
             self.objects[args["object"]]["@" + args["property"]] = args["value"]
             return {}
+        if uri == "ak.wwise.core.object.setReference":
+            self.calls.append((uri, args, options))
+            self.objects[args["object"]]["@" + args["reference"]] = None
+            return {}
         return super().call(uri, args, options)
 
 
 @pytest.mark.parametrize("version", VERSIONS)
-def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: Path, version: str) -> None:
-    task = PropertyTask(tmp_path, version, "object.setProperty")
-    task.metadata = {"Volume": {"name": "Volume", "type": "Real32",
+@pytest.mark.parametrize("operation,token", [
+    ("object.setProperty", "Volume"), ("object.setProperty", "NativeProperty" + "x" * 600),
+    ("object.setProperty", "声" * 300), ("object.setProperty", "NativeProperty" + "x" * 12000),
+    ("object.setReference", "OutputBus")],
+    ids=["ordinary", "long-ascii", "long-utf8", "paged-token", "reference-clear"])
+@pytest.mark.parametrize("drift", [None, "restriction", "type", "default-null", "unit", "postwrite-default"])
+def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: Path, version: str, operation: str, token: str, drift: str | None) -> None:
+    task = PropertyTask(tmp_path, version, operation)
+    reference = operation == "object.setReference"
+    before, after = ({"id": SECOND}, None) if reference else (0.0, -4)
+    task.metadata = {token: {"name": token, "type": "Real32",
+                                "display": {"name": "声量"},
                                 "restriction": {"type": "range", "min": -96.3, "max": 12}}}
-    task.objects[FIRST].update({"name": "Alarm", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm", "@Volume": 0.0})
+    if reference:
+        task.metadata[token].update(type="Reference", restriction={"type": "reference", "restrictions": [{"type": ["Bus"]}]})
+    task.objects[FIRST].update({"name": "Alarm", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm", "@" + token: before})
     target = task.bind(FIRST)
     code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
     assert code == 0, listed
@@ -132,25 +147,51 @@ def test_selected_field_reaches_preview_execution_and_verified_value(tmp_path: P
                              "--selection", listed["agent_result"]["fields"][0]["selection"])
     assert code == 0, detail
     code, declared = task.step("draft-declare-field-change", "--object-handle", target,
-                              "--field-handle", detail["field_candidates"][0]["handle"], "--business-value", "-4")
+                              "--field-handle", detail["field_candidates"][0]["handle"],
+                              *(["--clear-reference"] if reference else ["--business-value", "-4"]))
     assert code == 0, declared
     code, checked = task.step("draft-check")
     assert code == 0, json.dumps(checked)
     code, preview = task.step("preview-from-draft")
     assert code == 0, json.dumps(preview)
-    assert task.objects[FIRST]["@Volume"] == 0
+    assert task.objects[FIRST]["@" + token] == before
     tx = preview["transaction_id"]
     code, shown = task.run("transaction-show", tx)
     assert code == 0, json.dumps(shown)
     code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
     assert code == 0, json.dumps(confirmed)
+    if drift == "restriction":
+        task.metadata[token]["restriction"] = ({"type": "reference", "restrictions": [{"type": ["Sound"]}]}
+                                                 if reference else {"type": "range", "min": -96.3, "max": 0})
+    elif drift == "type":
+        task.metadata[token]["type"] = "Real64"
+    elif drift == "default-null":
+        task.metadata[token]["default"] = None
+    elif drift == "unit":
+        task.metadata[token]["ui"] = {"dataMeaning": "Frequency"}
     code, executed = task.run("execute", tx)
+    if drift and drift != "postwrite-default":
+        assert code == 2, executed
+        assert task.objects[FIRST]["@" + token] == before
+        assert not any(uri.endswith(("setProperty", "setReference")) for uri, _, _ in task.calls)
+        return
     assert code == 0, json.dumps(executed)
+    if drift == "postwrite-default":
+        task.metadata[token]["default"] = None
     code, verified = task.run("verify", tx)
+    if drift == "postwrite-default":
+        assert code == 2 and verified["verified"] is False, verified
+        assert sum(uri.endswith(("setProperty", "setReference")) for uri, _, _ in task.calls) == 1
+        return
     assert code == 0, json.dumps(verified)
     assert verified["verified"] is True
-    assert task.objects[FIRST]["@Volume"] == -4
-    assert sum(uri == "ak.wwise.core.object.setProperty" for uri, _, _ in task.calls) == 1
+    assert task.objects[FIRST]["@" + token] == after
+    assert [args for uri, args, _ in task.calls if uri.endswith(("setProperty", "setReference"))] == [
+        {"object": FIRST, "reference" if reference else "property": token,
+         "value": "{00000000-0000-0000-0000-000000000000}" if reference else -4}]
+    assert all(args["property"] == token for uri, args, _ in task.calls if uri.endswith("getPropertyInfo"))
+    assert any(token in options.get("return", []) for uri, _, options in task.calls
+               if uri.endswith("object.get") and options)
     assert list(verified)[-1] == "agent_result"
 
 

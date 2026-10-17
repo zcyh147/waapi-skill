@@ -12,6 +12,22 @@ from typing import Any, Mapping
 from .canonical import canonical_json_bytes
 
 
+def bounded_native_header(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Useful small facts with explicit previews; raw entries retain every byte."""
+    result: dict[str, Any] = {}
+    for key, value in metadata.items():
+        if len(canonical_json_bytes(value)) <= 1024:
+            result[key] = value
+        else:
+            if isinstance(value, str):
+                result[key] = value[:128]
+                result[key + "_characters"] = len(value)
+            else:
+                result[key + "_kind"] = "object" if isinstance(value, Mapping) else "array" if isinstance(value, list) else "value"
+            result[key + "_complete"] = False
+    return result
+
+
 def detail_entries(value: Any, pointer: str = "") -> list[dict[str, Any]]:
     if isinstance(value, Mapping):
         rows = [{"pointer": pointer, "kind": "object", "length": len(value)}]
@@ -79,7 +95,7 @@ def detail_page(metadata: Mapping[str, Any], *, selection: str,
                 "complete": stop == len(values),
                 "next_detail_page": f"md1.{stop}.{digest}" if stop < len(values) else None,
                 "detail_view": kind}
-    field = {key: metadata[key] for key in ("name", "type", "default", "supports", "unit", "availability") if key in metadata}
+    field = bounded_native_header({key: metadata[key] for key in ("name", "type", "classId", "default", "supports", "unit", "availability") if key in metadata})
     if isinstance(restriction, Mapping):
         field["constraints"] = {key: restriction[key] for key in ("type", "min", "max", "minInclusive", "maxInclusive") if key in restriction}
     field["dependency_page"] = typed_page("dependencies", dependencies)
