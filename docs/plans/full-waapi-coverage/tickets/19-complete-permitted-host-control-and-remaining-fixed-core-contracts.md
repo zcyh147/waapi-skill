@@ -130,3 +130,37 @@ populated-marker checks remain #193 work. A genuinely indistinguishable native
 observation may justify a reviewed weaker result under Spec96, but current
 missing checks are not that evidence. Full #193/WAL and remaining #188 scope
 remain open under the native launch hold.
+
+
+## Bounded successor: complete WAL observation delivery
+
+The exact slice is `ak.wwise.debug.getWalTree`, reflected in the packaged
+2023.1/2024.1/2025.1 Console surface and inherited Authoring profile. The
+2021.1/2022.1 packaged route boundary stays explicit; it is not new native
+absence evidence. Matching pinned schemas declare `id: number`, optional
+`return.nodes`, and no map count/ID uniqueness/key-to-ID constraint. Finite
+numeric IDs and omitted versus empty maps are preserved accordingly, without
+changing any native schema or global validator.
+
+`request-schema` discloses the closed `debug-wal-tree` delivery contract. The
+256 choice is a per-page summary/fragment bound, no longer a native node-count
+limit. A small reply retains the entire native document beside deterministic
+summaries. Larger replies use the existing lossless JSON document fragment and
+reread/hash pattern, retaining every key, extension field, empty container and
+array order. Copy-only continuations bind the selected configuration, endpoint,
+page choice, all available getInfo facts (including presence), whole canonical
+result and 900-second expiry. Optional process/session IDs need not exist for a
+read-only result. Any changed observation rejects continuation; reconstruction
+requires all prior fragments. Repeated reads do not promise an atomic snapshot
+across calls. No cache, native offset/input or mutation authority is introduced.
+
+Public fake controls cover all six reflected host/version lanes, four older
+packaged boundaries, more than 256 nodes, small requested prefixes, long native
+keys, unknown fields, duplicate numeric IDs under separate native keys, malformed
+nodes, optional omission, stale context/results, expiry and transport overflow.
+Actual main stdout reconstructs both hostile UTF-8/escaped documents and a
+230,000-character native field within ordinary per-page output. Native Debug
+availability, volatile real observations, platform delivery and remaining Tone
+waveform/markers/rate/envelope semantics still need their own evidence. Full
+#193, #194 downstream delivery and remaining #188 obligations stay open; no
+native, Console, Authoring or Fresh process was launched for this slice.

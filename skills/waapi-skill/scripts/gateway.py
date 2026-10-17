@@ -58,6 +58,7 @@ from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[repor
     SemanticPreview,
     SemanticValidationError,
 )
+from wwise_waapi.wal_read_continuation import wal_read_contract  # noqa: E402
 from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DebugLuaContractError,
     MAX_WAL_TREE_NODES,
@@ -1837,10 +1838,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="max_nodes",
         metavar=f"1..{MAX_WAL_TREE_NODES}",
         help=(
-            "Maximum WAL nodes returned after the complete bounded call; "
+            "Maximum node summaries or lossless document fragments per page; "
             f"defaults to 128 and is capped at {MAX_WAL_TREE_NODES}"
         ),
     )
+    debug_wal_tree.add_argument('--wal-page', help='Copy the Gateway-owned exact-observation continuation')
     debug_validate_call = subparsers.add_parser(
         "debug-validate-call",
         help=(
@@ -6153,6 +6155,12 @@ def preflight_debug_read_input(
                 "debug-wal-tree --max-nodes must be between 1 and "
                 f"{MAX_WAL_TREE_NODES}"
             )
+        if args.wal_page is not None:
+            from wwise_waapi.wal_read_continuation import parse_wal_page, WalContinuationError
+            try:
+                parse_wal_page(args.wal_page)
+            except WalContinuationError as exc:
+                raise GatewayInputError(str(exc)) from exc
         return
     if args.command != "debug-validate-call":
         raise GatewayInputError(f"unsupported debug-read command: {args.command}")
@@ -7148,6 +7156,9 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         "commands": commands,
         **({"business_contract": media_pool_field_discovery_contract()}
            if capability.uri == "ak.wwise.core.mediaPool.getFields" else {}),
+        **({'business_contract': wal_read_contract(
+            native_limit=int(capability.execution_contract['result_limit_bytes']), maximum=MAX_WAL_TREE_NODES)}
+           if capability.uri == 'ak.wwise.debug.getWalTree' else {}),
         "continuation": (
             commands[0]
             if len(commands) == 1
@@ -14427,6 +14438,13 @@ def dispatch_command(
             raise GatewayInputError(
                 f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
             )
+        from wwise_waapi.wal_read_continuation import prepare_wal_page, finish_wal_page, WalContinuationError
+        wal_context = {'configuration': selected_connection_binding(env), 'endpoint': common['endpoint'],
+            'live': dict(live_info)}
+        try:
+            wal_page = prepare_wal_page(token=args.wal_page, maximum=args.max_nodes, context=wal_context)
+        except WalContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': False}, error_code=exc.code) from exc
         request_validation = validate_semantic_payload(
             api,
             {},
@@ -14488,6 +14506,11 @@ def dispatch_command(
                 result.get("result"),
                 take=args.max_nodes,
             )
+            projection = finish_wal_page(wal_page, raw=result['result'], normalized=projection,
+                next_command=lambda token: transaction_next_command('debug-wal-tree',
+                    ['debug-wal-tree', '--max-nodes', str(args.max_nodes), '--wal-page', token]))
+        except WalContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': True}, error_code=exc.code) from exc
         except DebugLuaContractError as exc:
             raise GatewayResultShapeError(
                 str(exc),
