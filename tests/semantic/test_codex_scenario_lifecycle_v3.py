@@ -681,3 +681,77 @@ def test_unproven_start_failure_leaves_private_home_untouched(
     evidence = json.loads(caught.value.evidence_path.read_text(encoding="utf-8"))
     assert evidence["wwise_stop_status"] == "unproven"
     assert evidence["launch_environment_archive_path"] is None
+
+
+def test_successful_owner_can_stop_without_releasing_before_last_teardown(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='shared-authoring-owner', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    result = owner.finish('PASS', defer_success_cleanup=True)
+    assert result.final_status == 'PREPARED'
+    assert result.sandbox_retained is True
+    assert result.cleanup_deferred is True
+    assert result.as_dict()['contract'] == 'waapi-skill.codex-semantic-scenario-prepared-cleanup/v1'
+    assert owner._finished is True
+    assert runtime.sandbox.sandbox_project.exists()
+    assert runtime.owned_root.exists()
+
+
+def test_prepared_owner_releases_only_after_fresh_post_teardown_proofs(monkeypatch, tmp_path):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='shared-owner-release', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    prepared = owner.finish('PASS', defer_success_cleanup=True)
+    observations = []
+    def resource_check(actual_runtime):
+        assert actual_runtime is runtime
+        assert runtime.sandbox.sandbox_project.exists()
+        observations.append('fresh resource check')
+    result = owner.release_prepared_cleanup(post_teardown_check=resource_check)
+    assert observations == ['fresh resource check']
+    assert result.final_status == 'PASS'
+    assert result.cleanup_deferred is False
+    assert result.sandbox_retained is False
+    assert not runtime.owned_root.exists()
+    assert json.loads((runtime.evidence_root / 'lifecycle.json').read_text()) == prepared.as_dict()
+    assert json.loads((runtime.evidence_root / 'lifecycle-final.json').read_text()) == result.as_dict()
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='prepared'):
+        owner.release_prepared_cleanup(post_teardown_check=resource_check)
+
+
+@pytest.mark.parametrize('damage', ['source-content', 'source-mtime', 'resource'])
+def test_prepared_owner_preserves_root_when_last_teardown_changes_proofs(monkeypatch, tmp_path, damage):
+    source, _ = _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='shared-owner-late-drift', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    owner.finish('PASS', defer_success_cleanup=True)
+    if damage == 'source-content':
+        monkeypatch.setattr(lifecycle_v3, 'hash_project', lambda *_args, **_kwargs: _project_hash('b' * 64))
+    elif damage == 'source-mtime':
+        original = source.stat().st_mtime_ns
+        os.utime(source, ns=(source.stat().st_atime_ns, original + 1000000))
+    def resource_check(_runtime):
+        if damage == 'resource':
+            raise RuntimeError('owned process/resource reappeared after teardown')
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='post-teardown'):
+        owner.release_prepared_cleanup(post_teardown_check=resource_check)
+    assert runtime.owned_root.exists()
+    assert runtime.sandbox.sandbox_project.exists()
+    assert not (runtime.evidence_root / 'lifecycle-final.json').exists()
+
+
+@pytest.mark.parametrize('status', ['FAIL', 'BLOCKED', 'INDETERMINATE'])
+def test_original_nonpass_owner_never_becomes_a_prepared_release(monkeypatch, tmp_path, status):
+    _install_fakes(monkeypatch, tmp_path)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='original-nonpass', version='2022.1',
+        scenario_root=tmp_path / 'batch', live_environment={}, lock_root=tmp_path / 'lock')
+    runtime = owner.start()
+    result = owner.finish(status, defer_success_cleanup=True)
+    assert result.final_status == status
+    assert result.cleanup_deferred is False
+    with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='prepared'):
+        owner.release_prepared_cleanup(post_teardown_check=lambda _: pytest.fail('nonpass must not reach release'))
+    assert runtime.owned_root.exists()

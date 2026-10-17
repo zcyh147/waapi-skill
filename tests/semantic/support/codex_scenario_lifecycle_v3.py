@@ -14,7 +14,7 @@ import json
 import os
 import shutil
 import stat
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -134,6 +134,7 @@ class ScenarioLifecycleResult:
     source_mtime_after_ns: int | None
     errors: tuple[str, ...]
     quarantine_path: str | None
+    cleanup_deferred: bool = False
 
     @property
     def blocked(self) -> bool:
@@ -141,7 +142,9 @@ class ScenarioLifecycleResult:
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "contract": SCENARIO_LIFECYCLE_CONTRACT,
+            "contract": ("waapi-skill.codex-semantic-scenario-prepared-cleanup/v1"
+                         if self.cleanup_deferred else SCENARIO_LIFECYCLE_CONTRACT),
+            **({"cleanup_deferred": True} if self.cleanup_deferred else {}),
             "scenario_id": self.scenario_id,
             "version": self.version,
             "requested_status": self.requested_status,
@@ -223,6 +226,7 @@ class ScenarioLifecycle:
         self.runtime: ScenarioRuntime | None = None
         self._lock_acquired = False
         self._finished = False
+        self._prepared_cleanup: ScenarioLifecycleResult | None = None
         self._launch_environment_symlink_baseline: (
             dict[str, tuple[tuple[str, str], ...]] | None
         ) = None
@@ -512,6 +516,7 @@ class ScenarioLifecycle:
         *,
         reason: str = "",
         post_shutdown_hook: PostShutdownHook | None = None,
+        defer_success_cleanup: bool = False,
     ) -> ScenarioLifecycleResult:
         if status not in SCENARIO_STATUSES:
             raise ValueError(f"unsupported scenario status: {status}")
@@ -570,9 +575,12 @@ class ScenarioLifecycle:
             )
             for row in errors
         ) else status
+        prepared_success = defer_success_cleanup and final_status == "PASS" and not errors
+        if prepared_success:
+            final_status = "PREPARED"
         retained = final_status != "PASS"
         quarantine_path: str | None = None
-        if retained and shutdown_proved and post_shutdown_proved:
+        if retained and not prepared_success and shutdown_proved and post_shutdown_proved:
             try:
                 self._archive_launch_environment_roots(
                     evidence_root=runtime.evidence_root,
@@ -629,10 +637,58 @@ class ScenarioLifecycle:
             source_mtime_after_ns=source_mtime_after_ns,
             errors=tuple(errors),
             quarantine_path=quarantine_path,
+            cleanup_deferred=prepared_success and final_status == "PREPARED" and not errors,
         )
+        if result.cleanup_deferred:
+            self._prepared_cleanup = result
+            self._prepared_cleanup_paths = tuple(str(path.resolve(strict=True)) for path in (
+                runtime.sandbox.source_project, runtime.sandbox.source_root, runtime.owned_root,
+                runtime.sandbox.sandbox_path, runtime.sandbox.sandbox_project))
         _write_json(runtime.evidence_root / "lifecycle.json", result.as_dict())
         self._finished = True
         return result
+
+    def release_prepared_cleanup(self, *, post_teardown_check: PostShutdownHook) -> ScenarioLifecycleResult:
+        """Release only a successful preparation after all node teardowns."""
+        prepared, runtime = self._prepared_cleanup, self.runtime
+        if (prepared is None or runtime is None or not self._finished or self._lock_acquired
+                or not prepared.cleanup_deferred or prepared.final_status != 'PREPARED' or prepared.errors):
+            raise ScenarioLifecycleError('no eligible prepared success cleanup exists')
+        try:
+            paths = tuple(str(path.resolve(strict=True)) for path in (
+                runtime.sandbox.source_project, runtime.sandbox.source_root, runtime.owned_root,
+                runtime.sandbox.sandbox_path, runtime.sandbox.sandbox_project))
+            if paths != self._prepared_cleanup_paths:
+                raise ScenarioLifecycleError('post-teardown owned resource paths changed')
+            if json.loads((runtime.evidence_root / 'lifecycle.json').read_text(encoding='utf-8')) != prepared.as_dict():
+                raise ScenarioLifecycleError('post-teardown prepared receipt changed')
+            fresh_hash = hash_project(runtime.sandbox.source_root, preferred_strategy='full')
+            fresh_mtime = runtime.sandbox.source_project.stat().st_mtime_ns
+            if fresh_hash != prepared.source_hash_after or fresh_mtime != prepared.source_mtime_after_ns:
+                raise ScenarioLifecycleError('post-teardown immutable source hash or mtime changed')
+            if post_teardown_check(runtime) is not None:
+                raise ScenarioLifecycleError('post-teardown resource check did not complete')
+        except BaseException as exc:
+            self._prepared_cleanup = None
+            _write_json(runtime.evidence_root / 'lifecycle-release-error.json', {
+                'status': 'BLOCKED', 'phase': 'post-teardown', 'error': _format_error('post-teardown', exc)})
+            raise ScenarioLifecycleError(_format_error('post-teardown', exc)) from exc
+        # Consume before deletion: uncertain cleanup is never retried or promoted.
+        self._prepared_cleanup = None
+        try:
+            cleanup_sandbox(runtime.sandbox, keep=False, failed=False)
+            if runtime.owned_root.exists():
+                shutil.rmtree(runtime.owned_root, ignore_errors=False)
+            if runtime.owned_root.exists() or runtime.sandbox.sandbox_path.exists():
+                raise ScenarioLifecycleError('post-teardown owned resources remain after release')
+            result = replace(prepared, final_status='PASS', sandbox_retained=False,
+                             quarantine_path=None, cleanup_deferred=False)
+            _write_json(runtime.evidence_root / 'lifecycle-final.json', result.as_dict())
+            return result
+        except BaseException as exc:
+            _write_json(runtime.evidence_root / 'lifecycle-release-error.json', {
+                'status': 'BLOCKED', 'phase': 'release', 'error': _format_error('post-teardown', exc)})
+            raise ScenarioLifecycleError(_format_error('post-teardown', exc)) from exc
 
     def _archive_launch_environment_roots(
         self,
