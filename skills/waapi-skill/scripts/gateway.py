@@ -17049,6 +17049,7 @@ def dispatch_offline_business_draft_update(
             "Bind one exact live project object before adding business declarations"
         )
     session = BusinessDeclarationSession.from_dict(raw_session)
+    from wwise_waapi.object_graph_business import validate_object_graph_draft
     role_declaration = adapter.role_declaration
     if args.command == "draft-declare-import-batch":
         if adapter.family != "audio-import":
@@ -17565,7 +17566,7 @@ def dispatch_offline_business_draft_update(
         def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
             candidate = current.with_settings(settings)
             if adapter.family == "object-creation-graph" and candidate.declarations:
-                adapter.materialize(candidate)
+                validate_object_graph_draft(inspected.operation, candidate)
             return candidate
 
         event_type = "settings.revised"
@@ -17573,7 +17574,7 @@ def dispatch_offline_business_draft_update(
         def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
             candidate = current.remove_declaration(args.declaration_id)
             if adapter.family == "object-creation-graph":
-                adapter.materialize(candidate)
+                validate_object_graph_draft(inspected.operation, candidate)
             return candidate
 
         event_type = "declaration.removed"
@@ -17609,7 +17610,7 @@ def dispatch_offline_business_draft_update(
                     fields=fields,
                 )
                 if adapter.family == "object-creation-graph":
-                    adapter.materialize(candidate)
+                    validate_object_graph_draft(inspected.operation, candidate)
                 return candidate
 
             event_type = "declaration.added"
@@ -17621,7 +17622,7 @@ def dispatch_offline_business_draft_update(
                     fields=fields,
                 )
                 if adapter.family == "object-creation-graph":
-                    adapter.materialize(candidate)
+                    validate_object_graph_draft(inspected.operation, candidate)
                 return candidate
 
             event_type = "declaration.added"
@@ -17632,7 +17633,7 @@ def dispatch_offline_business_draft_update(
                     fields=fields,
                 )
                 if adapter.family == "object-creation-graph":
-                    adapter.materialize(candidate)
+                    validate_object_graph_draft(inspected.operation, candidate)
                 return candidate
 
             event_type = "declaration.revised"

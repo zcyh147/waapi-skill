@@ -9,6 +9,7 @@ from typing import Any, Mapping
 
 import pytest
 
+from wwise_waapi.business_declarations import BusinessDeclarationError
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     OPERATION_REQUEST_CONTRACT,
     OperationContractError,
@@ -114,58 +115,25 @@ def _project_info(project_root: Path, *, language: str = "Japanese") -> dict[str
     }
 
 
-def test_object_create_exposes_platform_list_and_source_control_without_raw_payload() -> None:
-    request = parse_operation_request(
-        {
-            "contract": OPERATION_REQUEST_CONTRACT,
-            "version": "2022.1",
-            "operation": "object.create",
-            "arguments": {
-                "parent": {"kind": "id", "value": OWNER_ID},
-                "type": "Sound",
-                "name": "CreatedInList",
-                "platform": "Windows",
-                "list": "CustomList",
-                "auto_add_to_source_control": True,
-            },
-        }
-    )
-    reader = Reader(
-        {
-            "ak.wwise.core.object.get": [
-                {"return": [_owner_row()]},
-                {
-                    "return": [
-                        {"id": OWNER_ID, "@CustomList": []}
-                    ]
-                },
-            ],
-            "ak.wwise.core.object.getTypes": [_types()],
-        }
-    )
-
-    prepared = prepare_operation(request, read_call=reader).as_dict()
-
-    assert prepared["dispatch"]["args"] == {
-        "parent": OWNER_ID,
-        "type": "Sound",
-        "name": "CreatedInList",
-        "onNameConflict": "fail",
-        "autoAddToSourceControl": True,
-        "platform": "Windows",
-        "list": "CustomList",
-    }
-    assert prepared["verification_plan"]["list"] == "CustomList"
-    assert prepared["pre_state"]["object_graph_guard"]["list_snapshots"][0][
-        "platform"
-    ] == "Windows"
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_object_create_rejects_fictitious_list_before_native_payload(version):
+    request = parse_operation_request({"contract": OPERATION_REQUEST_CONTRACT, "version": version,
+        "operation": "object.create", "arguments": {"parent": {"kind": "id", "value": OWNER_ID},
+            "type": "Sound", "name": "CreatedInList", "platform": "Windows", "list": "CustomList",
+            "auto_add_to_source_control": True}})
+    reader = Reader({"ak.wwise.core.object.get": [{"return": [_owner_row()]}, {"return": [{**_owner_row(), "classId": 524304}]}],
+        "ak.wwise.core.object.getTypes": [_types()]})
+    with pytest.raises(BusinessDeclarationError) as caught:
+        prepare_operation(request, read_call=reader)
+    assert caught.value.error_code == "DOCUMENTED_LIST_SELECTION_REQUIRED"
+    assert all(not uri.endswith("object.create") for uri, _, _ in reader.calls)
 
 
 @pytest.mark.parametrize(
     "version",
     ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"),
 )
-def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_version(
+def test_object_list_snapshot_uses_bounded_two_step_reads_in_every_version(
     version: str,
 ) -> None:
     member_id = "{41000000-0000-0000-0000-000000000002}"
@@ -196,34 +164,20 @@ def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_versio
         }
     )
 
-    prepared = prepare_operation(
-        parse_operation_request(
-            {
-                "contract": OPERATION_REQUEST_CONTRACT,
-                "version": version,
-                "operation": "object.create",
-                "arguments": {
-                    "parent": {"kind": "id", "value": OWNER_ID},
-                    "type": "Sound",
-                    "name": "NewListMember",
-                    "platform": "Windows",
-                    "list": "CustomList",
-                },
-            }
-        ),
-        read_call=reader,
-    ).as_dict()
+    reader.responses["ak.wwise.core.object.get"].popleft()
+    snapshot = _read_object_list_rows_with_evidence(OWNER_ID, "CustomList",
+        fields=["id", "name", "type", "path", "parent", "owner", "notes"], read=reader, platform="Windows", context="opaque accessor boundedness")
 
     object_reads = [
         call for call in reader.calls if call[0] == "ak.wwise.core.object.get"
     ]
-    assert object_reads[1] == (
+    assert object_reads[0] == (
         "ak.wwise.core.object.get",
         {"from": {"id": [OWNER_ID]}},
         {"return": ["id", "@CustomList"], "platform": "Windows"},
     )
-    assert object_reads[2][1] == {"from": {"id": [member_id]}}
-    assert object_reads[2][2]["platform"] == "Windows"
+    assert object_reads[1][1] == {"from": {"id": [member_id]}}
+    assert object_reads[1][2]["platform"] == "Windows"
     assert all(
         not any(
             isinstance(selector, str) and selector.startswith("@")
@@ -233,9 +187,7 @@ def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_versio
         )
         for call in object_reads
     )
-    assert prepared["pre_state"]["object_graph_guard"]["list_snapshots"][0][
-        "rows"
-    ] == [member_row]
+    assert snapshot[0] == [member_row]
 
 
 @pytest.mark.parametrize(
@@ -244,11 +196,10 @@ def test_object_create_list_snapshot_uses_bounded_two_step_reads_in_every_versio
         ("duplicate-member", "INVALID_READBACK"),
         ("missing-detail", "INVALID_READBACK"),
         ("extra-detail", "INVALID_READBACK"),
-        ("wrong-owner", "LIST_OWNER_MISMATCH"),
         ("over-limit", "LIST_SNAPSHOT_LIMIT_EXCEEDED"),
     ),
 )
-def test_object_create_list_snapshot_fails_closed_on_inexact_membership(
+def test_object_list_snapshot_fails_closed_on_inexact_membership(
     case: str,
     error_code: str,
 ) -> None:
@@ -304,27 +255,9 @@ def test_object_create_list_snapshot_fails_closed_on_inexact_membership(
         object_get_responses.append({"return": details})
 
     with pytest.raises(OperationContractError) as caught:
-        prepare_operation(
-            parse_operation_request(
-                {
-                    "contract": OPERATION_REQUEST_CONTRACT,
-                    "version": "2025.1",
-                    "operation": "object.create",
-                    "arguments": {
-                        "parent": {"kind": "id", "value": OWNER_ID},
-                        "type": "Sound",
-                        "name": "NewListMember",
-                        "list": "CustomList",
-                    },
-                }
-            ),
-            read_call=Reader(
-                {
-                    "ak.wwise.core.object.get": object_get_responses,
-                    "ak.wwise.core.object.getTypes": [_types()],
-                }
-            ),
-        )
+        _read_object_list_rows_with_evidence(OWNER_ID, "CustomList",
+            fields=["id", "name", "type", "path", "parent", "owner", "notes"],
+            read=Reader({"ak.wwise.core.object.get": object_get_responses[1:]}), context="opaque accessor negative")
 
     assert caught.value.error_code == error_code
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 from typing import Any, Mapping
 
 from .business_declaration_state import (
@@ -17,7 +18,7 @@ from .business_declarations import (
     resolve_semantic_kind,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
-from .documented_list_fields import resolve_list_choice
+from .documented_list_fields import resolve_list_choice, resolve_planned_list_evidence
 from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 from .operation_object import (
     DEFAULT_MAX_CHILDREN_PER_NODE,
@@ -309,6 +310,18 @@ def _compile_object_set_import(
     return {"files": files}
 
 
+def _compile_list_name(session, value, *, owner_handle):
+    if not isinstance(value, str) or not value.startswith("bfh1-"):
+        value = normalize_object_list_name(value, request_path="$.business.object_list")
+    planned = any(row.result_handle == owner_handle and isinstance(row.target, NewDescendantTarget)
+        for row in session.declarations)
+    if planned:
+        return resolve_planned_list_evidence(session, value, owner_handle=owner_handle)["declaration"]["name"]
+    if value.startswith("bfh1-"):
+        return resolve_list_choice(session, value, owner_id=session.handles.resolve_object(owner_handle).object_id).token
+    return normalize_object_list_name(value, request_path="$.business.object_list")
+
+
 def _compile_set_new_node(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
@@ -376,11 +389,10 @@ def _compile_set_new_node(
     object_list = extension_fields.get("object_list")
     if object_list is not None:
         try:
-            object_list = (resolve_list_choice(session, object_list,
-                owner_id=session.handles.resolve_object(declaration.target.parent_handle).object_id).token
-                if object_list.startswith("bfh1-") else normalize_object_list_name(
-                    object_list, request_path="$.business.object_list"))
-        except Exception as exc:
+            object_list = _compile_list_name(session, object_list, owner_handle=declaration.target.parent_handle)
+        except BusinessDeclarationError:
+            raise
+        except (ValueError, TypeError) as exc:
             raise _repair(
                 session,
                 "OBJECT_SET_LIST_NAME_INVALID",
@@ -407,8 +419,10 @@ def _compile_set_new_node(
         names = []
         for name in clears:
             try:
-                names.append(normalize_object_list_name(name, request_path="$.business.clear_object_lists"))
-            except Exception as exc:
+                names.append(_compile_list_name(session, name, owner_handle=declaration.result_handle))
+            except BusinessDeclarationError:
+                raise
+            except (ValueError, TypeError) as exc:
                 raise _repair(session, "OBJECT_SET_LIST_NAME_INVALID", field="clear_object_lists",
                               action="provide exact owned-list names without an @ prefix") from exc
         if len({name.casefold() for name in names}) != len(names):
@@ -859,10 +873,13 @@ def _materialize_create(
         }
         if object_list is not None:
             try:
-                node["list"] = normalize_object_list_name(
-                    object_list, request_path="$.business.object_list",
-                )
-            except Exception as exc:
+                node["list"] = (resolve_list_choice(session, object_list,
+                    owner_id=session.handles.resolve_object(row.target.parent_handle).object_id).token
+                    if object_list.startswith("bfh1-") else normalize_object_list_name(
+                        object_list, request_path="$.business.object_list"))
+            except BusinessDeclarationError:
+                raise
+            except (ValueError, TypeError) as exc:
                 raise _repair(
                     session,
                     "OBJECT_CREATE_LIST_NAME_INVALID",
@@ -893,6 +910,13 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
+    if "list" in root_node:
+        matches = [field for field in session.handles.as_dict()["fields"]
+            if field["field_kind"] == "list" and field["scope_kind"] == "object"
+            and field["scope_value"] == parent.object_id and field["token"] == root_node["list"]]
+        if matches:
+            field = resolve_list_choice(session, root_node["list"], owner_id=parent.object_id)
+            arguments["documented_list_bindings"] = [dict(field.restrictions["documented_list"])]
     if "list" not in root_node:
         _validate_specialized_relationship(
             session,
@@ -1362,9 +1386,12 @@ def _materialize_set(
         else:
             root_new.append(row)
 
+    node_result_handles = {}
+
     def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
+        node_result_handles[id(node)] = row.result_handle
         descendants = planned_children.get(row.result_handle, [])
         if descendants:
             for child in descendants:
@@ -1471,6 +1498,27 @@ def _materialize_set(
                     "reference_targets": [target["value"] for target in descriptor["target"]]}
                 if evidence not in documented_bindings:
                     documented_bindings.append(evidence)
+    def bind_planned_occurrences(node, request_path):
+        owner_handle = node_result_handles.get(id(node))
+        if owner_handle is not None:
+            for descriptor in node.get("lists", []):
+                evidence = resolve_planned_list_evidence(session, descriptor["name"], owner_handle=owner_handle)
+                documented_bindings.append({**evidence, "planned_owner": {
+                    "result_handle": owner_handle, "request_path": request_path}})
+            for reference in node.get("references", []):
+                fields = [field for field in session.handles.as_dict()["fields"]
+                    if field["field_kind"] == "list" and field["scope_kind"] == "class" and field["token"] == reference["name"]]
+                if fields:
+                    evidence = resolve_planned_list_evidence(session, reference["name"], owner_handle=owner_handle)
+                    documented_bindings.append({**evidence, "reference_targets": [target["value"] for target in reference["target"]],
+                        "planned_owner": {"result_handle": owner_handle, "request_path": request_path}})
+        for index, child in enumerate(node.get("children", [])):
+            bind_planned_occurrences(child, f"{request_path}.children[{index}]")
+        for index, descriptor in enumerate(node.get("lists", [])):
+            for member_index, member in enumerate(descriptor["objects"]):
+                bind_planned_occurrences(member, f"{request_path}.lists[{index}].objects[{member_index}]")
+    for index, row in enumerate(rows):
+        bind_planned_occurrences(row, f"$.objects[{index}]")
     if documented_bindings:
         arguments["documented_list_bindings"] = documented_bindings
     if "platform" in settings:
@@ -1681,6 +1729,19 @@ def _materialize_set_rtpc(
     ).as_dict()
 
 
+def validate_object_graph_draft(operation, session):
+    """Validate editable facts without requiring a not-yet-declared List.
+
+    This produces no request. Check/Preview always use the strict materializer
+    with the original settings, so pending replaceAll never becomes append.
+    """
+    validation = session
+    if (operation == "object.set" and session.settings.get("list_behavior") == "replace-all"
+            and not any("object_list" in row.fields or "clear_object_lists" in row.fields for row in session.declarations)):
+        validation = replace(session, settings={**session.settings, "list_behavior": "append"})
+    materialize_object_graph_business_request(operation, validation)
+
+
 def materialize_object_graph_business_request(
     operation: str,
     session: BusinessDeclarationSession,
@@ -1701,4 +1762,4 @@ def materialize_object_graph_business_request(
     raise ValueError("object graph business operation is not migrated yet")
 
 
-__all__ = ["materialize_object_graph_business_request"]
+__all__ = ["materialize_object_graph_business_request", "validate_object_graph_draft"]
