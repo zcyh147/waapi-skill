@@ -179,6 +179,31 @@ def test_nested_workspace_name_can_differ_from_temporary_lookup_name(tmp_path, v
     verified = confirm_execute_verify(env, state, client, preview)
     assert verified['verification']['business_state_verified'] is True
     assert client.layouts['TemporaryLookupName']['Layout']['Name'] == 'SerializedLayout'
+    code, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'TemporaryLookupName'],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, inspected
+    assert inspected['layout_name'] == 'TemporaryLookupName'
+    assert inspected['workspace_name'] == 'SerializedLayout'
+    assert inspected['agent_result']['workspace_name'] == 'SerializedLayout'
+    code, schema = gateway.execute_gateway(['request-schema', URI + 'removeLayout'], env=env)
+    assert code == 0, schema
+    code, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env)
+    assert code == 0, started
+    draft, authority = started['draft'], started['task_authority']
+    code, declared = gateway.execute_gateway([*state, 'draft-declare-layout-plan', draft['draft_id'],
+        '--task-authority', authority, '--expected-revision', str(draft['revision']),
+        '--layout-handle', inspected['layout_handle']], env=env, client_factory=lambda _: client)
+    assert code == 0, declared
+    code, checked = gateway.execute_gateway([*state, 'draft-check', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(declared['draft']['revision'])], env=env, client_factory=lambda _: client)
+    assert code == 0, checked
+    code, removal = gateway.execute_gateway([*state, 'preview-from-draft', draft['draft_id'], '--task-authority', authority,
+        '--expected-revision', str(checked['draft']['revision'])], env=env, client_factory=lambda _: client)
+    assert code == 0, removal
+    removed = confirm_execute_verify(env, state, client, removal)
+    assert removed['verified'] is True
+    assert 'TemporaryLookupName' not in client.layouts
+    assert [row[1] for row in client.calls if row[0] == URI + 'removeLayout'] == [{'name': 'TemporaryLookupName'}]
 
 
 def test_advertised_maximum_blueprint_depth_can_be_read_back_and_verified(tmp_path):
@@ -364,3 +389,49 @@ def test_other_or_unbound_requests_cannot_claim_constructor_terminal_capacity(tm
         gateway.project_successful_transaction_verify_payload(payload)
     assert caught.value.error_code == 'VERIFY_SUCCESS_SUMMARY_BUDGET_EXCEEDED'
     assert caught.value.details['limit_bytes'] == 22528
+
+
+@pytest.mark.parametrize('drift', ['workspace', 'nested-state', 'lookup'])
+def test_divergent_workspace_identity_still_rechecks_exact_lookup_and_document_before_write(tmp_path, drift):
+    def setup(client):
+        client.layouts['Profiler']['Layout']['Name'] = 'SerializedWorkspace'
+    env, state, client, preview = switch_preview(tmp_path, client_setup=setup)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, _ = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0
+    if drift == 'workspace':
+        client.layouts['Profiler']['Layout']['Name'] = 'DifferentWorkspace'
+    elif drift == 'nested-state':
+        client.layouts['Profiler']['Layout']['StackPanel']['Name'] = 'ChangedPanel'
+    else:
+        client.layouts['OtherLookup'] = client.layouts.pop('Profiler')
+    code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, rejected
+    assert URI + 'switchLayout' not in [row[0] for row in client.calls]
+
+
+def test_equal_workspace_names_never_merge_different_lookup_authorities(tmp_path):
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version='2025.1')
+    state = ['--state-dir', str(tmp_path / 'state')]
+    client = LayoutClient(tmp_path)
+    for name in ('Designer', 'Profiler'):
+        client.layouts[name]['Layout']['Name'] = 'SharedWorkspace'
+    client.views['Profiler'] = [{'viewID': '{33333333-3333-3333-3333-333333333333}',
+        'viewName': 'ProjectExplorer', 'viewDisplayName': 'Project Explorer', 'viewIsDocked': True}]
+    code, selected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Designer'],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, selected
+    code, foreign = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Profiler'],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, foreign
+    assert selected['workspace_name'] == foreign['workspace_name'] == 'SharedWorkspace'
+    _, schema = gateway.execute_gateway(['request-schema', URI + 'undockView'], env=env)
+    _, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env)
+    code, rejected = gateway.execute_gateway([*state, 'draft-declare-layout-plan', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(started['draft']['revision']),
+        '--layout-handle', selected['layout_handle'], '--view-handle', foreign['views'][0]['handle']],
+        env=env, client_factory=lambda _: client)
+    assert code != 0 and 'same layout' in rejected['message'].lower(), rejected
+    assert URI + 'undockView' not in [row[0] for row in client.calls]

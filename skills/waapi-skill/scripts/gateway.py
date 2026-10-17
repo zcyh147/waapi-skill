@@ -13557,8 +13557,9 @@ def dispatch_command(
             connection=connection, version=detected_version)
         instances = read_layout_observation('instances', {'name': args.layout_name}, dispatcher=dispatcher,
             connection=connection, version=detected_version)
-        if not isinstance(layout.get('Layout'), Mapping) or layout['Layout']['Name'] != args.layout_name:
-            raise GatewayInputError("Native layout name does not match the requested identity; no handles issued")
+        # The lookup name selects getLayout; serialized Layout.Name is a separate
+        # workspace name (the matching SDK documents divergent values). Retain
+        # that exact observed document in the capability, without equating names.
         try:
             elements, views = layout_identity_rows(layout, instances)
             store = LayoutHandleStore(resolve_transaction_state_directory(args, env=env))
@@ -13574,7 +13575,8 @@ def dispatch_command(
             element_handles, view_handles = issue(elements, 'element'), issue(views, 'view')
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
-        projection = {'layout_name': args.layout_name, 'layout_handle': layout_handle,
+        projection = {'layout_name': args.layout_name, 'workspace_name': layout['Layout']['Name'],
+                      'layout_handle': layout_handle,
                       'elements': element_handles, 'views': view_handles}
         return {**common, 'ok': True, 'status': 'ok', 'complete': True, 'truncated': False,
                 **projection, 'identity_lifetime_seconds': 900, 'agent_result': projection}

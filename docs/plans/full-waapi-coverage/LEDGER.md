@@ -375,3 +375,17 @@ including the original verification digest, strong/weak tamper and cleanup
 controls, exact profile/native obligations/owner and 231-node Program roster.
 This validates source behavior only; native effects and downstream reception
 remain pending.
+
+Clean capacity checkpoint `3e7b0b7a` passed 86 tests on its frozen source. An
+immediate public create/verify/inspect control then exposed that layout-inspect
+still equated the native lookup name with serialized Layout.Name. The original
+RED is retained. Inspection now presents separate layout_name/workspace_name
+values; its existing capability keeps the exact lookup identity plus full
+observed workspace document/hash. No capability schema migration or stale/same-
+layout guard was weakened. Both version lanes pass creation, verification, fresh
+inspection and a separately previewed removal by the original lookup name (2
+passed). Workspace/nested-document/lookup drift and foreign lookup authorities
+sharing a serialized workspace name, together with the complete scoped-read
+Gateway file, passed 71 tests. This is deterministic source proof, not native
+divergent-name write acceptance. Larger-output Broker/archive acceptance is
+tracked under the already-dependent OPEN #194; no Fresh run is authorized.

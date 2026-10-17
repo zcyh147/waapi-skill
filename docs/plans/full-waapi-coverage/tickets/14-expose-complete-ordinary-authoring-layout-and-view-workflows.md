@@ -141,3 +141,11 @@ and raw journal readback. The current 112 KiB business/compiled constructor
 ceilings and 14-level tree depth are Gateway resource gaps, not native absence.
 Larger legitimate native constructions, downstream Broker/Fresh reply acceptance
 and complete editor/sidebar/window/history/reset semantics stay owned here.
+
+Immediate identity repair keeps accepted divergent workspace constructions
+inspectable/reusable: the public reply separates lookup layout_name from observed
+workspace_name, while existing scoped capabilities retain exact lookup plus full
+observed document/hash. Both version lanes fake-test create/verify/inspect and
+separate removal; stale document/lookup and cross-layout authority checks remain
+strict. Downstream larger-output Gateway/Broker/archive acceptance is an explicit
+already-dependent OPEN #194 condition; CLI byte fit grants no such acceptance.
