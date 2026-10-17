@@ -232,6 +232,7 @@ def append_finalized_scenario_evidence(
             or lifecycle.get("final_status") not in {"PASS", "FAIL", "BLOCKED"}
             or phase_reports.get("setup") not in {"passed", "failed", "skipped"}
             or phase_reports.get("call") not in {"passed", "failed", "skipped"}
+            or phase_reports.get("teardown") not in {"passed", "failed", "skipped"}
             or not nodeid):
         raise AssertionError("scenario category evidence requires a finalized lifecycle and original pytest node report")
     outcome = ("FAIL" if "failed" in phase_reports.values() else

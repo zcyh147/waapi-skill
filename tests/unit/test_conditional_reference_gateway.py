@@ -3,11 +3,62 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from tests.unit.test_field_interface_closure_gateway import FieldTask, FIRST, SECOND, VERSIONS, gateway
+
+
+@pytest.fixture
+def condition_product_capture(request, tmp_path):
+    from tests.support.condition_branch_evidence import prepare_condition_capture, finish_condition_capture
+    root = Path(os.environ.get("WAAPI_CONDITION_BRANCH_EVIDENCE_ROOT", str(tmp_path / "condition-product-evidence"))).resolve()
+    capture = prepare_condition_capture(root, request.node.nodeid)
+    observed = {}
+    from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+    register_exact_evidence_finalizer(request.node, lambda reports: finish_condition_capture(capture, reports, observed))
+    yield observed
+
+
+def test_product_slew_rate_show_condition_changes_only_the_selected_field(tmp_path, condition_product_capture):
+    task = ScalarPropertyTask(tmp_path, "2025.1")
+    dependency = {"type": "property", "action": "Show", "context": "Self", "property": "RTPCRamping",
+                  "conditions": [{"restriction": {"type": "enum", "values": [{"value": 1}]}}]}
+    task.metadata = {"SlewRateUp": {"name": "SlewRateUp", "type": "Real64", "dependencies": [dependency]},
+                     "RTPCRamping": {"name": "RTPCRamping", "type": "int16"}}
+    task.objects[FIRST].update(type="GameParameter", name="OwnedVisibilityTarget",
+        path=r"\Game Parameters\Default Work Unit\OwnedVisibilityTarget", RTPCRamping=0, SlewRateUp=0.0)
+    before = deepcopy(task.objects[FIRST])
+    target = task.bind(FIRST)
+    field = task.discover(target, "SlewRateUp")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "37")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    after = deepcopy(task.objects[FIRST])
+    assert after == {**before, "SlewRateUp": 37}
+    writes = [{"uri": uri, "args": args, "options": options} for uri, args, options in task.calls
+              if uri.endswith(("setProperty", "setReference", "object.set"))]
+    assert len(writes) == 1 and writes[0]["args"]["property"] == "SlewRateUp"
+    condition_product_capture.update(
+        gateway={"argv": ["--state-dir", str(task.path / "state"), "verify", tx], "exit_code": code, "payload": verified},
+        native_call=writes[0], observations={"wwise-console": {"metadata": deepcopy(task.metadata["SlewRateUp"]),
+            "observations": [{"controller_before": before, "controller_after": after, "before": before, "after": after}]}},
+    )
 
 
 def condition(name="ListenerRelativeRouting", value=True):

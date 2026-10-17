@@ -13,6 +13,7 @@ import pytest
 from tests.destructive.test_attenuation_activation_gateway import PublicDraft, create_object, set_property
 from tests.destructive.support.category_evidence import exact_transaction_outcomes
 from tests.destructive.support.exact_real_evidence import append_finalized_scenario_evidence
+from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
@@ -139,9 +140,9 @@ def test_show_visibility_does_not_change_native_prerequisite(relation, request):
             finally:
                 result = lifecycle.finish(status, reason="" if status == "PASS" else reason)
             if "host" in evidence and "candidate" in evidence:
-                request.addfinalizer(lambda: append_finalized_scenario_evidence(
+                register_exact_evidence_finalizer(request.node, lambda reports: append_finalized_scenario_evidence(
                     repo_root=Path(__file__).parents[2], candidate=evidence["candidate"], version=version,
-                    nodeid=request.node.nodeid, phase_reports=getattr(request.node, "_waapi_phase_reports", {}),
+                    nodeid=request.node.nodeid, phase_reports=reports,
                     started_at_unix_ns=started_at_unix_ns, lifecycle=result.as_dict(), sandbox=runtime.sandbox,
                     host=evidence["host"], observation_path=observation_path, transactions=transactions,
                 ))
