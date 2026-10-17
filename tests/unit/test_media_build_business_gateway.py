@@ -13,6 +13,7 @@ import pytest
 from wwise_waapi.media_build_business_contracts import (
     MEDIA_POOL_GET_URI,
     PEAKS_REGION_URI,
+    PEAKS_TRIMMED_URI,
     SOUNDBANK_GET_INCLUSIONS_URI,
     media_build_business_operations,
     media_build_business_versions,
@@ -152,6 +153,8 @@ def test_every_issue_85_lane_has_one_business_schema_and_no_typed_bypass(
     assert schema_code == 0, schema
     assert schema["business_adapter"]["operation"] == operation
     assert schema["business_adapter"]["version"] == version
+    if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
+        assert schema["business_adapter"]["result_projection"]["optional_native_fields"] == "preserve absence; return partial observation when decoding facts are missing"
     bypass_code, bypass = gateway.execute_gateway(
         [ "typed-call", operation, "--schema-digest", "0" * 64],
         env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
@@ -884,3 +887,63 @@ def test_media_pool_complete_post_filter_replaces_prior_prefix_presentation(tmp_
     assert final["agent_result"]["complete"] is True
     assert [item["file_id"] for item in final["agent_result"]["items"]] == ["2"]
     assert final["agent_result"]["page"]["presentation"] == "replace_previous_prefix"
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_read_preserves_optional_missing_native_fields_without_inventing_decoded_data(tmp_path: Path, version: str, operation: str) -> None:
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    raw = {"numChannels": 1}
+    project = _project(tmp_path)
+    identity_reads = [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}]
+    if version == "2021.1":
+        identity_reads.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"], "path": "\\"}]})
+    client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": identity_reads,
+        operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 0, (payload, client.calls)
+    assert payload["status"] == "partial"
+    observation = payload["agent_result"]
+    assert observation["projection_complete"] is False
+    assert observation["decode_available"] is False
+    assert observation["native_result"] == raw
+    assert observation["unavailable_fields"] == ["peaksArrayLength", "peaksBinaryStrings", "peaksDataSize", "maxAbsValue"]
+    assert "channels" not in observation and "peak_pair_count" not in observation
+    assert payload["call"]["ok"] is True
+
+
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+@pytest.mark.parametrize("raw", [{"numChannels": None}, {"peaksArrayLength": 0.5}, {"peaksBinaryStrings": [None]},
+    {"numChannels": 1, "peaksArrayLength": 0, "peaksBinaryStrings": [""], "peaksDataSize": 0, "maxAbsValue": 1, "channelConfig": None}])
+def test_peak_read_rejects_malformed_present_fields_and_keeps_native_call_evidence(tmp_path: Path, operation: str, raw: dict) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}], operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert payload["error_code"] == "MEDIA_BUILD_RESULT_INVALID"
+    assert payload["details"]["call"]["ok"] is True
+    assert payload["details"]["native_observation"] == raw
+
+
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_read_preserves_zero_divisor_without_fabricating_normalized_samples(tmp_path: Path, operation: str) -> None:
+    raw = {"numChannels": 1, "peaksArrayLength": 0, "peaksBinaryStrings": [""], "peaksDataSize": 0, "maxAbsValue": 0}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}], operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["status"] == "partial"
+    assert payload["agent_result"]["decode_unavailable_reason"] == "zero_normalization_divisor"
+    assert payload["agent_result"]["native_result"] == raw
+    assert "channels" not in payload["agent_result"]

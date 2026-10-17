@@ -12015,6 +12015,18 @@ def dispatch_media_build_business_read(
 ) -> dict[str, Any]:
     """Revalidate and execute one closed media/build business read."""
 
+    def native_failure_evidence(native_call: Mapping[str, Any]) -> dict[str, Any]:
+        observation = native_call.get("result")
+        evidence: dict[str, Any] = {"call": dispatch_call_summary(native_call)}
+        if probe_gateway_json_document_size(observation, 64 * 1024) == "ok":
+            evidence["native_observation"] = observation
+        else:
+            evidence["native_observation_boundary"] = {
+                "complete": False, "inline_limit_bytes": 64 * 1024,
+                "evidence_path": native_call.get("evidence_path"),
+            }
+        return evidence
+
     project, project_call = current_project(
         dispatcher,
         connection=connection,
@@ -12163,15 +12175,14 @@ def dispatch_media_build_business_read(
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
     )
-    result_validation = (
-        validate_semantic_result(
-            request["api"],
-            result.get("result"),
-            version=detected_version,
+    try:
+        result_validation = (
+            validate_semantic_result(request["api"], result.get("result"), version=detected_version)
+            if result.get("ok") else None
         )
-        if result.get("ok")
-        else None
-    )
+    except SemanticValidationError as exc:
+        raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result),
+            error_code="MEDIA_BUILD_RESULT_INVALID") from exc
     normalized = None
     result_identity_rows: list[Mapping[str, Any]] = []
     if result.get("ok"):
@@ -12233,7 +12244,7 @@ def dispatch_media_build_business_read(
         except MediaBuildBusinessError as exc:
             raise GatewayResultShapeError(
                 str(exc),
-                details={"media_build_error_code": exc.code},
+                details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
         if args.api == MEDIA_POOL_GET_URI:
@@ -12257,7 +12268,10 @@ def dispatch_media_build_business_read(
             "incomplete_boundary"
             if incomplete_media_pool
             else "partial"
-            if args.api == MEDIA_POOL_GET_URI and isinstance(normalized, Mapping) and normalized.get("complete") is False
+            if isinstance(normalized, Mapping) and (
+                normalized.get("projection_complete") is False
+                or args.api == MEDIA_POOL_GET_URI and normalized.get("complete") is False
+            )
             else "ok"
             if result.get("ok")
             else "error"

@@ -269,6 +269,12 @@ def media_build_business_contract_data(
             "result_bound": True,
         },
         "result_shape": row["result_shape"],
+        **({"result_projection": {
+            "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",
+            "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
+            "malformed_present_fields": "bounded structured failure with native call evidence",
+            "partial_projection": "status=partial; projection_complete=false; decode_available=false; native_result retained",
+        }} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         **({"read_continuation": {
             "flag": "--media-page", "input": "copy returned Gateway continuation only",
             "native_offset_supported": False, "mode": "larger bounded prefix reread",

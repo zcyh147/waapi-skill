@@ -679,6 +679,23 @@ def _normalize_peaks_result(raw_result: Any, plan: Mapping[str, Any]) -> dict[st
             "peak result must be an object",
             code="MEDIA_BUILD_RESULT_INVALID",
         )
+    fields = ("numChannels", "peaksArrayLength", "peaksBinaryStrings", "peaksDataSize", "maxAbsValue")
+    # Native schemas make these fields optional. Present counters still have
+    # to be usable integer facts before a partial observation is accepted.
+    for field in ("numChannels", "peaksArrayLength", "peaksDataSize"):
+        if field in raw_result:
+            _whole_number(raw_result[field], field=field)
+    missing = [field for field in fields if field not in raw_result]
+    if missing:
+        return {
+            "contract": MEDIA_BUILD_RESULT_CONTRACT,
+            "kind": "peak_observation",
+            "projection_complete": False,
+            "decode_available": False,
+            "decode_unavailable_reason": "missing_native_fields",
+            "unavailable_fields": missing,
+            "native_result": dict(raw_result),
+        }
     count = _whole_number(raw_result.get("peaksArrayLength"), field="peaksArrayLength")
     requested = int(plan["requested_peak_pair_count"])
     if count > requested:
@@ -700,9 +717,9 @@ def _normalize_peaks_result(raw_result: Any, plan: Mapping[str, Any]) -> dict[st
         )
     data_size = _whole_number(raw_result.get("peaksDataSize"), field="peaksDataSize")
     maximum = _finite_number(raw_result.get("maxAbsValue"), field="maxAbsValue")
-    if maximum <= 0:
+    if maximum < 0:
         raise MediaBuildBusinessError(
-            "peak result maxAbsValue must be positive",
+            "peak result maxAbsValue must be nonnegative",
             code="MEDIA_BUILD_RESULT_INVALID",
         )
     channel_rows: list[dict[str, Any]] = []
@@ -725,12 +742,28 @@ def _normalize_peaks_result(raw_result: Any, plan: Mapping[str, Any]) -> dict[st
                 "peak binary byte count does not match peaksDataSize and peaksArrayLength",
                 code="MEDIA_BUILD_RESULT_INVALID",
             )
+        if maximum == 0:
+            if any(decoded):
+                raise MediaBuildBusinessError(
+                    "peak result has nonzero samples with a zero maxAbsValue",
+                    code="MEDIA_BUILD_RESULT_INVALID",
+                )
+            continue
         values = struct.unpack(f"<{count * 2}h", decoded)
         pairs = [
             [values[offset] / maximum, values[offset + 1] / maximum]
             for offset in range(0, len(values), 2)
         ]
         channel_rows.append({"channel_index": index, "pairs_normalized": pairs})
+    if maximum == 0:
+        return {
+            "contract": MEDIA_BUILD_RESULT_CONTRACT,
+            "kind": "peak_observation",
+            "projection_complete": False,
+            "decode_available": False,
+            "decode_unavailable_reason": "zero_normalization_divisor",
+            "native_result": dict(raw_result),
+        }
     result: dict[str, Any] = {
         "contract": MEDIA_BUILD_RESULT_CONTRACT,
         "kind": "decoded_peaks",
