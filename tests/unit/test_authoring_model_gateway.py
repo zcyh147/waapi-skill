@@ -395,3 +395,16 @@ def test_window_close_preview_cannot_overtake_a_frontend_awaiting_ownership_veri
     code, executed = gateway.execute_gateway([*state, 'execute', close['transaction_id']], env=env, client_factory=lambda _: client)
     assert code == 0, executed
     assert len([row for row in client.calls if row[0] == PREFIX + 'model.createHandle']) == 1
+
+
+def test_creation_recovery_rejects_an_older_live_authoring_version_before_context_lookup(tmp_path):
+    client = ModelClient(tmp_path, version='2024.1')
+    env, state, client, preview = model_preview(tmp_path, 'window.create', {'title': 'Owned', 'width': 10, 'height': 10}, version='2024.1', client=client)
+    confirm_execute_verify(env, state, client, preview)
+    set_gateway_config(env, wwise_version='2022.1', project_modification_policy='ask_before_changes')
+    older_client = LayoutClient(tmp_path, version='2022.1')
+    code, rejected = gateway.execute_gateway([*state, 'authoring-resource', preview['transaction_id']], env=env, client_factory=lambda _: older_client)
+    assert code != 0, rejected
+    assert 'Selected connection configuration changed after Preview creation' in rejected['message'], rejected
+    assert 'KeyError' not in json.dumps(rejected)
+    assert not any(uri.startswith(PREFIX + 'window.') or uri.startswith(PREFIX + 'model.') for uri, _, _ in older_client.calls)
