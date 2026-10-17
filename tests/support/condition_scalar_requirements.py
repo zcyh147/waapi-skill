@@ -72,6 +72,8 @@ def requirements_proposal(plan):
         live_metadata[live_key] = {"version": group["version"], "build": group["build"], "host": "wwise-console",
             "source_parent_key": group["source_parent_key"], "source_class": deepcopy(group["class"]),
             "source_receiver": deepcopy(group["receiver"]), "field": group["field"],
+            **({"exact_receiver_mapping": deepcopy(group['model']['source_receiver'])}
+               if 'source_receiver' in group['model'] else {}),
             "dependent_source_type": group["model"]["metadata"][group["field"]]["type"],
             "controller_types": {name: info["type"] for name, info in sorted(group["model"]["metadata"].items()) if name != group["field"]},
             "effective_instance_metadata": "unobserved", "matching_state": "unresolved",
