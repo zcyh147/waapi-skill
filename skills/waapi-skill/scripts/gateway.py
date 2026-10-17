@@ -12076,14 +12076,16 @@ def dispatch_media_build_business_read(
 ) -> dict[str, Any]:
     """Revalidate and execute one closed media/build business read."""
 
-    def native_failure_evidence(native_call: Mapping[str, Any]) -> dict[str, Any]:
+    def native_failure_evidence(native_call: Mapping[str, Any], *, maximum_inline_bytes: int | None = None) -> dict[str, Any]:
         observation = native_call.get("result")
+        inline_limit = maximum_inline_bytes or (6 * 1024 if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else 64 * 1024)
         evidence: dict[str, Any] = {"call": dispatch_call_summary(native_call)}
-        if probe_gateway_json_document_size(observation, 64 * 1024) == "ok":
+        if probe_gateway_json_document_size(observation, inline_limit) == "ok":
             evidence["native_observation"] = observation
         else:
             evidence["native_observation_boundary"] = {
-                "complete": False, "inline_limit_bytes": 64 * 1024,
+                "complete": False, "inline_limit_bytes": inline_limit,
+                "native_result_sha256": canonical_sha256(observation),
                 "evidence_path": native_call.get("evidence_path"),
             }
         return evidence
@@ -12181,6 +12183,17 @@ def dispatch_media_build_business_read(
             raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
+    peak_page = None
+    if args.api in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
+        from wwise_waapi.peak_read_continuation import PeakContinuationError, prepare_peak_page
+        peak_context = {"configuration": selected_connection_binding(env),
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")}}
+        try:
+            peak_page = prepare_peak_page(request, token=args.peak_page, context=peak_context)
+        except PeakContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     if args.api == MEDIA_POOL_GET_URI:
         required_type = None
         identity_rows = None
@@ -12320,6 +12333,17 @@ def dispatch_media_build_business_read(
                 details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
+        if peak_page is not None:
+            from wwise_waapi.peak_read_continuation import finish_peak_page, peak_page_argv
+            context_available = (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int
+                and live_info["processId"] > 0)
+            try:
+                normalized = finish_peak_page(peak_page, raw=result["result"], normalized=normalized,
+                    context_available=bool(context_available),
+                    next_command=lambda token: transaction_next_command("core-call", peak_page_argv(request, token)))
+            except PeakContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result,
+                    maximum_inline_bytes=4096 if exc.code == "PEAK_PROJECTION_LIMIT_EXCEEDED" else None), error_code=exc.code) from exc
         if args.api == MEDIA_POOL_GET_URI:
             from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
             try:
@@ -12422,6 +12446,14 @@ def dispatch_media_build_business_read(
         **({"read_page": normalized["page"]} if incomplete_media_pool else {}),
         **({"next_command": normalized["next_command"]}
            if incomplete_media_pool and "next_command" in normalized else {}),
+        **({"read_resource_boundary": {
+                "requested_pairs_per_channel": request["business_request"]["peak_pair_count"],
+                "requested_channel_mode": request["business_request"]["channel_mode"],
+                "combined_native_result_limit_bytes": int(capability.execution_contract["result_limit_bytes"]),
+                "native_capability_or_completion_proven": False,
+                "next_step": "Review the disclosed schema and choose an explicit smaller read; original resolution, region and channel mode are preserved and never silently changed",
+            }, "next_command": transaction_next_command("request-schema", ["request-schema", args.api])}
+           if peak_page is not None and result.get("error_code") == "RESULT_TOO_LARGE" else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 

@@ -7,6 +7,8 @@ from typing import Any
 
 MEDIA_BUILD_BUSINESS_CONTRACT = "waapi-skill.media-build-business/v1"
 
+MAX_PEAK_PAIR_COUNT = 16384
+
 PEAKS_REGION_URI = "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion"
 PEAKS_TRIMMED_URI = (
     "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion"
@@ -277,7 +279,7 @@ def media_build_business_contract_data(
         "legacy_typed_call_public": False,
         "safety": {
             "object_revalidation": "exact_guid_name_type_path",
-            "max_peak_pair_count": 512,
+            "max_peak_pair_count": MAX_PEAK_PAIR_COUNT,
             "max_media_pool_candidates": 200,
             "max_soundbank_inclusions": 500,
             "native_request_input": "forbidden",
@@ -287,7 +289,23 @@ def media_build_business_contract_data(
         **({"return_only_fields": {name: dict(value) for name, value in MEDIA_POOL_RETURN_ONLY_FIELDS.items()},
             "field_binding": row["field_binding"], "value_keys": row["value_keys"]}
            if operation == MEDIA_POOL_GET_URI else {}),
-        **({"result_projection": {
+        **({"peak_resource_limits": {
+            "requested_count_unit": "min/max pairs per returned channel",
+            "native_count": {"minimum": 1, "maximum": 4294967295, "required": True, "zero_or_omitted_default": False},
+            "native_omitted_channel_mode": "false" if version == "2025.1" else "not stated in this version schema; preserve observed channel count",
+            "gateway_requested_pair_limit": MAX_PEAK_PAIR_COUNT,
+            "combined_native_result_limit_bytes": 256 * 1024,
+            "completion_claim": "resource limits never prove native capability or collection completion",
+            "larger_intent": "region reads can request an explicit narrower time interval; no native offset/file continuation exists; independent intervals do not prove identical full-region bins",
+        }, "read_continuation": {
+            "flag": "--peak-page", "input": "copy returned Gateway command only",
+            "native_read": "repeat_same_bounded_read_and_verify_entire_result",
+            "binding": ["query", "configuration", "project", "host_session", "complete_native_result"],
+            "lifetime_seconds": 900, "mutation_authority": False,
+            "projection": "append channel-major fragments at exact channel_index/pair_offset; projection_complete covers the observation only",
+            "storage": "dynamic peaks are not stored in the metadata cache; no immutable native-result cache exists",
+        }, "result_projection": {
+            "native_pair_count": "shorter native array contains all available sample values within the requested window; fewer pairs are not truncation",
             "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",
             "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
             "malformed_present_fields": "bounded structured failure with native call evidence",

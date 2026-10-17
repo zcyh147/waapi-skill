@@ -1442,3 +1442,234 @@ def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_di
         "native_call": {"uri": native_call[0], "args": native_call[1], "options": native_call[2], "result": raw},
         "media_pool_dispatch_count": 1,
         "rejected_reads": [{"argv": rejected_argv, "exit_code": rejected_code, "payload": rejected}]})
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+@pytest.mark.parametrize("envelope", ["posix", "windows"])
+def test_large_peak_read_follows_bounded_exact_result_pages_without_losing_channels(tmp_path: Path, version: str, operation: str, envelope: str, monkeypatch, request) -> None:
+    import base64
+    import struct
+    import os
+    observed_capture = {}
+    context_path = os.environ.get("WAAPI_PEAK_BRANCH_CAPTURE_CONTEXT")
+    if context_path and envelope == "posix":
+        from tests.support.peak_query_branch_evidence import load_peak_capture, finish_peak_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_peak_capture(Path(context_path), request.node.nodeid, version, operation)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_peak_capture(capture, reports, observed_capture))
+
+    if envelope == "windows":
+        class WindowsEnvelopeOS:
+            name = "nt"
+            def __getattr__(self, name):
+                import os
+                return getattr(os, name)
+        monkeypatch.setattr(gateway, "os", WindowsEnvelopeOS())
+    pair_count = 1024
+    binary = base64.b64encode(struct.pack("<2h", -16384, 8192) * pair_count).decode()
+    native = {"numChannels": 2, "peaksArrayLength": pair_count,
+        "peaksBinaryStrings": [binary, binary], "peaksDataSize": pair_count * 4,
+        "maxAbsValue": 32768, "channelConfig": "2.0"}
+    if version == "2021.1":
+        native.pop("channelConfig")  # Not in either pinned 2021 result schema.
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    identity = {"return": [{"id": SOURCE_ID, "name": "Alarm_01", "type": "AudioFileSource",
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Alarm\Alarm_01"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [info] * 32,
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 32,
+        "ak.wwise.core.object.get": [identity] * 32, operation: [native] * 32})
+    env = _env(tmp_path, version=version)
+    argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", str(pair_count), "--channel-mode", "per-channel"]
+    if operation == PEAKS_REGION_URI:
+        argv += ["--start-seconds", "0.25", "--end-seconds", "1.75"]
+    observed = {0: [], 1: []}
+    page_count = 0
+    while True:
+        code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+        assert code == 0, payload
+        result = payload["agent_result"]
+        if not page_count:
+            observed_capture.update({"gateway": {"argv": list(argv), "payload": payload},
+                "native_call": {"api": operation, "args": dict(client.calls[-1][1]), "options": {}, "result": native}})
+        assert result["channel_count"] == 2 and result["peak_pair_count"] == pair_count
+        assert result["requested_peak_pair_count"] == pair_count and result["complete_requested_count"] is True
+        assert result["normalization_divisor"] == 32768
+        if version == "2021.1":
+            assert "channel_config" not in result
+        else:
+            assert result["channel_config"] == "2.0"
+        assert result["page"]["native_read"] == "repeat_same_bounded_read_and_verify_entire_result"
+        for channel in result["channels"]:
+            collected = observed[channel["channel_index"]]
+            assert channel["pair_offset"] == len(collected)
+            collected.extend(channel["pairs_normalized"])
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        assert list(payload)[-1] == "agent_result"
+        page_count += 1
+        if result["projection_complete"]:
+            assert "next_command" not in result
+            break
+        assert payload["status"] == "partial"
+        continuation = result["next_command"]
+        assert continuation["copy_instruction"]["source_field"] in {"shell_command", "model_command"}
+        argv = continuation["gateway_argv"]
+        if envelope == "windows":
+            from wwise_waapi.platform_commands import decode_windows_powershell_argv
+            decoded = decode_windows_powershell_argv(continuation["shell_command"])
+            assert list(decoded[decoded.index("gateway.py") + 1:]) == argv
+        assert "--peak-page" in argv
+        assert page_count < 32
+    assert page_count > 1
+    assert observed == {0: [[-0.5, 0.25]] * pair_count, 1: [[-0.5, 0.25]] * pair_count}
+    peak_calls = [call for call in client.calls if call[0] == operation]
+    assert len(peak_calls) == page_count
+    expected_args = {"object": SOURCE_ID, "numPeaks": pair_count, "getCrossChannelPeaks": False}
+    if operation == PEAKS_REGION_URI:
+        expected_args.update(timeFrom=0.25, timeTo=1.75)
+    assert all(call == (operation, expected_args, {}) for call in peak_calls)
+    observed_capture.update({"recovered_channels": {str(key): value for key, value in observed.items()},
+        "peak_dispatch_count": len(peak_calls), "all_pages_bounded": True, "projection_complete": True})
+
+
+@pytest.mark.parametrize("change", ["query", "session", "project", "result"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_pages_reject_drift_before_exposing_later_pairs(tmp_path: Path, operation: str, change: str) -> None:
+    import base64
+    import struct
+
+    binary = base64.b64encode(struct.pack("<2h", -16384, 8192) * 1024).decode()
+    raw = {"numChannels": 1, "peaksArrayLength": 1024, "peaksBinaryStrings": [binary],
+        "peaksDataSize": 4096, "maxAbsValue": 32768}
+    info = _info()
+    second_info = {**info, **({"sessionId": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"} if change == "session" else {})}
+    project = _project(tmp_path)
+    second_project = {**project, **({"id": "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"} if change == "project" else {})}
+    changed_raw = {**raw, **({"maxAbsValue": 16384} if change == "result" else {})}
+    identity = {"return": [{"id": SOURCE_ID, "name": "Alarm_01", "type": "AudioFileSource", "path": r"\Sources\Alarm_01"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [info, second_info],
+        "ak.wwise.core.getProjectInfo": [project, second_project],
+        "ak.wwise.core.object.get": [identity, identity], operation: [raw, changed_raw]})
+    env = _env(tmp_path)
+    argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1024"]
+    if operation == PEAKS_REGION_URI:
+        argv += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, first = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    argv = first["agent_result"]["next_command"]["gateway_argv"]
+    if change == "query":
+        argv[argv.index("--peak-pair-count") + 1] = "1025"
+    code, rejected = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    assert code == 2 and rejected["error_code"] == "PEAK_CONTINUATION_CHANGED", rejected
+    assert "agent_result" not in rejected
+    assert len([call for call in client.calls if call[0] == operation]) == (2 if change == "result" else 1)
+    if change == "result":
+        assert rejected["details"]["call"]["ok"] is True
+        assert rejected["details"]["native_observation"] == changed_raw
+    else:
+        assert rejected["details"] == {"native_query_dispatched": False}
+
+
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_schema_discloses_projection_pages_and_distinguishes_native_and_gateway_limits(tmp_path: Path, operation: str) -> None:
+    code, payload = gateway.execute_gateway(["request-schema", operation], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("offline schema connected"))
+    assert code == 0, payload
+    adapter = payload["business_adapter"]
+    assert adapter["safety"]["max_peak_pair_count"] == 16384
+    limits = adapter["peak_resource_limits"]
+    assert limits["requested_count_unit"] == "min/max pairs per returned channel"
+    assert limits["native_count"] == {"minimum": 1, "maximum": 4294967295, "required": True, "zero_or_omitted_default": False}
+    assert limits["gateway_requested_pair_limit"] == 16384
+    assert limits["combined_native_result_limit_bytes"] == 256 * 1024
+    assert limits["completion_claim"] == "resource limits never prove native capability or collection completion"
+    continuation = adapter["read_continuation"]
+    assert continuation["flag"] == "--peak-page"
+    assert continuation["native_read"] == "repeat_same_bounded_read_and_verify_entire_result"
+    assert continuation["binding"] == ["query", "configuration", "project", "host_session", "complete_native_result"]
+    assert continuation["mutation_authority"] is False
+    assert "shorter native array contains all available sample values" in adapter["result_projection"]["native_pair_count"]
+
+
+@pytest.mark.parametrize("flag", ["--start-seconds", "--end-seconds"])
+def test_trimmed_peak_read_rejects_time_region_fields_instead_of_ignoring_them(tmp_path: Path, flag: str) -> None:
+    code, rejected = gateway.execute_gateway(["core-call", PEAKS_TRIMMED_URI, "--audio-source-id", SOURCE_ID,
+        "--peak-pair-count", "1", flag, "1"], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("unsupported trimmed time field connected"))
+    assert code == 2, rejected
+    assert "region" in rejected["message"]
+
+
+def test_peak_pages_preserve_empty_channels_and_native_default(tmp_path: Path) -> None:
+    native = {"numChannels": 300, "peaksArrayLength": 0, "peaksBinaryStrings": [""] * 300,
+        "peaksDataSize": 0, "maxAbsValue": 1}
+    identity = {"return": [{"id": SOURCE_ID, "name": "Empty", "type": "AudioFileSource", "path": r"\Sources\Empty"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 8,
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 8,
+        "ak.wwise.core.object.get": [identity] * 8, PEAKS_TRIMMED_URI: [native] * 8})
+    env = _env(tmp_path)
+    argv = ["core-call", PEAKS_TRIMMED_URI, "--audio-source-id", SOURCE_ID,
+        "--peak-pair-count", "16384", "--channel-mode", "native-default"]
+    channels = []
+    while True:
+        code, payload = gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+        assert code == 0, payload
+        page = payload["agent_result"]
+        assert page["peak_pair_count"] == 0 and page["requested_peak_pair_count"] == 16384
+        assert page["complete_requested_count"] is False
+        assert page["channel_mode"] == "native-default"
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        channels.extend(page["channels"])
+        if page["projection_complete"]:
+            break
+        argv = page["next_command"]["gateway_argv"]
+    assert channels == [{"channel_index": index, "pair_offset": 0, "pairs_normalized": []} for index in range(300)]
+    assert all(call[1] == {"object": SOURCE_ID, "numPeaks": 16384}
+        for call in client.calls if call[0] == PEAKS_TRIMMED_URI)
+
+
+def test_peak_header_resource_boundary_retains_native_observation_without_false_completion(tmp_path: Path) -> None:
+    raw = {"numChannels": 1, "peaksArrayLength": 0, "peaksBinaryStrings": [""],
+        "peaksDataSize": 0, "maxAbsValue": 1, "channelConfig": "x" * 24000}
+    identity = {"return": [{"id": SOURCE_ID, "name": "Empty", "type": "AudioFileSource", "path": r"\Sources\Empty"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": [identity], PEAKS_TRIMMED_URI: [raw]})
+    code, rejected = gateway.execute_gateway(["core-call", PEAKS_TRIMMED_URI, "--audio-source-id", SOURCE_ID,
+        "--peak-pair-count", "1"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and rejected["error_code"] == "PEAK_PROJECTION_LIMIT_EXCEEDED", rejected
+    from wwise_waapi.canonical import canonical_sha256
+    assert "native_observation" not in rejected["details"]
+    boundary = rejected["details"]["native_observation_boundary"]
+    assert boundary["complete"] is False and boundary["inline_limit_bytes"] == 4096
+    assert boundary["native_result_sha256"] == canonical_sha256(raw)
+    assert rejected["details"]["call"]["ok"] is True
+    assert "agent_result" not in rejected
+
+
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_multichannel_native_byte_boundary_preserves_requested_resolution_and_schema_hop(tmp_path: Path, operation: str) -> None:
+    import base64
+    import struct
+
+    binary = base64.b64encode(struct.pack("<2h", -16384, 8192) * 16384).decode()
+    raw = {"numChannels": 4, "peaksArrayLength": 16384, "peaksBinaryStrings": [binary] * 4,
+        "peaksDataSize": 65536, "maxAbsValue": 32768}
+    identity = {"return": [{"id": SOURCE_ID, "name": "FourChannels", "type": "AudioFileSource", "path": r"\Sources\FourChannels"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": [identity], operation: [raw]})
+    argv = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "16384", "--channel-mode", "per-channel"]
+    if operation == PEAKS_REGION_URI:
+        argv += ["--start-seconds", "0.25", "--end-seconds", "1.75"]
+    code, payload = gateway.execute_gateway(argv, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2 and payload["call"]["error_code"] == "RESULT_TOO_LARGE", payload
+    assert payload["agent_result"] is None
+    boundary = payload["read_resource_boundary"]
+    assert boundary["requested_pairs_per_channel"] == 16384
+    assert boundary["combined_native_result_limit_bytes"] == 256 * 1024
+    assert boundary["requested_channel_mode"] == "per-channel"
+    assert boundary["native_capability_or_completion_proven"] is False
+    assert payload["next_command"]["gateway_argv"] == ["request-schema", operation]
+    assert payload["business_request"]["peak_pair_count"] == 16384
+    assert len([call for call in client.calls if call[0] == operation]) == 1
+    assert client.calls[-1][1]["numPeaks"] == 16384 and client.calls[-1][1]["getCrossChannelPeaks"] is False

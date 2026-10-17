@@ -282,7 +282,7 @@ def test_cross_channel_peak_result_requires_one_returned_channel() -> None:
         {"start_seconds": 1.0, "end_seconds": 1.0},
         {"peak_pair_count": True},
         {"peak_pair_count": 0},
-        {"peak_pair_count": 513},
+        {"peak_pair_count": 16385},
         {"channel_mode": "invented"},
         {"native_args": {}},
     ],
