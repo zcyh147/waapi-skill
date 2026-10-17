@@ -13,6 +13,386 @@ from tests.unit.test_field_interface_closure_gateway import FieldTask, FIRST, SE
 
 ROOT = "{33333333-3333-3333-3333-333333333333}"
 CHILD = "{44444444-4444-4444-4444-444444444444}"
+PROJECT_GROUP = "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}"
+
+
+def test_documented_list_discovery_selects_sound_rtpc_omitted_by_live_names(tmp_path):
+    task = FieldTask(tmp_path, "2025.1", "object.set")
+    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "parent": {"id": SECOND}}
+    task.metadata = {"OutputBus": {"name": "OutputBus", "type": "", "restriction": {"type": "reference"}}}
+    owner = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", owner,
+        "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    rtpc = next(row for row in listed["agent_result"]["items"] if row["name"] == "RTPC")
+    assert rtpc["field_kind"] == "list"
+    assert rtpc["element_classes"] == [{"name": "RTPC", "class_id": 1441808}]
+    code, selected = task.step("draft-discover-fields", "--object-handle", owner,
+        "--field-source", "documented-lists", "--selection", rtpc["selection"])
+    assert code == 0, selected
+    field = selected["meaning_results"][0]["candidates"][0]
+    assert field["handle"].startswith("bfh1-") and field["field_kind"] == "list"
+    assert field["evidence"]["kind"] == "documented-list"
+    assert not any(uri.endswith("getPropertyInfo") and args.get("property") == "RTPC"
+        for uri, args, _ in task.calls)
+
+
+def test_object_graph_next_action_discloses_documented_list_discovery(tmp_path):
+    task = FieldTask(tmp_path, "2025.1", "object.set")
+    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"}
+    code, bound = task.step("draft-bind-object", "--object-id", FIRST)
+    assert code == 0, bound
+    disclosure = bound["draft"]["next_action_binding"]["field_discovery"]["documented_lists"]
+    assert disclosure["append"] == ["--field-source", "documented-lists", "--list"]
+    assert disclosure["scope"] == "copy_exact_bound_owner_handle_or_type_handle"
+
+
+@pytest.mark.parametrize("version,fault", (("2023.1", None), ("2024.1", None), ("2025.1", "wrong-target-class"), ("2023.1", "reversed-effect"), ("2024.1", "missing-effect-field"), ("2023.1", "changed-reference-notes")))
+def test_documented_arguments_assigns_existing_references_with_order_and_preservation(tmp_path, version, fault):
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.types = [{"classId": 2293776, "name": "MusicSwitchContainer", "type": "WObject"},
+        {"classId": 1245200, "name": "SwitchGroup", "type": "WObject"},
+        {"classId": 458768, "name": "StateGroup", "type": "WObject"}]
+    task.objects = {
+        FIRST: {"id": FIRST, "name": "Music", "type": "MusicSwitchContainer", "classId": 2293776,
+            "path": r"\Interactive Music Hierarchy\Default Work Unit\Music", "parent": None,
+            "notes": "Keep music", "@Arguments": [{"id": SECOND}]},
+        SECOND: {"id": SECOND, "name": "Surface", "type": "SwitchGroup", "classId": 1245200,
+            "path": r"\Switches\Default Work Unit\Surface", "parent": {"id": PROJECT_GROUP}, "notes": "Keep group"},
+        ROOT: {"id": ROOT, "name": "Weather", "type": "StateGroup", "classId": 458768,
+            "path": r"\States\Default Work Unit\Weather", "parent": {"id": PROJECT_GROUP}, "owner": None},
+    }
+    preserved = deepcopy(task.objects)
+    owner = task.bind(FIRST)
+    targets = [task.bind(ROOT), task.bind(SECOND)]
+    code, listed = task.step("draft-discover-fields", "--object-handle", owner,
+        "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    arguments = next(row for row in listed["agent_result"]["items"] if row["name"] == "Arguments")
+    code, selected = task.step("draft-discover-fields", "--object-handle", owner,
+        "--field-source", "documented-lists", "--selection", arguments["selection"])
+    assert code == 0, selected
+    field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "music", "--object-handle", owner,
+        "--field-value", field, json.dumps(targets))
+    assert code == 0, declared
+    if fault == "wrong-target-class":
+        code, rejected = task.step("draft-check")
+        assert code == 2, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": FIRST, "@Arguments": [ROOT, SECOND]}]
+            task.objects[FIRST]["@Arguments"] = [{"id": ROOT}, {"id": SECOND}]
+            if fault == "reversed-effect":
+                task.objects[FIRST]["@Arguments"].reverse()
+            elif fault == "changed-reference-notes":
+                task.objects[SECOND]["notes"] = "Unrequested change"
+            elif fault == "missing-effect-field":
+                del task.objects[FIRST]["@Arguments"]
+            return {"objects": [{"id": FIRST, "name": "Music"}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get("verified") is True) == (fault is None), verified
+    if fault == "changed-reference-notes":
+        return
+    assert task.objects[SECOND] == preserved[SECOND] and task.objects[ROOT] == preserved[ROOT]
+    assert "owner" not in task.objects[SECOND] and task.objects[ROOT]["owner"] is None
+    assert not any(uri.endswith("getPropertyInfo") and args.get("property") == "Arguments"
+        for uri, args, _ in task.calls)
+
+
+def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, select=True, list_name="Metadata", clear=True):
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    element_class = 5570560 if version == "2025.1" else 5308432
+    element_name = "MetadataSlot" if version == "2025.1" else "Metadata"
+    if list_name == "RTPC":
+        element_name, element_class = "RTPC", 1441808
+    elif list_name == "Effects":
+        element_name, element_class = "EffectSlot", 5505040
+    accessor = {"Metadata": "@Metadata", "RTPC": "@RTPC", "Effects": "@Effects"}[list_name]
+    task.types = [{"classId": 65552, "name": "Sound", "type": "WObject"},
+                  {"classId": element_class, "name": element_name, "type": "WObject"}]
+    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain", "parent": {"id": SECOND},
+        "notes": "Keep sound", accessor: [{"id": CHILD}]}
+    task.objects[CHILD] = {"id": CHILD, "name": list_name, "type": "RTPC" if list_name == "RTPC" else "PluginInnerObject", "classId": element_class,
+        "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "parent": None, "notes": "Old slot"}
+    owner = task.bind(FIRST)
+    task.list_owner_handle = owner
+    field = list_name
+    if select:
+        code, listed = task.step("draft-discover-fields", "--object-handle", owner,
+            "--field-source", "documented-lists", "--list")
+        assert code == 0, listed
+        choice = next(row for row in listed["agent_result"]["items"] if row["name"] == list_name)
+        code, selected = task.step("draft-discover-fields", "--object-handle", owner,
+            "--field-source", "documented-lists", "--selection", choice["selection"])
+        assert code == 0, selected
+        field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    task.list_field_handle = field
+    calls_before = len(task.calls)
+    if clear:
+        code, declared = task.step("draft-clear-object-list", "--declaration-id", "clear",
+            "--object-handle", owner, "--list-name", list_name if alias else field)
+        assert code == 0, declared
+    if not select:
+        assert len(task.calls) == calls_before
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": FIRST, "listMode": "replaceAll", accessor: []}]
+            task.objects[FIRST][accessor] = []
+            del task.objects[CHILD]
+            return {"objects": [{"id": FIRST, "name": "Rain"}]}
+        return original(uri, args, options)
+    task.call = call
+    return task, element_class
+
+
+@pytest.mark.parametrize("fault", (None, "native-generic-type", "wrong-requested-class", "wrong-effect-class", "wrong-effect-owner", "missing-effect-membership", "reversed-effect-order"))
+def test_documented_metadata_list_handle_constructs_member_and_verifies_actual_class(tmp_path, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path)
+    # Revise the same draft into append construction of one exact discovered class.
+    del task.objects[CHILD]
+    task.objects[FIRST]["@Metadata"] = []
+    code, types = task.step("draft-discover-types", "--role", "object", "--meaning", "Sound" if fault == "wrong-requested-class" else "MetadataSlot")
+    assert code == 0, types
+    kind = types["type_candidates"][0]["handle"]
+    code, listed = task.step("draft-discover-fields", "--object-handle", task.list_owner_handle,
+        "--field-source", "documented-lists", "--list")
+    choice = next(row for row in listed["agent_result"]["items"] if row["name"] == "Metadata")
+    code, selected = task.step("draft-discover-fields", "--object-handle", task.list_owner_handle,
+        "--field-source", "documented-lists", "--selection", choice["selection"])
+    field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    code, created = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", task.list_owner_handle,
+        "--name", "New metadata", "--kind", kind, "--field", "object_list", field,
+        "--field", "list_behavior", "replace-all")
+    assert code == 0, created
+    if fault == "wrong-requested-class":
+        code, rejected = task.step("draft-check")
+        assert code == 2, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    if fault == "reversed-effect-order":
+        code, created = task.step("draft-declare-new", "--declaration-id", "second-slot", "--parent-handle", task.list_owner_handle,
+            "--name", "Second metadata", "--kind", kind, "--field", "object_list", field,
+            "--field", "list_behavior", "replace-all")
+        assert code == 0, created
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            expected_nodes = [{"type": "MetadataSlot", "name": "New metadata"}]
+            if fault == "reversed-effect-order":
+                expected_nodes.append({"type": "MetadataSlot", "name": "Second metadata"})
+            assert args["objects"] == [{"object": FIRST, "listMode": "replaceAll", "@Metadata": expected_nodes}]
+            task.objects[CHILD] = {"id": CHILD, "name": "New metadata", "type": "MetadataSlot", "classId": 5570560,
+                "path": task.objects[FIRST]["path"] + r"\New metadata", "owner": {"id": FIRST}, "parent": None, "notes": ""}
+            task.objects[FIRST]["@Metadata"] = [{"id": CHILD}]
+            if fault == "native-generic-type":
+                task.objects[CHILD]["type"] = "PluginInnerObject"
+                del task.objects[CHILD]["parent"]
+            elif fault == "wrong-effect-class":
+                task.objects[CHILD]["classId"] = 1441808
+            elif fault == "wrong-effect-owner":
+                task.objects[CHILD]["owner"] = {"id": SECOND}
+            elif fault == "missing-effect-membership":
+                task.objects[FIRST]["@Metadata"] = []
+            results = [{"id": CHILD, "name": "New metadata"}]
+            if fault == "reversed-effect-order":
+                task.objects[ROOT] = {**task.objects[CHILD], "id": ROOT, "name": "Second metadata",
+                    "path": task.objects[FIRST]["path"] + r"\Second metadata"}
+                task.objects[FIRST]["@Metadata"] = [{"id": ROOT}, {"id": CHILD}]
+                results.append({"id": ROOT, "name": "Second metadata"})
+            return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": results}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault in (None, "native-generic-type") else 2), verified
+    assert (verified.get("verified") is True) == (fault in (None, "native-generic-type")), verified
+    if fault == "reversed-effect-order":
+        assert verified.get("verified") is False and "ordered membership matches" in json.dumps(verified), verified
+
+
+def test_documented_list_guard_allows_requested_owner_rename_while_verifying_class_and_clear(tmp_path):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", task.list_owner_handle,
+        "--field", "new_name", "Storm")
+    assert code == 0, declared
+    code, declared = task.step("draft-clear-object-list", "--declaration-id", "owner", "--object-handle", task.list_owner_handle,
+        "--list-name", task.list_field_handle)
+    assert code == 0, declared
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": FIRST, "name": "Storm", "listMode": "replaceAll", "@Metadata": []}]
+            task.objects[FIRST].update(name="Storm", path=r"\Actor-Mixer Hierarchy\Default Work Unit\Storm")
+            task.objects[FIRST]["@Metadata"] = []
+            del task.objects[CHILD]
+            return {"objects": [{"id": FIRST, "name": "Storm"}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+
+
+def test_documented_list_exact_alias_resolves_at_preview_without_hidden_live_declaration(tmp_path):
+    task, _ = _documented_metadata_clear_case(tmp_path, alias=True, select=False)
+    tx, shown = task.preview()
+    guards = shown["artifact"]["prepared_operation"]["pre_state"]["documented_list_guards"]
+    assert guards[0]["evidence"]["declaration"]["name"] == "Metadata"
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("alias", (False, True))
+def test_documented_metadata_list_handle_clears_through_one_verified_transaction(tmp_path, version, alias):
+    task, element_class = _documented_metadata_clear_case(tmp_path, version, alias=alias)
+    tx, shown = task.preview()
+    proofs = shown["artifact"]["prepared_operation"]["pre_state"]["documented_list_guards"]
+    assert proofs[0]["evidence"]["source_member"] == "wwiseobject_sound.html"
+    assert proofs[0]["members"][0]["classId"] == element_class
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["notes"] == "Keep sound"
+    assert CHILD not in task.objects
+
+
+@pytest.mark.parametrize("list_name", ("RTPC", "Effects"))
+def test_documented_specialized_list_uses_same_closed_generic_clear_and_actual_owner_proof(tmp_path, list_name):
+    task, expected_class = _documented_metadata_clear_case(tmp_path, list_name=list_name)
+    tx, shown = task.preview()
+    guard = shown["artifact"]["prepared_operation"]["pre_state"]["documented_list_guards"][0]
+    assert guard["evidence"]["declaration"]["name"] == list_name
+    assert guard["members"][0]["classId"] == expected_class
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    assert CHILD not in task.objects and task.objects[FIRST]["notes"] == "Keep sound"
+
+
+@pytest.mark.parametrize("fault", ("wrong-member-class", "bool-member-class", "missing-member-class", "duplicate-member", "missing-member-owner", "null-member-owner", "wrong-member-owner"))
+def test_documented_list_preview_requires_actual_member_class_and_ownership(tmp_path, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path)
+    if fault == "wrong-member-class":
+        task.objects[CHILD]["classId"] = 1441808  # RTPC, independently declared by its own source page.
+    elif fault == "bool-member-class":
+        task.objects[CHILD]["classId"] = True
+    elif fault == "missing-member-class":
+        del task.objects[CHILD]["classId"]
+    elif fault == "duplicate-member":
+        task.objects[FIRST]["@Metadata"].append({"id": CHILD})
+    elif fault == "missing-member-owner":
+        del task.objects[CHILD]["owner"]
+    elif fault == "null-member-owner":
+        task.objects[CHILD]["owner"] = None
+    else:
+        task.objects[CHILD]["owner"] = {"id": SECOND}
+    code, rejected = task.step("draft-check")
+    assert code == 2, rejected
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+def test_documented_list_unknown_or_scalar_alias_reports_exact_legal_choices(tmp_path):
+    task, _ = _documented_metadata_clear_case(tmp_path)
+    code, rejected = task.step("draft-clear-object-list", "--declaration-id", "clear",
+        "--object-handle", task.list_owner_handle, "--list-name", "OutputBus")
+    assert code == 0, rejected  # Offline declaration performs no hidden live alias probe.
+    code, rejected = task.step("draft-check")
+    assert code == 2 and rejected["error_code"] == "DOCUMENTED_LIST_SELECTION_REQUIRED", rejected
+    assert rejected["details"]["repair"]["choices"] == ["Effects", "Metadata", "RTPC"]
+
+
+@pytest.mark.parametrize("fault", ("member-class", "member-order", "owner-class", "source"))
+def test_documented_list_immutable_preview_blocks_class_source_and_order_drift(tmp_path, monkeypatch, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path)
+    if fault == "member-order":
+        task.objects[ROOT] = {**task.objects[CHILD], "id": ROOT, "name": "Second", "path": task.objects[CHILD]["path"] + "Two"}
+        task.objects[FIRST]["@Metadata"].append({"id": ROOT})
+    if fault == "source":
+        from wwise_waapi import documented_list_fields
+        source_root = tmp_path / "source"
+        (source_root / "2025.1").mkdir(parents=True)
+        source = source_root / "2025.1" / "documented-list-fields.json"
+        source.write_bytes((documented_list_fields.CATALOG_ROOT / "2025.1" / source.name).read_bytes())
+        monkeypatch.setattr(documented_list_fields, "CATALOG_ROOT", source_root)
+    tx, shown = task.preview()
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    if fault == "member-class":
+        task.objects[CHILD]["classId"] = 1441808
+    elif fault == "member-order":
+        task.objects[FIRST]["@Metadata"].reverse()
+    elif fault == "owner-class":
+        task.objects[FIRST]["classId"] = 2293776
+    else:
+        import hashlib
+        catalog = json.loads(source.read_text())
+        next(row for row in catalog["classes"] if row["name"] == "Sound")["source_sha256"] = "0" * 64
+        unsigned = {key: value for key, value in catalog.items() if key != "catalog_sha256"}
+        catalog["catalog_sha256"] = hashlib.sha256(json.dumps(unsigned, ensure_ascii=False, sort_keys=True,
+            separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+        source.write_text(json.dumps(catalog))
+    code, rejected = task.run("execute", tx)
+    assert code == 2 and rejected.get("executed") is not True, rejected
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+def test_2021_documented_list_discovery_reports_missing_source_without_native_absence(tmp_path):
+    task = FieldTask(tmp_path, "2021.1", "object.create")
+    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"}
+    owner = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", owner,
+        "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    observed = listed["agent_result"]
+    assert observed["items"] == [] and observed["native_unavailability_proven"] is False
+    assert observed["availability"] == "source_does_not_establish_list_fields_for_this_class"
+    assert observed["source_coverage"]["indexed_pages"] == 96
+
+
+@pytest.mark.parametrize("fault", ("version", "class", "malformed"))
+def test_documented_list_catalog_failure_never_issues_a_mutation_field(tmp_path, monkeypatch, fault):
+    from wwise_waapi import documented_list_fields
+    task = FieldTask(tmp_path, "2025.1", "object.set")
+    task.objects[FIRST] = {"id": FIRST, "name": "Rain", "type": "Sound", "classId": 65552,
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Rain"}
+    owner = task.bind(FIRST)
+    root = tmp_path / "catalog"
+    (root / "2025.1").mkdir(parents=True)
+    source = root / "2025.1" / "documented-list-fields.json"
+    catalog = json.loads((documented_list_fields.CATALOG_ROOT / "2025.1" / source.name).read_text())
+    if fault == "version":
+        catalog["version"] = "2024.1"
+    elif fault == "class":
+        catalog["classes"][0]["class_id"] = True
+    else:
+        catalog["classes"] = [None]
+    import hashlib
+    unsigned = {key: value for key, value in catalog.items() if key != "catalog_sha256"}
+    catalog["catalog_sha256"] = hashlib.sha256(json.dumps(unsigned, ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    source.write_text(json.dumps(catalog))
+    monkeypatch.setattr(documented_list_fields, "CATALOG_ROOT", root)
+    code, rejected = task.step("draft-discover-fields", "--object-handle", owner,
+        "--field-source", "documented-lists", "--list")
+    assert code == 2, rejected
+    assert "field_candidates" not in rejected and "meaning_results" not in rejected
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
 class OwnedGraphTask(FieldTask):
@@ -578,28 +958,53 @@ def test_set_replace_does_not_verify_surviving_old_descendant(tmp_path: Path, ve
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
-def test_set_replace_list_collision_preserves_unrequested_member(tmp_path: Path, version: str) -> None:
-    task = SetReplaceTask(tmp_path, version)
-    task.objects[ROOT].update({"parent": None, "owner": {"id": FIRST}})
-    wind = "{77777777-7777-7777-7777-777777777777}"
-    task.objects[wind].update({"parent": None, "owner": {"id": FIRST}})
-    task.objects[FIRST]["@CustomList"] = [{"id": ROOT}, {"id": wind}]
+def test_set_rejects_fictitious_custom_list_without_source_or_live_list_evidence(tmp_path, version):
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.objects[FIRST].update({"type": "Sound", "classId": 65552})
     owner = task.bind(FIRST)
     code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
     assert code == 0, configured
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
-    assert code == 0, root
-    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
-                            root["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
-    assert code == 0, child
+    code, declared = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
+        "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
+    assert code == 0, declared
+    code, rejected = task.step("draft-check")
+    assert code == 2 and rejected["error_code"] == "DOCUMENTED_LIST_SELECTION_REQUIRED", rejected
+    assert "Metadata" in rejected["details"]["repair"]["choices"]
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    task.objects[ROOT] = {**task.objects[CHILD], "id": ROOT, "name": "Spare",
+        "path": task.objects[FIRST]["path"] + r"\Spare", "notes": "Keep spare"}
+    preserved = deepcopy(task.objects[ROOT])
+    task.objects[FIRST]["@Metadata"].append({"id": ROOT})
+    code, types = task.step("draft-discover-types", "--role", "object", "--meaning", "MetadataSlot")
+    assert code == 0, types
+    code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
+    assert code == 0, configured
+    code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", task.list_owner_handle,
+        "--name", "Metadata", "--kind", types["type_candidates"][0]["handle"],
+        "--field", "object_list", task.list_field_handle)
+    assert code == 0, declared
+    original = task.call
+    fresh_id = "{77777777-7777-7777-7777-777777777777}"
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": FIRST, "@Metadata": [{"type": "MetadataSlot", "name": "Metadata"}]}]
+            del task.objects[CHILD]
+            task.objects[fresh_id] = {"id": fresh_id, "name": "Metadata", "type": "PluginInnerObject", "classId": 5570560,
+                "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "notes": ""}
+            task.objects[FIRST]["@Metadata"] = [{"id": ROOT}, {"id": fresh_id}]
+            return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": [{"id": fresh_id, "name": "Metadata"}]}]}
+        return original(uri, args, options)
+    task.call = call
     tx, shown = task.preview()
-    prepared = shown["artifact"]["prepared_operation"]
-    assert {row["id"] for row in prepared["verification_plan"]["replaced_list_subtree_rows"]} == {ROOT, CHILD}
+    assert {row["id"] for row in shown["artifact"]["prepared_operation"]["verification_plan"]["replaced_list_subtree_rows"]} == {CHILD}
     code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, json.dumps(verified)
-    assert task.objects[FIRST]["@CustomList"] == [{"id": wind}, {"id": "{88888888-8888-8888-8888-888888888888}"}]
-    assert task.objects[wind]["notes"] == "Keep wind"
+    assert code == 0 and verified["verified"] is True, verified
+    assert CHILD not in task.objects and task.objects[ROOT] == preserved
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
@@ -656,24 +1061,17 @@ def test_set_reference_array_uses_only_bound_handles_and_verifies_ordered_guids(
     code, discovered = task.step("draft-discover-fields", "--object-handle", owner, "--meaning", "Target objects")
     assert code == 0, discovered
     candidate = discovered["meaning_results"][0]["candidates"][0]
-    assert ("json_array_of_bound_object_handles" in candidate["value_input"]["accepted_forms"]) is (version != "2022.1")
+    assert "json_array_of_bound_object_handles" not in candidate["value_input"]["accepted_forms"]
     field = candidate["handle"]
     code, before = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
     assert code == 0, before
     code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
                                "--field-value", field, "  " + json.dumps([target, owner]) + "  ")
-    if version == "2022.1":
-        assert code == 2 and declared["error_code"] == "NATIVE_VALUE_UNION_UNAVAILABLE", declared
-        code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
-        assert code == 0 and after["draft"] == before["draft"], after
-        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
-        return
-    assert code == 0, declared
-    tx, shown = task.preview()
-    args = shown["artifact"]["prepared_operation"]["dispatch"]["args"]
-    assert args["objects"] == [{"object": FIRST, "@Targets": [SECOND, FIRST]}]
-    code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+    expected = "NATIVE_VALUE_UNION_UNAVAILABLE" if version == "2022.1" else "REFERENCE_LIST_EVIDENCE_REQUIRED"
+    assert code == 2 and declared["error_code"] == expected, declared
+    code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0 and after["draft"] == before["draft"], after
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
@@ -688,17 +1086,11 @@ def test_new_set_descendant_reference_array_uses_the_same_version_boundary(tmp_p
     assert code == 0, before
     code, declared = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle", owner,
         "--kind", "sound-sfx", "--name", "Rain", "--field-value", field, json.dumps([target, owner]))
-    if version == "2022.1":
-        assert code == 2 and declared["error_code"] == "NATIVE_VALUE_UNION_UNAVAILABLE", declared
-        code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
-        assert code == 0 and after["draft"] == before["draft"], after
-        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
-        return
-    assert code == 0, declared
-    tx, shown = task.preview()
-    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]["children"][0]["@Targets"] == [SECOND, FIRST]
-    code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+    expected = "NATIVE_VALUE_UNION_UNAVAILABLE" if version == "2022.1" else "REFERENCE_LIST_EVIDENCE_REQUIRED"
+    assert code == 2 and declared["error_code"] == expected, declared
+    code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0 and after["draft"] == before["draft"], after
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -764,24 +1156,6 @@ def test_create_reference_unions_use_class_field_evidence_and_exact_bound_target
     assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["@Targets"] == expected
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
-
-
-@pytest.mark.parametrize("version", VERSIONS[2:])
-@pytest.mark.parametrize("bad_result", ("reverse-reference-array", "omit-reference-array"))
-def test_set_reference_array_verification_detects_reordered_or_missing_native_fields(
-    tmp_path: Path, version: str, bad_result: str,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.set")
-    task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"}}
-    owner, target = task.bind(FIRST), task.bind(SECOND)
-    field = task.discover(owner, "Target objects")
-    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
-                               "--field-value", field, json.dumps([target, owner]))
-    assert code == 0, declared
-    tx, shown = task.preview()
-    task.bad_result = bad_result
-    code, verified = task.finish(tx, shown)
-    assert code == 2 and verified["verified"] is False, verified
 
 
 @pytest.mark.parametrize("version", VERSIONS[2:])
