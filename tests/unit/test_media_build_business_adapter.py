@@ -583,11 +583,11 @@ def test_media_pool_result_rejects_missing_or_excess_projection_rows() -> None:
 
     with pytest.raises(MediaBuildBusinessError):
         normalize_media_build_result(prepared, {"return": [valid] * 3})
-    with pytest.raises(MediaBuildBusinessError):
-        normalize_media_build_result(
-            prepared,
-            {"return": [{key: value for key, value in valid.items() if key != "Path"}]},
-        )
+    missing_path = normalize_media_build_result(prepared,
+        {"return": [{key: value for key, value in valid.items() if key != "Path"}]})
+    assert missing_path["projection_complete"] is False
+    assert missing_path["items"][0]["unavailable_fields"] == ["path"]
+    assert "path" not in missing_path["items"][0]
     missing_optional = normalize_media_build_result(prepared, {
         "return": [{key: value for key, value in valid.items() if key != "Filename"}]})
     assert missing_optional["items"][0]["values"] == {}

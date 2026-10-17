@@ -1007,3 +1007,18 @@ def test_media_pool_long_windows_continuation_keeps_useful_rows_with_explicit_co
     assert page["continuation_unavailable_reason"] == "continuation_command_limit_exceeded"
     assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) < 64 * 1024
     assert len(client.calls[-1][1]["filters"]) == 16
+
+
+def test_media_pool_preserves_missing_identity_fields_as_observed_absence(tmp_path: Path) -> None:
+    raw = {"return": [{"FileId": "known", "Filename": "Known.wav"}, {"Path": "/Audio/PathOnly.wav"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [raw]})
+    code, payload = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "5", "--include-field", "filename"],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["status"] == "partial"
+    result = payload["agent_result"]
+    assert result["complete"] is True  # The bounded collection ended; row identities remain incomplete.
+    assert result["projection_complete"] is False
+    assert result["items"][0] == {"file_id": "known", "values": {"filename": "Known.wav"}, "unavailable_fields": ["path"]}
+    assert result["items"][1] == {"path": "/Audio/PathOnly.wav", "values": {}, "unavailable_fields": ["file_id"], "unavailable_values": ["filename"]}

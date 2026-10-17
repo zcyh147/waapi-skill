@@ -932,9 +932,15 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
     if isinstance(final_limit, int):
         filtered = filtered[:final_limit]
     projected: list[dict[str, Any]] = []
+    identity_projection_complete = True
     for index, row in enumerate(filtered):
         fixed: dict[str, Any] = {}
+        unavailable_fields: list[str] = []
         for native, business in (("Path", "path"), ("FileId", "file_id")):
+            if native not in row:
+                unavailable_fields.append(business)
+                identity_projection_complete = False
+                continue
             value = row.get(native)
             if not isinstance(value, str) or not value:
                 raise MediaBuildBusinessError(
@@ -968,10 +974,12 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
             else:
                 values[binding["key"]] = row[binding["field"]]
         projected.append({**fixed, "values": values,
+                          **({"unavailable_fields": unavailable_fields} if unavailable_fields else {}),
                           **({"unavailable_values": unavailable_values} if unavailable_values else {})})
     return {
         "contract": MEDIA_BUILD_RESULT_CONTRACT,
         "kind": "media_pool_rows",
+        **({"projection_complete": False} if not identity_projection_complete else {}),
         "complete": complete,
         "candidate_count": len(rows),
         "returned_count": len(projected),
