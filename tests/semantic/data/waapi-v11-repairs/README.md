@@ -21,7 +21,7 @@ from the sealed campaign evidence. Executor is gpt-5.6-terra, medium reasoning,
 default service tier. Each task has
 600 cumulative Agent seconds and at most 96 Gateway calls; the batch has at most
 2400 Agent seconds. No automatic retry or version multiplication. The only
-smaller selections are the explicitly documented F2–F4 and F3–F4 continuations below.
+smaller selections are the explicitly documented F2–F4, F3–F4 and F4 continuations below.
 Fixture setup calls and native preflight are deterministic runner work and are
 recorded separately from Agent transactions. No Windows acceptance is claimed.
 
@@ -171,3 +171,28 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
 A passing root would establish only its selected 2/2 result. F1's separate
 business assessment and F2's original FAIL must remain visible in any overall
 acceptance report. No failed root is regraded by this continuation.
+
+
+## Last unattempted F4 after r5
+
+Root `imac-v11-repairs-remaining2-r5` attempted F3, which selected an existing
+Game Parameter range operation instead of object creation. The Broker rejected
+its Draft start before dispatch. F3 remains **FAIL**, with no business PASS;
+its campaign remains **BLOCKED** because the old receipt does not contain the
+new structured initial-admission marker. No marker is synthesized for that root.
+
+Only `REPAIR25-F4` remains unattempted and authorized. This exact singleton uses
+one fresh CLI task, one user turn, one transaction, at most 600 Agent seconds,
+and zero reviewer calls or automatic retries. It authorizes no F2/F3 rerun.
+All previously documented selections and the default all-four profile remain
+unchanged; other singletons, arbitrary subsets and duplicates remain rejected.
+
+```bash
+skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
+  --profile waapi_v11_repairs_4 --version 2025.1 --case-id REPAIR25-F4 \
+  --model gpt-5.6-terra --reasoning-effort medium --service-tier default \
+  --campaign-root skills/waapi-skill-workspace/imac-v11-repairs-remaining1-r6
+```
+
+A 1/1 result would cover F4 only. Preserve F1's separate business assessment,
+F2/F3 failures, and all original campaign verdicts in the overall report.
