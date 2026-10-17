@@ -249,6 +249,7 @@ def discover_metadata(
     class_id: int | None = None,
     object: str | int | None = None,
     limit: int = DEFAULT_METADATA_DISCOVERY_LIMIT,
+    exact_field: str | None = None,
 ) -> MetadataDiscoveryResult:
     """Retrieve bounded live metadata candidates for natural-language phrases.
 
@@ -268,6 +269,8 @@ def discover_metadata(
         object=object,
     )
     names = _read_names(read_call, live_scope_args)
+    if exact_field is not None and (exact_field not in names or tuple(normalized_queries) != (exact_field,)):
+        raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Selected field is no longer in the live scope; list this scope again.")
 
     def exact_label(value: str) -> str:
         return "".join(char for char in value.casefold() if char.isalnum())
@@ -309,7 +312,7 @@ def discover_metadata(
         "inspection_limit": MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN,
     }
     info_by_name = {
-        name: _read_property_info(read_call, live_scope_args, name)
+        name: _read_property_info(read_call, live_scope_args, name, maximum_bytes=MAX_METADATA_DISCOVERY_RESULT_BYTES)
         for name in detail_names
     }
 
@@ -395,7 +398,7 @@ def discover_metadata(
         unresolved_dependencies=unresolved_dependencies,
         fallback_detail_scan=fallback_detail_scan,
     )
-    _require_result_size(result.as_dict())
+    _require_result_size(result.as_dict(detail=True))
     return result
 
 
@@ -571,6 +574,7 @@ def _read_property_info(
     read_call: ReadCall,
     scope_args: Mapping[str, Any],
     name: str,
+    *, maximum_bytes: int = MAX_METADATA_DISCOVERY_INFO_BYTES,
 ) -> PropertyInfoMetadataRecord:
     result = _closed_read(
         read_call,
@@ -588,7 +592,7 @@ def _read_property_info(
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
-    payload = info.as_dict()
+    payload = info.raw
     try:
         size = len(canonical_json_bytes(payload))
     except (TypeError, ValueError) as exc:
@@ -601,7 +605,7 @@ def _read_property_info(
                 "cause_type": type(exc).__name__,
             },
         ) from exc
-    if size > MAX_METADATA_DISCOVERY_INFO_BYTES:
+    if size > maximum_bytes:
         raise MetadataDiscoveryError(
             "LIVE_METADATA_LIMIT_EXCEEDED",
             "One getPropertyInfo result exceeds the discovery size limit.",
@@ -609,7 +613,7 @@ def _read_property_info(
                 "uri": GET_PROPERTY_INFO_URI,
                 "property": name,
                 "size_bytes": size,
-                "limit_bytes": MAX_METADATA_DISCOVERY_INFO_BYTES,
+                "limit_bytes": maximum_bytes,
             },
         )
     return info
@@ -1037,7 +1041,7 @@ def _candidate_payload(
             if candidate.scores.get(query, 0) > 0
         ],
         "same_object_dependencies": list(same_object_dependencies),
-        "metadata": candidate.info.as_dict(),
+        "metadata": dict(candidate.info.raw),
     }
 
 
@@ -1047,6 +1051,7 @@ def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
     name = str(candidate["name"])
     metadata = candidate["metadata"]
     assert isinstance(metadata, Mapping)
+    compact = _compact_metadata(metadata)
     return {
         "name": name,
         "kind": candidate["kind"],
@@ -1058,7 +1063,8 @@ def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
             metadata,
             owner_name=name,
         ),
-        "metadata": _compact_metadata(metadata),
+        "metadata": compact,
+        **({"metadata_details_complete": False} if compact.get("detail_required") else {}),
     }
 
 
@@ -1103,9 +1109,12 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
     payload = {
         "name": metadata["name"],
         "type": metadata["type"],
-        "default": metadata.get("default"),
-        "display": compact_display,
-        "restriction": compact_restriction,
+        **{key: metadata[key] for key in ("default", "supports", "dependencies") if key in metadata},
+        **({"ui": {"dataMeaning": metadata["ui"]["dataMeaning"]} if isinstance(metadata["ui"], Mapping) and "dataMeaning" in metadata["ui"] else {}} if "ui" in metadata else {}),
+        **({"display": compact_display} if "display" in metadata else {}),
+        **({"restriction": metadata["restriction"]} if "restriction" in metadata else {}),
+        "unit": metadata_unit(metadata),
+        "availability": {key: "unknown" for key in ("type", "default", "restriction", "dependencies", "supports", "ui") if key not in metadata},
     }
     typed_value_type = metadata_typed_value_type(str(metadata["type"]))
     if typed_value_type is not None:
@@ -1122,6 +1131,20 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
             for key in ("min", "max")
             if key in compact_restriction
         }
+    if len(canonical_json_bytes(payload)) > 2048:
+        if isinstance(restriction, Mapping):
+            payload["restriction"] = {key: restriction[key] for key in ("type", "min", "max") if key in restriction}
+            if isinstance(restriction.get("values"), list):
+                payload["restriction"]["value_count"] = len(restriction["values"])
+            if isinstance(restriction.get("restrictions"), list):
+                payload["restriction"]["restriction_count"] = len(restriction["restrictions"])
+        if isinstance(metadata.get("dependencies"), list):
+            payload.pop("dependencies", None)
+            payload["dependency_count"] = len(metadata["dependencies"])
+        for key in ("default", "display", "supports"):
+            if key in payload and len(canonical_json_bytes(payload[key])) > 1024:
+                payload[key] = {"status": "available_in_selected_detail"}
+        payload["detail_required"] = True
     return payload
 
 
@@ -1452,10 +1475,67 @@ __all__ = [
 ]
 
 
+def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
+                          meanings: Sequence[str] = (), page: str | None = None,
+                          page_size: int = 20) -> dict[str, Any]:
+    """Lossless live type inventory, with explicit lexical filtering and pages."""
+    import hashlib
+    import time
+    if isinstance(page_size, bool) or not isinstance(page_size, int) or not 1 <= page_size <= 64:
+        raise MetadataDiscoveryError("INVALID_METADATA_PAGE_SIZE", "page size must be 1..64")
+    try:
+        records = parse_get_types_result(_closed_read(read_call, GET_TYPES_URI, {}, {}))
+    except SemanticValidationError as exc:
+        raise _invalid_live_metadata(GET_TYPES_URI, exc) from exc
+    if len(records) > MAX_METADATA_DISCOVERY_TYPES:
+        raise MetadataDiscoveryError("LIVE_METADATA_LIMIT_EXCEEDED", "Live object type inventory exceeds the bounded reader limit.")
+    all_rows = [dict(record.raw) for record in records]
+    filters = tuple(meaning.casefold() for meaning in meanings)
+    rows = [row for row in all_rows if not filters or any(
+        meaning in row["name"].casefold() or meaning in row["type"].casefold()
+        for meaning in filters)]
+    snapshot = hashlib.sha256(canonical_json_bytes([context, all_rows, filters])).hexdigest()
+    now = issued = int(time.time())
+    offset = 0
+    def locator(index: int) -> str:
+        digest = hashlib.sha256(canonical_json_bytes([snapshot, issued, index])).hexdigest()
+        return f"mt1.{issued}.{index}.{digest}"
+    if page is not None:
+        try:
+            kind, stamp, position, _digest = page.split(".")
+            issued, offset = int(stamp), int(position)
+            valid = kind == "mt1" and page == locator(offset) and 0 <= offset < len(rows)
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        if not valid:
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Type inventory, lexical filters, host or version changed; list types again.")
+        if issued > now or now - issued > 900:
+            raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Type page expired; list types again.")
+    end = min(len(rows), offset + page_size)
+    while True:
+        result = {"contract": "waapi-skill.metadata-types-page/v1", "types": rows[offset:end],
+                  "meanings": list(meanings), "filter_kind": "case-insensitive-name-or-type-substring",
+                  "snapshot": snapshot, "available_count": len(all_rows), "total_count": len(rows),
+                  "offset": offset, "remaining_count": len(rows) - end, "complete": end == len(rows),
+                  "next_page": locator(end) if end < len(rows) else None,
+                  "expires_at": issued + 900, "mutation_authority": False}
+        try:
+            _require_result_size(result, maximum_bytes=16 * 1024, pretty=True)
+            return result
+        except MetadataDiscoveryError:
+            if end <= offset + 1:
+                raise
+            end -= 1
+
+
 def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                     object_type: str | None = None, class_id: int | None = None,
                     object: str | int | None = None, page_size: int = 20,
-                    page: str | None = None, selection: str | None = None) -> dict[str, Any]:
+                    page: str | None = None, selection: str | None = None,
+                    detail_page: str | None = None, complete_detail: bool = False,
+                    project_detail: bool = True, detail_view: str = "raw",
+                    select_fields: Sequence[str] | None = None,
+                    detail_item: int | None = None) -> dict[str, Any]:
     """Read an inventory page or exact detail using a read-only scoped locator.
 
     Locators are content addressed, not mutation capabilities. They bind the
@@ -1478,6 +1558,10 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
     def locator(kind: str, index: int) -> str:
         digest = hashlib.sha256(canonical_json_bytes([kind, snapshot, issued, index])).hexdigest()
         return f"{kind}.{issued}.{index}.{digest}"
+    if select_fields is not None:
+        if not all(name in names for name in select_fields):
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "A discovered field left the live scope; discover again.")
+        return {"fields": [{"name": name, "selection": locator("mf1", names.index(name))} for name in select_fields]}
     token = selection or page
     if token is not None:
         try:
@@ -1494,15 +1578,27 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
     if selection is not None:
         name = names[offset]
         try:
-            info = _read_property_info(read_call, scope_args, name)
-            metadata = info.as_dict()
+            info = _read_property_info(read_call, scope_args, name, maximum_bytes=(MAX_METADATA_DISCOVERY_RESULT_BYTES if complete_detail else MAX_METADATA_DISCOVERY_INFO_BYTES))
+            metadata = dict(info.raw)
             metadata["unit"] = metadata_unit(metadata)
             metadata["availability"] = {key: "known" if key in info.raw else "unknown"
                                         for key in ("type", "default", "restriction", "dependencies", "supports", "ui")}
-            payload = {"selection": selection, "scope": scope, "metadata": metadata, "mutation_authority": False}
+            payload = {"selection": selection, "scope": scope, "metadata": metadata, "complete": True, "mutation_authority": False}
+            if complete_detail and not project_detail:
+                return payload
+            if complete_detail:
+                from .metadata_detail import detail_page as project_detail_page
+                try:
+                    _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
+                except MetadataDiscoveryError:
+                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view, item_index=detail_item)
+                if detail_page is not None or detail_view != "raw":
+                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view, item_index=detail_item)
             _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
             return payload
         except MetadataDiscoveryError as exc:
+            if complete_detail and exc.error_code == "LIVE_METADATA_LIMIT_EXCEEDED":
+                raise
             if exc.error_code in {"LIVE_METADATA_LIMIT_EXCEEDED", "DISCOVERY_RESULT_LIMIT_EXCEEDED"}:
                 raise MetadataDiscoveryError("METADATA_DETAIL_TOO_LARGE", "The selected field detail exceeds the bounded detail response; no detail was truncated.", details={"field": name, "selection": selection, "scope": scope, "cause": exc.as_dict(), "repair": "Inspect another listed field; this exact field requires a separately supported larger-detail reader."}) from exc
             raise

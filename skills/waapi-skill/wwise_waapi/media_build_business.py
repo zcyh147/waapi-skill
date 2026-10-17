@@ -189,10 +189,9 @@ def _validate_exact_audio_file(value: Any, *, field: str) -> str:
 
 
 def _weight(value: Any, *, field: str) -> float:
-    result = _finite_number(value, field=field)
-    if not 0 <= result <= 1:
-        raise MediaBuildBusinessError(f"{field} must be from 0 through 1")
-    return result
+    # Native reflection specifies a number and recommends ordinary 0..1
+    # weights. Preserve other finite values for native validation; never clamp.
+    return _finite_number(value, field=field)
 
 
 def media_pool_requested_field_meanings(plan: Mapping[str, Any]) -> tuple[str, ...]:
@@ -436,7 +435,7 @@ def _materialize_media_pool(
                 "type": "field",
                 "field": bind(meaning),
                 "operator": operator,
-                "value": _bounded_text(value, field="text filter value"),
+                "value": _bounded_text(value, field="text filter value", nonempty=False),
             }
         )
     for meaning, operator, value in _triples(
@@ -596,7 +595,7 @@ def _materialize_media_pool(
         args["filters"] = filters
     search_text = plan.get("search_text")
     if search_text is not None:
-        search_text = _bounded_text(search_text, field="search_text")
+        search_text = _bounded_text(search_text, field="search_text", nonempty=False)
         if len(search_text) > MAX_MEDIA_POOL_SEARCH_TEXT_CHARS:
             raise MediaBuildBusinessError("search_text exceeds 1024 characters")
         args["searchText"] = search_text
@@ -926,14 +925,16 @@ def _normalize_media_pool_result(raw_result: Any, plan: Mapping[str, Any]) -> di
             fixed["database_id"] = database["id"].upper()
             fixed["database_name"] = database["name"]
         values: dict[str, Any] = {}
+        unavailable_values: list[str] = []
         for binding in plan.get("output_bindings", ()):
             if binding["field"] not in row:
-                raise MediaBuildBusinessError(
-                    f"Media Pool row {index} lacks requested field {binding['meaning']!r}",
-                    code="MEDIA_BUILD_RESULT_INVALID",
-                )
-            values[binding["key"]] = row[binding["field"]]
-        projected.append({**fixed, "values": values})
+                # Native Media Pool fields vary by file; absence is distinct
+                # from a field present with an explicit null value.
+                unavailable_values.append(binding["key"])
+            else:
+                values[binding["key"]] = row[binding["field"]]
+        projected.append({**fixed, "values": values,
+                          **({"unavailable_values": unavailable_values} if unavailable_values else {})})
     return {
         "contract": MEDIA_BUILD_RESULT_CONTRACT,
         "kind": "media_pool_rows",

@@ -440,7 +440,7 @@ def test_soundbank_inclusions_fail_closed_on_unusable_identity_evidence(
         {"text_filters": [["filename", "contains", "x"]] * 17},
         {"database_scopes": ["project-originals"] * 2},
         {"return_field_meanings": [f"custom-{index}" for index in range(33)]},
-        {"weighted_audio_descriptions": [["rain", 1.01]]},
+        {"weighted_audio_descriptions": [["rain", float("inf")]]},
         {"sort_rules": [["duration", "sideways"]]},
         {"exact_name_contains": "Rain"},
         {"final_limit": 1},
@@ -588,19 +588,10 @@ def test_media_pool_result_rejects_missing_or_excess_projection_rows() -> None:
             prepared,
             {"return": [{key: value for key, value in valid.items() if key != "Path"}]},
         )
-    with pytest.raises(MediaBuildBusinessError):
-        normalize_media_build_result(
-            prepared,
-            {
-                "return": [
-                    {
-                        key: value
-                        for key, value in valid.items()
-                        if key != "Filename"
-                    }
-                ]
-            },
-        )
+    missing_optional = normalize_media_build_result(prepared, {
+        "return": [{key: value for key, value in valid.items() if key != "Filename"}]})
+    assert missing_optional["items"][0]["values"] == {}
+    assert missing_optional["items"][0]["unavailable_values"] == ["filename"]
 
 
 def test_media_pool_database_identity_is_optional_unless_requested() -> None:

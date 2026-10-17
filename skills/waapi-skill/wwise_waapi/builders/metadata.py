@@ -343,6 +343,9 @@ def parse_get_property_info_result(result: Mapping[str, Any]) -> PropertyInfoMet
     _require_result_fields(GET_PROPERTY_INFO_URI, result, ("name", "type"))
     if not isinstance(result["name"], str) or not isinstance(result["type"], str):
         raise _result_error(GET_PROPERTY_INFO_URI, "Property info name and type must be strings.")
+    for field_name in ("supports", "display", "restriction", "ui"):
+        if field_name in result and not isinstance(result[field_name], Mapping):
+            raise _result_error(GET_PROPERTY_INFO_URI, f"Property info {field_name} must be an object when present.", field=field_name)
     dependencies = result.get("dependencies", ())
     if dependencies is None:
         dependencies = ()

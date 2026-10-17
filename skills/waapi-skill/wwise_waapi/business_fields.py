@@ -50,6 +50,7 @@ def field_is_action_duration(
 
 def field_value_input(
     session: BusinessDeclarationSession, field: BoundFieldHandle,
+    *, choice_limit: int | None = None,
 ) -> dict[str, Any]:
     """Disclose how to express a value, without exposing its native token."""
 
@@ -63,6 +64,9 @@ def field_value_input(
             {"input": f"choice:{index}", "value": value,
              "labels": [row["label"] for row in field.restrictions.get("enum_labels", [])
                         if row["value"] == value]}
-            for index, value in enumerate(field.restrictions["enum_choices"])
+            for index, value in enumerate(field.restrictions["enum_choices"][:choice_limit])
         ]
+        if choice_limit is not None and len(field.restrictions["enum_choices"]) > choice_limit:
+            result.update(total_choice_count=len(field.restrictions["enum_choices"]), choices_complete=False,
+                          choice_continuation="metadata_detail.field.choices.next_command")
     return result

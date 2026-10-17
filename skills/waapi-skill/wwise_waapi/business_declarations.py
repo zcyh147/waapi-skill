@@ -78,7 +78,10 @@ MAX_BUSINESS_NAME_BYTES = 512
 MAX_BUSINESS_PATH_BYTES = 8 * 1024
 MAX_FIELD_TOKEN_BYTES = 256
 MAX_FIELD_STRING_BYTES = 16 * 1024
-MAX_FIELD_ENUM_CHOICES = 64
+MAX_FIELD_METADATA_STRING_BYTES = 512 * 1024
+# The live metadata reader already owns a 512 KiB input ceiling. A count
+# ceiling below that input's possible row count would hide legal live enums.
+MAX_FIELD_ENUM_CHOICES = 512 * 1024
 MAX_REFERENCE_TARGET_TYPES = 64
 COMMON_BUSINESS_FIELDS = (
     "delay_ms",
@@ -2122,7 +2125,7 @@ def _normalize_restrictions(
             if (
                 not isinstance(row, Mapping) or set(row) != {"label", "value"}
                 or not isinstance(row["label"], str) or not row["label"].strip()
-                or len(row["label"].encode("utf-8")) > MAX_BUSINESS_REPAIR_TEXT_BYTES
+                or len(row["label"].encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES
             ):
                 raise ValueError("enum labels require bounded nonempty labels and values")
             value = _normalized_enum_choices([row["value"]], value_type=value_type)[0]
@@ -2141,6 +2144,8 @@ def _normalize_restrictions(
         normalized["allowed_target_types"] = sorted(target_types)
     if field_kind == "property" and "allowed_target_types" in normalized:
         raise ValueError("property fields cannot bind reference target types")
+    if len(canonical_json_bytes(normalized)) > 2 * 1024 * 1024:
+        raise ValueError("live restrictions exceed the bounded field state size")
     return dict(sorted(normalized.items()))
 
 
