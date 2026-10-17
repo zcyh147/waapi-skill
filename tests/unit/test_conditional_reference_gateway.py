@@ -1401,3 +1401,24 @@ def test_condition_metadata_numeric_equivalence_keeps_boolean_distinction(tmp_pa
     assert verified["verified"] is (expected_code == 0 or stage == "before"), verified
     assert task.objects[FIRST]["Attenuation"] == {"id": SECOND}
     assert sum(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls) == 1
+
+
+@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
+    for operation in (["object.setProperty"] if version == "2021.1" else ["object.setProperty", "object.set"])])
+@pytest.mark.parametrize("invalid_entry", ["string-value", "numeric-label"])
+def test_native_condition_enum_schema_invalid_entry_is_rejected_before_mutation(tmp_path, version, operation, invalid_entry):
+    task = ScalarPropertyTask(tmp_path, version, operation=operation)
+    entry = {"value": "sine"} if invalid_entry == "string-value" else {"value": 3, "displayName": 17}
+    task.metadata["LfoSmoothing"]["dependencies"][0]["conditions"][0]["restriction"]["values"] = [entry]
+    task.metadata["LfoWaveform"] = {"name": "LfoWaveform", "type": "string" if invalid_entry == "string-value" else "int16"}
+    task.objects[FIRST]["LfoWaveform"] = entry["value"]
+    target = task.bind(FIRST)
+    field = task.discover(target, "LfoSmoothing")
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", target, "--field-handle", field,
+                               "--business-value", "50") if operation == "object.setProperty" else
+                      task.step("draft-declare-existing", "--declaration-id", "smoothing", "--object-handle", target,
+                                "--field-value", field, "50"))
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 2, checked
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
