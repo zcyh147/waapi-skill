@@ -1875,6 +1875,8 @@ def build_parser() -> argparse.ArgumentParser:
         take=None,
         all_results=False,
     )
+    query_object.add_argument("--result-query", help="Copy the Gateway-issued bounded query read handle")
+    query_object.add_argument("--result-page", help="Copy the exact-result projection continuation")
     query_source.add_argument("--exact-id", dest="object_id")
     query_source.add_argument("--short-id", type=int, help="Read candidates for one unsigned 32-bit Short ID; never a mutation identity")
     from wwise_waapi.short_id_query_sources import SHORT_ID_KIND_CODES
@@ -3430,7 +3432,8 @@ def _execute_gateway_unconstrained(
     client_factory: ClientFactory | None = None,
     stream_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    args = build_parser().parse_args(argv)
+    original_argv = list(sys.argv[1:] if argv is None else argv)
+    args = build_parser().parse_args(original_argv)
     source_env = dict(os.environ if env is None else env)
     runtime_endpoint: dict[str, Any] | None = None
     runtime_detected_version: str | None = None
@@ -3497,6 +3500,23 @@ def _execute_gateway_unconstrained(
                 "stream-topic requires a live record sink; use the gateway CLI "
                 "entry point so every streamed record remains observable."
             )
+        if args.command == "query-object":
+            from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore
+            if args.result_query is not None or args.result_page is not None:
+                if args.result_query is None or args.result_page is None:
+                    raise GatewayInputError("Query projection requires both returned --result-query and --result-page")
+                expected = build_parser().parse_args(["query-object", "--result-query", args.result_query, "--result-page", args.result_page])
+                expected.state_dir = args.state_dir
+                if vars(expected) != vars(args):
+                    raise GatewayInputError("A query result continuation accepts only its returned handle/page and existing state directory")
+                record = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=source_env)).resolve(args.result_query)
+                handle, page = args.result_query, args.result_page
+                original_argv = record["plan"]["argv"]
+                args = build_parser().parse_args(original_argv)
+                if args.command != "query-object":
+                    raise GatewayInputError("Stored read is not an object query")
+                args.result_query, args.result_page, args.result_record = handle, page, record
+            args.original_query_argv = original_argv
         require_persisted_connection_binding(args, env=source_env)
         if args.command == "execute":
             require_transaction_preconnection_policy(args, env=source_env)
@@ -11525,6 +11545,8 @@ def dispatch_soundengine_business_read(
         except RuntimeGameObjectHandleError as exc:
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "handle_kind": "game_object", "handle": handle,
+                    "required_identity": "live scoped runtime game object", "operation_dispatched": False},
                 error_code=exc.error_code,
             ) from exc
         native_args["gameObject"] = game_object_record.game_object_id
@@ -11705,18 +11727,22 @@ def dispatch_core_business_read(
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     by_id: dict[str, Mapping[str, Any]] = {}
-    for row in rows:
+    for row_index, row in enumerate(rows):
         try:
             identity = normalize_live_object_identity(row)
         except ValueError as exc:
             raise GatewayResultShapeError(
                 "Core business identity row is malformed.",
+                details={"api": args.api, "reason": "malformed_identity", "row_index": row_index,
+                    "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             ) from exc
         key = identity.object_id
         if key in by_id:
             raise GatewayResultShapeError(
                 "Core business identity read returned a duplicate object.",
+                details={"api": args.api, "reason": "duplicate_identity", "row_index": row_index,
+                    "object_id": key, "requested_ids": list(requested.values()), "operation_dispatched": False},
                 error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
             )
         by_id[key] = {
@@ -11729,6 +11755,8 @@ def dispatch_core_business_read(
     if set(by_id) != {value.upper() for value in requested.values()}:
         raise GatewayResultShapeError(
             "Core business identity read did not match the requested objects.",
+            details={"api": args.api, "reason": "identity_set_mismatch", "requested_ids": list(requested.values()),
+                "actual_ids": sorted(by_id), "operation_dispatched": False},
             error_code="CORE_BUSINESS_IDENTITY_MISMATCH",
         )
     authority = "da1-" + canonical_sha256(
@@ -11924,6 +11952,9 @@ def dispatch_runtime_inspection_business_read(
         except RuntimeInspectionBusinessError as exc:  # pragma: no cover - store invariant
             raise GatewayResultShapeError(
                 str(exc),
+                details={"api": args.api, "transport_handle": transport_record.handle,
+                    "binding_stage": "materialize_stored_transport_binding", "cause_type": type(exc).__name__,
+                    "operation_dispatched": False},
                 error_code="TRANSPORT_HANDLE_STORE_CORRUPT",
             ) from exc
     else:
@@ -13253,6 +13284,8 @@ def _source_control_roots_from_project(
     if not isinstance(directories, Mapping):
         raise GatewayResultShapeError(
             "Live project information lacks source-control directory roots.",
+            details={"reason": "directory_map_missing", "required_fields": ["directories.root", "directories.originals"],
+                "actual_directories_type": type(directories).__name__, "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     project_root = directories.get("root")
@@ -13263,6 +13296,9 @@ def _source_control_roots_from_project(
     ):
         raise GatewayResultShapeError(
             "Live project information contains invalid source-control roots.",
+            details={"reason": "directory_roots_invalid", "required_fields": ["directories.root", "directories.originals"],
+                "invalid_fields": ["directories." + key for key, value in (("root", project_root), ("originals", originals_root))
+                    if not isinstance(value, str) or not value], "operation_dispatched": False},
             error_code="SOURCE_CONTROL_ROOTS_UNAVAILABLE",
         )
     return {
@@ -14582,6 +14618,13 @@ def dispatch_command(
             "agent_result": rows if result.get("ok") else None,
         }
     if args.command == "query-object":
+        if getattr(args, "result_record", None) is not None:
+            context = _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info)
+            if context != args.result_record["context"]:
+                raise GatewayResultShapeError("Query configuration, project or host session changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
             envelope = advanced_preview.envelope
@@ -14614,7 +14657,7 @@ def dispatch_command(
                 if result.get("ok")
                 else None
             )
-            return {
+            query_payload = {
                 "ok": bool(result.get("ok")),
                 "status": "ok" if result.get("ok") else "error",
                 **common,
@@ -14639,6 +14682,9 @@ def dispatch_command(
                 ),
                 "agent_result": business_rows if result.get("ok") else None,
             }
+            return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+                env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
+                common=common, live_info=live_info)
         if original_file_reference_match_requested(args):
             return dispatch_original_file_reference_match(
                 args,
@@ -14678,6 +14724,10 @@ def dispatch_command(
             dispatcher=dispatcher,
         )
         if custom_kind_clarification is not None:
+            if args.result_page is not None:
+                raise GatewayResultShapeError("The original query type selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -14692,6 +14742,10 @@ def dispatch_command(
             dispatcher=dispatcher,
         )
         if custom_field_clarification is not None:
+            if args.result_page is not None:
+                raise GatewayResultShapeError("The original query field selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
+                    error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
                 "status": "needs_clarification",
@@ -14757,7 +14811,7 @@ def dispatch_command(
             if result.get("ok")
             else None
         )
-        return {
+        query_payload = {
             "ok": bool(result.get("ok")),
             "status": "ok" if result.get("ok") else "error",
             **common,
@@ -14776,6 +14830,9 @@ def dispatch_command(
             ),
             "agent_result": business_rows if result.get("ok") else None,
         }
+        return _finish_object_query_result(args, query_payload, native=result, envelope=envelope,
+            env=env, connection=connection, detected_version=detected_version, dispatcher=dispatcher,
+            common=common, live_info=live_info)
     if args.command == "metadata":
         if args.operation == "media-pool-fields":
             from wwise_waapi.media_pool_field_discovery import browse_media_pool_fields
@@ -17857,12 +17914,15 @@ def _runtime_transport_context_from_live(
         if not isinstance(host, str) or isinstance(port, bool) or not isinstance(port, int):
             raise GatewayResultShapeError(
                 "Live endpoint identity is unavailable for transport handle binding.",
+                details={"required_fields": ["endpoint.url", "endpoint.host", "endpoint.port"],
+                    "binding": "runtime_transport_context"},
                 error_code="INVALID_STATUS_RESULT",
             )
         endpoint_url = f"ws://{host}:{port}/waapi"
     if not isinstance(display_name, str) or not display_name:
         raise GatewayResultShapeError(
             "Live Wwise build identity is unavailable for transport handle binding.",
+            details={"required_field": "version.displayName", "binding": "runtime_transport_context"},
             error_code="INVALID_STATUS_RESULT",
         )
     return RuntimeTransportContext(
@@ -18730,7 +18790,7 @@ def dispatch_business_field_discovery(
                 from wwise_waapi.metadata_detail import fit_detail_continuations
                 payload["agent_result"] = fit_detail_continuations(payload["agent_result"], lambda page: detail_continuation(page, binding.record.revision))
             return payload
-        meanings = (browsed["metadata"]["name"],)
+        meanings = (browsed["selected_field_token"],)
         read_call = binding.read_call
     discovery = discover_metadata(
         read_call=read_call,
@@ -19272,6 +19332,9 @@ def dispatch_business_type_discovery(
     except (TypeError, ValueError) as exc:
         raise GatewayResultShapeError(
             "Live object type discovery returned an invalid catalog.",
+            details={"api": CACHE_GET_TYPES_URI, "requested_role": str(args.role),
+                "required_result": "return array of native type metadata", "cause_type": type(exc).__name__,
+                "selection_advanced": False},
             error_code="INVALID_METADATA_RESULT",
         ) from exc
     role = str(args.role)
@@ -21384,6 +21447,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "Transport verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 transport_context = _runtime_transport_context_from_live(
@@ -21475,6 +21544,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 execution_payload = execution_result.get("result")
@@ -21537,6 +21612,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21588,6 +21669,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -21632,6 +21719,12 @@ def _dispatch_transaction_command_with_execution_lease(
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
                         "SoundEngine verification lacks its live project identity.",
+                        details={"transaction_id": transaction_id, "api": transaction_api,
+                            "phase": "post_verification_runtime_handle_binding", "state": final_record.state.value,
+                            "executed": True, "verification_recorded": True,
+                            "verified": verification.business_state_verified and verification.ok,
+                            "project_identity_available": False, "handle_persistence": "not_attempted",
+                            "automatic_retry": False},
                         error_code="INVALID_STATUS_RESULT",
                     )
                 native_args = transaction_arguments.get("args")
@@ -23025,7 +23118,14 @@ def _query_result_presence_contract() -> dict[str, Any]:
     return {
         "absent_fields": "unavailable_fields; omitted values are never replaced with null",
         "explicit_null": "preserved",
-        "missing_identity": "identity_completeness.complete=false; native_observation retained; no mutation authority",
+        "missing_identity": "identity_completeness.complete=false; native_observation retained, optionally as lossless page entries; no mutation authority",
+        "delivery": {"canonical_result": "agent_result is exact and terminal; large compact replies omit its duplicate objects with objects_source=agent_result",
+            "large_observation": "status partial; agent_result contains exact small identity headers, explicit omitted fields, and lossless JSON entries; copy next_command until projection_complete",
+            "completion": "projection_complete certifies delivery of that observation only, never query exhaustion or mutation selection",
+            "continuation": "short Gateway-issued --result-query and --result-page; 900 seconds; repeat identical bounded read and verify complete result, resolved fields, configuration, project and host session",
+            "detail": "--detail preserves diagnostics; oversized semantic_preview is retained in page entries",
+            "entries_encoding": "json-pointer-entries normally; json-document-fragments for oversized native keys/pointers. Concatenate document fragments by character offset to recover the exact observation, never mutation authority",
+            "page_stdout_utf8_bytes": 32768},
     }
 
 
@@ -23330,12 +23430,14 @@ def _bind_query_custom_fields_from_live_metadata(
     meanings = tuple(getattr(args, "query_custom_field_meanings", ()) or ())
     if not meanings:
         return None
+    selected_observations = []
+    read = transaction_read_call(dispatcher, connection=connection, version=detected_version)
+    def selection_read(uri, native_args, options):
+        observed = read(uri, native_args, options)
+        selected_observations.append({"api": uri, "args": native_args, "result": observed})
+        return observed
     discovery = discover_metadata(
-        read_call=transaction_read_call(
-            dispatcher,
-            connection=connection,
-            version=detected_version,
-        ),
+        read_call=selection_read,
         queries=meanings,
         object_type=args.object_type,
         object=args.path if args.path is not None else args.object_id,
@@ -23396,9 +23498,89 @@ def _bind_query_custom_fields_from_live_metadata(
         raise GatewayInputError(
             "query-object live field discovery resolved duplicate result fields"
         )
+    args.query_field_selection = selected_observations
     args.query_output_bindings = tuple(bindings)
     args.query_return_fields = (*SELECTED_REQUIRED_RETURN_FIELDS, *native_fields)
     return None
+
+
+def _query_result_context(args, *, env, connection, detected_version, dispatcher, common, live_info):
+    project_call = dispatch(dispatcher, OBJECT_GET_URI if detected_version == "2021.1" else GET_PROJECT_INFO_URI,
+        connection=connection, version=detected_version,
+        **({"args": {"waql": "from type Project take 1"}, "options": {"return": ["id", "name", "type", "path", "filePath"]}}
+           if detected_version == "2021.1" else {}))
+    if not project_call.get("ok"):
+        raise GatewayResultShapeError("Project identity could not be bound for the query continuation",
+            details={"call": dispatch_call_summary(project_call)}, error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    if detected_version == "2021.1":
+        project = require_single_result_row(strict_object_get_rows(project_call, command="query projection project",
+            maximum_rows=1, error_code="QUERY_RESULT_CONTINUATION_CHANGED"), command="query projection project",
+            error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    else:
+        project = strict_call_result_mapping(project_call, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    project = require_project_identity(project, command="query projection project", error_code="QUERY_RESULT_CONTINUATION_CHANGED")
+    require_runtime_directory_outside_project(resolve_transaction_state_directory(args, env=env), project=project)
+    return {"configuration": selected_connection_binding(env), "endpoint": common["endpoint"],
+        "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version", "isCommandLine")},
+        "project": {key: project.get(key) for key in ("id", "path", "filePath")}}
+
+
+def _finish_object_query_result(args, payload, *, native, envelope, env, connection,
+                                detected_version, dispatcher, common, live_info):
+    from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
+    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
+    if not payload.get("ok"):
+        return payload
+    if args.result_page is None and len(canonical_json_bytes(
+            project_successful_query_object_payload(payload, detail=args.detail))) <= 64 * 1024:
+        return payload
+    try:
+        context = (args.result_record["context"] if getattr(args, "result_record", None) is not None else
+            _query_result_context(args, env=env, connection=connection, detected_version=detected_version,
+                dispatcher=dispatcher, common=common, live_info=live_info))
+        binding = {"context": context, "original_public_argv_sha256": canonical_sha256(args.original_query_argv),
+            "detail": bool(args.detail), "query": {"args": envelope.args, "options": envelope.options,
+            "output_bindings": getattr(args, "query_output_bindings", ()),
+            "field_selection": getattr(args, "query_field_selection", None)},
+            "native_result_sha256": canonical_sha256(native["result"]),
+            "projection_sha256": canonical_sha256({key: payload[key] for key in ("objects", "native_observation") if key in payload})}
+        offset = parse_offset(args.result_page, binding)
+        store = ObjectQueryPlanStore(resolve_transaction_state_directory(args, env=env))
+        record = getattr(args, "result_record", None)
+        if record is None:
+            import time
+            issued = int(time.time())
+            handle = store.issue(plan={"argv": args.original_query_argv}, context=context, issued=issued)
+            expires = issued + 900
+        else:
+            handle, expires = args.result_query, record["expires_at"]
+        prefix = ["--state-dir", args.state_dir] if args.state_dir is not None else []
+        detail_fragment_required = args.detail and len(canonical_json_bytes(payload.get("semantic_preview"))) > 4096
+        page_payload = {**payload, "detail_fragment_required": detail_fragment_required}
+        page = build_page(page_payload, offset=offset, binding=binding, expires_at=expires,
+            next_command=lambda token: transaction_next_command("query-object", [*prefix, "query-object",
+                "--result-query", handle, "--result-page", token]))
+        if not (_canonical_guid(live_info.get("sessionId")) and type(live_info.get("processId")) is int and live_info["processId"] > 0):
+            page.pop("next_command", None)
+            if not page["projection_complete"]:
+                page["page"]["continuation_unavailable_reason"] = "host_session_identity_unavailable"
+        result = {key: value for key, value in payload.items() if key not in
+            {"objects", "agent_result", "native_observation", "mutation_selection", "continuations"}}
+        if detail_fragment_required:
+            result.pop("semantic_preview", None)
+        result.update(status="ok" if page["projection_complete"] else "partial",
+            projection_complete=page["projection_complete"],
+            projection_boundary={"page_limit_bytes": 32 * 1024, "mutation_authority": False,
+                "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
+                "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
+            objects_source="agent_result.objects", agent_result=page)
+        if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) != "ok":
+            raise QueryResultProjectionLimitError("The query page with diagnostics exceeds its bounded output; refine the original read")
+        return result
+    except QueryResultPageError as exc:
+        raise GatewayResultShapeError(str(exc),
+            details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
+            error_code=exc.code) from exc
 
 
 def project_successful_query_object_payload(
@@ -23429,11 +23611,19 @@ def project_successful_query_object_payload(
         "source_resolution",
         "count",
         "limit_reached",
+        "projection_complete",
+        "projection_boundary",
+        "objects_source",
         "objects",
         "continuations",
         "mutation_selection",
     )
     projected = {key: payload[key] for key in compact_keys if key in payload}
+    if "objects" in projected and payload.get("objects") is payload.get("agent_result"):
+        from wwise_waapi.canonical import canonical_json_bytes
+        if len(canonical_json_bytes(payload["agent_result"])) > 16 * 1024:
+            projected.pop("objects")
+            projected["objects_source"] = "agent_result"
     if "agent_result" in payload:
         # Preserve the exact object and keep it insertion-order last.  The outer
         # session-context attachment repeats the same terminal-order guarantee.

@@ -113,3 +113,38 @@ def test_native_absence_requires_omission_in_each_exact_host_observation():
     binding['absence_observation_pointers']['wwise-authoring'] = binding['absence_observation_pointers']['wwise-console']
     with pytest.raises(ValueError, match='host'):
         completion.validate_native_absence_observations(record, binding, checks, hosts)
+
+
+@pytest.mark.parametrize("damage", ["api_instead_of_uri", "missing_exit_code"])
+def test_metadata_result_producer_uses_existing_strict_reader_without_product_credit(tmp_path, damage):
+    from tests.support.metadata_read_branch_evidence import finish_metadata_capture, source_seals, _git_candidate, URI
+    from tests.support.media_pool_branch_evidence import public_read_observation
+    route = "2025.1|wwise-console|2025.1.7.9143|function|" + URI
+    branch = {"id": "controlled-metadata-default-presence", "route": route, "kind": "optional_presence",
+        "value": "present", "shape_sha256": "b" * 64, "pointer": "/resultSchema/properties/default/@presence/present"}
+    nodeid, candidate = "controlled-metadata-result-node", "c" * 64
+    observed = {**public_read_observation(gateway_argv=["metadata", "detail", "--selection", "controlled"], exit_code=0,
+        payload={"ok": True, "agent_result": {"metadata": {"default": None}}}, uri=URI,
+        args={"property": "Volume"}, options={}, result={"default": None}),
+        "native_metadata_dispatch_count": 1, "rejected_read": {"payload": {"error_code": "METADATA_SELECTION_SCOPE_CHANGED"}}}
+    capture = {"root": str(tmp_path), "version": "2025.1", "case_name": "controlled", "nodeid": nodeid,
+        "candidate_sha256": candidate, "git_candidate": _git_candidate(), "scope_kind": "controlled",
+        "relevant_sources": source_seals(), "groups": {"2025.1|controlled": {
+            "public": {"id": "2025.1|function|" + URI}, "branches": [{"branch": branch,
+                "observation_pointer": "/native_call/result/default", "reference_chain": [],
+                "check": {"pointer": "/native_call/result/default", "equals": None}}]}}}
+    finish_metadata_capture(capture, {"setup": "passed", "call": "passed", "teardown": "passed"}, observed)
+    root = tmp_path / "2025.1/controlled"
+    binding = json.loads((root / "bindings.json").read_text())["bindings"][branch["id"]]
+    descriptor = binding["evidence"]["program"]
+    assert completion.evidence_result(descriptor, branch, candidate, "program", "controlled", root, binding) == ("passed", None)
+    damaged = json.loads((root / "program.json").read_text())
+    if damage == "api_instead_of_uri":
+        damaged["native_call"]["api"] = damaged["native_call"].pop("uri")
+    else:
+        damaged["gateway"].pop("exit_code")
+    path = root / "damaged.json"
+    path.write_text(json.dumps(damaged))
+    outcome, reason = completion.evidence_result(sealed(path, nodeid=nodeid), branch, candidate, "program", "controlled", root, binding)
+    assert outcome == "missing" and ("uri" if damage == "api_instead_of_uri" else "exit_code") in reason
+    assert completion.evidence_result(descriptor, branch, candidate, "program", "product", root, binding)[0] == "missing"
