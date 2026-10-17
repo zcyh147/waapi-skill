@@ -9081,6 +9081,17 @@ def _compound_platform_guid(value: Any) -> bool:
     return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
 
 
+def _compound_project_platform(context: Any, platform: Any) -> bool:
+    """Require one actual non-null project platform, not just GUID syntax."""
+    if (not isinstance(context, Mapping) or not _compound_platform_guid(platform)
+            or platform.lower() == "{00000000-0000-0000-0000-000000000000}"):
+        return False
+    rows = context.get("platforms")
+    matches = [row for row in rows if isinstance(row, Mapping)
+               and _compound_platform_guid(row.get("id")) and _same_identity(row["id"], platform)] if isinstance(rows, list) else []
+    return len(matches) == 1
+
+
 def _compound_field_outcome_scope(
     prepared: PreparedOperation, *, version: str, read: ReadCall, evidence: dict[str, Any],
 ) -> Mapping[str, Any] | None:
@@ -9106,15 +9117,15 @@ def _compound_field_outcome_scope(
         context = read(GET_PROJECT_INFO_URI, {}, {})
         if needs_current:
             platform = context.get("currentPlatformId")
-            if not _compound_platform_guid(platform):
-                raise OperationContractError("INVALID_READBACK", "Compound current-platform binding requires one canonical currentPlatformId.")
+            if not _compound_project_platform(context, platform):
+                raise OperationContractError("INVALID_READBACK", "Compound current-platform binding requires one non-null currentPlatformId matching exactly one project platform.")
             expected = evidence.setdefault("compound_current_platform", platform)
             if not _same_identity(expected, platform):
                 raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "Current platform changed during compound preparation.")
         else:
             rows = context.get("platforms")
             matches = [row for row in rows if isinstance(row, Mapping) and row.get("name") == platform] if isinstance(rows, list) else []
-            if len(matches) != 1 or not _compound_platform_guid(matches[0].get("id")):
+            if len(matches) != 1 or not _compound_project_platform(context, matches[0].get("id")):
                 raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "The explicit platform name did not resolve exactly in live project platforms.", details={"platform": platform})
             previous = evidence.setdefault("compound_platform_aliases", {}).setdefault(str(platform), matches[0]["id"])
             if not _same_identity(previous, matches[0]["id"]):
@@ -14172,12 +14183,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if current_platform_children:
             expected_platform = pre_state.get("compound_current_platform")
             actual_platform = None
+            context = None
             if version != "2021.1" and _compound_platform_guid(expected_platform):
                 context = read_call(GET_PROJECT_INFO_URI, {}, {})
                 actual_platform = context.get("currentPlatformId") if isinstance(context, Mapping) else None
                 child_readbacks.append({"role": "compound-current-platform", "uri": GET_PROJECT_INFO_URI,
                     "args": {}, "options": {}, "result": dict(context) if isinstance(context, Mapping) else context})
-            platform_unchanged = _compound_platform_guid(actual_platform) and _same_identity(actual_platform, expected_platform)
+            platform_unchanged = (_compound_project_platform(context, actual_platform)
+                                  and _same_identity(actual_platform, expected_platform))
             passed = passed and platform_unchanged
             child_assertions.append({"name": "compound omitted property platform unchanged", "passed": platform_unchanged,
                                      "evidence": {"expected": expected_platform, "actual": actual_platform}})
@@ -14198,7 +14211,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "args": {}, "options": {}, "result": dict(context) if isinstance(context, Mapping) else context})
             for name, expected_id in aliases.items():
                 matches = [row for row in rows if isinstance(row, Mapping) and row.get("name") == name] if isinstance(rows, list) else []
-                unchanged = len(matches) == 1 and _same_identity(matches[0].get("id"), expected_id)
+                unchanged = (len(matches) == 1 and _compound_project_platform(context, matches[0].get("id"))
+                             and _same_identity(matches[0].get("id"), expected_id))
                 passed = passed and unchanged
                 child_assertions.append({"name": "compound platform name still resolves to its sealed GUID", "passed": unchanged,
                     "evidence": {"name": name, "expected": expected_id, "actual": matches}})
