@@ -973,3 +973,37 @@ def test_peak_read_can_preserve_native_channel_default_without_assuming_channel_
     schema_code, schema = gateway.execute_gateway(["--version", version, "request-schema", operation], env=_env(tmp_path), client_factory=lambda _: pytest.fail("offline schema connected"))
     assert schema_code == 0, schema
     assert "native-default" in schema["business_adapter"]["declaration"]["field_choices"]["channel_mode"]
+
+
+@pytest.mark.parametrize("post_filtered", [False, True])
+def test_media_pool_long_windows_continuation_keeps_useful_rows_with_explicit_command_boundary(tmp_path: Path, monkeypatch, post_filtered: bool) -> None:
+    class WindowsEnvelopeOS:
+        name = "nt"
+
+        def __getattr__(self, name):
+            import os
+            return getattr(os, name)
+
+    monkeypatch.setattr(gateway, "os", WindowsEnvelopeOS())
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}]})
+    command = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"]
+    for _ in range(15 if post_filtered else 16):
+        command += ["--audio-description", "雨" * 4096]
+    if post_filtered:
+        command += ["--text-filter", "filename", "contains", "Rain", "--exact-name-contains", "Rain", "--final-limit", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path), client_factory=lambda _: client)
+    if post_filtered:
+        assert code == 2 and payload["error_code"] == "MEDIA_POOL_POST_FILTER_INCOMPLETE", payload
+        assert payload["native_observation"] == {"return": _pool_rows(2)}
+        page = payload["read_page"]
+        assert "next_command" not in payload
+    else:
+        assert code == 0, payload
+        assert len(payload["agent_result"]["items"]) == 2
+        assert payload["agent_result"]["complete"] is False
+        page = payload["agent_result"]["page"]
+        assert "next_command" not in payload["agent_result"]
+    assert page["continuation_unavailable_reason"] == "continuation_command_limit_exceeded"
+    assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) < 64 * 1024
+    assert len(client.calls[-1][1]["filters"]) == 16

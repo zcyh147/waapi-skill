@@ -12253,9 +12253,16 @@ def dispatch_media_build_business_read(
                 normalized, next_page, next_maximum = finish_media_pool_page(media_page, rows=result["result"]["return"],
                     request=request, normalized=normalized, context_available=media_context_available)
             except MediaPoolContinuationError as exc:
-                raise GatewayResultShapeError(str(exc), details={"call": dispatch_call_summary(result), "native_observation": result["result"]}, error_code=exc.code) from exc
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result), error_code=exc.code) from exc
             if next_page is not None:
-                normalized["next_command"] = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
+                next_command = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
+                if probe_gateway_json_document_size(next_command, 64 * 1024) == "ok":
+                    normalized["next_command"] = next_command
+                else:
+                    normalized["page"].update({
+                        "continuation_unavailable_reason": "continuation_command_limit_exceeded",
+                        "continuation_command_limit_bytes": 64 * 1024,
+                    })
     incomplete_media_pool = (
         args.api == MEDIA_POOL_GET_URI
         and isinstance(normalized, Mapping)
@@ -12316,7 +12323,10 @@ def dispatch_media_build_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
-        **({"next_command": normalized["next_command"], "native_observation": result["result"]}
+        **({key: value for key, value in native_failure_evidence(result).items() if key != "call"}
+           if incomplete_media_pool else {}),
+        **({"read_page": normalized["page"]} if incomplete_media_pool else {}),
+        **({"next_command": normalized["next_command"]}
            if incomplete_media_pool and "next_command" in normalized else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
