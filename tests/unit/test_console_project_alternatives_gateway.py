@@ -901,6 +901,73 @@ def test_unknown_media_id_container_is_unverified_not_a_proven_native_failure(tm
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
 
 
+def test_cli_media_id_large_project_keeps_bounded_preview_and_exact_preservation(tmp_path):
+    class LargeMediaTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.project_file.with_suffix('.mediaid').write_bytes(b'unknown-native-format')
+            return super().call(uri, args, options)
+    task = LargeMediaTask(tmp_path, '2021.1', 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    unit = saved_fixture_project(task)
+    tree = ET.parse(unit)
+    children = tree.find('.//ChildrenList')
+    for index in range(2600):
+        sound = ET.SubElement(children, 'Sound', Name='Long sound ' + 's' * 140 + str(index),
+            ID='{10000000-0000-0000-0000-%012X}' % index)
+        sources = ET.SubElement(sound, 'ChildrenList')
+        source = ET.SubElement(sources, 'AudioFileSource', Name='Long source ' + 'a' * 140 + str(index),
+            ID='{20000000-0000-0000-0000-%012X}' % index)
+        ET.SubElement(source, 'Language').text = 'SFX'
+        ET.SubElement(source, 'AudioFile').text = 'sample-%s.wav' % index
+        ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID=str(index + 1))
+    tree.write(unit)
+    task.result_payload = {}
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    assert payload['verified'] is False
+    observation = next(row for row in payload['verification']['readbacks']
+        if row.get('kind') == 'cli-media-id-artifacts')
+    assert observation['work_unit_media_id_count_before'] == 2600
+    assert observation['work_unit_media_id_count_after'] == 2600
+    assert len(json.dumps(payload).encode()) < 64 * 1024
+
+
+@pytest.mark.parametrize('change', ['owner-id', 'owner-name', 'media-id', 'duplicate-media-row'])
+def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, change):
+    class ChangedIdentityTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                tree = ET.parse(self.unit)
+                source = tree.find('.//AudioFileSource')
+                if change == 'owner-id':
+                    source.set('ID', '{44444444-4444-4444-4444-444444444444}')
+                elif change == 'owner-name':
+                    source.set('Name', 'Changed')
+                elif change == 'media-id':
+                    source.find('./MediaIDList/MediaID').set('ID', '654321')
+                else:
+                    ET.SubElement(source.find('./MediaIDList'), 'MediaID', ID='123456')
+                tree.write(self.unit)
+            return super().call(uri, args, options)
+    task = ChangedIdentityTask(tmp_path, '2025.1')
+    task.unit = saved_fixture_project(task)
+    tree = ET.parse(task.unit)
+    source = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'ChildrenList'),
+        'AudioFileSource', Name='Keep source', ID='{33333333-3333-3333-3333-333333333333}')
+    ET.SubElement(source, 'Language').text = 'SFX'
+    ET.SubElement(source, 'AudioFile').text = 'Keep.wav'
+    ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
+    tree.write(task.unit)
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    assert payload['verified'] is False
+    code, payload = task.run('execute', tx)
+    assert code != 0
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
 @pytest.mark.parametrize('failure', ['missing-mapping', 'malformed-mapping', 'lost-workunit', 'unrelated-setting'])
 def test_cli_media_id_artifact_or_preservation_failure_cannot_verify(tmp_path, failure):
     class MediaFailure(CliProjectTask):

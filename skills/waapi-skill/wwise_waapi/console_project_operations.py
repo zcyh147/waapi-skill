@@ -360,7 +360,7 @@ def inspect_cli_project_effect(effect):
         project = _saved_project_snapshot(effect['path'], effect['io_root'], effect['version'])
         mapping = prove_artifact_path(effect['mapping_path'], io_root=effect['io_root'],
             field='media ID mapping', must_exist=False, expect_directory=False)
-        source_count = sum(len(rows) for rows in old_model['media_ids'].values())
+        source_count = sum(rows['count'] for rows in old_model['media_ids'].values())
         if (effect['uri'].endswith('moveMediaIdsToSingleFile') and source_count > 0
                 or effect['uri'].endswith('updateMediaIdsInSingleFile') and effect['mapping_before']['exists']) and not mapping['exists']:
             raise SoundBankContractError('MISSING_ARTIFACT', 'Requested media ID mapping artifact is missing')
@@ -372,7 +372,7 @@ def inspect_cli_project_effect(effect):
         unresolved = ['central_media_id_mapping_representation']
         return {'observations': [{'kind': 'cli-media-id-artifacts', 'mapping_file': mapping,
             'saved_model_files': len(model['files']), 'work_unit_media_id_count_before': source_count,
-            'work_unit_media_id_count_after': sum(len(rows) for rows in model['media_ids'].values()),
+            'work_unit_media_id_count_after': sum(rows['count'] for rows in model['media_ids'].values()),
             'unresolved': unresolved}], 'checks': [
             {'name': 'Project identity, platforms and languages were preserved during media ID maintenance',
                 'passed': project == effect['project_before']},
@@ -634,10 +634,13 @@ def _model_snapshot(project_path, root, *, excluded_platform=None, selected_plat
             for child in node:
                 visit(child, current, owner)
         visit(document, [], None)
-    for rows in summary['anchors'].values():
-        rows.sort(key=repr)
-    for rows in summary['media_ids'].values():
-        rows.sort(key=repr)
+    # Equality guards need the complete multiset, not thousands of repeated
+    # names in every immutable Preview. Hash every row (including duplicates)
+    # in deterministic order; keep counts for the media observation. The file,
+    # XML and total-byte limits still bound collection before this projection.
+    for field in ('anchors', 'media_ids'):
+        summary[field] = {relative: {'count': len(rows), 'sha256': digest(sorted(rows, key=repr))}
+            for relative, rows in summary[field].items()}
     for values in summary['platform_settings'].values():
         for rows in values.values():
             rows.sort()
