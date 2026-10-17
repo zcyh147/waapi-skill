@@ -81,6 +81,14 @@ def original_scalar_program_batch(request):
     destination = os.environ.get('WAAPI_SCALAR_PROGRAM_BATCH_ROOT')
     if not destination:
         pytest.skip('original scalar program batch requires an explicit new evidence root')
+    nodes = list(request.session.items)
+    if (not nodes or any(getattr(item, 'originalname', None) != 'test_product_self_scalar_source_conditions'
+            or Path(item.path).resolve() != Path(__file__).resolve() for item in nodes)):
+        pytest.fail('original scalar program collection is standalone-only; unrelated collected nodes are prohibited')
+    versions = [item.callspec.params.get('version') for item in nodes]
+    if (len(versions) != len(set(versions)) or any(version not in {'2021.1', '2022.1', '2023.1', '2024.1', '2025.1'} for version in versions)
+            or os.environ.get('WWISE_LIVE') == '1' or os.environ.get('WWISE_DESTRUCTIVE') == '1'):
+        pytest.fail('original scalar program collection requires exact non-live version nodes')
     root = Path(__file__).parents[2]
     plan = scalar_plan(scalar_manifest(root))
     selected = {group['id'] for group in plan['groups']}
@@ -91,7 +99,6 @@ def original_scalar_program_batch(request):
         assert len(selection['group_ids']) == len(set(selection['group_ids']))
         selected = set(selection['group_ids'])
         assert selected and selected <= {group['id'] for group in plan['groups']}
-    nodes = [item for item in request.session.items if item.originalname == 'test_product_self_scalar_source_conditions']
     roster = {item.nodeid: [group['id'] for group in plan['groups']
         if group['version'] == item.callspec.params['version'] and group['id'] in selected] for item in nodes}
     assert selected == {identity for identities in roster.values() for identity in identities}
