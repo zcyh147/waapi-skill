@@ -347,16 +347,6 @@ UNDO_GROUP_INNER_URIS_BY_VERSION: Mapping[str, frozenset[str]] = {
 }
 SWITCH_GROUP_REFERENCE = "SwitchGroupOrStateGroup"
 IDENTITY_RETURN_FIELDS = ("id", "name", "type", "path", "parent", "notes")
-# ``ak.wwise.core.object.get`` does not accept a bare numeric Short ID.  Its
-# ``from.id`` Short ID selector is a closed object whose numeric ``type`` is
-# the WAAPI object-type code.  Only Definition directives with an official
-# selector code are admitted here; notably, DialogueEvent has no such selector
-# and must fail closed instead of borrowing Event's code.
-DEFINITION_SHORT_ID_OBJECT_TYPE_CODES: Mapping[str, int] = {
-    "Event": 10,
-    "Effect": 17,  # EffectPlugin; Definition readback accepts Effect/EffectShareSet.
-    "AuxBus": 20,
-}
 OBJECT_REPLACE_SNAPSHOT_FIELDS = ("id", "path")
 OBJECT_REPLACE_MAX_SUBTREE_NODES = 128
 OBJECT_LIST_SNAPSHOT_FIELDS = (
@@ -3503,6 +3493,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "supported uint32 Short IDs because quoted names can complete without "
             "applying inclusions; 2023.1 and later retain the official quoted-name form",
             "unsupported directives, duplicate rows, unknown objects, and ambiguous names fail before dispatch",
+            "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently",
             "execution replays file/project and SoundBank inclusion snapshots; verification checks exact target inclusions and one unrelated control Bank",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
@@ -13019,7 +13010,7 @@ def _prepare_closed_soundbank_operation(
     snapshots = _capture_soundbank_artifact_snapshots(plan, io_root=io_root)
     definition_oracle: Mapping[str, Any] | None = None
     if request.operation == "soundbank.processDefinitionFiles":
-        definition_oracle = _prepare_definition_oracle(plan, roles=roles, read=read)
+        definition_oracle = _prepare_definition_oracle(plan, version=request.version, roles=roles, read=read)
 
     uri = describe_operation(request.operation).uri
     dispatch_args = plan.get("dispatch_args")
@@ -13513,6 +13504,7 @@ def _resolve_external_source_conversions(
 def _prepare_definition_oracle(
     plan: Mapping[str, Any],
     *,
+    version: str,
     roles: dict[str, ResolvedObject],
     read: ReadCall,
 ) -> dict[str, Any]:
@@ -13556,6 +13548,7 @@ def _prepare_definition_oracle(
             resolved = _resolve_definition_identity(
                 identity,
                 expected_type=expected_type,
+                version=version,
                 role=f"definition.bank[{bank_index}].inclusion[{inclusion_index}]",
                 read=read,
             )
@@ -13622,6 +13615,7 @@ def _resolve_definition_identity(
     identity: Any,
     *,
     expected_type: str,
+    version: str,
     role: str,
     read: ReadCall,
 ) -> ResolvedObject:
@@ -13637,27 +13631,12 @@ def _resolve_definition_identity(
                 "INVALID_PREVIEW",
                 f"{role} short ID is not a uint32.",
             )
-        object_type_code = DEFINITION_SHORT_ID_OBJECT_TYPE_CODES.get(expected_type)
-        if object_type_code is None:
-            raise OperationContractError(
-                "UNSUPPORTED_DEFINITION_SHORT_ID_TYPE",
-                "This Definition object type has no official object.get Short ID selector code.",
-                details={
-                    "role": role,
-                    "expected_type": expected_type,
-                    "supported_types": sorted(DEFINITION_SHORT_ID_OBJECT_TYPE_CODES),
-                },
-            )
-        # ``Global:<shortId>`` is a string-identity spelling accepted by
-        # selected mutation arguments, not an ``object.get`` qualified name.
-        # Real 2022.1 Authoring requires the reflected ``{shortId, type}``
-        # selector object and rejects a bare uint32 in ``from.id``.
-        options = {"return": [*IDENTITY_RETURN_FIELDS, "shortId"]}
-        result = read(
-            OBJECT_GET_URI,
-            {"from": {"id": [{"shortId": value, "type": object_type_code}]}},
-            options,
-        )
+        from wwise_waapi.short_id_query_sources import short_id_query
+        definition_kinds = {"Event": "event", "DialogueEvent": "dialogue-event", "AuxBus": "aux-bus", "Effect": "effect"}
+        if expected_type not in definition_kinds:
+            raise OperationContractError("INVALID_PREVIEW", "Definition Short ID type is not a closed directive type.")
+        args, options = short_id_query(version, number=value, kind=definition_kinds[expected_type], unique=True)
+        result = read(OBJECT_GET_URI, args, options)
         rows = _rows(result)
         if len(rows) != 1:
             raise OperationContractError(
@@ -13672,10 +13651,10 @@ def _resolve_definition_identity(
             )
         row = rows[0]
         live_short_id = row.get("shortId")
-        if isinstance(live_short_id, str) and live_short_id.isdecimal():
-            live_short_id = int(live_short_id, 10)
         object_id = row.get("id")
-        if live_short_id != value or not _valid_object_id(object_id):
+        from wwise_waapi.builders.query import STRUCTURED_GUID_PATTERN
+        canonical_guid = isinstance(object_id, str) and re.fullmatch(STRUCTURED_GUID_PATTERN, object_id) is not None
+        if type(live_short_id) is not int or live_short_id != value or not canonical_guid:
             raise OperationContractError(
                 "IDENTITY_MISMATCH",
                 "A Definition Short ID readback did not preserve the requested numeric identity.",
@@ -14480,10 +14459,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         role_snapshots.append((str(role), object_id, expected_row))
 
     role_batch: dict[str, Any] | None = None
+    short_id_roles = {str(role) for role, snapshot in roles.items() if snapshot.get("resolution") == "live-short-id"}
     if role_snapshots:
+        role_fields = list(IDENTITY_RETURN_FIELDS)
+        if short_id_roles:
+            role_fields.append("shortId")
         role_batch = _bounded_multi_identity_read(
             [object_id for _, object_id, _ in role_snapshots],
-            fields=IDENTITY_RETURN_FIELDS,
+            fields=role_fields,
             read=read_call,
             context="Prepared role validation",
         )
@@ -14524,15 +14507,21 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if len(rows) != 1:
             continue
         actual = rows[0]
-        for field_name in ("id", "name", "type", "path", "parent", "notes"):
+        comparison_fields = (*IDENTITY_RETURN_FIELDS, "shortId") if role in short_id_roles else IDENTITY_RETURN_FIELDS
+        for field_name in comparison_fields:
             if field_name not in expected_row:
                 continue
             expected = _parent_value(expected_row.get(field_name)) if field_name == "parent" else expected_row.get(field_name)
             observed = _parent_value(actual.get(field_name)) if field_name == "parent" else actual.get(field_name)
+            unchanged = observed == expected
+            if field_name in {"id", "parent"}:
+                unchanged = _same_identity(observed, expected)
+            elif field_name == "shortId":
+                unchanged = type(observed) is int and observed == expected
             assertions.append(
                 {
                     "name": f"{role}.{field_name} unchanged",
-                    "passed": _same_identity(observed, expected) if field_name in {"id", "parent"} else observed == expected,
+                    "passed": unchanged,
                     "evidence": {"expected": expected, "actual": observed},
                 }
             )

@@ -1118,7 +1118,9 @@ def short_id_product_capture(request, version):
     import os
     context = os.environ.get("WAAPI_SHORT_ID_BRANCH_CAPTURE_CONTEXT")
     observed = {}
-    if context:
+    # This historical capture owns the native from.id branch. The 2021
+    # alternative now uses WAQL and must not receive that branch's credit.
+    if context and version != "2021.1":
         from tests.support.short_id_query_branch_evidence import load_short_id_capture, finish_short_id_capture
         from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
         capture = load_short_id_capture(Path(context), request.node.nodeid, version)
@@ -1126,7 +1128,7 @@ def short_id_product_capture(request, version):
     return observed
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_short_id_source_resolves_native_candidates_then_applies_business_read_semantics(tmp_path: Path, version: str, short_id_product_capture: dict) -> None:
     object_id = "{11111111-1111-1111-1111-111111111111}"
     class Client(_AdvancedQueryClient):
@@ -1142,7 +1144,8 @@ def test_short_id_source_resolves_native_candidates_then_applies_business_read_s
         env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 0, json.dumps(payload,ensure_ascii=False)
     queries = [call for call in client.calls if call[0] == "ak.wwise.core.object.get"]
-    assert queries[0][1] == {"from": {"id": [{"shortId": 123456, "type": 10}]}, "transform": [{"range": [0, 65]}]}
+    assert queries[0][1] == ({"waql": "from type Event where shortId = 123456 take 65"} if version == "2021.1" else
+                             {"from": {"id": [{"shortId": 123456, "type": 10}]}, "transform": [{"range": [0, 65]}]})
     assert queries[0][2] == {"return": ["id", "name", "type", "path"]}
     assert queries[1][1] == {"waql": 'from object "{11111111-1111-1111-1111-111111111111}" where name = "Rain" take 5'}
     assert queries[1][2] == {"return": ["id", "name", "type", "path", "notes"], "platform": "Windows", "language": "English(US)"}
@@ -1157,7 +1160,7 @@ def test_short_id_source_resolves_native_candidates_then_applies_business_read_s
         "final_call": {"uri": queries[1][0], "args": queries[1][1], "options": queries[1][2]}})
 
 
-@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_short_id_collision_preserves_all_candidates_for_relationship_reads(tmp_path: Path, version: str) -> None:
     ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"]
     class Client(_AdvancedQueryClient):
@@ -1224,10 +1227,22 @@ def test_native_short_id_recursive_schema_rejects_bare_missing_and_invalid_type_
             {"return": ["id", "name", "type", "path"]}, version=version)
 
 
-def test_short_id_2021_kind_mapping_is_explicitly_unresolved_before_connection(tmp_path: Path) -> None:
-    code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "3"],
-        env=_env(tmp_path, "2021.1"), client_factory=lambda _: pytest.fail("unproven 2021 mapping connected"))
-    assert code == 2 and "mapping remains unresolved" in payload["message"], payload
+@pytest.mark.parametrize("kind,object_type", [("event", "Event"), ("switch-group", "SwitchGroup"),
+    ("state-group", "StateGroup"), ("effect", "Effect"), ("soundbank", "SoundBank"),
+    ("bus", "Bus"), ("aux-bus", "AuxBus"), ("game-parameter", "GameParameter"),
+    ("trigger", "Trigger"), ("audio-device", "AudioDevice")])
+def test_short_id_2021_business_kinds_use_documented_typed_predicate(tmp_path: Path, kind: str, object_type: str) -> None:
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": []}
+            return super().call(uri, args, options)
+    client = Client("2021.1")
+    code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", kind, "--max-results", "3"],
+        env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1][1] == {"waql": f"from type {object_type} where shortId = 123456 take 65"}
 
 
 def test_short_id_collision_final_query_rejects_an_unrelated_native_guid(tmp_path: Path) -> None:
@@ -1260,3 +1275,43 @@ def test_short_id_business_kinds_compile_only_the_exact_version_documented_type_
         env=_env(tmp_path, version), client_factory=lambda _: client)
     assert exit_code == 0, payload
     assert client.calls[-1][1] == {"from": {"id": [{"shortId": 1, "type": code}]}, "transform": [{"range": [0, 65]}]}
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("policy", ["read_only", "ask_before_changes", "allow_changes"])
+def test_short_id_dialogue_query_and_schema_agree_on_typed_source(tmp_path: Path, version: str, policy: str) -> None:
+    from tests.support.gateway_config import set_gateway_config
+    env = set_gateway_config(_env(tmp_path, version), project_modification_policy=policy)
+    code, schema = gateway.execute_gateway(["query-schema"], env=env,
+        client_factory=lambda _: pytest.fail("schema must stay offline"))
+    assert code == 0, schema
+    assert schema["source_rules"]["short_id"]["mapped_versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
+    assert "dialogue-event" in schema["source_rules"]["short_id"]["kind_choices"]
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": []}
+            return super().call(uri, args, options)
+    client = Client(version)
+    code, result = gateway.execute_gateway(["query-object", "--short-id", "4294967295", "--short-id-kind", "dialogue-event", "--max-results", "2"],
+        env=env, client_factory=lambda _: client)
+    assert code == 0, result
+    assert client.calls[-1][1:] == ({"waql": "from type DialogueEvent where shortId = 4294967295 take 65"}, {"return": ["id", "name", "type", "path"]})
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("rows", [[{"id": "malformed"}], [{"id": 123}], [{}],
+    [{"id": "{11111111-1111-1111-1111-111111111111}"}] * 2])
+def test_short_id_query_rejects_unbound_or_duplicate_native_candidates(tmp_path: Path, version: str, rows: list) -> None:
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": rows}
+            return super().call(uri, args, options)
+    client = Client(version)
+    code, result = gateway.execute_gateway(["query-object", "--short-id", "1", "--short-id-kind", "event", "--max-results", "2"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 2 and result["error_code"] == "INVALID_QUERY_RESULT", result
+    assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1

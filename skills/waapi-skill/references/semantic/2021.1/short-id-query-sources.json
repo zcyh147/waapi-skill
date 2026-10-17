@@ -1,0 +1,86 @@
+{
+  "version": "2021.1",
+  "source": "/tmp/owned-docs-2021.1/waql_reference.html",
+  "sha256": "87b10aecdd13083c0a2d75fb0659119fbe08ba54ea5bfa85f041576033074ac4",
+  "facts": [
+    {
+      "line": 416,
+      "html": "<p class=\"intertd\">Returns a numeric 32-bit short ID for the object. This is the ID being used in the Sound Engine.</p>"
+    },
+    {
+      "line": 420,
+      "html": "</td><td>$ where shortId = 1588715066 </td></tr>"
+    }
+  ],
+  "types": [
+    {
+      "type": "Event",
+      "member": "wwiseobject_event.html",
+      "sha256": "a3218d294b969c13f29fab18f8de343b8988afb21f3d6e84739e4e48dc2c0bd7",
+      "title_line": 8
+    },
+    {
+      "type": "SwitchGroup",
+      "member": "wwiseobject_switchgroup.html",
+      "sha256": "4ba7b52240245cff9bb9f993cb2ce2fc8f622105ee4df677de84b2af52526158",
+      "title_line": 8
+    },
+    {
+      "type": "StateGroup",
+      "member": "wwiseobject_stategroup.html",
+      "sha256": "e16683161b8973231f3a8a4fec7bfcfd5fff7e8c35f71c631d6b9d278c89ac36",
+      "title_line": 8
+    },
+    {
+      "type": "Effect",
+      "member": "wwiseobject_effect.html",
+      "sha256": "c24dc98925836cee0cac2b59abb9e6f518ccea2357a7a1d7f3230c8f0cbcae90",
+      "title_line": 8
+    },
+    {
+      "type": "SoundBank",
+      "member": "wwiseobject_soundbank.html",
+      "sha256": "81ac2950253e0d1a42e38c8da1ff9284579bc8197d7a55e2e8c4e359c46977f1",
+      "title_line": 8
+    },
+    {
+      "type": "Bus",
+      "member": "wwiseobject_bus.html",
+      "sha256": "778f6fda8b688c1aa90bf66edd52473e6ca797b897c1373ec78650d02aa0f1fc",
+      "title_line": 8
+    },
+    {
+      "type": "AuxBus",
+      "member": "wwiseobject_auxbus.html",
+      "sha256": "8465b4233c9c8462e762f59c5386ece01fe232248b61d851a6104c3db721e1b9",
+      "title_line": 8
+    },
+    {
+      "type": "GameParameter",
+      "member": "wwiseobject_gameparameter.html",
+      "sha256": "ba286ddcc90d05a598af54b08eaee39572e140641a8e5bcd7d2d56a1b265a2e9",
+      "title_line": 8
+    },
+    {
+      "type": "Trigger",
+      "member": "wwiseobject_trigger.html",
+      "sha256": "3b4146452f39ad1735e8c3bce17ecb31824935b50fc2b00e4b5e844446c8c33a",
+      "title_line": 8
+    },
+    {
+      "type": "AudioDevice",
+      "member": "wwiseobject_audiodevice.html",
+      "sha256": "878658518cf3a89a3f8fd439bfd5e5ad00f77fe9d1c4c613449b29816a870912",
+      "title_line": 8
+    },
+    {
+      "type": "DialogueEvent",
+      "member": "wwiseobject_dialogueevent.html",
+      "sha256": "d76eeba53699ed3cef55b14e815ef65fbc2c2a8c70481a52145cacfd0449a4a3",
+      "title_line": 8
+    }
+  ],
+  "archive": "/Applications/Audiokinetic/Wwise2021.1.14.8108/SDK/Help/WwiseSDK-Windows.chm",
+  "member": "waql_reference.html",
+  "native_execution": "pending matching-version sandbox observation; source evidence only"
+}

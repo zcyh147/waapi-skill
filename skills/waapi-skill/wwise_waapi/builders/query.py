@@ -38,6 +38,7 @@ BUILTIN_ACCESSORS = {
     "filePath",
     "type",
     "classId",
+    "shortId",
     "category",
     "isPlayable",
     "isExplicitMute",
