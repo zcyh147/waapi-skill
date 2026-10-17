@@ -19,6 +19,7 @@ from .business_declarations import (
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
 from .documented_list_fields import resolve_list_choice, resolve_planned_list_evidence
+from .planned_references import compile_result_reference, graph_result_bindings
 from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 from .operation_object import (
     DEFAULT_MAX_CHILDREN_PER_NODE,
@@ -528,6 +529,9 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
                       action="split the reference array into a bounded request")
     identities = []
     for item in values:
+        if isinstance(item, str) and item.startswith("bnh1-") and field.field_kind == "reference":
+            identities.append(compile_result_reference(session, field, item, native_type=_resolve_native_object_type))
+            continue
         handle = (session.handles.resolve_object(item).handle if field.field_kind == "list"
                   else session.handles.validate_field_value(field, item))
         target = session.handles.resolve_object(handle)
@@ -849,6 +853,8 @@ def _materialize_create(
             action="declare exactly one new root and its descendants",
         )
 
+    node_result_handles = {}
+
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
         fields = dict(row.fields)
@@ -871,6 +877,7 @@ def _materialize_create(
             "name": row.target.name,
             **_compile_create_fields(session, base),
         }
+        node_result_handles[id(node)] = row.result_handle
         if object_list is not None:
             try:
                 node["list"] = (resolve_list_choice(session, object_list,
@@ -910,6 +917,9 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
+    result_bindings = graph_result_bindings([(root_node, "$")], node_result_handles)
+    if result_bindings:
+        arguments["graph_result_bindings"] = result_bindings
     if "list" in root_node:
         matches = [field for field in session.handles.as_dict()["fields"]
             if field["field_kind"] == "list" and field["scope_kind"] == "object"
@@ -1524,6 +1534,9 @@ def _materialize_set(
                 bind_planned_occurrences(member, f"{request_path}.lists[{index}].objects[{member_index}]")
     for index, row in enumerate(rows):
         bind_planned_occurrences(row, f"$.objects[{index}]")
+    result_bindings = graph_result_bindings([(row, f"$.objects[{index}]") for index, row in enumerate(rows)], node_result_handles)
+    if result_bindings:
+        arguments["graph_result_bindings"] = result_bindings
     if documented_bindings:
         arguments["documented_list_bindings"] = documented_bindings
     if "platform" in settings:

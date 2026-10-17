@@ -337,7 +337,7 @@ def object_graph_business_contract_data(
             ],
             "legacy_shallow_composer_public": False,
             "reference_values": {
-                "forms": ["bound_object_handle", "null_to_clear_reference"] +
+                "forms": ["bound_object_handle", "same_Draft_new_declaration_result_handle", "null_to_clear_reference"] +
                          (["json_array_of_bound_object_handles"] if version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS else []),
                 **({"maximum_array_members": 32} if version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS else {}),
                 "inline_curve": {
@@ -349,6 +349,7 @@ def object_graph_business_contract_data(
                 },
                 "array_requires": "documented_List_Field_Handle_for_exact_owner_class_and_version; scalar_Reference_metadata_is_insufficient",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
+                "planned_target": "Gateway_derives_native_path_from_exact_root_and_normalized_graph_occurrence;_verify_actual_result_GUID_and_independent_class_parent_readback",
             },
             "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
             "safety": {
@@ -386,9 +387,10 @@ def object_graph_business_contract_data(
             },
             "bound_field_handle_container": "field_values",
             "reference_values": {
-                "forms": ["bound_object_handle", "null_to_clear_reference"],
+                "forms": ["bound_object_handle", "same_Draft_new_declaration_result_handle", "null_to_clear_reference"],
                 "native_value_boundary": "pinned_propertyValue_is_scalar_or_null;_array_inline_and_curve_values_require_an_available_object.set_lane",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
+                "planned_target": "Gateway_derives_native_path_from_exact_root_and_normalized_graph_occurrence;_verify_actual_result_GUID_and_independent_class_parent_readback",
             },
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
             "planned_parent": "copy_previous_declaration_result_handle",

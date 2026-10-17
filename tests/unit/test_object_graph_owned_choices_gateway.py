@@ -862,7 +862,7 @@ class OwnedGraphTask(FieldTask):
     def preview(self) -> tuple[str, dict[str, Any]]:
         before = deepcopy(self.objects)
         code, checked = self.step("draft-check")
-        assert code == 0, checked
+        assert code == 0, json.dumps(checked)
         code, preview = self.step("preview-from-draft")
         assert code == 0, preview
         code, shown = self.run("transaction-show", preview["transaction_id"])
@@ -1518,3 +1518,98 @@ def test_planned_metadata_slot_scalar_reference_stays_distinct_from_sound_metada
     assert (verified.get("verified") is True) == (fault is None), verified
     assert any(uri.endswith("getPropertyInfo") and args.get("classId") == 5570560 and args.get("property") == "Metadata"
         for uri, args, _ in task.calls)
+
+
+@pytest.mark.parametrize("fault", (None, "wrong-reference-effect", "wrong-class-effect", "missing-target-effect", "duplicate-target-result", "wrong-planned-type", "foreign-result", "not-null", "field-drift", "class-drift"))
+def test_new_slot_scalar_reference_uses_same_graph_target_result_handle_and_actual_guid(tmp_path, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    task.types.extend({"classId": cid, "name": name, "type": "WObject"} for name, cid in (
+        ("WorkUnit", 1638416), ("SwitchGroup", 1245200), ("MusicSwitchContainer", 2293776), ("MusicArgumentsSlot", 5832704)))
+    task.objects[PROJECT_GROUP] = {"id": PROJECT_GROUP, "name": "Default Work Unit", "type": "WorkUnit", "classId": 1638416,
+        "path": r"\Switches\Default Work Unit", "parent": None, "notes": "Keep switches"}
+    task.objects[SECOND]["path"] = r"\Interactive Music Hierarchy\Default Work Unit"
+    task.objects[FIRST]["parent"] = {"id": PROJECT_GROUP}
+    switch_parent, music_parent = task.bind(PROJECT_GROUP), task.bind(SECOND)
+    original = task.call
+    group_id, slot_id = "{55555555-5555-5555-5555-555555555555}", "{77777777-7777-7777-7777-777777777777}"
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args.get("classId") == 5832704, args
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": ["Argument"]}
+            assert args["property"] == "Argument", args
+            return {"name": "Argument", "type": "Reference", "display": {"name": "Argument"},
+                "restriction": {"type": "reference", "restrictions": [{"type": ["StateGroup"] if getattr(task, "reference_drift", False) else ["SwitchGroup", "StateGroup"]}, "notNull"]}}
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [
+                {"object": PROJECT_GROUP, "children": [{"type": "SwitchGroup", "name": "Surface"}]},
+                {"object": SECOND, "children": [{"type": "MusicSwitchContainer", "name": "Music",
+                    "@Arguments": [{"type": "MusicArgumentsSlot", "name": "Surface argument", "@Argument": r"\Switches\Default Work Unit\Surface"}]}]}]
+            task.objects[group_id] = {"id": group_id, "name": "Surface", "type": "SwitchGroup", "classId": 1245200,
+                "path": r"\Switches\Default Work Unit\Surface", "parent": {"id": PROJECT_GROUP}, "notes": ""}
+            task.objects[ROOT] = {"id": ROOT, "name": "Music", "type": "MusicSwitchContainer", "classId": 2293776,
+                "path": task.objects[SECOND]["path"] + r"\Music", "parent": {"id": SECOND}, "notes": "", "@Arguments": [{"id": slot_id}]}
+            task.objects[slot_id] = {"id": slot_id, "name": "Surface argument", "type": "PluginInnerObject", "classId": 5832704,
+                "path": task.objects[ROOT]["path"] + r"\Surface argument", "owner": {"id": ROOT}, "notes": "", "@Argument": {"id": SECOND if fault == "wrong-reference-effect" else group_id}}
+            if fault == "wrong-class-effect":
+                task.objects[group_id]["classId"] = 65552
+            elif fault == "missing-target-effect":
+                del task.objects[group_id]
+            target_results = [{"id": group_id, "name": "Surface"}] * (2 if fault == "duplicate-target-result" else 1)
+            return {"objects": [{"id": PROJECT_GROUP, "name": "Default Work Unit", "children": target_results},
+                {"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "Music", "@Arguments": [{"id": slot_id, "name": "Surface argument"}]}]}]}
+        return original(uri, args, options)
+    task.call = call
+    kinds = {}
+    for name in ("SwitchGroup", "MusicSwitchContainer", "MusicArgumentsSlot", "Sound"):
+        code, found = task.step("draft-discover-types", "--role", "object", "--meaning", name)
+        assert code == 0, found
+        kinds[name] = found["type_candidates"][0]["handle"]
+    code, listed = task.step("draft-discover-fields", "--type-handle", kinds["MusicSwitchContainer"], "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    choice = next(row for row in listed["agent_result"]["items"] if row["name"] == "Arguments")
+    code, found = task.step("draft-discover-fields", "--type-handle", kinds["MusicSwitchContainer"], "--field-source", "documented-lists", "--selection", choice["selection"])
+    assert code == 0, found
+    list_field = found["meaning_results"][0]["candidates"][0]["handle"]
+    code, found = task.step("draft-discover-fields", "--type-handle", kinds["MusicArgumentsSlot"], "--meaning", "Argument")
+    assert code == 0, found
+    argument = found["meaning_results"][0]["candidates"][0]["handle"]
+    code, group = task.step("draft-declare-new", "--declaration-id", "group", "--parent-handle", switch_parent,
+        "--name", "Surface", "--kind", kinds["Sound" if fault == "wrong-planned-type" else "SwitchGroup"])
+    assert code == 0, group
+    code, music = task.step("draft-declare-new", "--declaration-id", "music", "--parent-handle", music_parent,
+        "--name", "Music", "--kind", kinds["MusicSwitchContainer"])
+    assert code == 0, music
+    code, slot = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", music["draft"]["declared_object"]["result_handle"],
+        "--name", "Surface argument", "--kind", kinds["MusicArgumentsSlot"], "--field", "object_list", list_field,
+        "--field-value", argument, "null" if fault == "not-null" else "bnh1-" + "0" * 32 if fault == "foreign-result" else group["draft"]["declared_object"]["result_handle"])
+    if fault in {"wrong-planned-type", "foreign-result"}:
+        assert code == 2 and slot["error_code"] == ("REFERENCE_TARGET_TYPE_MISMATCH" if fault == "wrong-planned-type" else "PLANNED_REFERENCE_TARGET_NOT_AVAILABLE"), slot
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    assert code == 0, slot
+    if fault == "not-null":
+        code, rejected = task.step("draft-check")
+        assert code == 2 and "INVALID_REFERENCE_TARGET" in json.dumps(rejected), rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    tx, shown = task.preview()
+    if fault in {"field-drift", "class-drift"}:
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        if fault == "field-drift":
+            task.reference_drift = True
+        else:
+            next(row for row in task.types if row["name"] == "SwitchGroup")["classId"] = 65552
+        code, rejected = task.run("execute", tx)
+        assert code == 2 and rejected.get("executed") is not True, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get("verified") is True) == (fault is None), verified
+    if fault is None:
+        assert task.objects[slot_id]["@Argument"] == {"id": group_id}
+    assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
