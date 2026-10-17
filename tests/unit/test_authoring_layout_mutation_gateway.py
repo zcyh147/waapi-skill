@@ -39,6 +39,13 @@ class LayoutClient(FakeClient):
         if uri == URI + 'getViewInstances':
             self.calls.append((uri, args, options))
             return {'viewInstances': deepcopy(self.views.get(args['name'], []))}
+        if uri == URI + 'undockView':
+            self.calls.append((uri, args, options))
+            row = next(row for row in self.views[args['name']] if row['viewID'] == args['viewID'])
+            row['viewIsDocked'] = False
+            left, top = args.get('posX', 0), args.get('posY', 0)
+            self.rectangles[row['viewID']] = {'left': left, 'top': top, 'right': left + 300, 'bottom': top + 400}
+            return {}
         if uri == URI + 'closeView':
             self.calls.append((uri, args, options))
             self.views[self.current] = [row for row in self.views[self.current] if row['viewID'] != args['viewID']]
@@ -446,12 +453,13 @@ def test_close_view_polls_bounded_readbacks_without_repeating_mutation(tmp_path,
         assert pending_checks[0]['evidence'] == {'view_id': NODE, 'pending_async_close': True, 'polls': 16}
 
 
+@pytest.mark.parametrize('operation', ['closeView', 'undockView'])
 @pytest.mark.parametrize('drift', ['view', 'disappeared', 'current'])
-def test_close_view_revalidates_discovered_view_immediately_before_dispatch(tmp_path, drift):
+def test_scoped_view_mutations_revalidate_discovery_immediately_before_dispatch(tmp_path, drift, operation):
     def seed(client):
         client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
             'viewDisplayName': 'Project Explorer', 'viewIsDocked': False}]
-    env, state, client, preview = switch_preview(tmp_path, operation='closeView', layout_name='Designer',
+    env, state, client, preview = switch_preview(tmp_path, operation=operation, layout_name='Designer',
         fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle']), client_setup=seed)
     if drift == 'view':
         client.views['Designer'][0]['viewIsDocked'] = True
@@ -466,7 +474,7 @@ def test_close_view_revalidates_discovered_view_immediately_before_dispatch(tmp_
     assert code == 0, confirmed
     code, rejected = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
     assert code != 0, rejected
-    assert URI + 'closeView' not in [row[0] for row in client.calls]
+    assert URI + operation not in [row[0] for row in client.calls]
 
 
 def test_close_view_2024_absence_is_independently_reflected_and_rejected_offline(tmp_path):
@@ -479,7 +487,59 @@ def test_close_view_2024_absence_is_independently_reflected_and_rejected_offline
     assert code != 0, schema
 
 
+@pytest.mark.parametrize('operation', ['closeView', 'undockView'])
 @pytest.mark.parametrize('kind', ['layout', 'element'])
-def test_close_view_rejects_other_handle_roles_without_dispatch(tmp_path, kind):
-    switch_preview(tmp_path, operation='closeView', layout_name='Designer', expect_declaration_error=True,
+def test_scoped_view_mutations_reject_other_handle_roles_without_dispatch(tmp_path, kind, operation):
+    switch_preview(tmp_path, operation=operation, layout_name='Designer', expect_declaration_error=True,
         fields=lambda inspected: ('--view-handle', inspected['layout_handle'] if kind == 'layout' else inspected['elements'][0]['handle']))
+
+
+@pytest.mark.parametrize('version', ['2024.1', '2025.1'])
+@pytest.mark.parametrize('coordinates', [{}, {'position_x': 30}, {'position_y': 50}, {'position_x': -5, 'position_y': 10}])
+def test_undock_view_preserves_optional_position_choices_and_verifies_floating_identity(tmp_path, version, coordinates):
+    def seed(client):
+        client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
+            'viewDisplayName': 'Project Explorer', 'viewIsDocked': True}]
+    def fields(inspected):
+        result = ['--view-handle', inspected['views'][0]['handle']]
+        for key, value in coordinates.items():
+            result.extend(['--' + key.replace('_', '-'), str(value)])
+        return result
+    env, state, client, preview = switch_preview(tmp_path, version=version, operation='undockView', layout_name='Designer',
+        fields=fields, client_setup=seed)
+    prepared = TransactionStore(Path(state[1])).load_preview(preview['transaction_id']).artifact['prepared_operation']
+    native_args = {'name': 'Designer', 'viewID': NODE}
+    native_args.update({{'position_x': 'posX', 'position_y': 'posY'}[key]: value for key, value in coordinates.items()})
+    assert prepared['dispatch'] == {'uri': URI + 'undockView', 'args': native_args, 'options': {}}
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert client.views['Designer'][0]['viewIsDocked'] is False
+    assert [row[0] for row in client.calls].count(URI + 'undockView') == 1
+
+
+@pytest.mark.parametrize('failure', ['no-effect', 'missing', 'different-type', 'coordinate'])
+def test_undock_never_certifies_a_returned_empty_result_without_requested_business_state(tmp_path, failure):
+    def seed(client):
+        client.views['Designer'] = [{'viewID': NODE, 'viewName': 'ProjectExplorer',
+            'viewDisplayName': 'Project Explorer', 'viewIsDocked': True}]
+    env, state, client, preview = switch_preview(tmp_path, operation='undockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'], '--position-x', '30'), client_setup=seed)
+    original = client.call
+    def wrong_effect(uri, args=None, options=None):
+        if uri == URI + 'undockView':
+            if failure == 'no-effect':
+                client.calls.append((uri, args, options))
+            else:
+                original(uri, args, options)
+                if failure == 'missing':
+                    client.views['Designer'] = []
+                elif failure == 'different-type':
+                    client.views['Designer'][0]['viewName'] = 'SomeOtherView'
+                else:
+                    client.rectangles[NODE]['left'] = 31
+            return {}
+        return original(uri, args, options)
+    client.call = wrong_effect
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    assert [row[0] for row in client.calls].count(URI + 'undockView') == 1

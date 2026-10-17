@@ -24,7 +24,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -8738,15 +8738,18 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 verification.update(expected_name=binding['layout_name'], view_type=call_args['name'],
                     coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args},
                     existing_view_ids=[row['viewID'] for row in observed['instances'] if row['viewName'] == call_args['name']])
-            elif api == LAYOUT_CLOSE_URI:
+            elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
                 binding = arguments['layout_binding']
                 if current['name'] != binding['layout_name']:
-                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Closing a view requires its discovered layout to be current')
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Changing a view requires its discovered layout to be current')
                 try:
-                    validate_layout_view_binding(binding, read=read)
+                    observed_view = validate_layout_view_binding(binding, read=read)
                 except ValueError as exc:
                     raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
                 verification.update(expected_name=binding['layout_name'], view_id=call_args['viewID'])
+                if api == LAYOUT_UNDOCK_URI:
+                    verification.update(view_type=observed_view['viewName'],
+                        coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args})
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -13490,9 +13493,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         raise ValueError('The layout for view creation is no longer current')
                     if view_creation_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_view_prestate'):
                         raise ValueError('View catalog or instances changed after preview; inspect and preview again')
-                elif api == LAYOUT_CLOSE_URI:
+                elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
                     if current.get('name') != arguments['layout_binding']['layout_name']:
-                        raise ValueError('The layout for view closing is no longer current')
+                        raise ValueError('The layout for the view mutation is no longer current')
                     validate_layout_view_binding(arguments['layout_binding'], read=layout_guard_read)
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
@@ -15782,6 +15785,27 @@ def verify_prepared_operation(
             else:
                 readbacks.append(absent)
                 check('Temporary layout is absent after unregister', True, absent)
+        elif uri == LAYOUT_UNDOCK_URI:
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            floating = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is False
+            check('The discovered view is independently observed floating', floating, {'view_id': plan['view_id'], 'actual': matches})
+            if floating and plan.get('coordinates'):
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                in_scope = current.get('name') == plan['expected_name']
+                check('Floating placement remains in the reviewed current layout', in_scope, current)
+                if in_scope:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['view_id']}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['view_id']}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('Floating view ' + edge + ' matches its declared position', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge)})
         elif uri == LAYOUT_CLOSE_URI:
             observed, pending = {}, True
             for poll in range(16):
