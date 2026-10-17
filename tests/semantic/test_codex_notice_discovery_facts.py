@@ -30,6 +30,15 @@ def generated_discoveries():
 
 @pytest.mark.parametrize('unit_category', [None, 'Decibels'])
 def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path, monkeypatch, unit_category):
+    _real_field_producer_archive(tmp_path, monkeypatch, unit_category, omit_native_name=False)
+
+
+@pytest.mark.parametrize('unit_category', [None, 'Decibels'])
+def test_real_field_producer_omitted_native_name_survives_fake_runner_archive(tmp_path, monkeypatch, unit_category):
+    _real_field_producer_archive(tmp_path, monkeypatch, unit_category, omit_native_name=True)
+
+
+def _real_field_producer_archive(tmp_path, monkeypatch, unit_category, *, omit_native_name):
     from tests.unit.test_object_metadata_business_gateway import (
         waapi_gateway, _offline, _env, _info, _project, OBJECT_ID, FakeClient)
     from tests.semantic.test_codex_expansion_notice_adjudication import sealed_workflow
@@ -52,6 +61,8 @@ def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path
         'restriction': {'type': 'range', 'min': -96.0, 'max': 24.0}}
     if unit_category is not None:
         metadata['ui'] = {'dataMeaning': unit_category}
+    if omit_native_name:
+        metadata.pop('name')
     client = FakeClient({'ak.wwise.core.getInfo': [_info()], 'ak.wwise.core.getProjectInfo': [_project(producer)],
         'ak.wwise.core.object.getPropertyAndReferenceNames': [{'return': ['VolumeGain']}] * 2,
         'ak.wwise.core.object.getPropertyInfo': [metadata] * 2})
@@ -61,6 +72,7 @@ def test_real_field_producer_normalization_survives_fake_runner_archive(tmp_path
     assert code == 0, discovered
     assert discovered['meaning_results'][0]['meaning'] == 'Volume  gain'
     assert discovered['field_candidates'][0]['matched_meanings'] == ['Volume gain']
+    assert discovered['field_candidates'][0]['metadata'] == metadata
     discoveries = generated_discoveries()
     discoveries[1][0][-1] = 'Volume  gain'
     # Reuse exact real producer semantic rows in the existing generated archive;
@@ -572,6 +584,23 @@ def test_metadata_extension_remains_bounded_and_closed(field_context, damage):
     elif damage == 'unit-number': row['metadata']['ui']['dataMeaning'] = 3
     elif damage == 'unit-mismatch': row['unit'] = {'status': 'known', 'value': 'Decibels'}
     elif damage == 'unit-missing': row.pop('unit')
+    payload['field_candidates'] = [row.copy()]
+    reseal(context, 2)
+    decision = decide(context)
+    assert decision['outcome'] == 'material_reject'
+    assert 'input' not in decision
+
+
+@pytest.mark.parametrize('field', ['name', 'type', 'supports', 'display', 'restriction', 'dependencies', 'ui', 'audioEngineId'])
+def test_raw_metadata_presence_does_not_admit_explicit_native_null(field_context, field):
+    context = field_context
+    payload = context[2]['broker_records'][2]['payload']
+    row = payload['meaning_results'][0]['candidates'][0]
+    # This is a current raw metadata projection, not the historical complete
+    # normalized form whose audioEngineId=None compatibility is retained.
+    row['metadata'] = {'name': 'Gain', 'type': 'Real32'}
+    row['metadata'][field] = None
+    row['unit'] = {'status': 'unknown', 'value': None}
     payload['field_candidates'] = [row.copy()]
     reseal(context, 2)
     decision = decide(context)

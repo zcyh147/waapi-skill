@@ -65,13 +65,18 @@ def _validate_field_metadata_extension(row):
     from wwise_waapi.metadata_discovery import MAX_METADATA_DISCOVERY_INFO_BYTES
     metadata, unit = row['metadata'], row['unit']
     keys = {'name', 'type', 'default', 'supports', 'display', 'restriction', 'dependencies', 'ui', 'audioEngineId'}
-    if (not isinstance(metadata, Mapping) or set(metadata) != keys
+    if (not isinstance(metadata, Mapping) or not set(metadata) <= keys
             or len(canonical_json_bytes(metadata)) > MAX_METADATA_DISCOVERY_INFO_BYTES):
         raise ValueError('invalid bounded field metadata')
-    parsed = parse_get_property_info_result(metadata).as_dict()
-    if canonical_digest(parsed) != canonical_digest(metadata):
-        raise ValueError('metadata differs from public normalized shape')
-    meaning = metadata['ui'].get('dataMeaning')
+    # Current public discovery preserves native optional-key absence. Older
+    # authenticated receipts contain the complete normalized projection; retain
+    # that exact historical form without synthesizing missing native facts.
+    parsed = parse_get_property_info_result(metadata, require_identity=False)
+    legacy_normalized = set(metadata) == keys and canonical_digest(parsed.as_dict()) == canonical_digest(metadata)
+    if ('dependencies' in metadata and not isinstance(metadata['dependencies'], list)
+            or 'audioEngineId' in metadata and metadata['audioEngineId'] is None and not legacy_normalized):
+        raise ValueError('metadata optional field has an invalid explicit null or type')
+    meaning = metadata.get('ui', {}).get('dataMeaning')
     if meaning is not None and not isinstance(meaning, str):
         raise ValueError('invalid metadata unit category')
     expected = {'status': 'unknown', 'value': None} if meaning in {None, 'None'} else {'status': 'known', 'value': meaning}
