@@ -52,6 +52,8 @@ Identity projections always request `id,name,type,path`. Native rows can omit op
 
 `query-schema` lists the outputs available in the selected Wwise version. Use `query-schema --output NAME` for one output's meaning, applicability, result shape and supported versions. Audio conversion facts, Work Unit status, music context, state data and extracted SoundBank data use the same closed `--include` lane.
 
+Use `--platform` and `--language` for an exact name or GUID when the report needs that result scope. Omitted platform uses Wwise's current platform; omitted language leaves the native language default in effect. Each selection accepts one trimmed literal of at most 512 UTF-8 bytes. Generated query continuations retain both selections.
+
 Offline schema:
 
 ```bash

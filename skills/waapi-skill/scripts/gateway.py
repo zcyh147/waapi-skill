@@ -106,9 +106,11 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
+    MAX_QUERY_RETURN_SCOPE_BYTES,
     advanced_query_schema,
     build_advanced_object_get_query,
     build_object_get_query,
+    query_return_scope_options,
 )
 from wwise_waapi.object_query_outputs import (  # noqa: E402
     QUERY_BUSINESS_OUTPUTS,
@@ -1901,6 +1903,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument("--max-results", type=int)
+    query_object.add_argument("--platform", dest="query_platform", action="append", help="Read values for one exact platform name or GUID")
+    query_object.add_argument("--language", dest="query_language", action="append", help="Read values for one exact language name or GUID")
     query_object.add_argument(
         "--include",
         action="append",
@@ -5377,6 +5381,15 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "--max-results or pass exactly 100."
             )
         args.max_results = 100
+    for key in ("platform", "language"):
+        selected = getattr(args, f"query_{key}", None) or []
+        if len(selected) > 1:
+            raise GatewayInputError(f"query-object --{key} accepts one exact selection")
+        setattr(args, f"query_{key}", selected[0] if selected else None)
+    try:
+        query_return_scope_options(platform=args.query_platform, language=args.query_language)
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
     (projection_version,) = resolve_catalog_versions(args, env=env)
     _compile_query_business_projection(args, version=projection_version)
     args.where = []
@@ -5451,6 +5464,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "max_results": args.max_results,
             },
             version=advanced_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5484,6 +5499,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=MAX_QUERY_TAKE,
             return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5517,6 +5534,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=args.take,
             return_fields=return_fields,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
     _require_explicit_query_bound(args)
 
@@ -8340,6 +8359,7 @@ def query_business_schema_payload(
             "query_contract": ADVANCED_QUERY_CONTRACT,
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+            "return_scope": _query_return_scope_contract(),
             "result_presence": _query_result_presence_contract(),
             "business_outputs": list(available_query_outputs(version)),
             "output_detail": "query-schema --output <business-output>",
@@ -8381,6 +8401,7 @@ def query_business_schema_payload(
         "query_contract": BUSINESS_QUERY_CONTRACT,
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+        "return_scope": _query_return_scope_contract(),
         "result_presence": _query_result_presence_contract(),
         "business_outputs": list(available_query_outputs(version)),
         "output_detail": "query-schema --output <business-output>",
@@ -14220,6 +14241,8 @@ def dispatch_command(
             take=args.take,
             return_fields=return_fields,
             version=detected_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         _require_explicit_query_bound(args)
         envelope = preview.envelope
@@ -22062,6 +22085,8 @@ def dispatch_original_file_reference_match(
         take=MAX_QUERY_TAKE,
         return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
         version=detected_version,
+        platform=args.query_platform,
+        language=args.query_language,
     )
     envelope = preview.envelope
     result = dispatch(
@@ -22425,6 +22450,22 @@ def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     return {"mode": "exact-object"}
 
 
+def _query_return_scope_argv(args: argparse.Namespace) -> list[str]:
+    return [token for key in ("platform", "language")
+            if getattr(args, f"query_{key}", None) is not None
+            for token in (f"--{key}", getattr(args, f"query_{key}"))]
+
+
+def _query_return_scope_contract() -> dict[str, Any]:
+    return {
+        "platform": {"cli": "--platform <exact name or GUID>", "omitted": "current Wwise platform"},
+        "language": {"cli": "--language <exact name or GUID>", "omitted": "native Wwise language default; Gateway supplies no language"},
+        "max_utf8_bytes": MAX_QUERY_RETURN_SCOPE_BYTES,
+        "literal_identity": True,
+        "native_options_authored_by": "Gateway",
+    }
+
+
 def _query_result_presence_contract() -> dict[str, Any]:
     return {
         "absent_fields": "unavailable_fields; omitted values are never replaced with null",
@@ -22529,6 +22570,7 @@ def _query_mutation_selection(
                         GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         object_id,
                     ]
@@ -22592,6 +22634,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             source_id,
                             "--include",
@@ -22611,6 +22654,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             bus_id,
                             "--include",
@@ -22631,6 +22675,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             event_id,
                             "--relationship",
@@ -22656,6 +22701,7 @@ def _query_business_continuations(
                     "query-object",
                     [
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         target_id,
                         "--view",
