@@ -124,6 +124,18 @@ final integrated acceptance:
   Original candidate-specific product receipts are not transferred to this
   successor. All #177/#181/#188 implementation and native proof obligations
   remain open; no new native execution or completion credit is claimed.
+  Combined source focus on clean `e3637a2e` passed **2600 tests**, with one
+  native-Windows-only skip and twelve intentionally excluded product-capture
+  parameters, in 639.62 seconds. Source stayed clean and its owned process group
+  was empty afterward. Original f8 Non-live FAIL remains separate. Condition
+  native fixture success cleanup still occurs before final teardown; #177 must
+  reuse the deferred-success lifecycle API before that fixture can launch.
+  Producer publication rejection alone does not solve sandbox retention.
+  Reconciliation derives **874 public version rows / 216 unique URIs**. Only
+  2024.1/2025.1 `undockView` route keys are added; forty native obligations move
+  from missing implementation to unresolved. Every original native ID, shape,
+  owner, independent catalog seal, definition file and historical family seal
+  stays unchanged. All25layout rows retain migration-required #188 ownership.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
