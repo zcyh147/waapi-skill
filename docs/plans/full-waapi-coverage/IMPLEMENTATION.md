@@ -56,6 +56,33 @@ references. No main merge is authorized.
 The following are partial implementation checkpoints, not closed tickets or
 final integrated acceptance:
 
+- Integration `d9431c70` includes exact #177 `f8a2b7fc`, #181 `8f372491`
+  and #188 `9e8d0847` partials. Existing-object condition planning, bounded
+  metadata discovery and query projections, seven Authoring layout reads and
+  scoped layout switching are integrated. The combined focused run passed
+  **1530 tests**. Subsequent artifact checks preserved all **272,313** original
+  native obligation identities, shapes and owners; no route was removed.
+  Sixteen new public layout version rows retain #188 ownership without
+  inheriting historical completion seals. No new verified branch or native
+  effect credit is claimed.
+- The full five-version Program run on `d9431c70` **failed**: **7416 passed,
+  15 failed, 3 native-Windows-only skips**, exit 1, in 907.75 seconds.
+  The original log and byte-sealed result remain in
+  `program-d9431c70-r1.log` and `program-d9431c70-r1-result.json` under the ignored
+  coordination root. #177 owns two historical source-equivalence fixture
+  failures; #181 owns five query/protocol/reference-budget failures; #188 owns
+  eight layout contract/catalog/inventory expectation failures. Their repairs
+  and later passing runs must be recorded separately. This run is not a pass.
+- New Authoring launches are on hold after the user reported repeated access
+  permission prompts. Continue implementation and pure-code validation; group
+  remaining GUI effect tests on a frozen integrated candidate and explain the
+  required interaction before scheduling. API/schema collection is complete;
+  behavior and effect validation remain required. No native or Fresh run was
+  started during this integration. Two obsolete read snapshot worktrees were
+  archived after confirming that their only ignored files were disposable
+  runtimes/caches; all original capture evidence remains in the coordination
+  root.
+
 - #177 candidate `5d899f1e` passed 487 focused program tests. Its separate
   native Show-condition probes passed both Self and Parent cases on all five
   pinned Console builds: 10 passing nodes. For GameParameter.SlewRateUp and
