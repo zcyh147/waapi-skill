@@ -28,6 +28,7 @@ from wwise_waapi.operation_composer import (  # pyright: ignore[reportMissingImp
 )
 from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImports]
     BUSINESS_DECLARATION_INPUT_MODE,
+    IDENTITY_ARGUMENT_SCHEMA,
     COMPOSER_INPUT_MODE,
     INTERNAL_CANONICAL_INPUT_MODE,
     list_operation_specs,
@@ -331,6 +332,35 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    assert canonical_sha256(non_object_set_digests) == (
+        "38eefcd78cd9265657e74d7b0775403bf1832b382373e9ce586a09e3e3a3c2fd"
+    )
+    # Four plugin lanes add two ShareSet kinds and bound references. Restore
+    # only those reviewed additions to reproduce the previous aggregate.
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.createPlugin", version)
+        plugin = contract["argument_contract"]["properties"]["plugin"]
+        plugin["optional"].remove("references")
+        assert plugin["properties"]["kind"]["enum"] == ["source", "effect", "sink", "metadata"]
+        plugin["properties"]["kind"]["enum"] = ["source", "effect"]
+        assert plugin["properties"].pop("references") == {
+            "type": "array", "maxItems": 32,
+            "items": {
+                "type": "object", "required": ["name", "target"],
+                "additionalProperties": False,
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "target": IDENTITY_ARGUMENT_SCHEMA,
+                },
+            },
+        }
+        assert contract["constraints"][6] == (
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation"
+        )
+        contract["constraints"][6] = (
+            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties"
+        )
+        non_object_set_digests[f"object.createPlugin@{version}"] = canonical_sha256(contract)
     assert canonical_sha256(non_object_set_digests) == (
         "c7fb226089f3c5f610e39090d196ab13958814992f13c03f205c227339694234"
     )
