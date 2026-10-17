@@ -72,3 +72,53 @@ Prepared cases use the existing workflow sandbox and category finalizer:
 Run terminal CLI nodes individually in their own sequential lifecycles after
 the implementation hold is lifted. Retain original failures and source/host/
 candidate provenance. Format capture alone grants no business-effect coverage.
+
+## October 18 targeted native results and remaining work
+
+These observations supersede the pending-evidence statements above only for the
+exact tested branches. Original failures and quarantines remain unchanged.
+No complete ticket, full native matrix or Fresh acceptance is claimed.
+
+Current product candidate `c98897e2625df00606192f557f452f9a5fd26cc7` contains
+R14's exact-definition inline WAV compatibility and language-specific import
+verification fixes. On macOS Console 2023.1.19.8928, 2024.1.13.9056 and
+2025.1.7.9143, the canonical 48-byte unpadded WAV passed full public transaction
+verification and independent Sound → AudioFileSource → Originals file/PCM
+checks. All three file hashes equal the SHA-256 above. This is SFX evidence;
+localized replacement, uppercase `.WAV` path compatibility, other import
+branches and complete #182 acceptance remain open. Earlier historical candidate
+receipts accepted media but failed Gateway verification; they are not regraded.
+
+The same candidate exposed a Short ID lookup gap under #181. Typed Event lookup
+and exact-ID readback succeeded on all five versions. DialogueEvent
+`Objective_Status`, Short ID `3970659059`, was discovered normally but missed by
+typed Short ID lookup on 2021.1, 2022.1 and 2023.1; the identical ID lookup
+succeeded on 2024.1 and 2025.1. Numeric literal/signedness behavior is a
+hypothesis, not an established cause. Diagnose with matching sources and bounded
+public reads, repair construction, then prove affected versions. Do not select
+a convenient lower ID, remove DialogueEvent support or narrow uint32.
+
+Real RTPC.Curve class/object metadata and referenced Curve observations now
+exist for 2022.1–2025.1. The 2021.1 collector retained absent type-discovery
+matches and unavailable public curve-points projection as gaps, not engine
+absence. The 2022.1 observation passed at c988; 2023.1–2025.1 observations remain
+on their original historical diagnostic candidates and were not repeated.
+
+Owned-list observations remain incomplete on all five versions. Fresh names
+did not disclose sampled RTPC/Effects/Arguments lists even where bounded native
+relationship reads returned members. Native rows omitted `owner` on ordinary
+objects and `parent` on owned objects; missing is not silently null. In 2025.1
+the MusicSwitchContainer Arguments member returned type `PluginInnerObject`,
+while its path identified a MusicArgumentsSlot. Obtain exact class identity
+before equating documented class and returned object type. These findings need
+discovery/ownership implementation under #180/#181; SKIPs are not coverage.
+
+Durable ignored receipts: `.waapi-skill-state/full-coverage/native-c98897e2-r1/summary.json`
+contains all five candidate/build/response and final lifecycle references.
+`native-23ae9be2-r1/triage.json` retains the original 2021 test-script failure
+(`--kind event`, rejected before lookup) and its two completed read observations.
+The successor repaired only that syntax and proved the whole collector through
+the actual Gateway with fake native dispatch. Only the failed Short ID case was
+repeated on 2021. Every final record proves unchanged source hashes/mtime and
+no scoped process residue. Mixed failed/SKIP lifecycles stay quarantined,
+including those with an individual WAV PASS; no whole lifecycle passed.

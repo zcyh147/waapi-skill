@@ -453,6 +453,35 @@ failures, source hashes and process receipts remain in ignored
 and the remaining same-parent obligations stay open; no smaller scope,
 Fresh acceptance, ticket closure or main merge is claimed.
 
+## Fourteenth integration and targeted native checkpoint
+
+R14 `3b963f47571e2501809d42ea1a4bfc8239c05645` combines scoped inline WAV
+compatibility, import target/language verification repair and owned-list probe
+preparation. Its central preflight passed **825 tests in 21.79 seconds** and
+deduplicated crossfocus passed **19 in 3.03 seconds**. All 1,834 tracked hashes
+stayed unchanged, process groups ended, and all 272,313 native obligations kept
+their identities, requirements and evidence. This is not another full gate.
+
+Test-only `23ae9be2` shares Short ID reads with the existing workflow sandbox.
+Its twelve fake controls passed, but the first 2021 native run exposed an invalid
+inherited `--kind event` fixture command: **1 failed / 2 skipped**, retained.
+Test-only `c98897e2` fixes discovery through the existing public custom-kind path
+and passed **17 focused controls**, including the complete collector through the
+actual five-version Gateway parser and injected native dispatch. No product
+runtime changed between R14 and c988.
+
+Frozen c988 targeted macOS results: **1 failed** on 2021, **1 failed / 1 passed /
+1 skipped** on each of 2022 and 2023, and **2 passed / 1 skipped** on each of
+2024 and 2025. Current inline WAV acceptance passed all applicable 2023–2025
+versions, including Gateway verified state and independent exact media bytes.
+Short ID observation passed 2024/2025 and exposed a DialogueEvent lookup gap
+on 2021–2023. Owned-list observations remain incomplete; 2022 Curve metadata
+observation passed. See [native follow-ups](NATIVE_FOLLOWUPS.md) for scope.
+All 1,835 tracked hashes and source-project hashes/mtime stayed unchanged;
+process teardown was clean. Failed/mixed-SKIP sandboxes remain quarantined.
+Individual passes are not whole-lifecycle passes. No Fresh/Windows acceptance,
+ticket closure or main merge follows from this checkpoint.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
