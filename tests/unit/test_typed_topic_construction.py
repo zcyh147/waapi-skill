@@ -498,14 +498,16 @@ def test_selection_topic_schema_is_available_offline_for_authoring(version: str,
     assert payload["continuation"]["subcommands"] == ["wait-topic", "stream-topic"]
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_soundbank_topic_schema_exposes_closed_business_shortcuts(
     tmp_path: Path,
+    version: str,
 ) -> None:
     topic = "ak.wwise.core.soundbank.generated"
 
     code, payload = gateway.execute_gateway(
         ["topic-schema", topic],
-        env=_env(tmp_path, "2025.1"),
+        env=_env(tmp_path, version),
         client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
     )
 
@@ -524,14 +526,20 @@ def test_soundbank_topic_schema_exposes_closed_business_shortcuts(
     assert payload["continuation"]["advanced_field_catalog"] == (
         "topic-schema <topic-uri> --catalog"
     )
+    assert "exact_entry" not in payload["continuation"]["business_fact_argv"]
+    assert "event_row" not in payload["continuation"]["business_fact_argv"]
+    assert payload["continuation"]["exact_entry_field_disclosure"] == "topic-schema <topic-uri> --entry <scope>"
+    assert payload["continuation"]["event_row_field_disclosure"] == "topic-schema <topic-uri> --row <collection> --row-field-group <group>"
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
 def test_soundbank_topic_schema_discloses_long_tail_catalog_only_on_request(
     tmp_path: Path,
+    version: str,
 ) -> None:
     code, payload = gateway.execute_gateway(
         ["topic-schema", "ak.wwise.core.soundbank.generated", "--catalog"],
-        env=_env(tmp_path, "2025.1"),
+        env=_env(tmp_path, version),
         client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
     )
 
@@ -543,6 +551,27 @@ def test_soundbank_topic_schema_discloses_long_tail_catalog_only_on_request(
     assert len(business["exact_entries"]["rows"]) == business["exact_entries"][
         "catalog_count"
     ]
+    assert {"event_row", "exact_entry", "exact_entry_object", "exact_entry_row"} <= set(payload["continuation"]["business_fact_argv"])
+    code, compact = gateway.execute_gateway(
+        ["topic-schema", "ak.wwise.core.soundbank.generated"], env=_env(tmp_path, version),
+        client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+    )
+    assert code == 0, compact
+    assert compact["session_context"] == payload["session_context"]
+    assert compact["continuation"]["contract_binding"] == payload["continuation"]["contract_binding"]
+    for name, flag, selected_key in (("event_rows", "--row", "collection"), ("exact_entries", "--entry", "scope")):
+        for key in ("catalog_count", "catalog_digest", "catalog_disclosure", "field_disclosure"):
+            assert compact["business_input"][name][key] == business[name][key]
+        selected = business[name]["rows"][0][0]
+        code, disclosure = gateway.execute_gateway(
+            ["topic-schema", "ak.wwise.core.soundbank.generated", flag, selected], env=_env(tmp_path, version),
+            client_factory=lambda url: pytest.fail(f"topic-schema connected to {url}"),
+        )
+        assert code == 0, disclosure
+        assert disclosure["business_input"][name]["selected"][selected_key] == selected
+        assert disclosure["continuation"]["contract_binding"] == payload["continuation"]["contract_binding"]
+        fact = "event_row" if flag == "--row" else "exact_entry"
+        assert disclosure["continuation"]["business_fact_argv"][fact] == payload["continuation"]["business_fact_argv"][fact]
 
 
 def test_soundbank_topic_business_shortcuts_compile_without_handles(
