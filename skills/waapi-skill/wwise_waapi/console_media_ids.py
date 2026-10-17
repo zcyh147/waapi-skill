@@ -139,6 +139,8 @@ def project_storage_mode(document):
     if len(fields) != 1 or fields[0].get('Type') != 'bool':
         raise ValueError('Project media storage mode is ambiguous')
     field = fields[0]
+    if 'Value' in field.attrib and field.find('ValueList') is not None:
+        raise ValueError('Project media storage mode has multiple value encodings')
     values = field.findall('./ValueList/Value')
     value = field.get('Value') if not values else (values[0].text if len(values) == 1 and not values[0].attrib else None)
     if value not in {'True', 'False'}:
