@@ -102,6 +102,8 @@ public read path. Do not weaken connection binding.
 
 ## Next handoff
 
+The specification is published as [Complete WAAPI business coverage across Wwise 2021.1–2025.1](https://github.com/zcyh147/waapi-skill/issues/174). Local copy: [SPEC.md](SPEC.md). Implementation tickets have not been created.
+
 Proceed to `/to-spec` and `/to-tickets`, using English tickets and actual
 missing-branch IDs. Organize implementation by reusable mechanisms: metadata
 conditions; missing parameter/enum/nested shapes; object topology and placement;
