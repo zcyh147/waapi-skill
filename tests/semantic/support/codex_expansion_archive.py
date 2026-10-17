@@ -166,7 +166,12 @@ def _command_argv(record, plan):
             and argv and argv[0].startswith("-")):
         from tests.semantic.support.codex_repair_gateway_argv import repair_command_argv
         try:
-            return list(repair_command_argv(argv, parser=_public_gateway(plan).build_parser(), version=plan["version"]))
+            rejected = record.get("accepted") is False and "admission_rejection" in record
+            if rejected:
+                _validate_initial_admission_rejection(record, argv=argv,
+                    operation=plan.get("request_schema_uri") or plan.get("operation"))
+            return list(repair_command_argv(argv, parser=_public_gateway(plan).build_parser(),
+                version=plan["version"], initial_admission_rejected=rejected))
         except ValueError as exc:
             raise ExpansionArchiveError("invalid repair global options") from exc
     return argv

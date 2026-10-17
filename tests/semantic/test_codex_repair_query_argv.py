@@ -145,11 +145,14 @@ def reject_as_prior_policy(monkeypatch):
     monkeypatch.setattr(RepairBrokerPolicy, "prepare", prior)
 
 
-def test_authenticated_prior_schema_refusal_remains_fail_and_scheduler_reaches_next_unit(tmp_path, monkeypatch):
+@pytest.mark.parametrize("rejected_argv", [["--version", "2025.1", "query-schema"],
+    ["--version", "2024.1", "query-schema"], ["--version", "2025.1", "query-object", "--exact-id", FIRST]])
+def test_authenticated_prior_schema_refusal_remains_fail_and_scheduler_reaches_next_unit(tmp_path, monkeypatch, rejected_argv):
     from tests.semantic import run_codex_skill_matrix as matrix
     from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome
     from tests.semantic.test_codex_repair_cli_wiring import options
-    reject_as_prior_policy(monkeypatch)
+    if rejected_argv == ["--version", "2025.1", "query-schema"]:
+        reject_as_prior_policy(monkeypatch)
     ids = ["REPAIR25-F2", "REPAIR25-F3"]
     selected = options(tmp_path, monkeypatch, "matrix", *[part for value in ids for part in ("--case-id", value)])
     monkeypatch.setattr(matrix, "prepare_iteration_root", lambda path, **_: path.mkdir())
@@ -159,7 +162,7 @@ def test_authenticated_prior_schema_refusal_remains_fail_and_scheduler_reaches_n
         if unit.case_id == "F3":
             raise RuntimeError("fake executor stops after proving F3 was reached")
         scenario_root.mkdir(parents=True)
-        root, outcome, _ = produce_rejected_task(scenario_root, monkeypatch, rejected_argv=["--version", "2025.1", "query-schema"])
+        root, outcome, _ = produce_rejected_task(scenario_root, monkeypatch, rejected_argv=rejected_argv)
         replay = verify_expansion_task_archive(root, expected_unit_id=unit.unit_id, expected_version=unit.version, expected_inputs_sha256=INPUTS)
         assert replay["archive_valid"] and not replay["business_pass"] and replay["original_status"] == "FAIL"
         assert outcome["status"] == "FAIL" and not outcome["passed"]
@@ -185,3 +188,21 @@ def test_prior_versioned_refusal_requires_untampered_no_dispatch_proof(tmp_path,
         else: record["admission_rejection"]["gateway_argv_sha256"] = "0" * 64
     path.write_text(json.dumps(value))
     assert not expansion_case_isolated(scheduler_record(root, "FAIL"))
+
+
+@pytest.mark.parametrize("argv", [["--version", "2024.1", "query-schema"],
+    ["--version=2025.1", "query-object", "--exact-id", FIRST]])
+@pytest.mark.parametrize("marked", [True, False, "tampered"])
+def test_rejected_version_prefix_preserves_fail_only_with_initial_admission_proof(tmp_path, monkeypatch, argv, marked):
+    root, outcome, _ = produce_rejected_task(tmp_path, monkeypatch, rejected_argv=argv)
+    assert outcome["status"] == "FAIL" and outcome["passed"] is False
+    if marked is not True:
+        path = root / "expansion-broker.json"; evidence = json.loads(path.read_text())
+        if marked is False: evidence["records"][0].pop("admission_rejection")
+        else: evidence["records"][0]["admission_rejection"]["runner_dispatched"] = True
+        path.write_text(json.dumps(evidence))
+    assert expansion_case_isolated(scheduler_record(root, "FAIL")) is (marked is True)
+    if marked is True:
+        replay = verify_expansion_task_archive(root, expected_unit_id="REPAIR25-F2", expected_version="2025.1", expected_inputs_sha256=INPUTS)
+        assert replay["original_status"] == "FAIL" and not replay["business_pass"]
+        assert replay["executions"] == replay["execution_reservations"] == 0
