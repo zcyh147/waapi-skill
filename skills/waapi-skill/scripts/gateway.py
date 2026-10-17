@@ -22688,24 +22688,24 @@ def _bind_custom_kind_from_live_types(
         connection=connection,
         version=detected_version,
     )
-    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}))
+    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}), require_identity=False)
 
     def lexical(value: str) -> str:
         return "".join(character.casefold() for character in value if character.isalnum())
 
     needle = lexical(meaning)
-    exact = [record for record in records if lexical(record.name) == needle]
+    exact = [record for record in records if isinstance(record.name, str) and lexical(record.name) == needle]
     matches = exact or [
         record
         for record in records
-        if needle and (needle in lexical(record.name) or lexical(record.name) in needle)
+        if needle and isinstance(record.name, str) and (needle in lexical(record.name) or lexical(record.name) in needle)
     ]
     if len(matches) != 1:
         return {
             "metadata_authority": "live-waapi",
             "meaning": meaning,
             "candidate_count": len(matches),
-            "candidates": [record.as_dict() for record in matches[:8]],
+            "candidates": [dict(record.raw) for record in matches[:8]],
             "repair": "refine --custom-kind until one live Wwise type matches",
         }
     args.object_type = matches[0].name

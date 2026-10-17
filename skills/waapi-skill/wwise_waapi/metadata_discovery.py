@@ -435,7 +435,7 @@ def _resolve_scope(
         matches = [
             row
             for row in rows
-            if row.name.casefold() == requested.casefold()
+            if isinstance(row.name, str) and row.name.casefold() == requested.casefold()
         ]
         if len(matches) != 1:
             raise MetadataDiscoveryError(
@@ -448,6 +448,8 @@ def _resolve_scope(
                 },
             )
         match = matches[0]
+        if match.class_id is None:
+            raise MetadataDiscoveryError("OBJECT_TYPE_METADATA_INCOMPLETE", "The matched live type has no class ID for metadata discovery.", details={"requested": requested, "native_type": dict(match.raw)})
         return (
             {
                 "kind": "object_type",
@@ -503,7 +505,7 @@ def _resolve_scope(
 def _read_types(read_call: ReadCall) -> tuple[ObjectTypeMetadataRecord, ...]:
     result = _closed_read(read_call, GET_TYPES_URI, {}, {})
     try:
-        rows = parse_get_types_result(result)
+        rows = parse_get_types_result(result, require_identity=False)
     except SemanticValidationError as exc:
         raise _invalid_live_metadata(GET_TYPES_URI, exc) from exc
     if not rows:
@@ -583,10 +585,10 @@ def _read_property_info(
         {},
     )
     try:
-        info = parse_get_property_info_result(result)
+        info = parse_get_property_info_result(result, require_identity=False)
     except SemanticValidationError as exc:
         raise _invalid_live_metadata(GET_PROPERTY_INFO_URI, exc) from exc
-    if info.name != name:
+    if info.name is not None and info.name != name:
         raise MetadataDiscoveryError(
             "LIVE_METADATA_NAME_MISMATCH",
             "getPropertyInfo returned metadata for a different field.",
@@ -739,7 +741,7 @@ def _tokens(value: str) -> tuple[str, ...]:
 def _metadata_search_strings(
     info: PropertyInfoMetadataRecord,
 ) -> tuple[str, ...]:
-    values: list[str] = [info.type]
+    values: list[str] = [info.type] if isinstance(info.type, str) else []
     for source in (
         info.display,
         info.ui,
@@ -1086,8 +1088,7 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         dict(restriction) if isinstance(restriction, Mapping) else {}
     )
     payload = {
-        "name": metadata["name"],
-        "type": metadata["type"],
+        **{key: metadata[key] for key in ("name", "type") if key in metadata},
         **{key: metadata[key] for key in ("default", "supports", "dependencies") if key in metadata},
         **({"ui": {"dataMeaning": metadata["ui"]["dataMeaning"]} if isinstance(metadata["ui"], Mapping) and "dataMeaning" in metadata["ui"] else {}} if "ui" in metadata else {}),
         **({"display": compact_display} if "display" in metadata else {}),
@@ -1095,7 +1096,7 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
         "unit": metadata_unit(metadata),
         "availability": {key: "unknown" for key in ("type", "default", "restriction", "dependencies", "supports", "ui") if key not in metadata},
     }
-    typed_value_type = metadata_typed_value_type(str(metadata["type"]))
+    typed_value_type = metadata_typed_value_type(str(metadata.get("type", "")))
     if typed_value_type is not None:
         payload["typed_value_type"] = typed_value_type
     if (
@@ -1246,11 +1247,11 @@ def _match_evidence(
 
 def _metadata_kind(info: PropertyInfoMetadataRecord) -> str:
     if (
-        info.type.casefold() in {"reference", "objectreference"}
+        (isinstance(info.type, str) and info.type.casefold() in {"reference", "objectreference"})
         or str(info.restriction.get("type", "")).casefold() == "reference"
     ):
         return "reference"
-    return "property"
+    return "property" if info.type is not None else "unknown"
 
 
 def _validate_queries(queries: Sequence[str]) -> tuple[str, ...]:
@@ -1454,7 +1455,7 @@ def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
     if isinstance(page_size, bool) or not isinstance(page_size, int) or not 1 <= page_size <= 64:
         raise MetadataDiscoveryError("INVALID_METADATA_PAGE_SIZE", "page size must be 1..64")
     try:
-        records = parse_get_types_result(_closed_read(read_call, GET_TYPES_URI, {}, {}))
+        records = parse_get_types_result(_closed_read(read_call, GET_TYPES_URI, {}, {}), require_identity=False)
     except SemanticValidationError as exc:
         raise _invalid_live_metadata(GET_TYPES_URI, exc) from exc
     if len(records) > MAX_METADATA_DISCOVERY_TYPES:
@@ -1462,7 +1463,7 @@ def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
     all_rows = [dict(record.raw) for record in records]
     filters = tuple(meaning.casefold() for meaning in meanings)
     rows = [row for row in all_rows if not filters or any(
-        meaning in row["name"].casefold() or meaning in row["type"].casefold()
+        any(isinstance(row.get(key), str) and meaning in row[key].casefold() for key in ("name", "type"))
         for meaning in filters)]
     snapshot = hashlib.sha256(canonical_json_bytes([context, all_rows, filters])).hexdigest()
     now = issued = int(time.time())

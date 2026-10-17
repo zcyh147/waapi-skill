@@ -71,9 +71,9 @@ class MetadataReturnExpectation:
 class ObjectTypeMetadataRecord:
     """One row from ``ak.wwise.core.object.getTypes``."""
 
-    class_id: int
-    name: str
-    type: str
+    class_id: int | None
+    name: str | None
+    type: str | None
     raw: Mapping[str, Any] = field(default_factory=dict)
 
     def as_dict(self, *, include_raw: bool = False) -> dict[str, Any]:
@@ -101,8 +101,8 @@ class PropertyReferenceNameRecord:
 class PropertyInfoMetadataRecord:
     """Selected required and optional metadata from ``getPropertyInfo``."""
 
-    name: str
-    type: str
+    name: str | None
+    type: str | None
     default: Any = None
     supports: Mapping[str, Any] = field(default_factory=dict)
     display: Mapping[str, Any] = field(default_factory=dict)
@@ -308,18 +308,19 @@ def build_metadata_preview(operation: MetadataOperation | str, **kwargs: Any) ->
     return MetadataBuilder().preview(operation, **kwargs)
 
 
-def parse_get_types_result(result: Mapping[str, Any]) -> tuple[ObjectTypeMetadataRecord, ...]:
+def parse_get_types_result(result: Mapping[str, Any], *, require_identity: bool = True) -> tuple[ObjectTypeMetadataRecord, ...]:
     rows = _return_list(GET_TYPES_URI, result)
     records: list[ObjectTypeMetadataRecord] = []
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
             raise _result_error(GET_TYPES_URI, "getTypes return rows must be objects.", row_index=index, actual_type=type(row).__name__)
-        _require_result_fields(GET_TYPES_URI, row, ("classId", "name", "type"), row_index=index)
-        if not _is_uint32(row["classId"]):
+        if require_identity:
+            _require_result_fields(GET_TYPES_URI, row, ("classId", "name", "type"), row_index=index)
+        if "classId" in row and not _is_uint32(row["classId"]):
             raise _result_error(GET_TYPES_URI, "getTypes classId must be an integer.", row_index=index, field="classId")
-        if not isinstance(row["name"], str) or not isinstance(row["type"], str):
+        if any(key in row and not isinstance(row[key], str) for key in ("name", "type")):
             raise _result_error(GET_TYPES_URI, "getTypes name and type must be strings.", row_index=index)
-        records.append(ObjectTypeMetadataRecord(class_id=row["classId"], name=row["name"], type=row["type"], raw=dict(row)))
+        records.append(ObjectTypeMetadataRecord(class_id=row.get("classId"), name=row.get("name"), type=row.get("type"), raw=dict(row)))
     return tuple(records)
 
 
@@ -338,10 +339,11 @@ def parse_property_and_reference_names_result(result: Mapping[str, Any]) -> tupl
     return tuple(records)
 
 
-def parse_get_property_info_result(result: Mapping[str, Any]) -> PropertyInfoMetadataRecord:
+def parse_get_property_info_result(result: Mapping[str, Any], *, require_identity: bool = True) -> PropertyInfoMetadataRecord:
     _require_result_mapping(GET_PROPERTY_INFO_URI, result)
-    _require_result_fields(GET_PROPERTY_INFO_URI, result, ("name", "type"))
-    if not isinstance(result["name"], str) or not isinstance(result["type"], str):
+    if require_identity:
+        _require_result_fields(GET_PROPERTY_INFO_URI, result, ("name", "type"))
+    if any(key in result and not isinstance(result[key], str) for key in ("name", "type")):
         raise _result_error(GET_PROPERTY_INFO_URI, "Property info name and type must be strings.")
     for field_name in ("supports", "display", "restriction", "ui"):
         if field_name in result and not isinstance(result[field_name], Mapping):
@@ -355,8 +357,8 @@ def parse_get_property_info_result(result: Mapping[str, Any]) -> PropertyInfoMet
     if audio_engine_id is not None and not _is_uint32(audio_engine_id):
         raise _result_error(GET_PROPERTY_INFO_URI, "Property info audioEngineId must be a non-negative integer when present.")
     return PropertyInfoMetadataRecord(
-        name=result["name"],
-        type=result["type"],
+        name=result.get("name"),
+        type=result.get("type"),
         default=result.get("default"),
         supports=_mapping_or_empty(result.get("supports")),
         display=_mapping_or_empty(result.get("display")),
