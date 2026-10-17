@@ -1243,6 +1243,35 @@ _INLINE_WAV_REQUEST_COMPATIBILITY = {
 }
 
 
+_MEDIA_SINGLE_RESULT_BUILDS = {
+    "2021.1": "2021.1.14.8108",
+    "2022.1": "2022.1.19.8584",
+    "2023.1": "2023.1.19.8928",
+}
+
+
+def observed_console_result_schema(version, uri, schema, value):
+    """Admit the exact process result observed on earlier Console builds.
+
+    The immutable reflected empty-object schema stays available for its empty
+    result. This compatibility rule is not a wildcard for undocumented fields,
+    other media commands, result codes, or changed source schemas.
+    """
+    build = _MEDIA_SINGLE_RESULT_BUILDS.get(version)
+    if (build is None or uri != "ak.wwise.cli.moveMediaIdsToSingleFile"
+            or not isinstance(value, Mapping) or set(value) != {"result"}):
+        return schema, None
+    digest = "99334726611ccf58a148b0814696bfa6fe08c1b2d027e946beccf5a74331c9aa"
+    if _canonical_sha256(schema) != digest:
+        raise SchemaInventoryError("The observed Console media-result source changed; review the new schema before use")
+    return {"type": "object", "additionalProperties": False, "required": ["result"],
+        "properties": {"result": {"type": "integer", "enum": [0, 1, 2]}}}, {
+        "rule_id": "console-media-single-observed-process-result/v1",
+        "uri": uri, "version": version, "section": "result",
+        "reflected_schema_sha256": digest, "native_observation_build": build,
+    }
+
+
 def resolved_request_schema(
     version: str,
     uri: str,

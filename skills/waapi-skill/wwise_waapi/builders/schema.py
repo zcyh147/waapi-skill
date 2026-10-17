@@ -150,6 +150,13 @@ class SemanticSchemaValidator:
 
         schema = self.schema_for(uri)
         result_schema = _mapping_or_empty(schema.get("resultSchema"))
+        compatibility = None
+        if uri == "ak.wwise.cli.moveMediaIdsToSingleFile" and self.version in {"2021.1", "2022.1", "2023.1"}:
+            from wwise_waapi.schema_inventory import observed_console_result_schema, SchemaInventoryError
+            try:
+                result_schema, compatibility = observed_console_result_schema(self.version, uri, result_schema, result)
+            except SchemaInventoryError as exc:
+                raise _schema_error(uri, self.version, str(exc), section="result") from exc
         walker = _SchemaWalker(uri=uri, version=self.version)
         walker.validate(result_schema, result, path="result")
         return SchemaValidationResult(
@@ -160,6 +167,7 @@ class SemanticSchemaValidator:
             section="result",
             validated_nodes=walker.nodes,
             unresolved_refs=tuple(sorted(walker.unresolved_refs)),
+            compatibility_rules=(compatibility,) if compatibility is not None else (),
         )
 
     def validate_event(self, uri: str, event: Any) -> SchemaValidationResult:

@@ -31,16 +31,20 @@ def observe_cli_project_outcome(uri: str, version: str, result: Any) -> dict[str
     """Interpret only documented exit outcomes, separately from file effects.
 
     processResultCli in each pinned definition describes 0 success, 1 errors
-    (possibly warnings), and 2 warnings only. The earlier media-ID routes return
-    an empty object and disclose no process code. Neither proves file effects.
+    (possibly warnings), and 2 warnings only. Earlier media-ID schemas declare
+    an empty result. Matching 2021–2023 native move-to-single-file observations
+    also returned the process result; retain both shapes without inferring an
+    exit code from an empty result. Neither shape proves file effects.
     """
     if uri not in CLI_PROJECT_FILE_URIS:
         raise ValueError('Not an owned Console project/file command')
     if uri in _MEDIA_ID_URIS and version in {'2021.1', '2022.1', '2023.1'}:
-        if not isinstance(result, Mapping) or result:
+        if isinstance(result, Mapping) and not result:
+            return {'kind': 'cli-process-outcome', 'uri': uri, 'version': version,
+                'outcome': 'not_reported', 'business_effect_proven': False}
+        if (uri != 'ak.wwise.cli.moveMediaIdsToSingleFile'
+                or not isinstance(result, Mapping) or set(result) != {'result'}):
             raise ValueError('This version returns no process outcome; expected its empty result object')
-        return {'kind': 'cli-process-outcome', 'uri': uri, 'version': version,
-            'outcome': 'not_reported', 'business_effect_proven': False}
     code = result.get('result') if isinstance(result, Mapping) else None
     if isinstance(code, bool) or not isinstance(code, (int, float)) or code not in (0, 1, 2):
         raise ValueError('The native process result is not one of the documented outcomes 0, 1, or 2')

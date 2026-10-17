@@ -690,6 +690,12 @@ def cli_console_business_contract_data(
         **({"result_semantics": {
             "documented_process_outcomes": {"0": "success", "1": "errors_with_possible_partial_effects", "2": "warnings_only"},
             "earlier_media_id_empty_result": "no_process_outcome_reported",
+            **({"observed_process_result": {
+                "compatibility_rule": "console-media-single-observed-process-result/v1",
+                "scope": "matching_2021_to_2023_Console_moveMediaIdsToSingleFile",
+                "accepted_shapes": ["empty_object_without_process_outcome", "result_integer_0_1_or_2"],
+                "original_reflected_schema": "preserved; compatibility_requires_exact_source_digest",
+            }} if operation == 'ak.wwise.cli.moveMediaIdsToSingleFile' and version in {'2021.1', '2022.1', '2023.1'} else {}),
             "unknown_outcome": "executed_unverified_no_automatic_retry",
             "file_effect_verification": "independent_observation_required",
         }} if operation in CLI_PROJECT_FILE_URIS else {}),

@@ -933,6 +933,48 @@ def test_cli_media_id_large_project_keeps_bounded_preview_and_exact_preservation
     assert len(json.dumps(payload).encode()) < 64 * 1024
 
 
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1'])
+@pytest.mark.parametrize('outcome', [0, 1, 2])
+def test_earlier_media_id_observed_process_result_keeps_effect_unverified(tmp_path, version, outcome):
+    class ObservedResultTask(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.project_file.with_suffix('.mediaid').write_bytes(b'unknown-native-format')
+            return super().call(uri, args, options)
+    task = ObservedResultTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile', outcome)
+    saved_fixture_project(task)
+    code, schema = task.run('request-schema', task.operation)
+    assert code == 0
+    assert 'console-media-single-observed-process-result/v1' in json.dumps(schema)
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert payload['state'] == ('verification_failed' if outcome == 1 else 'result_schema_checked'), payload
+    assert (code != 0) == (outcome == 1)
+    assert payload['verified'] is False
+    process = next(row for row in payload['verification']['readbacks'] if row.get('kind') == 'cli-process-outcome')
+    assert process['outcome'] == {0: 'success', 1: 'errors', 2: 'warnings_only'}[outcome]
+    assert process['partial_effects_possible'] is (outcome == 1)
+    rules = [rule for assertion in payload['verification']['assertions']
+        for rule in assertion.get('evidence', {}).get('compatibility_rules', [])]
+    assert len(rules) == 1
+    assert rules[0]['rule_id'] == 'console-media-single-observed-process-result/v1'
+    assert rules[0]['version'] == version
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('native_result', [{'result': True}, {'result': 3}, {'result': '0'}, {'result': 0, 'extra': 1}])
+def test_earlier_media_id_process_compatibility_rejects_unproved_shapes(tmp_path, native_result):
+    task = CliProjectTask(tmp_path, '2021.1', 'ak.wwise.cli.moveMediaIdsToSingleFile')
+    task.result_payload = native_result
+    tx = task.execute_plan()
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload.get('verified') is not True, payload
+    assert payload['state'] in {'executed_unverified', 'verification_failed'}
+    code, payload = task.run('execute', tx)
+    assert code != 0
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
 @pytest.mark.parametrize('change', ['owner-id', 'owner-name', 'media-id', 'duplicate-media-row'])
 def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, change):
     class ChangedIdentityTask(CliProjectTask):
