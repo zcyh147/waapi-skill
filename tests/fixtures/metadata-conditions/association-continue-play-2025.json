@@ -1,0 +1,81 @@
+{
+  "contract": "waapi-skill.recorded-association-condition-facts/v1",
+  "version": "2025.1",
+  "build": "2025.1.7.9143",
+  "evidence_scope": "read-only native relationship/value and class-field metadata facts; no native mutation or owner typed-metadata proof",
+  "field_metadata": {
+    "name": "ContinuePlay",
+    "type": "bool",
+    "restriction": {},
+    "dependencies": [
+      {
+        "type": "property",
+        "action": "Enable",
+        "property": "SwitchBehavior",
+        "context": "AssocParent",
+        "conditions": [
+          {
+            "restriction": {
+              "type": "enum",
+              "values": [
+                {
+                  "value": 1,
+                  "displayName": "1"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "metadata_scope": {
+    "kind": "object_type",
+    "requested": "ObjectSettingAssoc",
+    "resolved": {
+      "classId": 1572880,
+      "name": "ObjectSettingAssoc",
+      "type": "WObject"
+    }
+  },
+  "original_metadata_receipt": {
+    "artifact": "condition-metadata-2025-r1/006.stdout",
+    "sha256": "3b2f4baf5e3353b598d99d21864e0da3ac4c6ee6482e89b38d421ad98e4537e1"
+  },
+  "relationship": {
+    "source": {
+      "name": "",
+      "type": "ObjectSettingAssociation",
+      "parent": null
+    },
+    "owner_type": "SwitchContainer",
+    "source_value": false,
+    "owner_value": 1
+  },
+  "original_relationship_observation": {
+    "artifact": "assoc-context-2025-r2/observations.json",
+    "sha256": "ef16931f8350cc28356050ac51e0f172fc8a68c84264fe392ad24b96b0f16d11"
+  },
+  "owner_metadata_model": {
+    "name": "SwitchBehavior",
+    "type": "int16",
+    "restriction": {
+      "type": "enum",
+      "values": [
+        {
+          "value": 0
+        },
+        {
+          "value": 1
+        }
+      ]
+    },
+    "dependencies": []
+  },
+  "owner_metadata_model_provenance": {
+    "kind": "installed_definition_only_not_native_getPropertyInfo",
+    "file": "WObjects/WObjects.xml",
+    "sha256": "3b363c24b7ffa032d7efc12f36023cd944b8f53323af33fcbe738c2193918454",
+    "path": "PluginModule/WwiseObject[SwitchContainer]/Properties/Property[SwitchBehavior]"
+  }
+}

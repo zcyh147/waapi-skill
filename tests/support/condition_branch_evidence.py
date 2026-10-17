@@ -48,6 +48,14 @@ for _version, _build, _index in (("2021.1", "2021.1.14.8108", 4), ("2022.1", "20
         "reason": "Exact Parent Show occurrence: injected public mutation changes only Weight while parent RandomOrSequence remains0. Original exploratory native captures supply recorded metadata input facts only; they grant no final native category or Fresh acceptance credit.",
         "scalar": {"controller": "RandomOrSequence", "controller_value": 0, "field": "Weight", "value": 37},
     }
+_PROGRAM_CASES["association-continue-play-2025.1"] = {
+    "branch_id": "2025.1|installed|2025.1.7.9143|condition|existing-object|WObjects/WObjects.xml|"
+                 "PluginModule/WwiseObject[ObjectSettingAssoc]/Properties/Property[ContinuePlay]/Dependencies/1/condition",
+    "public_uri": "ak.wwise.core.object.setProperty",
+    "selector": "exact_bound_ObjectSettingAssociation_ContinuePlay_Field_Handle_true_with_exact_SwitchContainer_owner_SwitchBehavior_1",
+    "reason": "Exact AssocParent ContinuePlay condition. Retained2025 native read-only facts certify the observed relationship/value and source class metadata; owner typed metadata is explicitly an installed-definition model. Injected mutation verifies exact owner scope without owner writes. Native owner metadata, enabled applicability and mutation effects remain unverified; older native identities remain unresolved.",
+    "scalar": {"controller": "SwitchBehavior", "controller_value": 1, "field": "ContinuePlay", "value": True},
+}
 
 
 def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show") -> dict:
@@ -76,6 +84,8 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/fixtures/metadata-conditions/3d-audio-bed-mixer.json",
         "tests/unit/test_parent_show_conditions_gateway.py",
         "tests/fixtures/metadata-conditions/parent-weight-show.json",
+        "tests/unit/test_association_condition_product_gateway.py",
+        "tests/fixtures/metadata-conditions/association-continue-play-2025.json",
     ])
     sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in sorted(set(relevant))}
     return {"root": root, "nodeid": nodeid, "branch": branch, "case": case,
