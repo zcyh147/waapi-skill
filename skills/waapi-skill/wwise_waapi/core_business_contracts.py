@@ -321,8 +321,8 @@ _READ_DECLARATIONS: dict[str, dict[str, Any]] = {
 
 for _history_uri, _history_versions in HISTORY_VERSIONS.items():
     _CONTRACTS[_history_uri] = {
-        "versions": _history_versions, "roles": (), "required_fields": ("history_scope", "expectation_receipt"),
-        "optional_fields": (), "field_types": {"history_scope": "latest_project_history_scope", "expectation_receipt": "owned_history_expectation_receipt"},
+        "versions": _history_versions, "roles": (), "required_fields": ("history_scope",),
+        "optional_fields": ("expectation_receipt",), "field_types": {"history_scope": "latest_project_history_scope", "expectation_receipt": "owned_history_expectation_receipt"},
         "execution_shape": "draft_mutation",
     }
 

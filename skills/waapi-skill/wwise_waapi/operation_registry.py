@@ -9595,9 +9595,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         if arguments.get("history_binding") is not None:
             from .edit_history_business import observe_history_state, history_summary
             try:
-                observed = observe_history_state(arguments["history_binding"], after_action=False, read=read)
-                if not observed["matches"]:
-                    raise ValueError("Current scoped state differs from the owned history expectation")
+                if arguments["history_binding"]["source_receipt"] is not None:
+                    observed = observe_history_state(arguments["history_binding"], after_action=False, read=read)
+                    if not observed["matches"]:
+                        raise ValueError("Current scoped state differs from the owned history expectation")
             except ValueError as exc:
                 raise OperationContractError("HISTORY_EXPECTATION_CHANGED", str(exc)) from exc
             metadata["history_binding"] = dict(arguments["history_binding"])
@@ -9606,7 +9607,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 metadata={**dict(preview.envelope.metadata), "history_expectation": metadata["history_expectation"]}),
                 source_note_family="latest-project-history", version=request.version,
                 requires_destructive_gate=True, raw_dispatch_allowed=False)
-            verification = {"kind": "history-scoped-effect", "uri": api, "version": request.version,
+            verification = {"kind": "history-scoped-effect" if arguments["history_binding"]["source_receipt"] is not None else "history-result-schema-only", "uri": api, "version": request.version,
                 "history_binding": dict(arguments["history_binding"])}
         if arguments.get("provider_profile_binding") is not None:
             from .source_control_profiles import check_profile
@@ -14668,12 +14669,14 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             }
         )
         if arguments.get("history_binding") is not None:
-            from .edit_history_business import observe_history_state
+            from .edit_history_business import observe_history_state, validate_history_binding
             try:
-                history_observation = observe_history_state(arguments["history_binding"], after_action=False, read=read_call)
+                history_binding = validate_history_binding(api, version, arguments["history_binding"])
+                history_observation = (observe_history_state(history_binding, after_action=False, read=read_call)
+                    if history_binding["source_receipt"] is not None else {"matches": True, "readbacks": [], "effect_expectation": "none"})
             except ValueError as exc:
                 history_observation = {"matches": False, "error": str(exc), "readbacks": getattr(exc, "readbacks", [])}
-            unchanged = (arguments["history_binding"] == prepared.get("pre_state", {}).get("history_binding")
+            unchanged = (_native_snapshot_equal(arguments["history_binding"], prepared.get("pre_state", {}).get("history_binding"))
                          and history_observation["matches"])
             passed = passed and unchanged
             readbacks.extend(history_observation["readbacks"])
@@ -19526,6 +19529,11 @@ def verify_prepared_operation(
         if isinstance(old_path, str) and old_path:
             old_rows = read_object(path=old_path, fields=("id", "path"))
             check("old path no longer resolves to GUID", not any(_same_identity(row.get("id"), object_id) for row in old_rows), old_rows)
+    elif kind == "history-result-schema-only":
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        success_status = "result_schema_checked"
+        verification_strength = "result_schema_only"
+        business_state_verified = False
     elif kind == "history-scoped-effect":
         check_result_schema(str(plan["uri"]), str(plan["version"]))
         from .edit_history_business import observe_history_state
@@ -21285,8 +21293,10 @@ def verify_prepared_operation(
         business_state_verified=business_state_verified,
     )
 
-    if kind == "history-scoped-effect":
-        message = ("The owned receipt's scoped expected state matches. Native history-entry identity and effects outside this scope remain unobserved."
+    if kind in {"history-scoped-effect", "history-result-schema-only"}:
+        message = ("Only the native result schema was checked. No effect expectation was selected; native history-entry identity, effects and preservation remain unobserved."
+                   if kind == "history-result-schema-only" and outcome.ok else
+                   "The owned receipt's scoped expected state matches. Native history-entry identity and effects outside this scope remain unobserved."
                    if outcome.ok else "The history result or scoped expected state could not be verified. Do not replay or compensate automatically.")
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)

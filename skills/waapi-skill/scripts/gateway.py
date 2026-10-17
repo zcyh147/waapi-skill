@@ -13065,13 +13065,13 @@ def dispatch_business_core_plan(
     from wwise_waapi.edit_history_contracts import HISTORY_VERSIONS
     if binding.record.operation in HISTORY_VERSIONS:
         from wwise_waapi.edit_history_business import capture_history_binding
-        if set(plan) != {"history_scope", "expectation_receipt"} or plan["history_scope"] != "latest_project_history":
-            raise GatewayInputError("History requires explicit latest_project_history scope and one owned expectation receipt")
+        if set(plan) not in ({"history_scope"}, {"history_scope", "expectation_receipt"}) or plan["history_scope"] != "latest_project_history":
+            raise GatewayInputError("History requires explicit latest_project_history scope and an optional owned expectation receipt")
         current_guard = build_project_guard(endpoint=common["endpoint"], version=detected_version,
             live_info=live_info, project=binding.project)
         try:
             history = capture_history_binding(binding.record.operation, TransactionStore(binding.state_dir),
-                plan.pop("expectation_receipt"), current_guard=current_guard)
+                plan.pop("expectation_receipt", None), current_guard=current_guard)
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
         plan["history_binding"] = history
