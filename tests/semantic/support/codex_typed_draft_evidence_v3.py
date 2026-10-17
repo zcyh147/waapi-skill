@@ -889,6 +889,11 @@ def _sealed_draft_transaction_binding(
         _fail("Composer transaction commands do not share the sealed transaction ID")
     for parent in transaction_payloads:
         if "agent_result" not in parent:
+            # Gateway emits the exact request on every successful terminal
+            # verify, including result-schema-only verification. Execute,
+            # confirmation and summary-only review have distinct compact shapes.
+            if parent.get("command") == "verify" and parent.get("ok") is True:
+                _fail("Composer successful terminal verify is missing its mandatory agent_result")
             continue
         agent_result = _mapping(
             parent["agent_result"],

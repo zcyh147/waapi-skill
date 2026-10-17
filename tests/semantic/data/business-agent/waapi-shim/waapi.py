@@ -158,6 +158,8 @@ class WaapiClient:
                 },
             }
         if uri == "ak.wwise.core.object.getTypes":
+            if "native_type_rows" in self.fixture:
+                return {"return": self.fixture["native_type_rows"]}
             names = sorted(
                 {str(row["type"]) for row in self.fixture["objects"]}
                 | {str(name) for name in self.fixture.get("types", [])}

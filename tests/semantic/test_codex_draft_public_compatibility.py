@@ -277,6 +277,8 @@ def test_near_capacity_public_layout_survives_authenticated_broker_and_archive(t
     tx = final["transaction_id"]
     artifact = TransactionStore(state).load_preview(tx).artifact
     assert final["agent_result"]["request"] == artifact["request"]
+    assert all("agent_result" not in payloads[f"tx01.{name}"]
+               for name in ("show", "confirm", "execute"))
     native = artifact["prepared_operation"]["dispatch"]["args"]["layout"]
     assert 114000 < len(json.dumps(native, ensure_ascii=False, separators=(",", ":")).encode()) <= 114688
     assert [child["Width"] for child in native["Layout"]["StackPanel"]["@Children"]] == [text] * 63
@@ -303,7 +305,7 @@ def test_near_capacity_public_layout_survives_authenticated_broker_and_archive(t
     damaged_facts[-1]["aggregated_output"] = stdout[:-2]
     with pytest.raises(campaign.CampaignEvidenceError):
         replay_archive(archive_records, damaged_facts)
-    for damage in ("wrong-policy", "stale-revision", "other-flow", "forged-compact", "missing-owed-context", "final-request", "journal-summary", "payload-digest"):
+    for damage in ("wrong-policy", "stale-revision", "other-flow", "forged-compact", "missing-owed-context", "final-request", "missing-final-result", "journal-summary", "payload-digest"):
         corrupt_records, corrupt_facts = deepcopy(archive_records), deepcopy(command_facts)
         index = next(i for i, row in enumerate(corrupt_records) if row["step_name"] == "tx01.declare")
         if damage == "missing-owed-context":
@@ -314,6 +316,9 @@ def test_near_capacity_public_layout_survives_authenticated_broker_and_archive(t
         elif damage == "final-request":
             index = len(corrupt_records) - 1
             corrupt_records[index]["payload"]["agent_result"]["request"]["arguments"]["args"]["layout"]["Layout"]["StackPanel"]["@Children"][0]["Width"] = "changed"
+        elif damage == "missing-final-result":
+            index = len(corrupt_records) - 1
+            corrupt_records[index]["payload"].pop("agent_result")
         elif damage == "journal-summary":
             index = len(corrupt_records) - 1
             corrupt_records[index]["payload"]["verification"]["canonical_sha256"] = "0" * 64
@@ -440,3 +445,67 @@ def test_catalog_true_reads_remain_available_under_every_modification_policy(tmp
     fixture_root.mkdir()
     broker, steps, _records, _state = _read_only_draft_evidence_fixture(fixture_root)
     assert broker._operation_draft_step_is_read_only(steps[-1]) is True
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX copied-command transport proof")
+def test_public_metadata_agent_result_commands_reach_authenticated_broker_unchanged(tmp_path, monkeypatch):
+    """Opaque metadata commands retain the accepted canonical candidate runner."""
+    root = Path(__file__).resolve().parents[2]
+    project = tmp_path / "Sandbox.wproj"
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    fixture = tmp_path / "fixture.json"
+    native = {"classId": 1, "name": "Sound", "type": "Sound", "details": "界\"\\" * 6000,
+              "native": {"contract": {"type": ["object", "array"]}}}
+    fixture.write_text(json.dumps({"version": "2025.1", "platform": "macosx",
+        "process_path": str(tmp_path / "WwiseConsole"), "project_path": str(project),
+        "objects": [], "fields": [], "native_type_rows": [native]}, ensure_ascii=False), encoding="utf-8")
+    selection = ResponseBinding("types", "/agent_result/types/0/selection")
+    steps = (
+        ExpectedGatewayStep("types", "metadata", ("types",)),
+        ExpectedGatewayStep("fields", "metadata", ("list", "--type-selection", selection)),
+        ExpectedGatewayStep("query", "query-object", ("--type-selection", selection, "--max-results", "20")),
+        ExpectedGatewayStep("detail", "metadata", ("types", "--selection", selection)),
+        ExpectedGatewayStep("detail-next", "metadata", ("types", "--selection", selection,
+            "--detail-page", ResponseBinding("detail", "/agent_result/next_detail_page"))),
+    )
+    workspace = tmp_path / "agent-workspace"
+    installed = prepare_workspace_skill_install(workspace, root / "skills/waapi-skill")
+    monkeypatch.chdir(workspace)
+    payloads = {}
+    with CodexGatewayBroker(skill_source=root / "skills/waapi-skill", expected_steps=steps,
+        invocation_skill_source=installed, expected_wwise_version="2025.1",
+        runner_environment={**os.environ, "PYTHONPATH": os.pathsep.join((str(WAAPI_SHIM_ROOT), str(root), str(root / "skills/waapi-skill"))),
+            FIXTURE_ENV: str(fixture), "WWISE_WAAPI_HOST": "127.0.0.1", "WWISE_WAAPI_PORT": "31337"},
+        working_root=tmp_path / "broker", transport="tcp") as broker:
+        first = run_model_command(broker, ["metadata", "types"])
+        (tmp_path / "metadata-types.stdout.txt").write_text(first.stdout, encoding="utf-8")
+        (tmp_path / "metadata-types.stderr.txt").write_text(first.stderr, encoding="utf-8")
+        (tmp_path / "metadata-authenticated-evidence.json").write_text(
+            json.dumps(broker.evidence().as_dict(include_output=True), ensure_ascii=False), encoding="utf-8")
+        assert first.returncode == 0, (first.stdout, first.stderr)
+        payloads["types"] = json.loads(first.stdout[first.stdout.index("{"):])
+        candidate = payloads["types"]["agent_result"]["types"][0]
+        assert candidate["details_complete"] is False
+        for name, field in (("fields", "fields_command"), ("query", "query_command"),
+                ("detail", "detail_command"), ("detail-next", "next_command")):
+            owner = payloads["detail"]["agent_result"] if name == "detail-next" else candidate
+            command = owner[field]
+            selected = command[command["copy_instruction"]["source_field"]]
+            argv = shlex.split(selected)
+            assert argv == command["full_argv"]
+            # No model-visible rewrite inside agent_result: the original
+            # candidate runner remains an explicitly accepted Broker path.
+            assert Path(argv[1]) == broker.runner_path
+            result = run_model_command(broker, argv[3:], runner_path=Path(argv[1]))
+            assert list(result.args) == argv
+            (tmp_path / f"metadata-{name}.stdout.txt").write_text(result.stdout, encoding="utf-8")
+            assert result.returncode == 0, (name, result.stdout, result.stderr)
+            payloads[name] = json.loads(result.stdout[result.stdout.index("{"):])
+            assert list(payloads[name])[-1] == "agent_result"
+        evidence = broker.evidence()
+    assert evidence.passed, evidence
+    assert all(row.authenticated and row.accepted and row.succeeded for row in evidence.records)
+    assert payloads["query"]["agent_result"] == []
+    assert payloads["detail"]["agent_result"]["next_detail_page"] is not None
+    (tmp_path / "metadata-authenticated-evidence.json").write_text(
+        json.dumps(evidence.as_dict(include_output=True), ensure_ascii=False), encoding="utf-8")
