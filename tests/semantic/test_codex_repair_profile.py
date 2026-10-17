@@ -64,8 +64,17 @@ def test_documented_remaining_suffix_has_three_tasks_two_transactions_and_no_f1(
         "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}
 
 
-@pytest.mark.parametrize("ids", [("REPAIR25-F2",), ("REPAIR25-F3", "REPAIR25-F4"),
+@pytest.mark.parametrize("ids", [("REPAIR25-F2",), ("REPAIR25-F1", "REPAIR25-F4"),
+    ("REPAIR25-F4", "REPAIR25-F3"), ("REPAIR25-F3", "REPAIR25-F3"),
     ("REPAIR25-F2", "REPAIR25-F4", "REPAIR25-F3"), ("REPAIR25-F2", "REPAIR25-F2", "REPAIR25-F4")])
 def test_remaining_suffix_does_not_enable_arbitrary_subsets(ids):
     with pytest.raises(ValueError):
         load_repair_profile(PROFILE, unit_ids=ids)
+
+
+def test_unattempted_final_pair_has_two_tasks_two_transactions_and_1200_seconds():
+    profile = load_repair_profile(PROFILE, unit_ids=("REPAIR25-F3", "REPAIR25-F4"))
+    assert [unit.case_id for unit in profile.units] == ["F3", "F4"]
+    assert profile.budget == {"fresh_tasks": 2, "user_turns": 2, "model_calls": 2,
+        "transactions": 2, "hard_seconds_per_task": 600, "hard_seconds_total": 1200,
+        "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}

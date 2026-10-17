@@ -82,11 +82,11 @@ def test_campaign_child_rejects_partial_repair_selection(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("archive_valid", [True, False])
-def test_remaining_campaign_argv_reaches_exact_three_executors_and_archive_gates(tmp_path, monkeypatch, archive_valid):
+@pytest.mark.parametrize("ids", [["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"], ["REPAIR25-F3", "REPAIR25-F4"]])
+def test_remaining_campaign_argv_reaches_exact_selected_executors_and_archive_gates(tmp_path, monkeypatch, archive_valid, ids):
     import json
     from dataclasses import replace
     from tests.semantic.support import codex_expansion_runtime as runtime, codex_expansion_archive as archive
-    ids = ["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"]
     selected = replace(options(tmp_path, monkeypatch, "campaign", *[part for value in ids for part in ("--case-id", value)]),
                        campaign_inputs_sha256="a" * 64)
     units = campaign.load_heavy_v3_campaign_units(selected)
@@ -114,10 +114,10 @@ def test_remaining_campaign_argv_reaches_exact_three_executors_and_archive_gates
     assert calls == (ids if archive_valid else ids[:1])
     assert replays == calls
     summary = json.loads((root / "summary.json").read_text())
-    assert summary["selected_unit_count"] == 3
+    assert summary["selected_unit_count"] == len(ids)
     assert summary["expansion_accounting"]["agent_units"]["selected"] == ids
     assert sum(unit.transaction_count for unit in units) == 2
-    assert len(units) * selected.timeout_seconds == 1800
+    assert len(units) * selected.timeout_seconds == 600 * len(ids)
     assert summary["pending_unit_ids"] == ([] if archive_valid else ids[1:])
     assert summary["all_selected_passed"] is archive_valid
     assert "REPAIR25-F1" not in summary["attempted_unit_ids"]
