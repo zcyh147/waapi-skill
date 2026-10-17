@@ -108,7 +108,7 @@ def requirements_proposal(plan):
 
 
 PROGRAM_REVIEW_PATH = 'tests/fixtures/metadata-conditions/self-scalar-program-review.json.gz'
-PROGRAM_REVIEW_SHA256 = '093e81caef8c779d675a633e581108c90c26ba3e0906b774a9f6d78420ef244c'
+PROGRAM_REVIEW_SHA256 = 'c5635681ac5b911c20ee1f2f18c1d5d6667dc6e0661fa1ea37d7b003c1ab2ac5'
 
 
 def program_review_document(plan):

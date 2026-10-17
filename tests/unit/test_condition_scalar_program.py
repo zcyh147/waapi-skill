@@ -147,6 +147,40 @@ def test_each_enum_choice_runs_a_real_public_workflow_with_that_controller_value
                for value in observed["workflows"].values())
 
 
+def test_independent_group_failures_are_aggregated_with_partial_original_observations(tmp_path, monkeypatch):
+    from tests.unit import test_scalar_condition_product_gateway as workflows
+    calls, observed = [], {}
+    def run(path, group, *, before_values=None):
+        calls.append(group['id'])
+        if group['id'] == 'first' and len(calls) == 2:
+            raise AssertionError('λ' * 10000)
+        return {'original': group['id'], 'before': before_values}
+    monkeypatch.setattr(workflows, 'run_scalar_public_workflow', run)
+    groups = {identity: {'id': identity, 'workflows': [{'id': str(i), 'before': {'Gate': i}} for i in range(2)],
+        'negative_controls': []} for identity in ('first', 'second')}
+    failures = workflows.run_original_scalar_groups(tmp_path, groups, list(groups), observed)
+    assert calls == ['first', 'first', 'second', 'second']
+    assert set(failures) == {'first'}
+    assert failures['first']['error_type'] == 'AssertionError'
+    assert len(failures['first']['message'].encode('utf-8')) <= 4096
+    assert set(observed['first']['workflows']) == {'0'}
+    assert set(observed['second']['workflows']) == {'0', '1'}
+    assert observed['first']['failure'] == failures['first']
+
+
+def test_failed_group_marker_cannot_publish_even_with_incorrect_pass_reports(tmp_path, request, source_inputs):
+    plan, inventory, _ = deepcopy(source_inputs)
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [request.node.nodeid], plan, inventory)
+    group = plan['groups'][0]
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    observed['failure'] = {'error_type': 'AssertionError', 'message': 'original group failed'}
+    with pytest.raises(ValueError, match='failed original group'):
+        producer.finish_program_node(capture, request.node.nodeid,
+            {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}, {group['id']: observed})
+    assert not (capture['root'] / 'published').exists()
+    assert not (capture['root'] / 'batch-final.json').exists()
+
+
 def test_missing_enum_behavior_cannot_be_replaced_by_its_disclosed_metadata(tmp_path, request, source_inputs):
     plan, inventory, _ = deepcopy(source_inputs)
     capture = producer.prepare_program_batch(tmp_path / "capture", [request.node.nodeid], plan, inventory, scope_kind="controlled")

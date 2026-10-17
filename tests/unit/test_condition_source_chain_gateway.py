@@ -45,3 +45,24 @@ def test_full_controller_budget_reaches_closed_check_preview_and_verify(tmp_path
     assert verified['verified'] is True
     assert task.objects[FIRST] == {**before, 'Value': 37.0}
     assert [args for uri, args, _ in task.calls if uri.endswith('setProperty')] == [{'object': FIRST, 'property': 'Value', 'value': 37.0}]
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_source_string_field_uses_the_literal_business_value_contract(tmp_path, source_plan, version):
+    group = next(g for g in source_plan['groups'] if g['version'] == version and g['field'] == 'ExitSourceCustomCueMatchName')
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    assert {flow['observations']['before']['ExitSourceAt'] for flow in observed['workflows'].values()} == {4, 5}
+    for actual in observed['workflows'].values():
+        assert actual['native_call']['args']['value'] == group['model']['requested']
+        assert type(actual['native_call']['args']['value']) is str
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+def test_real_field_witness_uses_the_public_number_representation(tmp_path, source_plan, version):
+    group = next(g for g in source_plan['groups'] if g['version'] == version and g['field'] == 'PlayMechanismTransitionTime')
+    assert group['model']['metadata'][group['field']]['type'] == 'Real64'
+    assert type(group['model']['requested']) is float
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    for actual in observed['workflows'].values():
+        assert type(actual['native_call']['args']['value']) is float
+        assert actual['native_call']['args']['value'] == group['model']['requested']

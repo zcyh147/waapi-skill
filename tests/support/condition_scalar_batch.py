@@ -299,6 +299,9 @@ def scalar_model(case: dict) -> dict:
             requested = minimum if before != minimum else maximum
         else:
             requested = 1 if before != 1 else 0
+    if field_type in {"Real32", "Real64"}:
+        # Public number inputs are parsed as floats, independently of source bound types.
+        requested = float(requested)
     return {"field": field, "controller": controller,
             "metadata": metadata,
             "before": {field: before, **controller_before}, "requested": requested,

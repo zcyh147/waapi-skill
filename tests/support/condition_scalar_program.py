@@ -114,6 +114,8 @@ def _validate_observation(group, observed, before_values):
 
 
 def _validate_group(group, bundle):
+    if 'failure' in bundle:
+        raise ValueError('failed original group cannot publish behavioral evidence')
     flows = {flow["id"]: flow for flow in group["workflows"]}
     if set(bundle.get("workflows", {})) != set(flows):
         raise ValueError("missing or extra original behavioral workflows; metadata disclosure is insufficient")
