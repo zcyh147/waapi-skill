@@ -177,3 +177,59 @@ def test_copy_snapshot_preserves_guid_text_properties_without_reference_rebindin
     assert all(row["passed"] for row in verified["verification"]["assertions"])
     assert task.objects[COPIED_ROOT]["@UserMarker"] == FIRST
     assert task.objects[COPIED_CHILD]["@Target"] == {"id": COPIED_ROOT}
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("operation", ("object.copy", "object.move"))
+def test_replace_snapshot_binds_omitted_metadata_identity_to_exact_scoped_names(
+    tmp_path: Path, version: str, operation: str,
+) -> None:
+    task = ReplaceTask(tmp_path, version, operation)
+    task.metadata["Volume"] = {"type": "Real64"}
+    task.metadata["Target"] = {"restriction": {"type": "reference"}}
+    task.declare()
+    tx, shown = task.preview()
+    snapshot = shown["artifact"]["prepared_operation"]["pre_state"]["copy_move_collision_guard"]["source_snapshot"][0]
+    evidence = snapshot["field_metadata"]["Target"]
+    assert evidence["raw"] == {"restriction": {"type": "reference"}}
+    assert evidence["name"] is None and evidence["type"] is None
+    assert evidence["field_binding"] == {"token": "Target", "source": "exact_scoped_getPropertyAndReferenceNames"}
+    assert evidence["scope"] == {"object": FIRST}
+    assert evidence["available_names"] == ["Target", "Volume"]
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verification"]["status"] == "indeterminate", verified
+    assert all(row["passed"] for row in verified["verification"]["assertions"])
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("metadata", (
+    {"name": "AnotherField", "type": "Real64"},
+    {"type": "UnrecognizedNativeScalar"},
+    {},
+))
+def test_replace_snapshot_rejects_wrong_identity_or_uncertified_scalar_type(
+    tmp_path: Path, version: str, metadata: dict[str, Any],
+) -> None:
+    task = ReplaceTask(tmp_path, version, "object.copy")
+    task.metadata["Volume"] = metadata
+    task.declare()
+    code, rejected = task.step("draft-check")
+    assert code == 2, rejected
+    assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_replace_guard_retains_raw_metadata_omission_provenance(
+    tmp_path: Path, version: str,
+) -> None:
+    task = ReplaceTask(tmp_path, version, "object.copy")
+    task.metadata["Target"] = {"restriction": {"type": "reference"}}
+    task.declare()
+    tx, shown = task.preview()
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    # Same effective field type/value, but a changed native observation must re-preview.
+    task.metadata["Target"] = {"name": "Target", "type": "Reference", "restriction": {"type": "reference"}}
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(uri.endswith(("object.copy", "object.move")) for uri, _, _ in task.calls)

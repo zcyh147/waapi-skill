@@ -4,7 +4,8 @@ from __future__ import annotations
 import re
 from typing import Any, Callable, Mapping
 
-from .builders.metadata import parse_get_property_info_result
+from .builders.metadata import bind_get_property_info_result
+from .metadata_discovery import metadata_typed_value_type
 
 
 GET = "ak.wwise.core.object.get"
@@ -75,15 +76,23 @@ def capture_lifecycle_graph(root_id: str, *, read: Read) -> list[dict[str, Any]]
         values: dict[str, Any] = {}
         reference_fields = []
         field_types = {}
+        field_metadata = {}
         for name in sorted(names):
             try:
-                info = parse_get_property_info_result(read(INFO, {"object": row["id"], "property": name}, {}))
+                info = bind_get_property_info_result(
+                    read(INFO, {"object": row["id"], "property": name}, {}),
+                    field_token=name, available_names=names,
+                )
             except ValueError as exc:
                 raise LifecycleGraphError("Lifecycle field metadata is malformed") from exc
-            if info.name != name or not isinstance(info.type, str):
+            if info.name != name:
                 raise LifecycleGraphError("Lifecycle field metadata does not match the discovered field")
-            field_types[name] = info.type
-            if info.type.casefold() in {"reference", "objectreference"} or info.restriction.get("type") == "reference":
+            reference = (info.type or "").casefold() in {"reference", "objectreference"} or info.restriction.get("type") == "reference"
+            if not reference and metadata_typed_value_type(info.type) is None:
+                raise LifecycleGraphError("Lifecycle field metadata does not certify a supported scalar value type")
+            field_types[name] = "reference" if reference else info.type
+            field_metadata[name] = {**info.as_dict(include_raw=True), "scope": {"object": row["id"]}, "available_names": sorted(names)}
+            if reference:
                 reference_fields.append(name)
         for offset in range(0, len(names), 32):
             chunk = sorted(names)[offset:offset + 32]
@@ -97,6 +106,7 @@ def capture_lifecycle_graph(root_id: str, *, read: Read) -> list[dict[str, Any]]
         row["field_values"] = values
         row["reference_fields"] = reference_fields
         row["field_types"] = field_types
+        row["field_metadata"] = field_metadata
     return sorted(normalized, key=lambda row: (row["path"].count("\\"), row["path"]))
 
 
