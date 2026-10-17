@@ -217,6 +217,7 @@ def source_control_business_contract_data(
                     "language": "--sound-language-media <Sound Handle> <language>",
                     "source": "--sound-source-media <Sound Handle> <AudioFileSource Handle> <language>"},
                 "language": "explicit_exact_Language_name_or_GUID; checked_against_selected_source",
+                "language_reference": "missing_reference_ID_uses_unique_exact_Language_name_discovery_then_exact_GUID_readback; raw_reference_and_resolved_identity_rechecked",
                 "active": "fresh_activeSource_in_explicit_language; absent_GUID_requires_unique_matching_direct_child; Sound_and_source_originalFilePath_must_match",
                 "language_selection": "exactly_one_direct_AudioFileSource_in_the_explicit_language; otherwise_bind_an_exact_source",
                 "source_selection": "exact_bound_source_must_be_a_direct_child_of_the_Sound_in_the_explicit_language; need_not_be_active",

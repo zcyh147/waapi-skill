@@ -1564,6 +1564,7 @@ def _sound_source_file_case(tmp_path, *, version="2025.1", mode="active", langua
             self.rows[french_id] = {"id": french_id, "name": "French", "type": "Language", "path": "\\Languages\\French"}
             self.rows[sfx_id] = {"id": sfx_id, "name": "SFX", "type": "Language", "path": "\\Languages\\SFX"}
             self.children = [self.source, self.other]
+            self.language_matches = [self.rows[french_id]]
             self.calls = []
         def call(self, uri, args=None, options=None):
             self.calls.append((uri, args, options))
@@ -1571,6 +1572,9 @@ def _sound_source_file_case(tmp_path, *, version="2025.1", mode="active", langua
                 return _info(version)
             if uri == "ak.wwise.core.object.get":
                 if "waql" in args:
+                    if args["waql"].startswith("from type Language"):
+                        assert args["waql"] == 'from type Language where name = "French" take 2'
+                        return {"return": [dict(row) for row in self.language_matches]}
                     assert args["waql"] == f'from object "{sound_id}" select children take 65'
                     return {"return": [dict(row) for row in self.children]}
                 return {"return": [dict(self.rows[selected]) for selected in args["from"]["id"] if selected in self.rows]}
@@ -2007,4 +2011,63 @@ def test_sound_active_name_reference_never_hides_invalid_or_ambiguous_identity(t
             client.other["name"] = client.source["name"]
             client.other["audioSource:language"] = dict(client.source["audioSource:language"])
     client, _state, _error, _run = _sound_source_file_case(tmp_path, prepare=prepare, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("mode", ["active", "language", "source"])
+def test_sound_source_name_only_language_is_certified_against_requested_guid(tmp_path, mode, version):
+    def prepare(client):
+        client.source["audioSource:language"] = {"name": "French"}
+    client, state, preview, run = _sound_source_file_case(tmp_path, mode=mode, version=version,
+        language="{44444444-4444-4444-4444-444444444444}", prepare=prepare)
+    row = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["source_control_binding"]["objects"][0]
+    assert row["source"]["language"] == {"name": "French"}
+    assert row["source"]["language_identity"] == {"id": "{44444444-4444-4444-4444-444444444444}",
+        "name": "French", "type": "Language", "path": "\\Languages\\French"}
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.checkOut")] == [{"files": [str(client.media)]}]
+
+
+
+@pytest.mark.parametrize("invalid", ["missing", "ambiguous", "wrong-type", "wrong-name", "wrong-guid", "exact-read-drift", "malformed-present-id"])
+def test_sound_source_name_only_language_rejects_unproved_identity_before_dispatch(tmp_path, invalid):
+    def prepare(client):
+        client.source["audioSource:language"] = {"name": "French"}
+        candidate = dict(client.language_matches[0])
+        client.language_matches = [candidate]
+        if invalid == "missing":
+            client.language_matches = []
+        elif invalid == "ambiguous":
+            client.language_matches.append({**candidate, "id": "{55555555-5555-5555-5555-555555555555}"})
+        elif invalid == "wrong-type":
+            candidate["type"] = "Sound"
+        elif invalid == "wrong-name":
+            candidate["name"] = "SFX"
+        elif invalid == "wrong-guid":
+            candidate["id"] = "{55555555-5555-5555-5555-555555555555}"
+            client.rows[candidate["id"]] = dict(candidate)
+        elif invalid == "exact-read-drift":
+            client.rows[candidate["id"]]["path"] = "\\Languages\\Moved"
+        else:
+            client.source["audioSource:language"]["id"] = "broken"
+    client, _state, _error, _run = _sound_source_file_case(tmp_path,
+        language="{44444444-4444-4444-4444-444444444444}", prepare=prepare, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+@pytest.mark.parametrize("change", ["identity", "ambiguity"])
+def test_sound_source_resolved_language_is_rechecked_before_provider_dispatch(tmp_path, change):
+    def prepare(client):
+        client.source["audioSource:language"] = {"name": "French"}
+    client, _state, preview, run = _sound_source_file_case(tmp_path,
+        language="{44444444-4444-4444-4444-444444444444}", prepare=prepare)
+    if change == "identity":
+        client.rows["{44444444-4444-4444-4444-444444444444}"]["path"] = "\\Languages\\Moved"
+    else:
+        client.language_matches.append({**client.language_matches[0], "id": "{55555555-5555-5555-5555-555555555555}"})
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0, result
     assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)

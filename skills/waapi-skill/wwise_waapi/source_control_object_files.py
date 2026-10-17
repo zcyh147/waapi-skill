@@ -10,6 +10,7 @@ from .host_paths import localize_waapi_host_path
 
 from .business_declarations import normalize_live_object_identity
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+from .waql import quote_waql_literal
 
 MAX_SOURCE_CONTROL_OBJECT_SCOPES = min(64, MULTI_IDENTITY_READ_MAX_IDS)
 GET = "ak.wwise.core.object.get"
@@ -112,9 +113,18 @@ def _validate_sound_row(row: Mapping[str, Any]) -> None:
     if selection["mode"] not in {"active", "language", "source"} or not isinstance(language, str) or not language or len(language.encode("utf-8")) > 4096:
         raise ValueError("Select an explicit language name or GUID and disclosed Sound source mode")
     source = row["source"]
-    if not isinstance(source, Mapping) or set(source) != {*_IDENTITY, "parent", "language", "file_name"}:
+    if not isinstance(source, Mapping) or set(source) != {*_IDENTITY, "parent", "language", "language_identity", "file_name"}:
         raise ValueError("Sound media requires exact source identity, parent, language and filename proof")
     source_identity = normalize_live_object_identity(source)
+    resolved_language = source["language_identity"]
+    if resolved_language is not None:
+        if not isinstance(resolved_language, Mapping) or set(resolved_language) != set(_IDENTITY):
+            raise ValueError("Resolved source language requires one exact Language identity")
+        resolved_language = _identity(resolved_language)
+        if (resolved_language["type"] != "Language" or not isinstance(source["language"], Mapping)
+            or any(key in source["language"] and source["language"][key] != resolved_language[key]
+                   for key in ("id", "name"))):
+            raise ValueError("Resolved Language identity does not match the observed source reference")
     if (isinstance(source["parent"], Mapping) and "name" in source["parent"] and source["parent"]["name"] != row["name"]
         or selection["mode"] == "active" and isinstance(row["active_source"], Mapping)
         and "name" in row["active_source"] and row["active_source"]["name"] != source_identity.name):
@@ -122,27 +132,41 @@ def _validate_sound_row(row: Mapping[str, Any]) -> None:
     if selection["mode"] == "source" and _identity(selection["source"]) != _identity(source):
         raise ValueError("The explicitly bound source identity changed")
     if (source_identity.object_type != "AudioFileSource" or _reference(source["parent"]) != str(row["id"]).upper()
-        or not _language_matches(language, source["language"]) or source["file_name"] != _file_name(row["file_path"])
+        or not _language_matches(language, resolved_language or source["language"]) or source["file_name"] != _file_name(row["file_path"])
         or (selection["mode"] == "active" and (
             not _active_matches(row["active_source"], source)
             or localize_waapi_host_path(row["active_file_path"]) != localize_waapi_host_path(row["file_path"])))):
         raise ValueError("Sound/source parent, language, active identity or original filename relationship is unproved")
 
 
-def _observed_language(value: Any, *, read: Read) -> dict[str, Any]:
+def _observed_language(value: Any, *, read: Read) -> tuple[dict[str, Any], dict[str, Any] | None]:
     if not isinstance(value, Mapping) or not value:
         raise ValueError("AudioFileSource readback omitted its language reference")
     language = dict(value)
     if "id" in language:
         language["id"] = _reference(language)
-    if "name" not in language and "id" in language:
-        identity = _exact_rows([language["id"]], fields=list(_IDENTITY), read=read)[language["id"]]
-        if identity.get("type") != "Language":
+    if "name" in language and (not isinstance(language["name"], str) or not language["name"]):
+        raise ValueError("AudioFileSource language reference has an invalid name")
+    resolved = None
+    if "id" not in language:
+        if "name" not in language:
+            raise ValueError("AudioFileSource language reference is incomplete")
+        query = f'from type Language where name = {quote_waql_literal(language["name"])} take 2'
+        result = read(GET, {"waql": query}, {"return": list(_IDENTITY)})
+        rows = result.get("return") if isinstance(result, Mapping) else None
+        if not isinstance(rows, list) or len(rows) != 1:
+            raise ValueError("Source language name must resolve to exactly one Language")
+        candidate = _identity(rows[0])
+        if candidate["type"] != "Language" or candidate["name"] != language["name"]:
+            raise ValueError("Scoped source language discovery returned an unrelated identity")
+        resolved = _identity(_exact_rows([candidate["id"]], fields=list(_IDENTITY), read=read)[candidate["id"]])
+        if resolved != candidate:
+            raise ValueError("Resolved source Language changed before exact GUID readback")
+    elif "name" not in language:
+        resolved = _identity(_exact_rows([language["id"]], fields=list(_IDENTITY), read=read)[language["id"]])
+        if resolved["type"] != "Language":
             raise ValueError("AudioFileSource language reference does not resolve to Language")
-        language["name"] = identity["name"]
-    if not isinstance(language.get("name"), str) or not language["name"]:
-        raise ValueError("AudioFileSource language reference is incomplete")
-    return language
+    return language, resolved
 
 
 def _language_source(sound_id: str, language: str, *, read: Read, name: str | None = None) -> str:
@@ -158,8 +182,8 @@ def _language_source(sound_id: str, language: str, *, read: Read, name: str | No
             raise ValueError("Sound source discovery returned duplicate or unrelated children")
         seen.add(identity["id"])
         if identity["type"] == "AudioFileSource" and (name is None or identity["name"] == name):
-            actual = _observed_language(row.get("audioSource:language"), read=read)
-            if _language_matches(language, actual):
+            actual, resolved = _observed_language(row.get("audioSource:language"), read=read)
+            if _language_matches(language, resolved or actual):
                 selected.append(identity["id"])
     if len(selected) != 1:
         raise ValueError("Sound requires exactly one AudioFileSource in the explicit language; select a bound source for ambiguous languages")
@@ -201,8 +225,9 @@ def _observe_sound_file(expected: Mapping[str, Any], selection: Mapping[str, Any
     path = source.get("originalFilePath")
     if not isinstance(path, str) or not path:
         raise ValueError("Selected source original file accessor is missing in the explicit language view")
-    source_proof = {**_identity(source), "parent": source.get("parent"),
-                    "language": _observed_language(source.get("audioSource:language"), read=read), "file_name": _file_name(path)}
+    source_language, language_identity = _observed_language(source.get("audioSource:language"), read=read)
+    source_proof = {**_identity(source), "parent": source.get("parent"), "language": source_language,
+                    "language_identity": language_identity, "file_name": _file_name(path)}
     row = {**_identity(sound), "scope": "sound-original-media", "file_path": path,
            "media_selection": dict(selection), "source": source_proof}
     if mode == "active":
