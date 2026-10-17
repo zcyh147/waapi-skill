@@ -17,10 +17,10 @@
   },
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
-    "gateway_parser_sha256": "39a067b3294884d75fec279f574f1e76490b7dca75e32f53b5ccf73fb01c722c",
-    "operation_contract_sha256": "93437acf58161de7ea3d694b77645136c41ea3ce0f818b4bc810ac5703256f75",
-    "public_continuation_sha256": "c040201be27d134b9f8cb7cf5439caa19d12e0443b8508da23e8926e927d5b2f",
-    "typed_request_surface_sha256": "5a60a7057fc4d526efd91b683018021ebe42840b3a37f99fbc7a059e76185259"
+    "gateway_parser_sha256": "ca3ab6496bd05d8edd2106c75ee13fb974bc049ddc6903fe447030aab69af07a",
+    "operation_contract_sha256": "452bff9e95ae97b54e0e05ce07e208f09249d64227778bd6edd90f40890d51a1",
+    "public_continuation_sha256": "7698e9e69066a4020c76b90453ccd83f5a24a7c743855d79fd823fcbd5262901",
+    "typed_request_surface_sha256": "667ce63d93b3a38f1d14d7348ae82fe728e731f24021ec868c687f2a2a5b87c7"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -145,6 +145,26 @@
       "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
     },
     {
+      "id": "authoring-model-partial",
+      "disposition": "migration_required",
+      "owner_issue": 189,
+      "match": {
+        "uris": [
+          "ak.wwise.ui.model.createHandle",
+          "ak.wwise.ui.model.destroyHandle",
+          "ak.wwise.ui.model.getState",
+          "ak.wwise.ui.model.registerWafm",
+          "ak.wwise.ui.model.setState",
+          "ak.wwise.ui.signal.emit",
+          "ak.wwise.ui.window.close",
+          "ak.wwise.ui.window.create",
+          "ak.wwise.ui.window.present"
+        ]
+      },
+      "leaked_mechanics": [],
+      "audit_evidence": "Partial #189 implementation exposes nine closed owned window/model/signal functions on captured 2024.1/2025.1 Authoring. Gateway-owned constructors, generated WAFM files, scoped resource receipts, state readback, atomic lifetime retirement and recoverable known creation identities preserve normal Preview and execute-once boundaries. Native constructor/state/window effects, signal delivery, cleanup, older-version business alternatives and exact branch evidence remain unfinished. These rows receive no historical host/UI family completion seal or inherited execution credit."
+    },
+    {
       "id": "generic-topics",
       "disposition": "already_deep",
       "owner_issue": null,
@@ -242,6 +262,7 @@
     }
   ],
   "ticket_blueprints": {
+    "authoring-model-partial": {"title": "Complete owned Authoring model/window/signal behavior and evidence", "scope": "Retain the exact 2024.1/2025.1 closed routes under #189 while native constructor effects, resource cleanup, delivered signals and exact branch evidence remain unresolved."},
     "authoring-layout-partial": {
       "title": "Complete ordinary Authoring layout business contracts and evidence",
       "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence."
@@ -289,7 +310,7 @@
       "rows_sha256": "7446dd701ea343d3a089f452c82ad1ec40c3ca261764d78adfda4a147e31db18"
     }
   },
-  "ticket_issue_numbers": {"authoring-layout-partial": 188},
+  "ticket_issue_numbers": {"authoring-model-partial": 189, "authoring-layout-partial": 188},
   "field_ownership_rules": {
     "gateway_derivation_names": ["acknowledge", "transform"],
     "fixed_gateway_derivation_names": ["advanced_return", "api", "array_handle", "choice_handle", "map_handle", "member_key", "parent_schema_token", "return", "return_field", "schema_digest", "select", "shape", "typed_advanced", "typed_append", "typed_choose", "typed_choose_dynamic", "typed_map_correct", "typed_map_put", "typed_map_remove", "typed_present", "typed_schema_digest", "typed_set", "typed_structured", "page", "selection"],

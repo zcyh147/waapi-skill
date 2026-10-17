@@ -16,6 +16,7 @@ GATEWAY = "skills/waapi-skill/scripts/gateway.py"
 # These are reviewed family entrypoints, not claims about each enum alternative.
 FAMILY_MODULES = {
     "authoring-layout-partial": "authoring_layout.py",
+    "authoring-model-partial": "authoring_model_business.py",
     "generic-cli-console": "cli_console_business.py",
     "generic-core-media-build": "media_build_business.py",
     "generic-core-project-object": "core_business.py",
@@ -33,6 +34,7 @@ FAMILY_MODULES = {
 
 FAMILY_FINDINGS = {
     "authoring-layout-partial": "Seven closed reads and scoped switch construction are partial #188 implementation; original UI definitions/OneOf interpretation, remaining layout mutations, exact branch bindings and required native effects remain unresolved. No historical host/UI family PASS is inherited.",
+    "authoring-model-partial": "Closed owned window/model/signal construction is partial #189 implementation; exact constructor branches, native state/window effects, delivered signals and lifetime cleanup still require matching native evidence. No historical host/UI family PASS is inherited.",
     "generic-cli-console": "CLI option spelling, repeatable bank/platform/language rows, default omission and hook exclusions need exact declaration-to-native correspondence; process success is not generated-bank verification.",
     "generic-core-media-build": "Import path/source replacement and SoundBank inclusion/build alternatives need independent public value mapping and output verification, including partial results.",
     "generic-core-project-object": "Reference/property, identity, destination and conflict-mode alternatives need exact target-type and dependency mappings; route attribution does not prove each nested value.",

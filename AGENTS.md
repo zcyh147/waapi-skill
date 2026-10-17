@@ -23,7 +23,7 @@ historical campaign requirements.
   WwiseConsole reflection. The separate `wwise-authoring-ui` profile is only
   that canonical surface plus the five fixed `ak.wwise.ui.commands.*` URIs
   and separately pinned observation Topics and approved core/selection/project
-  functions for 2024.1/2025.1;
+  functions and nine owned window/model/signal functions for 2024.1/2025.1;
   it is not a complete Authoring reflection. Profile counts are packaged route
   contracts, not claims that every row dispatches on the named host: all five
   UI-command routes require Authoring, including rows retained in older Console
