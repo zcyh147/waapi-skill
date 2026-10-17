@@ -57,10 +57,10 @@ def test_every_registry_row_has_one_complete_route_contract() -> None:
     assert len(rows) == 814
     assert len({(row.version, row.item_type, row.uri) for row in rows}) == 814
     assert Counter(row.route for row in rows) == {
-        "bounded_call": 111,
+        "bounded_call": 110,
         "bounded_topic_wait": 152,
         "excluded": 6,
-        "fixed_command": 56,
+        "fixed_command": 57,
         "isolated_transaction": 141,
         "managed_transaction": 220,
         "compound_transaction_member": 15,
@@ -271,21 +271,21 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
             "wwise-console": {
                 "function_rows": 662,
                 "unique_function_uris": 167,
-                "generic_reflected_rows": 440,
-                "generic_reflected_unique_uris": 116,
-                "special_rows": 222,
-                "special_unique_uris": 51,
+                "generic_reflected_rows": 439,
+                "generic_reflected_unique_uris": 115,
+                "special_rows": 223,
+                "special_unique_uris": 52,
             },
             "wwise-authoring-ui": {
-                "function_rows": 709,
-                "unique_function_uris": 178,
-                "generic_reflected_rows": 459,
-                "generic_reflected_unique_uris": 117,
-                "special_rows": 250,
-                "special_unique_uris": 61,
+                "function_rows": 712,
+                "unique_function_uris": 180,
+                "generic_reflected_rows": 458,
+                "generic_reflected_unique_uris": 116,
+                "special_rows": 254,
+                "special_unique_uris": 64,
             },
         },
-        "reviewed_special_uri_count": 61,
+        "reviewed_special_uri_count": 64,
         "reviewed_generic_restriction_count": 6,
     }
     assert summary["version_rows"] == 111
@@ -297,11 +297,11 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
     from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
-    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    from wwise_waapi.authoring_layout_business import layout_mutation_uris
     from wwise_waapi.native_surface_policy import _uses_generic_reflected_route_without_uri_specific_restrictions
-    layout_uris = LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS
     catalog = CapabilityCatalog()
     for version in ("2024.1", "2025.1"):
+        layout_uris = LAYOUT_READ_URIS | layout_mutation_uris(version)
         rows = [entry for entry in catalog.entries_for_profile(version, profile="wwise-authoring-ui")
                 if entry.uri in layout_uris]
         assert {entry.uri for entry in rows} == layout_uris
