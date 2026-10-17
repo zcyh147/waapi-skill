@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from wwise_waapi.dispatcher import DEFAULT_WWISE_VERSION
 
@@ -111,6 +111,7 @@ class PropertyInfoMetadataRecord:
     ui: Mapping[str, Any] = field(default_factory=dict)
     audio_engine_id: int | None = None
     raw: Mapping[str, Any] = field(default_factory=dict)
+    field_binding: Mapping[str, Any] = field(default_factory=dict)
 
     def as_dict(self, *, include_raw: bool = False) -> dict[str, Any]:
         payload = {
@@ -124,6 +125,9 @@ class PropertyInfoMetadataRecord:
             "ui": dict(self.ui),
             "audioEngineId": self.audio_engine_id,
         }
+        if self.field_binding:
+            payload["name"] = self.raw.get("name")
+            payload["field_binding"] = dict(self.field_binding)
         if include_raw:
             payload["raw"] = dict(self.raw)
         return payload
@@ -368,6 +372,26 @@ def parse_get_property_info_result(result: Mapping[str, Any], *, require_identit
         audio_engine_id=audio_engine_id,
         raw=dict(result),
     )
+
+
+def bind_get_property_info_result(
+    result: Mapping[str, Any], *, field_token: str, available_names: Sequence[str],
+) -> PropertyInfoMetadataRecord:
+    """Bind an omitted native name to a separately proven exact live token.
+
+    Read observations remain unchanged. Typed mutation still requires a native
+    type, and serialized metadata retains the absent name plus explicit binding
+    provenance rather than presenting the token as a native name observation.
+    """
+    info = parse_get_property_info_result(result, require_identity=False)
+    _require_result_fields(GET_PROPERTY_INFO_URI, result, ("type",))
+    if not isinstance(field_token, str) or not field_token or field_token not in available_names:
+        raise _result_error(GET_PROPERTY_INFO_URI, "Field binding needs an exact live-discovered token.")
+    if info.name is not None:
+        return info
+    return replace(info, name=field_token, field_binding={
+        "token": field_token, "source": "exact_scoped_getPropertyAndReferenceNames",
+    })
 
 
 def parse_is_property_enabled_result(result: Mapping[str, Any]) -> PropertyEnabledMetadataRecord:

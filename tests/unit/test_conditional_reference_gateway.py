@@ -1229,3 +1229,75 @@ def test_atomic_related_condition_large_repair_retains_exact_owner_at_output_bou
     assert issue["details"]["repair_details"] == "exceeds_batch_check_budget_use_separate_exact_field_preview"
     assert len(json.dumps(checked).encode()) < 65536
     assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+
+
+class NameOmittingConditionTask(ScalarPropertyTask):
+    def call(self, uri, args=None, options=None):
+        result = super().call(uri, args, options)
+        if uri.endswith("getPropertyInfo"):
+            result.pop("name", None)
+            if getattr(self, "omit_type", False):
+                result.pop("type", None)
+        if uri.endswith("getPropertyAndReferenceNames") and getattr(self, "remove_field_token", False):
+            result["return"] = [name for name in result["return"] if name != "LfoSmoothing"]
+        return result
+
+
+@pytest.mark.parametrize("version,operation", [(version, operation) for version in VERSIONS
+    for operation in (["object.setProperty"] if version == "2021.1" else ["object.setProperty", "object.set"])])
+@pytest.mark.parametrize("drift", ["none", "token-before", "type-before"])
+def test_exact_discovered_field_token_binds_missing_native_name_without_inventing_metadata(tmp_path, version, operation, drift):
+    task = NameOmittingConditionTask(tmp_path, version, operation=operation)
+    target = task.bind(FIRST)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", target, "--meaning", "LfoSmoothing")
+    assert code == 0, discovered
+    candidate = discovered["meaning_results"][0]["candidates"][0]
+    assert "name" not in candidate["metadata"]
+    assert candidate["metadata"]["type"] == "Real64"
+    assert candidate.get("handle"), discovered
+    field = candidate["handle"]
+    code, declared = (task.step("draft-declare-field-change", "--object-handle", target, "--field-handle", field,
+                               "--business-value", "50") if operation == "object.setProperty" else
+                      task.step("draft-declare-existing", "--declaration-id", "smoothing", "--object-handle", target,
+                                "--field-value", field, "50"))
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    prepared = shown["artifact"]["prepared_operation"]
+    state = prepared["pre_state"]
+    groups = state.get("condition_metadata_guards", []) if operation == "object.set" else [state["condition_metadata"]]
+    bound = next(info for group in groups for info in group["fields"] if info.get("field_binding", {}).get("token") == "LfoSmoothing")
+    assert bound["name"] is None
+    assert bound["field_binding"]["source"] == "exact_scoped_getPropertyAndReferenceNames"
+    metadata_reads = [row for row in prepared["preflight_reads"] if row["uri"].endswith("getPropertyInfo")]
+    assert metadata_reads and all("name" not in row["result"] for row in metadata_reads)
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    task.remove_field_token = drift == "token-before"
+    task.omit_type = drift == "type-before"
+    code, executed = task.run("execute", tx)
+    if drift != "none":
+        assert code == 2, executed
+        assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[FIRST]["LfoSmoothing"] == 50
+    assert task.objects[FIRST]["LfoWaveform"] == 3
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_missing_native_scalar_type_stops_field_acquisition_despite_proven_token(tmp_path, version):
+    task = NameOmittingConditionTask(tmp_path, version)
+    task.omit_type = True
+    target = task.bind(FIRST)
+    code, discovered = task.step("draft-discover-fields", "--object-handle", target, "--meaning", "LfoSmoothing")
+    assert code == 2, discovered
+    assert not any(uri.endswith(("setProperty", "setReference", "object.set")) for uri, _, _ in task.calls)
+    assert task.objects[FIRST]["LfoSmoothing"] == 0.0

@@ -35,6 +35,8 @@ from .builders.metadata import (
     PropertyInfoMetadataRecord,
     parse_get_types_result,
     parse_get_property_info_result,
+    bind_get_property_info_result,
+    parse_property_and_reference_names_result,
 )
 from .builders.object_mutation import ObjectMutationBuilder
 from .builders.properties import PropertyReferenceBuilder
@@ -7156,7 +7158,14 @@ def _read_property_info(
     else:  # pragma: no cover - internal invariant
         raise AssertionError("object_id or class_id is required")
     try:
-        info = parse_get_property_info_result(read(GET_PROPERTY_INFO_URI, args, {}))
+        result = read(GET_PROPERTY_INFO_URI, args, {})
+        if object_id is not None and "name" not in result:
+            names = parse_property_and_reference_names_result(read(
+                GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": object_id}, {},
+            ))
+            info = bind_get_property_info_result(result, field_token=name, available_names=tuple(row.name for row in names))
+        else:
+            info = parse_get_property_info_result(result)
     except SemanticValidationError as exc:
         raise OperationContractError("INVALID_METADATA", str(exc), details=exc.as_dict()) from exc
     if info.name != name:
@@ -7433,7 +7442,7 @@ def _related_condition_assertions(requirements, *, read):
                          if requirement.get("is_reference") else
                          condition_values_equal(_field_value(owner, name), requirement["value"])))
         args = {"object": owner_id, "property": name}
-        metadata = parse_get_property_info_result(read(GET_PROPERTY_INFO_URI, args, {})).as_dict()
+        metadata = _read_property_info(read, object_id=owner_id, name=name).as_dict()
         assertions.append({"name": f"association owner condition {name} unchanged", "passed": exact and _native_snapshot_equal(metadata, requirement["metadata"]),
                            "evidence": {"rows": rows, "metadata": metadata, "expected": requirement}})
     return assertions, readbacks
@@ -9184,12 +9193,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if "platform" in arguments
             else None
         )
-        info_payload = read(
-            GET_PROPERTY_INFO_URI,
-            {"object": source.object, "property": field_value},
-            {},
-        )
-        info = parse_get_property_info_result(info_payload)
+        info = _read_property_info(read, object_id=source.object, name=field_value)
         metadata["field_info"] = info.as_dict()
         if platform is not None and request.operation == "object.setProperty":
             _require_platform_field_enabled(
@@ -13938,9 +13942,10 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         condition_metadata_groups.append(condition_metadata)
     for condition_metadata in condition_metadata_groups:
         for expected in condition_metadata["fields"]:
-            args = {"object": condition_metadata["object_id"], "property": expected["name"]}
-            observed = parse_get_property_info_result(read_call(GET_PROPERTY_INFO_URI, args, {})).as_dict()
-            assertions.append({"name": f"condition metadata {expected['name']} unchanged",
+            name = expected.get("field_binding", {}).get("token", expected["name"])
+            args = {"object": condition_metadata["object_id"], "property": name}
+            observed = _read_property_info(read_call, object_id=condition_metadata["object_id"], name=name).as_dict()
+            assertions.append({"name": f"condition metadata {name} unchanged",
                                "passed": observed == expected,
                                "evidence": {"expected": expected, "actual": observed}})
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
