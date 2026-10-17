@@ -422,6 +422,7 @@ from wwise_waapi.soundengine_business_contracts import (  # noqa: E402  # pyrigh
     soundengine_control_business_read_operations,
     soundengine_control_business_versions,
 )
+from wwise_waapi.documented_list_fields import discovery_contract as documented_list_discovery_contract
 from wwise_waapi.runtime_game_object_handles import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     RuntimeGameObjectContext,
     RuntimeGameObjectHandleError,
@@ -3192,6 +3193,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SEARCH_PHRASE",
     )
     draft_discover_fields.add_argument("--platform")
+    draft_discover_fields.add_argument("--field-source", choices=("live", "documented-lists"), default="live")
 
     draft_discover_types = subparsers.add_parser(
         "draft-discover-types",
@@ -17100,7 +17102,7 @@ def _parse_object_graph_business_fields(
                     dynamic[handle] = json.loads(raw)
                 except ValueError as exc:
                     raise GatewayInputError("Inline curve input requires a closed curve_points document") from exc
-            elif operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.lstrip().startswith("["):
+            elif operation in {"object.create", "object.set"} and bound.field_kind in {"reference", "list"} and raw.lstrip().startswith("["):
                 try:
                     value = json.loads(raw)
                 except ValueError as exc:
@@ -19457,6 +19459,46 @@ def dispatch_business_field_discovery(
         raise GatewayInputError(
             "object.setLinked field discovery requires one explicit platform"
         )
+    if args.field_source == "documented-lists":
+        if binding.record.operation not in {"object.create", "object.set"}:
+            raise GatewayInputError("Documented List selection belongs to the existing object graph operations")
+        if args.platform is not None or args.detail_page or args.detail_view != "raw" or meanings:
+            raise GatewayInputError("Documented Lists use the bounded list/selection path without scalar metadata detail or platform")
+        from wwise_waapi.documented_list_fields import browse_lists, bind_documented_field
+        result = browse_lists(detected_version, scope_kind=scope_kind, scope_value=scope_value,
+            read=binding.read_call, context={"draft": args.draft_id, "context": session.context.as_binding_dict()},
+            page_size=args.page_size, page=args.page, selection=args.selection)
+        if source is not None and result.get("scope", {}).get("owner") not in (None, {
+                "id": source.object_id, "name": source.name, "type": source.object_type, "path": source.path}):
+            raise GatewayInputError("The documented List owner changed; bind it again")
+        captured = []
+        record = binding.record
+        if args.selection:
+            def bind_documented(current):
+                handles = BusinessHandleRegistry.from_dict(current.handles.as_dict())
+                captured.append(bind_documented_field(handles, result))
+                return current.with_handle_registry(handles)
+            record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
+                expected_revision=args.expected_revision,
+                schema_digest=operation_draft_schema_digest(binding.record.operation, detected_version),
+                composer_digest=operation_composer_digest(binding.record.operation, detected_version),
+                context=binding.context, update=bind_documented, event_type="handles.bound")
+        payload = operation_draft_payload(args.command, record, offline=False,
+            state_dir=args.state_dir, task_authority=args.task_authority)
+        if not args.selection:
+            payload["agent_result"] = result
+        else:
+            bound = captured[0]
+            payload["meaning_results"] = [{"meaning": result["declaration"]["display_name"], "candidates": [{
+                "handle": bound.handle, "label": result["declaration"]["display_name"], "field_kind": "list",
+                "value_type": "list", "evidence": result,
+                "value_input": {"use": "object_list_or_clear_list_selection", "native_token_input": "forbidden",
+                    "accepted_forms": ["owned_list_construction", "owned_list_clear"] +
+                        (["json_array_of_bound_object_handles"] if binding.record.operation == "object.set"
+                         and detected_version in {"2023.1", "2024.1", "2025.1"} else []),
+                    "maximum_array_members": 32,
+                    "array_validation": "exact_source_element_classes_and_fresh_native_members; ownership_not_inferred"}}]}]
+        return payload
     read_call = metadata_cached_read_call(
         binding.read_call,
         connection=connection,
@@ -19736,10 +19778,6 @@ def dispatch_business_field_discovery(
         if binding.record.operation in {"object.create", "object.set"} and bound.field_kind == "reference":
             value_input["accepted_forms"] = ["bound_object_handle", "null_to_clear_reference"]
             if binding.record.operation == "object.set":
-                from wwise_waapi.operation_object import OBJECT_SET_REFERENCE_ARRAY_VERSIONS
-                if session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS:
-                    value_input["accepted_forms"].append("json_array_of_bound_object_handles")
-                    value_input["maximum_array_members"] = 32
                 from wwise_waapi.object_inline_curve import require_inline_curve_field
                 try:
                     require_inline_curve_field(metadata.get("restriction", {}))
@@ -28329,6 +28367,7 @@ def _business_next_action_binding(
                             "<selected-type-handle>",
                         ],
                     },
+                    "documented_lists": documented_list_discovery_contract(),
                     "append_repeated": [
                         "--meaning",
                         "<user-facing-field-meaning>",
@@ -28457,7 +28496,7 @@ def _business_next_action_binding(
                         "<exact-user-owned-wwise-object-list-name>",
                     ],
                     "list_name_input": (
-                        "exact_user_owned_wwise_object_list_name_without_at_prefix"
+                        "selected_List_Field_Handle_or_exact_source_proven_alias_for_this_owner"
                     ),
                     "effect": "replace_all_with_empty_list",
                 },
@@ -28576,6 +28615,7 @@ def _business_next_action_binding(
                     "<selected-type-handle>",
                 ],
             },
+            "documented_lists": documented_list_discovery_contract(),
             "append_repeated": [
                 "--meaning",
                 "<user-facing-field-meaning>",

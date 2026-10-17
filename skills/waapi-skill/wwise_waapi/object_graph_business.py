@@ -17,6 +17,7 @@ from .business_declarations import (
     resolve_semantic_kind,
 )
 from .object_graph_business_contracts import object_graph_business_contract_data
+from .documented_list_fields import resolve_list_choice
 from .business_fields import ACTION_DURATION_FIELDS, OBJECT_BUSINESS_FIELD_TYPES
 from .operation_object import (
     DEFAULT_MAX_CHILDREN_PER_NODE,
@@ -375,10 +376,10 @@ def _compile_set_new_node(
     object_list = extension_fields.get("object_list")
     if object_list is not None:
         try:
-            object_list = normalize_object_list_name(
-                object_list,
-                request_path="$.business.object_list",
-            )
+            object_list = (resolve_list_choice(session, object_list,
+                owner_id=session.handles.resolve_object(declaration.target.parent_handle).object_id).token
+                if object_list.startswith("bfh1-") else normalize_object_list_name(
+                    object_list, request_path="$.business.object_list"))
         except Exception as exc:
             raise _repair(
                 session,
@@ -490,6 +491,12 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
     if isinstance(value, list) and not allow_arrays:
         raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
                       action="string reference arrays require the pinned object.set 2023.1-2025.1 alternative; choose one bound reference or null in this lane")
+    if isinstance(value, list) and field.field_kind != "list":
+        raise _repair(session, "REFERENCE_LIST_EVIDENCE_REQUIRED", field="field_values",
+                      action="discover this exact class's documented Lists; scalar Reference metadata does not certify array assignment")
+    if field.field_kind == "list" and not isinstance(value, list):
+        raise _repair(session, "LIST_VALUE_REQUIRES_BOUND_OBJECT_ARRAY", field="field_values",
+                      action="use an array of selected existing Object Handles, or the owned-list construction/clear declaration")
     if isinstance(value, Mapping) and not allow_inline_curve:
         raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
                       action="object.create accepts one bound reference or null; complex reference values belong to available object.set lanes")
@@ -507,7 +514,8 @@ def _compile_graph_field_reference(session: BusinessDeclarationSession, field: A
                       action="split the reference array into a bounded request")
     identities = []
     for item in values:
-        handle = session.handles.validate_field_value(field, item)
+        handle = (session.handles.resolve_object(item).handle if field.field_kind == "list"
+                  else session.handles.validate_field_value(field, item))
         target = session.handles.resolve_object(handle)
         identities.append({"kind": "id", "value": target.object_id})
     return {"name": field.token, "target": identities if isinstance(value, list) else identities[0]}
@@ -1226,10 +1234,10 @@ def _compile_existing_set_fields(
         names: list[str] = []
         for index, value in enumerate(raw_clears):
             try:
-                name = normalize_object_list_name(
-                    value,
-                    request_path=f"$.business.clear_object_lists[{index}]",
-                )
+                name = (resolve_list_choice(session, value, owner_id=source.object_id).token
+                    if value.startswith("bfh1-") else normalize_object_list_name(value, request_path="$.business.clear_object_lists"))
+            except BusinessDeclarationError:
+                raise
             except Exception as exc:
                 raise _repair(
                     session,
@@ -1442,6 +1450,29 @@ def _materialize_set(
             action="use one disclosed object.set batch setting",
         )
     arguments: dict[str, Any] = {"objects": rows}
+    documented_bindings = []
+    for row in rows:
+        for descriptor in row.get("lists", []):
+            matches = [field for field in session.handles.as_dict()["fields"]
+                if field["field_kind"] == "list" and field["scope_kind"] == "object"
+                and field["scope_value"] == row["object"]["value"] and field["token"] == descriptor["name"]]
+            if matches:
+                field = resolve_list_choice(session, descriptor["name"], owner_id=row["object"]["value"])
+                evidence = dict(field.restrictions["documented_list"])
+                if evidence not in documented_bindings:
+                    documented_bindings.append(evidence)
+        for descriptor in row.get("references", []):
+            candidates = [field for field in session.handles.as_dict()["fields"]
+                if field["field_kind"] == "list" and field["scope_kind"] == "object"
+                and field["scope_value"] == row["object"]["value"] and field["token"] == descriptor["name"]]
+            if candidates:
+                field = resolve_list_choice(session, descriptor["name"], owner_id=row["object"]["value"])
+                evidence = {**dict(field.restrictions["documented_list"]),
+                    "reference_targets": [target["value"] for target in descriptor["target"]]}
+                if evidence not in documented_bindings:
+                    documented_bindings.append(evidence)
+    if documented_bindings:
+        arguments["documented_list_bindings"] = documented_bindings
     if "platform" in settings:
         platform = settings["platform"]
         if not isinstance(platform, str) or not platform.strip():

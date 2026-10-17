@@ -823,12 +823,14 @@ class BusinessHandleRegistry:
             raise ValueError("token must be an exact Wwise property/reference token")
         if len(token.encode("utf-8")) > (MAX_FIELD_METADATA_STRING_BYTES if trusted_native_token else MAX_FIELD_TOKEN_BYTES):
             raise ValueError("token exceeds its fixed byte limit")
-        if field_kind not in {"property", "reference"}:
-            raise ValueError("field_kind must be property or reference")
-        if value_type not in {"number", "integer", "boolean", "string", "reference"}:
+        if field_kind not in {"property", "reference", "list"}:
+            raise ValueError("field_kind must be property, reference or list")
+        if value_type not in {"number", "integer", "boolean", "string", "reference", "list"}:
             raise ValueError("value_type is not supported")
         if (field_kind == "reference") != (value_type == "reference"):
             raise ValueError("reference fields require the reference value type")
+        if (field_kind == "list") != (value_type == "list"):
+            raise ValueError("documented list fields require the list value type")
         if not isinstance(metadata_digest, str) or not _SHA256.fullmatch(metadata_digest):
             raise ValueError("metadata_digest must be a lowercase SHA-256")
         normalized_restrictions = _normalize_restrictions(
@@ -1242,6 +1244,9 @@ def revalidate_live_field(
 
     if not isinstance(field, BoundFieldHandle):
         raise TypeError("field must be BoundFieldHandle")
+    if field.field_kind == "list":
+        from .documented_list_fields import revalidate_documented_field
+        return revalidate_documented_field(registry, field, read=read_call)
     normalized_platform = _normalize_field_platform(platform)
     if (
         normalized_platform is not None
@@ -1973,16 +1978,19 @@ def _bound_field_from_dict(
     if (not isinstance(token, str) or not token.strip()
             or len(token.encode("utf-8")) > MAX_FIELD_METADATA_STRING_BYTES):
         raise ValueError("bound field token is invalid")
-    if field_kind not in {"property", "reference"} or value_type not in {
+    if field_kind not in {"property", "reference", "list"} or value_type not in {
         "number",
         "integer",
         "boolean",
         "string",
         "reference",
+        "list",
     }:
         raise ValueError("bound field kind or value type is invalid")
     if (field_kind == "reference") != (value_type == "reference"):
         raise ValueError("bound field kind and value type disagree")
+    if (field_kind == "list") != (value_type == "list"):
+        raise ValueError("bound list kind and value type disagree")
     if not isinstance(metadata_digest, str) or not _SHA256.fullmatch(metadata_digest):
         raise ValueError("bound field metadata digest is invalid")
     restrictions = _normalize_restrictions(
@@ -2101,10 +2109,19 @@ def _normalize_restrictions(
 ) -> dict[str, Any]:
     if not isinstance(restrictions, Mapping):
         raise ValueError("restrictions must be an object")
-    allowed_keys = {"minimum", "maximum", "enum_choices", "enum_labels", "allowed_target_types"}
+    allowed_keys = {"minimum", "maximum", "enum_choices", "enum_labels", "allowed_target_types", "documented_list"}
     if set(restrictions) - allowed_keys:
         raise ValueError("restrictions contain unsupported fields")
     normalized: dict[str, Any] = {}
+    if "documented_list" in restrictions:
+        evidence = restrictions["documented_list"]
+        if (field_kind != "list" or set(restrictions) != {"documented_list"}
+                or not isinstance(evidence, Mapping) or evidence.get("kind") != "documented-list"
+                or len(canonical_json_bytes(evidence)) > 16 * 1024):
+            raise ValueError("A List handle requires its distinct bounded documented-list evidence")
+        return {"documented_list": dict(evidence)}
+    if field_kind == "list":
+        raise ValueError("List handles cannot fabricate live property metadata")
     for key in ("minimum", "maximum"):
         if key in restrictions:
             raw = restrictions[key]

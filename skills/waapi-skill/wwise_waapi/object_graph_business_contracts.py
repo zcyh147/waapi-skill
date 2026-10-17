@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .documented_list_fields import discovery_contract as documented_list_discovery_contract
+
 from typing import Any
 
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
@@ -223,6 +225,7 @@ def object_graph_business_contract_data(
                 "subcommand": "draft-discover-fields",
                 "input": "one_to_eight_distinct_user_facing_meanings",
                 "scope": "one_bound_target_or_declared_semantic_kind",
+                "documented_lists": documented_list_discovery_contract(),
                 "result": (
                     "one_ordered_meaning_result_with_bounded_candidates_per_input"
                 ),
@@ -284,7 +287,7 @@ def object_graph_business_contract_data(
             },
             "object_list_declaration": {
                 "member_fields": {
-                    "object_list": "exact_user_owned_wwise_object_list_name",
+                    "object_list": "selected_List_Field_Handle_or_exact_source_proven_alias_for_this_owner",
                     "list_behavior": ["append", "replace-all"],
                 },
                 "recursive_placement": "bound_or_planned_parent_handles;_ordinary_children_and_owned_lists_may_nest",
@@ -343,6 +346,7 @@ def object_graph_business_contract_data(
                     "applicability": "fresh_explicit_Curve_type_allowance;_custom_target_classifier_requirements_must_be_proven",
                     "verification": "exact_owner_field_points_and_independent_Curve_class_readback",
                 },
+                "array_requires": "documented_List_Field_Handle_for_exact_owner_class_and_version; scalar_Reference_metadata_is_insufficient",
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
             },
             "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},

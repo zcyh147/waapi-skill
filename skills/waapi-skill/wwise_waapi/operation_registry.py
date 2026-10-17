@@ -2683,6 +2683,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "list_mode",
             "on_name_conflict",
             "auto_add_to_source_control",
+            "documented_list_bindings",
         ),
         argument_contract={
             **_object_contract(
@@ -2771,12 +2772,15 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         ),
                     },
                     "auto_add_to_source_control": {"type": "boolean", "default": False},
+                    "documented_list_bindings": {"type": "array", "maxItems": 128,
+                        "items": {"type": "object"}, "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 },
                 optional=(
                     "platform",
                     "list_mode",
                     "on_name_conflict",
                     "auto_add_to_source_control",
+                    "documented_list_bindings",
                 ),
             ),
             "maximumCanonicalRequestBytes": DEFAULT_MAX_REQUEST_BYTES,
@@ -5618,6 +5622,7 @@ def _prepare_object_set(
     arguments: Mapping[str, Any],
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
+    documented_bindings = list(arguments.get("documented_list_bindings", []))
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     conflict = str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
@@ -5859,6 +5864,27 @@ def _prepare_object_set(
             )
         reference_targets = []
         for descriptor in references:
+            documented = [binding for binding in arguments.get("documented_list_bindings", [])
+                if binding.get("scope", {}).get("scope_kind") == "object"
+                and binding["scope"]["scope_value"] == target.object
+                and binding.get("declaration", {}).get("name") == descriptor.name
+                and "reference_targets" in binding]
+            if documented:
+                if (len(documented) != 1 or request.version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS
+                        or not isinstance(descriptor.target, tuple)):
+                    raise OperationContractError("INVALID_DOCUMENTED_LIST_ARRAY", "This exact List declaration requires its supported bounded reference-array shape")
+                identities = []
+                for offset, target_descriptor in enumerate(descriptor.targets):
+                    role = f"{descriptor.request_path}[{offset}]"
+                    resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                    roles[role] = resolved
+                    identities.append(resolved.object)
+                if identities != documented[0]["reference_targets"]:
+                    raise OperationContractError("INVALID_DOCUMENTED_LIST_ARRAY", "The List proof does not match the exact requested ordered target identities")
+                trusted[f"@{descriptor.name}"] = identities
+                target_spec["references"].append({"name": descriptor.name, "target_id": identities,
+                    "metadata_evidence": "documented-list"})
+                continue
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
@@ -5901,6 +5927,8 @@ def _prepare_object_set(
                 wwise_version=request.version)
         reference_requirements: dict[str, Any] = {}
         for descriptor in (*properties, *references):
+            if descriptor.name.casefold() not in property_info_by_name:
+                continue  # Exact documented-list evidence is re-read independently; no property-info receipt is invented.
             activation_properties = _apply_reference_activation_dependencies(
                 property_info_by_name[descriptor.name.casefold()],
                 read=read, object_id=target.object,
@@ -6157,16 +6185,15 @@ def _prepare_object_set(
         list_specs: list[dict[str, Any]] = []
         target_list_snapshots: list[dict[str, Any]] = []
         for list_index, descriptor in enumerate(lists):
-            if descriptor.name.casefold() in OBJECT_DEDICATED_LIST_NAMES:
-                raise OperationContractError(
-                    "DEDICATED_OPERATION_REQUIRED",
-                    "Effect and RTPC object lists must use object.createPlugin or object.setRTPC.",
-                    details={
-                        "index": index,
-                        "list_index": list_index,
-                        "list": descriptor.name,
-                    },
-                )
+            from .documented_list_fields import resolve_live_list_evidence
+            proof = resolve_live_list_evidence(request.version, target.object, descriptor.name, read=read)
+            selected = [binding for binding in documented_bindings
+                if binding.get("scope", {}).get("scope_value") == target.object
+                and binding.get("declaration", {}).get("name") == descriptor.name]
+            if selected and selected != [proof]:
+                raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Selected List proof differs from its exact owner/class/source")
+            if not selected:
+                documented_bindings.append(proof)
             before_rows = _normalize_object_list_snapshot(
                 _read_object_list(
                     target.object,
@@ -6233,6 +6260,12 @@ def _prepare_object_set(
                 for spec in prepared_specs
                 if spec.get("request_path") in root_paths
             ]
+            allowed_classes = {element["class_id"] for element in proof["declaration"]["element_classes"]}
+            if proof["declaration"]["unresolved_element_types"] or any(
+                    spec["class_id"] not in allowed_classes for spec in root_specs):
+                raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID",
+                    "Every requested List root class must be proved by this exact versioned owner declaration.",
+                    details={"list": descriptor.name, "allowed_element_classes": proof["declaration"]["element_classes"]})
             if len(root_specs) != len(descriptor.objects):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
@@ -6240,6 +6273,8 @@ def _prepare_object_set(
                 )
             for list_spec in prepared_specs:
                 is_root = list_spec.get("request_path") in root_paths
+                if is_root:
+                    list_spec["documented_list_element_class"] = list_spec["class_id"]
                 list_spec["target_index"] = index
                 list_spec.setdefault("platform", platform)
                 list_spec["collection"] = descriptor.name if is_root else list_spec.get("collection", "children")
@@ -6286,7 +6321,12 @@ def _prepare_object_set(
                         subtree.update({"object_id": target.object, "list": descriptor.name})
                     list_subtree_snapshots.extend(replacement_subtrees)
                 if row_list_mode == "append" and row_conflict == "merge" and collisions:
-                    if not _object_type_matches(collisions[0].get("type"), root_spec):
+                    # The ordinary List snapshot does not request classId. Never
+                    # accept an incidental extra field as semantic class proof.
+                    class_rows = _read_object_id_rows(collisions[0]["id"], fields=("id", "classId"), read=read)
+                    if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                            or not _object_type_matches(collisions[0].get("type"), root_spec,
+                                actual_class_id=class_rows[0].get("classId"))):
                         raise OperationContractError(
                             "INVALID_TARGET_TYPE",
                             "An object-list merge collision has a different live type.",
@@ -6638,6 +6678,15 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
     }
+    if documented_bindings:
+        if any(binding.get("version") != request.version for binding in documented_bindings):
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "List source evidence must belong to this exact Wwise version")
+        from .documented_list_fields import observe_list_binding
+        try:
+            state["documented_list_guards"] = [observe_list_binding(evidence, read=read)
+                for evidence in documented_bindings]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
     curve_guards = [field["curve_proof"] for spec in node_specs for field in spec.get("references", []) if "curve_proof" in field]
     if curve_guards:
         if len(node_specs) + len(curve_guards) > DEFAULT_MAX_NODES:
@@ -7822,6 +7871,9 @@ def _append_association_condition(requirements, *, source, owner, property_name,
 def _condition_metadata_assertions(pre_state, *, read, after_write=False):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = []
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_list_guards"):
+        from .documented_list_fields import list_guard_assertions
+        assertions.extend(list_guard_assertions(pre_state["documented_list_guards"], read=read, after_write=after_write))
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
@@ -8397,7 +8449,11 @@ def _object_type_token(value: Any) -> str:
     return "".join(character for character in str(value).casefold() if character.isalnum())
 
 
-def _object_type_matches(actual: Any, spec: Mapping[str, Any]) -> bool:
+def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_id: Any = None) -> bool:
+    if "documented_list_element_class" in spec:
+        return (isinstance(actual, str) and bool(actual)
+            and isinstance(actual_class_id, int) and not isinstance(actual_class_id, bool)
+            and actual_class_id == spec["documented_list_element_class"])
     token = _object_type_token(actual)
     return token in {
         _object_type_token(spec.get("requested_type")),
@@ -9097,6 +9153,7 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
+            *(("classId",) if "documented_list_element_class" in spec else ()),
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}
@@ -18029,6 +18086,7 @@ def verify_prepared_operation(
                 )
         spec_by_path = {str(row.get("request_path")): row for row in specs}
         resolved_id_by_path: dict[str, Any] = {}
+        observed_row_by_path: dict[str, Mapping[str, Any]] = {}
         for spec in specs:
             request_path = str(spec.get("request_path"))
             result_node = result_by_path.get(request_path)
@@ -18091,6 +18149,7 @@ def verify_prepared_operation(
             if len(rows) != 1:
                 continue
             row = rows[0]
+            observed_row_by_path[request_path] = row
             check(
                 f"{request_path} readback GUID matches the result",
                 _same_identity(row.get("id"), object_id),
@@ -18098,7 +18157,7 @@ def verify_prepared_operation(
             )
             check(
                 f"{request_path} reflected type matches the live-resolved request type",
-                _object_type_matches(row.get("type"), spec),
+                _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")),
                 {"requested": spec.get("requested_type"), "canonical": spec.get("canonical_type"), "actual": row.get("type")},
             )
             returned_name = result_node.name if result_node is not None else None
@@ -18177,7 +18236,7 @@ def verify_prepared_operation(
                 relation = ("owner" if spec.get("collection") not in {None, "children"} else "parent")
                 identity_ok = (
                     result_node is not None and _same_identity(row.get("id"), object_id)
-                    and _object_type_matches(row.get("type"), spec) and name_ok
+                    and _object_type_matches(row.get("type"), spec, actual_class_id=row.get("classId")) and name_ok
                     and _same_identity(_reference_identity(row.get(relation)), expected_parent_id)
                     and (expected_path is None or row.get("path") == expected_path)
                     and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
@@ -19070,6 +19129,27 @@ def verify_prepared_operation(
                 list_name=list_name,
             )
             readbacks.extend(list_readbacks)
+            documented = [guard for guard in pre_state.get("documented_list_guards", [])
+                if guard["evidence"]["scope"]["scope_value"] == owner_id
+                and guard["evidence"]["declaration"]["name"] == list_name
+                and "reference_targets" not in guard["evidence"]]
+            if documented:
+                if len(documented) != 1:
+                    raise OperationContractError("INVALID_PREVIEW", "Ordered List verification requires one exact source guard")
+                expected_order = ([] if list_mode == "replaceAll" else
+                    [row["id"] for row in documented[0]["members"]
+                     if _identity_key(row["id"]) not in replaced_set_ids])
+                for list_root_spec in list_root_specs:
+                    object_id = resolved_id_by_path.get(str(list_root_spec.get("request_path")))
+                    if _valid_object_id(object_id) and object_id not in expected_order:
+                        expected_order.append(object_id)
+                ordered_rows = read_object(object_id=owner_id, fields=("id", "@" + list_name), platform=effective_platform)
+                ordered_members = ordered_rows[0].get("@" + list_name) if len(ordered_rows) == 1 else None
+                actual_order = ([_reference_identity(member) for member in ordered_members]
+                    if isinstance(ordered_members, list) and len(ordered_members) <= OBJECT_LIST_MAX_SUBTREE_NODES else None)
+                check(f"{owner_path}.@{list_name} ordered membership matches the reviewed declaration",
+                    complete_expected and actual_order == expected_order,
+                    {"expected": expected_order, "actual": actual_order})
             actual_ids = {_identity_key(row["id"]) for row in actual_rows}
             check(
                 f"{owner_path}.@{list_name} GUID set matches the reviewed {list_mode} operation",
@@ -19088,11 +19168,25 @@ def verify_prepared_operation(
                     if _identity_key(before_member["id"]) in requested_ids | replaced_set_ids:
                         continue
                     matches = [row for row in actual_rows if _same_identity(row.get("id"), before_member["id"])]
+                    expected_member_path = before_member.get("path")
+                    owner_before = owner_spec.get("pre_state", {})
+                    owner_after = observed_row_by_path.get(owner_path, {})
+                    if (isinstance(owner_before, Mapping)
+                            and owner_spec.get("requested_name") != owner_before.get("name")
+                            and isinstance(owner_before.get("path"), str)
+                            and isinstance(owner_after.get("path"), str)
+                            and isinstance(expected_member_path, str)
+                            and expected_member_path.startswith(owner_before["path"] + "\\")):
+                        expected_owner_path = owner_before["path"].rsplit("\\", 1)[0] + "\\" + str(owner_after.get("name", ""))
+                        check(f"{owner_path} renamed List owner path follows its verified name",
+                            owner_after["path"] == expected_owner_path,
+                            {"expected": expected_owner_path, "actual": owner_after["path"]})
+                        expected_member_path = owner_after["path"] + expected_member_path[len(owner_before["path"]):]
                     unchanged = len(matches) == 1 and all(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_member.get(field)))
                          if field in {"id", "parent", "owner"} and before_member.get(field) is not None
-                         else matches[0].get(field) == before_member.get(field))
-                        for field in ("id", "name", "type", "parent", "owner", "notes") if field in before_member
+                         else matches[0].get(field) == (expected_member_path if field == "path" else before_member.get(field)))
+                        for field in ("id", "name", "type", "path", "parent", "owner", "notes") if field in before_member
                     )
                     check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
                           {"before": dict(before_member), "after": matches})
