@@ -33,12 +33,13 @@ references. No main merge is authorized.
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
   [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
-- Active implementation frontier: #187 (Topics) and #189 (Authoring model,
-  window and signal operations), each in a separate worktree from `f6adb041`
-  with `fork_turns="none"`. #177/#181/#188 and #184/#193/#194 retain open partial
-  checkpoints; their former workers are not active on those slices. Root owns
-  decisions, integration and native scheduling. #180 remains
-  blocked by #178; do not infer readiness from family proximity.
+- Active implementation workers own #179 (plugin placements) and #185
+  (SoundEngine controls and resource lifetimes), each in a separate worktree
+  with `fork_turns="none"`. The #178/#187/#189 partials are integrated at
+  `c689fd05`; their remaining implementation and native obligations stay open.
+  #177/#181/#188 and #184/#193/#194 also retain open partial checkpoints.
+  Root owns decisions, integration and native scheduling. #180 retains its
+  #178 dependency; shared primitives alone do not establish ticket completion.
 - Read-only object/plugin condition research is retained for #177/#178/#179.
   It includes integer enums/ranges, parent contexts, reference requirements,
   visibility, Uint16 plugin conditions and expanded 2025 EQ conditions. Installed
@@ -382,9 +383,19 @@ compiler symbol; current source pointers now name the generalized class compiler
 The original failure is retained separately. An earlier preparatory surface build
 also exposed missing WAFM reference reachability and stopped before publication;
 linking the original independent Authoring definition graph resolves that gap.
-Central preflight and proportional integrated checks remain pending at this
-source checkpoint. Worker results retain their original candidates and verdicts;
-the coordinated two-version signal check on `24dab99f` is not repeated here.
+On exact clean `c689fd05971ed75425900713e50c3c3d5eac6ce5`, one central
+preflight passed **825 tests in 22.40 seconds** and the non-overlapping combined
+selection passed **39 tests in 303.16 seconds**. Both runs preserved all 1,817
+tracked file hashes and ended with no owned processes. Sequential interface,
+branch and release-report `--check` commands also exited zero. Original results
+are sealed in `integration-partials-r10/FINAL-RESULT.json` under the ignored
+coordination directory. Worker results retain their original candidates and
+verdicts; the coordinated two-version signal check on `24dab99f` was not
+repeated. No full Program/Non-live, native or Fresh acceptance is inferred.
+
+The next full Non-live gate is scheduled after the fixed #179/#185 integration,
+with duration reporting, so these related runtime changes share one settled
+milestone. There is no automatic repeated Program gate or native/Fresh launch.
 
 ## Standing completion rules
 
