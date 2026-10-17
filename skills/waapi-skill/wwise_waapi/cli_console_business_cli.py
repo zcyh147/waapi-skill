@@ -13,6 +13,7 @@ class CliConsoleBusinessCliError(ValueError):
 
 
 def add_cli_console_plan_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--empty", action="append", default=[], metavar="BUSINESS_COLLECTION")
     parser.add_argument(
         "--value",
         action="append",
@@ -127,7 +128,7 @@ def cli_console_plan_from_namespace(
                 )
         put(name, value)
     for name, value in args.item:
-        if field_type(name) not in list_types:
+        if field_type(name) not in list_types | {"platform_creation_mappings"}:
             raise CliConsoleBusinessCliError(
                 f"{name} does not use the --item input form"
             )
@@ -154,6 +155,11 @@ def cli_console_plan_from_namespace(
                 f"{name} toggle requires enable or disable"
             )
         put(name, raw == "enable")
+    for name in getattr(args, "empty", []):
+        field_type(name)
+        if name not in contract["declaration"].get("explicit_empty_collections", []):
+            raise CliConsoleBusinessCliError(f"{name} does not disclose an explicit empty collection")
+        put(name, [])
     return result
 
 

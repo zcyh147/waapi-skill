@@ -247,4 +247,5 @@ tests/unit/test_scalar_program_admission.py
 tests/unit/test_object_query_result_pages.py
 tests/unit/test_gateway_error_context.py
 
+tests/unit/test_console_project_alternatives_gateway.py
 tests/unit/test_branch_evidence_readers.py

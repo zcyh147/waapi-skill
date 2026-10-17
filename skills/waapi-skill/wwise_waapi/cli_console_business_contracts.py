@@ -30,6 +30,11 @@ _COMMON_TYPES: dict[str, str] = {
     "source_control": "source_control_policy",
 }
 
+_EXPLICIT_EMPTY_COLLECTIONS = {
+    "ak.wwise.cli.createNewProject": ("platforms",),
+    "ak.wwise.console.project.create": ("platforms", "languages"),
+}
+
 
 def _row(
     versions: tuple[str, ...],
@@ -646,9 +651,11 @@ def cli_console_business_contract_data(
             "public_fields": public_fields,
             "field_types": field_types,
             "input_forms": {
-                field: _input_form(field, field_types[field])
+                field: _input_form(field, field_types[field], allow_empty=field in _EXPLICIT_EMPTY_COLLECTIONS.get(operation, ()))
                 for field in public_fields
             },
+            **({"explicit_empty_collections": list(_EXPLICIT_EMPTY_COLLECTIONS[operation])}
+               if operation in _EXPLICIT_EMPTY_COLLECTIONS else {}),
             **(
                 {"constraints": deepcopy(row["constraints"])}
                 if row["constraints"]
@@ -680,7 +687,7 @@ def cli_console_business_contract_data(
     }
 
 
-def _input_form(field: str, field_type: str) -> dict[str, Any]:
+def _input_form(field: str, field_type: str, *, allow_empty=False) -> dict[str, Any]:
     if field_type in {
         "platform_name_list",
         "language_name_list",
@@ -689,13 +696,22 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         "network_address_list",
         "http_origin_list",
     }:
-        return {"flag": "--item", "arguments": [field, "<value>"], "repeatable": True}
+        result = {"flag": "--item", "arguments": [field, "<value>"], "repeatable": True}
+        if allow_empty:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+        return result
     if field_type.endswith("_mappings"):
-        return {
+        result = {
             "flag": "--mapping",
             "arguments": [field, "<key>", "<value>"],
             "repeatable": True,
         }
+        if field_type == "platform_creation_mappings":
+            result["unnamed_platform_form"] = {"flag": "--item", "arguments": [field, "<base_platform>"], "repeatable": True}
+            result["meaning"] = "One base platform per unnamed row, or base platform and explicit name per mapping; the same base may have distinct named rows. Omission preserves the native project default."
+        if allow_empty:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+        return result
     if field_type == "boolean":
         return {
             "flag": "--toggle",
