@@ -10,6 +10,13 @@ from .business_declarations import business_repair
 from .host_paths import HostPathError, parse_absolute_host_path, parse_relative_host_path
 from .operation_registry import parse_operation_request
 from .runtime_inspection_business_contracts import (
+    PROFILER_CURSOR_MEANINGS,
+    BASE_LOG_CHANNEL_MEANINGS as _BASE_LOG_CHANNELS,
+    LATER_LOG_CHANNEL_MEANINGS as _LATER_LOG_CHANNELS,
+    PROFILER_CURSOR_MOVE_MEANINGS as _CURSOR_MOVES,
+    LOG_SEVERITY_MEANINGS as _LOG_SEVERITIES,
+    AUDITION_ACTION_MEANINGS as _AUDITION_ACTIONS,
+    PROFILER_RETURN_VIEWS as _PROFILER_RETURN_VIEWS,
     LOG_GET_URI,
     LOG_ADD_ITEM_URI,
     LOG_CLEAR_URI,
@@ -40,45 +47,10 @@ class RuntimeInspectionBusinessError(ValueError):
     pass
 
 
-_BASE_LOG_CHANNELS = {
-    "soundbank-generation": "soundbankGenerate",
-    "audio-conversion": "conversion",
-    "platform-settings-copy": "copyPlatformSettings",
-    "waapi": "waapi",
-    "project-load": "projectLoad",
-    "general": "general",
-}
-_LATER_LOG_CHANNELS = {
-    **_BASE_LOG_CHANNELS,
-    "source-control": "sourceControl",
-    "lua": "lua",
-}
-_PROFILER_CURSORS = {
-    "capture-latest": "capture",
-    "user-cursor": "user",
-}
+_PROFILER_CURSORS = PROFILER_CURSOR_MEANINGS
 _PROFILER_BUS_HANDLE = re.compile(r"^bus-instance-([0-9a-f]{8})$")
 _PROFILER_VOICE_HANDLE = re.compile(r"^voice-instance-([0-9a-f]{8})$")
 _TRANSPORT_HANDLE = re.compile(r"^trh1-[0-9a-f]{32}$")
-_CURSOR_MOVES = {
-    "first-frame": "first",
-    "last-frame": "last",
-    "next-frame": "next",
-    "previous-frame": "previous",
-}
-_LOG_SEVERITIES = {
-    "message": "Message",
-    "warning": "Warning",
-    "error": "Error",
-    "fatal": "Fatal Error",
-}
-_AUDITION_ACTIONS = {
-    "play": "play",
-    "stop": "stop",
-    "pause": "pause",
-    "toggle-play-stop": "playStop",
-    "play-directly": "playDirectly",
-}
 _CAPTURE_DATA_NATIVE_BASE = {
     "api-calls": "apiCalls",
     "audio-objects": "audioObjects",
@@ -170,123 +142,6 @@ def _port(value: Any, *, field: str) -> int:
             action="provide an integer TCP port from 1 to 65535",
         )
     return value
-_PROFILER_RETURN_VIEWS = {
-    PROFILER_GET_AUDIO_OBJECTS_URI: {
-        "summary": (
-            "audioObjectID",
-            "audioObjectName",
-            "busPipelineID",
-            "busName",
-            "gameObjectName",
-            "rmsMeter",
-            "peakMeter",
-        ),
-        "identity": (
-            "audioObjectID",
-            "audioObjectName",
-            "busPipelineID",
-            "busGUID",
-            "busName",
-            "gameObjectID",
-            "gameObjectName",
-            "instigatorPipelineID",
-        ),
-        "diagnostics": (
-            "audioObjectID",
-            "audioObjectName",
-            "busPipelineID",
-            "busGUID",
-            "busName",
-            "gameObjectID",
-            "gameObjectName",
-            "instigatorPipelineID",
-            "effectPluginName",
-            "spatializationMode",
-            "x",
-            "y",
-            "z",
-            "spread",
-            "focus",
-            "channelConfig",
-            "metadata",
-            "rmsMeter",
-            "peakMeter",
-        ),
-    },
-    PROFILER_GET_BUSSES_URI: {
-        "summary": (
-            "pipelineID",
-            "objectName",
-            "gameObjectName",
-            "volume",
-            "downstreamGain",
-            "voiceCount",
-            "depth",
-        ),
-        "identity": (
-            "pipelineID",
-            "objectGUID",
-            "objectName",
-            "gameObjectID",
-            "gameObjectName",
-        ),
-        "diagnostics": (
-            "pipelineID",
-            "mixBusID",
-            "objectGUID",
-            "objectName",
-            "gameObjectID",
-            "gameObjectName",
-            "deviceID",
-            "volume",
-            "downstreamGain",
-            "voiceCount",
-            "depth",
-        ),
-    },
-    PROFILER_GET_VOICES_URI: {
-        "summary": (
-            "pipelineID",
-            "objectName",
-            "gameObjectName",
-            "baseVolume",
-            "isStarted",
-            "isVirtual",
-        ),
-        "identity": (
-            "pipelineID",
-            "playingID",
-            "objectGUID",
-            "objectName",
-            "playTargetGUID",
-            "playTargetName",
-            "gameObjectID",
-            "gameObjectName",
-        ),
-        "diagnostics": (
-            "pipelineID",
-            "playingID",
-            "soundID",
-            "gameObjectID",
-            "gameObjectName",
-            "objectGUID",
-            "objectName",
-            "playTargetID",
-            "playTargetGUID",
-            "playTargetName",
-            "baseVolume",
-            "gameAuxSendVolume",
-            "envelope",
-            "normalizationGain",
-            "lowPassFilter",
-            "highPassFilter",
-            "priority",
-            "isStarted",
-            "isVirtual",
-            "isForcedVirtual",
-        ),
-    },
-}
 
 
 def _result_limit(max_results: int | None) -> int:

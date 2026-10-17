@@ -42,6 +42,166 @@ TRANSPORT_GET_STATE_URI = "ak.wwise.core.transport.getState"
 TRANSPORT_PREPARE_URI = "ak.wwise.core.transport.prepare"
 TRANSPORT_USE_ORIGINALS_URI = "ak.wwise.core.transport.useOriginals"
 
+PROFILER_CURSOR_MEANINGS = {"capture-latest": "capture", "user-cursor": "user"}
+
+BASE_LOG_CHANNEL_MEANINGS = {
+    "soundbank-generation": "soundbankGenerate",
+    "audio-conversion": "conversion",
+    "platform-settings-copy": "copyPlatformSettings",
+    "waapi": "waapi",
+    "project-load": "projectLoad",
+    "general": "general",
+}
+
+LATER_LOG_CHANNEL_MEANINGS = {
+    **BASE_LOG_CHANNEL_MEANINGS,
+    "source-control": "sourceControl",
+    "lua": "lua",
+}
+
+PROFILER_CURSOR_MOVE_MEANINGS = {
+    "first-frame": "first",
+    "last-frame": "last",
+    "next-frame": "next",
+    "previous-frame": "previous",
+}
+
+LOG_SEVERITY_MEANINGS = {
+    "message": "Message",
+    "warning": "Warning",
+    "error": "Error",
+    "fatal": "Fatal Error",
+}
+
+AUDITION_ACTION_MEANINGS = {
+    "play": "play",
+    "stop": "stop",
+    "pause": "pause",
+    "toggle-play-stop": "playStop",
+    "play-directly": "playDirectly",
+}
+
+PROFILER_RETURN_VIEWS = {
+    PROFILER_GET_AUDIO_OBJECTS_URI: {
+        "summary": (
+            "audioObjectID",
+            "audioObjectName",
+            "busPipelineID",
+            "busName",
+            "gameObjectName",
+            "rmsMeter",
+            "peakMeter",
+        ),
+        "identity": (
+            "audioObjectID",
+            "audioObjectName",
+            "busPipelineID",
+            "busGUID",
+            "busName",
+            "gameObjectID",
+            "gameObjectName",
+            "instigatorPipelineID",
+        ),
+        "diagnostics": (
+            "audioObjectID",
+            "audioObjectName",
+            "busPipelineID",
+            "busGUID",
+            "busName",
+            "gameObjectID",
+            "gameObjectName",
+            "instigatorPipelineID",
+            "effectPluginName",
+            "spatializationMode",
+            "x",
+            "y",
+            "z",
+            "spread",
+            "focus",
+            "channelConfig",
+            "metadata",
+            "rmsMeter",
+            "peakMeter",
+        ),
+    },
+    PROFILER_GET_BUSSES_URI: {
+        "summary": (
+            "pipelineID",
+            "objectName",
+            "gameObjectName",
+            "volume",
+            "downstreamGain",
+            "voiceCount",
+            "depth",
+        ),
+        "identity": (
+            "pipelineID",
+            "objectGUID",
+            "objectName",
+            "gameObjectID",
+            "gameObjectName",
+        ),
+        "diagnostics": (
+            "pipelineID",
+            "mixBusID",
+            "objectGUID",
+            "objectName",
+            "gameObjectID",
+            "gameObjectName",
+            "deviceID",
+            "volume",
+            "downstreamGain",
+            "voiceCount",
+            "depth",
+        ),
+    },
+    PROFILER_GET_VOICES_URI: {
+        "summary": (
+            "pipelineID",
+            "objectName",
+            "gameObjectName",
+            "baseVolume",
+            "isStarted",
+            "isVirtual",
+        ),
+        "identity": (
+            "pipelineID",
+            "playingID",
+            "objectGUID",
+            "objectName",
+            "playTargetGUID",
+            "playTargetName",
+            "gameObjectID",
+            "gameObjectName",
+        ),
+        "diagnostics": (
+            "pipelineID",
+            "playingID",
+            "soundID",
+            "gameObjectID",
+            "gameObjectName",
+            "objectGUID",
+            "objectName",
+            "playTargetID",
+            "playTargetGUID",
+            "playTargetName",
+            "baseVolume",
+            "gameAuxSendVolume",
+            "envelope",
+            "normalizationGain",
+            "lowPassFilter",
+            "highPassFilter",
+            "priority",
+            "isStarted",
+            "isVirtual",
+            "isForcedVirtual",
+        ),
+    },
+}
+
+TRANSPORT_SCOPE_CHOICES = ("one-transport", "all-active")
+AUDITION_MEDIA_CHOICES = ("originals", "converted")
+
 PROFILER_CAPTURE_DATA_CHOICES = {
     "2021.1": (
         "api-calls", "audio-objects", "auxiliary-sends", "cpu", "inactive-game-syncs",
@@ -443,6 +603,27 @@ def runtime_inspection_business_contract_data(
     }
     execution_shape = row.get("execution_shape", "bounded_read")
     bounded_read = execution_shape == "bounded_read"
+    value_choices = {}
+    field_meanings = {
+        "log_channel": BASE_LOG_CHANNEL_MEANINGS if version in {"2021.1", "2022.1"} else LATER_LOG_CHANNEL_MEANINGS,
+        "cursor_move": PROFILER_CURSOR_MOVE_MEANINGS,
+        "severity": LOG_SEVERITY_MEANINGS,
+        "audition_action": AUDITION_ACTION_MEANINGS,
+        "transport_scope": TRANSPORT_SCOPE_CHOICES,
+        "audition_media": AUDITION_MEDIA_CHOICES,
+    }
+    for field, meanings in field_meanings.items():
+        if field in exposed_fields:
+            value_choices[field] = list(meanings)
+    if "result_view" in exposed_fields:
+        value_choices["result_view"] = list(PROFILER_RETURN_VIEWS[operation])
+    if "profiler_cursor" in exposed_fields:
+        value_choices["profiler_cursor"] = list(PROFILER_CURSOR_MEANINGS)
+    if operation == PROFILER_ENABLE_DATA_URI:
+        value_choices.update({
+            "capture_data_changes.data_set": list(PROFILER_CAPTURE_DATA_CHOICES[version]),
+            "capture_data_changes.outcome": ["enable", "disable"],
+        })
     if operation.startswith("ak.wwise.core.log."):
         derivations = [
             "versioned_native_log_channel",
@@ -523,22 +704,17 @@ def runtime_inspection_business_contract_data(
                 if name in exposed_fields
             },
             "input_forms": {
-                name: value
+                name: {
+                    **value,
+                    **({"value_forms": {
+                        "named": list(PROFILER_CURSOR_MEANINGS),
+                        "integer_milliseconds": {"minimum": 0, "maximum": 2147483647, "encoding": "ASCII decimal string"},
+                    }} if name == "profiler_position" else {}),
+                }
                 for name, value in row["input_forms"].items()
                 if name in exposed_fields
             },
-            **(
-                {
-                    "value_choices": {
-                        "capture_data_changes.data_set": list(
-                            PROFILER_CAPTURE_DATA_CHOICES[version]
-                        ),
-                        "capture_data_changes.outcome": ["enable", "disable"],
-                    }
-                }
-                if operation == PROFILER_ENABLE_DATA_URI
-                else {}
-            ),
+            **({"value_choices": value_choices} if value_choices else {}),
         },
         **(
             {}

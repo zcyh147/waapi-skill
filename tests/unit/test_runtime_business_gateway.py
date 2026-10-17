@@ -245,6 +245,10 @@ def test_log_get_schema_exposes_business_channel_and_bounded_result_only(
                 "log_channel": {"flag": "--log-channel", "repeatable": False},
                 "max_results": {"flag": "--max-results", "repeatable": False},
             },
+            "value_choices": {"log_channel": [
+                "soundbank-generation", "audio-conversion", "platform-settings-copy",
+                "waapi", "project-load", "general", "source-control", "lua",
+            ]},
         },
         "gateway_derivations": [
             "versioned_native_log_channel",
@@ -643,6 +647,97 @@ def test_profiler_cursor_read_maps_business_cursor_and_projects_milliseconds(
         "available": True,
         "position_ms": 1234,
     }
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_profiler_cursor_choices_are_disclosed_before_the_live_read(tmp_path: Path, version: str) -> None:
+    env = _env(tmp_path, version=version)
+    code, schema = gateway.execute_gateway(
+        ["request-schema", GET_CURSOR_TIME_URI], env=env,
+        client_factory=lambda _url: pytest.fail("Offline schema must not connect"),
+    )
+    assert code == 0, schema
+    choices = schema["business_adapter"]["declaration"]["value_choices"]["profiler_cursor"]
+    assert choices == ["capture-latest", "user-cursor"]
+    native_choices = {"capture-latest": "capture", "user-cursor": "user"}
+    for choice in choices:
+        client = FakeClient({
+            "ak.wwise.core.getInfo": [{
+                "displayName": "Wwise", "isCommandLine": True, "apiVersion": 1,
+                "platform": "macosx", "configuration": "release",
+                "version": {"year": int(version[:4]), "major": 1, "minor": 0, "build": 1,
+                            "displayName": f"v{version}.0.1"},
+            }],
+            GET_CURSOR_TIME_URI: [{"return": 1234}],
+        })
+        code, result = gateway.execute_gateway(
+            [*schema["continuation"]["gateway_argv_prefix"], "--profiler-cursor", choice],
+            env=env, client_factory=lambda _url: client,
+        )
+        assert code == 0, result
+        assert (GET_CURSOR_TIME_URI, {"cursor": native_choices[choice]}, {}) in client.calls
+        assert result["agent_result"] == {"profiler_cursor": choice, "available": True, "position_ms": 1234}
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_runtime_schema_discloses_accepted_business_meanings_and_position_forms(tmp_path: Path, version: str) -> None:
+    channels = ["soundbank-generation", "audio-conversion", "platform-settings-copy", "waapi", "project-load", "general"]
+    if version not in {"2021.1", "2022.1"}:
+        channels += ["source-control", "lua"]
+    expectations = {
+        LOG_GET_URI: {"log_channel": channels},
+        GET_VOICES_URI: {"result_view": ["summary", "identity", "diagnostics"]},
+        "ak.wwise.core.transport.executeAction": {
+            "audition_action": ["play", "stop", "pause", "toggle-play-stop", "play-directly"],
+            "transport_scope": ["one-transport", "all-active"],
+        },
+    }
+    if version not in {"2021.1", "2022.1"}:
+        expectations["ak.wwise.core.log.addItem"] = {"log_channel": channels, "severity": ["message", "warning", "error", "fatal"]}
+        expectations["ak.wwise.core.transport.useOriginals"] = {"audition_media": ["originals", "converted"]}
+    if version == "2025.1":
+        expectations[PROFILER_MOVE_CURSOR_URI] = {"cursor_move": ["first-frame", "last-frame", "next-frame", "previous-frame"]}
+    for operation, expected in expectations.items():
+        code, schema = gateway.execute_gateway(
+            ["request-schema", operation], env=_env(tmp_path, version=version),
+            client_factory=lambda _url: pytest.fail("Offline schema must not connect"),
+        )
+        assert code == 0, schema
+        declaration = schema["business_adapter"]["declaration"]
+        assert declaration.get("value_choices") == expected, operation
+        if operation == GET_VOICES_URI:
+            assert declaration["input_forms"]["profiler_position"]["value_forms"] == {
+                "named": ["capture-latest", "user-cursor"],
+                "integer_milliseconds": {"minimum": 0, "maximum": 2147483647, "encoding": "ASCII decimal string"},
+            }
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_log_control_draft_and_invalid_choice_preserve_disclosed_meanings(tmp_path: Path, version: str) -> None:
+    env = _env(tmp_path, version=version)
+    state = tmp_path / "state"
+    code, started = gateway.execute_gateway(
+        ["--state-dir", str(state), "draft-start", "ak.wwise.core.log.clear"],
+        env=env, client_factory=lambda _url: pytest.fail("Offline Draft start must not connect"),
+    )
+    assert code == 0, started
+    next_action = started["draft"]["next_action_binding"]
+    disclosed = next_action["declaration"]["append_fields"]["value_choices"]["log_channel"]
+    assert "source-control" in disclosed
+    assert next_action["business_contract"]["declaration"]["value_choices"]["log_channel"] == disclosed
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state), "draft-declare-runtime-control-plan", started["draft"]["draft_id"],
+         "--task-authority", started["task_authority"], "--expected-revision", str(started["draft"]["revision"]),
+         "--log-channel", "invented-log-view"],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2, rejected
+    assert rejected["error_code"] == "BUSINESS_ENUM_INVALID"
+    repair = rejected["details"]["repair"]
+    assert repair["field"] == "log_channel"
+    assert set(repair["choices"]) == set(disclosed)
+    assert repair["draft_changed"] is False
 
 
 def test_profiler_cursor_unavailable_sentinel_is_hidden_from_business_result() -> None:
