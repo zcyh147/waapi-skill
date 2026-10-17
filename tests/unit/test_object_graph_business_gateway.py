@@ -2080,18 +2080,19 @@ def test_object_set_global_settings_materialize_at_request_scope(
         })
     assert materialized.request["arguments"] == expected_arguments
 
-    # object.create's replace choice must not enter object.set or change its draft.
-    before = store.inspect(draft_id, task_authority=authority).composition
-    code, rejected = _offline(
+    # Replacement is a native child/list conflict choice in object.set too.
+    code, replaced = _offline(
         tmp_path, "draft-business-configure", draft_id,
         "--task-authority", authority, "--expected-revision", str(revision),
         "--name-conflict", "replace", version=version,
     )
-    assert code == 2, rejected
-    assert rejected["error_code"] == "FIELD_VALUE_UNAVAILABLE"
-    after = store.inspect(draft_id, task_authority=authority)
-    assert after.revision == revision
-    assert after.composition == before
+    assert code == 0, replaced
+    after = store.materialize_request(
+        draft_id, task_authority=authority, expected_revision=replaced["draft"]["revision"],
+        schema_digest=gateway.operation_draft_schema_digest("object.set", version),
+        composer_digest=operation_composer_digest("object.set", version),
+    )
+    assert after.request["arguments"]["on_name_conflict"] == "replace"
 
 
 def test_gateway_declares_named_object_list_without_native_row_json(

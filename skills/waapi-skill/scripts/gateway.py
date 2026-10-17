@@ -27923,7 +27923,7 @@ def _business_next_action_binding(
                 "configure": {
                     **operation_draft_prefix_copy_binding(configure_prefix),
                     "append": [
-                        "[--name-conflict fail|rename|merge]",
+                        "[--name-conflict fail|rename|merge|replace]",
                         "[--list-behavior append|replace-all]",
                         "[--platform <exact-user-platform>]",
                         "[--add-to-source-control|--no-add-to-source-control]",

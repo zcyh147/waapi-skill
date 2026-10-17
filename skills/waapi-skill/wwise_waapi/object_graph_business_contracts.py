@@ -276,7 +276,7 @@ def object_graph_business_contract_data(
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
                 "existing_target_choices": {
-                    "name_conflict": ["fail", "rename", "merge"],
+                    "name_conflict": ["fail", "rename", "merge", "replace"],
                     "scope": "new_children_and_list_members_of_this_existing_target",
                     "overrides": "batch_name_conflict",
                 },
@@ -311,7 +311,7 @@ def object_graph_business_contract_data(
                 "supported_versions": ["2023.1", "2024.1", "2025.1"],
             },
             "settings": {
-                "name_conflict": ["fail", "rename", "merge"],
+                "name_conflict": ["fail", "rename", "merge", "replace"],
                 "list_behavior": ["append", "replace-all"],
                 "platform": "exact_user_requested_platform;_per_target_platform_overrides",
                 "add_to_source_control": "boolean",

@@ -2689,7 +2689,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                                 },
                                 "on_name_conflict": {
                                     "type": "string",
-                                    "enum": ["fail", "rename", "merge"],
+                                    "enum": ["fail", "rename", "merge", "replace"],
                                 },
                                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
                                 "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
@@ -2742,7 +2742,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     },
                     "on_name_conflict": {
                         "type": "string",
-                        "enum": ["fail", "rename", "merge"],
+                        "enum": ["fail", "rename", "merge", "replace"],
                         "default": "fail",
                         "description": (
                             "Applies only to genuinely new children, never to existing objects[] "
@@ -5586,6 +5586,7 @@ def _prepare_object_set(
     children_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     list_subtree_snapshots: list[dict[str, Any]] = []
+    replace_subtree_snapshots: list[dict[str, Any]] = []
     path_snapshots: list[dict[str, Any]] = []
     object_set_file_proofs: list[dict[str, Any]] = []
     requested_languages: set[str] = set()
@@ -5596,6 +5597,22 @@ def _prepare_object_set(
         tuple[str, str, str],
         PropertyInfoMetadataRecord,
     ] = {}
+
+    def seal_replace_collision(row: Mapping[str, Any]) -> None:
+        collision = ResolvedObject(
+            identity=ObjectIdentity(id=row.get("id")),
+            object=row.get("id"),
+            resolution="live-exact-set-collision",
+            row=dict(row),
+        )
+        _reject_protected_replace_boundary(collision)
+        rows = _capture_replace_subtree_snapshot(collision, read=read)
+        replace_subtree_snapshots.append({
+            "root_id": collision.object,
+            "root_path": collision.row.get("path"),
+            "fields": list(OBJECT_REPLACE_SNAPSHOT_FIELDS),
+            "rows": rows,
+        })
 
     def import_context_read(
         uri: str,
@@ -5652,6 +5669,7 @@ def _prepare_object_set(
         children = normalize_object_forest(
             item.get("children", []),
             on_name_conflict=row_conflict,
+            replace_owned=row_conflict == "replace",
             base_path=f"$.objects[{index}].children",
             allow_platform=True,
             allow_language=True,
@@ -5933,7 +5951,9 @@ def _prepare_object_set(
                 }
             )
             target_spec["rename_collision_rows"] = rename_rows
-            if row_conflict == "fail":
+            if row_conflict == "replace" and rename_rows:
+                seal_replace_collision(rename_rows[0])
+            if row_conflict in {"fail", "replace"}:
                 target_spec["expected_path"] = future_target_path
         for child_spec in child_specs:
             child_spec["target_index"] = index
@@ -5960,7 +5980,7 @@ def _prepare_object_set(
                     child_specs,
                     root_request_path=target_spec["request_path"],
                 )
-                if row_conflict in {"fail", "merge"}
+                if row_conflict in {"fail", "merge", "replace"}
                 else None
             )
             if row_conflict == "merge":
@@ -6017,7 +6037,7 @@ def _prepare_object_set(
                         }
                     )
             elif (
-                row_conflict == "fail"
+                row_conflict in {"fail", "replace"}
                 and child_spec["parent_request_path"] == target_spec["request_path"]
             ):
                 assert isinstance(expected_path, str)
@@ -6026,14 +6046,19 @@ def _prepare_object_set(
                 snapshot_language = _localized_import_read_language(
                     child_spec.get("requested_language")
                 )
+                collision_path = (
+                    _request_node_expected_path(target_path, child_spec, child_specs,
+                                                root_request_path=target_spec["request_path"])
+                    if row_conflict == "replace" else expected_path
+                )
                 rows = _read_object_path_rows(
-                    expected_path,
+                    collision_path,
                     fields=fields,
                     read=read,
                     platform=snapshot_platform,
                     language=snapshot_language,
                 )
-                if rows:
+                if rows and row_conflict == "fail":
                     raise OperationContractError(
                         "TARGET_EXISTS",
                         "object.set append-only child creation with fail requires each root child path to be absent.",
@@ -6041,13 +6066,19 @@ def _prepare_object_set(
                     )
                 path_snapshots.append(
                     {
-                        "path": expected_path,
+                        "path": collision_path,
                         "fields": fields,
                         "platform": snapshot_platform,
                         "language": snapshot_language,
                         "rows": rows,
                     }
                 )
+                if len(rows) > 1:
+                    raise OperationContractError("AMBIGUOUS_IDENTITY", "A replace child collision must resolve at most once.")
+                if rows and row_conflict == "replace":
+                    seal_replace_collision(rows[0])
+                child_spec["expected_path"] = expected_path
+            elif row_conflict == "replace":
                 child_spec["expected_path"] = expected_path
 
         list_specs: list[dict[str, Any]] = []
@@ -6176,6 +6207,11 @@ def _prepare_object_set(
                             "rows": collisions,
                         },
                     )
+                if row_list_mode == "append" and row_conflict == "replace" and collisions:
+                    replacement_subtrees = _capture_object_list_replace_subtrees(collisions, read=read)
+                    for subtree in replacement_subtrees:
+                        subtree.update({"object_id": target.object, "list": descriptor.name})
+                    list_subtree_snapshots.extend(replacement_subtrees)
                 if row_list_mode == "append" and row_conflict == "merge" and collisions:
                     if not _object_type_matches(collisions[0].get("type"), root_spec):
                         raise OperationContractError(
@@ -6296,6 +6332,11 @@ def _prepare_object_set(
                     if collisions and row_list_mode == "append":
                         if row_conflict == "fail":
                             raise OperationContractError("TARGET_EXISTS", "The nested list member already exists.")
+                        if row_conflict == "replace":
+                            replacement_subtrees = _capture_object_list_replace_subtrees(collisions, read=read)
+                            for subtree in replacement_subtrees:
+                                subtree.update({"object_id": owner_id, "list": descriptor.name})
+                            list_subtree_snapshots.extend(replacement_subtrees)
                         if row_conflict == "merge":
                             if not _object_type_matches(collisions[0].get("type"), spec):
                                 raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested list member has another type.")
@@ -6379,6 +6420,25 @@ def _prepare_object_set(
             )
         dispatch_objects.append(trusted)
 
+    replaced_ids = {
+        _identity_key(row["id"])
+        for snapshot in [*replace_subtree_snapshots, *list_subtree_snapshots]
+        for row in snapshot["rows"]
+    }
+    if len(replaced_ids) > OBJECT_REPLACE_MAX_SUBTREE_NODES:
+        raise OperationContractError(
+            "REPLACE_SNAPSHOT_LIMIT_EXCEEDED",
+            "The batch replacement exceeds the complete old-GUID snapshot budget.",
+            details={"count": len(replaced_ids), "limit": OBJECT_REPLACE_MAX_SUBTREE_NODES},
+        )
+    for role, resolved in roles.items():
+        if _identity_key(resolved.object) in replaced_ids:
+            raise OperationContractError(
+                "REPLACE_DEPENDENCY_CONFLICT",
+                "A replacement would delete a target or reference required by this same Preview.",
+                details={"role": role, "object_id": resolved.object},
+            )
+
     has_imports = any(
         isinstance(spec.get("import"), Mapping) for spec in node_specs
     )
@@ -6458,6 +6518,7 @@ def _prepare_object_set(
         "children_snapshots": children_snapshots,
         "list_snapshots": list_snapshots,
         "list_subtree_snapshots": list_subtree_snapshots,
+        "subtree_snapshots": replace_subtree_snapshots,
         "field_snapshots": field_snapshots,
     }
     import_guard = {
@@ -6485,6 +6546,7 @@ def _prepare_object_set(
             }
             | {snapshot["list"] for row in node_specs for snapshot in row.get("list_snapshots", [])}
         ),
+        "replaced_subtree_rows": [dict(row) for snapshot in replace_subtree_snapshots for row in snapshot["rows"]],
         "replaced_list_subtree_rows": [
             dict(row)
             for snapshot in list_subtree_snapshots
@@ -18227,6 +18289,14 @@ def verify_prepared_operation(
                         unchanged,
                         {"expected": expected_collision, "actual": collided_rows},
                     )
+        replaced_set_rows: list[Any] = []
+        if kind == "object-set-batch":
+            for field in ("replaced_subtree_rows", "replaced_list_subtree_rows"):
+                rows = plan.get(field, [])
+                if not isinstance(rows, list):
+                    raise OperationContractError("INVALID_PREVIEW", "object.set replacement snapshots must be arrays.")
+                replaced_set_rows.extend(rows)
+        replaced_set_ids = {_identity_key(row.get("id")) for row in replaced_set_rows if isinstance(row, Mapping) and _valid_object_id(row.get("id"))}
         if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge" and plan.get("list") is not None):
             direct_specs_by_parent: dict[str, list[Mapping[str, Any]]] = {}
             for child_spec in specs:
@@ -18265,6 +18335,7 @@ def verify_prepared_operation(
                     for row in parent_spec.get("preexisting_children", [])
                     if isinstance(row, Mapping) and _valid_object_id(row.get("id"))
                 }
+                expected_ids.difference_update(replaced_set_ids)
                 complete_expected = True
                 for child_spec in direct_specs_by_parent.get(parent_path, ()):
                     child_id = resolved_id_by_path.get(str(child_spec.get("request_path")))
@@ -18298,7 +18369,7 @@ def verify_prepared_operation(
                 )
                 requested_ids = {_identity_key(value) for value in resolved_id_by_path.values() if _valid_object_id(value)}
                 for before_child in parent_spec.get("preexisting_children", []):
-                    if not isinstance(before_child, Mapping) or _identity_key(before_child.get("id")) in requested_ids:
+                    if not isinstance(before_child, Mapping) or _identity_key(before_child.get("id")) in requested_ids | replaced_set_ids:
                         continue
                     matches = [row for row in actual_children if _same_identity(row.get("id"), before_child.get("id"))]
                     unchanged = len(matches) == 1 and all(
@@ -18394,6 +18465,7 @@ def verify_prepared_operation(
                     if isinstance(row, Mapping) and _valid_object_id(row.get("id"))
                 }
             )
+            expected_ids.difference_update(replaced_set_ids)
             complete_expected = True
             for list_root_spec in list_root_specs:
                 object_id = resolved_id_by_path.get(
@@ -18442,7 +18514,7 @@ def verify_prepared_operation(
                 requested_ids = {_identity_key(resolved_id_by_path[str(spec["request_path"])])
                                  for spec in list_root_specs if str(spec["request_path"]) in resolved_id_by_path}
                 for before_member in before_rows:
-                    if _identity_key(before_member["id"]) in requested_ids:
+                    if _identity_key(before_member["id"]) in requested_ids | replaced_set_ids:
                         continue
                     matches = [row for row in actual_rows if _same_identity(row.get("id"), before_member["id"])]
                     unchanged = len(matches) == 1 and all(
@@ -18454,11 +18526,11 @@ def verify_prepared_operation(
                     check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
                           {"before": dict(before_member), "after": matches})
         if kind == "object-set-batch":
-            replaced_rows = plan.get("replaced_list_subtree_rows", [])
+            replaced_rows = replaced_set_rows
             if not isinstance(replaced_rows, list):
                 raise OperationContractError(
                     "INVALID_PREVIEW",
-                    "Object-list replaceAll old-subtree verification is malformed.",
+                    "object.set replacement old-subtree verification is malformed.",
                 )
             seen_old_ids: set[str] = set()
             for index, old_row in enumerate(replaced_rows):
@@ -18467,7 +18539,7 @@ def verify_prepared_operation(
                 ):
                     raise OperationContractError(
                         "INVALID_PREVIEW",
-                        "Object-list replaceAll old-subtree row is malformed.",
+                        "object.set replacement old-subtree row is malformed.",
                     )
                 old_id = old_row.get("id")
                 old_key = _identity_key(old_id)
@@ -18479,7 +18551,7 @@ def verify_prepared_operation(
                     fields=OBJECT_LIST_SNAPSHOT_FIELDS,
                 )
                 check(
-                    f"replaced object-list subtree GUID {index} is absent",
+                    f"replaced object.set subtree GUID {index} is absent",
                     not old_rows,
                     {"old_row": dict(old_row), "remaining_rows": old_rows},
                 )
@@ -21329,6 +21401,7 @@ def _validate_nested_request_shape(
                 forest = normalize_object_forest(
                     item.get("children", []),
                     on_name_conflict=row_conflict,
+                    replace_owned=row_conflict == "replace",
                     base_path=f"$.objects[{index}].children",
                     allow_platform=True,
                     allow_language=True,
@@ -22707,7 +22780,7 @@ def _reject_protected_replace_boundary(target: ResolvedObject) -> None:
     if protected:
         raise OperationContractError(
             "PROTECTED_REPLACE_ROOT",
-            "Project, management, and default-work-unit roots cannot bound or be removed by object.create replace.",
+            "Project, management, and default-work-unit roots cannot bound or be removed by replacement.",
             details={"target": target.as_dict()},
         )
 

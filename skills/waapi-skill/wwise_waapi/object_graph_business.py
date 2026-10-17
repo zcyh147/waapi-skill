@@ -1111,12 +1111,12 @@ def _compile_existing_set_fields(
     compiled = _compile_create_fields(session, stable_declaration)
     if "name_conflict" in fields:
         conflict = fields["name_conflict"]
-        if conflict not in {"fail", "rename", "merge"}:
+        if conflict not in {"fail", "rename", "merge", "replace"}:
             raise _repair(
                 session,
                 "FIELD_VALUE_UNAVAILABLE",
                 field="name_conflict",
-                choices=["fail", "rename", "merge"],
+                choices=["fail", "rename", "merge", "replace"],
                 action="choose one disclosed collision outcome for this target's new children and list members",
             )
         compiled["on_name_conflict"] = conflict
@@ -1424,12 +1424,12 @@ def _materialize_set(
             )
         arguments["platform"] = platform
     conflict = settings.get("name_conflict", "fail")
-    if conflict not in {"fail", "rename", "merge"}:
+    if conflict not in {"fail", "rename", "merge", "replace"}:
         raise _repair(
             session,
             "FIELD_VALUE_UNAVAILABLE",
             field="name_conflict",
-            choices=["fail", "rename", "merge"],
+            choices=["fail", "rename", "merge", "replace"],
             action="choose one disclosed child collision outcome",
         )
     if conflict != "fail":

@@ -118,8 +118,16 @@ class OwnedGraphTask(FieldTask):
                 row = self.objects[item["object"]]
                 row["notes"] = item.get("notes", row["notes"])
                 children = [self._create(child, row["id"]) for child in item.get("children", [])]
-                results.append({"id": row["id"], "name": row["name"],
-                                **({"children": children} if children else {})})
+                result_row = {"id": row["id"], "name": row["name"],
+                              **({"children": children} if children else {})}
+                for key, values in item.items():
+                    if key.startswith("@") and isinstance(values, list):
+                        previous = [member for member in row.get(key, []) if member["id"] in self.objects]
+                        members = [self._create(member, row["id"], owned=True) for member in values]
+                        previous = [member for member in previous if member["id"] in self.objects]
+                        row[key] = [*previous, *({"id": member["id"]} for member in members if {"id": member["id"]} not in previous)]
+                        result_row[key] = members
+                results.append(result_row)
             if self.bad_result == "alter-unrequested":
                 for row in self.objects.values():
                     if row["name"] == "Wind":
@@ -443,3 +451,193 @@ def test_create_merges_owned_list_root_and_descendants_preserving_existing_child
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
     assert task.objects[ROOT]["notes"] == "Keep layers" and task.objects[old_child]["notes"] == "Keep wind"
+
+
+class SetReplaceTask(OwnedGraphTask):
+    """Model native replace deleting a collision before creating fresh GUIDs."""
+    def __init__(self, path: Path, version: str) -> None:
+        super().__init__(path, version, "object.set")
+        self.retain_old_descendant = False
+        self.objects[ROOT] = {"id": ROOT, "name": "LAYERS", "type": "Sound",
+            "path": self.objects[FIRST]["path"] + r"\LAYERS", "parent": {"id": FIRST}, "notes": "Old root"}
+        self.objects[CHILD] = {"id": CHILD, "name": "Old child", "type": "Sound",
+            "path": self.objects[ROOT]["path"] + r"\Old child", "parent": {"id": ROOT}, "notes": "Old child"}
+        self.old_child = deepcopy(self.objects[CHILD])
+        self.objects["{77777777-7777-7777-7777-777777777777}"] = {
+            "id": "{77777777-7777-7777-7777-777777777777}", "name": "Wind", "type": "Sound",
+            "path": self.objects[FIRST]["path"] + r"\Wind", "parent": {"id": FIRST}, "notes": "Keep wind"}
+
+    def call(self, uri: str, args: Any = None, options: Any = None) -> Any:
+        if uri.endswith("object.set"):
+            for item in args["objects"]:
+                if "name" not in item:
+                    continue
+                source = self.objects[item["object"]]
+                before_path = source["path"]
+                after_path = before_path.rsplit("\\", 1)[0] + "\\" + item["name"]
+                if item.get("onNameConflict", args.get("onNameConflict")) == "replace":
+                    collisions = [row for row in self.objects.values() if row["id"] != source["id"]
+                                  and row["path"].casefold() == after_path.casefold()]
+                    for collision in collisions:
+                        for object_id, row in list(self.objects.items()):
+                            if object_id == collision["id"] or row["path"].startswith(collision["path"] + "\\"):
+                                del self.objects[object_id]
+                source["name"] = item["name"]
+                for row in self.objects.values():
+                    if row["path"] == before_path or row["path"].startswith(before_path + "\\"):
+                        row["path"] = after_path + row["path"][len(before_path):]
+        return super().call(uri, args, options)
+
+    def _create(self, node: dict[str, Any], parent: str, *, owned: bool = False) -> dict[str, Any]:
+        if self.conflict == "replace":
+            collisions = [row for row in self.objects.values()
+                          if row["name"].casefold() == node["name"].casefold()
+                          and row.get("owner" if owned else "parent") == {"id": parent}]
+            for collision in collisions:
+                for object_id, row in list(self.objects.items()):
+                    if object_id == collision["id"] or row["path"].startswith(collision["path"] + "\\"):
+                        del self.objects[object_id]
+        result = super()._create(node, parent, owned=owned)
+        if self.conflict == "replace":
+            # Native replacement allocates fresh IDs, even if names/types match.
+            old_id = result["id"]
+            new_id = {ROOT: "{88888888-8888-8888-8888-888888888888}",
+                      CHILD: "{99999999-9999-9999-9999-999999999999}"}.get(old_id, old_id)
+            row = self.objects.pop(old_id)
+            row["id"] = result["id"] = new_id
+            self.objects[new_id] = row
+            for child in self.objects.values():
+                if child.get("parent") == {"id": old_id}:
+                    child["parent"] = {"id": new_id}
+            if self.retain_old_descendant and node["name"] == "Layers":
+                self.objects[CHILD] = deepcopy(self.old_child)
+        return result
+
+
+def _declare_set_replacement(task: SetReplaceTask, *, per_target: bool = False) -> None:
+    owner = task.bind(FIRST)
+    if per_target:
+        code, declared = task.step("draft-declare-existing", "--declaration-id", "owner",
+                                   "--object-handle", owner, "--field", "notes", "Owner updated",
+                                   "--field", "name_conflict", "replace")
+    else:
+        code, declared = task.step("draft-business-configure", "--name-conflict", "replace")
+    assert code == 0, declared
+    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
+                           "--name", "Layers", "--kind", "actor-mixer")
+    assert code == 0, root
+    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
+                            root["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
+    assert code == 0, child
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("per_target", (False, True))
+def test_set_replace_seals_case_insensitive_collision_and_verifies_fresh_subtree(
+    tmp_path: Path, version: str, per_target: bool,
+) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    _declare_set_replacement(task, per_target=per_target)
+    tx, shown = task.preview()
+    prepared = shown["artifact"]["prepared_operation"]
+    assert prepared["dispatch"]["args"]["objects"][0].get("onNameConflict", prepared["dispatch"]["args"]["onNameConflict"]) == "replace"
+    assert {row["id"] for row in prepared["verification_plan"]["replaced_subtree_rows"]} == {ROOT, CHILD}
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+    assert ROOT not in task.objects and CHILD not in task.objects
+    assert task.objects["{88888888-8888-8888-8888-888888888888}"]["name"] == "Layers"
+    assert task.objects["{77777777-7777-7777-7777-777777777777}"]["notes"] == "Keep wind"
+    assert len([uri for uri, _, _ in task.calls if uri.endswith("object.set")]) == 1
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_replace_rejects_changed_old_subtree_before_dispatch(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    _declare_set_replacement(task)
+    tx, shown = task.preview()
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    task.objects[CHILD]["path"] += " renamed"
+    code, rejected = task.run("execute", tx)
+    assert code == 2, rejected
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_replace_does_not_verify_surviving_old_descendant(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    _declare_set_replacement(task)
+    tx, shown = task.preview()
+    task.retain_old_descendant = True
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verified"] is False, verified
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_replace_list_collision_preserves_unrequested_member(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    task.objects[ROOT].update({"parent": None, "owner": {"id": FIRST}})
+    wind = "{77777777-7777-7777-7777-777777777777}"
+    task.objects[wind].update({"parent": None, "owner": {"id": FIRST}})
+    task.objects[FIRST]["@CustomList"] = [{"id": ROOT}, {"id": wind}]
+    owner = task.bind(FIRST)
+    code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
+    assert code == 0, configured
+    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
+                           "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
+    assert code == 0, root
+    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
+                            root["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
+    assert code == 0, child
+    tx, shown = task.preview()
+    prepared = shown["artifact"]["prepared_operation"]
+    assert {row["id"] for row in prepared["verification_plan"]["replaced_list_subtree_rows"]} == {ROOT, CHILD}
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+    assert task.objects[FIRST]["@CustomList"] == [{"id": wind}, {"id": "{88888888-8888-8888-8888-888888888888}"}]
+    assert task.objects[wind]["notes"] == "Keep wind"
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_replace_rejects_deleting_another_explicit_batch_target(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    _declare_set_replacement(task)
+    old_child = task.bind(CHILD)
+    code, rejected = task.step("draft-declare-existing", "--declaration-id", "old-child",
+                               "--object-handle", old_child, "--field", "notes", "Conflicting update")
+    # The declaration remains mutable until Preview seals the whole batch.
+    if code == 0:
+        code, rejected = task.step("draft-check")
+    assert code == 2 and rejected["error_code"] == "REPLACE_DEPENDENCY_CONFLICT", rejected
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_replace_without_collision_creates_the_requested_graph(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    del task.objects[ROOT], task.objects[CHILD]
+    _declare_set_replacement(task)
+    tx, shown = task.preview()
+    assert shown["artifact"]["prepared_operation"]["verification_plan"]["replaced_subtree_rows"] == []
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_replace_rename_keeps_source_identity_and_replaces_exact_sibling(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    task.objects[ROOT].update({"parent": {"id": SECOND}, "path": task.objects[SECOND]["path"] + r"\LAYERS"})
+    task.objects[CHILD]["path"] = task.objects[ROOT]["path"] + r"\Old child"
+    source = task.bind(FIRST)
+    code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
+    assert code == 0, configured
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "source", "--object-handle", source,
+                               "--field", "new_name", "Layers")
+    assert code == 0, declared
+    tx, shown = task.preview()
+    assert {row["id"] for row in shown["artifact"]["prepared_operation"]["verification_plan"]["replaced_subtree_rows"]} == {ROOT, CHILD}
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+    assert task.objects[FIRST]["name"] == "Layers" and ROOT not in task.objects and CHILD not in task.objects
+    wind = task.objects["{77777777-7777-7777-7777-777777777777}"]
+    assert wind["parent"] == {"id": FIRST} and wind["notes"] == "Keep wind"
