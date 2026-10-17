@@ -31062,6 +31062,37 @@
     {
       "model_values": [
         {
+          "channel": "fixed.debug-wal-tree",
+          "name": "max-nodes",
+          "path": [
+            "fixed_command",
+            "debug-wal-tree",
+            "max-nodes"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "channel": "fixed.debug-wal-tree",
+          "name": "wal-page",
+          "path": [
+            "fixed_command",
+            "debug-wal-tree",
+            "wal-page"
+          ],
+          "required": false,
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        }
+      ],
+      "sha256": "2be9f19c6da1b54300b89a7c6bc2b90525ec1ec192504a21f87347103557f80a"
+    },
+    {
+      "model_values": [
+        {
           "channel": "request",
           "name": "emitter",
           "path": [
@@ -145137,24 +145168,6 @@
     {
       "model_values": [
         {
-          "channel": "fixed.debug-wal-tree",
-          "name": "max-nodes",
-          "path": [
-            "fixed_command",
-            "debug-wal-tree",
-            "max-nodes"
-          ],
-          "required": false,
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        }
-      ],
-      "sha256": "e92ba73a10165d56c595d2c6a33c98ca41cf81930ff1e1b4392903669aa01741"
-    },
-    {
-      "model_values": [
-        {
           "channel": "request",
           "name": "copy-from-platform",
           "path": [
@@ -155951,7 +155964,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 878
   },
-  "inventory_sha256": "002e6814949faed479df741077e3f6a1957a67bf9b7d7f2848354b820a34ec69",
+  "inventory_sha256": "62855c10e7100730497f2d2cc6e9437c7a53f4579ab0934469c5d3cfde6d847a",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -169369,7 +169382,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "2d01929dda0d36713f9348434dd61c06a6f0db62aa3e5e5665b97dc1fe4635d8",
-      "field_contract_sha256": "e92ba73a10165d56c595d2c6a33c98ca41cf81930ff1e1b4392903669aa01741",
+      "field_contract_sha256": "2be9f19c6da1b54300b89a7c6bc2b90525ec1ec192504a21f87347103557f80a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -175766,7 +175779,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "cc58ba17bec30eb007e82f8c5175d43e5861d233a10251f9b3617ea53b3eaf1f",
-      "field_contract_sha256": "e92ba73a10165d56c595d2c6a33c98ca41cf81930ff1e1b4392903669aa01741",
+      "field_contract_sha256": "2be9f19c6da1b54300b89a7c6bc2b90525ec1ec192504a21f87347103557f80a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -182932,7 +182945,7 @@
       ],
       "disposition": "already_deep",
       "execution_policy_sha256": "a558c82f1d1f02f5ab25f9c4917a0ac022f6a0fc77195bae979f0df0d1756881",
-      "field_contract_sha256": "e92ba73a10165d56c595d2c6a33c98ca41cf81930ff1e1b4392903669aa01741",
+      "field_contract_sha256": "2be9f19c6da1b54300b89a7c6bc2b90525ec1ec192504a21f87347103557f80a",
       "host": "wwise-console",
       "item_type": "function",
       "leaked_mechanics": [],
@@ -186977,7 +186990,7 @@
       "argument_contract_sha256": "8cec34dce4ef5f90bb78fb04329ea2d134360f9335632d5aefe62e7bf0061825",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "3306d3a85bce2d39c8d4050556692ae2d89bbc9f2cb8f6d38fd6ee5a34b4a981",
+      "contract_sha256": "a05768f7dfeb8ffe0c05a5a9e23fca83765cf599e7aa39ace0d9eb9b93f26123",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187004,7 +187017,7 @@
       "argument_contract_sha256": "8cec34dce4ef5f90bb78fb04329ea2d134360f9335632d5aefe62e7bf0061825",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "4435e01c69b7959ad7c05cd74ec3d10c2959eb535905e8f12260f721d888a1eb",
+      "contract_sha256": "5d6f68d08b88d481c6ede78b91c1346bb3b48482b7f5ce2dbbf7d65a3af6526c",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187031,7 +187044,7 @@
       "argument_contract_sha256": "8cec34dce4ef5f90bb78fb04329ea2d134360f9335632d5aefe62e7bf0061825",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "327b2e3e0c5f37d2db5f0e19f8c938b88d1fbc0a09444cc1ca9a23b93ededb50",
+      "contract_sha256": "96ba8691d2bd48beb39a9faab5db83bc60beb67da64a131851ed94c2c0c0ac03",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187058,7 +187071,7 @@
       "argument_contract_sha256": "8cec34dce4ef5f90bb78fb04329ea2d134360f9335632d5aefe62e7bf0061825",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "d9b65d39fb1b77a133035051d845bdc9040b828d0edc92034f591315661449e1",
+      "contract_sha256": "aa58f74a30f9c1fc1e766f5ef0d56c0f04e58e380d26de78001b47651191f1c5",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187436,7 +187449,7 @@
       "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "0ffa2a03c6fc79c33a2de282951fbf8c6e48d9be8081585de4efe156e061449f",
+      "contract_sha256": "607ead7cc76275201a2a018b0e526e1932215419799854ccf4df31f411ee7c5a",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187463,7 +187476,7 @@
       "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "6bf7dd5d6bb922a3c2c3fc410429d5a2b2bfd8aee36529ccd0b9f3eb2c352823",
+      "contract_sha256": "9988021f8aaa279fef73139b51ac8b37b194ce6dcb635e866d83fe1c29538830",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187490,7 +187503,7 @@
       "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "8b149d780beefe6794907b662cef4ade9ed659f819eb1b56f692d51c13b69197",
+      "contract_sha256": "0f0d1b353891f9bd88b223934f9f89f6c73238c611e467c3c955d6487d0c4d47",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187517,7 +187530,7 @@
       "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "facd6dc05ad579c3bb91f221030849a38915ddcb61e997aafdde58f3a504ff62",
+      "contract_sha256": "4a681f60d968aeb0e8809b870c6d179afbab1979d9217b52e0d6f128a8005129",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187544,7 +187557,7 @@
       "argument_contract_sha256": "2747a462a58d266ceab111cbeba0a5a7268d0c9ab619e1c5e42a8c8ae54031f2",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "632cadd7a725a92fcdde14f10035260ab4ab6c7db95dfd13be034efe6042e131",
+      "contract_sha256": "267c926e08ec9c12ec7af339594fbc75d12eebcbac51256821f128dce0a3c3d2",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187679,7 +187692,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "08977cd33118193010bc33466acc83b87fc1e7ad83d22cb35e97742e677c847f",
+      "contract_sha256": "d15b8c2685acd0da803526c3258f120e2f0a436a53d5603be25c96b6cb3183a7",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187706,7 +187719,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "ab3f6de4059c987225c0ad1d6edc61c04f3cb11db5705b294aae3b2ed2781fb3",
+      "contract_sha256": "fb9fb48b54f9439cbef3646b849db4e0c7141f3a46ef6b63e14c6d8046666472",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187733,7 +187746,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "4a1da6bf684e0d237bed7017ca4cb3a19ce7868b3a7f60c18d3992d3a16a7e5f",
+      "contract_sha256": "7220e9ac0b2ae05867489824e82f0d2d8ffba540adade0f90cc0710eef24dbbc",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187760,7 +187773,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "bfed0780948dd749bb482cd3cb409afadd8612a84acb4b7e94ec010297f9d9f0",
+      "contract_sha256": "cf9c5ada319f1337bf4c539bfbdd0bd4afbba1f4212b8ba0ca3a6f7630fbb84a",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -187787,7 +187800,7 @@
       "argument_contract_sha256": "b64ab9f24a6023d76a40a7ba1fd53f0ed4c1ae3477440677f893717d968d2438",
       "audit_evidence": "The public object-metadata-business/v1 Adapters accept exact object identities, short user-facing field meanings, optional platform, and business outcomes; live discovery issues opaque field handles, compiles the exact metadata scope, token, wire value, request, and staged continuation inside the Gateway, and removes normal inline_typed ingress for all 13 lanes. #77 retains five-version deterministic repair and non-bypass coverage, exact macOS/Windows 2022.1 and 2025.1 real-host execution, and a current-v3 Terra Fresh Agent Alarm reference repair PASS plus identical verify-only audit on both hosts. v1.1 review: paged enumeration/exact scope-bound selection retains complete live metadata; reviewed conditional-reference prerequisites are explicit in Preview and verification, while unknown dependencies remain boundaries. Metadata locators alone never authorize mutation.",
       "classification": "named-object-metadata-fields",
-      "contract_sha256": "334959d110ea1609b9c19f25046adb3eed705bcf7ea3b530a9ab53ce82f60127",
+      "contract_sha256": "fb8fc2cef3ede7bcd1e9418554510213099857ef3233b702c51e148a334305af",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -189387,9 +189400,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "8d60ac051953f0201f717983e80c0249e837810a4f0b8a974f27c92dd5188b3c",
-    "operation_contract_sha256": "eb219a226469e82b34fc8b6813e8e222a7d925d9db53d104afc95477a315a710",
-    "public_continuation_sha256": "0770d8481f676ba5c41c22ade8327e71dd4eff025bcbf1b258c985fe046be6e2",
+    "gateway_parser_sha256": "bcc40519ed5a49c68bd6a2d2ef37eb22abe14c7aba1883728f59f792319b5156",
+    "operation_contract_sha256": "93437acf58161de7ea3d694b77645136c41ea3ce0f818b4bc810ac5703256f75",
+    "public_continuation_sha256": "c040201be27d134b9f8cb7cf5439caa19d12e0443b8508da23e8926e927d5b2f",
     "typed_request_surface_sha256": "5a60a7057fc4d526efd91b683018021ebe42840b3a37f99fbc7a059e76185259"
   },
   "summary": {

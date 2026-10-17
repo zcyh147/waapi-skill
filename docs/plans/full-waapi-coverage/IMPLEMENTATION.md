@@ -293,6 +293,31 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   results and empty process-group receipts remain separate. Full Program and
   Non-live gates remain pending on the final integrated candidate.
 
+- Eighth partial integration consumes only fixed #177 `6ae226a8`, #193
+  `02c8f2d0` and #194 `6a05ce99` on `b328ec63`. Existing-object reference
+  category/playability and shared-owner checks retain exact live facts, one-shot
+  execution and terminal false-versus-unknown verification outcomes. The opt-in
+  GameParameter source plan maps 35 exact original Min/Max members through ten
+  direct receiver groups; its default approved f72 plan and all native/live
+  requirements remain unchanged. WAL responses preserve the complete native
+  document through bounded context-bound fragments, and large legal Tone plans
+  retain bounded request/artifact checks. The Program Tone fixtures now create
+  independent isolated WAV artifacts. Formal-harness compatibility uses actual
+  public Draft continuations and compact terminal receipts; compound-child and
+  remaining #194 acceptance work stay open.
+  Reconciliation preserves 878 public rows / 218 unique URIs, all 272,313 native
+  ID/shape/owner tuples and all obligation states, requirements and evidence.
+  Three WAL command contracts and fourteen named metadata contract seals change;
+  parser and continuation seals follow the reviewed runtime. The Program union
+  remains 241 unique nodes without duplicate or whole-file/node overlap.
+  Original b328 Program **9495 passed, 3 failed, 3 Windows skips** in 2398.60
+  seconds remains a FAIL, independently of the repaired Tone fixture evidence.
+  Worker #194's original synthetic-fixture failures remain preserved; its fixed
+  four-module focus passed **742 tests with 6 native-Windows skips** in 371.31
+  seconds. Combined integration focus and broad gates are pending. No native,
+  Authoring, Console or Fresh process was launched for this integration, no
+  historical receipt is transferred, and no ticket completion is claimed.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
