@@ -82,6 +82,12 @@ _BUSINESS_DRAFT_EVENT_OPTIONS = {
     "draft-declare-soundbank-plan": frozenset({"settings.revised"}),
     "draft-declare-artifact-plan": frozenset({"settings.revised"}),
     "draft-declare-core-plan": frozenset({"settings.revised"}),
+    "draft-declare-cli-console-plan": frozenset({"settings.revised"}),
+    "draft-declare-debug-intent": frozenset({"settings.revised"}),
+    "draft-declare-host-plan": frozenset({"settings.revised"}),
+    "draft-declare-layout-plan": frozenset({"settings.revised"}),
+    "draft-declare-soundengine-plan": frozenset({"settings.revised"}),
+    "draft-declare-undo-plan": frozenset({"settings.revised"}),
     "draft-declare-project-setting-plan": frozenset({"settings.revised"}),
     "draft-declare-runtime-control-plan": frozenset({"settings.revised"}),
     "draft-declare-source-control-plan": frozenset({"settings.revised"}),
@@ -644,6 +650,7 @@ def _composer_flow_step_indexes(
 
 def _validate_business_draft_evidence(
     *,
+    state_directory: Path,
     operation: str,
     version: str,
     schema_digest: str,
@@ -655,12 +662,20 @@ def _validate_business_draft_evidence(
 ) -> Mapping[str, Any]:
     event_options: list[frozenset[str]] = []
     response_revisions: list[int] = []
+    response_no_events: list[bool] = []
     preview_payload: Mapping[str, Any] | None = None
     for step, payload in zip(steps, payloads, strict=True):
+        no_event = step.subcommand == "draft-inspect" or (
+            step.subcommand == "draft-discover-fields" and "--list" in step.arguments
+        )
+        if (step.subcommand.startswith("draft-")
+                and step.subcommand not in _BUSINESS_DRAFT_EVENT_OPTIONS
+                and step.subcommand != "draft-inspect"):
+            _fail("Business Draft command has no exact business event or read-only policy")
         options = _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
-        if options is not None:
+        if options is not None and not no_event:
             event_options.extend(
-                (options, options)
+                (frozenset({"seal_reserved"}), frozenset({"sealed"}))
                 if step.subcommand == "preview-from-draft"
                 else (options,)
             )
@@ -689,6 +704,7 @@ def _validate_business_draft_evidence(
         ):
             _fail("Business Draft response does not preserve its immutable binding")
         response_revisions.append(revision)
+        response_no_events.append(no_event)
         integrity = raw_draft.get("response_integrity")
         if integrity is not None and (
             not isinstance(integrity, Mapping)
@@ -706,10 +722,11 @@ def _validate_business_draft_evidence(
         )
         or durable.revision != len(audit_types)
         or any(
-            later <= earlier
-            for earlier, later in zip(
+            (later != earlier if no_event else later <= earlier)
+            for earlier, later, no_event in zip(
                 response_revisions,
                 response_revisions[1:],
+                response_no_events[1:],
                 strict=False,
             )
         )
@@ -762,11 +779,13 @@ def _validate_business_draft_evidence(
             != durable.seal.get("artifact_hash")
         ):
             _fail("Business Draft Preview is not bound to its durable canonical request")
-        preview_binding: Mapping[str, Any] | None = {
-            "transaction_id": durable.seal["transaction_id"],
-            "artifact_hash": durable.seal["artifact_hash"],
-            "transaction_state": durable.seal["transaction_state"],
-        }
+        preview_binding, _cleanup = _sealed_draft_transaction_binding(
+            state_directory=state_directory, canonical=canonical_request,
+            transaction_id=durable.seal["transaction_id"],
+            artifact_hash=durable.seal["artifact_hash"], preview_payload=preview_payload,
+            steps=steps, payloads=payloads,
+        )
+        preview_binding = {**preview_binding, "transaction_state": durable.seal["transaction_state"]}
     else:
         preview_binding = None
 
@@ -814,6 +833,132 @@ def _materialize_archived_business_request(
             and adapter.supports_cleaned_file_evidence
         ),
     )
+
+
+def _sealed_draft_transaction_binding(
+    *, state_directory: Path, canonical: Mapping[str, Any],
+    transaction_id: str, artifact_hash: str, preview_payload: Mapping[str, Any],
+    steps: Sequence[Any], payloads: Sequence[Mapping[str, Any]],
+) -> tuple[Mapping[str, Any], Any]:
+    """Replay the original immutable transaction and full journal for either Draft lane."""
+    preview_agent = _mapping(
+        preview_payload.get("agent_result"),
+        label="Composer Preview agent_result",
+    )
+    if (
+        preview_agent.get("request") != canonical
+        or preview_agent.get("transaction_id") != transaction_id
+        or preview_agent.get("artifact_hash") != artifact_hash
+        or (
+            "cleanup" in preview_payload
+            and preview_agent.get("cleanup") != preview_payload["cleanup"]
+        )
+    ):
+        _fail("Composer Preview agent_result is not bound to the canonical request")
+
+    transaction = load_transaction_archive_snapshot(state_directory, transaction_id)
+    artifact = _mapping(transaction.preview.artifact, label="Composer Preview artifact")
+    prepared = _mapping(
+        artifact.get("prepared_operation"),
+        label="Composer prepared operation",
+    )
+    if (
+        transaction.preview.artifact_hash != artifact_hash
+        or artifact.get("request") != canonical
+        or prepared.get("request") != canonical
+    ):
+        _fail("Composer transaction artifact is not canonical-request equivalent")
+    expected_preview_cleanup = transaction_cleanup_payload(
+        prepared,
+        phase="preview",
+    )
+    if preview_payload.get("cleanup") != expected_preview_cleanup:
+        _fail("Composer Preview cleanup does not replay from its immutable spec")
+    preview_step = next(
+        step for step in steps if step.subcommand == "preview-from-draft"
+    )
+    draft_label = preview_step.name.split(".", 1)[0]
+    transaction_payloads = [
+        payload
+        for step, payload in zip(steps, payloads)
+        if step.name.startswith(f"{draft_label}.")
+        and step.subcommand
+        in {"transaction-show", "confirm", "reject", "execute", "verify"}
+    ]
+    if any(payload.get("transaction_id") != transaction_id for payload in transaction_payloads):
+        _fail("Composer transaction commands do not share the sealed transaction ID")
+    for parent in transaction_payloads:
+        if "agent_result" not in parent:
+            continue
+        agent_result = _mapping(
+            parent["agent_result"],
+            label="Composer transaction agent_result",
+        )
+        if (
+            agent_result.get("request") != canonical
+            or agent_result.get("transaction_id") != transaction_id
+            or agent_result.get("artifact_hash") != artifact_hash
+        ):
+            _fail("Composer transaction agent_result drifted from its sealed request")
+        if "cleanup" in parent and agent_result.get("cleanup") != parent["cleanup"]:
+            _fail("Composer transaction cleanup projections disagree")
+    cleanup = preview_payload.get("cleanup")
+    for payload in reversed(transaction_payloads):
+        if "cleanup" in payload:
+            cleanup = payload["cleanup"]
+            break
+    execution_result: Mapping[str, Any] = {}
+    for event in transaction.events:
+        if event.get("event_type") != "execution_completed":
+            continue
+        details = event.get("details")
+        if isinstance(details, Mapping) and isinstance(
+            details.get("dispatch_result"), Mapping
+        ):
+            execution_result = details["dispatch_result"]
+    final_event_type = transaction.events[-1].get("event_type")
+    cleanup_phase = (
+        "verified"
+        if final_event_type == "verification_recorded"
+        else "indeterminate"
+        if final_event_type == "execution_indeterminate"
+        else "execution_cancelled"
+        if final_event_type == "execution_cancelled"
+        else "executed"
+        if final_event_type == "execution_completed"
+        else "preview"
+    )
+    expected_cleanup = transaction_cleanup_payload(
+        prepared,
+        phase=cleanup_phase,
+        execution_result=execution_result,
+    )
+    if cleanup != expected_cleanup:
+        _fail("Composer cleanup outcome does not replay from its immutable spec")
+    final_event_details = _mapping(
+        transaction.events[-1].get("details"),
+        label="Composer final transaction event details",
+    )
+    final_transaction_payload = transaction_payloads[-1] if transaction_payloads else {}
+    if (
+        "verification" in final_transaction_payload
+        and not _verification_projection_matches_journal(
+            final_transaction_payload["verification"],
+            final_event_details.get("verification"),
+        )
+    ):
+        _fail("Composer verification result does not match the transaction journal")
+    preview_binding = {
+        "transaction_id": transaction_id,
+        "artifact_hash": artifact_hash,
+        "transaction_final_state": transaction.record.state.value,
+        "transaction_event_count": len(transaction.events),
+        "transaction_last_event_hash": transaction.record.last_event_hash,
+        "cleanup_spec_sha256": canonical_sha256(
+            prepared.get("cleanup", {"kind": "none"})
+        ),
+    }
+    return preview_binding, cleanup
 
 
 def _validate_typed_draft_evidence(
@@ -916,6 +1061,7 @@ def _validate_typed_draft_evidence(
 
     if operation_uses_business_declaration(operation, version):
         return _validate_business_draft_evidence(
+            state_directory=state_directory,
             operation=operation,
             version=version,
             schema_digest=schema_digest,
@@ -1281,123 +1427,11 @@ def _validate_typed_draft_evidence(
             or preview_payload.get("state") != durable.seal["transaction_state"]
         ):
             _fail("Composer Preview response does not match the durable seal")
-        preview_agent = _mapping(
-            preview_payload.get("agent_result"),
-            label="Composer Preview agent_result",
+        preview_binding, cleanup = _sealed_draft_transaction_binding(
+            state_directory=state_directory, canonical=canonical,
+            transaction_id=transaction_id, artifact_hash=artifact_hash,
+            preview_payload=preview_payload, steps=steps, payloads=payloads,
         )
-        if (
-            preview_agent.get("request") != canonical
-            or preview_agent.get("transaction_id") != transaction_id
-            or preview_agent.get("artifact_hash") != artifact_hash
-            or (
-                "cleanup" in preview_payload
-                and preview_agent.get("cleanup") != preview_payload["cleanup"]
-            )
-        ):
-            _fail("Composer Preview agent_result is not bound to the canonical request")
-
-        transaction = load_transaction_archive_snapshot(state_directory, transaction_id)
-        artifact = _mapping(transaction.preview.artifact, label="Composer Preview artifact")
-        prepared = _mapping(
-            artifact.get("prepared_operation"),
-            label="Composer prepared operation",
-        )
-        if (
-            transaction.preview.artifact_hash != artifact_hash
-            or artifact.get("request") != canonical
-            or prepared.get("request") != canonical
-        ):
-            _fail("Composer transaction artifact is not canonical-request equivalent")
-        expected_preview_cleanup = transaction_cleanup_payload(
-            prepared,
-            phase="preview",
-        )
-        if preview_payload.get("cleanup") != expected_preview_cleanup:
-            _fail("Composer Preview cleanup does not replay from its immutable spec")
-        preview_step = next(
-            step for step in steps if step.subcommand == "preview-from-draft"
-        )
-        draft_label = preview_step.name.split(".", 1)[0]
-        transaction_payloads = [
-            payload
-            for step, payload in zip(steps, payloads)
-            if step.name.startswith(f"{draft_label}.")
-            and step.subcommand
-            in {"transaction-show", "confirm", "reject", "execute", "verify"}
-        ]
-        if any(payload.get("transaction_id") != transaction_id for payload in transaction_payloads):
-            _fail("Composer transaction commands do not share the sealed transaction ID")
-        for parent in transaction_payloads:
-            if "agent_result" not in parent:
-                continue
-            agent_result = _mapping(
-                parent["agent_result"],
-                label="Composer transaction agent_result",
-            )
-            if (
-                agent_result.get("request") != canonical
-                or agent_result.get("transaction_id") != transaction_id
-                or agent_result.get("artifact_hash") != artifact_hash
-            ):
-                _fail("Composer transaction agent_result drifted from its sealed request")
-            if "cleanup" in parent and agent_result.get("cleanup") != parent["cleanup"]:
-                _fail("Composer transaction cleanup projections disagree")
-        cleanup = None
-        for payload in reversed(transaction_payloads):
-            if "cleanup" in payload:
-                cleanup = payload["cleanup"]
-                break
-        execution_result: Mapping[str, Any] = {}
-        for event in transaction.events:
-            if event.get("event_type") != "execution_completed":
-                continue
-            details = event.get("details")
-            if isinstance(details, Mapping) and isinstance(
-                details.get("dispatch_result"), Mapping
-            ):
-                execution_result = details["dispatch_result"]
-        final_event_type = transaction.events[-1].get("event_type")
-        cleanup_phase = (
-            "verified"
-            if final_event_type == "verification_recorded"
-            else "indeterminate"
-            if final_event_type == "execution_indeterminate"
-            else "execution_cancelled"
-            if final_event_type == "execution_cancelled"
-            else "executed"
-            if final_event_type == "execution_completed"
-            else "preview"
-        )
-        expected_cleanup = transaction_cleanup_payload(
-            prepared,
-            phase=cleanup_phase,
-            execution_result=execution_result,
-        )
-        if cleanup != expected_cleanup:
-            _fail("Composer cleanup outcome does not replay from its immutable spec")
-        final_event_details = _mapping(
-            transaction.events[-1].get("details"),
-            label="Composer final transaction event details",
-        )
-        final_transaction_payload = transaction_payloads[-1] if transaction_payloads else {}
-        if (
-            "verification" in final_transaction_payload
-            and not _verification_projection_matches_journal(
-                final_transaction_payload["verification"],
-                final_event_details.get("verification"),
-            )
-        ):
-            _fail("Composer verification result does not match the transaction journal")
-        preview_binding = {
-            "transaction_id": transaction_id,
-            "artifact_hash": artifact_hash,
-            "transaction_final_state": transaction.record.state.value,
-            "transaction_event_count": len(transaction.events),
-            "transaction_last_event_hash": transaction.record.last_event_hash,
-            "cleanup_spec_sha256": canonical_sha256(
-                prepared.get("cleanup", {"kind": "none"})
-            ),
-        }
 
     evidence: dict[str, Any] = {
         "contract": TYPED_DRAFT_EVIDENCE_CONTRACT,

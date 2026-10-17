@@ -46,7 +46,11 @@ _EXACT_TYPE_NAME_WAQL = re.compile(
 
 
 class WaapiRequestFailed(RuntimeError):
-    pass
+    def __init__(self, message: str, kwargs: Mapping[str, Any] | None = None) -> None:
+        super().__init__(message)
+        if kwargs is not None:
+            self.uri = message
+            self.kwargs = kwargs
 
 
 class WaapiClient:
@@ -69,7 +73,7 @@ class WaapiClient:
             return {
                 "displayName": "Wwise",
                 "isCommandLine": bool(self.fixture.get("is_command_line", True)),
-                "sessionId": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+                "sessionId": self.fixture.get("session_id", "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}"),
                 "processId": 4242,
                 "processPath": str(self.fixture["process_path"]),
                 "apiVersion": 1,
@@ -81,8 +85,36 @@ class WaapiClient:
                     "minor": 0,
                     "build": 1,
                     "displayName": f"v{year}.{major}.0.1",
+                    **({"schema": 152} if "layout_state_path" in self.fixture else {}),
                 },
             }
+        if uri.startswith("ak.wwise.ui.layout.") and "layout_state_path" in self.fixture:
+            state_path = Path(self.fixture["layout_state_path"])
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            state["calls"].append({"uri": uri, "args": arguments, "options": dict(options or {})})
+            state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+            method = uri.removeprefix("ak.wwise.ui.layout.")
+            if method == "getLayoutNames":
+                return {"layouts": list(state["layouts"])}
+            if method == "getViewTypes":
+                return {"viewTypes": [{"viewName": "ProjectExplorer", "viewDisplayName": "Project Explorer"}]}
+            if method == "getViewInstances":
+                return {"viewInstances": []}
+            if method == "getCurrentLayoutName":
+                return {"name": state["current"]}
+            if method == "getLayout":
+                name = arguments["name"]
+                if name not in state["layouts"]:
+                    raise WaapiRequestFailed("ak.wwise.unavailable", {
+                        "details": {"procedureUri": uri},
+                        "message": f"Layout '{name}' could not be found.",
+                    })
+                return state["layouts"][name]
+            if method == "setLayout":
+                state["layouts"][arguments["name"]] = arguments["layout"]
+                state_path.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+                return {}
+            raise AssertionError(f"unexpected layout fixture call: {uri}")
         if uri == "ak.wwise.core.getProjectInfo":
             project_path = Path(self.fixture["project_path"])
             root = project_path.parent

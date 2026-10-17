@@ -64,6 +64,7 @@ from wwise_waapi.operation_drafts import (
     operation_draft_authority_digest,
 )
 from wwise_waapi.business_declaration_state import BusinessDeclarationSession
+from wwise_waapi.capabilities import CapabilityCatalog, CapabilityCatalogError
 from wwise_waapi.business_adapters import (
     business_adapter,
     business_adapter_operations,
@@ -73,6 +74,7 @@ from wwise_waapi.audio_import_business_contracts import (
 )
 from wwise_waapi.operation_registry import (
     OperationContractError,
+    operation_uses_business_declaration,
     parse_operation_request,
 )
 from wwise_waapi.typed_operations import (
@@ -8803,7 +8805,17 @@ def _project_operation_draft_runner(
     if value.get("contract") == "waapi-skill.typed-container-handle/v1":
         return project_disclosure_commands(value)
 
-    projected_draft = project_disclosure_commands(value)
+    # A Draft owns these control fields. Its declarations/current facts are
+    # business data, even when their keys resemble a continuation contract.
+    projected_draft = dict(value)
+    next_command = value.get("next_command")
+    if isinstance(next_command, Mapping):
+        projected_draft["next_command"] = _project_model_visible_runner(
+            next_command,
+            candidate_runner=candidate_runner,
+            invocation_runner=invocation_runner,
+            platform_name=platform_name,
+        )
     binding = value.get("next_action_binding")
     if isinstance(binding, Mapping):
         projected_draft["next_action_binding"] = (
@@ -8844,7 +8856,7 @@ def _project_model_visible_runner(
                 invocation_runner=invocation_runner,
                 platform_name=platform_name,
             )
-        if value.get("contract") in {
+        if isinstance(value.get("contract"), str) and value["contract"] in {
             "waapi-skill.operation-draft/v1",
             "waapi-skill.operation-draft-next-action/v1",
             "waapi-skill.business-draft-next-action/v1",
@@ -8856,12 +8868,18 @@ def _project_model_visible_runner(
                 invocation_runner=invocation_runner,
                 platform_name=platform_name,
             )
+        # Only Gateway-owned envelope locations may carry model commands.
+        # Native results, schemas and the exact final agent_result are opaque.
+        control_fields = {"draft", "next_command", "next_action_binding", "action_result", "continuation"}
         return {
-            key: _project_model_visible_runner(
-                nested,
-                candidate_runner=candidate_runner,
-                invocation_runner=invocation_runner,
-                platform_name=platform_name,
+            key: (
+                _project_model_visible_runner(
+                    nested,
+                    candidate_runner=candidate_runner,
+                    invocation_runner=invocation_runner,
+                    platform_name=platform_name,
+                )
+                if key in control_fields else nested
             )
             for key, nested in value.items()
         }
@@ -14554,6 +14572,14 @@ class CodexGatewayBroker:
             raise GatewayInvocationError(
                 "Draft response is missing its immutable start version"
             )
+        if operation_uses_business_declaration(operation, version):
+            try:
+                capability = CapabilityCatalog().authoring_ui_describe(version, operation)
+                return capability.execution_contract["effect"] == "read"
+            except (CapabilityCatalogError, KeyError) as exc:
+                raise GatewayInvocationError(
+                    "Business Draft response has no exact execution classification"
+                ) from exc
         try:
             return request_contract(version, operation).effect == "read"
         except TypedRequestError as exc:

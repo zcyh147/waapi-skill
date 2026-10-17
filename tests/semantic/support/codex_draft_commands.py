@@ -32,6 +32,7 @@ DRAFT_GATEWAY_SUBCOMMANDS = frozenset(
         "draft-declare-debug-intent",
         "draft-declare-cli-console-plan",
         "draft-declare-host-plan",
+        "draft-declare-layout-plan",
         "draft-declare-project-setting-plan",
         "draft-declare-runtime-control-plan",
         "draft-declare-soundengine-plan",
