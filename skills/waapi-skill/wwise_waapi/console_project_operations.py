@@ -607,6 +607,22 @@ def _xml_value(node, *, excluded_platform=None, document_root=False, exclude_med
             or node.tag == 'Property' and node.get('Name') == 'MediaIDsInSingleFile'
                 and _path == ('WwiseDocument', 'ProjectInfo', 'Project', 'PropertyList')):
         return None
+    # Wwise serialization may omit an empty EffectSlot ReferenceList and turn
+    # a scalar Property Value attribute into one unqualified ValueList/Value.
+    # Compare the exact value, type and name; never collapse platform-specific,
+    # dual-encoded, attributed, nested or nonempty reference representations.
+    if (node.tag == 'ReferenceList' and _path and _path[-1] == 'EffectSlot'
+            and not node.attrib and not len(node) and not (node.text or '').strip()):
+        return None
+    if (node.tag == 'Property' and _path and _path[-1] == 'PropertyList'
+            and set(node.attrib) == {'Name', 'Type'} and len(node) == 1
+            and not (node.text or '').strip()):
+        values = node[0]
+        if (values.tag == 'ValueList' and not values.attrib and len(values) == 1
+                and not (values.text or '').strip()):
+            value = values[0]
+            if value.tag == 'Value' and not value.attrib and not len(value):
+                return [node.tag, sorted([*node.attrib.items(), ('Value', value.text or '')]), '', []]
     excluded = {'WwiseVersion', 'WwiseBuild', 'SchemaVersion'} if document_root else set()
     return [node.tag, sorted((k, v) for k, v in node.attrib.items() if k not in excluded),
         (node.text if node.text and node.text.strip() else ''), [value for child in node

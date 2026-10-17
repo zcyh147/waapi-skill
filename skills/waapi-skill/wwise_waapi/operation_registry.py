@@ -21291,11 +21291,15 @@ def verify_prepared_operation(
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
     if kind == 'console-project-process':
-        message = (
-            'The documented Console command outcome passed; file and project effects remain unverified.'
-            if outcome.ok else
-            'The Console command reported errors; partial effects are possible and execution must not be retried.'
-        )
+        if outcome.business_state_verified:
+            message = 'The requested Console command effects passed independent verification.'
+        elif outcome.ok:
+            message = 'The documented Console command outcome passed; file and project effects remain unverified.'
+        elif any(row.get('kind') == 'cli-process-outcome' and row.get('reported_errors') is True
+                 for row in outcome.readbacks):
+            message = 'The Console command reported errors; partial effects are possible and execution must not be retried.'
+        else:
+            message = 'The Console command failed verification; inspect the retained checks and do not retry execution.'
         return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
             outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
     if kind == 'tone-wav-artifact':

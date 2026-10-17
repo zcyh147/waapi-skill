@@ -1018,6 +1018,9 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     ('2025.1', 'AudioFileSource', 'mode-value-list'),
     ('2025.1', 'PluginMediaSource', 'plugin-conflicting-encodings'),
     ('2025.1', 'PluginMediaSource', 'plugin-value-list'),
+    *[(version, 'AudioFileSource', 'serialization') for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
+    *[('2025.1', 'AudioFileSource', 'serialization-' + fault) for fault in
+      ['value', 'platform', 'dual', 'value-attribute', 'reference', 'reference-attribute']],
     *[('2025.1', 'AudioFileSource', change) for change in ['media-id', 'source-id', 'filename',
         'language-id', 'other-language', 'duplicate-source', 'duplicate-media', 'missing-media',
         'mode-unchanged', 'work-unit-ids-remain', 'unrelated-property', 'unrelated-same-name-property']],
@@ -1062,6 +1065,19 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                     tree.find('.//Sound/PropertyList/Property/ValueList/Value').text = '-12'
                 elif change == 'unrelated-same-name-property':
                     tree.find('.//Sound/PropertyList/Property[@Name="MediaIDsInSingleFile"]').set('Value', 'True')
+                if change and change.startswith('serialization'):
+                    field = tree.find('.//Sound/PropertyList/Property[@Name="PlainScalar"]')
+                    value = field.attrib.pop('Value')
+                    nested = ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value')
+                    nested.text = '42' if change == 'serialization-value' else value
+                    if change == 'serialization-platform':
+                        nested.set('Platform', 'Windows')
+                    elif change == 'serialization-dual':
+                        field.set('Value', '42')
+                    elif change == 'serialization-value-attribute':
+                        nested.set('Unestablished', 'x')
+                    slot = tree.find('.//EffectSlot')
+                    slot.remove(slot.find('ReferenceList'))
                 tree.write(self.unit)
                 tree = ET.parse(self.project_file)
                 if change != 'mode-unchanged':
@@ -1095,6 +1111,13 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     else:
         ET.SubElement(source, 'Language').text = 'SFX'
         ET.SubElement(source, 'AudioFile' if source_kind == 'AudioFileSource' else 'MidiFile').text = 'Keep.wav'
+    if change and change.startswith('serialization'):
+        ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='PlainScalar', Type='Real32', Value='22.7')
+        references = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'EffectSlot'), 'ReferenceList')
+        if change == 'serialization-reference':
+            ET.SubElement(references, 'Reference', Name='Effect')
+        elif change == 'serialization-reference-attribute':
+            references.set('Unestablished', 'x')
     if change == 'unrelated-same-name-property':
         ET.SubElement(tree.find('.//Sound/PropertyList'), 'Property', Name='MediaIDsInSingleFile', Type='bool', Value='False')
     ET.SubElement(ET.SubElement(source, 'MediaIDList'), 'MediaID', ID='123456')
@@ -1110,7 +1133,7 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list'}:
+    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list', 'serialization'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         code, payload = task.run('execute', tx)
@@ -1258,3 +1281,31 @@ def test_cli_add_platform_keeps_preexisting_unregistered_platform_values_unresol
     code, payload = task.run('verify', tx)
     assert code == 0 and payload['verified'] is False and payload['state'] == 'result_schema_checked', payload
     assert 'preexisting_unregistered_platform_values' in payload['verification']['readbacks'][-1]['unresolved']
+
+
+@pytest.mark.parametrize('case', ['verified', 'unresolved', 'artifact-failure', 'native-errors'])
+def test_console_verification_summary_distinguishes_process_result_and_effects(tmp_path, case):
+    operation = {'verified': 'addNewPlatform', 'unresolved': 'migrate',
+                 'artifact-failure': 'dumpObjects', 'native-errors': 'migrate'}[case]
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.' + operation,
+                          outcome=1 if case == 'native-errors' else 2)
+    extra = ('--value', 'base_platform', 'Windows') if case == 'verified' else (
+        ('--value', 'output_file', str(tmp_path / 'missing.json')) if case == 'artifact-failure' else ())
+    transaction = task.execute_plan(*extra)
+    code, payload = task.run('verify', transaction)
+    message = payload['verification']['message']
+    if case == 'verified':
+        assert code == 0 and payload['verified'] is True
+        assert 'passed independent verification' in message
+        assert 'remain unverified' not in message
+    elif case == 'unresolved':
+        assert code == 0 and payload['verified'] is False
+        assert 'remain unverified' in message
+    elif case == 'artifact-failure':
+        assert code != 0 and payload['verified'] is False
+        assert 'reported errors' not in message
+        assert 'failed verification' in message
+    else:
+        assert code != 0 and payload['verified'] is False
+        assert 'reported errors' in message and 'partial effects' in message
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1

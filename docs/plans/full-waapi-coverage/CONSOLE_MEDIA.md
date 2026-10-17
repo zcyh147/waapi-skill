@@ -87,3 +87,34 @@ mode, remaining Work Unit IDs and unrelated property changes. The final affected
 selection passed 24 tests in 11.80 seconds. Earlier REDs and focused results remain
 separate. This is program evidence; current native acceptance, transfer back to
 Work Units, refresh semantics and other storage variants remain same-parent work.
+
+## Saved-baseline native check and representation repair
+
+Exact `3d05ddd1` ran the existing isolated 2025.1 lifecycle after a separate public
+Gateway project save. It failed (1 failed, 11.79 seconds), with all 749 full mapping
+records matching, no remaining Work Unit media IDs and the correct storage mode.
+Non-storage preservation alone failed; the source and candidate were unchanged,
+owned processes ended and the sandbox remains quarantined. This is not a PASS.
+
+Its immutable Preview file hashes establish two serialization differences:
+
+- `Effects/Factory McDSP Effects.wwu` matches the original fixture byte-for-byte
+  before dispatch. All 1569 scalar Property values survive unchanged, expressed
+  as one unqualified `ValueList/Value` instead of a `Value` attribute.
+- `Busses/Default Work Unit.wwu` baseline was reconstructed by the existing
+  read-only Auro prelaunch preparation and matched the exact Preview SHA-256
+  `dbd6e902dd8f062900f3c7e6ed38c55998d1af194e7d77d5d56c3e11f455992a`.
+  The sole change is removal of an empty, unattributed EffectSlot ReferenceList.
+
+The model comparison now normalizes precisely these equivalent forms. It retains
+name, type and literal value; platform-specific, dual-encoded, nested or attributed
+values and nonempty/attributed references remain distinguishable. Public Gateway
+controls cover all five versions and reject actual value/platform/reference
+changes: original RED 1 failed, successor 1 passed, then 31 affected cases passed
+in 15.22 seconds. This program evidence does not regrade the native failure.
+
+Native failure also exposed a misleading summary: a failed artifact check was
+called a reported Console error, and strong success was described as unverified.
+The summary now distinguishes verified effects, unresolved effects, actual native
+errors and failed verification. Its public RED retained 2 failed / 2 passed;
+message controls and migration regression passed 14 cases in 7.00 seconds.
