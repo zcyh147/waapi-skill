@@ -212,3 +212,12 @@ terminal capacities remain active. Focused anonymous/remaining-interpretation
 controls passed 17 tests; the original source/older-lane REDs remain separate.
 No native/Fresh launch, actual writer/rounding/signal proof or ticket completion
 credit is asserted. The remaining exact seventeen-URI #193 roster stays owned.
+
+A separate actual public-main verify control covers 128 omitted/default-empty
+marker labels on the ordinary 24 KiB terminal path. It prepares/confirms,
+executes once against a fake artifact effect, emits real verification, and
+compares the exact machine result plus immutable request and durable journal
+digest. The existing projection compacts the 128 observation rows without a
+capacity increase. This is distinct from the earlier maximum-label request
+cases that select the exceptional bounded envelope; neither is native/Fresh or
+Broker/archive acceptance.

@@ -1568,3 +1568,46 @@ def test_tone_legacy_anonymous_header_retains_unresolved_representation(tmp_path
     client.artifact_bytes = _tone_wav_bytes()
     verified = _finish_tone_collection(env, state, client, preview)
     assert 'anonymous' in str(verified)
+
+
+def test_tone_128_empty_label_markers_verify_through_actual_main_with_ordinary_output_budget(tmp_path, monkeypatch, capsys):
+    fields = [token for _ in range(128) for token in ('--marker', '0')]
+    env, state, client, _, _, _, preview = _tone_collection_preview(tmp_path, '2025.1', fields,
+        values={'waveform': 'silence'})
+    client.artifact_bytes = _tone_wav_bytes(extra=_tone_marker_chunks([(identity, 0, None) for identity in range(128)]))
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, confirmed = gateway.execute_gateway([*state, 'confirm', tx,
+        '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0, confirmed
+    code, executed = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code == 0, executed
+    actual_execute = gateway.execute_gateway
+    observed_payloads = []
+    def observe_actual_gateway(argv):
+        result = actual_execute(argv)
+        observed_payloads.append(result[1])
+        return result
+    with monkeypatch.context() as emitting:
+        emitting.setenv('WAAPI_SKILL_CONFIG_PATH', env['WAAPI_SKILL_CONFIG_PATH'])
+        emitting.setattr(gateway, 'default_client_factory', lambda _: client)
+        # Observe the real public verify result, without replacing its verifier,
+        # result or filesystem behavior; main emits that exact machine object.
+        emitting.setattr(gateway, 'execute_gateway', observe_actual_gateway)
+        assert gateway.main([*state, 'verify', tx]) == 0
+    rendered = capsys.readouterr().out
+    decoded = json.loads(rendered)
+    assert decoded['verified'] is True
+    assert decoded['stdout_projection']['stdout_budget_bytes'] == 24576
+    assert len(rendered.encode('utf-8')) <= 24576
+    assert decoded['agent_result'] == observed_payloads[0]['agent_result']
+    assert decoded['agent_result']['request'] == preview['agent_result']['request']
+    assert list(decoded)[-1] == 'agent_result'
+    assert [row[0] for row in client.calls].count('ak.wwise.debug.generateToneWAV') == 1
+    from wwise_waapi.transactions import TransactionStore
+    journal = next(event['details']['verification'] for event in TransactionStore(Path(state[1])).read_events(tx)
+        if event['event_type'] == 'verification_recorded')
+    assert journal['readbacks'][0]['wav']['markers']['cue_count'] == 128
+    assert journal['readbacks'][0]['wav']['markers']['label_count'] == 0
+    assert decoded['stdout_projection']['verification_canonical_sha256'] == canonical_sha256(journal)
+    (tmp_path / 'terminal.stdout.json').write_text(rendered, encoding='utf-8')
