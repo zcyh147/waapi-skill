@@ -1025,8 +1025,19 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
         'language-id', 'other-language', 'duplicate-source', 'duplicate-media', 'missing-media',
         'mode-unchanged', 'work-unit-ids-remain', 'unrelated-property', 'unrelated-same-name-property']],
 ])
-def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_path, version, source_kind, change):
+def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_path, version, source_kind, change, media_id_product_capture):
     class MoveMediaTask(CliProjectTask):
+        def __init__(self, *args, **kwargs):
+            self.public_invocations = []
+            self.native_observations = []
+            super().__init__(*args, **kwargs)
+
+        def run(self, *argv):
+            code, payload = super().run(*argv)
+            self.public_invocations.append({'argv': ['--state-dir', str(self.path / 'state'), *argv],
+                'exit_code': code, 'payload': deepcopy(payload)})
+            return code, payload
+
         def call(self, uri, args=None, options=None):
             if uri == self.operation:
                 self.project_file.with_suffix('.mediaid').write_text('''<WwiseDocument Type="MediaIDs">
@@ -1093,8 +1104,12 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                             del field.attrib['Value']
                         ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'True'
                 tree.write(self.project_file)
-            return super().call(uri, args, options)
-    task = MoveMediaTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile')
+            result = super().call(uri, args, options)
+            if uri == self.operation:
+                self.native_observations.append({'uri': uri, 'args': deepcopy(args), 'options': deepcopy(options), 'result': deepcopy(result)})
+            return result
+    task = MoveMediaTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile',
+        outcome=2 if source_kind == 'AudioFileSource' and change is None else 0)
     task.unit = saved_fixture_project(task)
     tree = ET.parse(task.unit)
     source = ET.SubElement(ET.SubElement(tree.find('.//Sound'), 'ChildrenList'),
@@ -1153,6 +1168,25 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     assert observation['work_unit_media_id_count_before'] == (0 if change == 'already-central' else 1)
     assert observation['work_unit_media_id_count_after'] == 0
     assert len([row for row in task.calls if row[0] == task.operation]) == 1
+    if source_kind == 'AudioFileSource' and change is None:
+        from tests.support.media_id_branch_evidence import public_media_id_observation
+        media_id_product_capture.update(public_media_id_observation(
+            gateway=task.public_invocations[-1], public_invocations=task.public_invocations,
+            native_observations=task.native_observations))
+
+
+@pytest.fixture
+def media_id_product_capture(request):
+    import os
+    from pathlib import Path
+    observed = {}
+    context_path = os.environ.get('WAAPI_MEDIA_ID_BRANCH_CAPTURE_CONTEXT')
+    if context_path:
+        from tests.support.media_id_branch_evidence import load_media_id_capture, finish_media_id_capture
+        from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+        capture = load_media_id_capture(Path(context_path), request.node.nodeid)
+        register_exact_evidence_finalizer(request.node, lambda reports: finish_media_id_capture(capture, reports, observed))
+    return observed
 
 
 @pytest.mark.parametrize('failure', ['missing-mapping', 'malformed-mapping', 'lost-workunit', 'unrelated-setting'])
