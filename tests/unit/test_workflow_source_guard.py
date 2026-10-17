@@ -234,3 +234,155 @@ def test_full_source_hash_rejects_changed_open_file_identity(
     monkeypatch.setattr(os, "fstat", switched_identity)
     with pytest.raises(workflow.SandboxFixtureError, match="changed.*hashing"):
         workflow._hash_mutation_bearing_project_files(root)
+
+
+def _curve_probe_runtime(tmp_path, workflow, *, version="2025.1", curve_query_error=False,
+                         repeat_names_page=False):
+    import json
+    import uuid
+
+    state = tmp_path / "state"
+    evidence = tmp_path / "dispatcher"
+    evidence.mkdir()
+    config = tmp_path / "config.json"
+    config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1",
+                                  "waapi_port": 31337, "project_modification_policy": "read_only"}))
+    commands = []
+    owner = "{11111111-1111-1111-1111-111111111111}"
+    curve = "{22222222-2222-2222-2222-222222222222}"
+
+    def gateway(command):
+        command = list(command)
+        commands.append(command)
+        assert command[0] in {"config-show", "status", "metadata", "query-object", "query-schema"}
+        payload = {"ok": True, "fixture_only": True, "detected_version": version,
+                   "endpoint": {"host": "127.0.0.1", "port": 31337, "url": "ws://127.0.0.1:31337/waapi"}}
+        if command[:2] == ["metadata", "types"]:
+            payload["agent_result"] = {"complete": True, "types": [
+                {"name": "RTPC", "type": "WObject", "classId": 655360, "selection": "rtpc-type"},
+                {"name": "Curve", "type": "WObject", "classId": 917520, "selection": "curve-type"},
+            ]}
+        elif command[:2] == ["metadata", "list"]:
+            payload["agent_result"] = {"complete": not repeat_names_page, "fields": [
+                {"name": "Curve", "selection": "selected-Curve"},
+            ]}
+            if repeat_names_page:
+                payload["agent_result"]["next_command"] = {"gateway_argv": command + ["--page", "fixture-page"]}
+        elif command[:2] == ["metadata", "detail"]:
+            assert command[-2:] == ["--selection", "selected-Curve"]
+            payload["agent_result"] = {"complete": True, "metadata": {
+                # Preserve genuine omission of optional name/type in the result.
+                "restriction": {"type": "reference", "restrictions": [{"type": ["Curve"]}]},
+                "nativeOptionalNull": None,
+            }}
+        elif command[0] == "query-object":
+            if "--advanced-waql" in command or "--exact-id" in command:
+                if "--advanced-waql" in command:
+                    assert command[2] == f'from object "{owner}" select @Curve'
+                    assert command[command.index("--max-results") + 1] == "1"
+                else:
+                    assert command[2] == curve
+                if curve_query_error:
+                    return 2, {"ok": False, "error_code": "fixture-native-unavailable",
+                               "native_observation": {"fixture_only": True}}
+                payload["objects"] = [{"id": curve, "name": "", "type": "Curve", "path": "\\Curve",
+                                       "class_id": 917520, "curve_points": [{"x": 0, "y": -6, "shape": "Linear"}]}]
+            else:
+                assert command == ["query-object", "--type-selection", "rtpc-type", "--max-results", "2"]
+                payload["objects"] = [{"id": owner, "name": "", "type": "RTPC", "path": "\\RTPC"}]
+        (evidence / (uuid.uuid4().hex + ".json")).write_text(json.dumps({"fixture_only": True,
+                                            "command": command, "result": payload}))
+        return 0, payload
+
+    return SimpleNamespace(state_dir=state, env={"WWISE_EVIDENCE_DIR": str(evidence),
+                          "WAAPI_SKILL_CONFIG_PATH": str(config)}, version=version,
+                          candidate="a" * 40, lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"),
+                          port=31337, category_results=[], raw_gateway=gateway), commands
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_curve_probe_retains_exact_read_only_observations_without_native_launch(
+    tmp_path, workflow, version,
+):
+    import hashlib
+    import json
+    from wwise_waapi.object_query_outputs import available_query_outputs
+
+    runtime, commands = _curve_probe_runtime(tmp_path, workflow, version=version)
+    category = workflow._collect_rtpc_curve_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    # Collector fixture only; no real category publisher ran.
+    assert category["status"] == ("blocked" if version == "2021.1" else "PASS")
+    assert observed["candidate"] == "a" * 40 and observed["version"] == version
+    assert ("curve-points" in available_query_outputs(version)) is (version != "2021.1")
+    if version == "2021.1":
+        assert "curve-points" not in commands[-1]
+        assert any(row["reason"] == "curve_points_output_unavailable_in_public_version" for row in observed["boundaries"])
+    assert observed["mutation_authority"] is False and observed["business_effect_verified"] is False
+    details = [row for row in observed["calls"] if row["stage"].endswith("-detail")]
+    assert len(details) == 2
+    for row in details:
+        metadata = row["payload"]["agent_result"]["metadata"]
+        assert "name" not in metadata and "type" not in metadata
+        assert metadata["nativeOptionalNull"] is None
+    assert details[0]["gateway_argv"][2:4] == ["--type-selection", "rtpc-type"]
+    assert details[1]["gateway_argv"][2:4] == ["--exact-id", "{11111111-1111-1111-1111-111111111111}"]
+    assert len(observed["native_evidence"]) == len(commands)
+    assert hashlib.sha256(Path(category["observation_path"]).read_bytes()).hexdigest() == category["observation_sha256"]
+    assert all(Path(row["path"]).is_file() for row in observed["native_evidence"])
+
+
+def test_curve_probe_records_failed_public_curve_read_as_boundary(tmp_path, workflow):
+    import json
+    runtime, _commands = _curve_probe_runtime(tmp_path, workflow, curve_query_error=True)
+    category = workflow._collect_rtpc_curve_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked"
+    assert any(row.get("error_code") == "fixture-native-unavailable" for row in observed["boundaries"])
+    assert observed["calls"][-1]["payload"]["native_observation"] == {"fixture_only": True}
+
+
+def test_curve_probe_stops_incomplete_name_paging_at_owned_bound(tmp_path, workflow):
+    import json
+    runtime, commands = _curve_probe_runtime(tmp_path, workflow, repeat_names_page=True)
+    category = workflow._collect_rtpc_curve_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked"
+    assert any(row["reason"] == "eight_page_bound_reached" for row in observed["boundaries"])
+    assert len([command for command in commands if command[:2] == ["metadata", "list"]]) == 16
+    assert not any(command[:2] == ["metadata", "detail"] for command in commands)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_curve_probe_reference_read_uses_existing_public_gateway_contract(tmp_path, workflow, version):
+    from tests.unit.test_object_graph_business_gateway import _info
+
+    runtime, _commands = _curve_probe_runtime(tmp_path, workflow, version=version)
+    calls = []
+    owner = "{11111111-1111-1111-1111-111111111111}"
+    curve = "{22222222-2222-2222-2222-222222222222}"
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            calls.append((uri, args, options))
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            assert uri == "ak.wwise.core.object.get", (uri, args, options)
+            assert args == {"waql": f'from object "{owner}" select @Curve take 1'}
+            assert options["return"] == ["id", "name", "type", "path", "classId", *(["points"] if version != "2021.1" else [])]
+            return {"return": [{"id": curve, "name": "", "type": "Curve", "path": "\\Curve",
+                                "classId": 917520, "points": [{"x": 0, "y": -6, "shape": "Linear"}]}]}
+
+        def disconnect(self):
+            pass
+
+    code, payload = workflow.waapi_gateway.execute_gateway([
+        "--state-dir", str(runtime.state_dir), "query-object", "--advanced-waql",
+        f'from object "{owner}" select @Curve', "--max-results", "1", "--include", "class-id",
+        *(["--include", "curve-points"] if version != "2021.1" else []),
+    ], env=runtime.env, client_factory=lambda _url: Client())
+    assert code == 0, payload
+    assert payload["objects"][0]["id"] == curve and payload["objects"][0]["type"] == "Curve"
+    if version != "2021.1":
+        assert payload["objects"][0]["curve_points"] == [{"x": 0, "y": -6, "shape": "Linear"}]
+    assert all(uri in {"ak.wwise.core.getInfo", "ak.wwise.core.object.get"} for uri, _args, _options in calls)
