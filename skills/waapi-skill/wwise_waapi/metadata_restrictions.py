@@ -42,6 +42,11 @@ def reference_allowed_types(restriction: Mapping[str, Any]) -> tuple[str, ...]:
                     "CONSTRAINED_REFERENCE_BOUNDARY",
                     "Playable reference restrictions require a dedicated live target classifier.",
                 )
+            if row == "mustChildOf":
+                raise MetadataRestrictionError(
+                    "CONSTRAINED_REFERENCE_BOUNDARY",
+                    "The native mustChildOf flag requires a separately proven hierarchy classifier.",
+                )
             raise MetadataRestrictionError(
                 "INVALID_METADATA",
                 "Reference restriction metadata contains an unknown string flag.",
