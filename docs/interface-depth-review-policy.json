@@ -140,9 +140,9 @@
       "id": "authoring-layout-partial",
       "disposition": "migration_required",
       "owner_issue": 188,
-      "match": {"uris": ["ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.removeLayout", "ak.wwise.ui.layout.setLayout", "ak.wwise.ui.layout.switchLayout"]},
+      "match": {"uris": ["ak.wwise.ui.layout.closeView", "ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getOrCreateView", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.removeLayout", "ak.wwise.ui.layout.setLayout", "ak.wwise.ui.layout.switchLayout"]},
       "leaked_mechanics": [],
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
     },
     {
       "id": "generic-topics",

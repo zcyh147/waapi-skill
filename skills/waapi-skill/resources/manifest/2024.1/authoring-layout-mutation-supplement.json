@@ -3,6 +3,45 @@
   "host": "wwise-authoring",
   "native_catalog_sha256": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
   "schemas": {
+    "ak.wwise.ui.layout.getOrCreateView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The unique identifier, as a string, of the view type to get or create.",
+            "type": "string"
+          },
+          "posX": {
+            "description": "Initial position of the created view on the horizontal axis. Defaults to -1.",
+            "type": "integer"
+          },
+          "posY": {
+            "description": "Initial position of the created view on the vertical axis. Defaults to -1.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Gets a view, if it exists in the current layout, or creates a new one.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique ID of the view"
+          }
+        },
+        "type": "object"
+      }
+    },
     "ak.wwise.ui.layout.removeLayout": {
       "argsSchema": {
         "additionalProperties": false,

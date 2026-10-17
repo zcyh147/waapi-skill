@@ -14,10 +14,10 @@ def frozen_inventory():
 
 def test_layout_supplements_retain_exact_routes_definitions_and_unresolved_ownership(frozen_inventory):
     from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
-    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS, layout_mutation_uris
 
     expected = {f'{version}|function|{uri}' for version in ('2024.1', '2025.1')
-                for uri in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS}
+                for uri in LAYOUT_READ_URIS | layout_mutation_uris(version)}
     routes = {row['id']: row for row in frozen_inventory['routes'] if row['id'] in expected}
     assert set(routes) == expected
     assert all(row['family'] == 'authoring-layout-partial' for row in routes.values())
