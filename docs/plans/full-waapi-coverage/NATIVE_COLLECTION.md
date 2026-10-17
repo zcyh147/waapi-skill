@@ -174,3 +174,9 @@ seal tests: **140 passed**. The root merger owns a fresh fixed Program gate on
 the integrated T01 candidate before #175 closes. Broader Non-live remains the
 combined substantial runtime PR gate. The earlier full Program result remains
 7001 passed / 3 skipped / 2 stale-parser-seal failures, not a passing run.
+
+Integrated T01 Program verification on `faa704ff01e1f0a3a2af0a4d31094176ef1a8d73`
+exited 0: **7014 passed, 3 native-Windows-only skips** in 496.88 seconds. The
+three skips cover native Windows shell/runner and NTFS junction behavior; they
+are not Windows passing evidence. #175 was closed with this evidence; #176 and
+the subsequent functional tickets remain open under #174.

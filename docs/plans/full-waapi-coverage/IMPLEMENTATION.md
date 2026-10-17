@@ -19,35 +19,30 @@ references. No main merge is authorized.
 ## Active work
 
 - Draft integration PR: [#196](https://github.com/zcyh147/waapi-skill/pull/196).
-- #175 is assigned and in progress on isolated branch `codex/full-native-catalog`.
-  The first collector/discovery slice was integrated at `3c8406f3`; this exact
-  candidate was held unchanged for all native collection.
-- All five Console captures completed with source full hashes/mtimes unchanged,
-  archived receipts, clean shutdown and disposable sandbox removal. These are
-  native reflection results, not business execution or Fresh acceptance.
-- All five Authoring function/Topic lists and schemas were captured. 2021/2022
-  completed cleanly. 2023 completed its catalog, but the one-off owner's immediate
-  port check failed; a separate bounded follow-up proved port release and no
-  residual process. Its original verdict is retained. 2024/2025 raw captures
-  correctly stopped catalog publication for missing UI definition documents;
-  separately attested same-build UI/WAFM definitions complete offline derivation
-  into new roots, without changing the original failed receipts.
-- An earlier 2025 private-HOME startup attempt failed before reflection. Removing
-  the borrowed application-wrapper alternate-loader/wait flags allowed the direct
-  `wine start.exe /wait EXE PROJECT` route to reach exact sandbox readiness.
-  Keep both attempts and avoid attributing causality to one individual flag.
-- Native catalogs, source provenance and exact cross-host schema comparisons are
-  being packaged and verified. #175 is not complete yet; #176 remains blocked.
-- Supporting read-only research found additional observed object/plugin condition
-  forms across all five installed builds, including integer sets/ranges, parent
-  contexts, references and visibility. These remain #177/#178/#179 work, and the
-  installed XML evidence does not substitute for live metadata or behavior proof.
+- #175 is complete and closed. Integration candidate `faa704ff` passed the fixed
+  five-version Program gate: **7014 passed, 3 native-Windows-only skips**, exit 0,
+  in 496.88 seconds. Final focused validation passed 140 tests. Original earlier
+  stale-seal failures remain recorded separately.
+- Ten independently attested Console/Authoring catalogs, full definitions and
+  exact shared-schema comparisons are packaged. All 782 shared schema pairs
+  match; all 48 initially missing ordinary Authoring schema rows are included.
+  See [native collection](NATIVE_COLLECTION.md) for builds, provenance, original
+  failures, offline derivation and separate cleanup follow-up evidence.
+- #176 is the next frontier: exact native business-branch accounting, functional
+  ownership, candidate-scoped evidence and computed completion. It must retain
+  every missing or unverified use under #174; tool completion is distinct from
+  product completion. Prepared worktree: `waapi-coverage-ledger`.
+- Read-only object/plugin condition research is retained for #177/#178/#179.
+  It includes integer enums/ranges, parent contexts, reference requirements,
+  visibility, Uint16 plugin conditions and expanded 2025 EQ conditions. Installed
+  XML facts still require matching live metadata and behavior evidence.
 - No Fresh run has been authorized or started for this specification.
 
 Ignored durable coordination state is under `.waapi-skill-state/full-coverage/`:
-`active-checkpoint.json`, independent `*-evidence-seal.json` files, original
-capture roots, derived catalogs and the `research/` driver/source notes. Preserve
-these before archiving worktrees. Every original failure remains unchanged.
+`active-checkpoint.json`, `program-faa704ff-result.json`, independent
+`*-evidence-seal.json` files, original capture roots, derived catalogs and
+`research/` notes. Preserve these before archiving worktrees. Original failed
+roots and verdicts remain unchanged. No native process remains running.
 
 ## Standing completion rules
 
