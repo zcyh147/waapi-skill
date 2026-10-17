@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .edit_history_contracts import HISTORY_VERSIONS, history_declaration
+
 
 CORE_BUSINESS_CONTRACT = "waapi-skill.core-business/v1"
 
@@ -317,7 +319,17 @@ _READ_DECLARATIONS: dict[str, dict[str, Any]] = {
     },
 }
 
+for _history_uri, _history_versions in HISTORY_VERSIONS.items():
+    _CONTRACTS[_history_uri] = {
+        "versions": _history_versions, "roles": (), "required_fields": ("history_scope", "expectation_receipt"),
+        "optional_fields": (), "field_types": {"history_scope": "latest_project_history_scope", "expectation_receipt": "owned_history_expectation_receipt"},
+        "execution_shape": "draft_mutation",
+    }
+
+
 _CATALOG_INTENTS = {
+    "ak.wwise.core.undo.undo": "undo the latest project history action with an owned state expectation",
+    "ak.wwise.core.undo.redo": "redo the latest project history action with an owned state expectation",
     "ak.wwise.core.object.setAttenuationCurve": "set one attenuation curve",
     "ak.wwise.core.object.setRandomizer": "configure one property randomizer",
     "ak.wwise.core.switchContainer.getAssignments": "read Switch Container assignments",
@@ -504,6 +516,8 @@ def core_business_contract_data(operation: str, version: str) -> dict[str, Any]:
         "field_types": dict(public_field_types),
         "input_forms": dict(input_forms),
     }
+    if operation in HISTORY_VERSIONS:
+        declaration["history"] = history_declaration()
     if operation == "ak.wwise.core.object.setAttenuationCurve":
         declaration["value_domains"] = attenuation_curve_value_domains(version)
     field_semantics = row.get("field_semantics")

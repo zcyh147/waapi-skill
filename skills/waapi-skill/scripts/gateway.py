@@ -5051,6 +5051,9 @@ def preflight_typed_request_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-call requires one exact Wwise version")
+    from wwise_waapi.edit_history_contracts import HISTORY_VERSIONS
+    if args.api in HISTORY_VERSIONS:
+        raise GatewayInputError("Standalone history uses its closed Core business Draft with explicit latest_project_history scope")
     if args.api in LAYOUT_READ_URIS:
         raise GatewayInputError("Layout reads use the closed layout-read continuation")
     if core_business_route_available(args.api, versions[0]):
@@ -5466,6 +5469,9 @@ def preflight_typed_zero_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("typed-zero-call requires one configured Wwise version")
+    from wwise_waapi.edit_history_contracts import HISTORY_VERSIONS
+    if args.api in HISTORY_VERSIONS:
+        raise GatewayInputError("Standalone history uses its closed Core business Draft with explicit latest_project_history scope")
     if args.api in LAYOUT_READ_URIS:
         raise GatewayInputError("Layout reads use the closed layout-read continuation")
     contract = request_contract(versions[0], args.api)
@@ -12995,6 +13001,8 @@ def dispatch_business_core_plan(
             "platform_name",
             "wwise_object_name",
             "exact_user_io_root",
+            "latest_project_history_scope",
+            "owned_history_expectation_receipt",
         }:
             value = raw
         else:
@@ -13053,6 +13061,20 @@ def dispatch_business_core_plan(
                 edge["fade_position"] = fade_position
             edges.append(edge)
         plan["edges"] = edges
+
+    from wwise_waapi.edit_history_contracts import HISTORY_VERSIONS
+    if binding.record.operation in HISTORY_VERSIONS:
+        from wwise_waapi.edit_history_business import capture_history_binding
+        if set(plan) != {"history_scope", "expectation_receipt"} or plan["history_scope"] != "latest_project_history":
+            raise GatewayInputError("History requires explicit latest_project_history scope and one owned expectation receipt")
+        current_guard = build_project_guard(endpoint=common["endpoint"], version=detected_version,
+            live_info=live_info, project=binding.project)
+        try:
+            history = capture_history_binding(binding.record.operation, TransactionStore(binding.state_dir),
+                plan.pop("expectation_receipt"), current_guard=current_guard)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        plan["history_binding"] = history
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings({"core_plan": plan})
@@ -30939,6 +30961,11 @@ def transaction_show_summary(
     # Required user notice survives every compact variant; the existing byte
     # ceiling fails closed if the complete change list cannot fit.
     derived_notice = {"derived_changes": derived_changes} if derived_changes else {}
+    if isinstance(request, Mapping) and isinstance(request.get("arguments"), Mapping):
+        history_binding = request["arguments"].get("history_binding")
+        if isinstance(history_binding, Mapping):
+            from wwise_waapi.edit_history_business import history_summary
+            derived_notice["history_action"] = history_summary(history_binding)
 
     # ``transaction-show --summary-only`` predates the bounded projections.
     # Preserve that committed public shape exactly for ordinary transactions;

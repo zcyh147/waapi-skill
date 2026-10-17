@@ -320,7 +320,13 @@ def materialize_core_business_request(
     version = session.context.wwise_version
     contract = core_business_contract_data(operation, version)
     plan = _core_plan(session)
-    if operation == "ak.wwise.core.object.diff":
+    from .edit_history_contracts import HISTORY_VERSIONS
+    if operation in HISTORY_VERSIONS:
+        _require_plan_fields(plan, required={"history_scope", "history_binding"})
+        if plan["history_scope"] != "latest_project_history":
+            raise business_repair("HISTORY_SCOPE_INVALID", field="history_scope", action="select latest_project_history explicitly")
+        args = {}
+    elif operation == "ak.wwise.core.object.diff":
         expected = {"source_handle", "target_handle"}
         if set(plan) != expected:
             raise business_repair(
@@ -772,6 +778,8 @@ def materialize_core_business_request(
         "args": args,
         "options": {},
     }
+    if operation in HISTORY_VERSIONS:
+        operation_arguments["history_binding"] = plan["history_binding"]
     if operation == "ak.wwise.core.audio.convert":
         io_root = plan["io_root"]
         if not isinstance(io_root, str) or not io_root:

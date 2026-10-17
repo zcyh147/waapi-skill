@@ -2031,7 +2031,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding"),
+        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding", "history_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2067,6 +2067,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
                 "source_control_binding": {"type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded."},
+                "history_binding": {"type": "object", "description": "Gateway-owned latest-history scoped expectation proof; never forwarded."},
                 "provider_profile_binding": {"type": "object", "description": "Gateway-owned protected provider profile recipe; native values resolve only during dispatch."},
                 "model_binding": {"type": "object", "description": "Gateway-owned Authoring resource and declaration proof."},
                 "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
@@ -2078,7 +2079,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding", "source_control_binding", "provider_profile_binding", "history_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -4260,6 +4261,17 @@ def _public_call_arguments(
         authoring_ui_profile=api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS)
     if api in PROJECT_FILE_URIS:
         validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
+    from .edit_history_contracts import HISTORY_VERSIONS
+    if api in HISTORY_VERSIONS:
+        from .edit_history_business import validate_history_binding
+        try:
+            validate_history_binding(api, version, arguments.get("history_binding"))
+            if raw_args != {} or raw_options != {}:
+                raise ValueError("Latest-history actions accept only the sealed empty native request")
+        except ValueError as exc:
+            raise OperationContractError("HISTORY_EXPECTATION_REQUIRED", str(exc)) from exc
+    elif "history_binding" in arguments:
+        raise OperationContractError("INVALID_ARGUMENT", "History expectation belongs only to standalone undo/redo")
     provider_binding = arguments.get("provider_profile_binding")
     if api == "ak.wwise.core.sourceControl.setProvider":
         from .source_control_profiles import validate_binding
@@ -9578,6 +9590,24 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 metadata["remote_connection_before"] = remote_connection_snapshot(request.version, read)
             except (ValueError, SemanticValidationError) as exc:
                 raise OperationContractError("INVALID_REMOTE_CONNECTION_OBSERVATION", str(exc)) from exc
+
+
+        if arguments.get("history_binding") is not None:
+            from .edit_history_business import observe_history_state, history_summary
+            try:
+                observed = observe_history_state(arguments["history_binding"], after_action=False, read=read)
+                if not observed["matches"]:
+                    raise ValueError("Current scoped state differs from the owned history expectation")
+            except ValueError as exc:
+                raise OperationContractError("HISTORY_EXPECTATION_CHANGED", str(exc)) from exc
+            metadata["history_binding"] = dict(arguments["history_binding"])
+            metadata["history_expectation"] = history_summary(arguments["history_binding"])
+            preview = SemanticPreview(envelope=SemanticEnvelope(uri=api, args=call_args, options=call_options,
+                metadata={**dict(preview.envelope.metadata), "history_expectation": metadata["history_expectation"]}),
+                source_note_family="latest-project-history", version=request.version,
+                requires_destructive_gate=True, raw_dispatch_allowed=False)
+            verification = {"kind": "history-scoped-effect", "uri": api, "version": request.version,
+                "history_binding": dict(arguments["history_binding"])}
         if arguments.get("provider_profile_binding") is not None:
             from .source_control_profiles import check_profile
             try:
@@ -14637,6 +14667,18 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 },
             }
         )
+        if arguments.get("history_binding") is not None:
+            from .edit_history_business import observe_history_state
+            try:
+                history_observation = observe_history_state(arguments["history_binding"], after_action=False, read=read_call)
+            except ValueError as exc:
+                history_observation = {"matches": False, "error": str(exc), "readbacks": getattr(exc, "readbacks", [])}
+            unchanged = (arguments["history_binding"] == prepared.get("pre_state", {}).get("history_binding")
+                         and history_observation["matches"])
+            passed = passed and unchanged
+            readbacks.extend(history_observation["readbacks"])
+            assertions.append({"name": "owned history expectation scoped prestate unchanged", "passed": unchanged,
+                "evidence": history_observation})
         if arguments.get("source_control_binding") is not None:
             from .source_control_object_files import observe_object_file_binding
             def object_file_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -14737,7 +14779,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None else [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS or arguments.get("source_control_binding") is not None or arguments.get("history_binding") is not None else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")
@@ -19484,6 +19526,18 @@ def verify_prepared_operation(
         if isinstance(old_path, str) and old_path:
             old_rows = read_object(path=old_path, fields=("id", "path"))
             check("old path no longer resolves to GUID", not any(_same_identity(row.get("id"), object_id) for row in old_rows), old_rows)
+    elif kind == "history-scoped-effect":
+        check_result_schema(str(plan["uri"]), str(plan["version"]))
+        from .edit_history_business import observe_history_state
+        try:
+            history_observation = observe_history_state(plan["history_binding"], after_action=True, read=read_call)
+            readbacks.extend(history_observation["readbacks"])
+            check("latest project history action matches the owned scoped state expectation", history_observation["matches"], history_observation)
+        except ValueError as exc:
+            readbacks.extend(getattr(exc, "readbacks", []))
+            check("latest project history action has complete scoped readback", False,
+                  {"error": str(exc), "stack_head_observed": False})
+        verification_strength = "scoped_history_effect_readback"
     elif kind == "same-guid-notes":
         rows = read_object(object_id=plan.get("object_id"), fields=("id", "notes", "path", "type"))
         check("notes target resolves exactly once", len(rows) == 1, rows)
@@ -21231,6 +21285,11 @@ def verify_prepared_operation(
         business_state_verified=business_state_verified,
     )
 
+    if kind == "history-scoped-effect":
+        message = ("The owned receipt's scoped expected state matches. Native history-entry identity and effects outside this scope remain unobserved."
+                   if outcome.ok else "The history result or scoped expected state could not be verified. Do not replay or compensate automatically.")
+        return VerificationResult(outcome.operation, outcome.status, outcome.assertions,
+            outcome.readbacks, message, outcome.verification_strength, outcome.business_state_verified)
     if kind == 'console-project-process':
         message = (
             'The documented Console command outcome passed; file and project effects remain unverified.'

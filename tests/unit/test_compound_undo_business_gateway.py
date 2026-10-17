@@ -1208,3 +1208,358 @@ def test_compound_current_platform_membership_drift_blocks_before_begin_group(tm
     assert rejected["executed"] is False
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
     assert not any(row[0].endswith("setProperty") for row in client.calls)
+
+
+def _owned_notes_history_case(tmp_path, *, version="2025.1", direction="undo", effect=True, source_operation="object.setNotes", initial_notes="before history edit", verify_source=True, history_values=None, declaration_error=False, confirm_history=True, history_policy=None):
+    from tests.unit.test_remaining_core_business_gateway import _env
+    from tests.unit.test_object_graph_business_gateway import _info
+    class Client(ObjectLifecycleClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                self.calls.append((uri, args, options))
+                return _info(version)
+            if uri == "ak.wwise.core.object.setNotes":
+                self.calls.append((uri, args, options))
+                self.source["notes"] = args["value"]
+                self.history_after = dict(self.source)
+                return {}
+            if uri == "ak.wwise.core.object.setName":
+                self.calls.append((uri, args, options))
+                self.source.update(name=args["value"], path=self.source["path"].rsplit("\\", 1)[0] + "\\" + args["value"])
+                self.history_after = dict(self.source)
+                return {}
+            if uri in {"ak.wwise.core.undo.beginGroup", "ak.wwise.core.undo.endGroup", "ak.wwise.core.undo.cancelGroup"}:
+                self.calls.append((uri, args, options))
+                return {}
+            if uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+                self.calls.append((uri, args, options))
+                if effect:
+                    self.source = dict(self.history_before if uri.endswith(".undo") else self.history_after)
+                return {}
+            return super().call(uri, args, options)
+    client = Client()
+    client.source["notes"] = initial_notes
+    client.history_before = dict(client.source)
+    state = tmp_path / "state"
+    env = _env(tmp_path, version=version)
+    def run(*argv):
+        return waapi_gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda _url: client)
+    def check_preview(draft, authority, revision, *, confirm=True):
+        code, checked = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(revision))
+        assert code == 0, json.dumps(checked)
+        code, preview = run("preview-from-draft", draft, "--task-authority", authority,
+            "--expected-revision", str(checked["draft"]["revision"]), "--apply")
+        assert code == 0, json.dumps(preview)
+        code, shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+        assert code == 0, shown
+        confirmation = shown["next_command"]["gateway_argv"]
+        if confirm and confirmation[0] == "confirm":
+            code, confirmed = run(*confirmation)
+            assert code == 0, confirmed
+        return preview, shown
+    if source_operation == "waapi.undoGroup":
+        state, env, source = _preview_cancellation_case(tmp_path, client, version=version,
+            cancellation="native-default" if version == "2022.1" else "undo-changes")
+    else:
+        code, phase = run("draft-start", source_operation)
+        assert code == 0, phase
+        draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+        code, phase = run("draft-bind-object", draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]), "--object-id", OBJECT_GUID)
+        assert code == 0, phase
+        code, phase = run("draft-declare-object-change", draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]),
+            *( ["--notes", "after history edit"] if source_operation == "object.setNotes" else ["--new-name", "AfterHistoryName"] ))
+        assert code == 0, phase
+        source, _shown = check_preview(draft, authority, phase["draft"]["revision"])
+    code, result = run("execute", source["transaction_id"])
+    assert code == 0, json.dumps(result)
+    if verify_source:
+        code, verified = run("verify", source["transaction_id"])
+        assert code == 0 and verified["verified"] is True, verified
+    if direction == "redo":
+        client.source = dict(client.history_before)
+    if history_policy is not None:
+        code, configured = run("config-set", "--project-modification-policy", history_policy)
+        assert code == 0, configured
+    code, phase = run("draft-start", "ak.wwise.core.undo." + direction)
+    assert code == 0, json.dumps(phase)
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    values = {"history_scope": "latest_project_history", "expectation_receipt": source["transaction_id"]} if history_values is None else history_values
+    flags = [token for key, value in values.items() for token in ("--value", key, source["transaction_id"] if value == "<source>" else value)]
+    code, phase = run("draft-declare-core-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), *flags)
+    if declaration_error:
+        assert code == 2, phase
+        return client, state, source, phase, None, run
+    assert code == 0, json.dumps(phase)
+    preview, shown = check_preview(draft, authority, phase["draft"]["revision"], confirm=confirm_history)
+    return client, state, source, preview, shown, run
+
+
+def test_standalone_history_latest_action_uses_owned_receipt_only_for_observed_expectation(tmp_path):
+    client, _state, _source, preview, shown, run = _owned_notes_history_case(tmp_path)
+    assert "latest_project_history" in json.dumps(shown)
+    assert "stack_head_observed" in json.dumps(shown)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, json.dumps(result)
+    assert [row[1:] for row in client.calls if row[0] == "ak.wwise.core.undo.undo"] == [({}, {})]
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0, json.dumps(verified)
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert verified["agent_result"]["result"] == {}
+    assert list(verified)[-1] == "agent_result"
+    assert any(read["result"]["return"][0]["notes"] == "before history edit" for read in verified["verification"]["readbacks"])
+
+
+@pytest.mark.parametrize("version,direction", [("2022.1", "undo"), ("2023.1", "undo"), ("2024.1", "undo"), ("2025.1", "undo"),
+    ("2023.1", "redo"), ("2024.1", "redo"), ("2025.1", "redo")])
+def test_standalone_history_observes_expected_notes_for_each_pinned_action_version(tmp_path, version, direction):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, version=version, direction=direction)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verification_strength"] == "scoped_history_effect_readback", verified
+    assert client.source["notes"] == ("before history edit" if direction == "undo" else "after history edit")
+    assert [row[1:] for row in client.calls if row[0] == "ak.wwise.core.undo." + direction] == [({}, {})]
+    code, repeated = run("execute", preview["transaction_id"])
+    assert code == 2, repeated
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo." + direction]) == 1
+
+
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+def test_standalone_history_empty_native_result_without_expected_effect_fails_verification(tmp_path, direction):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, direction=direction, effect=False)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 2 and verified["status"] == "verification_failed" and verified["verified"] is False, verified
+    assert verified["verification_strength"] == "scoped_history_effect_readback"
+    assert not any(row[0] == "ak.wwise.core.undo." + ("redo" if direction == "undo" else "undo") for row in client.calls)
+
+
+@pytest.mark.parametrize("changed", ["notes", "name", "type", "path"])
+def test_standalone_history_prewrite_scope_drift_never_dispatches(tmp_path, changed):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path)
+    client.source[changed] = "unreviewed field value"
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 2, result
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+def test_standalone_history_discovery_is_versioned_and_discloses_global_scope_and_observation_only_receipt(tmp_path, version, direction):
+    from tests.unit.test_remaining_core_business_gateway import _env
+    code, result = waapi_gateway.execute_gateway(["--version", version, "request-schema", "ak.wwise.core.undo." + direction],
+        env=_env(tmp_path, version=version), client_factory=lambda _url: pytest.fail("offline history disclosure connected"))
+    supported = version != "2021.1" and (direction == "undo" or version != "2022.1")
+    if not supported:
+        assert code == 2, result
+        return
+    assert code == 0, result
+    declaration = result["business_adapter"]["declaration"]
+    assert set(declaration["required_fields"]) == {"history_scope", "expectation_receipt"}
+    assert declaration["history"]["history_scope"]["choices"] == ["latest_project_history"]
+    assert declaration["history"]["expectation_receipt"]["native_entry_selection"] is False
+    assert declaration["history"]["stack_head_observed"] is False
+
+
+
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+def test_standalone_history_recovers_owned_rename_identity_and_hierarchy_path(tmp_path, direction):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, direction=direction, source_operation="object.setName")
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verification_strength"] == "scoped_history_effect_readback", verified
+    expected = client.history_before if direction == "undo" else client.history_after
+    assert client.source["id"] == OBJECT_GUID
+    assert (client.source["name"], client.source["path"]) == (expected["name"], expected["path"])
+
+
+
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+def test_standalone_history_observes_all_recoverable_children_of_owned_compound_receipt(tmp_path, direction):
+    client, state, _source, preview, shown, run = _owned_notes_history_case(tmp_path,
+        direction=direction, source_operation="waapi.undoGroup")
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    assert {row["field"] for row in binding["observations"]} == {"notes", "name"}
+    assert "stack_head_observed" in json.dumps(shown)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["verification_strength"] == "scoped_history_effect_readback", verified
+    expected = client.history_before if direction == "undo" else client.history_after
+    assert (client.source["name"], client.source["path"], client.source["notes"]) == (expected["name"], expected["path"], expected["notes"])
+
+
+def test_standalone_history_incomplete_effect_readback_retains_raw_native_response(tmp_path):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    original = client.call
+    def missing(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.get":
+            client.calls.append((uri, args, options))
+            return {"return": []}
+        return original(uri, args, options)
+    client.call = missing
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 2 and verified["verified"] is False, verified
+    assert any(read.get("result") == {"return": []} for read in verified["verification"]["readbacks"]), verified
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+    assert not any(row[0] == "ak.wwise.core.undo.redo" for row in client.calls)
+
+
+
+def test_standalone_history_compound_preserves_unchanged_child_observation_alongside_real_change(tmp_path):
+    client, state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path,
+        source_operation="waapi.undoGroup", initial_notes="after")
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact["request"]["arguments"]["history_binding"]
+    note = next(row for row in binding["observations"] if row["field"] == "notes")
+    assert note["before"] == note["after"] == "after"
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0, verified
+    assert client.source["name"] == client.history_before["name"] and client.source["notes"] == "after"
+
+
+
+@pytest.mark.parametrize("values", [{}, {"history_scope": "latest_project_history"},
+    {"history_scope": "receipt-target", "expectation_receipt": "<source>"},
+    {"history_scope": "latest_project_history", "expectation_receipt": "missing"},
+    {"history_scope": "latest_project_history", "expectation_receipt": "<source>", "native_entry_id": "invented"}])
+def test_standalone_history_requires_explicit_global_scope_and_valid_owned_expectation(tmp_path, values):
+    client, _state, _source, _rejected, _shown, _run = _owned_notes_history_case(tmp_path,
+        history_values=values, declaration_error=True)
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+def test_standalone_history_unverified_receipt_is_not_promoted_to_effect_proof(tmp_path):
+    client, _state, _source, rejected, _shown, _run = _owned_notes_history_case(tmp_path,
+        verify_source=False, declaration_error=True)
+    assert "successfully business-verified" in rejected["message"], rejected
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+@pytest.mark.parametrize("direction", ["undo", "redo"])
+@pytest.mark.parametrize("entry", ["typed-call", "typed-zero-call"])
+def test_standalone_history_legacy_zero_input_entry_cannot_bypass_business_scope(tmp_path, direction, entry):
+    from tests.unit.test_remaining_core_business_gateway import _env
+    code, result = waapi_gateway.execute_gateway([entry, "ak.wwise.core.undo." + direction,
+        "--schema-digest", "0" * 64, "--apply"], env=_env(tmp_path),
+        client_factory=lambda _url: pytest.fail("history legacy entry connected"))
+    assert code == 2 and ("business Draft" in result["message"] or "closed Core business" in result["message"]), result
+
+
+def test_standalone_history_read_only_policy_stops_an_already_confirmed_history_action(tmp_path):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path)
+    code, result = run("config-set", "--project-modification-policy", "read_only")
+    assert code == 0, result
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 2, result
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+def test_standalone_history_receipt_corruption_cannot_dispatch_latest_history_action(tmp_path):
+    client, state, source, preview, _shown, run = _owned_notes_history_case(tmp_path)
+    receipt = state / "transactions" / source["transaction_id"] / "preview.json"
+    payload = json.loads(receipt.read_text())
+    payload["artifact"]["request"]["arguments"]["value"] = "tampered expectation"
+    receipt.write_text(json.dumps(payload), encoding="utf-8")
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 2, result
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+def test_standalone_history_ambiguous_native_failure_is_not_replayed_or_compensated(tmp_path):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path)
+    original = client.call
+    def uncertain(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == "ak.wwise.core.undo.undo":
+            raise RuntimeError("fixture lost acknowledgement after history action")
+        return result
+    client.call = uncertain
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 2 and result["status"] == "indeterminate", result
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+    assert not any(row[0] == "ak.wwise.core.undo.redo" for row in client.calls)
+    code, repeated = run("execute", preview["transaction_id"])
+    assert code == 2, repeated
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+
+
+def test_standalone_history_wrong_typed_effect_value_is_failure_with_original_readback(tmp_path):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    client.source["notes"] = True
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 2 and verified["verified"] is False, verified
+    assert any(read["result"]["return"][0]["notes"] is True for read in verified["verification"]["readbacks"])
+
+
+
+def test_standalone_history_ask_policy_cannot_dispatch_without_explicit_confirmation(tmp_path):
+    client, _state, _source, preview, _shown, run = _owned_notes_history_case(tmp_path, confirm_history=False)
+    code, rejected = run("execute", preview["transaction_id"])
+    assert code == 2, rejected
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+def test_standalone_history_allow_policy_uses_distinct_durable_authority_and_discloses_scope(tmp_path):
+    client, state, _source, preview, shown, run = _owned_notes_history_case(tmp_path,
+        confirm_history=False, history_policy="allow_changes")
+    assert preview["state"] == "policy_authorized", preview
+    assert "latest_project_history" in json.dumps(shown) and "stack_head_observed" in json.dumps(shown)
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+    events = TransactionStore(state).read_events(preview["transaction_id"])
+    assert any(row["event_type"] == "policy_authorized" for row in events)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+
+
+def test_standalone_history_receipt_without_observable_transition_is_not_effect_proof(tmp_path):
+    client, _state, _source, rejected, _shown, _run = _owned_notes_history_case(tmp_path,
+        initial_notes="after history edit", declaration_error=True)
+    assert "no observable transition" in rejected["message"], rejected
+    assert not any(row[0] in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"} for row in client.calls)
+
+
+def test_standalone_history_undo_then_explicit_redo_each_observes_its_expected_state(tmp_path):
+    client, _state, source, undo, _shown, run = _owned_notes_history_case(tmp_path)
+    code, executed = run("execute", undo["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", undo["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    assert client.source["notes"] == "before history edit"
+    code, phase = run("draft-start", "ak.wwise.core.undo.redo")
+    assert code == 0, phase
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    code, phase = run("draft-declare-core-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]),
+        "--value", "history_scope", "latest_project_history",
+        "--value", "expectation_receipt", source["transaction_id"])
+    assert code == 0, phase
+    code, checked = run("draft-check", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, checked
+    code, redo = run("preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(checked["draft"]["revision"]), "--apply")
+    assert code == 0, redo
+    code, shown = run("transaction-show", redo["transaction_id"], "--summary-only")
+    assert code == 0 and "stack_head_observed" in json.dumps(shown), shown
+    assert not any(row[0] == "ak.wwise.core.undo.redo" for row in client.calls)
+    code, confirmed = run(*shown["next_command"]["gateway_argv"])
+    assert code == 0, confirmed
+    code, executed = run("execute", redo["transaction_id"])
+    assert code == 0, executed
+    code, verified = run("verify", redo["transaction_id"])
+    assert code == 0 and verified["verified"] is True, verified
+    assert client.source["notes"] == "after history edit"
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo.undo"]) == 1
+    assert len([row for row in client.calls if row[0] == "ak.wwise.core.undo.redo"]) == 1

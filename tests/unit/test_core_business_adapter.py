@@ -45,7 +45,11 @@ VERSIONS_BY_OPERATION = {
 
 
 def test_exact_issue_84_version_surface_has_one_core_business_contract_per_lane() -> None:
-    assert core_business_operations() == frozenset(VERSIONS_BY_OPERATION)
+    history_versions = {
+        "ak.wwise.core.undo.undo": ("2022.1", "2023.1", "2024.1", "2025.1"),
+        "ak.wwise.core.undo.redo": ("2023.1", "2024.1", "2025.1"),
+    }
+    assert core_business_operations() == frozenset(VERSIONS_BY_OPERATION) | frozenset(history_versions)
     observed = {
         (operation, version)
         for operation, versions in VERSIONS_BY_OPERATION.items()
@@ -58,6 +62,17 @@ def test_exact_issue_84_version_surface_has_one_core_business_contract_per_lane(
         assert contract["legacy_typed_call_public"] is False
         assert contract["execution_shape"] in {"bounded_read", "draft_mutation"}
         assert contract["declaration"]["field_types"]
+    history_lanes = {
+        (operation, version)
+        for operation, versions in history_versions.items()
+        for version in versions
+        if core_business_contract_data(operation, version)
+    }
+    assert len(history_lanes) == 7
+    for operation, version in history_lanes:
+        contract = core_business_contract_data(operation, version)
+        assert contract["execution_shape"] == "draft_mutation"
+        assert contract["declaration"]["history"]["stack_head_observed"] is False
 
 
 def _session(version: str = "2025.1") -> tuple[BusinessDeclarationSession, str, str]:
