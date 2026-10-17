@@ -4112,3 +4112,231 @@ def test_read_only_rtpc_curve_native_metadata_observation(
     if category["status"] == "blocked":
         pytest.skip(f"RTPC.Curve observation incomplete; retained exact evidence: {category}")
     assert category["status"] == "PASS", category
+
+
+def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+    """Observe a tiny existing graph through public reads, without mutation credit."""
+    sdk_build = {"2021.1": "2021.1.14.8108", "2022.1": "2022.1.19.8584",
+                 "2023.1": "2023.1.19.8928", "2024.1": "2024.1.13.9056",
+                 "2025.1": "2025.1.7.9143"}[runtime.version]
+    sdk_members = ["wwiseobject_sound.html", "waql_reference.html"]
+    if runtime.version >= "2022.1":
+        sdk_members.append("ak_wwise_core_object_get_example_gets_the_rtpc_ids_from_a_sound_s_rtpc_list.html")
+    if runtime.version >= "2023.1":
+        sdk_members.append("wwiseobject_musicswitchcontainer.html")
+    if runtime.version == "2025.1":
+        sdk_members.append("wwiseobject_musicargumentsslot.html")
+    output = runtime.state_dir / "owned-list-metadata-observation.json"
+    evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous = set(evidence_root.glob("*.json"))
+    config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
+    observation: dict[str, Any] = {
+        "contract": "waapi-skill.owned-list-metadata-observation/v1",
+        "candidate": runtime.candidate, "version": runtime.version,
+        "endpoint": {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url},
+        "config_path": str(config), "config_sha256": hashlib.sha256(config.read_bytes()).hexdigest(),
+        "source_evidence": {"research": "/tmp/full-coverage-180-owned-discovery-research.md",
+            "installed_source_report": "/tmp/full-coverage-180-installed-owned-sources.md",
+            "sdk_archive": f"/Applications/Audiokinetic/Wwise{sdk_build}/SDK/Help/WwiseSDK-Windows.chm",
+            "sdk_members": sdk_members,
+            "scope": "matching version; 2021 RTPC is an observation candidate, not a documented List-type claim"},
+        "bounds": {"calls": 96, "pages_per_metadata_read": 8, "rows": 2048,
+                   "members_per_hop": 4, "owner_rows": 16, "observation_bytes": 8 * 1024 * 1024},
+        "calls": [], "boundaries": [], "native_evidence": [], "relationships": [], "owner_comparisons": [],
+        "complete_owned_list_discovery_proven": False, "field_cardinality_permission_proven": False,
+        "mutation_authority": False, "business_effect_verified": False,
+    }
+    category = {"category": "owned-list-native-metadata-observation", "status": "FAIL",
+                "verifier_strength": "bounded_sample_metadata_list_and_owner_observation_only",
+                "observation_path": str(output), "reason": "observation incomplete",
+                "business_effect_verified": False, "complete_owned_list_discovery_proven": False}
+    runtime.category_results.append(category)
+    total_rows = 0
+
+    def retain() -> None:
+        body = json.dumps(observation, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= observation["bounds"]["observation_bytes"], "Owned-list observation byte bound exceeded"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+    def boundary(stage: str, reason: str, **facts: Any) -> None:
+        observation["boundaries"].append({"stage": stage, "reason": reason, **facts})
+
+    def read(stage: str, argv: Sequence[str]) -> dict[str, Any]:
+        assert len(observation["calls"]) < 96, "Owned-list public call bound exceeded"
+        code, payload = runtime.raw_gateway(argv)
+        observation["calls"].append({"stage": stage, "gateway_argv": list(argv), "exit_code": code, "payload": payload})
+        retain()
+        if code != 0 or payload.get("ok") is not True:
+            boundary(stage, "public_read_rejected", error_code=payload.get("error_code"))
+        elif argv[0] not in {"config-show", "query-schema"}:
+            assert payload.get("endpoint") == observation["endpoint"], payload
+            assert payload.get("detected_version") == runtime.version, payload
+        return payload
+
+    def count(rows: list[Any]) -> None:
+        nonlocal total_rows
+        total_rows += len(rows)
+        assert total_rows <= 2048, "Owned-list cumulative row bound exceeded"
+
+    def pages(stage: str, argv: Sequence[str], field: str | None = None) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        command = list(argv)
+        for _ in range(8):
+            payload = read(stage, command)
+            if payload.get("ok") is not True:
+                return []
+            result = payload["agent_result"]
+            if field:
+                batch = result.get(field)
+                assert isinstance(batch, list) and len(batch) <= 64, payload
+                count(batch)
+                rows.extend(batch)
+            if result.get("complete") is True:
+                return rows
+            command = result.get("next_command", {}).get("gateway_argv")
+            assert isinstance(command, list) and command[0] == "metadata", payload
+        boundary(stage, "metadata_page_bound_reached")
+        return []
+
+    def canonical(value: Any) -> str:
+        assert isinstance(value, str) and value.casefold() == ("{" + str(uuid.UUID(value)) + "}").casefold(), value
+        return value
+
+    def query(stage: str, source: Sequence[str], *, maximum: int = 5, sample: bool = False) -> list[dict[str, Any]]:
+        payload = read(stage, ["query-object", *source, "--max-results", str(maximum),
+                               "--include", "parent", "--include", "owner"])
+        if payload.get("ok") is not True:
+            return []
+        if payload.get("projection_complete") is False or payload.get("status") == "partial":
+            boundary(stage, "query_projection_incomplete")
+            return []
+        rows = payload.get("objects", payload.get("agent_result"))
+        assert isinstance(rows, list) and len(rows) <= maximum, payload
+        count(rows)
+        if not sample and (len(rows) == maximum or payload.get("limit_reached") is True):
+            boundary(stage, "query_row_bound_reached", maximum=maximum)
+            return []
+        for row in rows:
+            canonical(row.get("id"))
+            assert isinstance(row.get("type"), str) and row["type"], row
+            for key in ("parent", "owner"):
+                if key not in row:
+                    boundary(stage, "relationship_output_missing", field=key, object_id=row["id"])
+                elif row[key] is not None:
+                    assert isinstance(row[key], Mapping), row
+                    canonical(row[key].get("id"))
+        if len({row["id"].casefold() for row in rows}) != len(rows):
+            boundary(stage, "duplicate_query_identity")
+            return []
+        return rows
+
+    def metadata(owner: str, fields: Sequence[str]) -> None:
+        listed = pages(owner + "-names", ["metadata", "list", "--exact-id", owner, "--page-size", "64"], "fields")
+        for field in fields:
+            selected = [row for row in listed if row.get("name") == field]
+            if len(selected) != 1:
+                boundary(owner + "." + field, "field_not_uniquely_listed_gateway_discovery_boundary", matching_count=len(selected))
+                continue
+            pages(owner + "." + field + "-detail", ["metadata", "detail", "--exact-id", owner,
+                                                       "--selection", selected[0]["selection"]])
+
+    def hop(owner: str, field: str) -> list[dict[str, Any]]:
+        rows = query(owner + "." + field, ["--advanced-waql", f'from object "{owner}" select @{field}'])
+        observation["relationships"].append({"owner_id": owner, "field": field, "members": rows})
+        for row in rows:
+            exact = query(row["id"] + "-exact", ["--exact-id", row["id"]], maximum=2)
+            if len(exact) != 1 or any(exact[0].get(key) != row.get(key) for key in ("id", "type", "parent", "owner")):
+                boundary(row["id"], "exact_readback_relationship_changed")
+        return rows
+
+    def compare(owner: str, known: Sequence[Mapping[str, Any]]) -> None:
+        actual = query(owner + "-from-project-owner", ["--advanced-waql", f'from project where owner.id = "{owner}"'], maximum=17)
+        expected = {row["id"] for row in known if isinstance(row.get("owner"), Mapping)
+                    and row["owner"].get("id", "").casefold() == owner.casefold()}
+        actual_ids = {row["id"] for row in actual}
+        missing = sorted(expected - actual_ids)
+        observation["owner_comparisons"].append({"owner_id": owner, "owner_rows": actual,
+            "known_owned_ids": sorted(expected), "missing_known_owned_ids": missing,
+            "additional_owner_ids": sorted(actual_ids - expected), "scope": "this sample only; no list labels/order or exhaustive discovery proof"})
+        if missing:
+            boundary(owner, "owner_query_missed_known_owned_members", missing_ids=missing)
+        if any(not isinstance(row.get("owner"), Mapping) or row["owner"].get("id", "").casefold() != owner.casefold() for row in actual):
+            boundary(owner, "owner_filter_readback_mismatch")
+
+    try:
+        read("configuration", ["config-show"])
+        read("host-and-project", ["status"])
+        read("advanced-read-contract", ["query-schema", "--advanced"])
+        kinds = ("Sound", "RTPC", *(["MusicSwitchContainer"] if runtime.version >= "2023.1" else []))
+        types = pages("live-types", ["metadata", "types", *[token for kind in kinds for token in ("--meaning", kind)], "--page-size", "64"], "types")
+        selected = {kind: [row for row in types if row.get("name") == kind] for kind in kinds}
+        observation["selected_types"] = selected
+        for kind in kinds:
+            if len(selected[kind]) != 1:
+                boundary("live-types", "type_not_uniquely_observed", name=kind)
+        sounds = query("sample-Sound-with-RTPC", ["--advanced-waql", 'from type RTPC select owner where type = "Sound"'], maximum=1, sample=True) if len(selected["RTPC"]) == 1 else []
+        if not sounds and len(selected["Sound"]) == 1:
+            sounds = query("sample-Sound", ["--type-selection", selected["Sound"][0]["selection"]], maximum=1, sample=True)
+        if sounds:
+            sound = sounds[0]
+            assert sound["type"] == "Sound", sound
+            owner = sound["id"]
+            fields = ("OutputBus", "RTPC", "Effect0" if runtime.version < "2023.1" else "Effects")
+            metadata(owner, fields)
+            related = [row for field in fields for row in hop(owner, field)]
+            if not any(row["type"] == "RTPC" for row in related):
+                boundary(owner, "no_populated_RTPC_list_observed")
+            compare(owner, related)
+        else:
+            boundary("sample-Sound", "no_existing_Sound_observed")
+        if runtime.version >= "2023.1" and len(selected["MusicSwitchContainer"]) == 1:
+            music = query("sample-MusicSwitchContainer", ["--type-selection", selected["MusicSwitchContainer"][0]["selection"]], maximum=1, sample=True)
+            if not music:
+                boundary("sample-MusicSwitchContainer", "no_existing_MusicSwitchContainer_observed")
+            else:
+                owner = music[0]["id"]
+                assert music[0]["type"] == "MusicSwitchContainer", music[0]
+                metadata(owner, ("Arguments",))
+                arguments = hop(owner, "Arguments")
+                if not arguments:
+                    boundary(owner, "no_populated_Arguments_list_observed")
+                expected = {"MusicArgumentsSlot"} if runtime.version == "2025.1" else {"SwitchGroup", "StateGroup"}
+                if any(row["type"] not in expected for row in arguments):
+                    boundary(owner, "Arguments_member_type_differs_from_matching_source")
+                if runtime.version == "2025.1":
+                    for slot in arguments:
+                        if slot["type"] == "MusicArgumentsSlot":
+                            metadata(slot["id"], ("Argument",))
+                            targets = hop(slot["id"], "Argument")
+                            if len(targets) != 1 or targets[0]["type"] not in {"SwitchGroup", "StateGroup"}:
+                                boundary(slot["id"], "slot_Argument_scalar_target_not_observed")
+                compare(owner, arguments)
+        category.update(status="blocked" if observation["boundaries"] else "PASS",
+                        reason="observation has explicit gaps" if observation["boundaries"] else "bounded sample observed; discovery/cardinality completeness requires separate review")
+        return category
+    finally:
+        status, reason = category["status"], category["reason"]
+        category.update(status="FAIL", reason="observation retention incomplete")
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == observation["config_sha256"], "Probe config changed"
+        new_evidence = sorted(set(evidence_root.glob("*.json")) - previous)
+        assert len(new_evidence) <= 512, "Owned-list dispatcher file bound exceeded"
+        total = 0
+        for path in new_evidence:
+            body = path.read_bytes()
+            total += len(body)
+            assert total <= 32 * 1024 * 1024, "Owned-list dispatcher byte bound exceeded"
+            observation["native_evidence"].append({"path": str(path), "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()})
+        retain()
+        category.update(status=status, reason=reason)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_owned_list_native_metadata_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Observe existing members and owner-query correspondence in the module sandbox."""
+    category = _collect_owned_list_metadata_probe(workflow_sandbox_runtime)
+    if category["status"] == "blocked":
+        pytest.skip(f"Owned-list observation incomplete; retained exact evidence: {category}")
+    assert category["status"] == "PASS", category
