@@ -6,6 +6,61 @@ from pathlib import Path
 import pytest
 
 from tests.destructive.support import category_evidence
+from tests.destructive.support import exact_real_evidence
+
+
+@pytest.mark.parametrize("damage", [None, "hash", "mtime", "retained", "residual", "cleanup", "unreported"])
+def test_finalized_scenario_produces_original_category_v3_with_exact_node_and_observation(tmp_path, monkeypatch, damage):
+    from types import SimpleNamespace
+    from tests.maintenance.branch_audit_completion import read_category_run
+    import hashlib
+
+    target = tmp_path / "category.jsonl"
+    monkeypatch.setenv("WWISE_CATEGORY_EVIDENCE_PATH", str(target))
+    monkeypatch.setattr(category_evidence, "current_evidence_platform", lambda: "macos")
+    observation = tmp_path / "condition-visibility.json"
+    observation.write_text(json.dumps({"observations": [{"after": {"SlewRateUp": 37}}]}))
+    lifecycle = {"contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3", "final_status": "PASS",
+                 "sandbox_retained": False, "errors": [], "quarantine_path": None,
+                 "source_hash_before": {"digest": "same", "strategy": "full"},
+                 "source_hash_after": {"digest": "same", "strategy": "full"},
+                 "source_mtime_before_ns": 10, "source_mtime_after_ns": 10}
+    metadata = SimpleNamespace(process_cleanup_result="cleaned", process_cleanup_details={"residual_processes": []})
+    reports = {"setup": "passed", "call": "passed"}
+    if damage == "hash":
+        lifecycle["source_hash_after"]["digest"] = "changed"
+    if damage == "mtime":
+        lifecycle["source_mtime_after_ns"] = 11
+    if damage == "retained":
+        lifecycle["sandbox_retained"] = True
+    if damage == "residual":
+        metadata.process_cleanup_details["residual_processes"] = [123]
+    if damage == "cleanup":
+        metadata.process_cleanup_result = "unknown"
+    if damage == "unreported":
+        reports.pop("call")
+    kwargs = {"repo_root": tmp_path, "candidate": "a" * 40, "version": "2025.1",
+              "nodeid": "tests/destructive/test_condition_visibility_gateway.py::test_show_visibility_does_not_change_native_prerequisite[Self]",
+              "phase_reports": reports, "started_at_unix_ns": 1, "lifecycle": lifecycle,
+              "sandbox": SimpleNamespace(sandbox_path=tmp_path / "deleted-sandbox", metadata=metadata),
+              "host": {"displayName": "Wwise", "isCommandLine": True,
+                       "version": {"year": 2025, "major": 1, "minor": 7, "build": 9143}},
+              "observation_path": observation, "transactions": []}
+    if damage is not None:
+        with pytest.raises(AssertionError):
+            exact_real_evidence.append_finalized_scenario_evidence(**kwargs)
+        assert not target.exists()
+        return
+    exact_real_evidence.append_finalized_scenario_evidence(**kwargs)
+    record = json.loads(target.read_text())
+    descriptor = {"artifact": str(target), "record_index": 0, "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
+                  "nodeid": kwargs["nodeid"]}
+    context = read_category_run(descriptor, tmp_path)
+    assert context["build"] == "2025.1.7.9143"
+    assert record["invocation"]["node_outcomes"] == [{"nodeid": kwargs["nodeid"], "outcome": "PASS"}]
+    assert record["categories"][0]["observation"] == {
+        "artifact": str(observation), "sha256": hashlib.sha256(observation.read_bytes()).hexdigest(),
+    }
 
 
 def _append(tmp_path: Path, *, candidate: str = "a" * 40) -> None:

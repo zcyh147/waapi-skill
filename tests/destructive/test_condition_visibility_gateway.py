@@ -6,10 +6,13 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 import pytest
 
 from tests.destructive.test_attenuation_activation_gateway import PublicDraft, create_object, set_property
+from tests.destructive.support.category_evidence import exact_transaction_outcomes
+from tests.destructive.support.exact_real_evidence import append_finalized_scenario_evidence
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
@@ -35,7 +38,8 @@ def _row(actor, object_id, fields):
 
 
 @pytest.mark.parametrize("relation", ["Self", "Parent"])
-def test_show_visibility_does_not_change_native_prerequisite(relation):
+def test_show_visibility_does_not_change_native_prerequisite(relation, request):
+    started_at_unix_ns = time.time_ns()
     version = os.environ["WWISE_VERSION"]
     root = Path(os.environ["WAAPI_CONDITION_PROBE_ROOT"]).resolve() / relation.lower()
     private_home = root / "owned" / "wwise-user-home" if sys.platform == "darwin" else None
@@ -125,6 +129,21 @@ def test_show_visibility_does_not_change_native_prerequisite(relation):
             if not closed:
                 status, reason = "BLOCKED", "owned oracle did not close"
         if runtime is not None:
-            (runtime.evidence_root / "condition-visibility.json").write_text(json.dumps(evidence, indent=2, ensure_ascii=False), encoding="utf-8")
-            result = lifecycle.finish(status, reason="" if status == "PASS" else reason)
+            transactions = []
+            observation_path = runtime.evidence_root / "condition-visibility.json"
+            try:
+                transactions = exact_transaction_outcomes(runtime.owned_root / "setup-state")
+                observation_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False), encoding="utf-8")
+            except BaseException as exc:
+                status, reason = "BLOCKED", f"evidence finalization: {type(exc).__name__}: {exc}"
+            finally:
+                result = lifecycle.finish(status, reason="" if status == "PASS" else reason)
+            if "host" in evidence and "candidate" in evidence:
+                request.addfinalizer(lambda: append_finalized_scenario_evidence(
+                    repo_root=Path(__file__).parents[2], candidate=evidence["candidate"], version=version,
+                    nodeid=request.node.nodeid, phase_reports=getattr(request.node, "_waapi_phase_reports", {}),
+                    started_at_unix_ns=started_at_unix_ns, lifecycle=result.as_dict(), sandbox=runtime.sandbox,
+                    host=evidence["host"], observation_path=observation_path, transactions=transactions,
+                ))
             assert result.final_status == status and closed, result.as_dict()
+            assert status == "PASS", reason
