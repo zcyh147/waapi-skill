@@ -24,7 +24,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -8889,7 +8889,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     raise OperationContractError('INVALID_LAYOUT_SPLITTER_SCOPE', str(exc)) from exc
                 metadata['layout_splitter_prestate'] = observed
                 verification.update(splitter_id=call_args['id'], axis=observed['axis'], parent_id=observed['parent_id'],
-                    rectangle_before=observed['rectangle'], pixel_delta=call_args['delta'])
+                    rectangle_before=observed['rectangle'], pixel_delta=call_args['delta'],
+                    preserved_view_identities=layout_view_identities(observed['instances']))
             elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI}:
                 binding = arguments['layout_binding']
                 if current['name'] != binding['layout_name']:
@@ -8907,7 +8908,8 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     metadata['layout_dock_prestate'] = dock_state
                     verification.update(view_type=observed_view['viewName'], target_id=call_args['targetID'],
                         target_kind=dock_state['target']['kind'], dock_side=call_args['side'],
-                        target_previous_ids=layout_subtree_ids(dock_state['target']['observation']))
+                        target_previous_ids=layout_subtree_ids(dock_state['target']['observation']),
+                        preserved_view_identities=layout_view_identities(dock_state['instances']))
                 if api == LAYOUT_UNDOCK_URI:
                     verification.update(view_type=observed_view['viewName'],
                         coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args})
@@ -15966,6 +15968,12 @@ def verify_prepared_operation(
             scoped = current.get('name') == plan['expected_name']
             check('Splitter movement remains in the reviewed current layout', scoped, current)
             if scoped:
+                instances_raw = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': instances_raw})
+                view_identities = layout_view_identities(canonical_view_instances(instances_raw))
+                check('Splitter movement preserves every existing view identity and type',
+                    view_identities == plan['preserved_view_identities'],
+                    {'before': plan['preserved_view_identities'], 'after': view_identities})
                 layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})
                 readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': layout})
                 try:
@@ -15997,6 +16005,10 @@ def verify_prepared_operation(
             scoped = current.get('name') == plan['expected_name']
             docked = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is True
             check('Docked view remains in the reviewed current layout', scoped, current)
+            view_identities = layout_view_identities(instances)
+            check('Docking preserves every existing view identity and type',
+                view_identities == plan['preserved_view_identities'],
+                {'before': plan['preserved_view_identities'], 'after': view_identities})
             check('The exact discovered view is independently observed docked', docked, {'view_id': plan['view_id'], 'actual': matches})
             if scoped and docked:
                 layout = read_call('ak.wwise.ui.layout.getLayout', {'name': plan['expected_name']}, {})

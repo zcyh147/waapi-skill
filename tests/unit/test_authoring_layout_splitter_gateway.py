@@ -4,7 +4,7 @@ from copy import deepcopy
 import pytest
 
 from tests.unit.test_authoring_layout_mutation_gateway import (
-    URI, NODE, switch_preview, confirm_execute_verify, gateway,
+    URI, NODE, switch_preview, confirm_execute_verify, gateway, _seed_dock_client,
 )
 from wwise_waapi.transactions import TransactionStore
 
@@ -115,3 +115,77 @@ def test_splitter_requires_unique_typed_serialized_parent_before_write(tmp_path,
         fields=lambda inspected: ('--splitter-handle', next(row['handle'] for row in inspected['elements']
             if row['kind'] == ('StackPanel' if context == 'wrong-kind' else 'Splitter')), '--pixel-delta', '20'),
         client_setup=seed, expect_check_error=True)
+
+
+@pytest.mark.parametrize('damage', ['dropped', 'retagged'])
+def test_splitter_rejects_exact_movement_when_an_existing_view_is_lost_or_retagged(tmp_path, damage):
+    def seed(client):
+        _seed_splitter(client)
+        client.views['Designer'] = [{'viewID': '{55555555-5555-5555-5555-555555555555}',
+            'viewName': 'Transport', 'viewDisplayName': 'Transport', 'viewIsDocked': True}]
+    env, state, client, preview = switch_preview(tmp_path, operation='moveSplitter', layout_name='Designer',
+        fields=lambda inspected: _fields(inspected, 20), client_setup=seed)
+    original = client.call
+    def damage_other_view(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'moveSplitter':
+            if damage == 'dropped':
+                client.views['Designer'] = []
+            else:
+                client.views['Designer'][0]['viewName'] = 'QueryEditor'
+        return result
+    client.call = damage_other_view
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    assert [row[0] for row in client.calls].count(URI + 'moveSplitter') == 1
+
+
+def test_splitter_preserves_view_identity_without_requiring_old_container_or_dock_state(tmp_path):
+    unrelated_node = {'@type': 'View', 'ID': '{55555555-5555-5555-5555-555555555555}', 'Name': 'Transport'}
+    def seed(client):
+        _seed_splitter(client)
+        client.views['Designer'] = [{'viewID': unrelated_node['ID'], 'viewName': 'Transport',
+            'viewDisplayName': 'Transport', 'viewIsDocked': False}]
+        client.layouts['Designer']['Layout']['StackPanel']['@Children'].append(
+            {'@type': 'StackPanel', 'ID': 'old wrapper', 'Orientation': 'Vertical', '@Children': [unrelated_node]})
+    env, state, client, preview = switch_preview(tmp_path, operation='moveSplitter', layout_name='Designer',
+        fields=lambda inspected: _fields(inspected, 20), client_setup=seed)
+    original = client.call
+    def restructure(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'moveSplitter':
+            children = client.layouts['Designer']['Layout']['StackPanel']['@Children']
+            children[1] = deepcopy(unrelated_node)
+            client.views['Designer'][0]['viewIsDocked'] = True
+        return result
+    client.call = restructure
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert 'old wrapper' not in str(client.layouts['Designer'])
+    assert [row[0] for row in client.calls].count(URI + 'moveSplitter') == 1
+
+
+@pytest.mark.parametrize('operation', ['dockView', 'moveSplitter'])
+def test_layout_movement_revalidates_all_view_identities_before_the_write(tmp_path, operation):
+    def seed(client):
+        if operation == 'dockView':
+            _seed_dock_client(client)
+        else:
+            _seed_splitter(client)
+        client.views['Designer'].append({'viewID': '{55555555-5555-5555-5555-555555555555}',
+            'viewName': 'Transport', 'viewDisplayName': 'Transport', 'viewIsDocked': True})
+    def fields(inspected):
+        if operation == 'moveSplitter':
+            return _fields(inspected, 20)
+        return ('--view-handle', inspected['views'][0]['handle'], '--target-element-handle',
+                inspected['elements'][0]['handle'], '--dock-side', 'left')
+    env, state, client, preview = switch_preview(tmp_path, operation=operation, layout_name='Designer',
+        fields=fields, client_setup=seed)
+    tx = preview['transaction_id']
+    _, shown = gateway.execute_gateway([*state, 'transaction-show', tx], env=env)
+    code, _ = gateway.execute_gateway([*state, 'confirm', tx, '--confirmation-token', shown['confirmation']['token']], env=env)
+    assert code == 0
+    client.views['Designer'][-1]['viewName'] = 'QueryEditor'
+    code, result = gateway.execute_gateway([*state, 'execute', tx], env=env, client_factory=lambda _: client)
+    assert code != 0, result
+    assert URI + operation not in [row[0] for row in client.calls]

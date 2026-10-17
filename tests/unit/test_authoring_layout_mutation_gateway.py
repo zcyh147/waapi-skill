@@ -716,3 +716,57 @@ def test_dock_keeps_exact_leaf_and_nested_container_target_kinds_representable(t
     verified = confirm_execute_verify(env, state, client, preview)
     assert verified['verification']['business_state_verified'] is True
     assert [row[0] for row in client.calls].count(URI + 'dockView') == 1
+
+
+@pytest.mark.parametrize('damage', ['dropped', 'retagged'])
+def test_dock_rejects_correct_side_when_an_unrelated_existing_view_is_lost_or_retagged(tmp_path, damage):
+    unrelated_id = '{55555555-5555-5555-5555-555555555555}'
+    def seed(client):
+        _seed_dock_client(client)
+        client.views['Designer'].append({'viewID': unrelated_id, 'viewName': 'Transport',
+            'viewDisplayName': 'Transport', 'viewIsDocked': True})
+        client.layouts['Designer']['Layout']['StackPanel']['@Children'].append(
+            {'@type': 'View', 'ID': unrelated_id, 'Name': 'Transport'})
+    env, state, client, preview = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=seed)
+    original = client.call
+    def damage_other_view(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'dockView':
+            if damage == 'dropped':
+                client.views['Designer'] = [row for row in client.views['Designer'] if row['viewID'] != unrelated_id]
+            else:
+                next(row for row in client.views['Designer'] if row['viewID'] == unrelated_id)['viewName'] = 'QueryEditor'
+        return result
+    client.call = damage_other_view
+    verified = confirm_execute_verify(env, state, client, preview, expect_verification_failure=True)
+    assert verified['verification']['business_state_verified'] is False
+    assert [row[0] for row in client.calls].count(URI + 'dockView') == 1
+
+
+@pytest.mark.parametrize('initially_docked', [False, True], ids=['floating', 'redock'])
+def test_dock_preserves_other_views_while_allowing_container_restructuring_and_dock_state_changes(tmp_path, initially_docked):
+    unrelated_id = '{55555555-5555-5555-5555-555555555555}'
+    unrelated_node = {'@type': 'View', 'ID': unrelated_id, 'Name': 'Transport'}
+    def seed(client):
+        _seed_dock_client(client, initially_docked=initially_docked)
+        client.views['Designer'].append({'viewID': unrelated_id, 'viewName': 'Transport',
+            'viewDisplayName': 'Transport', 'viewIsDocked': False})
+        client.layouts['Designer']['Layout']['StackPanel']['@Children'].append(
+            {'@type': 'StackPanel', 'ID': 'old wrapper', 'Orientation': 'Vertical', '@Children': [unrelated_node]})
+    env, state, client, preview = switch_preview(tmp_path, operation='dockView', layout_name='Designer',
+        fields=lambda inspected: ('--view-handle', inspected['views'][0]['handle'],
+            '--target-element-handle', inspected['elements'][0]['handle'], '--dock-side', 'left'), client_setup=seed)
+    original = client.call
+    def restructure(uri, args=None, options=None):
+        result = original(uri, args, options)
+        if uri == URI + 'dockView':
+            client.layouts['Designer']['Layout']['StackPanel']['@Children'].append(deepcopy(unrelated_node))
+            client.views['Designer'][1]['viewIsDocked'] = True
+        return result
+    client.call = restructure
+    verified = confirm_execute_verify(env, state, client, preview)
+    assert verified['verification']['business_state_verified'] is True
+    assert 'old wrapper' not in str(client.layouts['Designer'])
+    assert [row[0] for row in client.calls].count(URI + 'dockView') == 1

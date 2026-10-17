@@ -426,11 +426,13 @@ def validate_layout_live_binding(binding: Mapping[str, Any], *, read: Any) -> No
         raise ValueError('Authoring layout changed since discovery; inspect and preview again')
 
 
-def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any) -> Mapping[str, Any]:
+def validate_layout_view_binding(binding: Mapping[str, Any], *, read: Any,
+                                 instances: list[dict[str, Any]] | None = None) -> Mapping[str, Any]:
     view = validate_layout_binding(binding['view_identity'], role='view')
     if not time.time() < view['expires_at']:
         raise ValueError('The discovered view identity expired; inspect again')
-    instances = canonical_view_instances(read('ak.wwise.ui.layout.getViewInstances', {'name': binding['layout_name']}, {}))
+    if instances is None:
+        instances = canonical_view_instances(read('ak.wwise.ui.layout.getViewInstances', {'name': binding['layout_name']}, {}))
     matches = [row for row in instances if row['viewID'].upper() == view['native_id'].upper()]
     if len(matches) != 1 or canonical_sha256(matches[0]) != view['observation_sha256']:
         raise ValueError('The discovered view changed or disappeared; inspect and preview again')
@@ -463,7 +465,8 @@ def layout_element_observation(layout: Mapping[str, Any], identity: str) -> Mapp
 
 
 def dock_state_observation(binding: Mapping[str, Any], *, read: Any) -> dict[str, Any]:
-    view = validate_layout_view_binding(binding, read=read)
+    instances = canonical_view_instances(read('ak.wwise.ui.layout.getViewInstances', {'name': binding['layout_name']}, {}))
+    view = validate_layout_view_binding(binding, read=read, instances=instances)
     target = validate_layout_binding(binding['target_identity'], role='element')
     if not time.time() < target['expires_at']:
         raise ValueError('The discovered dock target expired; inspect again')
@@ -471,7 +474,7 @@ def dock_state_observation(binding: Mapping[str, Any], *, read: Any) -> dict[str
     element = layout_element_observation(layout, target['native_id'])
     if canonical_sha256(element['observation']) != target['observation_sha256']:
         raise ValueError('The discovered dock target changed; inspect again')
-    return {'view': dict(view), 'target': dict(element), 'rectangles': {
+    return {'view': dict(view), 'instances': instances, 'target': dict(element), 'rectangles': {
         role: require_layout_rectangle(read('ak.wwise.ui.layout.getElementRectangle', {'id': identity}, {}))
         for role, identity in (('view', view['viewID']), ('target', target['native_id']))}}
 
@@ -618,5 +621,13 @@ def splitter_state_observation(binding: Mapping[str, Any], *, read: Any) -> dict
     observed = splitter_element_context(layout, splitter['native_id'])
     if canonical_sha256(observed['element']) != splitter['observation_sha256']:
         raise ValueError('The discovered splitter changed; inspect again')
-    return {**observed, 'rectangle': require_layout_rectangle(
+    instances = canonical_view_instances(read('ak.wwise.ui.layout.getViewInstances', {'name': binding['layout_name']}, {}))
+    return {**observed, 'instances': instances, 'rectangle': require_layout_rectangle(
         read('ak.wwise.ui.layout.getElementRectangle', {'id': splitter['native_id']}, {}))}
+
+
+def layout_view_identities(instances: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Preserve view identity/type while allowing native pane and dock-state changes."""
+    rows = canonical_view_instances({'viewInstances': instances})
+    return sorted([{'view_id': _element_identity(row['viewID']), 'view_type': row['viewName']}
+                   for row in rows], key=lambda row: (row['view_id'], row['view_type']))

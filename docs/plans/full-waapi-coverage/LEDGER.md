@@ -301,3 +301,16 @@ then passed together with the owner control (2 passed). These are deterministic 
 not owned native observations, branch completion or release acceptance. Nested
 setLayout construction, 2025 reset semantics, exact native interpretations and
 consolidated host-specific validation remain open under the GUI launch hold.
+
+The dock/splitter partial was merged with released integration `dcf0ae11`; its
+post-merge focused selection passed 192 tests, including the additive 230-node
+Program manifest. Review then exposed a missing preservation guard: four new
+public controls all failed because the requested geometry could be certified
+while an unrelated existing view was removed or retagged. Their original RED
+run is retained. The fix snapshots every canonical instance in preview-local
+prestate and verifies exact view identities/types only for dock/moveSplitter.
+Those four controls then passed; three positive controls permit floating/redock,
+old wrapper removal and changed dock flags; the 30-case full positive movement
+matrix plus pre-execute unrelated-view drift controls passed. Container-ID or
+whole-view-state equality is not an extra post-write prerequisite. Original
+native behavior proof and complete nested/reset scope remain outstanding.
