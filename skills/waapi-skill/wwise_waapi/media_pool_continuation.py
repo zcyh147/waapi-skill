@@ -8,15 +8,125 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hmac
+import json
+import os
+from pathlib import Path
+import re
+import secrets
+import stat
 import time
 from typing import Any, Mapping, Sequence
 
-from .canonical import canonical_sha256
-from .media_build_business import MAX_MEDIA_POOL_RESULTS
+from .canonical import canonical_json_bytes, canonical_sha256
+from .filesystem_security import path_is_link_or_reparse
+from .media_build_business import MAX_MEDIA_POOL_RESULTS, validate_media_pool_business_plan
 
 
 class MediaPoolContinuationError(ValueError):
     code = "MEDIA_POOL_CONTINUATION_CHANGED"
+
+
+class MediaPoolQueryStore:
+    """Immutable read plans, outside the project, with no mutation authority."""
+
+    _HANDLE = re.compile(r"^mpq1-[0-9a-f]{32}$")
+    MAX_RECORDS = 128
+    MAX_RECORD_BYTES = 512 * 1024
+    MAX_TOTAL_BYTES = 16 * 1024 * 1024
+
+    def __init__(self, state_dir: Path):
+        self.root = state_dir / "media-pool-query-plans-v1"
+
+    @classmethod
+    def validate_handle(cls, handle: str) -> None:
+        if not isinstance(handle, str) or not cls._HANDLE.fullmatch(handle):
+            raise MediaPoolContinuationError("Expected one Gateway-issued Media Pool query handle")
+
+    def _directory(self, *, create: bool) -> None:
+        for path in [*reversed(self.root.parents), self.root]:
+            if os.path.lexists(path):
+                if path_is_link_or_reparse(path) or not path.is_dir():
+                    raise MediaPoolContinuationError("Media Pool query storage rejects links, reparse points and non-directories")
+            elif create:
+                path.mkdir(mode=0o700)
+            else:
+                raise MediaPoolContinuationError("Media Pool query state is unavailable; start the search again")
+
+    def _load(self, handle: str, *, allow_expired: bool = False) -> dict[str, Any]:
+        self.validate_handle(handle)
+        self._directory(create=False)
+        path = self.root / f"{handle}.json"
+        try:
+            if path_is_link_or_reparse(path):
+                raise MediaPoolContinuationError("Media Pool query record rejects links and reparse points")
+            descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+            with os.fdopen(descriptor, "rb") as stream:
+                metadata = os.fstat(stream.fileno())
+                if (not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1
+                        or metadata.st_size > self.MAX_RECORD_BYTES
+                        or path_is_link_or_reparse(path, metadata=metadata)):
+                    raise MediaPoolContinuationError("Media Pool query record is not one bounded regular file")
+                payload = json.loads(stream.read(self.MAX_RECORD_BYTES + 1))
+            fields = {"contract", "handle", "plan", "context", "expires_at", "sha256"}
+            if not isinstance(payload, dict) or set(payload) != fields:
+                raise ValueError("record fields changed")
+            digest = payload.pop("sha256")
+            expiry = payload["expires_at"]
+            if (payload["contract"] != "waapi-skill.media-pool-query-plan/v1" or payload["handle"] != handle
+                    or not isinstance(digest, str) or not hmac.compare_digest(canonical_sha256(payload), digest)
+                    or type(expiry) not in (int, float) or not 0 < expiry <= time.time() + 900
+                    or not isinstance(payload["plan"], dict) or not isinstance(payload["context"], dict)):
+                raise ValueError("record binding changed")
+            if not allow_expired or expiry > time.time():
+                validate_media_pool_business_plan(payload["plan"])
+            if not allow_expired and expiry <= time.time():
+                raise MediaPoolContinuationError("Media Pool query expired; start the search again")
+            return payload
+        except (OSError, ValueError, TypeError) as exc:
+            if isinstance(exc, MediaPoolContinuationError):
+                raise
+            raise MediaPoolContinuationError("Media Pool query record is missing, malformed or changed; start the search again") from exc
+
+    def resolve(self, handle: str) -> dict[str, Any]:
+        return self._load(handle)
+
+    def retire(self, handle: str) -> None:
+        self._load(handle, allow_expired=True)
+        (self.root / f"{handle}.json").unlink()
+
+    def issue(self, *, plan: Mapping[str, Any], context: Mapping[str, Any], issued: int) -> str:
+        validate_media_pool_business_plan(plan)
+        self._directory(create=True)
+        paths = []
+        for index, path in enumerate(self.root.iterdir()):
+            if index >= self.MAX_RECORDS or path.suffix != ".json" or not self._HANDLE.fullmatch(path.stem):
+                raise MediaPoolContinuationError("Media Pool query storage reached its bounded record ceiling or contains an unknown entry")
+            paths.append(path)
+        count, total_bytes = 0, 0
+        for path in paths:
+            record = self._load(path.stem, allow_expired=True)
+            if record["expires_at"] <= time.time():
+                path.unlink()
+            else:
+                count += 1
+                total_bytes += path.stat().st_size
+        handle = "mpq1-" + secrets.token_hex(16)
+        body = {"contract": "waapi-skill.media-pool-query-plan/v1", "handle": handle,
+                "plan": dict(plan), "context": dict(context), "expires_at": issued + 900}
+        encoded = canonical_json_bytes({**body, "sha256": canonical_sha256(body)})
+        if len(encoded) > self.MAX_RECORD_BYTES or count >= self.MAX_RECORDS or total_bytes + len(encoded) > self.MAX_TOTAL_BYTES:
+            raise MediaPoolContinuationError("Media Pool query storage reached its bounded capacity; retry after expiry or narrow the search")
+        path = self.root / f"{handle}.json"
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(encoded)
+                stream.flush()
+                os.fsync(stream.fileno())
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+        return handle
 
 
 @dataclass(frozen=True, slots=True)

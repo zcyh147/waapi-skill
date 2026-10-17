@@ -282,6 +282,9 @@ def media_build_business_contract_data(
         }} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         **({"read_continuation": {
             "flag": "--media-page", "input": "copy returned Gateway continuation only",
+            "long_query_flag": "--media-query; copy returned opaque read-plan handle only",
+            "long_query_state": "immutable validated business plan; exact context binding; no native payload input or mutation authority",
+            "state_lifetime": "completed query plans retired; expired plans safely reclaimed within bounded record and byte capacity",
             "native_offset_supported": False, "mode": "larger bounded prefix reread",
             "binding": ["query", "configuration", "project", "host_session", "exact preceding native prefix"],
             "expires_after_seconds": 900, "maximum_prefix_count": 200,

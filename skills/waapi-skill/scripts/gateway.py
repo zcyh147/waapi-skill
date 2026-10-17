@@ -5121,12 +5121,23 @@ def preflight_core_business_input(
         return
     if args.api in media_build_business_operations():
         try:
+            restored_plan = None
+            args.media_query_record = None
+            if args.api == MEDIA_POOL_GET_URI and args.media_query is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, MediaPoolQueryStore
+                store = MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env))
+                record = store.resolve(args.media_query)
+                if record["context"].get("configuration") != selected_connection_binding(env):
+                    raise MediaPoolContinuationError("Media Pool query configuration changed; start the search again")
+                args.media_query_record = record
+                restored_plan = record["plan"]
             media_input = media_build_input_from_namespace(
                 args,
                 operation=args.api,
                 version=versions[0],
+                restored_media_pool_plan=restored_plan,
             )
-        except MediaBuildBusinessCliError as exc:
+        except (MediaBuildBusinessCliError, ValueError, OSError) as exc:
             raise GatewayInputError(str(exc)) from exc
         args.media_build_request = media_input.materialized_request
         args.media_build_plan = media_input.deferred_media_pool_plan
@@ -12103,6 +12114,11 @@ def dispatch_media_build_business_read(
             "project": {key: project.get(key) for key in ("id", "path")},
         }
         try:
+            if args.media_query_record is not None:
+                state_dir = resolve_transaction_state_directory(args, env=env)
+                require_runtime_directory_outside_project(state_dir, project=project)
+                if args.media_query_record["context"] != media_context:
+                    raise MediaPoolContinuationError("Stored Media Pool query belongs to a different live context; start the search again")
             media_page = prepare_media_pool_page(request, token=args.media_page, context=media_context)
         except MediaPoolContinuationError as exc:
             raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
@@ -12255,7 +12271,22 @@ def dispatch_media_build_business_read(
             except MediaPoolContinuationError as exc:
                 raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result), error_code=exc.code) from exc
             if next_page is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                handle = args.media_query
+                state_dir = None
+                if handle is not None:
+                    state_dir = resolve_transaction_state_directory(args, env=env)
                 next_command = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
+                if handle is None and probe_gateway_json_document_size(next_command, 64 * 1024) != "ok":
+                    try:
+                        state_dir = resolve_transaction_state_directory(args, env=env)
+                        require_runtime_directory_outside_project(state_dir, project=project)
+                        handle = MediaPoolQueryStore(state_dir).issue(plan=args.media_build_plan, context=media_context, issued=media_page.issued)
+                    except (MediaPoolContinuationError, GatewayInputError, OSError) as exc:
+                        normalized["page"]["query_state_unavailable"] = str(exc)[:512]
+                if handle is not None:
+                    next_command = transaction_next_command("core-call", ["core-call", MEDIA_POOL_GET_URI,
+                        "--max-results", str(next_maximum), "--media-query", handle, "--media-page", next_page], state_dir=state_dir)
                 if probe_gateway_json_document_size(next_command, 64 * 1024) == "ok":
                     normalized["next_command"] = next_command
                 else:
@@ -12263,6 +12294,12 @@ def dispatch_media_build_business_read(
                         "continuation_unavailable_reason": "continuation_command_limit_exceeded",
                         "continuation_command_limit_bytes": 64 * 1024,
                     })
+            elif args.media_query is not None and normalized.get("complete") is True:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                try:
+                    MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env)).retire(args.media_query)
+                except (MediaPoolContinuationError, OSError) as exc:
+                    normalized["page"]["query_state_cleanup"] = {"complete": False, "message": str(exc)[:512]}
     incomplete_media_pool = (
         args.api == MEDIA_POOL_GET_URI
         and isinstance(normalized, Mapping)
