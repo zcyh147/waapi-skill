@@ -46,14 +46,354 @@
     "windows_acceptance": false,
     "skip_scope": "See complete log: live/destructive lanes, native Windows checks and absent optional historical evidence are not PASS credit."
   },
-  "status": "fresh_acceptance_incomplete",
-  "integration_repair_candidate": "121ab54fdd8caf1ad036674f68e68e7833f319f4",
-  "fresh_actual_attempts": 1,
-  "fresh_unattempted": [
-    "F2",
-    "F3",
+  "status": "approved_batch_finished_acceptance_decision_pending",
+  "integration_repair_candidate": "2a2d8a206e5e15ee8ca0c29293288f84e6570c39",
+  "fresh_actual_attempts": 5,
+  "fresh_unattempted": [],
+  "windows_acceptance": false,
+  "fresh_business_pass": [
+    "F1",
     "F4"
   ],
-  "additional_f1_attempt_requires_approval": true,
-  "windows_acceptance": false
+  "fresh_not_completed": [
+    "F2",
+    "F3"
+  ],
+  "additional_fresh_authorized": false,
+  "fresh_batch": {
+    "actual_attempts": 5,
+    "unique_workflows": 4,
+    "totals": {
+      "input_tokens": 1342192,
+      "cached_input_tokens": 1194240,
+      "output_tokens": 9690,
+      "agent_seconds": 202.2267895839177
+    },
+    "roots": [
+      {
+        "root": "imac-v11-repairs-first4-r2",
+        "case": "F1",
+        "task_status": "FAIL",
+        "campaign_status": "BLOCKED",
+        "reason": "untrusted heavy case evidence: expansion archive is untrusted: broker argv digest mismatch",
+        "usage": {
+          "input_tokens": 183892,
+          "cached_input_tokens": 160768,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 2082,
+          "reasoning_output_tokens": 914
+        },
+        "agent_seconds": 29.750843124929816,
+        "assertions": {},
+        "lifecycle": {
+          "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+          "errors": [
+            "scenario:V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint, visible_preview_notice"
+          ],
+          "final_status": "FAIL",
+          "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-first4-r2/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/quarantine.json",
+          "requested_status": "FAIL",
+          "sandbox_retained": true,
+          "scenario_id": "REPAIR25-F1",
+          "source_hash_after": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_hash_before": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_mtime_after_ns": 1785701407051832215,
+          "source_mtime_before_ns": 1785701407051832215,
+          "version": "2025.1"
+        },
+        "files_sha256": {
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/expansion-task-result.json": "2e87135e15057fb1cdf5c42eaa4621afd70e921c182383575300899b8e45eac9",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/turns/turn-01/events.jsonl": "08074d8470dfe15f15686f03315f3ab978d91950b787a24ccebd2b7cb83c68a9",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/lifecycle.json": "4cce85502de1c4cbc38b6ffc0e28620fffd25e3aa7fc59338e3561da96d16bf6",
+          "attempts/attempt-000001/runs/heavy-v3/classification.json": "a6987db5dae81e291af888b7763a5b24cc2aae71dbf5bbecd6f4d5f6ed3ecead"
+        }
+      },
+      {
+        "root": "imac-v11-repairs-first4-r3",
+        "case": "F1",
+        "task_status": "PASS",
+        "campaign_status": "BLOCKED",
+        "reason": "untrusted heavy case evidence: expansion archive is untrusted: invalid expansion archive: TransactionSealError: transaction preview artifact does not match its closed field contract; missing=[], unknown=['connection_configuration'].",
+        "usage": {
+          "input_tokens": 536686,
+          "cached_input_tokens": 489472,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 3431,
+          "reasoning_output_tokens": 790
+        },
+        "agent_seconds": 51.98068399960175,
+        "assertions": {
+          "complete_snapshots": true,
+          "media_unchanged": true,
+          "metadata_list_page_detail": true,
+          "other_objects_unchanged": true,
+          "source_unchanged": true,
+          "target_cardinality": true,
+          "target_identity": true,
+          "target_values": true
+        },
+        "lifecycle": {
+          "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+          "errors": [],
+          "final_status": "PASS",
+          "quarantine_path": null,
+          "requested_status": "PASS",
+          "sandbox_retained": false,
+          "scenario_id": "REPAIR25-F1",
+          "source_hash_after": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_hash_before": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_mtime_after_ns": 1785701407051832215,
+          "source_mtime_before_ns": 1785701407051832215,
+          "version": "2025.1"
+        },
+        "files_sha256": {
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/expansion-task-result.json": "3ba87328fa9c2f6c3e0f3a57f91470c3e112a3451447199fe7c3ba8b88bac05a",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/codex-task/turns/turn-01/events.jsonl": "4fd5b98e6cd76e1d7869525a39d5403d7e580b360709408e57b1cb1d91de445f",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F1/evidence/lifecycle.json": "5ae475e4911d168c46db7472a2a4e50f34948ed38bc7a0b93cf0e7f08b59c4fd",
+          "attempts/attempt-000001/runs/heavy-v3/classification.json": "0c3ea6a717f9de916625679fb9eb41b43703c931e29bf2c34cda546ed94e4a0e"
+        }
+      },
+      {
+        "root": "imac-v11-repairs-remaining3-r4",
+        "case": "F2",
+        "task_status": "FAIL",
+        "campaign_status": "BLOCKED",
+        "reason": "untrusted heavy case evidence: expansion archive is untrusted: read rejection changed the original failed gates",
+        "usage": {
+          "input_tokens": 73938,
+          "cached_input_tokens": 60416,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 835,
+          "reasoning_output_tokens": 496
+        },
+        "agent_seconds": 31.505095875356346,
+        "assertions": {
+          "complete_snapshots": true,
+          "media_unchanged": true,
+          "other_objects_unchanged": true,
+          "read_refinement": false,
+          "source_unchanged": true,
+          "target_cardinality": true,
+          "target_identity": true,
+          "target_values": true
+        },
+        "lifecycle": {
+          "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+          "errors": [
+            "scenario:V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint"
+          ],
+          "final_status": "FAIL",
+          "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-remaining3-r4/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/quarantine.json",
+          "requested_status": "FAIL",
+          "sandbox_retained": true,
+          "scenario_id": "REPAIR25-F2",
+          "source_hash_after": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_hash_before": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_mtime_after_ns": 1785701407051832215,
+          "source_mtime_before_ns": 1785701407051832215,
+          "version": "2025.1"
+        },
+        "files_sha256": {
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-task-result.json": "c4dce6e66c36371c478d1335f3a80fabe53cb12f7686a723e29c98c9e5c35f93",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/events.jsonl": "f3d98a5829071dc723e8b4f40c67b24f6db7a21ee0d96e93b1aa577ea01d7a4a",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/lifecycle.json": "2484abab4663d12f5f2a51698d9daeafb316036e69360d384fc33dc95b8f3d3c",
+          "attempts/attempt-000001/runs/heavy-v3/classification.json": "3f08747a86664f0c39bc20d980e3589c6416c5ce400475267cc7fce570018a34"
+        }
+      },
+      {
+        "root": "imac-v11-repairs-remaining2-r5",
+        "case": "F3",
+        "task_status": "FAIL",
+        "campaign_status": "BLOCKED",
+        "reason": "untrusted heavy case evidence: expansion archive is untrusted: rejected command lacks authenticated pre-dispatch proof",
+        "usage": {
+          "input_tokens": 135438,
+          "cached_input_tokens": 114176,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 939,
+          "reasoning_output_tokens": 276
+        },
+        "agent_seconds": 20.854942250065506,
+        "assertions": {},
+        "lifecycle": {
+          "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+          "errors": [
+            "scenario:V3TaskRunnerError: expansion turn failed: broker_provenance, policy_checkpoint, visible_preview_notice"
+          ],
+          "final_status": "FAIL",
+          "quarantine_path": "/Users/xiye/Documents/Git/waapi-skills/skills/waapi-skill-workspace/imac-v11-repairs-remaining2-r5/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/quarantine.json",
+          "requested_status": "FAIL",
+          "sandbox_retained": true,
+          "scenario_id": "REPAIR25-F3",
+          "source_hash_after": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_hash_before": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_mtime_after_ns": 1785701407051832215,
+          "source_mtime_before_ns": 1785701407051832215,
+          "version": "2025.1"
+        },
+        "files_sha256": {
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/expansion-task-result.json": "b265b323cf9d7b2705a12decc590ae5af12a60147385b589307114c7b61e8c9a",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/turns/turn-01/events.jsonl": "5d653ee13a75042fca4a84fa315cf9d866a4c14890979cdfd544cfb7a6f4490c",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/lifecycle.json": "89d27a365e5f3dcccd8edf208212eff6ffb1a0cc7fd7400f67bd59a44f12177a",
+          "attempts/attempt-000001/runs/heavy-v3/classification.json": "dc4cc8091950f1af4efb278ee549083931126481e3077580263dc9ebd8f99471"
+        }
+      },
+      {
+        "root": "imac-v11-repairs-final-f4-r6",
+        "case": "F4",
+        "task_status": "PASS",
+        "campaign_status": "PASS",
+        "reason": "runner and independent business oracle passed",
+        "usage": {
+          "input_tokens": 412238,
+          "cached_input_tokens": 369408,
+          "cache_write_input_tokens": 0,
+          "output_tokens": 2403,
+          "reasoning_output_tokens": 434
+        },
+        "agent_seconds": 68.13522433396429,
+        "assertions": {
+          "complete_snapshots": true,
+          "media_unchanged": true,
+          "other_objects_unchanged": true,
+          "source_unchanged": true,
+          "target_cardinality": true,
+          "target_identity": true,
+          "target_values": true
+        },
+        "lifecycle": {
+          "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+          "errors": [],
+          "final_status": "PASS",
+          "quarantine_path": null,
+          "requested_status": "PASS",
+          "sandbox_retained": false,
+          "scenario_id": "REPAIR25-F4",
+          "source_hash_after": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_hash_before": {
+            "algorithm": "sha256",
+            "bytes_hashed": 3943065,
+            "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+            "file_count": 83,
+            "strategy": "full"
+          },
+          "source_mtime_after_ns": 1785701407051832215,
+          "source_mtime_before_ns": 1785701407051832215,
+          "version": "2025.1"
+        },
+        "files_sha256": {
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F4/evidence/codex-task/expansion-task-result.json": "3f49a5f9bc17f269a33f67f14ccd7659b9988a78115b7d7383c62da60cc51e5c",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F4/evidence/codex-task/turns/turn-01/events.jsonl": "7ad9d1df1091b5d055e48755848f5748a8498181eca4076a9e83884fa97d9f6e",
+          "attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F4/evidence/lifecycle.json": "401832e89e0ceeb271df551080b9f151bbec10bbdccb3598a577577e13b39b09",
+          "attempts/attempt-000001/runs/heavy-v3/classification.json": "0c1e4628b4b24efe531f115113062637c3583029da2d60645537c559749f04f1"
+        }
+      }
+    ],
+    "business_results": {
+      "F1": "PASS with framework note; raw campaign remains BLOCKED",
+      "F2": "not completed; harness forced wrong lane",
+      "F3": "not completed; wrong existing-object operation selected",
+      "F4": "PASS with identical verify-only"
+    },
+    "additional_fresh_authorized": false
+  },
+  "f4_verify_only": {
+    "candidate": "2a2d8a206e5e15ee8ca0c29293288f84e6570c39",
+    "selected": [
+      "REPAIR25-F4"
+    ],
+    "original_exit": 0,
+    "verify_only_exit": 0,
+    "immutable_files": 78,
+    "byte_identical": true,
+    "business_assertions": {
+      "complete_snapshots": true,
+      "media_unchanged": true,
+      "other_objects_unchanged": true,
+      "source_unchanged": true,
+      "target_cardinality": true,
+      "target_identity": true,
+      "target_values": true
+    },
+    "lifecycle": {
+      "contract": "waapi-skill.codex-semantic-scenario-lifecycle/v3",
+      "errors": [],
+      "final_status": "PASS",
+      "quarantine_path": null,
+      "requested_status": "PASS",
+      "sandbox_retained": false,
+      "scenario_id": "REPAIR25-F4",
+      "source_hash_after": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_hash_before": {
+        "algorithm": "sha256",
+        "bytes_hashed": 3943065,
+        "digest": "60855d800d1e95c7b8684d8c35f2fda247bc3c4d716f1375b6cded212c8c72bd",
+        "file_count": 83,
+        "strategy": "full"
+      },
+      "source_mtime_after_ns": 1785701407051832215,
+      "source_mtime_before_ns": 1785701407051832215,
+      "version": "2025.1"
+    }
+  }
 }

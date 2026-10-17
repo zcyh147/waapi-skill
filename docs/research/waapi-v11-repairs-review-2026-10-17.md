@@ -22,3 +22,20 @@ was the argv/scope issue resolved by `8a0989ad`. Follow-up found no new issue.
 Original review reports are retained with local acceptance evidence. This
 closeout does not turn test-only review into native or semantic PASS, erase raw
 failures, or claim completion of the audit's explicitly unknown business groups.
+
+## Subsequent framework review
+
+The connection-archive binding and F2–F4 selection (`62390b65`, `784b5e14`)
+passed narrow review. The read-only schedule/rejected-read review reported one
+P2: failed F2 assertion maps were not independently recomputed. `c194d11b`
+resolved it with unconditional current-plan recomputation and tamper negatives;
+follow-up found no remaining issue. The initial zero-dispatch admission proof
+and F4-only continuation (`64e5face`, `05e44704`) passed narrow review.
+
+The preparation-only F2 / ordered F2–F3 retry selections (`8239aba3`) also passed
+review. They preserve fixed budgets and require new user approval; they do not
+launch tests or change previous verdicts. Its focused 56 passing tests are
+implementer evidence, not another full gate or Fresh acceptance.
+
+These reports are preserved in the separate local supplement
+`.waapi-skill-state/repair-evidence/supplement-archive-final-8239aba3/reviews/`.

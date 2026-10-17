@@ -35,8 +35,8 @@ claimed. User projects, including Lyra, are outside the test scope.
   remains; test sandbox disposal belongs only to the test lifecycle.
 - #172: formal four-workflow Fresh profile, authenticated evidence, native oracles,
   notice checks and archive verification implemented. Actual Fresh acceptance is
-  still pending: F1 ran once and was blocked by the test Broker before any Agent
-  write; F2–F4 have not run.
+  incomplete: all four workflows have now been attempted within the expanded
+  five-attempt budget. F1 and F4 have business PASS; F2 and F3 do not.
 
 ## Completed validation
 
@@ -63,20 +63,22 @@ removed their passing sandbox, and left no scoped Wwise processes. Failed probe
 roots remain preserved. See the native acceptance and research reports for exact
 candidate/version evidence; these are component tests, not Fresh acceptance.
 
-## Fresh incidents and remaining work
+## Fresh results and remaining decision
 
-The first root stopped before Agent startup. The second ran F1 once but the
-Broker rejected a valid unchanged Draft revision during property listing. No
-Agent Preview or Execute occurred. Both roots remain frozen. Repairs are merged
-at `121ab54f`; related regressions and follow-up review passed. See the
-[acceptance checkpoint](../../research/waapi-v11-repairs-acceptance-2026-10-17.md)
-for raw verdicts, exact candidates, usage, component evidence and limitations.
+The user approved an F1 rerun plus the unattempted F2–F4. Five actual attempts
+are complete. F1 passed its independent business checks; its raw campaign stays
+BLOCKED on a subsequently fixed archive reader. F4 passed task/matrix/campaign
+and identical verify-only with 78 unchanged evidence files. F2 received the
+wrong reference from the harness and did not complete; the framework is fixed.
+F3 chose an existing-object range operation for a creation task and did not
+complete. No original root was regraded and no four-case PASS is claimed.
 
-One F1 rerun plus the three unattempted workflows remains. The additional one
-Agent attempt requires user approval; no additional Fresh is authorized yet.
-After that decision, complete the agreed acceptance, update the draft PR,
-retain the frozen evidence. All ten managed worktrees are archived. Do not merge
-PR #173 to main or mark incomplete Fresh acceptance as passing.
+See the [acceptance record](../../research/waapi-v11-repairs-acceptance-2026-10-17.md)
+for exact candidates, original verdicts, usage, preserved source state and
+framework repairs. The installed Skill is unchanged from the completed full
+Program/Non-live gates. Additional Fresh attempts require user approval;
+alternatively the user may explicitly accept delivery with the two limitations.
+Until that decision, keep PR #173 draft. Do not merge it to main.
 
 ## Evidence retention
 

@@ -12,8 +12,9 @@ Candidate `e8ca72d3` passed Program **6942 / 3 skipped** and Non-live
 repairs received focused validation, not relabeled full-gate runs. Native
 component tests cover all five GameParameter/dependency lanes and supported
 2022.1–2025.1 standalone ShareSet lanes, with an explicit 2021.1 boundary.
-Fresh acceptance is incomplete: one F1 attempt stopped on a Broker defect before
-any Agent-initiated write; F2–F4 remain unattempted. See the
+Five approved actual Fresh attempts covered all four workflows. F1 and F4 have
+independent business PASS; F4 also has a selected 1/1 all-PASS root and identical
+verify-only. F2 and F3 did not complete, so full Fresh acceptance is not claimed. See the
 [dated acceptance checkpoint](../docs/research/waapi-v11-repairs-acceptance-2026-10-17.md)
 for exact candidate boundaries, raw verdicts, retained evidence and review.
 No native-Windows acceptance is claimed.
