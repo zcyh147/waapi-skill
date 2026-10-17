@@ -711,7 +711,7 @@ def test_parent_snapshot_is_unchanged_when_checked_child_is_revised_later(
     assert snapshotted["request"]["arguments"]["value"] == "snapshotted"
 
 
-def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None):
+def _preview_cancellation_case(tmp_path, client, *, version, cancellation, declaration_error=None, property_child=False, duplicate_property=False, parent_check_error=None, second_platform=None):
     state_dir = tmp_path / "state"
     env = gateway_env(tmp_path, version=version)
     def run(*argv):
@@ -722,14 +722,27 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
     parent = run("draft-start", "waapi.undoGroup")
     draft, authority, revision = parent["draft"]["draft_id"], parent["task_authority"], str(parent["draft"]["revision"])
     children = []
-    for operation, flag, value in (("object.setNotes", "--notes", "after"), ("object.setName", "--new-name", "Renamed")):
+    child_specs = (("object.setProperty", "--business-value", "2") if property_child else
+                   ("object.setNotes", "--notes", "after"),
+                   ("object.setProperty", "--business-value", "3") if duplicate_property else ("object.setName", "--new-name", "Renamed"))
+    for child_index, (operation, flag, value) in enumerate(child_specs):
         phase = run("draft-start-undo-child", draft, "--task-authority", authority,
                     "--expected-revision", revision, "--operation", operation)
         child, child_authority = phase["draft"]["draft_id"], phase["task_authority"]
         phase = run("draft-bind-object", child, "--task-authority", child_authority,
                     "--expected-revision", str(phase["draft"]["revision"]), "--object-id", OBJECT_GUID)
-        phase = run("draft-declare-object-change", child, "--task-authority", child_authority,
-                    "--expected-revision", str(phase["draft"]["revision"]), flag, value)
+        if operation == "object.setProperty":
+            object_handle = phase["bound_object"]["handle"]
+            phase = run("draft-discover-fields", child, "--task-authority", child_authority,
+                "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
+                "--meaning", "volume",
+                *(("--platform", second_platform) if child_index == 1 and second_platform else ()))
+            phase = run("draft-declare-field-change", child, "--task-authority", child_authority,
+                "--expected-revision", str(phase["draft"]["revision"]), "--object-handle", object_handle,
+                "--field-handle", phase["field_candidates"][0]["handle"], flag, value)
+        else:
+            phase = run("draft-declare-object-change", child, "--task-authority", child_authority,
+                        "--expected-revision", str(phase["draft"]["revision"]), flag, value)
         run("draft-check", child, "--task-authority", child_authority, "--expected-revision", str(phase["draft"]["revision"]))
         children.extend(("--child-draft", child, child_authority))
     declaration = ("draft-declare-undo-plan", draft, "--task-authority", authority,
@@ -741,7 +754,13 @@ def _preview_cancellation_case(tmp_path, client, *, version, cancellation, decla
         assert code == 2 and declaration_error in json.dumps(rejected), rejected
         return state_dir, env, rejected
     phase = run(*declaration)
-    phase = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    check = ("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    if parent_check_error:
+        code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), *check],
+            env=env, client_factory=lambda _url: client)
+        assert code == 2 and parent_check_error in json.dumps(rejected), rejected
+        return state_dir, env, rejected
+    phase = run(*check)
     preview = run("preview-from-draft", draft, "--task-authority", authority,
         "--expected-revision", str(phase["draft"]["revision"]), "--apply")
     shown = run("transaction-show", preview["transaction_id"], "--summary-only")
@@ -912,3 +931,247 @@ def test_compound_cancellation_observation_keeps_matching_read_contract_byte_lim
     assert any(read.get("call", {}).get("error_code") == "RESULT_TOO_LARGE" for read in observed["readbacks"]), observed
     assert result["verified"] is False and result["automatic_retry"] is False
     assert len([uri for uri, _args, _options in client.calls if uri.endswith("cancelGroup")]) == 1
+
+
+def _property_cancellation_client(version, *, wrong_scalar=False):
+    client = _cancellation_client(version)
+    client.source["@Volume"] = 1.0
+    client.before = dict(client.source)
+    client.current_platform = "{44444444-4444-4444-4444-444444444444}"
+    client.linked = True
+    client.platform_values = {"{44444444-4444-4444-4444-444444444444}": 1.0,
+                              "{55555555-5555-5555-5555-555555555555}": 1.0}
+    client.platform_names = {"Windows": "{44444444-4444-4444-4444-444444444444}",
+                             "Mac": "{55555555-5555-5555-5555-555555555555}"}
+    original = client.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.getProjectInfo":
+            result = original(uri, args, options)
+            return {**result, "currentPlatformId": client.current_platform,
+                    "platforms": [{"id": object_id, "name": name}
+                                  for name, object_id in client.platform_names.items()]}
+        if uri == "ak.wwise.core.object.getPropertyAndReferenceNames":
+            client.calls.append((uri, args, options))
+            return {"return": ["Volume"]}
+        if uri == "ak.wwise.core.object.getPropertyInfo":
+            client.calls.append((uri, args, options))
+            return {"name": "Volume", "type": "Real32", "default": 0,
+                    "restriction": {"type": "range", "min": -96, "max": 6},
+                    "supports": {"unlink": True}}
+        if uri == "ak.wwise.core.object.isLinked":
+            client.calls.append((uri, args, options))
+            return {"linked": client.linked}
+        if uri == "ak.wwise.core.object.isPropertyEnabled":
+            client.calls.append((uri, args, options))
+            return {"return": True}
+        if uri == "ak.wwise.core.object.setProperty":
+            client.calls.append((uri, args, options))
+            client.source["@Volume"] = args["value"]
+            selector = args.get("platform", client.current_platform)
+            selected = client.platform_names.get(selector, selector)
+            for platform in client.platform_values:
+                if client.linked or platform == selected:
+                    client.platform_values[platform] = args["value"]
+            return {}
+        result = original(uri, args, options)
+        if uri.endswith("cancelGroup"):
+            if (args or {}).get("undo") is True:
+                client.platform_values = dict.fromkeys(client.platform_values, 1.0)
+            if wrong_scalar:
+                client.source["@Volume"] = True
+                client.platform_values[client.current_platform] = True
+        if uri == "ak.wwise.core.object.get":
+            selector = (options or {}).get("platform", client.current_platform)
+            selected = client.platform_names.get(selector, selector)
+            for row in result.get("return", []):
+                if row.get("id") == OBJECT_GUID and "@Volume" in row:
+                    row["@Volume"] = client.platform_values[selected]
+        return result
+    client.call = call
+    return client
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_property_child_keeps_legal_current_platform_omission(tmp_path, version):
+    client = _property_cancellation_client(version)
+    choice = "native-default" if version in {"2021.1", "2022.1"} else "undo-changes"
+    if version == "2021.1":
+        state_dir, _env, rejected = _preview_cancellation_case(tmp_path, client, version=version,
+            cancellation=choice, property_child=True, parent_check_error="UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN")
+        assert not (state_dir / "transactions").exists()
+        assert "current_platform_or_global_linkage_observer" in json.dumps(rejected)
+        return
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation=choice, property_child=True)
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    native = artifact["prepared_operation"]["pre_state"]["execution_plan"]["calls"][0]["args"]
+    assert native == {"object": OBJECT_GUID, "property": "Volume", "value": 2.0}
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    observed = result["compound_execution"]["cancellation_observation"]
+    assert observed["complete"] is True
+    assert observed["pre_state_restored"] is (version not in {"2021.1", "2022.1"})
+
+
+def test_compound_same_current_platform_field_still_rejects_overlapping_children(tmp_path):
+    client = _property_cancellation_client("2025.1")
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
+        cancellation="undo-changes", property_child=True, duplicate_property=True,
+        parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_compound_numeric_prestate_one_is_not_restored_by_boolean_true(tmp_path, version):
+    client = _property_cancellation_client(version, wrong_scalar=True)
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="undo-changes", property_child=True)
+    code, result = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    observed = result["compound_execution"]["cancellation_observation"]
+    assert observed["complete"] is True
+    assert observed["pre_state_restored"] is False and result["rollback_verified"] is False
+    assert observed["children"][0] == {"index": 0, "complete": True, "pre_state_match": False}
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_current_and_named_platform_cannot_assume_distinct_outcomes(tmp_path, version):
+    client = _property_cancellation_client(version)
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="native-default", property_child=True, duplicate_property=True,
+        second_platform="{44444444-4444-4444-4444-444444444444}",
+        parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_current_platform_drift_requires_new_aggregate_preview(tmp_path, version):
+    client = _property_cancellation_client(version)
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="native-default", property_child=True)
+    client.current_platform = "{55555555-5555-5555-5555-555555555555}"
+    code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and rejected["status"] == "repreview_required", rejected
+    assert rejected["executed"] is False
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_compound_unlinked_current_and_distinct_named_platforms_rebind_linkage(tmp_path, version):
+    client = _property_cancellation_client(version)
+    client.linked = False
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="undo-changes", property_child=True, duplicate_property=True,
+        second_platform="Mac")
+    artifact = TransactionStore(state_dir).load_preview(preview["transaction_id"]).artifact
+    calls = artifact["prepared_operation"]["pre_state"]["execution_plan"]["calls"]
+    assert "platform" not in calls[0]["args"]
+    assert calls[1]["args"]["platform"] == "Mac"
+    client.linked = True
+    code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and rejected["status"] == "repreview_required", rejected
+    assert rejected["executed"] is False
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_distinct_platforms_need_actual_unlinked_evidence(tmp_path, version):
+    client = _property_cancellation_client(version)
+    error = "UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN" if version == "2022.1" else "UNDO_GROUP_OVERLAPPING_OUTCOME"
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="native-default", property_child=True, duplicate_property=True,
+        second_platform="Mac", parent_check_error=error)
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_compound_schema_discloses_effective_platform_proof_and_unfinished_lanes(tmp_path, version):
+    code, result = offline_execute(tmp_path, "--version", version, "operation-schema", "waapi.undoGroup", version=version)
+    assert code == 0, result
+    scope = result["business_adapter"]["safety"]["field_platform_scope"]
+    assert scope["selector_spelling_proves_independence"] is False
+    assert scope["current_platform_observer"] == ("unimplemented_for_pinned_lane" if version == "2021.1" else "getProjectInfo.currentPlatformId")
+    assert scope["linked_state_observer"] == ("object.isLinked" if version in {"2023.1", "2024.1", "2025.1"} else "not_in_pinned_catalog")
+    assert scope["unknown_effective_scope"] == "guarded_before_preview; remains_implementation_obligation"
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_compound_independent_unlinked_platform_children_execute_and_verify_exact_views(tmp_path, version):
+    client = _property_cancellation_client(version)
+    client.linked = False
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="undo-changes", property_child=True, duplicate_property=True, second_platform="Mac")
+    def run(command):
+        return waapi_gateway.execute_gateway(["--state-dir", str(state_dir), command, preview["transaction_id"]],
+            env=env, client_factory=lambda _url: client)
+    code, executed = run("execute")
+    assert code == 0 and executed["executed"] is True, executed
+    code, verified = run("verify")
+    assert code == 0 and verified["verified"] is True, verified
+    writes = [row for row in client.calls if row[0] == "ak.wwise.core.object.setProperty"]
+    assert [row[1] for row in writes] == [
+        {"object": OBJECT_GUID, "property": "Volume", "value": 2.0},
+        {"object": OBJECT_GUID, "property": "Volume", "value": 3.0, "platform": "Mac"}]
+    assert client.platform_values == {"{44444444-4444-4444-4444-444444444444}": 2.0,
+                                      "{55555555-5555-5555-5555-555555555555}": 3.0}
+    code, replay = run("execute")
+    assert code == 2 and len([row for row in client.calls if row[0].endswith("setProperty")]) == 2, replay
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_compound_platform_name_rebinding_requires_new_aggregate_preview(tmp_path, version):
+    client = _property_cancellation_client(version)
+    client.linked = False
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="undo-changes", property_child=True, duplicate_property=True, second_platform="Mac")
+    client.platform_names["Mac"] = "{66666666-6666-6666-6666-666666666666}"
+    client.platform_values[client.platform_names["Mac"]] = 1.0
+    code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and rejected["status"] == "repreview_required", rejected
+    assert rejected["executed"] is False
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_compound_nonboolean_link_readback_cannot_authorize_platform_children(tmp_path, version):
+    client = _property_cancellation_client(version)
+    client.linked = False
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version=version,
+        cancellation="undo-changes", property_child=True, duplicate_property=True, second_platform="Mac")
+    client.linked = 0
+    code, rejected = waapi_gateway.execute_gateway(["--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and rejected["ok"] is False, rejected
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("platform", ("broken", True))
+def test_compound_malformed_current_platform_cannot_seal_field_scope(tmp_path, platform):
+    client = _property_cancellation_client("2025.1")
+    client.current_platform = platform
+    # Preserve an ordinary field read so malformed platform identity reaches
+    # the public scope binder rather than failing inside the fake view store.
+    client.platform_values[platform] = 1.0
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
+        cancellation="undo-changes", property_child=True, parent_check_error="INVALID_READBACK")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+@pytest.mark.parametrize("platform", ("Windows", "{44444444-4444-4444-4444-444444444444}".lower()))
+def test_compound_alias_of_current_unlinked_platform_still_overlaps(tmp_path, platform):
+    client = _property_cancellation_client("2025.1")
+    client.linked = False
+    state_dir, _env, _rejected = _preview_cancellation_case(tmp_path, client, version="2025.1",
+        cancellation="undo-changes", property_child=True, duplicate_property=True, second_platform=platform,
+        parent_check_error="UNDO_GROUP_OVERLAPPING_OUTCOME")
+    assert not (state_dir / "transactions").exists()
+    assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)

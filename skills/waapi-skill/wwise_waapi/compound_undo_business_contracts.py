@@ -128,6 +128,17 @@ def compound_undo_business_contract_data(version: str) -> dict[str, Any]:
             },
             "every_eligible_child_requires_business_state_verification": True,
             "overlapping_final_outcomes": "reject_before_preview",
+            "field_platform_scope": {
+                "selector_spelling_proves_independence": False,
+                "current_platform_observer": ("unimplemented_for_pinned_lane" if version == "2021.1"
+                                              else "getProjectInfo.currentPlatformId"),
+                "linked_state_observer": ("object.isLinked" if version in {"2023.1", "2024.1", "2025.1"}
+                                          else "not_in_pinned_catalog"),
+                "independent_property_children": "distinct_exact_platforms_with_live_unlinked_evidence",
+                "execution_guard": "recheck_current_platform_name_bindings_and_observed_linkage",
+                "reference_omission": "not_inferred_as_property_current_platform",
+                "unknown_effective_scope": "guarded_before_preview; remains_implementation_obligation",
+            },
             "immutable_preview": True,
             "single_execute": True,
         },
