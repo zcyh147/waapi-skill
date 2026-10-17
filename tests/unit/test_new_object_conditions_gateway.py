@@ -565,12 +565,12 @@ class ProspectiveReferenceTask(ClassTask):
                 "restriction": {"type": "reference", "restrictions": [{"type": ["SwitchGroup", "StateGroup"]}]}},
         }
 
-    def declare_hierarchy(self, *, reverse=False):
+    def declare_hierarchy(self, *, reverse=False, expected_code=0):
         target, group = self.bind(HIERARCHY_TARGET), self.bind(HIERARCHY_GROUP)
         values = [("DefaultSwitchOrState", target), ("SwitchGroupOrStateGroup", group)]
         if reverse:
             values.reverse()
-        return self.declare(**dict(values))
+        return self.declare(expected_code=expected_code, **dict(values))
 
 
 @pytest.mark.parametrize("version", VERSIONS)
@@ -613,6 +613,12 @@ def test_new_reference_hierarchy_rejects_invalid_prospective_relationship_withou
         task.objects[HIERARCHY_TARGET]["type"] = "Sound"
     if fault == "missing-group":
         task.declare(DefaultSwitchOrState=task.bind(HIERARCHY_TARGET))
+    elif fault == "wrong-target-type":
+        rejected = task.declare_hierarchy(expected_code=2)
+        assert rejected["error_code"] == "REFERENCE_TARGET_TYPE_MISMATCH", rejected
+        assert CREATED not in task.objects
+        assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+        return
     else:
         task.declare_hierarchy()
     code, rejected = task.step("draft-check")
@@ -677,3 +683,21 @@ def test_set_new_node_reuses_prospective_reference_hierarchy_proof(tmp_path):
     assert task.objects[CREATED]["DefaultSwitchOrState"] == HIERARCHY_TARGET
     assert sum(uri.endswith("object.set") for uri, _, _ in task.calls) == 1
     assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2025.1"])
+@pytest.mark.parametrize("policy", ["read_only", "allow_changes"])
+def test_new_reference_hierarchy_retains_creation_policy_authority(tmp_path, version, policy):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    code, configured = task.run("config-set", "--project-modification-policy", policy)
+    assert code == 0, configured
+    task.declare_hierarchy()
+    code, result = task.transaction(policy)
+    if policy == "read_only":
+        assert code == 2 and CREATED not in task.objects, result
+        assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+    else:
+        assert code == 0 and result["verified"] is True, result
+        assert task.objects[CREATED]["SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+        assert task.objects[CREATED]["DefaultSwitchOrState"] == HIERARCHY_TARGET
+        assert sum(uri.endswith("object.create") for uri, _, _ in task.calls) == 1
