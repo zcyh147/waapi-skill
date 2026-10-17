@@ -1040,7 +1040,7 @@ def test_business_inclusion_plan_checks_and_seals_one_immutable_preview(
     ("missing-short-id", "IDENTITY_MISMATCH"), ("malformed-guid", "IDENTITY_MISMATCH"),
     ("empty", "AMBIGUOUS_IDENTITY"), ("duplicate", "AMBIGUOUS_IDENTITY"), ("collision", "AMBIGUOUS_IDENTITY")])
 def test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path: Path, version: str, object_type: str,
-    directive: str, native_code: int | None, readback: str, error: str | None) -> None:
+    directive: str, native_code: int | None, readback: str, error: str | None, number: int = 123) -> None:
     """The public Definition lifecycle admits documented DialogueEvent IDs."""
     project = _project(tmp_path)
     project_root = Path(project["path"]).parent
@@ -1058,20 +1058,21 @@ def test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path: Path, 
         "soundBankOutputRoot": str(project_root / "GeneratedSoundBanks"),
         "commands": str(project_root / "Commands"), "properties": str(project_root)}})
     definition = project_root / "Dialogue.tsv"
-    number = 1 if readback == "bool" else 123
+    number = 1 if readback == "bool" else number
     filters = "Event\tMedia" if object_type in {"Event", "DialogueEvent"} else "Structure\tMedia"
     definition.write_text(f"Harbor\t{directive}{number}\t{filters}\n", encoding="utf-8")
     event = {"id": OBJECT_ID, "name": "Target", "type": object_type, "path": r"\Objects\Target", "shortId": number}
     if readback == "wrong-type":
         event["type"] = "Sound"
     elif readback in {"wrong-short-id", "bool", "string", "missing-short-id"}:
-        event["shortId"] = {"wrong-short-id": 124, "bool": True, "string": "123", "missing-short-id": None}[readback]
+        event["shortId"] = {"wrong-short-id": number ^ 1, "bool": True, "string": str(number), "missing-short-id": None}[readback]
     elif readback == "malformed-guid":
         event["id"] = "unbound"
     rows = [] if readback == "empty" else [event]
     if readback in {"duplicate", "collision"}:
         rows.append({**event, "id": OBJECT_ID if readback == "duplicate" else BANK_ID})
-    lookup = ({"waql": f"from type {object_type} where shortId = {number} take 2"} if native_code is None else
+    literal = f"{number}.0" if version in {"2022.1", "2023.1"} else str(number)
+    lookup = ({"waql": f"from type {object_type} where shortId = {literal} take 2"} if native_code is None else
               {"from": {"id": [{"shortId": number, "type": native_code}]}, "transform": [{"range": [0, 2]}]})
     calls = []
     class Client:
@@ -1103,6 +1104,8 @@ def test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path: Path, 
         "--expected-revision", "1", "--definition-file", str(definition), "--io-root", str(tmp_path))
     assert code == 0, declared
     code, checked = run("draft-check", draft_id, "--task-authority", authority, "--expected-revision", str(declared["draft"]["revision"]))
+    assert ("ak.wwise.core.object.get", lookup,
+            {"return": ["id", "name", "type", "path", "parent", "notes", "shortId"]}) in calls
     if error:
         assert code == 2 and checked["error_code"] == error, checked
         assert not any(uri == "ak.wwise.core.soundbank.processDefinitionFiles" for uri, _, _ in calls)
@@ -1115,7 +1118,19 @@ def test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path: Path, 
     stored = TransactionStore(tmp_path / "state").load_preview(previewed["transaction_id"])
     prepared = stored.artifact["prepared_operation"]
     role = prepared["resolved_roles"]["definition.bank[0].inclusion[0]"]
-    assert role["object"] == OBJECT_ID and role["row"]["shortId"] == 123
-    assert ("ak.wwise.core.object.get", lookup,
-            {"return": ["id", "name", "type", "path", "parent", "notes", "shortId"]}) in calls
+    assert role["object"] == OBJECT_ID and role["row"]["shortId"] == number and type(role["row"]["shortId"]) is int
     assert not any(uri == "ak.wwise.core.soundbank.processDefinitionFiles" for uri, _, _ in calls)
+
+
+@pytest.mark.parametrize("version,number,readback,error", [
+    (version, number, "unique", None) for version in ["2022.1", "2023.1", "2024.1", "2025.1"]
+    for number in [0, 2147483647, 2147483648, 3970659059, 4294967295]
+] + [("2023.1", 3970659059, readback, error) for readback, error in [
+    ("wrong-type", "INVALID_TARGET_TYPE"), ("wrong-short-id", "IDENTITY_MISMATCH"),
+    ("bool", "IDENTITY_MISMATCH"), ("string", "IDENTITY_MISMATCH"), ("missing-short-id", "IDENTITY_MISMATCH"),
+    ("malformed-guid", "IDENTITY_MISMATCH"), ("empty", "AMBIGUOUS_IDENTITY"),
+    ("duplicate", "AMBIGUOUS_IDENTITY"), ("collision", "AMBIGUOUS_IDENTITY")]])
+def test_definition_dialogue_short_id_decimal_boundary_and_counterexamples(tmp_path: Path, version: str,
+    number: int, readback: str, error: str | None) -> None:
+    test_definition_short_id_draft_checks_and_seals_unique_guid(tmp_path, version, "DialogueEvent", "-DialogueEvent\t", None,
+        readback, error, number=number)

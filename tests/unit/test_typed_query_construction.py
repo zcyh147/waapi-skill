@@ -1144,7 +1144,7 @@ def test_short_id_source_resolves_native_candidates_then_applies_business_read_s
         env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 0, json.dumps(payload,ensure_ascii=False)
     queries = [call for call in client.calls if call[0] == "ak.wwise.core.object.get"]
-    assert queries[0][1] == ({"waql": "from type Event where shortId = 123456 take 65"} if version == "2021.1" else
+    assert queries[0][1] == ({"waql": "from type Event where shortId = 123456.0 take 65"} if version == "2021.1" else
                              {"from": {"id": [{"shortId": 123456, "type": 10}]}, "transform": [{"range": [0, 65]}]})
     assert queries[0][2] == {"return": ["id", "name", "type", "path"]}
     assert queries[1][1] == {"waql": 'from object "{11111111-1111-1111-1111-111111111111}" where name = "Rain" take 5'}
@@ -1181,20 +1181,23 @@ def test_short_id_collision_preserves_all_candidates_for_relationship_reads(tmp_
 
 @pytest.mark.parametrize("count,custom_field,reason", [(0, False, None), (2, True, "custom_fields_require_one_exact_guid"),
                                                        (65, False, "short_id_source_limit_reached")])
+@pytest.mark.parametrize("version", ["2021.1", "2023.1", "2025.1"])
 def test_short_id_empty_and_unresolved_sources_do_not_run_a_partial_final_query(
-    tmp_path: Path, count: int, custom_field: bool, reason: str | None,
+    tmp_path: Path, count: int, custom_field: bool, reason: str | None, version: str,
 ) -> None:
     class Client(_AdvancedQueryClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.object.get":
                 self.calls.append((uri, args, options))
+                literal = "4294967295.0" if version in {"2021.1", "2023.1"} else "4294967295"
+                assert args == {"waql": f"from type DialogueEvent where shortId = {literal} take 65"}, args
                 return {"return": [{"id": "{%08X-1111-1111-1111-111111111111}" % n} for n in range(count)]}
             return super().call(uri, args, options)
-    client = Client("2025.1")
-    command = ["query-object", "--short-id", "4294967295", "--short-id-kind", "event", "--max-results", "3"]
+    client = Client(version)
+    command = ["query-object", "--short-id", "4294967295", "--short-id-kind", "dialogue-event", "--max-results", "3"]
     if custom_field:
         command.extend(["--include-field", "Volume"])
-    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 0, payload
     assert len([call for call in client.calls if call[0] == "ak.wwise.core.object.get"]) == 1
     if reason is None:
@@ -1242,20 +1245,21 @@ def test_short_id_2021_business_kinds_use_documented_typed_predicate(tmp_path: P
     code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", kind, "--max-results", "3"],
         env=_env(tmp_path, "2021.1"), client_factory=lambda _: client)
     assert code == 0, payload
-    assert client.calls[-1][1] == {"waql": f"from type {object_type} where shortId = 123456 take 65"}
+    assert client.calls[-1][1] == {"waql": f"from type {object_type} where shortId = 123456.0 take 65"}
 
 
-def test_short_id_collision_final_query_rejects_an_unrelated_native_guid(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", ["2021.1", "2023.1", "2025.1"])
+def test_short_id_collision_final_query_rejects_an_unrelated_native_guid(tmp_path: Path, version: str) -> None:
     class Client(_AdvancedQueryClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.object.get":
                 self.calls.append((uri, args, options))
-                ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"] if "from" in args else ["{33333333-3333-3333-3333-333333333333}"]
+                ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"] if args.get("waql", "").startswith("from type") else ["{33333333-3333-3333-3333-333333333333}"]
                 return {"return": [{"id": value} for value in ids]}
             return super().call(uri, args, options)
-    client = Client("2025.1")
-    code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "3"],
-        env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
+    client = Client(version)
+    code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", "dialogue-event", "--max-results", "3"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 2, payload
     assert payload["error_code"] == "SHORT_ID_CANDIDATE_DRIFT"
 
@@ -1297,7 +1301,41 @@ def test_short_id_dialogue_query_and_schema_agree_on_typed_source(tmp_path: Path
     code, result = gateway.execute_gateway(["query-object", "--short-id", "4294967295", "--short-id-kind", "dialogue-event", "--max-results", "2"],
         env=env, client_factory=lambda _: client)
     assert code == 0, result
-    assert client.calls[-1][1:] == ({"waql": "from type DialogueEvent where shortId = 4294967295 take 65"}, {"return": ["id", "name", "type", "path"]})
+    literal = "4294967295.0" if version in {"2021.1", "2022.1", "2023.1"} else "4294967295"
+    assert client.calls[-1][1:] == ({"waql": f"from type DialogueEvent where shortId = {literal} take 65"}, {"return": ["id", "name", "type", "path"]})
+
+
+@pytest.mark.parametrize("version,kind,object_type,number", [
+    (version, "dialogue-event", "DialogueEvent", number)
+    for version in SUPPORTED_WWISE_VERSION_KEYS
+    for number in [0, 2147483647, 2147483648, 3970659059, 4294967295]
+] + [(version, "event", "Event", 72162316) for version in SUPPORTED_WWISE_VERSION_KEYS])
+def test_short_id_exact_uint32_native_expression_and_final_integer(tmp_path: Path, version: str, kind: str, object_type: str, number: int) -> None:
+    object_id = "{3C874205-5335-4290-830F-A8BFF3AE8A6B}"
+    row = {"id": object_id, "name": "Known", "type": object_type, "path": r"\Objects\Known", "shortId": number}
+    native = kind == "event" and version != "2021.1"
+    literal = f"{number}.0" if version in {"2021.1", "2022.1", "2023.1"} else str(number)
+    expected = ({"from": {"id": [{"shortId": number, "type": 10}]}, "transform": [{"range": [0, 65]}]} if native else
+                {"waql": f"from type {object_type} where shortId = {literal} take 65"})
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri != "ak.wwise.core.object.get":
+                return super().call(uri, args, options)
+            self.calls.append((uri, args, options))
+            if len(self.calls) == 1:
+                assert args == expected and options == {"return": ["id", "name", "type", "path"]}, (args, options)
+                return {"return": [{key: row[key] for key in options["return"]}]}
+            assert args == {"waql": f'from object "{object_id}" take 2'}, args
+            assert options == {"return": ["id", "name", "type", "path", "shortId"]}, options
+            return {"return": [row]}
+    client = Client(version)
+    code, result = gateway.execute_gateway(["query-object", "--short-id", str(number), "--short-id-kind", kind,
+        "--max-results", "2", "--include", "short-id"], env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert code == 0, result
+    assert result["agent_result"] == [{**{key: value for key, value in row.items() if key != "shortId"}, "short_id": number}]
+    assert type(result["agent_result"][0]["short_id"]) is int
+    assert result["source_resolution"]["short_id"] == number and type(result["source_resolution"]["short_id"]) is int
+    assert result["source_resolution"]["complete"] is True and len(client.calls) == 2
 
 
 @pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)

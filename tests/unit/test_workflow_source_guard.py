@@ -870,6 +870,7 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
          "type": "DialogueEvent", "path": "\\Events\\Dialogue_Example", "shortId": 456},
     ]
     dispatches = []
+    dialogue_literal = "456.0" if version in {"2021.1", "2022.1", "2023.1"} else "456"
 
     class Client:
         def call(self, uri, args=None, options=None):
@@ -891,8 +892,8 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
                 selected = rows[1] if "DialogueEvent" in expression or rows[1]["id"] in expression else rows[0]
                 assert expression in {
                     "from type Event take 1", "from type DialogueEvent take 1",
-                    "from type Event where shortId = 123 take 65",
-                    "from type DialogueEvent where shortId = 456 take 65",
+                    "from type Event where shortId = 123.0 take 65",
+                    f"from type DialogueEvent where shortId = {dialogue_literal} take 65",
                     *(f'from object "{row["id"]}"' + suffix for row in rows for suffix in ("", " take 64")),
                 }, expression
             else:
@@ -923,10 +924,10 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
     assert [row["short_id"] for row in evidence["observations"]] == [123, 456]
     assert [row["canonical_id"] for row in evidence["observations"]] == [row["id"] for row in rows]
     assert len(dispatches) == 8
-    assert any(args == {"waql": "from type DialogueEvent where shortId = 456 take 65"}
+    assert any(args == {"waql": f"from type DialogueEvent where shortId = {dialogue_literal} take 65"}
                for args, _options in dispatches)
     if version == "2021.1":
-        assert any(args == {"waql": "from type Event where shortId = 123 take 65"}
+        assert any(args == {"waql": "from type Event where shortId = 123.0 take 65"}
                    for args, _options in dispatches)
 
 
@@ -969,6 +970,10 @@ def test_short_id_diagnostic_uses_actual_gateway_and_retains_unsigned_miss(tmp_p
             expression = args["waql"]
             assert expression in expected, expression
             dispatches.append((expression, options))
+            if options == {"return": ["id", "name", "type", "path"]}:
+                literal = f"{number}.0" if version in {"2021.1", "2022.1", "2023.1"} else str(number)
+                assert expression == f"from type DialogueEvent where shortId = {literal} take 65"
+                return {"return": []}  # Keep a baseline-miss control after the repair, too.
             if fault == "native-error" and f"{number}.0" in expression:
                 raise RuntimeError("diagnostic decimal literal rejected")
             if f"shortId = {number} " in expression:
