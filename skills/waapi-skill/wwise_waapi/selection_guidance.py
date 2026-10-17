@@ -72,9 +72,14 @@ CAPABILITY_SELECTION_GUIDANCE: dict[str, Mapping[str, Any]] = {
         "The user asks to remove a Blend Container child assignment.",
         generic_targets=("object.setReference", "object.set"),
     ),
-    "ak.wwise.core.gameParameter.setRange": _specialized_authoring_mutation(
-        "The user asks to set a Game Parameter minimum and maximum as one range operation.",
-        generic_targets=("object.setProperty", "object.set"),
+    "ak.wwise.core.gameParameter.setRange": _guidance(
+        domain="authoring_project_model",
+        use_when=("Change one existing Game Parameter minimum and maximum with dependent-curve handling.",),
+        avoid_when=("Creating a new GameParameter or setting its default InitialValue: this range operation does neither.",),
+        preferred_over=(("object.setProperty", "only an existing parameter range and dependent-curve handling are requested"),
+                        ("object.set", "only an existing parameter range and dependent-curve handling are requested")),
+        choose_instead=(("object.create", "create a new GameParameter, including discovered Min, Max and InitialValue fields"),
+                        ("object.setProperty", "change only the default InitialValue of an existing GameParameter")),
     ),
     "ak.wwise.core.object.pasteProperties": _specialized_authoring_mutation(
         "The user asks to paste or transfer a reviewed property set between Authoring objects.",

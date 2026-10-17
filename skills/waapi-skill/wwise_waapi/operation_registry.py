@@ -2219,7 +2219,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "object.create",
         "ak.wwise.core.object.create",
         "object-mutation",
-        "Create or merge one bounded recursive object tree under a live-resolved parent, including a guarded replace confined to one explicitly authorized root.",
+        "Create or merge one bounded recursive object tree under a live-resolved parent, including a new GameParameter with discovered Min, Max and InitialValue fields, or a guarded replace confined to one explicitly authorized root.",
         ("parent", "type", "name"),
         (
             "notes",
@@ -2297,6 +2297,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         selection_guidance=_selection_guidance(
             use_when=(
                 "The request creates one wholly new recursive root.",
+                "Create a new GameParameter with its range and default in the same declaration: discover class fields Min, Max and InitialValue, then declare their values; setRange only edits an existing parameter range.",
                 "Exactly one same-name existing root remains unchanged while only a descendant tree is merged below it.",
                 "The request replaces one exact same-name subtree through the guarded on_name_conflict=replace contract.",
             ),

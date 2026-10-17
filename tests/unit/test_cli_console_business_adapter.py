@@ -657,9 +657,16 @@ def test_operations_catalog_routes_cli_console_intent_to_request_schema(
             "use_when": "the user asks to save the connected project without naming a UI command ID",
             "never_substitute": ["operation-schema", "ui.commands.execute"],
         },
+        "game_parameter_creation": {
+            "choose": ["operation-schema", "object.create"],
+            "use_when": "the user asks to create a new Game Parameter, including its minimum, maximum and default value",
+            "field_discovery": "discover GameParameter class fields Min, Max and InitialValue before declaring the new object",
+            "never_substitute": ["ak.wwise.core.gameParameter.setRange"],
+        },
         "game_parameter_range": {
             "choose": ["request-schema", "ak.wwise.core.gameParameter.setRange"],
-            "use_when": "the user asks to set one Game Parameter minimum and maximum",
+            "use_when": "the user asks to change one existing Game Parameter minimum and maximum, with dependent-curve handling, on a version that exposes this route",
+            "avoid_when": "creating a new parameter or setting its default InitialValue; setRange does neither",
             "never_substitute": [
                 "operation-schema",
                 "object.setProperty",

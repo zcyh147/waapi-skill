@@ -352,7 +352,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
     lines = PROGRAM_TEST_MANIFEST.read_text(encoding="utf-8").splitlines()
     nodes = load_program_nodes(PROGRAM_TEST_MANIFEST)
 
-    assert len(nodes) == 204
+    assert len(nodes) == 205
     assert nodes[0] == "tests/unit/test_gateway_session_context.py"
     assert nodes[-1] == "tests/unit/test_policy_recovery_gateway.py"
     assert {
@@ -360,6 +360,7 @@ def test_program_manifest_is_the_single_ordered_cross_platform_node_source() -> 
         "tests/unit/test_metadata_selection_gateway.py",
         "tests/unit/test_conditional_reference_gateway.py",
         "tests/unit/test_gameparameter_class_fields_gateway.py",
+        "tests/unit/test_gameparameter_route_disclosure.py",
         "tests/unit/test_plugin_shareset_gateway.py",
         "tests/unit/test_persistent_project_cleanup_gateway.py",
         "tests/unit/test_policy_recovery_gateway.py",

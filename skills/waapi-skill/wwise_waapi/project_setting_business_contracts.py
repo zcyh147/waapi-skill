@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .selection_guidance import selection_guidance_for_uri
+
 
 PROJECT_SETTING_BUSINESS_CONTRACT = "waapi-skill.project-setting-business/v1"
 GAME_PARAMETER_SET_RANGE_URI = "ak.wwise.core.gameParameter.setRange"
@@ -45,8 +47,8 @@ _INTENTS = {
         "on an exact platform."
     ),
     GAME_PARAMETER_SET_RANGE_URI: (
-        "Set one Game Parameter minimum and maximum and choose how dependent "
-        "curves respond."
+        "Change one existing Game Parameter minimum and maximum and choose how dependent "
+        "curves respond; does not create a parameter or set its default InitialValue."
     ),
 }
 
@@ -99,6 +101,8 @@ def project_setting_business_contract_data(
         "version": version,
         "input_mode": "business_declaration",
         "execution_shape": "draft_mutation",
+        **({"selection_guidance": dict(selection_guidance_for_uri(operation))}
+           if operation == GAME_PARAMETER_SET_RANGE_URI else {}),
         "start": {
             "subcommand": "draft-start",
             "gateway_argv": ["draft-start", operation],
