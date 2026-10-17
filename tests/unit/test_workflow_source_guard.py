@@ -555,7 +555,7 @@ def _owned_probe_runtime(tmp_path, workflow, *, version="2025.1", missing_list=F
         ("sound", "rtpc", "bus", "effect", "music", "group", "slot"), start=1)}
     def row(name, kind, owner=None):
         return {"id": ids[name], "name": name, "type": kind, "path": "\\" + name,
-                "parent": None, "owner": {"id": ids[owner]} if owner else None}
+                "parent": None, "owner": {"id": ids[owner]} if owner else None, "class_id": 1234}
     sound, music = row("sound", "Sound"), row("music", "MusicSwitchContainer")
     rtpc, bus = row("rtpc", "RTPC", "sound"), row("bus", "Bus")
     effect = row("effect", "Effect" if version < "2023.1" else "EffectSlot", "sound")
@@ -620,6 +620,7 @@ def test_owned_list_probe_retains_sample_only_graph_and_fresh_metadata(tmp_path,
     assert observed["mutation_authority"] is False
     assert observed["owner_comparisons"][0]["missing_known_owned_ids"] == []
     assert observed["native_evidence"] and observed["calls"]
+    assert all("class-id" in command for command in commands if command[0] == "query-object")
     details = [call for call in observed["calls"] if call["gateway_argv"][:2] == ["metadata", "detail"]]
     assert "name" not in details[0]["payload"]["agent_result"]["metadata"]
     assert "type" not in details[0]["payload"]["agent_result"]["metadata"]
@@ -686,9 +687,12 @@ def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp
                 return _info(version)
             assert uri == "ak.wwise.core.object.get", (uri, args, options)
             observed.append(args["waql"])
-            assert options["return"] == ["id", "name", "type", "path", "parent", "owner"]
-            return {"return": [{"id": ids["rtpc"], "name": "", "type": "RTPC", "path": "\\RTPC",
-                                "parent": None, "owner": {"id": ids["sound"]}}]}
+            assert options["return"] == ["id", "name", "type", "path", "parent", "owner", "classId"]
+            slot = version == "2025.1" and "select @Arguments" in args["waql"]
+            return {"return": [{"id": ids["slot"] if slot else ids["rtpc"], "name": "",
+                                "type": "PluginInnerObject" if slot else "RTPC", "path": "\\RTPC",
+                                "parent": None, "owner": {"id": ids["sound"]},
+                                "classId": 5832704 if slot else 1441808}]}
 
         def disconnect(self):
             pass
@@ -696,11 +700,14 @@ def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp
     for expression in expressions:
         code, payload = workflow.waapi_gateway.execute_gateway([
             "--state-dir", str(runtime.state_dir), "query-object", "--advanced-waql", expression,
-            "--max-results", "5", "--include", "parent", "--include", "owner"],
+            "--max-results", "5", "--include", "parent", "--include", "owner", "--include", "class-id"],
             env=runtime.env, client_factory=lambda _url: Client())
         assert code == 0, payload
         rows = payload.get("objects", payload.get("agent_result"))
         assert rows[0]["owner"]["id"] == ids["sound"] and rows[0]["parent"] is None
+        slot = version == "2025.1" and "select @Arguments" in expression
+        assert rows[0]["class_id"] == (5832704 if slot else 1441808)
+        assert rows[0]["type"] == ("PluginInnerObject" if slot else "RTPC")
     assert observed == [expression + " take 5" for expression in expressions]
 
 
@@ -1088,3 +1095,161 @@ def test_short_id_diagnostic_uses_actual_gateway_and_retains_unsigned_miss(tmp_p
         receipt = next(receipt for receipt in evidence["receipts"] if f"{number}.0" in str(receipt["argv"]))
         assert receipt["exit_code"] == 2
         assert receipt["payload"]["call"]["error_code"] == "RuntimeError"
+
+
+def _prospective_native_runtime(tmp_path, workflow, version, family, *, fault=None):
+    from copy import deepcopy
+    from tests.unit.test_new_object_conditions_gateway import (
+        ProspectiveReferenceTask, HIERARCHY_GROUP, HIERARCHY_TARGET, CREATED,
+    )
+    from tests.unit.test_field_interface_closure_gateway import FIRST
+
+    class Client(ProspectiveReferenceTask):
+        def call(self, uri, args=None, options=None):
+            if uri.endswith("object.get"):
+                expression = args.get("waql", "")
+                if expression == f"from type {family} take 1":
+                    self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                    rows = [] if fault == "missing-target" else [self.objects[HIERARCHY_TARGET]]
+                elif expression.startswith('from object "'):
+                    self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                    identity = expression.split('"')[1]
+                    if identity.startswith("\\"):
+                        assert identity == self.objects[FIRST]["path"], expression
+                        rows = [deepcopy(self.objects[FIRST])]
+                    else:
+                        rows = [deepcopy(self.objects[identity])]
+                    if fault == "independent-reference" and rows[0]["id"] == CREATED:
+                        rows[0]["DefaultSwitchOrState"] = HIERARCHY_GROUP
+                else:
+                    result = super().call(uri, args, options)
+                    rows = result["return"]
+                return {"return": [{key: deepcopy(row[key[1:] if key.startswith("@") else key])
+                    for key in options["return"] if (key[1:] if key.startswith("@") else key) in row}
+                    for row in rows]}
+            result = super().call(uri, args, options)
+            if fault == "ignored-default" and uri.endswith("object.create"):
+                self.objects[CREATED]["DefaultSwitchOrState"] = None
+            return result
+
+    client = Client(tmp_path, version, state=family == "State")
+    client.types += [{"classId": 10, "name": family, "type": "WObject"},
+                     {"classId": 11, "name": family + "Group", "type": "WObject"}]
+    client.objects[FIRST]["path"] = (workflow.CONTAINERS_PARENT if version == "2025.1"
+                                      else workflow.ACTOR_MIXER_PARENT)
+    client.calls.clear()
+    evidence_root = tmp_path / "dispatcher"
+    evidence_root.mkdir()
+    runtime = SimpleNamespace(version=version, candidate="a" * 40, state_dir=tmp_path / "state",
+        category_results=[], env={**client.env, "WWISE_EVIDENCE_DIR": str(evidence_root)},
+        lifecycle=SimpleNamespace(host="127.0.0.1", waapi_url="ws://127.0.0.1:31337/waapi"),
+        port=31337, sandbox=SimpleNamespace(metadata=SimpleNamespace(get_info_version={"fixture": version})))
+    commands = []
+
+    def gateway(command):
+        commands.append(list(command))
+        workflow.waapi_gateway.build_parser().parse_args(list(command))
+        return workflow.waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: client)
+
+    runtime.raw_gateway = gateway
+    return runtime, client, commands
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("family", ("Switch", "State"))
+def test_prospective_reference_native_collector_uses_public_gateway(tmp_path, workflow, version, family):
+    from tests.unit.test_new_object_conditions_gateway import HIERARCHY_GROUP, HIERARCHY_TARGET, CREATED
+
+    runtime, client, commands = _prospective_native_runtime(tmp_path, workflow, version, family)
+    workflow.test_prospective_group_default_native_acceptance(runtime, family)
+    category, = runtime.category_results
+    evidence = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "PASS"
+    assert evidence["independent_readback"]["id"] == CREATED
+    assert evidence["selected_target"]["id"] == HIERARCHY_TARGET
+    assert evidence["selected_group"]["id"] == HIERARCHY_GROUP
+    assert evidence["source_rule"]["version"] == version
+    assert len(evidence["source_rule"]["sha256"]) == 64
+    writes = [(uri, args) for uri, args, _ in client.calls if uri.endswith(
+        ("object.create", "object.set", "setReference", "setProperty"))]
+    assert len(writes) == 1 and writes[0][0].endswith("object.create")
+    assert writes[0][1]["@SwitchGroupOrStateGroup"] == HIERARCHY_GROUP
+    assert writes[0][1]["@DefaultSwitchOrState"] == HIERARCHY_TARGET
+    assert sum(command[0] == "execute" for command in commands) == 1
+    assert any(command[:3] == ["query-object", "--custom-kind", family] for command in commands)
+    independent = next(i for i, command in enumerate(commands) if command[:3] == ["query-object", "--exact-id", CREATED])
+    assert independent > next(i for i, command in enumerate(commands) if command[0] == "verify")
+    assert commands[independent].count("--include-field") == 2
+    assert evidence["lifecycle_acceptance"].startswith("Requires the final")
+
+
+@pytest.mark.parametrize("fault", ("missing-target", "ignored-default", "independent-reference"))
+def test_prospective_reference_native_collector_retains_failure_without_retry(tmp_path, workflow, fault):
+    runtime, client, commands = _prospective_native_runtime(tmp_path, workflow, "2025.1", "State", fault=fault)
+    with pytest.raises(AssertionError):
+        workflow.test_prospective_group_default_native_acceptance(runtime, "State")
+    category, = runtime.category_results
+    evidence = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "FAIL" and evidence["error"]
+    expected_creates = 0 if fault == "missing-target" else 1
+    assert sum(command[0] == "execute" for command in commands) == expected_creates
+    assert sum(uri.endswith("object.create") for uri, _, _ in client.calls) == expected_creates
+    if fault == "ignored-default":
+        last = evidence["receipts"][-1]
+        assert last["argv"][0] == "verify" and last["exit_code"] == 2
+        assert last["payload"].get("verified") is not True
+    elif fault == "independent-reference":
+        assert any(row["argv"][0] == "verify" and row["payload"].get("state") == "verified"
+                   for row in evidence["receipts"])
+        assert evidence["receipts"][-1]["argv"][0] == "query-object"
+    if expected_creates:
+        assert evidence["lifecycle_final_reference"]["transaction_id"] == category["transaction_id"]
+        assert category["transaction_id"]
+
+
+def test_owned_list_probe_keeps_generic_member_type_and_exact_class_id_observation(tmp_path, workflow):
+    runtime, commands, ids = _owned_probe_runtime(tmp_path, workflow)
+    original = runtime.raw_gateway
+
+    def gateway(command):
+        code, payload = original(command)
+        if command[0] == "query-object":
+            for row in payload["objects"]:
+                if row["id"] == ids["slot"]:
+                    row.update(type="PluginInnerObject", class_id=5832704)
+        return code, payload
+
+    runtime.raw_gateway = gateway
+    category = workflow._collect_owned_list_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked"
+    members = next(row["members"] for row in observed["relationships"] if row["field"] == "Arguments")
+    assert members[0]["type"] == "PluginInnerObject" and members[0]["class_id"] == 5832704
+    assert any(row["reason"] == "Arguments_member_type_differs_from_matching_source" for row in observed["boundaries"])
+    assert observed["complete_owned_list_discovery_proven"] is False
+    assert observed["field_cardinality_permission_proven"] is False and observed["mutation_authority"] is False
+    assert all("class-id" in command for command in commands if command[0] == "query-object")
+
+
+@pytest.mark.parametrize("missing", ("owner", "class_id"))
+def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_path, workflow, missing):
+    runtime, _commands, ids = _owned_probe_runtime(tmp_path, workflow)
+    original = runtime.raw_gateway
+
+    def gateway(command):
+        code, payload = original(command)
+        if command[0] == "query-object":
+            for row in payload["objects"]:
+                if row["id"] == ids["slot"]:
+                    row.pop(missing, None)
+        return code, payload
+
+    runtime.raw_gateway = gateway
+    category = workflow._collect_owned_list_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked"
+    members = next(row["members"] for row in observed["relationships"] if row["field"] == "Arguments")
+    assert missing not in members[0] and members[0]["parent"] is None
+    expected = "relationship_output_missing" if missing == "owner" else "class_id_output_missing"
+    assert any(row["reason"] == expected for row in observed["boundaries"])

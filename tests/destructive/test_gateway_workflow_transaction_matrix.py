@@ -4206,7 +4206,7 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
 
     def query(stage: str, source: Sequence[str], *, maximum: int = 5, sample: bool = False) -> list[dict[str, Any]]:
         payload = read(stage, ["query-object", *source, "--max-results", str(maximum),
-                               "--include", "parent", "--include", "owner"])
+                               "--include", "parent", "--include", "owner", "--include", "class-id"])
         if payload.get("ok") is not True:
             return []
         if payload.get("projection_complete") is False or payload.get("status") == "partial":
@@ -4221,6 +4221,10 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
         for row in rows:
             canonical(row.get("id"))
             assert isinstance(row.get("type"), str) and row["type"], row
+            if "class_id" not in row:
+                boundary(stage, "class_id_output_missing", object_id=row["id"])
+            elif not isinstance(row["class_id"], int) or isinstance(row["class_id"], bool):
+                boundary(stage, "class_id_output_not_integer", object_id=row["id"], value=row["class_id"])
             for key in ("parent", "owner"):
                 if key not in row:
                     boundary(stage, "relationship_output_missing", field=key, object_id=row["id"])
@@ -4247,7 +4251,7 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
         observation["relationships"].append({"owner_id": owner, "field": field, "members": rows})
         for row in rows:
             exact = query(row["id"] + "-exact", ["--exact-id", row["id"]], maximum=2)
-            if len(exact) != 1 or any(exact[0].get(key) != row.get(key) for key in ("id", "type", "parent", "owner")):
+            if len(exact) != 1 or any(exact[0].get(key) != row.get(key) for key in ("id", "type", "class_id", "parent", "owner")):
                 boundary(row["id"], "exact_readback_relationship_changed")
         return rows
 
@@ -4424,4 +4428,152 @@ def test_read_only_short_id_native_observation(workflow_sandbox_runtime: _Workfl
 def test_read_only_short_id_native_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     """Explicitly selected hypothesis probes within the existing owned lifecycle."""
     category = _collect_short_id_native_probe(workflow_sandbox_runtime, diagnostic=True)
+    assert category["status"] == "PASS", category
+
+
+def _collect_prospective_group_default_native_acceptance(
+    runtime: _WorkflowSandboxRuntime, family: str,
+) -> dict[str, Any]:
+    """One closed create plus independent reads inside the existing sandbox owner."""
+    import gzip
+    from types import SimpleNamespace
+
+    assert family in {"Switch", "State"}
+    output = runtime.state_dir / f"prospective-group-default-{family}.json"
+    config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
+    config_hash = hashlib.sha256(config.read_bytes()).hexdigest()
+    dispatcher = Path(runtime.env["WWISE_EVIDENCE_DIR"])
+    previous = set(dispatcher.glob("*.json"))
+    endpoint = {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url}
+    category = {"category": "prospective-group-default-" + family, "status": "FAIL",
+        "verifier_strength": "gateway_verified_create_plus_independent_exact_identity_and_two_references",
+        "observation_path": str(output), "reason": "acceptance incomplete", "transaction_id": None}
+    runtime.category_results.append(category)
+    evidence: dict[str, Any] = {"candidate": runtime.candidate, "version": runtime.version,
+        "build": runtime.sandbox.metadata.get_info_version, "family": family, "endpoint": endpoint,
+        "config_path": str(config), "config_sha256": config_hash, "receipts": [], "native_evidence": [],
+        "lifecycle_final_reference": {"contract": "waapi-skill.host-category-evidence/v3", "phase": "final",
+            "candidate": runtime.candidate, "category": category["category"], "transaction_id": None,
+            "cleanup_status": "unresolved_until_final_row"},
+        "lifecycle_acceptance": "Requires the final host-category-evidence/v3 row for this candidate, category and transaction; the existing workflow lifecycle seals source hashes/mtime and process cleanup. Collector completion alone is not cleanup success."}
+
+    def call(command: Sequence[str], *, live: bool) -> dict[str, Any]:
+        assert len(evidence["receipts"]) < 32, "Prospective reference public call bound exceeded"
+        code, payload = runtime.raw_gateway(command)
+        evidence["receipts"].append({"argv": list(command), "exit_code": code, "payload": payload})
+        if command[0] == "preview-from-draft" and payload.get("transaction_id"):
+            category["transaction_id"] = payload["transaction_id"]
+            evidence["lifecycle_final_reference"]["transaction_id"] = payload["transaction_id"]
+        assert code == 0 and payload.get("ok") is True, payload
+        if live:
+            assert payload.get("endpoint") == endpoint, payload
+            assert payload.get("detected_version") == runtime.version, payload
+        return payload
+
+    # Reuse the existing business-Draft helpers; this view only records their
+    # public commands and has no client, configuration or lifecycle of its own.
+    commands = SimpleNamespace(gateway=call)
+
+    def one(source: Sequence[str], *outputs: str) -> dict[str, Any]:
+        payload = call(["query-object", *source, "--max-results", "1", *outputs], live=True)
+        assert payload.get("projection_complete") is not False and payload.get("status") != "partial", payload
+        rows = payload.get("objects", payload.get("agent_result"))
+        assert isinstance(rows, list) and len(rows) == 1, payload
+        row = rows[0]
+        assert all(isinstance(row.get(key), str) and row[key] for key in ("id", "name", "type", "path")), row
+        canonical(row["id"])
+        return row
+
+    def canonical(value: Any) -> str:
+        identity = value.get("id") if isinstance(value, Mapping) else value
+        assert isinstance(identity, str) and identity.casefold() == ("{" + str(uuid.UUID(identity)) + "}").casefold(), value
+        assert uuid.UUID(identity).int != 0, value
+        return identity.casefold()
+
+    try:
+        source_path = REPO_ROOT / "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz"
+        sources = json.loads(gzip.decompress(source_path.read_bytes()))["files"]
+        matches = [(key, document) for key, document in sources.items()
+                   if key.startswith(runtime.version + ".") and key.endswith("|condition|WObjects/WObjects.xml")]
+        assert len(matches) == 1, [key for key, _ in matches]
+        key, document = matches[0]
+        raw = base64.b64decode(document["bytes_base64"])
+        assert hashlib.sha256(raw).hexdigest() == document["sha256"]
+        definition = ET.fromstring(raw).find('./WwiseObject[@Name="SwitchContainer"]/Properties/Reference[@Name="DefaultSwitchOrState"]')
+        assert definition is not None
+        assert definition.find('./Restrictions/IsChildOfReferenceRestriction/Reference').attrib == {"Name": SWITCH_GROUP_REFERENCE}
+        assert definition.find('./Dependencies/ReferenceDependency').attrib == {"Name": SWITCH_GROUP_REFERENCE, "Action": "Enable"}
+        assert definition.find('./Dependencies/ReferenceDependency/Condition/ReferenceIsSet').attrib == {"Value": "true"}
+        evidence["source_rule"] = {"version": runtime.version, "key": key, "sha256": document["sha256"],
+            "fixture": str(source_path), "field_xml": ET.tostring(definition, encoding="unicode")}
+        sample = one(["--custom-kind", family], "--include", "parent")
+        assert sample["type"] == family, sample
+        target = one(["--exact-id", sample["id"]], "--include", "parent")
+        assert target == sample, {"sample": sample, "exact": target}
+        group_id = canonical(target["parent"])
+        group = one(["--exact-id", group_id])
+        assert group["type"] == family + "Group", group
+        evidence.update(selected_target=target, selected_group=group)
+        draft = _start_business_draft(commands, "object.create")
+        segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == "2025.1" else ACTOR_MIXER_PARENT_SEGMENTS
+        parent_row = one([token for segment in segments for token in ("--path-segment", segment)])
+        parent = _bind_business_object(commands, draft, object_id=parent_row["id"])
+        target_handle = _bind_business_object(commands, draft, object_id=target["id"])
+        group_handle = _bind_business_object(commands, draft, object_id=group["id"])
+        kind = _discover_business_type(commands, draft, meaning="SwitchContainer", role="object", expected_label="SwitchContainer")
+        fields = []
+        # Deliberately declare the dependent first: the same-create condition
+        # must resolve against the complete field set, not argument order.
+        for meaning, handle in (("DefaultSwitchOrState", target_handle), (SWITCH_GROUP_REFERENCE, group_handle)):
+            found = _update_business_draft(commands, draft, "draft-discover-fields",
+                ["--type-handle", kind, "--meaning", meaning], live=True)
+            fields.extend(["--field-value", discovered_business_field_handle(found, meaning), handle])
+        name = "WAAPI_PROSPECTIVE_" + family + "_" + uuid.uuid4().hex[:12]
+        _update_business_draft(commands, draft, "draft-declare-new",
+            ["--declaration-id", "container", "--parent-handle", parent, "--name", name, "--kind", kind, *fields], live=False)
+        completed = _complete_business_draft(commands, draft)
+        created = _created_object_id(completed["execute"])
+        row = one(["--exact-id", created], "--include", "parent",
+                  "--include-field", SWITCH_GROUP_REFERENCE, "--include-field", "DefaultSwitchOrState")
+        assert row["name"] == name and row["type"] == "SwitchContainer", row
+        assert row["path"] == "\\" + "\\".join((*segments, name)), row
+        assert canonical(row["id"]) == canonical(created)
+        assert canonical(row["parent"]) == canonical(parent_row["id"]), row
+        references = row["references"]
+        assert canonical(references[SWITCH_GROUP_REFERENCE]) == canonical(group["id"]), row
+        assert canonical(references["DefaultSwitchOrState"]) == canonical(target["id"]), row
+        assert one(["--exact-id", target["id"]], "--include", "parent") == target
+        assert one(["--exact-id", group["id"]]) == group
+        evidence["independent_readback"] = row
+        category.update(status="PASS", reason="one public create verified; independent identity, group/default references and original target/group preserved")
+        return category
+    except BaseException as exc:
+        category["reason"] = f"{type(exc).__name__}: {exc}"
+        evidence["error"] = category["reason"]
+        raise
+    finally:
+        assert hashlib.sha256(config.read_bytes()).hexdigest() == config_hash, "Prospective reference acceptance changed config"
+        paths = sorted(set(dispatcher.glob("*.json")) - previous)
+        assert len(paths) <= 512
+        total_bytes = 0
+        for path in paths:
+            body = path.read_bytes()
+            total_bytes += len(body)
+            assert total_bytes <= 32 * 1024 * 1024
+            evidence["native_evidence"].append({"path": str(path), "bytes": len(body), "sha256": hashlib.sha256(body).hexdigest()})
+        body = json.dumps(evidence, ensure_ascii=False, indent=2).encode("utf-8")
+        assert len(body) <= 8 * 1024 * 1024
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(body)
+        category["observation_sha256"] = hashlib.sha256(body).hexdigest()
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+@pytest.mark.parametrize("family", ("Switch", "State"))
+def test_prospective_group_default_native_acceptance(
+    workflow_sandbox_runtime: _WorkflowSandboxRuntime, family: str,
+) -> None:
+    """Create one container with explicit group/default in the existing sandbox."""
+    category = _collect_prospective_group_default_native_acceptance(workflow_sandbox_runtime, family)
     assert category["status"] == "PASS", category
