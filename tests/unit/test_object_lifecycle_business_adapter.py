@@ -97,6 +97,17 @@ def test_every_business_input_lane_has_exactly_one_registered_adapter() -> None:
         | runtime_control_business_operations()
         | soundengine_control_business_operations()
         | LAYOUT_MUTATION_URIS
+        | {
+            "ak.wwise.ui.window.create",
+            "ak.wwise.ui.window.present",
+            "ak.wwise.ui.window.close",
+            "ak.wwise.ui.model.registerWafm",
+            "ak.wwise.ui.model.createHandle",
+            "ak.wwise.ui.model.destroyHandle",
+            "ak.wwise.ui.model.getState",
+            "ak.wwise.ui.model.setState",
+            "ak.wwise.ui.signal.emit",
+        }
     )
 
 
