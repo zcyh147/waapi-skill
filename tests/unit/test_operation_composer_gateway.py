@@ -333,6 +333,19 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "f0cf1aaf03c0b79f218aff1f20b8e32f3ed19822896f32c39bf20d9f7cab9c33"
+    )
+    # Only the four supported Definition lanes add this reviewed Short ID
+    # resolution contract. Restore that exact addition to retain earlier seals.
+    for version in ("2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("soundbank.processDefinitionFiles", version)
+        constraint = (
+            "Event, DialogueEvent, AuxBus and Effect uint32 Short IDs resolve through a version-pinned bounded typed read; exact numeric Short ID, canonical GUID and directive type are checked independently"
+        )
+        assert contract["constraints"].count(constraint) == 1
+        contract["constraints"].remove(constraint)
+        non_object_set_digests[f"soundbank.processDefinitionFiles@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
         "394a834d31bc4bbe49a106abdcfbb9db0998b8e9dee941817bc175cd604bb3e7"
     )
     # Reviewed lifecycle replacement and create null-reference additions.

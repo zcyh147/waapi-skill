@@ -47,7 +47,7 @@ Classify only when the outer command succeeds and the terminal result says `scan
 
 ## Object queries
 
-Choose exactly one business source: repeated `--path-segment`, `--exact-id`, `--short-id` with the closed `--short-id-kind` and explicit `--max-results`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. `query-schema` discloses the Short ID kinds and version-aware lookup. Short ID collisions remain candidates requiring canonical GUID selection and exact-ID readback before changes. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. Custom-kind miss/ambiguity uses returned candidates, never an invented type.
+Choose exactly one business source: repeated `--path-segment`, `--exact-id`, `--short-id` + `--short-id-kind`, closed `--kind`, live-resolved `--custom-kind`, `--search-text`, `--query-id`, or repeated `--query-path-segment`. Short ID kinds/versions come from `query-schema`; set `--max-results`. Collisions require canonical GUID choice and exact-ID readback before changes. Never reconstruct a Wwise path separator. Gateway constructs the exact Wwise path and separators from literal hierarchy names. Custom-kind miss/ambiguity uses returned candidates, never an invented type.
 
 `--predicate BUSINESS_CONDITION VALUE` repeats flat AND. `--relationship`: `descendants`, `ancestors`, `references-to`, `children`, `parent`. Broad sources need user `--max-results`. `all-sounds`/`sound` includes SFX/Voice; explicit scope uses `sound-sfx`/`sound-voice`. Another source takes type as `--predicate kind-is`.
 
@@ -95,7 +95,7 @@ Use the business declaration for one source and flat AND. Use advanced only for 
 - For relative depth, derive depth from each returned `path`, counting the root's direct children as relative depth 1; do not add `parent` solely to calculate relative depth. Request `parent` only when the user needs a parent identity or a direct parent-child relationship.
 - When the user supplies a maximum, copy that exact number to `--max-results`. Otherwise ask for a limit instead of inventing one.
 
-For example, a bounded descendant inventory of Sound candidates:
+Bounded Sound descendant example:
 
 ```bash
 python scripts/run.py gateway.py query-object --path-segment 'Actor-Mixer Hierarchy' --path-segment 'Default Work Unit' --path-segment 'Combat' --relationship descendants --predicate kind-is all-sounds --max-results 24
@@ -111,12 +111,6 @@ Direct parents:
 
 ```bash
 python scripts/run.py gateway.py query-object --kind all-sounds --relationship parent --predicate kind-is random-container --predicate children-at-least 3 --predicate notes-contain parent-review --max-results 10
-```
-
-Ownership:
-
-```bash
-python scripts/run.py gateway.py query-object --exact-id '{GUID}' --relationship ancestors --max-results 8
 ```
 
 ## Object types, metadata, and fixed reads
