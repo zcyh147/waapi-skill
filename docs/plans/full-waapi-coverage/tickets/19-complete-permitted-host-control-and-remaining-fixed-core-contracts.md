@@ -22,6 +22,10 @@ Users receive complete permitted host-control/fixed Core inputs and truthful ter
 - [ ] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved.
 - [ ] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage.
 
+- [ ] Remove the Skill-only incomplete delivery boundary in `debug-wal-tree`: candidate `dcf0ae11` rejects a native `return.nodes` map above 256 entries despite no native `maxProperties` constraint, and smaller requested views expose only a prefix with no continuation. Provide complete bounded delivery for valid results within the transport budget through the existing Gateway mechanisms. Test public routing, exact reconstruction, deterministic ordering, stale-result rejection and output ceilings across every reflected 2021.1–2025.1 host/version lane. Keep genuine transport/resource failures and unavailable Debug-build evidence explicit; neither establishes native absence or ticket completion.
+
+- [ ] Expose the missing explicit-empty test-tone choices through the closed business declaration. The `f7dd0f4f` source comparison found that `waveform_channels` requires a nonempty list and cannot emit native `waveformChannelMask=0` (reflected in 2024.1/2025.1), while `markers=[]` is accepted internally but cannot be expressed by the public CLI (reflected in 2025.1). Keep omission, explicit empty/zero and populated values distinct; disclose their forms in the schema/continuation, preserve the requested waveform, and test actual public Preview/execute/verify plus conflicting-input and version-boundary negatives. Establish native effects separately before completion; older unreflected fields are not silently sent.
+
 ## Blocked by
 
 - [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)

@@ -230,6 +230,40 @@ Ignored durable coordination state is under `.waapi-skill-state/full-coverage/`:
 roots and verdicts remain unchanged. No owned native process remains running;
 unrelated pre-existing Wine helpers are never terminated by this work.
 
+- Sixth integration partial merges only #177 `f72f37df`, #181 `f7dd0f4f` and
+  #188 `be48b1b1` onto `dcf0ae11`. Bounded complete condition closure, explicit
+  standalone scalar capture admission, lossless large-query delivery/contextual
+  failures and partial nested layout/dock/splitter controls remain unfinished
+  overall. The original dcf0 full Nonlive result remains **19940 passed, 1 failed,
+  127 skipped, 41 deselected** in 2382.44 seconds. Its sole platform verifier
+  fixture failure is repaired by #181 with the missing independent metadata
+  response; separate worker shared/platform validation passed **315 tests** in
+  45.12 seconds. These are distinct candidates/runs, not a regraded broad PASS.
+  Original f72 pure-code scalar batch passed five nodes in 558.46 seconds, covering
+  995 groups/5202 exact members; this evidence stays on its original source and
+  grants no integrated/default-ledger/live/native credit. Its strict reader
+  independently matched all 5202 reviewed member IDs; every program result is
+  implemented_unverified, all native/live_metadata proof remains missing and
+  completion stays false (reader SHA-256
+  `87a7a549d391f29533e9d4b1f41df65d6edb477cb40fdba9de82394fdd3a6f47`).
+  All 467 unresolved
+  source alternatives remain open. The new #193 WAL delivery and #194 larger
+  terminal-response acceptance criteria are synced additively and remain open.
+  Original failed roots, native requirements and historical evidence are retained.
+  No native/Authoring/Console/Fresh launch or completion claim is made.
+  Combined source focus on exact clean `8dfdcc76` retained **4134 passed,
+  2 failed, 1 setup error, 11 Windows skips and 18 intentional deselections**
+  in 1356.13 seconds. The failures were two stale exact layout-route assertions;
+  the setup error was the generated route partition awaiting four new layout
+  rows. Original run/source/exit remain sealed; reconciliation and targeted
+  reruns are separate evidence. The additional #193 tone empty-collection
+  criterion is synced as open work, with no runtime expansion.
+  Reconciliation derives 878 route rows and 218 unique URIs; exactly four
+  2024/2025 dockView/moveSplitter keys are added. All 272313 native ID/shape/owner
+  tuples, independent catalogs, original definitions and historical family seals
+  remain unchanged. Sixty-four missing-route obligations move only to unresolved;
+  all 29 layout rows remain migration_required under #188.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.

@@ -17,10 +17,10 @@
   },
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
-    "gateway_parser_sha256": "b3a27187d59ce2bd09ac99875b5bf539c9341faea3ed17b3dc36816a428c652d",
+    "gateway_parser_sha256": "00eb6373c2a043a7c2bc7e587cbbd12e16aabd0903704b231d051e43fe94a081",
     "operation_contract_sha256": "de138bb31b2c4ff5d79bbe706bc65b4dd6c544b920327bb7528b2fc62e042f08",
-    "public_continuation_sha256": "3d1b4f1bbf6a623638678e308be3ad4f417e537443cfa82fd2c1415405abb0ba",
-    "typed_request_surface_sha256": "341f0bc1f8ef9c56181985e4289cccfbdc5492c0f817de8da842331945677456"
+    "public_continuation_sha256": "ff994dd16e58f2c412a6014d9c2659d1ced776a30b436988745167322f8463e8",
+    "typed_request_surface_sha256": "5a60a7057fc4d526efd91b683018021ebe42840b3a37f99fbc7a059e76185259"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -140,9 +140,9 @@
       "id": "authoring-layout-partial",
       "disposition": "migration_required",
       "owner_issue": 188,
-      "match": {"uris": ["ak.wwise.ui.layout.closeView", "ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getOrCreateView", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.removeLayout", "ak.wwise.ui.layout.setLayout", "ak.wwise.ui.layout.switchLayout", "ak.wwise.ui.layout.undockView"]},
+      "match": {"uris": ["ak.wwise.ui.layout.closeView", "ak.wwise.ui.layout.dockView", "ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getOrCreateView", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.moveSplitter", "ak.wwise.ui.layout.removeLayout", "ak.wwise.ui.layout.setLayout", "ak.wwise.ui.layout.switchLayout", "ak.wwise.ui.layout.undockView"]},
       "leaked_mechanics": [],
-      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads plus scoped-handle switch, empty temporary registration/removal, and get-or-create-view Drafts on 2024.1/2025.1, plus scoped view undocking with independently verified explicit positions and a 2025-only discovered-view close Draft with bounded asynchronous disappearance verification. Scoped docking/redocking binds exact target topology and side, and splitter movement derives its parent axis and verifies exact signed displacement. Owned native effects for these paths remain unproven. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
     },
     {
       "id": "generic-topics",

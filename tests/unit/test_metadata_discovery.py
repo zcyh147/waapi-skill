@@ -175,6 +175,7 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "mutation_authoring_policy",
         "dependency_candidates",
         "dependency_closure_complete",
+        "dependency_bounds",
         "unresolved_dependencies",
         "fallback_detail_scan",
         "selection_required",
@@ -968,3 +969,38 @@ def test_read_failures_are_structured_and_do_not_leak_unbounded_text() -> None:
 
     assert caught.value.error_code == "LIVE_METADATA_READ_FAILED"
     assert len(caught.value.details["cause"]) <= 512
+
+
+@pytest.mark.parametrize('controllers', [16, 17])
+def test_exact_dependency_traversal_uses_one_unique_field_budget(controllers):
+    names = ['Selected'] + ['Gate' + str(index) for index in range(controllers)]
+    info = {name: _property_info(name, dependencies=[_self_dependency(names[index + 1])] if index + 1 < len(names) else [])
+            for index, name in enumerate(names)}
+    reader = MetadataReader(names=names, info=info)
+    if controllers == 17:
+        with pytest.raises(MetadataDiscoveryError) as error:
+            discover_metadata(read_call=reader, object='exact-object', queries=['Selected'], exact_field='Selected')
+        assert error.value.error_code == 'DEPENDENCY_LIMIT_EXCEEDED'
+        assert error.value.details == {'count': 17, 'limit': 16}
+    else:
+        result = discover_metadata(read_call=reader, object='exact-object', queries=['Selected'], exact_field='Selected').as_dict()
+        assert result['dependency_closure_complete'] is True
+        assert len(result['dependency_candidates']) == 16
+        assert result['dependency_bounds']['unique_controller_fields'] == 16
+        assert result['dependency_bounds']['maximum_simple_path_edges'] == 16
+        assert result['dependency_bounds']['projection']['agent_result_bytes'] == MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES
+    reads = [args for uri, args, _ in reader.calls if uri == GET_PROPERTY_INFO_URI]
+    assert len(reads) == len({args['property'] for args in reads}) == 17
+    assert all(args['object'] == 'exact-object' for args in reads)
+
+
+def test_exact_selection_does_not_expand_an_unrelated_oversized_dependency_graph():
+    names = ['Selected', 'Unrelated'] + ['UnrelatedGate' + str(index) for index in range(20)]
+    info = {'Selected': _property_info('Selected')}
+    for index, name in enumerate(names[1:]):
+        info[name] = _property_info(name, dependencies=[_self_dependency(names[index + 2])] if index + 2 < len(names) else [])
+    reader = MetadataReader(names=names, info=info)
+    result = discover_metadata(read_call=reader, object='exact-object', queries=['Selected'], exact_field='Selected').as_dict()
+    assert [row['name'] for row in result['candidates']] == ['Selected']
+    assert result['dependency_candidates'] == []
+    assert [args['property'] for uri, args, _ in reader.calls if uri == GET_PROPERTY_INFO_URI] == ['Selected']

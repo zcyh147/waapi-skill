@@ -111,3 +111,46 @@ tool was executed. This closes the Mac source plumbing milestone for the five
 currently owner-aware layout nodes, with real startup/effect proof still pending.
 Windows ownership and other families remain explicit unsupported integration
 requirements. The five-node roster grants no complete-layout or native credit.
+
+
+## Closed nested constructor partial (2026-10-17)
+
+The existing setLayout Draft accepts a bounded local-key stack/view blueprint.
+The Gateway owns generated IDs, native keys, live view-type validation, immutable
+materialization and complete requested-field/order readback. A separate optional
+workspace name expresses the inner Layout.Name without forcing equality to its
+temporary lookup name; omission deliberately uses the latter as a convenience.
+The matching SDK getLayout example documents differing names but grants no
+native write/overwrite proof. Focused fake controls passed 47 cases; a further
+maximum-depth RED exposed the serialized readback limit and passed after the
+business ceiling was tightened to 14, preserving existing native bounds.
+
+This is a constructor milestone only. Typed editor/sidebar state choices and
+changes, floating windows, all eight history lists, view-specific state, splitter
+and tab-panel contradictions, reset omission/empty/list behavior and host-specific
+effect evidence remain owned here. Opaque observed-state reuse does not complete
+new state creation. All acceptance boxes and native requirements remain open.
+
+Constructor resource follow-up (code/fake proof only): compiled expansion, Draft
+seals and exact terminal request rendering now have separate disclosed bounds.
+The closed setLayout blueprint alone may use a bounded 280 KiB verify envelope
+(existing 256 KiB seal allowance plus 24 KiB framing); ordinary operations and
+small constructors retain 24 KiB. Every admitted request must fit its terminal
+request allowance before writes, preserving exact immutable request/agent_result
+and raw journal readback. The current 112 KiB business/compiled constructor
+ceilings and 14-level tree depth are Gateway resource gaps, not native absence.
+Larger legitimate native constructions, downstream Broker/Fresh reply acceptance
+and complete editor/sidebar/window/history/reset semantics stay owned here.
+
+Immediate identity repair keeps accepted divergent workspace constructions
+inspectable/reusable: the public reply separates lookup layout_name from observed
+workspace_name, while existing scoped capabilities retain exact lookup plus full
+observed document/hash. Both version lanes fake-test create/verify/inspect and
+separate removal; stale document/lookup and cross-layout authority checks remain
+strict. Downstream larger-output Gateway/Broker/archive acceptance is an explicit
+already-dependent OPEN #194 condition; CLI byte fit grants no such acceptance.
+
+Omitted native Layout is separately unavailable for identity issuance: inspection
+requires an observed Layout object and string workspace Name before creating any
+handle. This guard does not equate lookup/workspace names. Public versioned
+negative controls prove a deliberate structured error and zero new handle files.

@@ -3,6 +3,53 @@
   "host": "wwise-authoring",
   "native_catalog_sha256": "32d68574fe0f41a4ee70bb1c6098f5ecdac434d6f6e00bbb237cba4aa28f7fd9",
   "schemas": {
+    "ak.wwise.ui.layout.dockView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The name of the layout where to dock the view",
+            "type": "string"
+          },
+          "side": {
+            "description": "The side where to drop the view on the target.",
+            "enum": [
+              "left",
+              "right",
+              "top",
+              "bottom"
+            ],
+            "type": "string"
+          },
+          "targetID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the target element."
+          },
+          "viewID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the view to dock."
+          }
+        },
+        "required": [
+          "name",
+          "viewID",
+          "targetID",
+          "side"
+        ],
+        "type": "object"
+      },
+      "description": "Dock a floating view into a layout.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
     "ak.wwise.ui.layout.getOrCreateView": {
       "argsSchema": {
         "additionalProperties": false,
@@ -39,6 +86,37 @@
             "description": "The unique ID of the view"
           }
         },
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.moveSplitter": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "delta": {
+            "description": "The delta, in pixels, to add to the splitter position.",
+            "type": "integer"
+          },
+          "id": {
+            "description": "The ID of the splitter to move.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "delta"
+        ],
+        "type": "object"
+      },
+      "description": "Moves a splitter by a delta given in pixels.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
         "type": "object"
       }
     },

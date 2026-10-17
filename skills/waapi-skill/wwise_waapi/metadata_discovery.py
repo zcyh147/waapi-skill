@@ -30,6 +30,7 @@ from .builders.metadata import (
     parse_property_and_reference_names_result,
 )
 from .canonical import canonical_json_bytes
+from .condition_limits import MAX_CONDITION_CONTROLLERS
 
 
 METADATA_DISCOVERY_CONTRACT = "waapi-skill.metadata-discovery/v2"
@@ -46,8 +47,7 @@ MAX_METADATA_DISCOVERY_NAMES = 4_096
 MAX_METADATA_DISCOVERY_NAME_CHARS = 256
 MAX_METADATA_DISCOVERY_DETAIL_POOL = 32
 MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN = 256
-MAX_METADATA_DISCOVERY_DEPENDENCIES = 16
-MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH = 2
+MAX_METADATA_DISCOVERY_DEPENDENCIES = MAX_CONDITION_CONTROLLERS
 MAX_METADATA_DISCOVERY_INFO_BYTES = 32 * 1024
 MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES = 28 * 1024
 MAX_METADATA_DISCOVERY_RESULT_BYTES = 512 * 1024
@@ -211,6 +211,17 @@ class MetadataDiscoveryResult:
                 for item in self.dependency_candidates
             ],
             "dependency_closure_complete": self.dependency_closure_complete,
+            "dependency_bounds": {
+                "unique_controller_fields": MAX_METADATA_DISCOVERY_DEPENDENCIES,
+                "maximum_simple_path_edges": MAX_METADATA_DISCOVERY_DEPENDENCIES,
+                "scope": "exact_selected_object_or_class",
+                "repeated_edges": "metadata_read_once_expansion_once_per_selected_root",
+                "projection": {
+                    "dependency_info_bytes": MAX_METADATA_DISCOVERY_INFO_BYTES,
+                    "agent_result_bytes": MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES,
+                    "detail_result_bytes": MAX_METADATA_DISCOVERY_RESULT_BYTES,
+                },
+            },
             "unresolved_dependencies": [
                 dict(item) for item in self.unresolved_dependencies
             ],
@@ -853,14 +864,14 @@ def _resolve_dependency_closure(
         candidate.name: [] for candidate in candidates
     }
     unresolved: list[dict[str, Any]] = []
-    queue: list[tuple[str, str, PropertyInfoMetadataRecord, int]] = [
-        (candidate.name, candidate.name, candidate.info, 0)
+    queue: list[tuple[str, str, PropertyInfoMetadataRecord]] = [
+        (candidate.name, candidate.name, candidate.info)
         for candidate in candidates
     ]
     expanded: set[tuple[str, str]] = set()
 
     while queue:
-        root_name, source_name, info, depth = queue.pop(0)
+        root_name, source_name, info = queue.pop(0)
         expansion_key = (root_name.casefold(), source_name.casefold())
         if expansion_key in expanded:
             continue
@@ -907,7 +918,7 @@ def _resolve_dependency_closure(
                 continue
             if canonical == root_name:
                 # A cyclic edge back to the selected candidate is already
-                # satisfied by the root metadata and must not consume depth.
+                # satisfied by the root metadata and needs no further read.
                 continue
             if canonical not in names_by_candidate[root_name]:
                 names_by_candidate[root_name].append(canonical)
@@ -920,18 +931,8 @@ def _resolve_dependency_closure(
             ) in expanded:
                 # The dependency metadata for this field was already expanded
                 # for the same root.  This is a closed cycle, not a reason to
-                # consume more depth or repeat a live read.
+                # repeat its expansion or a live read.
                 continue
-            if depth >= MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH:
-                raise MetadataDiscoveryError(
-                    "DEPENDENCY_LIMIT_EXCEEDED",
-                    "Live same-object metadata dependencies exceed the discovery depth limit.",
-                    details={
-                        "root_candidate": root_name,
-                        "property": canonical,
-                        "limit": MAX_METADATA_DISCOVERY_DEPENDENCY_DEPTH,
-                    },
-                )
             if len(required_by) > MAX_METADATA_DISCOVERY_DEPENDENCIES:
                 raise MetadataDiscoveryError(
                     "DEPENDENCY_LIMIT_EXCEEDED",
@@ -949,7 +950,7 @@ def _resolve_dependency_closure(
                     canonical,
                 )
                 info_by_name[canonical] = dependency_info
-            queue.append((root_name, canonical, dependency_info, depth + 1))
+            queue.append((root_name, canonical, dependency_info))
 
     dependency_payloads = tuple(
         {
