@@ -18049,6 +18049,7 @@ def verify_prepared_operation(
                 )
         spec_by_path = {str(row.get("request_path")): row for row in specs}
         resolved_id_by_path: dict[str, Any] = {}
+        observed_row_by_path: dict[str, Mapping[str, Any]] = {}
         for spec in specs:
             request_path = str(spec.get("request_path"))
             result_node = result_by_path.get(request_path)
@@ -18111,6 +18112,7 @@ def verify_prepared_operation(
             if len(rows) != 1:
                 continue
             row = rows[0]
+            observed_row_by_path[request_path] = row
             check(
                 f"{request_path} readback GUID matches the result",
                 _same_identity(row.get("id"), object_id),
@@ -19129,11 +19131,25 @@ def verify_prepared_operation(
                     if _identity_key(before_member["id"]) in requested_ids | replaced_set_ids:
                         continue
                     matches = [row for row in actual_rows if _same_identity(row.get("id"), before_member["id"])]
+                    expected_member_path = before_member.get("path")
+                    owner_before = owner_spec.get("pre_state", {})
+                    owner_after = observed_row_by_path.get(owner_path, {})
+                    if (isinstance(owner_before, Mapping)
+                            and owner_spec.get("requested_name") != owner_before.get("name")
+                            and isinstance(owner_before.get("path"), str)
+                            and isinstance(owner_after.get("path"), str)
+                            and isinstance(expected_member_path, str)
+                            and expected_member_path.startswith(owner_before["path"] + "\\")):
+                        expected_owner_path = owner_before["path"].rsplit("\\", 1)[0] + "\\" + str(owner_after.get("name", ""))
+                        check(f"{owner_path} renamed List owner path follows its verified name",
+                            owner_after["path"] == expected_owner_path,
+                            {"expected": expected_owner_path, "actual": owner_after["path"]})
+                        expected_member_path = owner_after["path"] + expected_member_path[len(owner_before["path"]):]
                     unchanged = len(matches) == 1 and all(
                         (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_member.get(field)))
                          if field in {"id", "parent", "owner"} and before_member.get(field) is not None
-                         else matches[0].get(field) == before_member.get(field))
-                        for field in ("id", "name", "type", "parent", "owner", "notes") if field in before_member
+                         else matches[0].get(field) == (expected_member_path if field == "path" else before_member.get(field)))
+                        for field in ("id", "name", "type", "path", "parent", "owner", "notes") if field in before_member
                     )
                     check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
                           {"before": dict(before_member), "after": matches})

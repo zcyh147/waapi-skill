@@ -1002,7 +1002,8 @@ def test_documented_list_merge_uses_explicit_actual_class_projection_without_rew
     assert task.objects[CHILD]["type"] == "PluginInnerObject" and task.objects[CHILD]["notes"] == "Updated slot"
 
 
-def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path):
+@pytest.mark.parametrize("fault", (None, "name", "notes", "path", "rename-owner-good-path", "rename-owner-bad-path"))
+def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path, fault):
     task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
     task.objects[ROOT] = {**task.objects[CHILD], "id": ROOT, "name": "Spare",
         "path": task.objects[FIRST]["path"] + r"\Spare", "notes": "Keep spare"}
@@ -1012,6 +1013,10 @@ def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path
     assert code == 0, types
     code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
     assert code == 0, configured
+    if fault in {"rename-owner-good-path", "rename-owner-bad-path"}:
+        code, renamed = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", task.list_owner_handle,
+            "--field", "new_name", "Storm")
+        assert code == 0, renamed
     code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", task.list_owner_handle,
         "--name", "Metadata", "--kind", types["type_candidates"][0]["handle"],
         "--field", "object_list", task.list_field_handle)
@@ -1021,19 +1026,33 @@ def test_documented_list_replace_collision_preserves_unrequested_member(tmp_path
     def call(uri, args=None, options=None):
         if uri == "ak.wwise.core.object.set":
             task.calls.append((uri, deepcopy(args), deepcopy(options)))
-            assert args["objects"] == [{"object": FIRST, "@Metadata": [{"type": "MetadataSlot", "name": "Metadata"}]}]
+            expected = {"object": FIRST, "@Metadata": [{"type": "MetadataSlot", "name": "Metadata"}]}
+            if fault in {"rename-owner-good-path", "rename-owner-bad-path"}:
+                expected["name"] = "Storm"
+                task.objects[FIRST].update(name="Storm", path=r"\Actor-Mixer Hierarchy\Default Work Unit\Storm")
+                task.objects[ROOT]["path"] = task.objects[FIRST]["path"] + r"\Spare"
+                if fault == "rename-owner-bad-path":
+                    task.objects[ROOT]["path"] += " Unexpected"
+            assert args["objects"] == [expected]
             del task.objects[CHILD]
             task.objects[fresh_id] = {"id": fresh_id, "name": "Metadata", "type": "PluginInnerObject", "classId": 5570560,
                 "path": task.objects[FIRST]["path"] + r"\Metadata", "owner": {"id": FIRST}, "notes": ""}
             task.objects[FIRST]["@Metadata"] = [{"id": ROOT}, {"id": fresh_id}]
-            return {"objects": [{"id": FIRST, "name": "Rain", "@Metadata": [{"id": fresh_id, "name": "Metadata"}]}]}
+            if fault in {"name", "notes", "path"}:
+                task.objects[ROOT][fault] += " Unexpected"
+            return {"objects": [{"id": FIRST, "name": task.objects[FIRST]["name"], "@Metadata": [{"id": fresh_id, "name": "Metadata"}]}]}
         return original(uri, args, options)
     task.call = call
     tx, shown = task.preview()
     assert {row["id"] for row in shown["artifact"]["prepared_operation"]["verification_plan"]["replaced_list_subtree_rows"]} == {CHILD}
     code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, verified
-    assert CHILD not in task.objects and task.objects[ROOT] == preserved
+    success = fault in (None, "rename-owner-good-path")
+    assert code == (0 if success else 2), verified
+    assert verified.get("verified") is success, verified
+    if success:
+        if fault == "rename-owner-good-path":
+            preserved["path"] = r"\Actor-Mixer Hierarchy\Default Work Unit\Storm\Spare"
+        assert CHILD not in task.objects and task.objects[ROOT] == preserved
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
