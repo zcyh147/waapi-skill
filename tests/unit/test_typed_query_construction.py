@@ -480,7 +480,7 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
             "sound-sfx": "only Sound objects whose source language is SFX",
             "sound-voice": "only Sound objects whose source language is not SFX",
         }
-        assert payload["sources"]["short_id_candidates"] == "--short-id <uint32> --max-results <1..1000>"
+        assert payload["sources"]["short_id_candidates"] == "--short-id <uint32> --short-id-kind <business-kind> --max-results <1..1000>"
         assert payload["source_rules"]["short_id"]["mutation_authority"] is False
         assert {key: value for key, value in payload["source_rules"].items() if key != "short_id"} == {
             "exactly_one_source": True,
@@ -1118,23 +1118,23 @@ def short_id_product_capture(request, version):
     return observed
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
 def test_short_id_source_resolves_native_candidates_then_applies_business_read_semantics(tmp_path: Path, version: str, short_id_product_capture: dict) -> None:
     object_id = "{11111111-1111-1111-1111-111111111111}"
     class Client(_AdvancedQueryClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.object.get":
                 self.calls.append((uri, args, options))
-                return {"return": [{"id": object_id, "name": "Rain", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Rain", "notes": "Exterior"}]}
+                return {"return": [{"id": object_id, "name": "Rain", "type": "Event", "path": r"\Events\Rain", "notes": "Exterior"}]}
             return super().call(uri, args, options)
     client = Client(version)
     code, payload = gateway.execute_gateway(
-        ["query-object", "--short-id", "123456", "--max-results", "5", "--predicate", "name-is", "Rain",
+        ["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "5", "--predicate", "name-is", "Rain",
          "--include", "notes", "--platform", "Windows", "--language", "English(US)", "--detail"],
         env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 0, json.dumps(payload,ensure_ascii=False)
     queries = [call for call in client.calls if call[0] == "ak.wwise.core.object.get"]
-    assert queries[0][1] == {"from": {"id": [123456]}, "transform": [{"range": [0, 65]}]}
+    assert queries[0][1] == {"from": {"id": [{"shortId": 123456, "type": 10}]}, "transform": [{"range": [0, 65]}]}
     assert queries[0][2] == {"return": ["id", "name", "type", "path"]}
     assert queries[1][1] == {"waql": 'from object "{11111111-1111-1111-1111-111111111111}" where name = "Rain" take 5'}
     assert queries[1][2] == {"return": ["id", "name", "type", "path", "notes"], "platform": "Windows", "language": "English(US)"}
@@ -1142,24 +1142,24 @@ def test_short_id_source_resolves_native_candidates_then_applies_business_read_s
     assert payload["source_resolution"]["candidate_count"] == 1
     assert payload["source_resolution"]["mutation_authority"] is False
     assert payload["mutation_selection"]["candidates"][0]["id"] == object_id
-    short_id_product_capture.update({"gateway": {"argv": ["query-object", "--short-id", "123456", "--max-results", "5",
+    short_id_product_capture.update({"gateway": {"argv": ["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "5",
         "--predicate", "name-is", "Rain", "--include", "notes", "--platform", "Windows", "--language", "English(US)", "--detail"],
         "exit_code": code, "payload": payload},
         "native_call": {"uri": queries[0][0], "args": queries[0][1], "options": queries[0][2]},
         "final_call": {"uri": queries[1][0], "args": queries[1][1], "options": queries[1][2]}})
 
 
-@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
 def test_short_id_collision_preserves_all_candidates_for_relationship_reads(tmp_path: Path, version: str) -> None:
     ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"]
     class Client(_AdvancedQueryClient):
         def call(self, uri, args=None, options=None):
             if uri == "ak.wwise.core.object.get":
                 self.calls.append((uri, args, options))
-                return {"return": [{"id": value, "name": "Rain", "type": "Sound", "path": r"\Actor-Mixer Hierarchy\Rain"} for value in ids]}
+                return {"return": [{"id": value, "name": "Rain", "type": "Event", "path": r"\Events\Rain"} for value in ids]}
             return super().call(uri, args, options)
     client = Client(version)
-    code, payload = gateway.execute_gateway(["query-object", "--short-id", "0", "--max-results", "4", "--relationship", "parent"],
+    code, payload = gateway.execute_gateway(["query-object", "--short-id", "0", "--short-id-kind", "event", "--max-results", "4", "--relationship", "parent"],
         env=_env(tmp_path, version), client_factory=lambda _: client)
     assert code == 0, payload
     assert client.calls[-1][1] == {"waql": 'from object "{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}" select parent take 4'}
@@ -1180,7 +1180,7 @@ def test_short_id_empty_and_unresolved_sources_do_not_run_a_partial_final_query(
                 return {"return": [{"id": "{%08X-1111-1111-1111-111111111111}" % n} for n in range(count)]}
             return super().call(uri, args, options)
     client = Client("2025.1")
-    command = ["query-object", "--short-id", "4294967295", "--max-results", "3"]
+    command = ["query-object", "--short-id", "4294967295", "--short-id-kind", "event", "--max-results", "3"]
     if custom_field:
         command.extend(["--include-field", "Volume"])
     code, payload = gateway.execute_gateway(command, env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
@@ -1199,3 +1199,56 @@ def test_short_id_source_requires_a_valid_uint32_and_result_bound_before_connect
     code, payload = gateway.execute_gateway(["query-object", *extra], env=_env(tmp_path, "2025.1"),
         client_factory=lambda _: pytest.fail("invalid Short ID source connected"))
     assert code == 2, payload
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+@pytest.mark.parametrize("selector", [123456, {"shortId": 123456}, {"shortId": 123456, "type": "Event"}])
+def test_native_short_id_recursive_schema_rejects_bare_missing_and_invalid_type_before_dispatch(
+    tmp_path: Path, version: str, selector: object,
+) -> None:
+    from wwise_waapi.builders.common import SemanticValidationError
+    from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+    # This is the same recursive schema boundary called by query preflight;
+    # root explicitly requested these malformed referenced-shape controls.
+    with pytest.raises(SemanticValidationError):
+        validate_resolved_semantic_payload("ak.wwise.core.object.get",
+            {"from": {"id": [selector]}, "transform": [{"range": [0, 65]}]},
+            {"return": ["id", "name", "type", "path"]}, version=version)
+
+
+def test_short_id_2021_kind_mapping_is_explicitly_unresolved_before_connection(tmp_path: Path) -> None:
+    code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "3"],
+        env=_env(tmp_path, "2021.1"), client_factory=lambda _: pytest.fail("unproven 2021 mapping connected"))
+    assert code == 2 and "mapping remains unresolved" in payload["message"], payload
+
+
+def test_short_id_collision_final_query_rejects_an_unrelated_native_guid(tmp_path: Path) -> None:
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                ids = ["{11111111-1111-1111-1111-111111111111}", "{22222222-2222-2222-2222-222222222222}"] if "from" in args else ["{33333333-3333-3333-3333-333333333333}"]
+                return {"return": [{"id": value} for value in ids]}
+            return super().call(uri, args, options)
+    client = Client("2025.1")
+    code, payload = gateway.execute_gateway(["query-object", "--short-id", "123456", "--short-id-kind", "event", "--max-results", "3"],
+        env=_env(tmp_path, "2025.1"), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert payload["error_code"] == "SHORT_ID_CANDIDATE_DRIFT"
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("kind,code", [("event", 10), ("switch-group", 12), ("state-group", 14), ("effect", 17),
+    ("soundbank", 18), ("bus", 19), ("aux-bus", 20), ("game-parameter", 22), ("trigger", 41), ("audio-device", 68)])
+def test_short_id_business_kinds_compile_only_the_exact_version_documented_type_codes(tmp_path: Path, version: str, kind: str, code: int) -> None:
+    class Client(_AdvancedQueryClient):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.object.get":
+                self.calls.append((uri, args, options))
+                return {"return": []}
+            return super().call(uri, args, options)
+    client = Client(version)
+    exit_code, payload = gateway.execute_gateway(["query-object", "--short-id", "1", "--short-id-kind", kind, "--max-results", "3"],
+        env=_env(tmp_path, version), client_factory=lambda _: client)
+    assert exit_code == 0, payload
+    assert client.calls[-1][1] == {"from": {"id": [{"shortId": 1, "type": code}]}, "transform": [{"range": [0, 65]}]}

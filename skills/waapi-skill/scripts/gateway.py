@@ -1877,6 +1877,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     query_source.add_argument("--exact-id", dest="object_id")
     query_source.add_argument("--short-id", type=int, help="Read candidates for one unsigned 32-bit Short ID; never a mutation identity")
+    from wwise_waapi.short_id_query_sources import SHORT_ID_KIND_CODES
+    query_object.add_argument("--short-id-kind", choices=tuple(SHORT_ID_KIND_CODES), help="Business kind required by the native typed Short ID selector")
     query_source.add_argument(
         "--kind",
         choices=QUERY_BUSINESS_KINDS,
@@ -5401,9 +5403,21 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
 
     relationships = tuple(getattr(args, "relationships", ()) or ())
     args.object_ids = None
+    if args.short_id_kind is not None and args.short_id is None:
+        raise GatewayInputError("--short-id-kind requires the --short-id source")
     if args.short_id is not None:
         if not 0 <= args.short_id <= 4294967295 or args.max_results is None:
             raise GatewayInputError("query-object --short-id requires uint32 0..4294967295 and explicit --max-results 1..1000")
+        from wwise_waapi.short_id_query_sources import short_id_selector
+        (short_id_version,) = resolve_catalog_versions(args, env=env)
+        try:
+            args.short_id_selector = short_id_selector(short_id_version, number=args.short_id, kind=args.short_id_kind)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+        validate_resolved_semantic_payload(OBJECT_GET_URI,
+            {"from": {"id": [args.short_id_selector]}, "transform": [{"range": [0, 65]}]},
+            {"return": list(SELECTED_REQUIRED_RETURN_FIELDS)}, version=short_id_version)
         # Validate all requested business semantics before transport. Live
         # resolution replaces this compiler-only placeholder with proven GUIDs.
         args.object_ids = ("{00000000-0000-0000-0000-000000000000}",)
@@ -8497,7 +8511,7 @@ def query_business_schema_payload(
         "sources": {
             "object_path": "--path-segment <one literal name> (repeat)",
             "exact_object_id": "--exact-id <canonical GUID>",
-            "short_id_candidates": "--short-id <uint32> --max-results <1..1000>",
+            "short_id_candidates": "--short-id <uint32> --short-id-kind <business-kind> --max-results <1..1000>",
             "common_kind": "--kind <closed business kind>",
             "custom_kind": "--custom-kind <user-facing type meaning>",
             "search": "--search-text <literal text>",
@@ -8511,7 +8525,10 @@ def query_business_schema_payload(
             "sound-voice": "only Sound objects whose source language is not SFX",
         },
         "source_rules": {
-            "short_id": {"lookup": "native from.id uint32, at most 65 candidate identities; 65 stops at an explicit 64-source resource boundary",
+            "short_id": {"lookup": "native from.id structured Short ID and Gateway-derived type code, at most 65 candidate identities; 65 stops at an explicit 64-source resource boundary",
+                         "kind_choices": ["event", "switch-group", "state-group", "effect", "soundbank", "bus", "aux-bus", "game-parameter", "trigger", "audio-device"],
+                         "mapped_versions": ["2022.1", "2023.1", "2024.1", "2025.1"],
+                         "2021.1": "native shape exists; business-kind codes remain unresolved pending matching proof, not a native absence",
                          "combined_semantics": "Gateway resolves canonical GUID candidates before applying all requested predicates, relationships, outputs, platform and language",
                          "custom_fields": "requires exactly one resolved GUID; nonunique source requires selecting an exact GUID first",
                          "mutation_authority": False, "later_change": "select and verify canonical GUID through the exact-ID route"},
@@ -14585,7 +14602,7 @@ def dispatch_command(
         source_resolution = None
         if args.short_id is not None:
             source_call = dispatch(dispatcher, OBJECT_GET_URI, connection=connection, version=detected_version,
-                args={"from": {"id": [args.short_id]}, "transform": [{"range": [0, 65]}]},
+                args={"from": {"id": [args.short_id_selector]}, "transform": [{"range": [0, 65]}]},
                 options={"return": list(SELECTED_REQUIRED_RETURN_FIELDS)}, exact_object_lookup=False)
             if not source_call.get("ok"):
                 return {"ok": False, "status": "error", **common, "call": dispatch_call_summary(source_call), "agent_result": None}
@@ -14594,7 +14611,7 @@ def dispatch_command(
             if len(set(ids)) != len(ids):
                 raise GatewayResultShapeError("Short ID source returned duplicate canonical GUIDs",
                     details={"native_observation": source_call["result"], "call": dispatch_call_summary(source_call)})
-            source_resolution = {"source": "short-id", "short_id": args.short_id, "candidate_count": len(ids),
+            source_resolution = {"source": "short-id", "short_id": args.short_id, "business_kind": args.short_id_kind, "candidate_count": len(ids),
                 "complete": len(ids) < 65, "mutation_authority": False, "call": dispatch_call_summary(source_call)}
             if len(ids) >= 65 or (len(ids) > 1 and args.query_custom_field_meanings):
                 return {"ok": True, "status": "needs_clarification", **common, "source_resolution": source_resolution,
@@ -14673,6 +14690,10 @@ def dispatch_command(
             else []
         )
         if result.get("ok"):
+            if args.short_id is not None and not args.select and any(row["id"].upper() not in ids for row in rows):
+                raise GatewayResultShapeError("Short ID final read returned a GUID outside the resolved source",
+                    details={"native_observation": result["result"], "source_resolution": source_resolution,
+                             "call": dispatch_call_summary(result)}, error_code="SHORT_ID_CANDIDATE_DRIFT")
             validate_exact_query_identity(args, rows, native_result=result)
             validate_query_business_view_result(args, rows)
         business_rows = (

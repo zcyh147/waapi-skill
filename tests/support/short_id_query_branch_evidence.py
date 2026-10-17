@@ -34,6 +34,7 @@ def prepare_short_id_capture(root: Path) -> Path:
             witnesses[version] = {"branch": branch, "public": next(row for row in inventory["routes"]
                 if row["id"] == version + "|function|ak.wwise.core.object.get")}
     assert len(witnesses) == 5
+    witnesses.pop("2021.1")
     context = {"contract": "waapi-skill.short-id-query-program-context/v1", "root": str(root.resolve()),
         "candidate_sha256": inventory["native_coverage"]["candidate_sha256"], "git_candidate": _git_candidate(),
         "relevant_sources": source_seals(), "witnesses": witnesses}
@@ -72,7 +73,7 @@ def finish_short_id_capture(capture: dict, reports: dict, observed: dict) -> Non
         "invocation": {"phase": "final", "outcome": outcome, "node_outcomes": [{"nodeid": capture["nodeid"], "outcome": outcome}]},
         **deepcopy(observed), "branch_assertions": {branch["id"]: {"native_shape_sha256": branch["shape_sha256"],
         "native_route": branch["route"], "checks": [
-            {"pointer": "/native_call/args/from/id/0", "equals": 123456},
+            {"pointer": "/native_call/args/from/id/0", "equals": {"shortId": 123456, "type": 10}},
             {"pointer": "/gateway/payload/agent_result", "equals": observed.get("gateway", {}).get("payload", {}).get("agent_result")},
             {"pointer": "/gateway/payload/source_resolution/mutation_authority", "equals": False},
             {"pointer": "/final_call/options/platform", "equals": "Windows"},
