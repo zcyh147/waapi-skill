@@ -857,6 +857,8 @@ def _resolve_dependency_closure(
             continue
         expanded.add(expansion_key)
         for index, dependency in enumerate(info.dependencies):
+            if _is_visibility_dependency(dependency):
+                continue
             if _is_terminal_structural_dependency(dependency):
                 # Wwise 2024+ may expose a visibility predicate such as
                 # ``isMasterBus == false``.  It describes the current object
@@ -958,7 +960,7 @@ def _resolve_dependency_closure(
                 required_by[name],
                 key=lambda value: (value.casefold(), value),
             ),
-            "metadata": info_by_name[name].as_dict(),
+            "metadata": dict(info_by_name[name].raw),
         }
         for name in sorted(
             (name for name in required_by if name not in root_names),
@@ -978,6 +980,25 @@ def _resolve_dependency_closure(
         not unresolved,
         unresolved_payload,
     )
+
+
+def _is_visibility_dependency(dependency: Mapping[str, Any]) -> bool:
+    from .metadata_restrictions import condition_restriction, reference_presence_condition, MetadataRestrictionError
+    if (set(dependency) != {"type", "action", "context", "property", "conditions"}
+            or dependency.get("action") != "Show"
+            or dependency.get("context") not in {"Self", "Parent", "AssocParent"}
+            or not isinstance(dependency.get("property"), str) or not dependency["property"]):
+        return False
+    try:
+        if dependency["type"] == "property":
+            condition_restriction(dependency["conditions"])
+        elif dependency["type"] == "reference":
+            reference_presence_condition(dependency["conditions"])
+        else:
+            return False
+    except MetadataRestrictionError:
+        return False
+    return True
 
 
 def _is_terminal_structural_dependency(dependency: Mapping[str, Any]) -> bool:
@@ -1118,6 +1139,9 @@ def _compact_dependency_requirements(
     for dependency in dependencies:
         if not isinstance(dependency, Mapping):
             continue
+        if _is_visibility_dependency(dependency):
+            requirements.append({**dependency, "required_values": [], "visibility_only": True})
+            continue
         context = dependency.get("context")
         name = dependency.get("property")
         if (
@@ -1132,6 +1156,12 @@ def _compact_dependency_requirements(
         requirement["required_values"] = _dependency_required_values(
             dependency
         )
+        if dependency.get("type") == "reference":
+            from .metadata_restrictions import reference_presence_condition, MetadataRestrictionError
+            try:
+                requirement["required_presence"] = reference_presence_condition(dependency.get("conditions"))
+            except MetadataRestrictionError:
+                pass
         requirements.append(requirement)
     return requirements
 
