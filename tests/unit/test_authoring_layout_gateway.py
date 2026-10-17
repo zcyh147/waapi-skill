@@ -267,7 +267,8 @@ def test_layout_directory_discloses_compact_authoring_namespace_defaults(tmp_pat
     set_gateway_config(env, wwise_version='2025.1')
     code, directory = gateway.execute_gateway(['operations'], env=env)
     assert code == 0, directory
-    assert directory['request_schema_route_defaults_by_namespace']['ak.wwise.ui.'] == {'host_surface': 'wwise-authoring'}
+    assert directory['request_schema_route_defaults_by_namespace']['ak.wwise.ui.layout.'] == {
+        'host_surface': 'wwise-authoring', 'supported_versions': ['2024.1', '2025.1']}
     assert gateway.gateway_json_document_size(directory) < 26 * 1024
 
 
@@ -308,6 +309,37 @@ def test_scoped_layout_handle_expires_without_target_dispatch(tmp_path, monkeypa
         inspection['views'][0]['handle']], env=env, client_factory=lambda _: client)
     assert code == 2 and 'expired' in result['message']
     assert URI + 'getViewHandle' not in [call[0] for call in client.calls]
+
+
+def test_inspection_reclaims_only_valid_expired_handles_at_capacity(tmp_path, monkeypatch):
+    import json
+    from copy import deepcopy
+    from wwise_waapi import authoring_layout_handles as handles
+    from wwise_waapi.canonical import canonical_sha256
+    env, state, _ = _inspect_scoped_layout(tmp_path)
+    root = tmp_path / 'state' / 'authoring-layout-handles-v1'
+    live = {path: path.read_bytes() for path in root.iterdir()}
+    template = json.loads(next(iter(live.values())))
+    expired = []
+    for index in range(len(live)):
+        record = deepcopy(template)
+        record['handle'] = 'lh1-' + format(index, '032x')
+        record['expires_at'] = 1
+        record.pop('sha256')
+        record['sha256'] = canonical_sha256(record)
+        path = root / (record['handle'] + '.json')
+        path.write_text(json.dumps(record), encoding='utf-8')
+        expired.append(path)
+    preserved = {root / 'unowned.txt': b'keep user data', root / ('lh1-' + 'f' * 32 + '.json'): b'{broken'}
+    for path, data in preserved.items():
+        path.write_bytes(data)
+    monkeypatch.setattr(handles, '_MAX_RECORDS', len(live) * 2 + len(preserved))
+    code, result = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Designer'],
+        env=env, client_factory=lambda _: _identity_client())
+    assert code == 0, result
+    assert all(not path.exists() for path in expired)
+    assert all(path.read_bytes() == data for path, data in {**live, **preserved}.items())
+    assert len(list(root.iterdir())) == handles._MAX_RECORDS
 
 
 @pytest.mark.parametrize('suffix,subject,name,_', READS)

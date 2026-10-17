@@ -13,6 +13,7 @@ import pytest
 from wwise_waapi.media_build_business_contracts import (
     MEDIA_POOL_GET_URI,
     PEAKS_REGION_URI,
+    PEAKS_TRIMMED_URI,
     SOUNDBANK_GET_INCLUSIONS_URI,
     media_build_business_operations,
     media_build_business_versions,
@@ -152,6 +153,8 @@ def test_every_issue_85_lane_has_one_business_schema_and_no_typed_bypass(
     assert schema_code == 0, schema
     assert schema["business_adapter"]["operation"] == operation
     assert schema["business_adapter"]["version"] == version
+    if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI}:
+        assert schema["business_adapter"]["result_projection"]["optional_native_fields"] == "preserve absence; return partial observation when decoding facts are missing"
     bypass_code, bypass = gateway.execute_gateway(
         [ "typed-call", operation, "--schema-digest", "0" * 64],
         env=set_gateway_config(_env(tmp_path, version=version), wwise_version=version),
@@ -758,3 +761,342 @@ def test_media_pool_finite_weights_reach_native_without_clamping(tmp_path: Path,
     code, payload = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "5", "--weighted-audio-description", "rain", str(weight)], env=_env(tmp_path), client_factory=lambda _: client)
     assert code == 0, payload
     assert client.calls[-1][1] == {"maxResults": 5, "filters": [{"type": "audioDescription", "value": "rain", "weight": weight}]}
+
+
+def _pool_rows(count: int) -> list[dict[str, str]]:
+    return [{"Path": f"/owned/source-{index}.wav", "FileId": str(index)} for index in range(count)]
+
+
+def test_media_pool_prefix_continuations_keep_useful_rows_and_verify_prior_prefix(tmp_path: Path) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 3,
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 3,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 3,
+        MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}, {"return": _pool_rows(4)}, {"return": _pool_rows(5)}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--search-text", ""], env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    assert first["status"] == "partial"
+    page = first["agent_result"]
+    assert page["complete"] is False and page["incomplete_reason"] == "candidate_limit_reached"
+    assert [item["file_id"] for item in page["items"]] == ["0", "1"]
+    command = page["next_command"]
+    assert command["copy_instruction"]["action"] == "execute_verbatim_as_one_shell_tool_call"
+    code, second = gateway.execute_gateway(command["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, second
+    assert [item["file_id"] for item in second["agent_result"]["items"]] == ["2", "3"]
+    assert second["agent_result"]["page"]["mode"] == "larger_bounded_prefix_reread"
+    assert second["agent_result"]["page"]["native_offset_supported"] is False
+    code, last = gateway.execute_gateway(second["agent_result"]["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, last
+    assert [item["file_id"] for item in last["agent_result"]["items"]] == ["4"]
+    assert last["agent_result"]["complete"] is True
+    assert "next_command" not in last["agent_result"]
+    assert [args["maxResults"] for uri, args, _ in client.calls if uri == MEDIA_POOL_GET_URI] == [2, 4, 6]
+
+
+@pytest.mark.parametrize("change", ["prefix", "query", "session", "configuration", "project"])
+def test_media_pool_prefix_continuation_rejects_changed_binding_or_rows(tmp_path: Path, change: str) -> None:
+    changed_info = _info()
+    if change == "session":
+        changed_info["sessionId"] = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    second_rows = _pool_rows(4)
+    if change == "prefix":
+        second_rows[0], second_rows[1] = second_rows[1], second_rows[0]
+    second_project = _project(tmp_path / "other") if change == "project" else _project(tmp_path)
+    client = FakeClient({"ak.wwise.core.getInfo": [_info(), changed_info],
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path), second_project],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 2,
+        MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}, {"return": second_rows}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"], env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    command = first["agent_result"]["next_command"]["gateway_argv"]
+    if change == "query":
+        command += ["--search-text", "changed"]
+    if change == "configuration":
+        set_gateway_config(env, waapi_port=31338)
+    code, stopped = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    assert code == 2, stopped
+    assert stopped["error_code"] == "MEDIA_POOL_CONTINUATION_CHANGED"
+    reads = [call for call in client.calls if call[0] == MEDIA_POOL_GET_URI]
+    assert len(reads) == (2 if change == "prefix" else 1)
+    if change == "prefix":
+        assert stopped["details"]["call"]["ok"] is True
+        assert stopped["details"]["native_observation"] == {"return": second_rows}
+
+
+def test_media_pool_ultimate_prefix_boundary_never_claims_collection_complete(tmp_path: Path) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()],
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}],
+        MEDIA_POOL_GET_URI: [{"return": _pool_rows(200)}]})
+    code, result = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "200"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, result
+    page = result["agent_result"]
+    assert len(page["items"]) == 200
+    assert page["complete"] is False
+    assert page["page"]["resource_boundary_reached"] is True
+    assert "next_command" not in page
+
+
+@pytest.mark.parametrize("change", ["expired", "tampered", "foreign-route"])
+def test_media_pool_continuation_preflight_stops_invalid_reuse(tmp_path: Path, change: str, monkeypatch) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}]})
+    env = _env(tmp_path)
+    code, result = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"], env=env, client_factory=lambda _: client)
+    assert code == 0, result
+    command = result["agent_result"]["next_command"]["gateway_argv"]
+    if change == "expired":
+        import time
+        later = time.time() + 901
+        monkeypatch.setattr(time, "time", lambda: later)
+    elif change == "tampered":
+        command[-1] += "invalid"
+    else:
+        command[1] = PEAKS_REGION_URI
+    code, rejected = gateway.execute_gateway(command, env=env, client_factory=lambda _: pytest.fail("invalid continuation connected"))
+    assert code == 2, rejected
+    assert rejected["error_code"] == "GatewayInputError"
+
+
+def test_media_pool_does_not_issue_unbound_session_continuation(tmp_path: Path) -> None:
+    info = _info()
+    info.pop("sessionId")
+    client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}]})
+    code, result = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, result
+    assert len(result["agent_result"]["items"]) == 2
+    assert result["agent_result"]["page"]["continuation_unavailable_reason"] == "host_session_identity_unavailable"
+    assert "next_command" not in result["agent_result"]
+
+
+def test_media_pool_complete_post_filter_replaces_prior_prefix_presentation(tmp_path: Path) -> None:
+    rows = [{**row, "Filename": f"Rain-{index}.wav", "WAV/Duration": index + 1} for index, row in enumerate(_pool_rows(3))]
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename", "WAV/Duration"]}] * 2,
+        MEDIA_POOL_GET_URI: [{"return": rows[:2]}, {"return": rows}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--exact-name-contains", "Rain",
+        "--sort-by", "duration-seconds", "descending", "--final-limit", "1"], env=env, client_factory=lambda _: client)
+    assert code == 2 and first["error_code"] == "MEDIA_POOL_POST_FILTER_INCOMPLETE", first
+    assert first["native_observation"] == {"return": rows[:2]}
+    code, final = gateway.execute_gateway(first["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, final
+    assert final["agent_result"]["complete"] is True
+    assert [item["file_id"] for item in final["agent_result"]["items"]] == ["2"]
+    assert final["agent_result"]["page"]["presentation"] == "replace_previous_prefix"
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_read_preserves_optional_missing_native_fields_without_inventing_decoded_data(tmp_path: Path, version: str, operation: str) -> None:
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    raw = {"numChannels": 1}
+    project = _project(tmp_path)
+    identity_reads = [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}]
+    if version == "2021.1":
+        identity_reads.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"], "path": "\\"}]})
+    client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": identity_reads,
+        operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 0, (payload, client.calls)
+    assert payload["status"] == "partial"
+    observation = payload["agent_result"]
+    assert observation["projection_complete"] is False
+    assert observation["decode_available"] is False
+    assert observation["native_result"] == raw
+    assert observation["unavailable_fields"] == ["peaksArrayLength", "peaksBinaryStrings", "peaksDataSize", "maxAbsValue"]
+    assert "channels" not in observation and "peak_pair_count" not in observation
+    assert payload["call"]["ok"] is True
+
+
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+@pytest.mark.parametrize("raw", [{"numChannels": None}, {"peaksArrayLength": 0.5}, {"peaksBinaryStrings": [None]},
+    {"numChannels": 1, "peaksArrayLength": 0, "peaksBinaryStrings": [""], "peaksDataSize": 0, "maxAbsValue": 1, "channelConfig": None}])
+def test_peak_read_rejects_malformed_present_fields_and_keeps_native_call_evidence(tmp_path: Path, operation: str, raw: dict) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}], operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 2, payload
+    assert payload["error_code"] == "MEDIA_BUILD_RESULT_INVALID"
+    assert payload["details"]["call"]["ok"] is True
+    assert payload["details"]["native_observation"] == raw
+
+
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_read_preserves_zero_divisor_without_fabricating_normalized_samples(tmp_path: Path, operation: str) -> None:
+    raw = {"numChannels": 1, "peaksArrayLength": 0, "peaksBinaryStrings": [""], "peaksDataSize": 0, "maxAbsValue": 0}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.object.get": [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}], operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["status"] == "partial"
+    assert payload["agent_result"]["decode_unavailable_reason"] == "zero_normalization_divisor"
+    assert payload["agent_result"]["native_result"] == raw
+    assert "channels" not in payload["agent_result"]
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_read_can_preserve_native_channel_default_without_assuming_channel_count(tmp_path: Path, version: str, operation: str) -> None:
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    project = _project(tmp_path)
+    identities = [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}]
+    if version == "2021.1":
+        identities.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"], "path": "\\"}]})
+    raw = {"numChannels": 2, "peaksArrayLength": 1, "peaksBinaryStrings": ["AAAAAA==", "AAAAAA=="], "peaksDataSize": 4, "maxAbsValue": 32768}
+    client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [project],
+        "ak.wwise.core.object.get": identities, operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1", "--channel-mode", "native-default"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["agent_result"]["channel_count"] == 2
+    assert payload["agent_result"]["channel_mode"] == "native-default"
+    assert "getCrossChannelPeaks" not in client.calls[-1][1]
+    assert [channel["pairs_normalized"] for channel in payload["agent_result"]["channels"]] == [[[0.0, 0.0]], [[0.0, 0.0]]]
+    schema_code, schema = gateway.execute_gateway(["--version", version, "request-schema", operation], env=_env(tmp_path), client_factory=lambda _: pytest.fail("offline schema connected"))
+    assert schema_code == 0, schema
+    assert "native-default" in schema["business_adapter"]["declaration"]["field_choices"]["channel_mode"]
+
+
+@pytest.mark.parametrize("post_filtered", [False, True])
+def test_media_pool_long_windows_continuation_roundtrips_through_short_durable_plan(tmp_path: Path, monkeypatch, post_filtered: bool) -> None:
+    class WindowsEnvelopeOS:
+        name = "nt"
+
+        def __getattr__(self, name):
+            import os
+            return getattr(os, name)
+
+    monkeypatch.setattr(gateway, "os", WindowsEnvelopeOS())
+    rows = [{**row, "Filename": "Rain.wav"} for row in _pool_rows(3)]
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 2, MEDIA_POOL_GET_URI: [{"return": rows[:2]}, {"return": rows}]})
+    command = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"]
+    for _ in range(15 if post_filtered else 16):
+        command += ["--audio-description", "雨" * 4096]
+    if post_filtered:
+        command += ["--text-filter", "filename", "contains", "Rain", "--exact-name-contains", "Rain", "--final-limit", "1"]
+    env = {**_env(tmp_path), "WAAPI_SKILL_STATE_DIR": str(tmp_path / "external-state")}
+    code, payload = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    if post_filtered:
+        assert code == 2 and payload["error_code"] == "MEDIA_POOL_POST_FILTER_INCOMPLETE", payload
+        assert payload["native_observation"] == {"return": rows[:2]}
+        continuation = payload["next_command"]
+    else:
+        assert code == 0, payload
+        assert len(payload["agent_result"]["items"]) == 2
+        assert payload["agent_result"]["complete"] is False
+        continuation = payload["agent_result"]["next_command"]
+    assert "--media-query" in continuation["gateway_argv"]
+    from wwise_waapi.platform_commands import decode_windows_powershell_argv
+    decoded = decode_windows_powershell_argv(continuation["shell_command"])
+    assert list(decoded) == continuation["full_argv"]
+    assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) < 64 * 1024
+    assert len(client.calls[-1][1]["filters"]) == 16
+    code, final = gateway.execute_gateway(continuation["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, final
+    assert final["agent_result"]["complete"] is True
+    assert [item["file_id"] for item in final["agent_result"]["items"]] == (["0"] if post_filtered else ["2"])
+    searches = [call for call in client.calls if call[0] == MEDIA_POOL_GET_URI]
+    assert searches[0][1]["filters"] == searches[1][1]["filters"]
+    assert [call[1]["maxResults"] for call in searches] == [2, 4]
+    stale_code, stale = gateway.execute_gateway(continuation["gateway_argv"], env=env, client_factory=lambda _: pytest.fail("completed query state connected"))
+    assert stale_code == 2 and stale["error_code"] == "GatewayInputError", stale
+
+
+def test_media_pool_preserves_missing_identity_fields_as_observed_absence(tmp_path: Path) -> None:
+    raw = {"return": [{"FileId": "known", "Filename": "Known.wav"}, {"Path": "/Audio/PathOnly.wav"}]}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}], MEDIA_POOL_GET_URI: [raw]})
+    code, payload = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "5", "--include-field", "filename"],
+        env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["status"] == "partial"
+    result = payload["agent_result"]
+    assert result["complete"] is True  # The bounded collection ended; row identities remain incomplete.
+    assert result["projection_complete"] is False
+    assert result["items"][0] == {"file_id": "known", "values": {"filename": "Known.wav"}, "unavailable_fields": ["path"]}
+    assert result["items"][1] == {"path": "/Audio/PathOnly.wav", "values": {}, "unavailable_fields": ["file_id"], "unavailable_values": ["filename"]}
+
+
+@pytest.mark.parametrize("change", ["missing", "tampered", "invalid-plan", "symlink", "configuration", "session", "expired", "edited-declaration"])
+def test_media_pool_durable_plan_rejects_changed_or_invalid_continuations(tmp_path: Path, change: str, monkeypatch) -> None:
+    info = _info()
+    info["sessionId"] = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    client = FakeClient({"ak.wwise.core.getInfo": [_info(), info], "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 2, MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}]})
+    env = {**_env(tmp_path), "WAAPI_SKILL_STATE_DIR": str(tmp_path / "external-state")}
+    command = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"]
+    for _ in range(16):
+        command += ["--audio-description", "rain" * 1024]
+    code, first = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    continuation = first["agent_result"]["next_command"]["gateway_argv"]
+    assert "--media-query" in continuation
+    record = next((tmp_path / "external-state").rglob("mpq1-*.json"))
+    if change == "missing":
+        record.unlink()
+    elif change == "symlink":
+        from tests.support.platform_filesystem import create_symlink_or_skip
+        saved = tmp_path / "saved-plan.json"
+        record.rename(saved)
+        create_symlink_or_skip(record, saved)
+    elif change in {"tampered", "invalid-plan"}:
+        document = json.loads(record.read_text(encoding="utf-8"))
+        document["plan"]["native_args"] = {}
+        if change == "invalid-plan":
+            from wwise_waapi.canonical import canonical_sha256
+            document["sha256"] = canonical_sha256({key: value for key, value in document.items() if key != "sha256"})
+        record.write_text(json.dumps(document), encoding="utf-8")
+    elif change == "configuration":
+        set_gateway_config(env, waapi_port=31338)
+    elif change == "expired":
+        import time
+        later = time.time() + 901
+        monkeypatch.setattr(time, "time", lambda: later)
+    elif change == "edited-declaration":
+        continuation += ["--search-text", "changed"]
+    code, rejected = gateway.execute_gateway(continuation, env=env,
+        client_factory=lambda _: client if change == "session" else pytest.fail("invalid durable continuation connected"))
+    assert code == 2, rejected
+    assert rejected["error_code"] == ("MEDIA_POOL_CONTINUATION_CHANGED" if change == "session" else "GatewayInputError")
+    assert len([call for call in client.calls if call[0] == MEDIA_POOL_GET_URI]) == 1
+
+
+def test_media_pool_durable_plan_capacity_reclaims_only_expired_query_records(tmp_path: Path, monkeypatch) -> None:
+    env = {**_env(tmp_path), "WAAPI_SKILL_STATE_DIR": str(tmp_path / "external-state")}
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 130, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 130,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 130, MEDIA_POOL_GET_URI: [{"return": _pool_rows(2)}] * 130})
+    command = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2"]
+    for _ in range(16):
+        command += ["--audio-description", "rain" * 1024]
+    for _ in range(128):
+        code, page = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+        assert code == 0 and "next_command" in page["agent_result"], page
+    code, full = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    assert code == 0, full
+    assert "next_command" not in full["agent_result"]
+    assert "bounded capacity" in full["agent_result"]["page"]["query_state_unavailable"]
+    import time
+    later = time.time() + 901
+    monkeypatch.setattr(time, "time", lambda: later)
+    code, fresh = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    assert code == 0 and "next_command" in fresh["agent_result"], fresh
+    assert len(list((tmp_path / "external-state").rglob("mpq1-*.json"))) == 1

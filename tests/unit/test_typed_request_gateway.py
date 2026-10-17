@@ -430,7 +430,7 @@ def test_migrated_soundengine_read_rejects_retired_typed_optional_array(
         ("ak.wwise.core.getInfo", ["status"]),
         (
             "ak.wwise.core.object.getTypes",
-            ["metadata types", "metadata discover"],
+            ["metadata types", "metadata discover", "metadata list", "metadata detail"],
         ),
         ("ak.wwise.debug.getWalTree", ["debug-wal-tree"]),
     ),

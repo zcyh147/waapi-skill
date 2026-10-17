@@ -281,6 +281,9 @@ def _public_continuation_rows(
         elif lane.get("construction_shape") == "closed_read":
             row["business_read"] = lane["business_read_contract"]
             row["native_result_semantics"] = lane["result_semantics"]
+        elif lane.get("construction_shape") == "closed_business":
+            row['business_declaration'] = lane['business_contract']
+            row['native_request_semantics'] = lane['request_semantics']
         elif "request-schema" in lane["execution_policy"]["gateway_commands"]:
             try:
                 row["typed"] = request_contract(
@@ -442,6 +445,13 @@ def _field_ownership(
 def _typed_field_rows(
     lane: Mapping[str, Any], policy: Mapping[str, Any]
 ) -> list[dict[str, Any]]:
+    if lane.get('construction_shape') == 'closed_business':
+        declaration = lane['business_contract']['declaration']
+        return [{'channel': 'business_declaration', 'path': ['business', name], 'name': name,
+                 'shape': 'scalar', 'required': name in declaration['required_fields'],
+                 'value_ownership': 'live_bound_handle' if name.endswith('_handle') else 'stable_business_declaration',
+                 'transport_ownership': 'gateway_derivation'}
+                for name in declaration['public_fields']]
     if lane.get("construction_shape") == "closed_read":
         return [{"channel": "business_read", "path": ["business", name], "name": name,
                  "shape": "scalar", "required": True,

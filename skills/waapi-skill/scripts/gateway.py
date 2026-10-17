@@ -47,7 +47,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
 )
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
-    LAYOUT_MUTATION_URIS, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
+    LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
 )
 from wwise_waapi.canonical import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     canonical_json_bytes,
@@ -114,9 +114,11 @@ from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[rep
 from wwise_waapi.builders.query import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     ADVANCED_QUERY_CONTRACT,
     MAX_QUERY_TAKE,
+    MAX_QUERY_RETURN_SCOPE_BYTES,
     advanced_query_schema,
     build_advanced_object_get_query,
     build_object_get_query,
+    query_return_scope_options,
 )
 from wwise_waapi.object_query_outputs import (  # noqa: E402
     QUERY_BUSINESS_OUTPUTS,
@@ -1919,6 +1921,8 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     query_object.add_argument("--max-results", type=int)
+    query_object.add_argument("--platform", dest="query_platform", action="append", help="Read values for one exact platform name or GUID")
+    query_object.add_argument("--language", dest="query_language", action="append", help="Read values for one exact language name or GUID")
     query_object.add_argument(
         "--include",
         action="append",
@@ -2614,6 +2618,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_layout_plan = subparsers.add_parser("draft-declare-layout-plan", help="Declare one closed Authoring layout outcome")
     _add_business_draft_binding_arguments(draft_layout_plan)
     draft_layout_plan.add_argument("--layout-handle", required=True)
+    draft_layout_plan.add_argument("--new-layout-name")
     draft_declare_host_plan = subparsers.add_parser(
         "draft-declare-host-plan",
         help=(
@@ -5117,12 +5122,23 @@ def preflight_core_business_input(
         return
     if args.api in media_build_business_operations():
         try:
+            restored_plan = None
+            args.media_query_record = None
+            if args.api == MEDIA_POOL_GET_URI and args.media_query is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, MediaPoolQueryStore
+                store = MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env))
+                record = store.resolve(args.media_query)
+                if record["context"].get("configuration") != selected_connection_binding(env):
+                    raise MediaPoolContinuationError("Media Pool query configuration changed; start the search again")
+                args.media_query_record = record
+                restored_plan = record["plan"]
             media_input = media_build_input_from_namespace(
                 args,
                 operation=args.api,
                 version=versions[0],
+                restored_media_pool_plan=restored_plan,
             )
-        except MediaBuildBusinessCliError as exc:
+        except (MediaBuildBusinessCliError, ValueError, OSError) as exc:
             raise GatewayInputError(str(exc)) from exc
         args.media_build_request = media_input.materialized_request
         args.media_build_plan = media_input.deferred_media_pool_plan
@@ -5420,6 +5436,15 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "--max-results or pass exactly 100."
             )
         args.max_results = 100
+    for key in ("platform", "language"):
+        selected = getattr(args, f"query_{key}", None) or []
+        if len(selected) > 1:
+            raise GatewayInputError(f"query-object --{key} accepts one exact selection")
+        setattr(args, f"query_{key}", selected[0] if selected else None)
+    try:
+        query_return_scope_options(platform=args.query_platform, language=args.query_language)
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
     (projection_version,) = resolve_catalog_versions(args, env=env)
     _compile_query_business_projection(args, version=projection_version)
     args.where = []
@@ -5494,6 +5519,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
                 "max_results": args.max_results,
             },
             version=advanced_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5527,6 +5554,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=MAX_QUERY_TAKE,
             return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         return
 
@@ -5560,6 +5589,8 @@ def preflight_query_object_input(args: argparse.Namespace, *, env: Mapping[str, 
             take=args.take,
             return_fields=return_fields,
             version=preflight_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
     _require_explicit_query_bound(args)
 
@@ -8389,6 +8420,7 @@ def query_business_schema_payload(
             "query_contract": ADVANCED_QUERY_CONTRACT,
             "input_shape": "business_declaration",
             "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+            "return_scope": _query_return_scope_contract(),
             "result_presence": _query_result_presence_contract(),
             "business_outputs": list(available_query_outputs(version)),
             "output_detail": "query-schema --output <business-output>",
@@ -8430,6 +8462,7 @@ def query_business_schema_payload(
         "query_contract": BUSINESS_QUERY_CONTRACT,
         "input_shape": "business_declaration",
         "identity_projection": list(SELECTED_REQUIRED_RETURN_FIELDS),
+        "return_scope": _query_return_scope_contract(),
         "result_presence": _query_result_presence_contract(),
         "business_outputs": list(available_query_outputs(version)),
         "output_detail": "query-schema --output <business-output>",
@@ -10051,9 +10084,13 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "supported_versions": list(versions),
                 "host_surface": "wwise-console",
             }
-            namespace_defaults = {"ak.wwise.ui.": {"host_surface": "wwise-authoring"}}
+            namespace_defaults = {"ak.wwise.ui.layout.": {"host_surface": "wwise-authoring",
+                "supported_versions": list(LAYOUT_VERSIONS)}, "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
+                "ak.soundengine.": {"intent": "perform one closed SoundEngine runtime business operation"},
+                "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view"}}
             def defaults_for_route(api: str) -> dict[str, Any]:
-                return {**route_defaults, **next((value for prefix, value in namespace_defaults.items() if api.startswith(prefix)), {})}
+                matching = [prefix for prefix in namespace_defaults if api.startswith(prefix)]
+                return {**route_defaults, **(namespace_defaults[max(matching, key=len)] if matching else {})}
             payload["request_schema_routes"] = [
                 {
                     key: value
@@ -10074,7 +10111,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             payload["request_schema_route_defaults"] = route_defaults
             payload["request_schema_route_defaults_by_namespace"] = namespace_defaults
             payload["directory_reading"] = (
-                "Rows inherit request_schema_route_defaults, then matching "
+                "Rows inherit request_schema_route_defaults, then the longest matching API prefix in "
                 "request_schema_route_defaults_by_namespace; explicit row fields override. "
                 "For schema discovery, use row next_command when present; "
                 "otherwise instantiate the static schema-command templates: "
@@ -11549,6 +11586,7 @@ def dispatch_core_business_read(
     if args.api in media_build_business_operations():
         return dispatch_media_build_business_read(
             args,
+            env=env,
             connection=connection,
             detected_version=detected_version,
             live_info=live_info,
@@ -11984,6 +12022,7 @@ def dispatch_runtime_inspection_business_read(
 def dispatch_media_build_business_read(
     args: argparse.Namespace,
     *,
+    env: Mapping[str, str],
     connection: GatewayConnection,
     detected_version: str,
     live_info: Mapping[str, Any],
@@ -11991,6 +12030,18 @@ def dispatch_media_build_business_read(
     common: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Revalidate and execute one closed media/build business read."""
+
+    def native_failure_evidence(native_call: Mapping[str, Any]) -> dict[str, Any]:
+        observation = native_call.get("result")
+        evidence: dict[str, Any] = {"call": dispatch_call_summary(native_call)}
+        if probe_gateway_json_document_size(observation, 64 * 1024) == "ok":
+            evidence["native_observation"] = observation
+        else:
+            evidence["native_observation_boundary"] = {
+                "complete": False, "inline_limit_bytes": 64 * 1024,
+                "evidence_path": native_call.get("evidence_path"),
+            }
+        return evidence
 
     project, project_call = current_project(
         dispatcher,
@@ -12004,6 +12055,8 @@ def dispatch_media_build_business_read(
         version=detected_version,
     )
     field_discovery_call = None
+    media_page = None
+    media_context_available = False
     if args.api == MEDIA_POOL_GET_URI:
         field_api = "ak.wwise.core.mediaPool.getFields"
         field_capability = live_capability(
@@ -12055,6 +12108,25 @@ def dispatch_media_build_business_read(
             )
         except MediaBuildBusinessError as exc:
             raise GatewayInputError(str(exc)) from exc
+        from wwise_waapi.media_pool_continuation import MediaPoolContinuationError, prepare_media_pool_page
+        media_context_available = (_canonical_guid(live_info.get("sessionId")) and isinstance(live_info.get("processId"), int)
+                                   and not isinstance(live_info.get("processId"), bool) and live_info["processId"] > 0)
+        media_context = {
+            "configuration": selected_connection_binding(env),
+            "modification_policy": load_gateway_config(env).config.project_modification_policy,
+            "endpoint": common["endpoint"],
+            "live": {key: live_info.get(key) for key in ("sessionId", "processId", "version")},
+            "project": {key: project.get(key) for key in ("id", "path")},
+        }
+        try:
+            if args.media_query_record is not None:
+                state_dir = resolve_transaction_state_directory(args, env=env)
+                require_runtime_directory_outside_project(state_dir, project=project)
+                if args.media_query_record["context"] != media_context:
+                    raise MediaPoolContinuationError("Stored Media Pool query belongs to a different live context; start the search again")
+            media_page = prepare_media_pool_page(request, token=args.media_page, context=media_context)
+        except MediaPoolContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={"native_query_dispatched": False}, error_code=exc.code) from exc
     else:
         request = args.media_build_request
     if args.api == MEDIA_POOL_GET_URI:
@@ -12124,15 +12196,14 @@ def dispatch_media_build_business_read(
         result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         operation_timeout=float(capability.execution_contract["timeout_seconds"]),
     )
-    result_validation = (
-        validate_semantic_result(
-            request["api"],
-            result.get("result"),
-            version=detected_version,
+    try:
+        result_validation = (
+            validate_semantic_result(request["api"], result.get("result"), version=detected_version)
+            if result.get("ok") else None
         )
-        if result.get("ok")
-        else None
-    )
+    except SemanticValidationError as exc:
+        raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result),
+            error_code="MEDIA_BUILD_RESULT_INVALID") from exc
     normalized = None
     result_identity_rows: list[Mapping[str, Any]] = []
     if result.get("ok"):
@@ -12194,13 +12265,50 @@ def dispatch_media_build_business_read(
         except MediaBuildBusinessError as exc:
             raise GatewayResultShapeError(
                 str(exc),
-                details={"media_build_error_code": exc.code},
+                details={"media_build_error_code": exc.code, **native_failure_evidence(result)},
                 error_code=exc.code,
             ) from exc
+        if args.api == MEDIA_POOL_GET_URI:
+            from wwise_waapi.media_pool_continuation import finish_media_pool_page, media_pool_continuation_argv
+            try:
+                normalized, next_page, next_maximum = finish_media_pool_page(media_page, rows=result["result"]["return"],
+                    request=request, normalized=normalized, context_available=media_context_available)
+            except MediaPoolContinuationError as exc:
+                raise GatewayResultShapeError(str(exc), details=native_failure_evidence(result), error_code=exc.code) from exc
+            if next_page is not None:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                handle = args.media_query
+                state_dir = None
+                if handle is not None:
+                    state_dir = resolve_transaction_state_directory(args, env=env)
+                next_command = transaction_next_command("core-call", media_pool_continuation_argv(args.media_build_plan, token=next_page, maximum=next_maximum))
+                if handle is None and probe_gateway_json_document_size(next_command, 64 * 1024) != "ok":
+                    try:
+                        state_dir = resolve_transaction_state_directory(args, env=env)
+                        require_runtime_directory_outside_project(state_dir, project=project)
+                        handle = MediaPoolQueryStore(state_dir).issue(plan=args.media_build_plan, context=media_context, issued=media_page.issued)
+                    except (MediaPoolContinuationError, GatewayInputError, OSError) as exc:
+                        normalized["page"]["query_state_unavailable"] = str(exc)[:512]
+                if handle is not None:
+                    next_command = transaction_next_command("core-call", ["core-call", MEDIA_POOL_GET_URI,
+                        "--max-results", str(next_maximum), "--media-query", handle, "--media-page", next_page], state_dir=state_dir)
+                if probe_gateway_json_document_size(next_command, 64 * 1024) == "ok":
+                    normalized["next_command"] = next_command
+                else:
+                    normalized["page"].update({
+                        "continuation_unavailable_reason": "continuation_command_limit_exceeded",
+                        "continuation_command_limit_bytes": 64 * 1024,
+                    })
+            elif args.media_query is not None and normalized.get("complete") is True:
+                from wwise_waapi.media_pool_continuation import MediaPoolQueryStore
+                try:
+                    MediaPoolQueryStore(resolve_transaction_state_directory(args, env=env)).retire(args.media_query)
+                except (MediaPoolContinuationError, OSError) as exc:
+                    normalized["page"]["query_state_cleanup"] = {"complete": False, "message": str(exc)[:512]}
     incomplete_media_pool = (
         args.api == MEDIA_POOL_GET_URI
         and isinstance(normalized, Mapping)
-        and normalized.get("complete") is False
+        and normalized.get("incomplete_reason") == "candidate_limit_reached_before_exact_case_post_filter"
     )
     effective_ok = bool(result.get("ok")) and not incomplete_media_pool
     return {
@@ -12208,6 +12316,11 @@ def dispatch_media_build_business_read(
         "status": (
             "incomplete_boundary"
             if incomplete_media_pool
+            else "partial"
+            if isinstance(normalized, Mapping) and (
+                normalized.get("projection_complete") is False
+                or args.api == MEDIA_POOL_GET_URI and normalized.get("complete") is False
+            )
             else "ok"
             if result.get("ok")
             else "error"
@@ -12252,6 +12365,11 @@ def dispatch_media_build_business_read(
             "request": request_validation.as_dict(),
             "result": result_validation.as_dict() if result_validation else None,
         },
+        **({key: value for key, value in native_failure_evidence(result).items() if key != "call"}
+           if incomplete_media_pool else {}),
+        **({"read_page": normalized["page"]} if incomplete_media_pool else {}),
+        **({"next_command": normalized["next_command"]}
+           if incomplete_media_pool and "next_command" in normalized else {}),
         "agent_result": None if incomplete_media_pool else normalized,
     }
 
@@ -13169,8 +13287,14 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         live_info=live_info, dispatcher=dispatcher)
     identity = resolve_layout_identity(args.layout_handle, role='layout', context=context, args=args,
         env=env, connection=connection, version=detected_version, dispatcher=dispatcher)
-    settings = {'authoring_layout_plan': {'layout_handle': args.layout_handle},
-                'authoring_layout_binding': layout_binding_descriptor(identity)}
+    plan = {'layout_handle': args.layout_handle}
+    if pending.operation == LAYOUT_SET_URI:
+        plan['new_layout_name'] = args.new_layout_name
+    elif args.new_layout_name is not None:
+        raise GatewayInputError('--new-layout-name belongs only to temporary layout registration')
+    settings = {'authoring_layout_plan': plan,
+                'authoring_layout_binding': layout_binding_descriptor(identity,
+                    registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
         adapter.materialize(candidate)
@@ -14446,6 +14570,8 @@ def dispatch_command(
             take=args.take,
             return_fields=return_fields,
             version=detected_version,
+            platform=args.query_platform,
+            language=args.query_language,
         )
         _require_explicit_query_bound(args)
         envelope = preview.envelope
@@ -22288,6 +22414,8 @@ def dispatch_original_file_reference_match(
         take=MAX_QUERY_TAKE,
         return_fields=ORIGINAL_FILE_REFERENCE_RETURN_FIELDS,
         version=detected_version,
+        platform=args.query_platform,
+        language=args.query_language,
     )
     envelope = preview.envelope
     result = dispatch(
@@ -22651,6 +22779,22 @@ def _query_bound_summary(args: argparse.Namespace) -> dict[str, Any]:
     return {"mode": "exact-object"}
 
 
+def _query_return_scope_argv(args: argparse.Namespace) -> list[str]:
+    return [token for key in ("platform", "language")
+            if getattr(args, f"query_{key}", None) is not None
+            for token in (f"--{key}", getattr(args, f"query_{key}"))]
+
+
+def _query_return_scope_contract() -> dict[str, Any]:
+    return {
+        "platform": {"cli": "--platform <exact name or GUID>", "omitted": "current Wwise platform"},
+        "language": {"cli": "--language <exact name or GUID>", "omitted": "native Wwise language default; Gateway supplies no language"},
+        "max_utf8_bytes": MAX_QUERY_RETURN_SCOPE_BYTES,
+        "literal_identity": True,
+        "native_options_authored_by": "Gateway",
+    }
+
+
 def _query_result_presence_contract() -> dict[str, Any]:
     return {
         "absent_fields": "unavailable_fields; omitted values are never replaced with null",
@@ -22755,6 +22899,7 @@ def _query_mutation_selection(
                         GATEWAY_RUNNER_PATH.as_posix(),
                         "gateway.py",
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         object_id,
                     ]
@@ -22818,6 +22963,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             source_id,
                             "--include",
@@ -22837,6 +22983,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             bus_id,
                             "--include",
@@ -22857,6 +23004,7 @@ def _query_business_continuations(
                         "query-object",
                         [
                             "query-object",
+                            *_query_return_scope_argv(args),
                             "--exact-id",
                             event_id,
                             "--relationship",
@@ -22882,6 +23030,7 @@ def _query_business_continuations(
                     "query-object",
                     [
                         "query-object",
+                        *_query_return_scope_argv(args),
                         "--exact-id",
                         target_id,
                         "--view",
@@ -22914,24 +23063,24 @@ def _bind_custom_kind_from_live_types(
         connection=connection,
         version=detected_version,
     )
-    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}))
+    records = parse_get_types_result(read(CACHE_GET_TYPES_URI, {}, {}), require_identity=False)
 
     def lexical(value: str) -> str:
         return "".join(character.casefold() for character in value if character.isalnum())
 
     needle = lexical(meaning)
-    exact = [record for record in records if lexical(record.name) == needle]
+    exact = [record for record in records if isinstance(record.name, str) and lexical(record.name) == needle]
     matches = exact or [
         record
         for record in records
-        if needle and (needle in lexical(record.name) or lexical(record.name) in needle)
+        if needle and isinstance(record.name, str) and (needle in lexical(record.name) or lexical(record.name) in needle)
     ]
     if len(matches) != 1:
         return {
             "metadata_authority": "live-waapi",
             "meaning": meaning,
             "candidate_count": len(matches),
-            "candidates": [record.as_dict() for record in matches[:8]],
+            "candidates": [dict(record.raw) for record in matches[:8]],
             "repair": "refine --custom-kind until one live Wwise type matches",
         }
     args.object_type = matches[0].name
@@ -28060,7 +28209,8 @@ def operation_draft_payload(
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
 
     read_only_draft = (
-        record.operation.startswith("ak.")
+        record.operation not in LAYOUT_MUTATION_URIS
+        and record.operation.startswith("ak.")
         and public_typed_contract(record.version, record.operation).effect == "read"
     )
 

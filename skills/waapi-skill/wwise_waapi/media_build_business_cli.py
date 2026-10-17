@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
 
 from .media_build_business import (
     MediaBuildBusinessError,
@@ -18,6 +18,7 @@ from .media_build_business_contracts import (
     SOUNDBANK_GET_INCLUSIONS_URI,
     media_build_business_contract_data,
 )
+from .media_pool_continuation import MediaPoolContinuationError, parse_media_pool_page
 
 
 class MediaBuildBusinessCliError(ValueError):
@@ -37,10 +38,12 @@ def add_media_build_read_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--peak-pair-count", type=int)
     parser.add_argument(
         "--channel-mode",
-        choices=("per-channel", "cross-channel"),
+        choices=("per-channel", "cross-channel", "native-default"),
     )
     parser.add_argument("--soundbank-id")
     parser.add_argument("--max-results", type=int)
+    parser.add_argument("--media-page", help="Copy the returned Media Pool prefix continuation verbatim")
+    parser.add_argument("--media-query", help="Copy only the returned opaque Media Pool query handle")
     parser.add_argument("--database-scope", action="append", default=[])
     parser.add_argument("--database-id", action="append", default=[])
     parser.add_argument("--search-text")
@@ -77,6 +80,8 @@ def media_build_fields_supplied(args: argparse.Namespace) -> bool:
             "channel_mode",
             "soundbank_id",
             "max_results",
+            "media_page",
+            "media_query",
             "search_text",
             "exact_name_contains",
             "final_limit",
@@ -103,6 +108,7 @@ def media_build_input_from_namespace(
     *,
     operation: str,
     version: str,
+    restored_media_pool_plan: Mapping[str, Any] | None = None,
 ) -> MediaBuildCliInput:
     media_build_business_contract_data(operation, version)
     foreign_core_values = (
@@ -183,9 +189,15 @@ def media_build_input_from_namespace(
                     "Media Pool reads accept only their disclosed media business fields"
                 )
             plan = _media_pool_plan(args)
+            if args.media_query is not None:
+                if args.media_page is None or restored_media_pool_plan is None or set(plan) != {"max_results"}:
+                    raise MediaBuildBusinessCliError("A stored Media Pool continuation accepts only its returned query handle, page and next result bound")
+                plan = {**dict(restored_media_pool_plan), "max_results": plan["max_results"]}
             validate_media_pool_business_plan(plan)
+            if args.media_page is not None:
+                parse_media_pool_page(args.media_page)
             return MediaBuildCliInput(deferred_media_pool_plan=plan)
-    except MediaBuildBusinessError as exc:
+    except (MediaBuildBusinessError, MediaPoolContinuationError) as exc:
         raise MediaBuildBusinessCliError(str(exc)) from exc
     raise MediaBuildBusinessCliError("Unsupported media/build business read")
 
@@ -195,6 +207,8 @@ def _media_pool_fields_supplied(args: argparse.Namespace) -> bool:
         getattr(args, name, None) is not None
         for name in (
             "max_results",
+            "media_page",
+            "media_query",
             "search_text",
             "exact_name_contains",
             "final_limit",

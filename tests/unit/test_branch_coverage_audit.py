@@ -160,20 +160,39 @@ def test_selector_attribution_requires_matching_profile_schema_occurrence(frozen
     assert 'schema occurrences differs' in check_inventory(changed, expected=frozen_inventory)
 
 
-def test_native_denominator_keeps_unimplemented_authoring_routes_and_exact_builds(frozen_inventory):
-    from tests.maintenance.branch_coverage_audit import build_inventory
-    inventory = frozen_inventory
-    native = inventory['native_coverage']
+def test_native_denominator_keeps_unimplemented_authoring_routes_and_exact_builds():
+    from tests.maintenance.branch_coverage_audit import ROOT, digest, load
+    from wwise_waapi.schema_inventory import build_typed_request_surface
+    from tests.maintenance.branch_audit_completion import native_coverage
+
+    surface = build_typed_request_surface()
+    inventory = {'sources': {}, 'routes': [
+        {'id': '|'.join((r['version'], r['item_type'], r['uri']))}
+        for r in surface['lanes']]}
+    native = native_coverage(ROOT, inventory, digest=digest,
+                             schema_branches=schema_branches, load=load)
     assert len(native['catalogs']) == 10
+    uri = 'ak.wwise.ui.layout.getLayoutNames'
+    public_id = f'2025.1|function|{uri}'
     row = next(r for r in native['routes'] if r['version'] == '2025.1'
-               and r['host'] == 'wwise-authoring'
-               and r['uri'] == 'ak.wwise.ui.layout.getLayoutNames')
+               and r['host'] == 'wwise-authoring' and r['uri'] == uri)
     assert row['build'] == '2025.1.7.9143'
-    assert row['public_route'] is None
+    assert row['public_route'] == public_id
     obligations = [r for r in native['obligations'] if r['route'] == row['id']]
     assert obligations and all(r['owner_issue'] == 188 for r in obligations)
-    assert all(r['state'] == 'missing_implementation' for r in obligations)
+    assert all(r['state'] == 'unresolved' for r in obligations)
     assert native['completion']['complete'] is False
+
+    # Remove only this public implementation in the test scope. The independent
+    # native denominator and ownership must survive, now missing implementation.
+    missing = native_coverage(ROOT, {'sources': {}, 'routes': [r for r in inventory['routes']
+                                               if r['id'] != public_id]},
+                              digest=digest, schema_branches=schema_branches, load=load)
+    assert {(r['id'], r['shape_sha256'], r['owner_issue']) for r in missing['obligations']} == {
+        (r['id'], r['shape_sha256'], r['owner_issue']) for r in native['obligations']}
+    assert next(r for r in missing['routes'] if r['id'] == row['id'])['public_route'] is None
+    assert all(r['state'] == 'missing_implementation' for r in missing['obligations']
+               if r['route'] == row['id'])
 
 
 def test_native_reference_graph_retains_capital_oneof_and_recursive_result_edges(frozen_inventory):

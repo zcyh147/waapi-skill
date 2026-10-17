@@ -222,3 +222,19 @@ def test_selected_long_enum_label_can_be_inspected_and_declared(tmp_path: Path, 
     code, declared = task.step("draft-declare-field-change", "--object-handle", target,
         "--field-handle", field["handle"], "--business-value", "choice:0")
     assert code == 0, declared
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_selected_field_without_native_type_rejects_handle_acquisition(tmp_path: Path, version: str) -> None:
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    task.metadata = {"Mode": {"name": "Mode", "default": 0}}
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    revision = task.revision
+    code, rejected = task.step("draft-discover-fields", "--object-handle", target, "--selection", listed["agent_result"]["fields"][0]["selection"])
+    assert code == 2, rejected
+    assert rejected["error_code"] == "GatewayInputError"
+    assert rejected["details"]["draft_changed"] is False
+    assert rejected["details"]["rejected_candidates"][0]["field"] == "Mode"
+    assert task.revision == revision

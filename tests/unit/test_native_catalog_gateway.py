@@ -22,7 +22,8 @@ def load_module(name, path):
 
 gateway = load_module("native_catalog_gateway_test", ROOT / "skills/waapi-skill/scripts/gateway.py")
 collector = load_module("native_catalog_collector_test", ROOT / "tests/maintenance/collect_authoring_core.py")
-URI = "ak.wwise.ui.layout.getLayoutNames"
+# A synthetic reflection-only route stays unimplemented as real coverage grows.
+URI = "ak.wwise.ui.layout.testOnlyReflectedRead"
 SCHEMA = {"argsSchema": {"type": "object", "properties": {}, "additionalProperties": False}, "optionsSchema": {"type": "object", "properties": {}}, "resultSchema": {"type": "object", "properties": {"names": {"type": "array", "items": {"type": "string"}}}}}
 
 
@@ -339,7 +340,7 @@ def test_full_native_schema_discloses_content_bound_source_pointers(tmp_path, mo
     code, payload = gateway.execute_gateway(["--version", "2025.1", "describe", URI, "--native-host", "wwise-authoring", "--full-schema"], env={})
     assert code == 0, payload
     row = payload["availability"]["2025.1"]["capability"]
-    assert row["schema"]["source"]["pointer"] == "/schemas/ak.wwise.ui.layout.getLayoutNames"
+    assert row["schema"]["source"]["pointer"] == f"/schemas/{URI}"
     assert row["schema"]["source"]["definitions_pointer"] == "/definitions/documents"
     assert len(row["schema"]["source"]["catalog_sha256"]) == 64
     assert row["provenance"]["sources"] == {"capture.json": "a" * 64}

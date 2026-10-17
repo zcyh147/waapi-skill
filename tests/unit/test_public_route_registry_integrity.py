@@ -277,15 +277,15 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
                 "special_unique_uris": 51,
             },
             "wwise-authoring-ui": {
-                "function_rows": 705,
-                "unique_function_uris": 176,
+                "function_rows": 709,
+                "unique_function_uris": 178,
                 "generic_reflected_rows": 459,
                 "generic_reflected_unique_uris": 117,
-                "special_rows": 246,
-                "special_unique_uris": 59,
+                "special_rows": 250,
+                "special_unique_uris": 61,
             },
         },
-        "reviewed_special_uri_count": 59,
+        "reviewed_special_uri_count": 61,
         "reviewed_generic_restriction_count": 6,
     }
     assert summary["version_rows"] == 111

@@ -1390,6 +1390,47 @@ def test_metadata_detail_counts_unknown_native_extension_in_read_budget(tmp_path
     assert "x" * 1024 not in json.dumps(detail)
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_optional_metadata_identity_facts_remain_absent_in_reads(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version, names=("Volume",))
+    responses[GET_PROPERTY_INFO_URI] = {"default": None, "supports": {"rtpc": "None"}}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    def run(argv):
+        return waapi_gateway.execute_gateway(argv, env=env, client_factory=lambda _: client)
+    code, listed = run(["metadata", "list", "--exact-id", OBJECT_GUID])
+    assert code == 0, listed
+    code, detail = run(["metadata", "detail", "--exact-id", OBJECT_GUID, "--selection", listed["agent_result"]["fields"][0]["selection"]])
+    assert code == 0, detail
+    observed = detail["agent_result"]["metadata"]
+    assert "name" not in observed and "type" not in observed
+    assert observed["default"] is None
+    assert observed["availability"]["type"] == "unknown"
+    code, discovered = run(["metadata", "discover", "--exact-id", OBJECT_GUID, "--meaning", "Volume"])
+    assert code == 0, discovered
+    candidate = discovered["agent_result"]["candidates"][0]
+    assert candidate["name"] == "Volume" and candidate["kind"] == "unknown"
+    assert "name" not in candidate["metadata"] and "type" not in candidate["metadata"]
+
+
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_type_inventory_retains_schema_optional_missing_facts(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    rows = [{"name": "Sound", "classId": 65552}, {"name": "Unidentified"}, {"type": "WObject"}, {}]
+    responses[GET_TYPES_URI] = {"return": rows}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, observed = waapi_gateway.execute_gateway(["metadata", "types"], env=env, client_factory=lambda _: client)
+    assert code == 0, observed
+    assert observed["agent_result"]["types"] == rows
+    code, filtered = waapi_gateway.execute_gateway(["metadata", "types", "--meaning", "WObject"], env=env, client_factory=lambda _: client)
+    assert code == 0, filtered
+    assert filtered["agent_result"]["types"] == [{"type": "WObject"}]
+    code, scoped = waapi_gateway.execute_gateway(["metadata", "list", "--custom-kind", "Sound"], env=env, client_factory=lambda _: client)
+    assert code == 0, scoped
+    assert (GET_NAMES_URI, {"classId": 65552}, {}) in client.calls
+
+
 def test_metadata_large_detail_continuation_is_complete_and_snapshot_bound(tmp_path: Path) -> None:
     responses = _metadata_responses(tmp_path)
     text = "声\\\"" * 16000
