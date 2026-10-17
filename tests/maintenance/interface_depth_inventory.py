@@ -447,6 +447,21 @@ def _typed_field_rows(
 ) -> list[dict[str, Any]]:
     if lane.get('construction_shape') == 'closed_business':
         declaration = lane['business_contract']['declaration']
+        if lane['business_contract']['contract'] == 'waapi-skill.authoring-model-business/v1':
+            from wwise_waapi.authoring_model_business import model_resource_roles
+            schema = declaration['schema']
+            rows = _walk_operation_schema(schema, path=('business', 'plan'), name='plan',
+                required=True, uri=lane['uri'], policy=policy)
+            for name, definition in sorted(schema.get('definitions', {}).items()):
+                rows.extend(_walk_operation_schema(definition,
+                    path=('business', 'plan', '<definition:' + name + '>'), name=name,
+                    required=False, uri=lane['uri'], policy=policy))
+            roles = model_resource_roles(lane['uri'])
+            for row in rows:
+                row['channel'] = 'business_declaration'
+                row['value_ownership'] = ('live_bound_handle' if row['path'] == ['business', 'plan', row['name']]
+                    and row['name'] in roles else 'stable_business_declaration')
+            return rows
         return [{'channel': 'business_declaration', 'path': ['business', name], 'name': name,
                  'shape': 'scalar', 'required': name in declaration['required_fields'],
                  'value_ownership': 'live_bound_handle' if name.endswith('_handle') else 'stable_business_declaration',

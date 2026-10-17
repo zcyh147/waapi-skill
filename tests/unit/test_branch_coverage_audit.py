@@ -48,6 +48,26 @@ def test_schema_inventory_retains_optional_enum_union_and_nested_collection_bran
     assert branches["/properties/children/items/oneOf/1"]["value"] == {"type": "integer"}
 
 
+def test_model_supplements_retain_original_native_obligations_without_family_credit(frozen_inventory):
+    from wwise_waapi.authoring_model_business import MODEL_OPERATIONS
+    expected = {f'{version}|function|{uri}' for version in ('2024.1', '2025.1')
+                for uri in MODEL_OPERATIONS}
+    routes = {row['id']: row for row in frozen_inventory['routes'] if row['id'] in expected}
+    assert set(routes) == expected
+    assert all(row['family'] == 'authoring-model-partial' for row in routes.values())
+    assert all(not row['reviewed_snapshot']['current_execution_credit'] for row in routes.values())
+    for version in ('2024.1', '2025.1'):
+        assert any(row['id'].startswith(version + '|')
+                   and 'authoring-model-supplement.json|' in row['id']
+                   for row in frozen_inventory['branches'])
+    native_routes = {row['id'] for row in frozen_inventory['native_coverage']['routes']
+                     if row['uri'] in MODEL_OPERATIONS}
+    native = [row for row in frozen_inventory['native_coverage']['obligations']
+              if row.get('route') in native_routes]
+    assert native and all(row['owner_issue'] == 189 and row['state'] == 'unresolved' for row in native)
+    assert all(row['evidence_results'] == {} for row in native)
+
+
 def test_independent_reflection_rejects_same_count_route_substitution():
     import json
     import pytest

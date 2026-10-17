@@ -331,6 +331,19 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     }
 
     assert len(non_object_set_digests) == 149
+    assert canonical_sha256(non_object_set_digests) == (
+        "c7fb226089f3c5f610e39090d196ab13958814992f13c03f205c227339694234"
+    )
+    # The only new named contract field is the internal owned model proof.
+    # Removing that exact addition must reproduce the earlier reviewed seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("model_binding")
+        contract["argument_contract"]["optional"].remove("model_binding")
+        assert contract["argument_contract"]["properties"].pop("model_binding") == {
+            "type": "object", "description": "Gateway-owned Authoring resource and declaration proof.",
+        }
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(contract)
     # Reviewed hierarchy delta: only the five setReference contracts change
     # their activation guidance. Restoring that exact prior wording reproduces
     # the previous aggregate seal, preserving every other field and pair.
@@ -354,6 +367,9 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # Retain the earlier layout-proof review and its original aggregate seal.
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
         contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("model_binding")
+        contract["argument_contract"]["optional"].remove("model_binding")
+        contract["argument_contract"]["properties"].pop("model_binding")
         contract["optional_arguments"].remove("layout_binding")
         contract["argument_contract"]["optional"].remove("layout_binding")
         assert contract["argument_contract"]["properties"].pop("layout_binding") == {

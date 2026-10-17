@@ -47,8 +47,8 @@ def test_generated_inventory_is_current_and_exactly_covers_both_surfaces() -> No
     assert inventory == build_interface_depth_inventory()
     native = inventory["native_lanes"]
     operations = inventory["operation_lanes"]
-    assert len(native) == 878
-    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 878
+    assert len(native) == 896
+    assert len({(row["version"], row["item_type"], row["uri"]) for row in native}) == 896
     expected_operations = {
         (name, version)
         for name, spec in OPERATION_SPECS.items()
@@ -605,7 +605,7 @@ def test_historical_construction_baseline_is_preserved_without_depth_claim() -> 
     baseline = _inventory()["historical_baseline"]
     assert baseline == {
         "contract": "waapi-skill.typed-request-surface/v1",
-        "total_lanes": 878,
+        "total_lanes": 896,
         "construction_coverage_is_depth_evidence": False,
     }
     assert set(SUPPORTED_WWISE_VERSION_KEYS) == {
@@ -667,6 +667,21 @@ def test_closed_layout_mutations_project_business_fields_without_native_typed_in
     assert blueprint['value_ownership'] == 'stable_business_declaration'
     assert blueprint['transport_ownership'] == 'gateway_derivation'
     assert blueprint['required'] is False
+
+
+def test_owned_model_plans_keep_resource_handles_and_constructor_values_separate():
+    inventory = _inventory()
+    rows = [row for row in inventory['native_lanes'] if row['classification'] == 'authoring-model-partial']
+    assert len(rows) == 18
+    assert all(row['owner_issue'] == 189 and row['disposition'] == 'migration_required' for row in rows)
+    lane = next(row for row in rows if row['version'] == '2025.1'
+                and row['uri'] == 'ak.wwise.ui.model.createHandle')
+    fields = _model_values(inventory, lane)
+    assert {row['name'] for row in fields} >= {'plan', 'window', 'template', 'template_key'}
+    assert all(row['value_ownership'] == 'live_bound_handle' for row in fields
+               if row['name'] in {'window', 'template'})
+    assert next(row for row in fields if row['name'] == 'template_key')['value_ownership'] == 'stable_business_declaration'
+    assert all(row['transport_ownership'] == 'gateway_derivation' for row in fields)
 
 
 def test_partial_layout_rows_keep_exact_owner_without_inheriting_completed_family():

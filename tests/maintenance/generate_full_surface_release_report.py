@@ -33,8 +33,9 @@ REPORT_CONTRACT = "waapi-skill.full-surface-release-report/v1"
 from wwise_waapi.authoring_core_manifest import COMMON_URIS  # noqa: E402
 from wwise_waapi.authoring_layout import LAYOUT_READ_URIS  # noqa: E402
 from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS  # noqa: E402
+from wwise_waapi.authoring_model_business import MODEL_OPERATIONS  # noqa: E402
 
-REVIEWED_AUTHORING_URIS = LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | COMMON_URIS | {"ak.wwise.ui.getSelectedFiles"}
+REVIEWED_AUTHORING_URIS = MODEL_OPERATIONS | LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | COMMON_URIS | {"ak.wwise.ui.getSelectedFiles"}
 REPORT_RELATIVE_PATH = Path("docs/full-surface-release-report.json")
 MANIFEST_RELATIVE_PATH = Path("skills/waapi-skill/resources/manifest")
 
@@ -482,14 +483,21 @@ def _continuation_error(
         elif construction_shape == 'closed_business':
             if not gateway.core_business_route_available(uri, version) or commands != ['request-schema']:
                 return 'closed business declaration has no exact reviewed public route'
-            payload = gateway.layout_business_contract_data(uri, version)
+            payload = (gateway.model_business_contract(uri, version) if uri in MODEL_OPERATIONS
+                       else gateway.layout_business_contract_data(uri, version))
             if (payload.get('operation') != uri or payload.get('version') != version
                     or payload.get('input_mode') != 'business_declaration'
-                    or payload.get('legacy_native_request_public') is not False
-                    or payload.get('legacy_typed_call_public') is not False
                     or payload.get('safety', {}).get('immutable_preview') is not True
                     or payload.get('safety', {}).get('single_execute') is not True):
                 return 'closed business route differs from its immutable business contract'
+            if uri in MODEL_OPERATIONS:
+                if (payload['declaration']['subcommand'] != 'draft-declare-model-plan'
+                        or not isinstance(payload['declaration'].get('schema'), Mapping)
+                        or payload['safety'].get('native_request_fields') != 'gateway_owned'):
+                    return 'owned model construction differs from its closed declaration'
+            elif (payload.get('legacy_native_request_public') is not False
+                    or payload.get('legacy_typed_call_public') is not False):
+                return 'closed business route exposes legacy native request input'
             gateway.build_parser().parse_args(payload['start']['gateway_argv'])
         elif construction_shape == "closed_read":
             if uri not in LAYOUT_READ_URIS or commands != ["request-schema", "layout-read"]:

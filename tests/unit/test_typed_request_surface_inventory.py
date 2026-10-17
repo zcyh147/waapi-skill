@@ -64,10 +64,10 @@ def test_packaged_surface_includes_all_exact_lanes_and_closed_layout_reads() -> 
     assert result["contract"] == TYPED_REQUEST_SURFACE_CONTRACT
     assert result["versions"] == list(SUPPORTED_WWISE_VERSION_KEYS)
     assert result["totals"] == {
-        "function_lanes": 718,
+        "function_lanes": 736,
         "topic_lanes": 160,
-        "total_lanes": 878,
-        "unique_function_uris": 183,
+        "total_lanes": 896,
+        "unique_function_uris": 192,
         "unique_topic_uris": 35,
     }
     assert result["unresolved_references"] == []
@@ -476,7 +476,8 @@ def test_closed_layout_reads_retain_native_definition_graph_and_unresolved_resul
 
 def test_closed_layout_business_lanes_retain_exact_native_request_definition_obligations():
     result = build_typed_request_surface(root=RESOURCE_ROOT)
-    rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business']
+    rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_business'
+            and row['uri'].startswith('ak.wwise.ui.layout.')]
     assert len(rows) == 15
     assert {row['uri'].rsplit('.', 1)[-1] for row in rows} == {'setLayout', 'switchLayout', 'removeLayout', 'getOrCreateView', 'closeView', 'undockView', 'dockView', 'moveSplitter'}
     assert {row['version'] for row in rows if row['uri'].endswith('.closeView')} == {'2025.1'}
@@ -489,3 +490,21 @@ def test_closed_layout_business_lanes_retain_exact_native_request_definition_obl
             graph = result['native_result_definition_graphs'][row['version']]
             assert row['native_ui_definition_graph_sha256'] == graph['sha256']
             assert graph['documents']['waapi_ui_definitions.json']['definitions']['Element']['OneOf']
+
+
+def test_owned_models_use_exact_authoring_definitions_and_closed_business_constructors():
+    from wwise_waapi.authoring_model_business import MODEL_OPERATIONS
+    from wwise_waapi.schema_inventory import load_authoring_definition_graph
+    result = build_typed_request_surface(root=RESOURCE_ROOT)
+    rows = [row for row in result['lanes'] if row['uri'] in MODEL_OPERATIONS]
+    assert {(row['version'], row['uri']) for row in rows} == {
+        (version, uri) for version in ('2024.1', '2025.1') for uri in MODEL_OPERATIONS}
+    for row in rows:
+        graph = load_authoring_definition_graph(row['version'])
+        assert 'wafm_definitions.json' in graph.documents
+        assert row['definition_graph_sha256'] == graph.inventory_sha256
+        assert row['native_authoring_definition_graph_sha256'] == graph.inventory_sha256
+        assert row['construction_shape'] == 'closed_business'
+        assert row['business_contract']['declaration']['subcommand'] == 'draft-declare-model-plan'
+        assert row['request_semantics']['native_write_acceptance'] == 'pending_owned_native_observation'
+    assert result['unresolved_references'] == []
