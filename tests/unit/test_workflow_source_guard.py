@@ -702,3 +702,65 @@ def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp
         rows = payload.get("objects", payload.get("agent_result"))
         assert rows[0]["owner"]["id"] == ids["sound"] and rows[0]["parent"] is None
     assert observed == [expression + " take 5" for expression in expressions]
+
+
+def _short_id_probe_runtime(tmp_path, *, version="2021.1", fault=None):
+    state = tmp_path / "short-id-state"
+    state.mkdir()
+    config = tmp_path / "short-id-config.json"
+    config.write_text(json.dumps({"project_modification_policy": "ask_before_changes"}))
+    evidence_root = tmp_path / "short-id-dispatcher"
+    evidence_root.mkdir()
+    commands = []
+    endpoint = {"host": "127.0.0.1", "port": 8080, "url": "ws://127.0.0.1:8080/waapi"}
+    event = {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "Play_Example",
+             "type": "Event", "path": "\\Events\\Play_Example", "short_id": 123}
+    dialogue = {"id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}", "name": "Dialogue_Example",
+                "type": "DialogueEvent", "path": "\\Events\\Dialogue_Example", "short_id": 456}
+
+    def gateway(command):
+        command = list(command)
+        commands.append(command)
+        assert command[0] in {"status", "query-object"}, command
+        payload = {"ok": True, "endpoint": endpoint, "detected_version": version}
+        if command[0] == "query-object":
+            selected = dialogue if "DialogueEvent" in command or "dialogue-event" in command else event
+            if "--exact-id" in command:
+                selected = dialogue if dialogue["id"] in command else event
+            payload["agent_result"] = [dict(selected)]
+            if "--short-id" in command:
+                payload["source_resolution"] = {"complete": True, "candidate_count": 1}
+        path = evidence_root / f"{len(commands)}.json"
+        path.write_text(json.dumps({"fixture_only": True, "argv": command, "payload": payload}))
+        return 0, payload
+
+    runtime = SimpleNamespace(version=version, candidate="a" * 40, state_dir=state,
+        category_results=[], env={"WAAPI_SKILL_CONFIG_PATH": str(config),
+                                  "WWISE_EVIDENCE_DIR": str(evidence_root)},
+        lifecycle=SimpleNamespace(host=endpoint["host"], waapi_url=endpoint["url"]),
+        port=endpoint["port"], raw_gateway=gateway)
+    return runtime, commands, config
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_short_id_probe_reuses_shared_runtime_without_policy_change(tmp_path, workflow, version):
+    import hashlib
+    runtime, commands, config = _short_id_probe_runtime(tmp_path, version=version)
+    config_before = config.read_bytes()
+    workflow.test_read_only_short_id_typed_native_read_observations(runtime)
+    category, = runtime.category_results
+    assert category["status"] == "PASS", category
+    body = Path(category["observation_path"]).read_bytes()
+    observed = json.loads(body)
+    assert category["observation_sha256"] == hashlib.sha256(body).hexdigest()
+    assert observed["candidate"] == runtime.candidate and observed["version"] == version
+    assert observed["project_mutation_count"] == 0 and observed["mutation_authority"] is False
+    assert observed["observations"] == [
+        {"kind": "event", "short_id": 123, "canonical_id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+         "outcome": "NATIVE_SUCCESS", "candidate_count": 1},
+        {"kind": "dialogue-event", "short_id": 456, "canonical_id": "{BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB}",
+         "outcome": "NATIVE_SUCCESS", "candidate_count": 1},
+    ]
+    assert len(commands) == len(observed["receipts"]) == len(observed["native_evidence"]) == 7
+    assert config.read_bytes() == config_before
+    assert all(command[0] in {"status", "query-object"} for command in commands)
