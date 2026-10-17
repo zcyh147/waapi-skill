@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -17,6 +18,7 @@ _HANDLE = re.compile(r'^lh1-[0-9a-f]{32}$')
 _MAX_RECORD_BYTES = 300 * 1024
 _MAX_RECORDS = 4096
 HANDLE_TTL_SECONDS = 900
+_MAX_EXPIRED_RECLAIMS = 64
 
 
 class LayoutHandleError(ValueError):
@@ -37,8 +39,9 @@ class LayoutHandleStore:
 
     def issue(self, *, context: Mapping[str, Any], layout_name: str, role: str,
               native_id: str, observation: Mapping[str, Any]) -> str:
-        for index, _ in enumerate(self.root.iterdir()):
-            if index >= _MAX_RECORDS - 1:
+        if self._at_capacity():
+            self._reclaim_expired()
+            if self._at_capacity():
                 raise LayoutHandleError('Layout handle store reached its bounded record ceiling')
         handle = 'lh1-' + secrets.token_hex(16)
         body = {'contract': 'waapi-skill.authoring-layout-handle/v1', 'handle': handle,
@@ -59,6 +62,51 @@ class LayoutHandleStore:
             path.unlink(missing_ok=True)
             raise
         return handle
+
+    def _at_capacity(self) -> bool:
+        for index, _ in enumerate(self.root.iterdir()):
+            if index >= _MAX_RECORDS - 1:
+                return True
+        return False
+
+    def _reclaim_expired(self) -> None:
+        """Reclaim bounded, intact expired capabilities; preserve everything else."""
+        fields = {'contract', 'handle', 'context', 'layout_name', 'role', 'native_id', 'observation', 'expires_at', 'sha256'}
+        reclaimed = 0
+        now = time.time()
+        for index, path in enumerate(self.root.iterdir()):
+            if index >= _MAX_RECORDS or reclaimed >= _MAX_EXPIRED_RECLAIMS:
+                break
+            if not path.name.endswith('.json') or not _HANDLE.fullmatch(path.name[:-5]) or path_is_link_or_reparse(path):
+                continue
+            try:
+                descriptor = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+                with os.fdopen(descriptor, 'rb') as stream:
+                    info = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_RECORD_BYTES:
+                        continue
+                    payload = json.loads(stream.read(_MAX_RECORD_BYTES + 1))
+                if not isinstance(payload, dict) or set(payload) != fields:
+                    continue
+                digest = payload.pop('sha256')
+                expiry = payload['expires_at']
+                if (canonical_sha256(payload) != digest
+                        or payload['contract'] != 'waapi-skill.authoring-layout-handle/v1'
+                        or payload['handle'] != path.name[:-5]
+                        or payload['role'] not in {'layout', 'element', 'view'}
+                        or not isinstance(payload['context'], dict) or not isinstance(payload['observation'], dict)
+                        or not isinstance(payload['layout_name'], str) or not isinstance(payload['native_id'], str)
+                        or type(expiry) not in (int, float) or not math.isfinite(expiry) or expiry >= now):
+                    continue
+                current = path.stat(follow_symlinks=False)
+                if (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns) != (
+                        info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns):
+                    continue
+                path.unlink()
+                reclaimed += 1
+            except (OSError, ValueError, TypeError):
+                # Unknown/malformed records remain available for inspection; never delete them.
+                continue
 
     def resolve(self, handle: str, *, context: Mapping[str, Any], role: str) -> dict[str, Any]:
         if not isinstance(handle, str) or not _HANDLE.fullmatch(handle):
