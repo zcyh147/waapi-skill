@@ -4104,6 +4104,7 @@ def test_preview_agent_result_preserves_quotes_backslashes_and_unicode_from_arti
     )
 
     payload = preview(request, tmp_path=tmp_path, state_dir=state_dir, client=client)
+    assert list(payload)[-1] == "agent_result"
     stored_request = TransactionStore(state_dir).load_preview(payload["transaction_id"]).artifact["request"]
 
     assert payload["agent_result"] == {

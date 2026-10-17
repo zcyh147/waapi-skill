@@ -8946,6 +8946,18 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 ),
             ),
         }
+        if args.api == SOUNDBANK_GENERATED_TOPIC_URI and not args.catalog:
+            # Long-tail field tables already use explicit catalog/selection
+            # disclosure. Keep their fact recipes beside those same views.
+            facts = payload["continuation"]["business_fact_argv"]
+            if args.row is None:
+                for key in ("event_row", "typed_event_row", "empty_event_row"):
+                    facts.pop(key)
+            if args.entry is None:
+                for key in ("exact_entry", "typed_exact_entry", "empty_exact_entry",
+                            "exact_entry_object", "typed_exact_entry_object",
+                            "exact_entry_row", "typed_exact_entry_row"):
+                    facts.pop(key)
         if args.api in {"ak.wwise.ui.signal.click", "ak.wwise.ui.signal.toggle"}:
             payload["continuation"]["owned_signal_observation"] = {
                 "model": "--signal-model <owned-model-resource>",
@@ -10319,7 +10331,19 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             namespace_defaults = {"ak.wwise.ui.layout.": {"host_surface": "wwise-authoring",
                 "supported_versions": list(LAYOUT_VERSIONS)}, "ak.wwise.ui.": {"host_surface": "wwise-authoring"},
                 "ak.soundengine.": {"intent": "perform one closed SoundEngine runtime business operation"},
-                "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view"}}
+                "ak.wwise.core.profiler.": {"intent": "read bounded Profiler state from a named time position and result view",
+                    "host_requirement": "wwise-console-or-authoring"},
+                "ak.wwise.core.remote.": {"intent": "connect Authoring to one exact remote runtime or Profiler capture",
+                    "host_requirement": "wwise-authoring"},
+                "ak.wwise.core.transport.": {"intent": "create, inspect, or control an Authoring audition transport",
+                    "host_requirement": "wwise-authoring"}}
+            for prefix, defaults in namespace_defaults.items():
+                # Inheritance must not invent optional fields on routes whose
+                # full catalog row omitted them.
+                matching_rows = [row for row in request_schema_routes if row["api"].startswith(prefix)]
+                for key in tuple(defaults):
+                    if any(key not in row for row in matching_rows):
+                        defaults.pop(key)
             def defaults_for_route(api: str) -> dict[str, Any]:
                 matching = [prefix for prefix in namespace_defaults if api.startswith(prefix)]
                 return {**route_defaults, **(namespace_defaults[max(matching, key=len)] if matching else {})}
@@ -26487,7 +26511,7 @@ def _business_next_action_binding(
             ),
             "direct_query_before_binding": "forbidden",
         }
-        return {
+        result = {
             **object_binding,
             "by_id": role_by_id,
             "by_path_segments": role_by_path_segments,
@@ -26511,6 +26535,21 @@ def _business_next_action_binding(
                 "the returned handle into the same named declaration field"
             ),
         }
+        if record.operation in {"switchContainer.addAssignment", "switchContainer.removeAssignment"}:
+            result.update({
+                "selection_rule": (
+                    "complete_path_or_scoped_child_uses_by_path_segments;_"
+                    "unscoped_name_requires_query_then_by_id;_selected_GUID_uses_by_id"
+                ),
+                "name_rule": "scoped_child_is_exact_identity;_query_only_unscoped_names",
+                "path_rule": "copy_literal_nonempty_segments_root_to_leaf;_Gateway_inserts_separators;_no_type_prefixes",
+                "result_validation_rule": (
+                    "match_returned_name_and_path_to_user_target;_for_user_stated_type_use_resolved_business_kind_"
+                    "not_reflected_type_and_stop_if_ambiguous;_hierarchy_labels_are_not_types;_rebind_or_stop_on_mismatch"
+                ),
+                "role_assignment": "copy_role_prefix_exactly;_use_returned_handle_in_same_named_declaration_field",
+            })
+        return result
 
     forbidden_inputs = [
         "native_request",
