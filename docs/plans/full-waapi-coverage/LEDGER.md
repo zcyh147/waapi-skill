@@ -39,6 +39,16 @@ alternatives, five plugin kinds and placement modes remain distinct. Reflected
 object types also retain separate creation/edit applicability obligations.
 Internal types and unresolved plugin placements are not presumed creatable.
 
+Existing-object plug-in condition rows belong to #177 without a blanket #179
+creation dependency. Their built-in Effect/Source/System classes can be bound
+to independently located existing instances, or to instances created through
+an already supported public route. This establishes no whole-class, placement
+or native evidence credit. New-object plug-in conditions still depend on
+#177 and #179, and plug-in topology rows retain #177/#178 dependencies. If an
+exact existing class cannot be reached through those routes, retain that
+obligation and add its actual implementation dependency rather than omitting
+it or requiring every existing edit to wait for all creation modes.
+
 ## Ownership
 
 `docs/branch-coverage-ownership.json` is an exact URI/kind roster. It assigns

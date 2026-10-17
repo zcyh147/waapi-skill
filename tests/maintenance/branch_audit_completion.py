@@ -104,7 +104,9 @@ def installed_obligations(root, *, digest, load):
                             'business_dimensions': {'operation_mode': mode, 'condition': occurrence['attributes'],
                                 'alternative': alternative, 'class': occurrence.get('class'),
                                 'host_applicability': 'unverified', 'condition_value': value if alternative != 'condition' else None},
-                            'owner_issue': owner, 'dependencies': ([177] if owner == 178 else []) + ([179] if corpus['name'] == 'plugin-condition' else []),
+                            # Existing-instance edits do not require every
+                            # plug-in creation or placement mode to be ready.
+                            'owner_issue': owner, 'dependencies': ([177] + ([179] if corpus['name'] == 'plugin-condition' else []) if mode == 'new-object' else []),
                             'parent_issue': 174, 'blocks_issue': 195, 'state': 'unresolved'})
             for source in lane['files']:
                 for plugin in source.get('classes', []):
