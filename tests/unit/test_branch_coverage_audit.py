@@ -12,6 +12,29 @@ def frozen_inventory():
     return build_inventory()
 
 
+def test_layout_supplements_retain_exact_routes_definitions_and_unresolved_ownership(frozen_inventory):
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+
+    expected = {f'{version}|function|{uri}' for version in ('2024.1', '2025.1')
+                for uri in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS}
+    routes = {row['id']: row for row in frozen_inventory['routes'] if row['id'] in expected}
+    assert set(routes) == expected
+    assert all(row['family'] == 'authoring-layout-partial' for row in routes.values())
+    assert all(not row['reviewed_snapshot']['current_execution_credit'] for row in routes.values())
+    for version in ('2024.1', '2025.1'):
+        definitions = [row for row in frozen_inventory['branches']
+                       if row['id'].startswith(f'{version}|')
+                       and 'authoring-layout-read-supplement.json|waapi_ui_definitions.json|' in row['id']]
+        assert definitions
+        assert any(row['kind'] == 'native_keyword_semantics' and row['value'] == 'OneOf' for row in definitions)
+    native_routes = {row['id'] for row in frozen_inventory['native_coverage']['routes']
+                     if row['uri'] in LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS}
+    native = [row for row in frozen_inventory['native_coverage']['obligations']
+              if row.get('route') in native_routes]
+    assert native and all(row['owner_issue'] == 188 and row['state'] == 'unresolved' for row in native)
+
+
 def test_schema_inventory_retains_optional_enum_union_and_nested_collection_branches():
     schema = {"type": "object", "properties": {
         "mode": {"enum": ["create", "replace"]},
@@ -181,6 +204,27 @@ def test_installed_conditions_keep_existing_new_and_plugin_placement_obligations
     assert {r['business_dimensions']['placement'] for r in plugins} == {'owner-local-effect', 'independent-shareset'}
     assert all(r['owner_issue'] == 179 for r in plugins)
     assert all(r['owner_issue'] in range(177, 194) for r in native['obligations'])
+
+
+def test_existing_plugin_condition_grammar_does_not_depend_on_plugin_creation(frozen_inventory):
+    from tests.maintenance.branch_coverage_audit import ROOT, load
+    rows = frozen_inventory['native_coverage']['obligations']
+    original = load(ROOT / 'docs/branch-coverage-inventory.json')['native_coverage']['obligations']
+    # Changing dependency scheduling must retain the independently enumerated
+    # denominator, exact ownership, and unresolved proof obligations.
+    assert {(r['id'], r['owner_issue']) for r in rows} == {(r['id'], r['owner_issue']) for r in original}
+    for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1'):
+        plugin_conditions = [r for r in rows if r['kind'] == 'metadata_condition'
+                             and r.get('version') == version and '|plugin-condition|' in r['id']]
+        existing = [r for r in plugin_conditions if r['business_dimensions']['operation_mode'] == 'existing-object']
+        new = [r for r in plugin_conditions if r['business_dimensions']['operation_mode'] == 'new-object']
+        assert existing and new
+        assert all(r['owner_issue'] == 177 and r['dependencies'] == [] for r in existing)
+        assert all(r['owner_issue'] == 178 and r['dependencies'] == [177, 179] for r in new)
+        topology = [r for r in rows if r['kind'] == 'plugin_topology' and r.get('version') == version]
+        assert topology and all(r['owner_issue'] == 179 and r['dependencies'] == [177, 178] for r in topology)
+    assert all(r['state'] == 'unresolved' and not r['requirements']
+               for r in rows if r['kind'] == 'metadata_condition')
 
 
 def test_finite_and_unfamiliar_schema_alternatives_remain_explicit():

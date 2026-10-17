@@ -10,6 +10,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
+from .authoring_layout import LAYOUT_READ_URIS, LAYOUT_VERSIONS, PINNED_SHA256, layout_read_contract, load_layout_read_evidence
 from .builders.common import DEFAULT_MANIFEST_ROOT
 from .capabilities import CapabilityCatalog
 from .execution_contracts import AUTHORING_UI_EXECUTION_PROFILE
@@ -250,7 +251,7 @@ def validate_packaged_typed_request_surface(
     *,
     root: Path = DEFAULT_MANIFEST_ROOT,
 ) -> dict[str, Any]:
-    """Validate and return the immutable 824-lane typed surface contract."""
+    """Validate the immutable versioned construction surface contract."""
 
     selected_root = Path(root)
     path = selected_root / TYPED_REQUEST_SURFACE_FILENAME
@@ -308,6 +309,7 @@ def build_typed_request_surface(
     unique_topics: set[str] = set()
     function_lanes = 0
     topic_lanes = 0
+    native_result_definition_graphs: dict[str, Any] = {}
 
     for version in SUPPORTED_WWISE_VERSION_KEYS:
         graph = load_definition_graph(version, root=selected_root)
@@ -387,6 +389,25 @@ def build_typed_request_surface(
                     f"Unsupported reflected item type: {capability.item_type!r}"
                 )
 
+            route_graph = graph
+            closed_layout_read = capability.uri in LAYOUT_READ_URIS
+            if closed_layout_read:
+                native = load_layout_read_evidence(selected_root, version)
+                if native['build'] != graph.wwise_build:
+                    raise SchemaInventoryError('Authoring UI definitions differ from the exact base graph build')
+                document = native['definitions']
+                retained = {'documents': {'waapi_ui_definitions.json': document},
+                            'source_supplement_sha256': PINNED_SHA256[version],
+                            'build': native['build'], 'host': native['host'],
+                            'semantics': 'native_source_preserved_without_normalization'}
+                retained['sha256'] = _canonical_sha256(retained)
+                native_result_definition_graphs[version] = retained
+                route_graph = DefinitionGraph(contract=graph.contract, version=version,
+                    wwise_build=graph.wwise_build,
+                    source_file_names=(*graph.source_file_names, 'waapi_ui_definitions.json'),
+                    documents=MappingProxyType({**graph.documents, 'waapi_ui_definitions.json': document}),
+                    inventory_sha256=_canonical_sha256({'base': graph.inventory_sha256,
+                        'native_result_graph': retained['sha256']}))
             schema = capability.schema
             unknown_keywords.extend(
                 validate_schema_envelope(
@@ -451,7 +472,7 @@ def build_typed_request_surface(
                             resolve_schema_reference(
                                 reference,
                                 root_schema=section,
-                                graph=graph,
+                                graph=route_graph,
                             )
                         except SchemaInventoryError as exc:
                             unresolved_references.append(
@@ -477,15 +498,15 @@ def build_typed_request_surface(
                 ),
                 "schema_sha256": _canonical_sha256(schema),
                 "construction_shape": (
-                    _function_construction_shape(
+                    "closed_read" if closed_layout_read else _function_construction_shape(
                         schema,
-                        graph=graph,
+                        graph=route_graph,
                         execution_policy=capability.execution_contract,
                     )
                     if capability.item_type == "function"
                     else "topic"
                 ),
-                "definition_graph_sha256": graph.inventory_sha256,
+                "definition_graph_sha256": route_graph.inventory_sha256,
                 "schema_keywords": sorted(schema_keywords),
                 "reference_count": reference_count,
                 "intentionally_blocked_fields": list(
@@ -499,6 +520,21 @@ def build_typed_request_surface(
                     )
                 ),
             }
+            if closed_layout_read:
+                business = layout_read_contract(version, capability.uri)
+                unresolved = capability.uri.endswith('.getLayout')
+                row['business_read_contract'] = business
+                row['native_result_definition_graph_sha256'] = native_result_definition_graphs[version]['sha256']
+                row['result_semantics'] = {
+                    'status': 'definition_semantics_unresolved' if unresolved else 'closed_result_validated',
+                    'business_arrangement_verified': False,
+                    'native_input_schema_is_not_public_construction': True,
+                    'issues': [
+                        {'pointer': '/definitions/Element/OneOf', 'issue': 'native capital OneOf retained without reinterpretation'},
+                        {'pointer': '/definitions/Splitter', 'issue': 'required undeclared @Children conflicts with closed properties'},
+                        {'pointer': '/definitions/ViewHolder', 'issue': 'holder tag and closed properties conflict with allOf Element'},
+                    ] if unresolved else [],
+                }
             rows.append(row)
 
     rows.sort(key=lambda row: (row["version"], row["item_type"], row["uri"]))
@@ -535,6 +571,7 @@ def build_typed_request_surface(
                 item["keyword"],
             ),
         ),
+        "native_result_definition_graphs": native_result_definition_graphs,
         "lanes": rows,
     }
     return {**unsigned, "inventory_sha256": _canonical_sha256(unsigned)}

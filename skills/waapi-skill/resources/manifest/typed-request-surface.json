@@ -1,7 +1,7 @@
 {
   "contract": "waapi-skill.typed-request-surface/v1",
   "intentionally_blocked_field_occurrences": 79,
-  "inventory_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c",
+  "inventory_sha256": "3d88ee827197f529aff3cb264b2dec9db8ad375e2602a050182f754faed8ce7e",
   "lanes": [
     {
       "construction_shape": "inline",
@@ -2116,7 +2116,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2131,7 +2133,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "d552a165d3858a34208cecde1b89b37637b0447ecc6f47534d624464a528945a",
+      "execution_policy_sha256": "4e1a2c76a2f0bb45be90b87d3af243df63ee5ac3aa84b6d3515f75fc361ccd24",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -2161,7 +2163,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2176,7 +2180,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "ca693f60d0cae57bac8acabb4ffe8b1eebee26c68764c5b101c046f31defd693",
+      "execution_policy_sha256": "427253b9ab7754209cebe8273c5055ab3a3b4f34fadc769e8963621117154672",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -2208,7 +2212,9 @@
         "executable": true,
         "gateway_commands": [
           "metadata types",
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -2223,7 +2229,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2021.1"
       },
-      "execution_policy_sha256": "e56f154d3c5c4c90c9102dd636fd4390b496f939a2e95c3587d0a94715390470",
+      "execution_policy_sha256": "3a05bb65b2b40825b7a6f9d726e394f96852b026cfc54b05db56a7ab302f2e38",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 1,
@@ -8117,7 +8123,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -8132,7 +8140,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "9960984c7f1fb6d12119e5a69efc7134f351769856310ee21c268240e8085095",
+      "execution_policy_sha256": "381b852749a521d518d958ba143817d066ef13c362734bb3b0144a02ad797983",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -8162,7 +8170,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -8177,7 +8187,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "9a4c12a37f9ba901f7cb58aa54087f8254071f690f36870886ccd73b6e0a9a62",
+      "execution_policy_sha256": "db2022716f70b116013fd7f3b2323117cf9b6a5f619a3f257e958cf51f061b84",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -8209,7 +8219,9 @@
         "executable": true,
         "gateway_commands": [
           "metadata types",
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -8224,7 +8236,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2022.1"
       },
-      "execution_policy_sha256": "640a58b5deeb185fbc956eb184cb1c3fe3600be1312709698330deebbba7d6ed",
+      "execution_policy_sha256": "eeb0698b1c6a41bf91075047c027d7307565bca192d097a4461c2f35111dd998",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 1,
@@ -15347,7 +15359,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15362,7 +15376,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "496ddb1d86c7246700b66088afb11e46ed6b05d9013f46f05bd56a9d1721cfc9",
+      "execution_policy_sha256": "b6db32d9d5ff1087efa1618a823c993119c13e95d26751c088278a41e01d681b",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -15392,7 +15406,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15407,7 +15423,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "dc0776e684e03451404d91f46e15c0e563ca6b630a1874cbfd6d6ac10d002ad5",
+      "execution_policy_sha256": "e553ff5ed9622a3d47cb7da7271268d75d261df10bb35de6e156dd4e37101119",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -15439,7 +15455,9 @@
         "executable": true,
         "gateway_commands": [
           "metadata types",
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -15454,7 +15472,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2023.1"
       },
-      "execution_policy_sha256": "1be3b2ec76e801ff2e54bda43ba78519ffb52f8be2638d7de52c8e90a850fafa",
+      "execution_policy_sha256": "c494eb6345acb686c060e8296cafe9a5f2f0bf50f27fda89c6de662126ab9cda",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 1,
@@ -24011,7 +24029,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -24026,7 +24046,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "274b9d05bc3a53863a8e32c206573ef54873a7d21c6980314a8454a67a5d9bf5",
+      "execution_policy_sha256": "9bff7136866dcc93e30722b43eb58f6d307eff00eb4018350668a99b7bb39650",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -24056,7 +24076,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -24071,7 +24093,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "602509d784bf3e24e8371cd4c3bca544c368663cb3b78bafd20aa0c64d716122",
+      "execution_policy_sha256": "c7a5a536f5169df95f1af55a36f643e84cf7b3d9506496b6d17e5ba0a32e558b",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -24103,7 +24125,9 @@
         "executable": true,
         "gateway_commands": [
           "metadata types",
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -24118,7 +24142,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2024.1"
       },
-      "execution_policy_sha256": "3d5271de106aa4db3d4f7095b097b47c5f99e2919eb28b6f275739459280b2c5",
+      "execution_policy_sha256": "17c579ac9f4fc5248e1da01dae060fb00159a3319da0a2897a39b40954aca2e1",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 1,
@@ -27922,6 +27946,702 @@
       ],
       "schema_sha256": "ea3b718b94930a3272715f4238f19cc2d3388cd5240e3440f5e9511816f49b09",
       "uri": "ak.wwise.ui.getSelectedObjects",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getCurrentLayoutName",
+        "business_fields": {},
+        "command": "request-schema",
+        "continuation": {
+          "append": [],
+          "gateway_argv": [
+            "layout-read",
+            "current"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "current_layout_name",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "ee2e34e1c582385dc8fcfeaed7f6795a1c61af080400d085fe5d679bb7a5b67f",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 0,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "e27f85da443119045960314bc0a167e11cecb46e43e072368a043cd879a37460",
+      "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getElementRectangle",
+        "business_fields": {
+          "element_handle": {
+            "authority": "Gateway-issued scoped identity",
+            "pattern": "^lh1-[0-9a-f]{32}$",
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--element-handle <discovered-handle>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "rectangle"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "identity_discovery": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "expires_after_seconds": 900,
+          "gateway_argv": [
+            "layout-inspect"
+          ],
+          "live_session_project_and_configuration_bound": true
+        },
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "allocated_element_rectangle",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getElementRectangle",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "6ee587d507363de21d0f01a5d88ba0e86ff27632b68995f9a356eb18c376109b",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 0,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "53c4c5d4a0262e489e6c17c22ba31e0a515030889a86e1f75e456dcd04bb314f",
+      "uri": "ak.wwise.ui.layout.getElementRectangle",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getLayout",
+        "business_fields": {
+          "layout_name": {
+            "empty_allowed": true,
+            "max_utf8_bytes": 4096,
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "contents"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "bounded_native_document_with_unresolved_definition_semantics",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getLayout",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "49372e88c4c7803d419495588fcccd293c5e12e399d221477d0ec9885ccd0fbf",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [
+          {
+            "issue": "native capital OneOf retained without reinterpretation",
+            "pointer": "/definitions/Element/OneOf"
+          },
+          {
+            "issue": "required undeclared @Children conflicts with closed properties",
+            "pointer": "/definitions/Splitter"
+          },
+          {
+            "issue": "holder tag and closed properties conflict with allOf Element",
+            "pointer": "/definitions/ViewHolder"
+          }
+        ],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "definition_semantics_unresolved"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "14893302243e7da4686b59998be43da9ea9e18557060fb2a1e2fe8f2a80db788",
+      "uri": "ak.wwise.ui.layout.getLayout",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getLayoutNames",
+        "business_fields": {},
+        "command": "request-schema",
+        "continuation": {
+          "append": [],
+          "gateway_argv": [
+            "layout-read",
+            "names"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "factory_layout_names",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getLayoutNames",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "dbc77385694dd1f0a67793cb27a04c4ea46527962a3b2936448d75c00d7059f7",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 0,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "8abc5c244886f6ba46dd219f025f4c0e75549e6d46a1359fcd1bec12fdc44b59",
+      "uri": "ak.wwise.ui.layout.getLayoutNames",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getViewHandle",
+        "business_fields": {
+          "view_handle": {
+            "authority": "Gateway-issued scoped identity",
+            "pattern": "^lh1-[0-9a-f]{32}$",
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--view-handle <discovered-handle>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "frontend"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "identity_discovery": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "expires_after_seconds": 900,
+          "gateway_argv": [
+            "layout-inspect"
+          ],
+          "live_session_project_and_configuration_bound": true
+        },
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "instantiated_view_frontend_handles",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getViewHandle",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "a830bb09881de09ef27886277502196dc0df6f10d5778722104d2fc681e57b52",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "fa65797b4a242e4d9bca5383024149df64ca13a2bb4eb676dbd01de19c4730ab",
+      "uri": "ak.wwise.ui.layout.getViewHandle",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getViewInstances",
+        "business_fields": {
+          "layout_name": {
+            "empty_allowed": true,
+            "max_utf8_bytes": 4096,
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "instances"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "layout_view_instances",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getViewInstances",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "5187962bbaf27a9c628900ef724583d351731dee661f49301e0311785af0ec32",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "7f90e37164e6832cde50e3b2f75ef87b54735dc9026f9abd1c31f0e42802e8ba",
+      "uri": "ak.wwise.ui.layout.getViewInstances",
+      "version": "2024.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getViewTypes",
+        "business_fields": {},
+        "command": "request-schema",
+        "continuation": {
+          "append": [],
+          "gateway_argv": [
+            "layout-read",
+            "types"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "currently_registered_view_types",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2024.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "9381ada7260254f98fcfda2f43750c5e3e3d6def1c662936b962c01ab6d5713b",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getViewTypes",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "d0bb3d7372759a1e21f2db23444e84d11119ab87640ffaa4d9b39d0e193ed260",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "f0e7d91f0becb1dc68bd400fbe4db465420b607000197c6b0846065b38430bcc",
+      "uri": "ak.wwise.ui.layout.getViewTypes",
+      "version": "2024.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "548a0bdcce2b8b91975a046080f96d38b0d7d9b9799c04e9ea6457efe8fcdb7a",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.switchLayout",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2024.1"
+      },
+      "execution_policy_sha256": "a294f3e619dad582a7ee4f31d3a92baca1753d629a694233f85838f63e8a700f",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "1860b63155ffc2e02201cdf1330d038a30f998d38f75c3401e4cd564b1bc9305",
+      "uri": "ak.wwise.ui.layout.switchLayout",
       "version": "2024.1"
     },
     {
@@ -33089,7 +33809,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -33104,7 +33826,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "ef401359e643ecff01b0a1f4d975d02bbffac9f6693c43c21a9ec67092334bb2",
+      "execution_policy_sha256": "4aa03d5b0edda3e3f5c7409b6194209ec4646e36d573be9f016b204357b215e9",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 2,
@@ -33134,7 +33856,9 @@
         "excluded_reason": null,
         "executable": true,
         "gateway_commands": [
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -33149,7 +33873,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "eebf53a9735f78da554e5f6a2689e9060fbf4a3363945105ee98a805512a4098",
+      "execution_policy_sha256": "8ac200f8f859b7f85eb871d9e07fcf139ea6f0bf23751eb772a8e77bd7f10c57",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 7,
@@ -33181,7 +33905,9 @@
         "executable": true,
         "gateway_commands": [
           "metadata types",
-          "metadata discover"
+          "metadata discover",
+          "metadata list",
+          "metadata detail"
         ],
         "item_type": "function",
         "lifecycle_strategy": "none",
@@ -33196,7 +33922,7 @@
         "verification_strategy": "fixed_result_contract",
         "version": "2025.1"
       },
-      "execution_policy_sha256": "b6a88d69ac39f493905310c9586308dbe845a38e252ee8e59396fc47aaac8a2d",
+      "execution_policy_sha256": "b6faac38870ce4eba945d8323487ad5fc7dd0cb931d33e83fc556f27472c5440",
       "intentionally_blocked_fields": [],
       "item_type": "function",
       "reference_count": 1,
@@ -37234,6 +37960,702 @@
       "version": "2025.1"
     },
     {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getCurrentLayoutName",
+        "business_fields": {},
+        "command": "request-schema",
+        "continuation": {
+          "append": [],
+          "gateway_argv": [
+            "layout-read",
+            "current"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "current_layout_name",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "998f9d9892da78f0e5880fe416675466cdb5d7350e195e08ef62385a2aadc06f",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 0,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "e27f85da443119045960314bc0a167e11cecb46e43e072368a043cd879a37460",
+      "uri": "ak.wwise.ui.layout.getCurrentLayoutName",
+      "version": "2025.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getElementRectangle",
+        "business_fields": {
+          "element_handle": {
+            "authority": "Gateway-issued scoped identity",
+            "pattern": "^lh1-[0-9a-f]{32}$",
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--element-handle <discovered-handle>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "rectangle"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "identity_discovery": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "expires_after_seconds": 900,
+          "gateway_argv": [
+            "layout-inspect"
+          ],
+          "live_session_project_and_configuration_bound": true
+        },
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "allocated_element_rectangle",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getElementRectangle",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "f413615498b8b209ca9858f33735e90864de22aae96f2137f8f9b70bb87b4c71",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 0,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "53c4c5d4a0262e489e6c17c22ba31e0a515030889a86e1f75e456dcd04bb314f",
+      "uri": "ak.wwise.ui.layout.getElementRectangle",
+      "version": "2025.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getLayout",
+        "business_fields": {
+          "layout_name": {
+            "empty_allowed": true,
+            "max_utf8_bytes": 4096,
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "contents"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "bounded_native_document_with_unresolved_definition_semantics",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getLayout",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "640e6ed51a5b3e9728d9940ba7d0f61c5067d76554d7775445414497732f4802",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [
+          {
+            "issue": "native capital OneOf retained without reinterpretation",
+            "pointer": "/definitions/Element/OneOf"
+          },
+          {
+            "issue": "required undeclared @Children conflicts with closed properties",
+            "pointer": "/definitions/Splitter"
+          },
+          {
+            "issue": "holder tag and closed properties conflict with allOf Element",
+            "pointer": "/definitions/ViewHolder"
+          }
+        ],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "definition_semantics_unresolved"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "14893302243e7da4686b59998be43da9ea9e18557060fb2a1e2fe8f2a80db788",
+      "uri": "ak.wwise.ui.layout.getLayout",
+      "version": "2025.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getLayoutNames",
+        "business_fields": {},
+        "command": "request-schema",
+        "continuation": {
+          "append": [],
+          "gateway_argv": [
+            "layout-read",
+            "names"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "factory_layout_names",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getLayoutNames",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "aa098f8e2506d1e925c83780390b6dd486f1024ab288911eadf5802bbe632ed1",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 0,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "8abc5c244886f6ba46dd219f025f4c0e75549e6d46a1359fcd1bec12fdc44b59",
+      "uri": "ak.wwise.ui.layout.getLayoutNames",
+      "version": "2025.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getViewHandle",
+        "business_fields": {
+          "view_handle": {
+            "authority": "Gateway-issued scoped identity",
+            "pattern": "^lh1-[0-9a-f]{32}$",
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--view-handle <discovered-handle>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "frontend"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "identity_discovery": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "expires_after_seconds": 900,
+          "gateway_argv": [
+            "layout-inspect"
+          ],
+          "live_session_project_and_configuration_bound": true
+        },
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "instantiated_view_frontend_handles",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getViewHandle",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "e9323658904f305433e7a5e31d6e8a3ea38a7ae8067d601c27d0d87c5f32d74e",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "fa65797b4a242e4d9bca5383024149df64ca13a2bb4eb676dbd01de19c4730ab",
+      "uri": "ak.wwise.ui.layout.getViewHandle",
+      "version": "2025.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getViewInstances",
+        "business_fields": {
+          "layout_name": {
+            "empty_allowed": true,
+            "max_utf8_bytes": 4096,
+            "type": "string"
+          }
+        },
+        "command": "request-schema",
+        "continuation": {
+          "append": [
+            "--layout-name <exact-discovered-layout-name>"
+          ],
+          "gateway_argv": [
+            "layout-read",
+            "instances"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "layout_view_instances",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getViewInstances",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "116595b54c3e3eac78a1db6415438643c53cc817ba5d91f02e2e73d7845ca71d",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "7f90e37164e6832cde50e3b2f75ef87b54735dc9026f9abd1c31f0e42802e8ba",
+      "uri": "ak.wwise.ui.layout.getViewInstances",
+      "version": "2025.1"
+    },
+    {
+      "business_read_contract": {
+        "api": "ak.wwise.ui.layout.getViewTypes",
+        "business_fields": {},
+        "command": "request-schema",
+        "continuation": {
+          "append": [],
+          "gateway_argv": [
+            "layout-read",
+            "types"
+          ]
+        },
+        "contract": "waapi-skill.layout-read/v1",
+        "host_surface": "wwise-authoring",
+        "input_mode": "bounded_business_read",
+        "limits": {
+          "nesting_depth": 32,
+          "nodes": 32768,
+          "result_bytes": 262144,
+          "rows": 1024,
+          "timeout_seconds": 10
+        },
+        "offline": true,
+        "ok": true,
+        "result_scope": "currently_registered_view_types",
+        "safety": {
+          "live_host_detection": true,
+          "mutation_identity_authority": false,
+          "native_request_input": "forbidden",
+          "read_only": true
+        },
+        "status": "ok",
+        "version": "2025.1"
+      },
+      "construction_shape": "closed_read",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "e995e25e966e068deb66267088cbfd24a7b6efe33c636f7391909eb802f807bc",
+      "execution_policy": {
+        "accepted_authorization_modes": [],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "read",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema",
+          "layout-read"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "none",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "call-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": false,
+        "result_limit_bytes": 262144,
+        "route": "bounded_call",
+        "timeout_seconds": 10.0,
+        "uri": "ak.wwise.ui.layout.getViewTypes",
+        "verification_strategy": "bounded_native_observation",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "8d7c87c700a7ade31944f3d139d3a1a445a875b6ebbf6ab8c9ee50c14a4b34da",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "native_result_definition_graph_sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "reference_count": 1,
+      "result_semantics": {
+        "business_arrangement_verified": false,
+        "issues": [],
+        "native_input_schema_is_not_public_construction": true,
+        "status": "closed_result_validated"
+      },
+      "schema_keywords": [
+        "$ref",
+        "additionalProperties",
+        "description",
+        "items",
+        "properties",
+        "type"
+      ],
+      "schema_sha256": "f0e7d91f0becb1dc68bd400fbe4db465420b607000197c6b0846065b38430bcc",
+      "uri": "ak.wwise.ui.layout.getViewTypes",
+      "version": "2025.1"
+    },
+    {
+      "construction_shape": "inline",
+      "correct_host": "wwise-authoring",
+      "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
+      "execution_policy": {
+        "accepted_authorization_modes": [
+          "explicit_confirmation",
+          "policy_authorization"
+        ],
+        "companion_uris": [],
+        "contract": "waapi-skill.public-execution-contract/v2",
+        "effect": "project_mutation",
+        "excluded_reason": null,
+        "executable": true,
+        "gateway_commands": [
+          "request-schema"
+        ],
+        "item_type": "function",
+        "lifecycle_strategy": "single_guarded_runtime_call",
+        "post_execution_project_guard_policy": "revalidate",
+        "program_case": "managed_transaction-result-schema",
+        "project_guard_mode": "invariant",
+        "requires_authorization": true,
+        "result_limit_bytes": 1048576,
+        "route": "managed_transaction",
+        "timeout_seconds": 30.0,
+        "uri": "ak.wwise.ui.layout.switchLayout",
+        "verification_strategy": "authoring_layout_state",
+        "version": "2025.1"
+      },
+      "execution_policy_sha256": "709b8eba750030600057892b1d0e08bb1f9d77924a3df0e5a220e08d3f0ebf67",
+      "intentionally_blocked_fields": [],
+      "item_type": "function",
+      "reference_count": 0,
+      "schema_keywords": [
+        "additionalProperties",
+        "description",
+        "properties",
+        "required",
+        "type"
+      ],
+      "schema_sha256": "1860b63155ffc2e02201cdf1330d038a30f998d38f75c3401e4cd564b1bc9305",
+      "uri": "ak.wwise.ui.layout.switchLayout",
+      "version": "2025.1"
+    },
+    {
       "construction_shape": "inline",
       "correct_host": "wwise-authoring",
       "definition_graph_sha256": "61e9c4ca7756b827e65389fd0ecbe0d6a75a90ab93a280be7d6963f52ef15ccf",
@@ -39044,11 +40466,1361 @@
       "version": "2025.1"
     }
   ],
+  "native_result_definition_graphs": {
+    "2024.1": {
+      "build": "2024.1.13.9056",
+      "documents": {
+        "waapi_ui_definitions.json": {
+          "definitions": {
+            "BottomEditorState": {
+              "description": "The state of the bottom editor.",
+              "enum": [
+                "Normal",
+                "Maximized",
+                "Minimized"
+              ],
+              "type": "string"
+            },
+            "EditorId": {
+              "additionalProperties": false,
+              "description": "Identifier of an editor.",
+              "properties": {
+                "@type": {
+                  "description": "Type of EditorId.",
+                  "enum": [
+                    "EditorId"
+                  ],
+                  "type": "string"
+                },
+                "EffectIndex": {
+                  "description": "Index of the effect.",
+                  "type": "string"
+                },
+                "PluginId": {
+                  "description": "Plugin ID of the Editor.",
+                  "type": "string"
+                },
+                "UniqueViewId": {
+                  "description": "View ID of the editor.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "UniqueViewId",
+                "PluginId",
+                "EffectIndex"
+              ],
+              "type": "object"
+            },
+            "EditorPriority": {
+              "description": "Liste of editors by priority.",
+              "items": {
+                "$ref": "#/definitions/EditorId"
+              },
+              "type": "array"
+            },
+            "EditorState": {
+              "description": "State of an editor.",
+              "enum": [
+                "Normal",
+                "Maximized",
+                "Minimized"
+              ],
+              "type": "string"
+            },
+            "Element": {
+              "OneOf": [
+                {
+                  "$ref": "#/definitions/View"
+                },
+                {
+                  "$ref": "#/definitions/Splitter"
+                },
+                {
+                  "$ref": "#/definitions/ObjectPanel"
+                },
+                {
+                  "$ref": "#/definitions/ObjectTabPanel"
+                },
+                {
+                  "$ref": "#/definitions/StackPanel"
+                }
+              ],
+              "description": "UI Element."
+            },
+            "Layout": {
+              "additionalProperties": false,
+              "description": "The layout description in JSON format.",
+              "properties": {
+                "AudioDeviceLastTabPositions": {
+                  "description": "List of last view positions.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "EffectLastTabPositions": {
+                  "description": "List of last tab positions for effects.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "FallbackLastTabPositions": {
+                  "description": "Fallback of the list of last tab position.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "LastPositions": {
+                  "description": "List of last tab position.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "MetadataLastTabPositions": {
+                  "description": "List of last tab position for metadata.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "Name": {
+                  "description": "Name of the layout.",
+                  "type": "string"
+                },
+                "ObjectTypeLastTabPositions": {
+                  "description": "List of last positions for object type.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "PluginInnerObjectLastTabPositions": {
+                  "description": "List of last position for plugin inner object.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "SourcePluginLastTabPositions": {
+                  "description": "List of last tab positions for source plugin.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "StackPanel": {
+                  "$ref": "#/definitions/StackPanel"
+                },
+                "Undocked": {
+                  "description": "List of undocked views.",
+                  "items": {
+                    "$ref": "#/definitions/ViewHolder"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "Name"
+              ],
+              "type": "object"
+            },
+            "LayoutEntity": {
+              "additionalProperties": false,
+              "description": "A layout entity.",
+              "properties": {
+                "Layout": {
+                  "$ref": "#/definitions/Layout"
+                }
+              },
+              "required": [
+                "Layout"
+              ],
+              "type": "object"
+            },
+            "ObjectPanel": {
+              "additionalProperties": false,
+              "description": "An object panel.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ObjectPanel.",
+                  "enum": [
+                    "ObjectPanel"
+                  ],
+                  "type": "string"
+                },
+                "BottomEditorState": {
+                  "$ref": "#/definitions/BottomEditorState"
+                },
+                "EditorPriority": {
+                  "$ref": "#/definitions/EditorPriority"
+                },
+                "EditorState": {
+                  "$ref": "#/definitions/EditorState"
+                },
+                "Height": {
+                  "description": "The height of the object panel.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the object panel.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the object panel.",
+                  "type": "string"
+                },
+                "PreferredHeights": {
+                  "$ref": "#/definitions/PreferredHeights"
+                },
+                "SideBar": {
+                  "$ref": "#/definitions/SideBar"
+                },
+                "Width": {
+                  "description": "The width of the object panel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Name",
+                "ID"
+              ],
+              "type": "object"
+            },
+            "ObjectTabPanel": {
+              "additionalProperties": false,
+              "description": "The object tab panel.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ObjectTabPanel.",
+                  "enum": [
+                    "ObjectTabPanel"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the the object tab panel.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifer of the object tab panel.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the object tab panel.",
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the the object tab panel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Name",
+                "ID"
+              ],
+              "type": "object"
+            },
+            "PreferredHeight": {
+              "additionalProperties": false,
+              "description": "The preferred height for an editor.",
+              "properties": {
+                "@type": {
+                  "description": "The type of PreferredHeight.",
+                  "enum": [
+                    "PreferredHeight"
+                  ],
+                  "type": "string"
+                },
+                "EffectIndex": {
+                  "description": "The effect index.",
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The preferred height of the editor.",
+                  "type": "string"
+                },
+                "PluginId": {
+                  "description": "The plugin identifier of the editor.",
+                  "type": "string"
+                },
+                "UniqueViewId": {
+                  "description": "The view identifier of the editor.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "UniqueViewId",
+                "PluginId",
+                "EffectIndex",
+                "Height"
+              ],
+              "type": "object"
+            },
+            "PreferredHeights": {
+              "description": "List of preferred height of editors.",
+              "items": {
+                "$ref": "#/definitions/PreferredHeight"
+              },
+              "type": "array"
+            },
+            "SideBar": {
+              "additionalProperties": false,
+              "description": "The side bar.",
+              "properties": {
+                "@type": {
+                  "description": "The type of SideBar.",
+                  "enum": "SideBar",
+                  "type": "string"
+                },
+                "CollapseState": {
+                  "description": "The state of the side bar.",
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the side bar.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Width",
+                "CollapseState"
+              ],
+              "type": "object"
+            },
+            "Splitter": {
+              "additionalProperties": false,
+              "description": "The splitter.",
+              "properties": {
+                "@type": {
+                  "description": "The type of Splitter.",
+                  "enum": [
+                    "Splitter"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the splitter.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the splitter.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the splitter.",
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the splitter.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ID",
+                "Name",
+                "@Children"
+              ],
+              "type": "object"
+            },
+            "StackPanel": {
+              "additionalProperties": true,
+              "description": "Stack panel in a layout.",
+              "properties": {
+                "@Children": {
+                  "description": "UI element in the stack panel.",
+                  "items": {
+                    "$ref": "#/definitions/Element"
+                  },
+                  "type": "array"
+                },
+                "@type": {
+                  "description": "The type of StackPanel.",
+                  "enum": [
+                    "StackPanel"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the stack panel.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the stack panel.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the stack panel.",
+                  "type": "string"
+                },
+                "Orientation": {
+                  "description": "The orientation of the stack panel.",
+                  "enum": [
+                    "Vertical",
+                    "Horizontal"
+                  ],
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the stack panel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ID",
+                "Name",
+                "@Children",
+                "Orientation"
+              ],
+              "type": "object"
+            },
+            "View": {
+              "additionalProperties": false,
+              "description": "View in a layout.",
+              "properties": {
+                "@type": {
+                  "description": "The type of View.",
+                  "enum": [
+                    "View"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the view.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the view.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the view.",
+                  "type": "string"
+                },
+                "SelectionChannel": {
+                  "description": "The selection chanel of the view.",
+                  "type": "string"
+                },
+                "ViewData": {
+                  "additionalProperties": true,
+                  "description": "Extra view data.",
+                  "type": "object"
+                },
+                "Width": {
+                  "description": "The width of the view.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "Name",
+                "ID",
+                "SelectionChannel"
+              ],
+              "type": "object"
+            },
+            "ViewHolder": {
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Element"
+                }
+              ],
+              "description": "View holder for flotting window.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ViewHolder",
+                  "enum": [
+                    "ViewHolder"
+                  ],
+                  "type": "string"
+                },
+                "StackPanel": {
+                  "$ref": "#/definitions/StackPanel"
+                },
+                "WindowPlacement_Flags": {
+                  "description": "Flags of WindowPlacement.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_X": {
+                  "description": "Maximum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_Y": {
+                  "description": "Maximum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_X": {
+                  "description": "Minimum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_Y": {
+                  "description": "Minimum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Bottom": {
+                  "description": "Normal bottom position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Left": {
+                  "description": "Normal left position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Right": {
+                  "description": "Normal right position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Top": {
+                  "description": "Normal left position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_ShowCmd": {
+                  "description": "Last ShowCmd of the WindowPlacement.",
+                  "enum": [
+                    "Normal",
+                    "Maximized",
+                    "Minimized"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "WindowPlacement_Flags",
+                "WindowPlacement_MinPos_X",
+                "WindowPlacement_MinPos_Y",
+                "WindowPlacement_MaxPos_X",
+                "WindowPlacement_MaxPos_Y",
+                "WindowPlacement_NormalPos_Left",
+                "WindowPlacement_NormalPos_Top",
+                "WindowPlacement_NormalPos_Right",
+                "WindowPlacement_NormalPos_Bottom"
+              ],
+              "type": "object"
+            },
+            "ViewPosition": {
+              "additionalProperties": false,
+              "description": "Information of the positions of a window of a view.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ViewPosition.",
+                  "enum": [
+                    "ViewPosition"
+                  ],
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the view.",
+                  "type": "string"
+                },
+                "WindowPlacement_Flags": {
+                  "description": "The flags of the window placement.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_X": {
+                  "description": "The maximum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_Y": {
+                  "description": "The maximum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_X": {
+                  "description": "The minimum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_Y": {
+                  "description": "The minimum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Bottom": {
+                  "description": "The normal bottom position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Left": {
+                  "description": "The normal left position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Right": {
+                  "description": "The normal right position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Top": {
+                  "description": "The normal top position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_ShowCmd": {
+                  "description": "The last showCmd for the window placement.",
+                  "enum": [
+                    "Normal",
+                    "Maximized",
+                    "Minimized"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Name",
+                "WindowPlacement_Flags",
+                "WindowPlacement_MinPos_X",
+                "WindowPlacement_MinPos_Y",
+                "WindowPlacement_MaxPos_X",
+                "WindowPlacement_MaxPos_Y",
+                "WindowPlacement_NormalPos_Left",
+                "WindowPlacement_NormalPos_Top",
+                "WindowPlacement_NormalPos_Right",
+                "WindowPlacement_NormalPos_Bottom"
+              ],
+              "type": "object"
+            },
+            "viewInstance": {
+              "additionalProperties": false,
+              "description": "A Wwise view instance part of a layout.",
+              "properties": {
+                "viewDisplayName": {
+                  "description": "Display name of the view instance.",
+                  "type": "string"
+                },
+                "viewID": {
+                  "$ref": "common_definitions.json#/definitions/guid",
+                  "description": "ID of the view instance."
+                },
+                "viewIsDocked": {
+                  "description": "True if the view is docked.",
+                  "type": "boolean"
+                },
+                "viewName": {
+                  "description": "Name of the view instance.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "viewTypeToName": {
+              "additionalProperties": false,
+              "description": "Association between a view name and its display name.",
+              "properties": {
+                "viewDisplayName": {
+                  "description": "The display name of the view.",
+                  "type": "string"
+                },
+                "viewName": {
+                  "description": "The type name of the view.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "widgetAttributeEntry": {
+              "description": "The state of an attribute.",
+              "properties": {
+                "attribute": {
+                  "description": "The name of the attribute.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "The value of the attribute."
+                }
+              },
+              "type": "object"
+            }
+          },
+          "version": 1
+        }
+      },
+      "host": "wwise-authoring",
+      "semantics": "native_source_preserved_without_normalization",
+      "sha256": "036c45f605854c1b571b2c84af47a10b42118e06973b1fe15f8eb5a80114dc93",
+      "source_supplement_sha256": "b908f2ce9c4cff713bff4d3b6fb1644bacb2ff023e4527a8248eecdd1ad9ee66"
+    },
+    "2025.1": {
+      "build": "2025.1.7.9143",
+      "documents": {
+        "waapi_ui_definitions.json": {
+          "definitions": {
+            "BottomEditorState": {
+              "description": "The state of the bottom editor.",
+              "enum": [
+                "Normal",
+                "Maximized",
+                "Minimized"
+              ],
+              "type": "string"
+            },
+            "EditorId": {
+              "additionalProperties": false,
+              "description": "Identifier of an editor.",
+              "properties": {
+                "@type": {
+                  "description": "Type of EditorId.",
+                  "enum": [
+                    "EditorId"
+                  ],
+                  "type": "string"
+                },
+                "EffectIndex": {
+                  "description": "Index of the effect.",
+                  "type": "string"
+                },
+                "PluginId": {
+                  "description": "Plugin ID of the Editor.",
+                  "type": "string"
+                },
+                "UniqueViewId": {
+                  "description": "View ID of the editor.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "UniqueViewId",
+                "PluginId",
+                "EffectIndex"
+              ],
+              "type": "object"
+            },
+            "EditorPriority": {
+              "description": "List of editors by priority.",
+              "items": {
+                "$ref": "#/definitions/EditorId"
+              },
+              "type": "array"
+            },
+            "EditorState": {
+              "description": "State of an editor.",
+              "enum": [
+                "Normal",
+                "Maximized",
+                "Minimized"
+              ],
+              "type": "string"
+            },
+            "Element": {
+              "OneOf": [
+                {
+                  "$ref": "#/definitions/View"
+                },
+                {
+                  "$ref": "#/definitions/Splitter"
+                },
+                {
+                  "$ref": "#/definitions/ObjectPanel"
+                },
+                {
+                  "$ref": "#/definitions/ObjectTabPanel"
+                },
+                {
+                  "$ref": "#/definitions/StackPanel"
+                }
+              ],
+              "description": "UI Element."
+            },
+            "Layout": {
+              "additionalProperties": false,
+              "description": "The layout description in JSON format.",
+              "properties": {
+                "AudioDeviceLastTabPositions": {
+                  "description": "List of last view positions.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "EffectLastTabPositions": {
+                  "description": "List of last tab positions for effects.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "FallbackLastTabPositions": {
+                  "description": "Fallback list of last tab positions.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "LastPositions": {
+                  "description": "List of last tab positions.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "MetadataLastTabPositions": {
+                  "description": "List of last tab positions for metadata.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "Name": {
+                  "description": "Name of the layout.",
+                  "type": "string"
+                },
+                "ObjectTypeLastTabPositions": {
+                  "description": "List of last positions for object type.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "PluginInnerObjectLastTabPositions": {
+                  "description": "List of last positions for plugin inner objects.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "SourcePluginLastTabPositions": {
+                  "description": "List of last tab positions for source plugin.",
+                  "items": {
+                    "$ref": "#/definitions/ViewPosition"
+                  },
+                  "type": "array"
+                },
+                "StackPanel": {
+                  "$ref": "#/definitions/StackPanel"
+                },
+                "Undocked": {
+                  "description": "List of undocked views.",
+                  "items": {
+                    "$ref": "#/definitions/ViewHolder"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "Name"
+              ],
+              "type": "object"
+            },
+            "LayoutEntity": {
+              "additionalProperties": false,
+              "description": "A layout entity.",
+              "properties": {
+                "Layout": {
+                  "$ref": "#/definitions/Layout"
+                }
+              },
+              "required": [
+                "Layout"
+              ],
+              "type": "object"
+            },
+            "ObjectPanel": {
+              "additionalProperties": false,
+              "description": "An object panel.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ObjectPanel.",
+                  "enum": [
+                    "ObjectPanel"
+                  ],
+                  "type": "string"
+                },
+                "BottomEditorState": {
+                  "$ref": "#/definitions/BottomEditorState"
+                },
+                "EditorPriority": {
+                  "$ref": "#/definitions/EditorPriority"
+                },
+                "EditorState": {
+                  "$ref": "#/definitions/EditorState"
+                },
+                "Height": {
+                  "description": "The height of the object panel.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the object panel.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the object panel.",
+                  "type": "string"
+                },
+                "PreferredHeights": {
+                  "$ref": "#/definitions/PreferredHeights"
+                },
+                "SideBar": {
+                  "$ref": "#/definitions/SideBar"
+                },
+                "Width": {
+                  "description": "The width of the object panel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Name",
+                "ID"
+              ],
+              "type": "object"
+            },
+            "ObjectTabPanel": {
+              "additionalProperties": false,
+              "description": "The object tab panel.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ObjectTabPanel.",
+                  "enum": [
+                    "ObjectTabPanel"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the object tab panel.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the object tab panel.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the object tab panel.",
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the object tab panel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Name",
+                "ID"
+              ],
+              "type": "object"
+            },
+            "PreferredHeight": {
+              "additionalProperties": false,
+              "description": "The preferred height for an editor.",
+              "properties": {
+                "@type": {
+                  "description": "The type of PreferredHeight.",
+                  "enum": [
+                    "PreferredHeight"
+                  ],
+                  "type": "string"
+                },
+                "EffectIndex": {
+                  "description": "The effect index.",
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The preferred height of the editor.",
+                  "type": "string"
+                },
+                "PluginId": {
+                  "description": "The plugin identifier of the editor.",
+                  "type": "string"
+                },
+                "UniqueViewId": {
+                  "description": "The view identifier of the editor.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "UniqueViewId",
+                "PluginId",
+                "EffectIndex",
+                "Height"
+              ],
+              "type": "object"
+            },
+            "PreferredHeights": {
+              "description": "List of preferred heights of editors.",
+              "items": {
+                "$ref": "#/definitions/PreferredHeight"
+              },
+              "type": "array"
+            },
+            "SideBar": {
+              "additionalProperties": false,
+              "description": "The side bar.",
+              "properties": {
+                "@type": {
+                  "description": "The type of SideBar.",
+                  "enum": [
+                    "SideBar"
+                  ],
+                  "type": "string"
+                },
+                "CollapseState": {
+                  "description": "The state of the side bar.",
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the side bar.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Width",
+                "CollapseState"
+              ],
+              "type": "object"
+            },
+            "Splitter": {
+              "additionalProperties": false,
+              "description": "The splitter.",
+              "properties": {
+                "@type": {
+                  "description": "The type of Splitter.",
+                  "enum": [
+                    "Splitter"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the splitter.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the splitter.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the splitter.",
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the splitter.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ID",
+                "Name",
+                "@Children"
+              ],
+              "type": "object"
+            },
+            "StackPanel": {
+              "additionalProperties": true,
+              "description": "Stack panel in a layout.",
+              "properties": {
+                "@Children": {
+                  "description": "UI elements in the stack panel.",
+                  "items": {
+                    "$ref": "#/definitions/Element"
+                  },
+                  "type": "array"
+                },
+                "@type": {
+                  "description": "The type of StackPanel.",
+                  "enum": [
+                    "StackPanel"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the stack panel.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the stack panel.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the stack panel.",
+                  "type": "string"
+                },
+                "Orientation": {
+                  "description": "The orientation of the stack panel.",
+                  "enum": [
+                    "Vertical",
+                    "Horizontal"
+                  ],
+                  "type": "string"
+                },
+                "Width": {
+                  "description": "The width of the stack panel.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "ID",
+                "Name",
+                "@Children",
+                "Orientation"
+              ],
+              "type": "object"
+            },
+            "View": {
+              "additionalProperties": false,
+              "description": "View in a layout.",
+              "properties": {
+                "@type": {
+                  "description": "The type of View.",
+                  "enum": [
+                    "View"
+                  ],
+                  "type": "string"
+                },
+                "Height": {
+                  "description": "The height of the view.",
+                  "type": "string"
+                },
+                "ID": {
+                  "description": "The identifier of the view.",
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the view.",
+                  "type": "string"
+                },
+                "SelectionChannel": {
+                  "description": "The selection channel of the view.",
+                  "type": "string"
+                },
+                "ViewData": {
+                  "additionalProperties": true,
+                  "description": "Extra view data.",
+                  "type": "object"
+                },
+                "Width": {
+                  "description": "The width of the view.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "Name",
+                "ID",
+                "SelectionChannel"
+              ],
+              "type": "object"
+            },
+            "ViewHolder": {
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "$ref": "#/definitions/Element"
+                }
+              ],
+              "description": "View holder for floating window.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ViewHolder",
+                  "enum": [
+                    "ViewHolder"
+                  ],
+                  "type": "string"
+                },
+                "StackPanel": {
+                  "$ref": "#/definitions/StackPanel"
+                },
+                "WindowPlacement_Flags": {
+                  "description": "Flags of WindowPlacement.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_X": {
+                  "description": "Maximum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_Y": {
+                  "description": "Maximum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_X": {
+                  "description": "Minimum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_Y": {
+                  "description": "Minimum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Bottom": {
+                  "description": "Normal bottom position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Left": {
+                  "description": "Normal left position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Right": {
+                  "description": "Normal right position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Top": {
+                  "description": "Normal top position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_ShowCmd": {
+                  "description": "Last ShowCmd of the WindowPlacement.",
+                  "enum": [
+                    "Normal",
+                    "Maximized",
+                    "Minimized"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "WindowPlacement_Flags",
+                "WindowPlacement_MinPos_X",
+                "WindowPlacement_MinPos_Y",
+                "WindowPlacement_MaxPos_X",
+                "WindowPlacement_MaxPos_Y",
+                "WindowPlacement_NormalPos_Left",
+                "WindowPlacement_NormalPos_Top",
+                "WindowPlacement_NormalPos_Right",
+                "WindowPlacement_NormalPos_Bottom"
+              ],
+              "type": "object"
+            },
+            "ViewPosition": {
+              "additionalProperties": false,
+              "description": "Information about the positions of a view's window.",
+              "properties": {
+                "@type": {
+                  "description": "The type of ViewPosition.",
+                  "enum": [
+                    "ViewPosition"
+                  ],
+                  "type": "string"
+                },
+                "Name": {
+                  "description": "The name of the view.",
+                  "type": "string"
+                },
+                "WindowPlacement_Flags": {
+                  "description": "The flags of the window placement.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_X": {
+                  "description": "The maximum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MaxPos_Y": {
+                  "description": "The maximum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_X": {
+                  "description": "The minimum X position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_MinPos_Y": {
+                  "description": "The minimum Y position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Bottom": {
+                  "description": "The normal bottom position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Left": {
+                  "description": "The normal left position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Right": {
+                  "description": "The normal right position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_NormalPos_Top": {
+                  "description": "The normal top position of the window.",
+                  "type": "string"
+                },
+                "WindowPlacement_ShowCmd": {
+                  "description": "The last showCmd for the window placement.",
+                  "enum": [
+                    "Normal",
+                    "Maximized",
+                    "Minimized"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "@type",
+                "Name",
+                "WindowPlacement_Flags",
+                "WindowPlacement_MinPos_X",
+                "WindowPlacement_MinPos_Y",
+                "WindowPlacement_MaxPos_X",
+                "WindowPlacement_MaxPos_Y",
+                "WindowPlacement_NormalPos_Left",
+                "WindowPlacement_NormalPos_Top",
+                "WindowPlacement_NormalPos_Right",
+                "WindowPlacement_NormalPos_Bottom"
+              ],
+              "type": "object"
+            },
+            "viewInstance": {
+              "additionalProperties": false,
+              "description": "A Wwise view instance part of a layout.",
+              "properties": {
+                "viewDisplayName": {
+                  "description": "Display name of the view instance.",
+                  "type": "string"
+                },
+                "viewID": {
+                  "$ref": "common_definitions.json#/definitions/guid",
+                  "description": "ID of the view instance."
+                },
+                "viewIsDocked": {
+                  "description": "True if the view is docked.",
+                  "type": "boolean"
+                },
+                "viewName": {
+                  "description": "Name of the view instance.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "viewTypeToName": {
+              "additionalProperties": false,
+              "description": "Association between a view name and its display name.",
+              "properties": {
+                "viewDisplayName": {
+                  "description": "The display name of the view.",
+                  "type": "string"
+                },
+                "viewName": {
+                  "description": "The type name of the view.",
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "widgetAttributeEntry": {
+              "description": "The state of an attribute.",
+              "properties": {
+                "attribute": {
+                  "description": "The name of the attribute.",
+                  "type": "string"
+                },
+                "value": {
+                  "description": "The value of the attribute."
+                }
+              },
+              "type": "object"
+            }
+          },
+          "version": 1
+        }
+      },
+      "host": "wwise-authoring",
+      "semantics": "native_source_preserved_without_normalization",
+      "sha256": "b272e0b3a64ed24d29454e24dbaaaa0a6b4e93fe01429321d35c476386a93353",
+      "source_supplement_sha256": "b40bce2f7e506c420de3e26cefd57b5f92585e2af49d7e80ed7a0fecec027dfb"
+    }
+  },
   "totals": {
-    "function_lanes": 689,
+    "function_lanes": 705,
     "topic_lanes": 160,
-    "total_lanes": 849,
-    "unique_function_uris": 168,
+    "total_lanes": 865,
+    "unique_function_uris": 176,
     "unique_topic_uris": 35
   },
   "unknown_schema_keywords": [],

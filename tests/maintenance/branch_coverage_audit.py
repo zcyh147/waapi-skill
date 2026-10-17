@@ -150,13 +150,16 @@ def build_inventory(root=ROOT, *, surface=None, native_policy=None):
             for row in load(path)[key]:
                 routes[route_key(version, kind, row["uri"])] = kind
         for filename in ("schemas.json", "authoring-ui-commands-supplement.json",
-                         "authoring-ui-topics-supplement.json", "authoring-core-supplement.json"):
+                         "authoring-ui-topics-supplement.json", "authoring-core-supplement.json",
+                         "authoring-layout-read-supplement.json", "authoring-layout-mutation-supplement.json"):
             path = folder / filename
             if not path.exists():
                 continue
             data = load(path)
             source = repository_source_identity(path, root)
             sources[source] = digest(data)
+            if filename == "authoring-layout-read-supplement.json":
+                definitions.append((version, source, "waapi_ui_definitions.json", data["definitions"]))
             if filename == "authoring-ui-commands-supplement.json":
                 for kind, key in (("function", "functions"), ("topic", "topics")):
                     for row in data[key]:

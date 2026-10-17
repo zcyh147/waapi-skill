@@ -682,6 +682,39 @@ def test_non_self_or_unresolvable_dependencies_are_reported_not_guessed() -> Non
     ] == ["OutputBus"]
 
 
+@pytest.mark.parametrize("context", ["Self", "Parent", "AssocParent"])
+def test_visibility_metadata_is_disclosed_without_a_mutation_dependency(context) -> None:
+    dependency = {"type": "property", "action": "Show", "context": context,
+                  "property": "RTPCRamping", "conditions": [{"restriction": {
+                      "type": "enum", "values": [{"value": 1}]}}]}
+    reader = MetadataReader(names=["SlewRateUp"], info={
+        "SlewRateUp": {"name": "SlewRateUp", "type": "Real64", "dependencies": [dependency]},
+    })
+    result = discover_metadata(read_call=reader, class_id=65552, queries=["SlewRateUp"]).as_dict()
+    assert result["dependency_closure_complete"] is True
+    assert result["unresolved_dependencies"] == []
+    assert result["dependency_candidates"] == []
+    assert result["candidates"][0]["same_object_dependencies"] == []
+    assert result["candidates"][0]["dependency_requirements"] == [
+        {**dependency, "required_values": [], "visibility_only": True},
+    ]
+
+
+def test_reference_presence_disclosure_and_detail_preserve_native_metadata_presence() -> None:
+    dependency = {"type": "reference", "action": "Enable", "context": "Self",
+                  "property": "UserAuxSend0", "conditions": [{"referenceIsSet": True}]}
+    native = {"name": "UserAuxSend0", "type": "", "restriction": {"type": "reference"}}
+    reader = MetadataReader(names=["UserAuxSendVolume0", "UserAuxSend0"], info={
+        "UserAuxSendVolume0": {"name": "UserAuxSendVolume0", "type": "Real64", "dependencies": [dependency]},
+        "UserAuxSend0": native,
+    })
+    result = discover_metadata(read_call=reader, class_id=65552, queries=["UserAuxSendVolume0"], limit=1)
+    assert result.as_dict()["candidates"][0]["dependency_requirements"] == [
+        {**dependency, "required_values": [], "required_presence": True},
+    ]
+    assert result.as_dict(detail=True)["dependency_candidates"][0]["metadata"] == native
+
+
 def test_is_master_bus_visibility_predicate_is_terminal_not_a_property_edge() -> None:
     predicate = {
         "action": "Show",

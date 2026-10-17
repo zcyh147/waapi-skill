@@ -277,15 +277,15 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
                 "special_unique_uris": 51,
             },
             "wwise-authoring-ui": {
-                "function_rows": 689,
-                "unique_function_uris": 168,
+                "function_rows": 705,
+                "unique_function_uris": 176,
                 "generic_reflected_rows": 459,
                 "generic_reflected_unique_uris": 117,
-                "special_rows": 230,
-                "special_unique_uris": 51,
+                "special_rows": 246,
+                "special_unique_uris": 59,
             },
         },
-        "reviewed_special_uri_count": 51,
+        "reviewed_special_uri_count": 59,
         "reviewed_generic_restriction_count": 6,
     }
     assert summary["version_rows"] == 111
@@ -296,6 +296,16 @@ def test_native_surface_policy_partitions_every_function_and_binds_high_risk_dif
     assert sum(summary["selectors_by_status"].values()) == 870
     assert summary["selectors_by_status"]["intentionally_blocked"] > 0
     assert summary["selectors_by_status"]["missing"] == 0
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
+    from wwise_waapi.authoring_layout_business import LAYOUT_MUTATION_URIS
+    from wwise_waapi.native_surface_policy import _uses_generic_reflected_route_without_uri_specific_restrictions
+    layout_uris = LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS
+    catalog = CapabilityCatalog()
+    for version in ("2024.1", "2025.1"):
+        rows = [entry for entry in catalog.entries_for_profile(version, profile="wwise-authoring-ui")
+                if entry.uri in layout_uris]
+        assert {entry.uri for entry in rows} == layout_uris
+        assert all(not _uses_generic_reflected_route_without_uri_specific_restrictions(entry) for entry in rows)
 
 
 def test_native_surface_policy_records_closed_import_semantic_boundaries() -> None:

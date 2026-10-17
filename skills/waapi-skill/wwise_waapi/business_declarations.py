@@ -33,6 +33,7 @@ from .metadata_restrictions import (
     MetadataRestrictionError,
     reference_allowed_types,
     reference_type_token,
+    supports_property_prerequisite_workflow,
 )
 
 
@@ -1148,7 +1149,7 @@ def bind_live_field(
     enabled_dependency_fields = (
         dependency_fields if field_kind == "property" else ()
     )
-    if scope_kind == "object" and _is_positioning_override_terminal(info):
+    if scope_kind == "object" and _is_boolean_override_terminal(info):
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and scope_kind == "class":
@@ -1185,7 +1186,7 @@ def bind_live_field(
                 field=token,
                 action="refresh the live property-enabled state before continuing",
             ) from exc
-        if not enabled:
+        if not enabled and not supports_property_prerequisite_workflow(info.dependencies):
             raise _error(
                 "FIELD_DISABLED",
                 field=token,
@@ -1287,7 +1288,7 @@ def revalidate_live_field(
     enabled_dependency_fields = (
         dependency_fields if field.field_kind == "property" else ()
     )
-    if field.scope_kind == "object" and _is_positioning_override_terminal(info):
+    if field.scope_kind == "object" and _is_boolean_override_terminal(info):
         enabled_dependency_fields = ()
     class_default_evidence = None
     if enabled_dependency_fields and field.scope_kind == "class":
@@ -1327,7 +1328,7 @@ def revalidate_live_field(
                 field=field.token,
                 action="refresh the live property-enabled state before Preview",
             ) from exc
-        if not enabled:
+        if not enabled and not supports_property_prerequisite_workflow(info.dependencies):
             raise _error(
                 "FIELD_DISABLED",
                 field=field.token,
@@ -1736,13 +1737,14 @@ def _restrictions_from_live_metadata(
     return normalized
 
 
-def _is_positioning_override_terminal(info):
+def _is_boolean_override_terminal(info):
     # The reflected self override describes the switch being edited. Wwise
     # reports it disabled while false, but setting this Boolean is precisely
     # how its separately previewed prerequisite is enabled.
-    marker = {"type": "override", "action": "Enable", "context": "Self", "property": "OverridePositioning"}
-    return (info.name == "OverridePositioning" and info.type.casefold() == "bool"
-            and bool(info.dependencies) and all(row == marker for row in info.dependencies))
+    from .metadata_restrictions import is_terminal_override_dependency
+    return bool(info.dependencies) and all(
+        is_terminal_override_dependency(info.name, info.type, row) for row in info.dependencies
+    )
 
 
 def _new_class_field_evidence(registry, info, live_scope, read_call):
@@ -1782,6 +1784,7 @@ def _dependency_field_tokens(
     values = {
         value
         for dependency in dependencies
+        if dependency.get("action") != "Show"
         for value in (dependency.get("property"), dependency.get("reference"))
         if isinstance(value, str) and value
     }

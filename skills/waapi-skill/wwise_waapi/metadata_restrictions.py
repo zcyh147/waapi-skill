@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Mapping
+import math
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,3 +84,100 @@ __all__ = [
     "reference_allowed_types",
     "reference_type_token",
 ]
+
+
+def condition_restriction(conditions: Any) -> dict[str, Any]:
+    """Validate the native scalar condition without selecting a business value."""
+    if not isinstance(conditions, list) or len(conditions) != 1 or not isinstance(conditions[0], Mapping) or set(conditions[0]) != {"restriction"}:
+        raise MetadataRestrictionError("INVALID_METADATA", "A scalar dependency requires one restriction condition.")
+    restriction = conditions[0]["restriction"]
+    if not isinstance(restriction, Mapping):
+        raise MetadataRestrictionError("INVALID_METADATA", "Condition restriction must be an object.")
+    if restriction.get("type") == "enum" and set(restriction) == {"type", "values"}:
+        values = restriction["values"]
+        if isinstance(values, list) and values and all(
+            isinstance(row, Mapping) and "value" in row and set(row) <= {"value", "displayName"}
+            and isinstance(row["value"], (str, bool, int, float))
+            and (not isinstance(row["value"], float) or math.isfinite(row["value"]))
+            for row in values
+        ):
+            return dict(restriction)
+    if restriction.get("type") == "range" and set(restriction) == {"type", "min", "max"}:
+        if all(isinstance(restriction[key], (int, float)) and not isinstance(restriction[key], bool)
+               and math.isfinite(restriction[key]) for key in ("min", "max")) and restriction["min"] <= restriction["max"]:
+            return dict(restriction)
+    raise MetadataRestrictionError("INVALID_METADATA", "Condition restriction is malformed or has an unimplemented native shape.")
+
+
+def condition_values_equal(left: Any, right: Any) -> bool:
+    """Compare native scalars without treating Boolean values as numbers."""
+    if isinstance(left, (int, float)) and not isinstance(left, bool):
+        return (isinstance(right, (int, float)) and not isinstance(right, bool)
+                and math.isfinite(left) and math.isfinite(right) and left == right)
+    return type(left) is type(right) and left == right
+
+
+def is_terminal_override_dependency(name: str, metadata_type: str, dependency: Mapping[str, Any]) -> bool:
+    """A Boolean switch's exact self override is a terminal metadata marker."""
+    return metadata_type.casefold() in {"bool", "boolean"} and dependency == {
+        "type": "override", "action": "Enable", "context": "Self", "property": name,
+    }
+
+
+def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
+    """Evaluate a validated scalar condition with Boolean/number distinction."""
+    if restriction["type"] == "enum":
+        return any(condition_values_equal(value, row["value"]) for row in restriction["values"])
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and math.isfinite(value) and restriction["min"] <= value <= restriction["max"])
+
+
+def intersect_condition_restrictions(restrictions: list[Mapping[str, Any]]) -> dict[str, Any]:
+    """Combine accumulated native requirements before selecting any value."""
+    enums = [item for item in restrictions if item["type"] == "enum"]
+    if enums:
+        values = [dict(row) for row in enums[0]["values"]
+                  if all(condition_matches(item, row["value"]) for item in restrictions)]
+        if values:
+            return {"type": "enum", "values": values}
+    else:
+        minimum = max(item["min"] for item in restrictions)
+        maximum = min(item["max"] for item in restrictions)
+        if minimum <= maximum:
+            return {"type": "range", "min": minimum, "max": maximum}
+    raise MetadataRestrictionError("CONDITION_CONFLICT", "Accumulated dependency conditions have no shared value.")
+
+
+def supports_property_prerequisite_workflow(dependencies: Any) -> bool:
+    """A disabled field may be acquired for the closed prerequisite planner."""
+    activations = [item for item in dependencies if item.get("action") != "Show"]
+    if not activations:
+        return False
+    for item in activations:
+        if item.get("context") not in {"Self", "AssocParent"} or item.get("action") != "Enable":
+            return False
+        if item.get("context") == "AssocParent" and item.get("type") != "property":
+            return False
+        if item.get("type") == "override" and set(item) == {"type", "action", "context", "property"}:
+            continue
+        if item.get("type") == "reference" and set(item) == {"type", "action", "context", "property", "conditions"}:
+            try:
+                reference_presence_condition(item["conditions"])
+            except MetadataRestrictionError:
+                return False
+            continue
+        if item.get("type") != "property" or set(item) != {"type", "action", "context", "property", "conditions"}:
+            return False
+        try:
+            condition_restriction(item["conditions"])
+        except MetadataRestrictionError:
+            return False
+    return True
+
+
+def reference_presence_condition(conditions: Any) -> bool:
+    if (not isinstance(conditions, list) or len(conditions) != 1
+            or not isinstance(conditions[0], Mapping) or set(conditions[0]) != {"referenceIsSet"}
+            or type(conditions[0]["referenceIsSet"]) is not bool):
+        raise MetadataRestrictionError("INVALID_METADATA", "Reference-presence condition requires one native Boolean referenceIsSet value.")
+    return conditions[0]["referenceIsSet"]

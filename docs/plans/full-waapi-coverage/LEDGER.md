@@ -39,6 +39,16 @@ alternatives, five plugin kinds and placement modes remain distinct. Reflected
 object types also retain separate creation/edit applicability obligations.
 Internal types and unresolved plugin placements are not presumed creatable.
 
+Existing-object plug-in condition rows belong to #177 without a blanket #179
+creation dependency. Their built-in Effect/Source/System classes can be bound
+to independently located existing instances, or to instances created through
+an already supported public route. This establishes no whole-class, placement
+or native evidence credit. New-object plug-in conditions still depend on
+#177 and #179, and plug-in topology rows retain #177/#178 dependencies. If an
+exact existing class cannot be reached through those routes, retain that
+obligation and add its actual implementation dependency rather than omitting
+it or requiring every existing edit to wait for all creation modes.
+
 ## Ownership
 
 `docs/branch-coverage-ownership.json` is an exact URI/kind roster. It assigns
@@ -210,5 +220,13 @@ Repeat with the same arguments plus `--check` to verify the saved result. A
 finished ticket can still produce exit 2 because other product obligations
 remain open. Use controlled scope only for checker tests, never to rename a
 partial product result complete. The committed inventory currently has 272,313
-obligations: 268,559 unresolved, 3,638 missing implementation and 116 exact
+obligations: 269,548 unresolved, 2,649 missing implementation and 116 exact
 approved exclusions. These are accounting rows, not distinct API or bug counts.
+
+The integrated #177/#181/#188 partials retain every original native obligation
+identity, shape and owner. The public source partition now contains 865 exact
+version/function/Topic rows; the 16 new 2024.1/2025.1 layout read and switch rows
+remain explicitly assigned to #188 as migration required in the interface-depth
+policy. Existing completed family seals remain unchanged. Public route presence
+reduces missing-route accounting only; no branch bindings, evidence requirements,
+native effects or ticket completion are certified by this reconciliation.

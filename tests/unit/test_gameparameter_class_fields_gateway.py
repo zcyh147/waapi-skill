@@ -58,7 +58,10 @@ class ParameterTask(CreateTask):
                                   "Min": 11.0, "Max": 23.0, "InitialValue": 17.0}
         self.types = [{"classId": 1, "name": "WorkUnit", "type": "WObject"},
                       {"classId": 20, "name": "GameParameter", "type": "WObject"}]
-        self.metadata = {name: {"name": name, "type": "Real64", "dependencies": [{"property": "ControlMode"}]}
+        self.metadata = {name: {"name": name, "type": "Real64", "dependencies": [{
+            "type": "property", "action": "Enable", "context": "Self", "property": "ControlMode",
+            "conditions": [{"restriction": {"type": "enum", "values": [{"value": 0}]}}],
+        }]}
                          for name in ("Min", "Max", "InitialValue")}
         self.metadata["ControlMode"] = {"name": "ControlMode", "type": "int32", "default": 0}
         self.fail_property = None
@@ -69,7 +72,7 @@ class ParameterTask(CreateTask):
             assert CREATED not in self.objects, "duplicate creation"
             self.objects[CREATED] = {"id": CREATED, "name": args["name"], "type": "GameParameter",
                                     "path": self.objects[FIRST]["path"] + "\\" + args["name"],
-                                    "parent": {"id": FIRST}, "Min": 0.0, "Max": 100.0, "InitialValue": 0.0}
+                                    "parent": {"id": FIRST}, "Min": 0.0, "Max": 100.0, "InitialValue": 0.0, "ControlMode": 0}
             return {key: self.objects[CREATED][key] for key in ("id", "name", "type", "path")}
         if uri == "ak.wwise.core.object.isPropertyEnabled":
             self.calls.append((uri, args, options))

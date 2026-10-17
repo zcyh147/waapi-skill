@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Any
 
 from .capabilities import CapabilityCatalog
+from .authoring_layout import LAYOUT_READ_URIS
+from .authoring_layout_business import LAYOUT_MUTATION_URIS
 from .execution_contracts import (
     AUTHORING_UI_EXECUTION_PROFILE,
     CONSOLE_EXECUTION_PROFILE,
@@ -409,7 +411,9 @@ def _validate_public_function_route_audit(
 def _uses_generic_reflected_route_without_uri_specific_restrictions(
     entry: Any,
 ) -> bool:
-    return entry.uri not in GENERIC_URI_RESTRICTION_URIS and (
+    return entry.uri not in (
+        GENERIC_URI_RESTRICTION_URIS | LAYOUT_READ_URIS | LAYOUT_MUTATION_URIS
+    ) and (
         entry.preferred_route == "manifest_dispatch"
         or (
             entry.preferred_route == "transaction_operation"
