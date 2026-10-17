@@ -66,6 +66,16 @@ for _version, _build, _index in (("2021.1", "2021.1.14.8108", 152), ("2022.1", "
                      f"PluginModule/WwiseObject[GameParameter]/Properties/Property[SlewRateUp]/Dependencies/{_index}/condition",
     }
 
+for _version, _build, _index in (("2021.1", "2021.1.14.8108", 160), ("2025.1", "2025.1.7.9143", 150)):
+    _PROGRAM_CASES[f"time-modulator-range-{_version}"] = {
+        "branch_id": f"{_version}|installed|{_build}|condition|existing-object|WObjects/WObjects.xml|"
+                     f"PluginModule/WwiseObject[ModulatorTime]/Properties/Property[EnvelopeStopPlayback]/Dependencies/{_index}/condition",
+        "public_uri": "ak.wwise.core.object.setProperty",
+        "selector": "exact_bound_existing_modeled_ModulatorTime_EnvelopeStopPlayback_Field_Handle_false_with_TimeModLoops_50",
+        "reason": "Exact installed range1..100 condition with sealed version-matching class metadata. Injected public workflow preserves50; endpoints, invalid0, explicit staged repair and available atomic repair are covered. Instance identity and controller metadata are explicitly modeled from installed definitions, not native observations. Native instance applicability, enabled behavior and mutation effects remain unverified.",
+        "scalar": {"controller": "TimeModLoops", "controller_value": 50, "field": "EnvelopeStopPlayback", "value": False},
+    }
+
 
 def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew-rate-show", create_output: bool = True) -> dict:
     """Freeze exact source and branch facts before the public workflow executes."""
@@ -97,6 +107,8 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/unit/test_association_condition_product_gateway.py",
         "tests/fixtures/metadata-conditions/association-continue-play-2025.json",
         "tests/unit/test_condition_native_evidence.py",
+        "tests/unit/test_time_modulator_range_gateway.py",
+        "tests/fixtures/metadata-conditions/time-modulator-range.json",
     ])
     sources = {name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in sorted(set(relevant))}
     return {"root": root, "nodeid": nodeid, "branch": branch, "case": case,
