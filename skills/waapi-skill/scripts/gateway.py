@@ -18730,7 +18730,7 @@ def dispatch_business_field_discovery(
                 from wwise_waapi.metadata_detail import fit_detail_continuations
                 payload["agent_result"] = fit_detail_continuations(payload["agent_result"], lambda page: detail_continuation(page, binding.record.revision))
             return payload
-        meanings = (browsed["metadata"]["name"],)
+        meanings = (browsed["selected_field_token"],)
         read_call = binding.read_call
     discovery = discover_metadata(
         read_call=read_call,

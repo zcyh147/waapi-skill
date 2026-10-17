@@ -1625,6 +1625,10 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                                         for key in ("type", "default", "restriction", "dependencies", "supports", "ui")}
             payload = {"selection": selection, "scope": scope, "metadata": metadata, "complete": True, "mutation_authority": False}
             if complete_detail and not project_detail:
+                # Internal handoff to Field Handle acquisition. This token was
+                # selected in the freshly read, scope-bound name inventory;
+                # it is not a synthesized native getPropertyInfo.name.
+                payload["selected_field_token"] = name
                 return payload
             if complete_detail:
                 from .metadata_detail import detail_page as project_detail_page
