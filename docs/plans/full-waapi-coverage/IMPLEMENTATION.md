@@ -166,6 +166,18 @@ final integrated acceptance:
   query/metadata/peak branches and all exact evidence requirements remain open.
   No old product receipt is forwarded; earlier failed producer roots retain
   their original verdicts. This partial grants no native or completion credit.
+  Combined source focus on exact clean `5b87ae32` passed **2689 tests**, with
+  eleven Windows cmd.exe parity skips and six intentionally excluded product
+  capture parameters, in 282.25 seconds. Source/head stayed clean and unchanged,
+  and its owned process group was empty afterward. The new guard is covered by
+  this focused run; a0 Program proof remains attached to the earlier candidate.
+  The single remote-verified #183 Definition Short-ID acceptance item is synced
+  locally as an open version-proof inconsistency, without a runtime change or
+  native failure/absence claim. Existing ticket text and dependency are retained.
+  Source reconciliation preserves all 874 route keys and all 272,313 native
+  ID/shape/owner tuples, original definitions, independent catalogs, detailed
+  policy and historical family seals. There is no branch-state transition or
+  new verified/native/Fresh credit; all 25 layout rows stay #188 migration work.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
