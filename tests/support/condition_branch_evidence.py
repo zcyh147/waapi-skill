@@ -97,6 +97,13 @@ def prepare_condition_capture(root: Path, nodeid: str, *, case_name: str = "slew
         "tests/destructive/test_condition_visibility_gateway.py",
         "tests/destructive/support/exact_real_evidence.py",
         "tests/destructive/support/category_evidence.py",
+        "tests/destructive/support/condition_finalization.py",
+        "tests/destructive/support/sandbox_fixture.py",
+        "tests/destructive/support/live_environment.py",
+        "tests/semantic/support/codex_scenario_lifecycle_v3.py",
+        "tests/semantic/support/codex_campaign.py",
+        "tests/semantic/support/codex_filesystem_security.py",
+        "tests/unit/test_condition_native_finalization.py",
         "tests/conftest.py", "tests/support/exact_evidence_finalization.py",
         "tests/maintenance/branch_audit_completion.py", "tests/maintenance/branch_coverage_audit.py",
         "docs/branch-coverage-condition-sources.json",
@@ -220,11 +227,7 @@ def publish_condition_native_capture(capture: dict, category: dict, observation_
         raise ValueError("native wrapper requires the exact finalized PASS node")
     if category["candidate"] != capture["git_candidate"]:
         raise ValueError("native original candidate differs from frozen source")
-    if (not capture["relevant_sources"] or any(
-            hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() != seal
-            for name, seal in capture["relevant_sources"].items())
-            or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=audit.ROOT, text=True).strip() != capture["git_candidate"]):
-        raise ValueError("native frozen source changed")
+    validate_condition_frozen_source(capture)
     observation_bytes = observation_path.read_bytes()
     observation = json.loads(observation_bytes)
     host = category["host"]
@@ -311,3 +314,12 @@ def publish_condition_native_capture(capture: dict, category: dict, observation_
     if observation_path.read_bytes() != observation_bytes:
         raise ValueError("original native observation changed before publication")
     pending.rename(root)
+
+
+def validate_condition_frozen_source(capture: dict) -> None:
+    """Require the original source seal again before destructive cleanup."""
+    if (not capture["relevant_sources"] or any(
+            hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() != seal
+            for name, seal in capture["relevant_sources"].items())
+            or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=audit.ROOT, text=True).strip() != capture["git_candidate"]):
+        raise ValueError("native frozen source changed")
