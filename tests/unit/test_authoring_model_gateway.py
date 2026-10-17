@@ -408,3 +408,41 @@ def test_creation_recovery_rejects_an_older_live_authoring_version_before_contex
     assert 'Selected connection configuration changed after Preview creation' in rejected['message'], rejected
     assert 'KeyError' not in json.dumps(rejected)
     assert not any(uri.startswith(PREFIX + 'window.') or uri.startswith(PREFIX + 'model.') for uri, _, _ in older_client.calls)
+
+
+@pytest.mark.parametrize(('version', 'digest'), [
+    ('2024.1', 'ef6edeaae18bf7b879acec3aca0f4353bdf220827791351203812d2ef922bf90'),
+    ('2025.1', 'b2bc3ec3e63e151ee0d52748b5b5a2f25fa7777179b0763669b2b2f76753fa50'),
+])
+def test_wafm_public_schema_reuses_one_fresh_catalog_without_changing_content(tmp_path, monkeypatch, version, digest):
+    from pathlib import Path
+    from wwise_waapi.canonical import canonical_sha256
+    from wwise_waapi.native_catalog import NATIVE_CATALOG_ROOT
+
+    source = NATIVE_CATALOG_ROOT / version / 'wwise-authoring.json'
+    read_bytes = Path.read_bytes
+    reads = []
+    damaged = False
+
+    def read(path):
+        raw = read_bytes(path)
+        if path == source:
+            reads.append(path)
+            return raw + b' ' if damaged else raw
+        return raw
+
+    monkeypatch.setattr(Path, 'read_bytes', read)
+    argv = ['--version', version, 'request-schema', PREFIX + 'model.registerWafm']
+    env = gateway_env(tmp_path)
+    code, response = gateway.execute_gateway(argv, env=env, client_factory=lambda _: pytest.fail('offline schema opened client'))
+    assert code == 0, response
+    assert canonical_sha256(response['business_adapter']) == digest
+    assert len(reads) == 1, 'one public schema call must verify one fresh graph, then reuse its immutable data'
+    response['business_adapter']['construction']['widget_kinds']['Checkbox']['attributes'].clear()
+    code, repeated = gateway.execute_gateway(argv, env=env)
+    assert code == 0 and canonical_sha256(repeated['business_adapter']) == digest
+    assert len(reads) == 2, 'a later command must independently verify its current catalog bytes'
+    damaged = True
+    code, rejected = gateway.execute_gateway(argv, env=env)
+    assert code != 0 and 'digest mismatch' in str(rejected), rejected
+    assert len(reads) == 3
