@@ -19425,8 +19425,10 @@ def dispatch_business_field_discovery(
         if binding.record.operation in {"object.create", "object.set"} and bound.field_kind == "reference":
             value_input["accepted_forms"] = ["bound_object_handle", "null_to_clear_reference"]
             if binding.record.operation == "object.set":
-                value_input["accepted_forms"].append("json_array_of_bound_object_handles")
-                value_input["maximum_array_members"] = 32
+                from wwise_waapi.operation_object import OBJECT_SET_REFERENCE_ARRAY_VERSIONS
+                if session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS:
+                    value_input["accepted_forms"].append("json_array_of_bound_object_handles")
+                    value_input["maximum_array_members"] = 32
                 from wwise_waapi.object_inline_curve import require_inline_curve_field
                 try:
                     require_inline_curve_field(metadata.get("restriction", {}))

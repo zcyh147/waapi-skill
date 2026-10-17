@@ -24,6 +24,7 @@ from .operation_object import (
     DEFAULT_MAX_FIELDS_PER_NODE,
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
+    OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
     normalize_object_list_name,
     normalize_curve_points,
 )
@@ -327,7 +328,9 @@ def _compile_set_new_node(
     node = {
         "type": _resolve_native_object_type(session, declaration.target.kind),
         "name": declaration.target.name,
-        **_compile_create_fields(session, base, allow_reference_arrays=True),
+        **_compile_create_fields(session, base,
+            allow_reference_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+            allow_inline_curve=True),
     }
     platform = extension_fields.get("platform")
     if platform is not None:
@@ -482,8 +485,12 @@ def _resolve_native_object_type(
     return kind.native_object_type
 
 
-def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *, allow_arrays: bool) -> dict[str, Any]:
-    if isinstance(value, (list, Mapping)) and not allow_arrays:
+def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *,
+                                   allow_arrays: bool, allow_inline_curve: bool) -> dict[str, Any]:
+    if isinstance(value, list) and not allow_arrays:
+        raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
+                      action="string reference arrays require the pinned object.set 2023.1-2025.1 alternative; choose one bound reference or null in this lane")
+    if isinstance(value, Mapping) and not allow_inline_curve:
         raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
                       action="object.create accepts one bound reference or null; complex reference values belong to available object.set lanes")
     if isinstance(value, Mapping):
@@ -510,6 +517,7 @@ def _compile_create_fields(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
     *, allow_reference_arrays: bool = False,
+    allow_inline_curve: bool = False,
 ) -> dict[str, Any]:
     fields = dict(declaration.fields)
     unexpected = sorted(set(fields) - _CREATE_FIELDS)
@@ -682,7 +690,8 @@ def _compile_create_fields(
             normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            references.append(_compile_graph_field_reference(session, field, business_value, allow_arrays=allow_reference_arrays))
+            references.append(_compile_graph_field_reference(session, field, business_value,
+                allow_arrays=allow_reference_arrays, allow_inline_curve=allow_inline_curve))
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -1128,7 +1137,9 @@ def _compile_existing_set_fields(
         target=declaration.target,
         fields=stable_fields,
     )
-    compiled = _compile_create_fields(session, stable_declaration, allow_reference_arrays=True)
+    compiled = _compile_create_fields(session, stable_declaration,
+        allow_reference_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+        allow_inline_curve=True)
     if "name_conflict" in fields:
         conflict = fields["name_conflict"]
         if conflict not in {"fail", "rename", "merge", "replace"}:
@@ -1281,7 +1292,9 @@ def _compile_existing_set_fields(
             normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            references.append(_compile_graph_field_reference(session, field, business_value, allow_arrays=True))
+            references.append(_compile_graph_field_reference(session, field, business_value,
+                allow_arrays=session.context.wwise_version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
+                allow_inline_curve=True))
     _validate_compiled_field_limit(
         session,
         properties=properties,
