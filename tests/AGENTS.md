@@ -542,8 +542,7 @@ existing single-Draft reordering path before a new compound Fresh campaign is
 opened.
 
 Before reporting or reusing historical acceptance, read
-[TEST_INVENTORY.md](TEST_INVENTORY.md); use
-[business acceptance](semantic/TEST_ACCEPTANCE.md) for current scheduling and triage.
+[TEST_INVENTORY.md](TEST_INVENTORY.md).
 
 The public `integration` profile is the integration-acceptance contract, not a
 per-API coverage profile. It contains six prewritten multi-operation workflows,

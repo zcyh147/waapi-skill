@@ -286,9 +286,6 @@ user's approval.
 Start with the cheapest lane that proves the change. Expand only when the
 changed behavior requires it.
 
-For implementation batch boundaries, cheap preflight and artifact regeneration
-order, follow [the coverage workflow](docs/plans/full-waapi-coverage/WORKFLOW.md).
-
 Repository development and ordinary test execution use the Poetry environment:
 invoke `ci/test.sh`, which delegates to Poetry, rather than installing project
 test dependencies into the Skill environment. The packaged Skill runtime and
@@ -480,8 +477,7 @@ profiles for sealed history and replay. Their roots are component evidence,
 not a unified `integration` campaign and not a single-candidate 12/12 result.
 
 Before reporting or reusing historical acceptance, read
-[tests/TEST_INVENTORY.md](tests/TEST_INVENTORY.md); use
-[business acceptance](tests/semantic/TEST_ACCEPTANCE.md) for current scheduling and triage.
+[tests/TEST_INVENTORY.md](tests/TEST_INVENTORY.md).
 
 The legacy internal `integration_workflows_v2_cross_version_6` component is a
 distinct fixed-baseline contract. Its three workflows run once on Wwise
