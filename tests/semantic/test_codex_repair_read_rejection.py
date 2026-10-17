@@ -17,7 +17,7 @@ SKILL = Path(__file__).parents[2] / "skills/waapi-skill"
 INPUTS = "a" * 64
 
 
-def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only", rejected_argv=None):
+def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only", rejected_argv=None, gateway_calls=None):
     held = {}
     def broker_factory(**kwargs):
         held["broker"] = CodexGatewayBroker(**kwargs)
@@ -40,20 +40,23 @@ def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only", rejected
                 item = {"id": f"read-{number}", "type": "command_execution", "command": shlex.join(["cat", str(path)]),
                     "status": "completed", "exit_code": 0, "aggregated_output": path.read_text()}
                 events.extend([{"type": "item.started", "item": {**item, "status": "in_progress"}}, {"type": "item.completed", "item": item}])
-            argv = [str(broker.invocation_runner_path), "gateway.py", *(rejected_argv or ["query-object", "--kind", "game-parameter",
-                    "--include", "range", "--include", "default", "--max-results", "100"])]
-            reply = broker._handle_request({"token": broker._token, "interpreter": "python", "argv": argv})
-            assert reply["exit_code"] == 126
-            item = {"id": "query", "type": "command_execution", "command": shlex.join(["python", *argv]),
-                "status": "completed", "exit_code": 126, "aggregated_output": reply["stdout"]}
-            events.extend([{"type": "item.started", "item": {**item, "status": "in_progress"}}, {"type": "item.completed", "item": item},
-                {"type": "item.completed", "item": {"id": "final", "type": "agent_message", "text": "I could not complete the read. No change was made."}}, {"type": "turn.completed"}])
+            calls = gateway_calls or [(rejected_argv or ["query-object", "--kind", "game-parameter",
+                    "--include", "range", "--include", "default", "--max-results", "100"], 126)]
+            for number, (arguments, expected_exit) in enumerate(calls):
+                argv = [str(broker.invocation_runner_path), "gateway.py", *arguments]
+                reply = broker._handle_request({"token": broker._token, "interpreter": "python", "argv": argv})
+                assert reply["exit_code"] == expected_exit, reply
+                item = {"id": f"query-{number}", "type": "command_execution", "command": shlex.join(["python", *argv]),
+                    "status": "completed", "exit_code": expected_exit, "aggregated_output": reply["stdout"]}
+                events.extend([{"type": "item.started", "item": {**item, "status": "in_progress"}}, {"type": "item.completed", "item": item}])
+            final = "Target has range -12 to 36 and default 7. No change was made." if gateway_calls and calls[-1][1] == 0 else "I could not complete the read. No change was made."
+            events.extend([{"type": "item.completed", "item": {"id": "final", "type": "agent_message", "text": final}}, {"type": "turn.completed"}])
             self.budget.finish_turn(101)
             commands = completed_command_records(events, platform_name="posix")
             facts = classify_task_commands(commands, workspace=self.config.workspace, skill_source=SKILL,
-                expected_gateway_subcommands=("query-object", "draft-start"), expected_wwise_version="2025.1")
+                expected_gateway_subcommands=("query-object", "query-schema", "draft-start"), expected_wwise_version="2025.1")
             result = SimpleNamespace(stdout="".join(json.dumps(event) + "\n" for event in events), stderr="", exit_status=0,
-                timed_out=False, thread_id=self.thread_id, final_response="I could not complete the read. No change was made.",
+                timed_out=False, thread_id=self.thread_id, final_response=final,
                 command_facts=facts, isolation_audit=SimpleNamespace(passed=True), prompt_audit=SimpleNamespace(passed=True, has_memory=False),
                 session_audit=audit_session_events(events), collab_call_count=0, file_change_count=0, skill_tree_unchanged=True,
                 created_source_files=(), modified_source_files=(), deleted_source_files=())
