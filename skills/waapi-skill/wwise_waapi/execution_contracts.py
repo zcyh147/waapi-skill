@@ -186,13 +186,19 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
         "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation",),
         "ak.wwise.core.object.getPropertyAndReferenceNames": (
             "metadata discover",
+            "metadata list",
+            "metadata detail",
         ),
         "ak.wwise.core.object.getPropertyInfo": (
             "metadata discover",
+            "metadata list",
+            "metadata detail",
         ),
         "ak.wwise.core.object.getTypes": (
             "metadata types",
             "metadata discover",
+            "metadata list",
+            "metadata detail",
         ),
         "ak.wwise.core.object.isPropertyEnabled": ("metadata property-state",),
         "ak.wwise.core.profiler.getGameObjects": (

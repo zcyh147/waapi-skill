@@ -191,11 +191,11 @@ def test_every_generated_inline_lane_is_either_generic_or_exactly_isolated() -> 
             assert contract.as_gateway_payload()["input_shape"] == "inline"
             generic.append((row["version"], row["uri"]))
 
-    assert len(inline_rows) == 471
+    assert len(inline_rows) == 473
     # Isolated typed routes joined the same schema compiler in #44; only
     # dedicated exact-operation lanes remain intentionally unavailable through
     # generic request-schema.
-    assert len(generic) == 370
+    assert len(generic) == 372
     assert len(isolated) == 101
     assert ("2025.1", "ak.wwise.core.object.setName") in isolated
     assert ("2025.1", "ak.wwise.core.log.get") in generic
@@ -456,8 +456,9 @@ def _canonical_sha256(value: object) -> str:
 
 
 def test_closed_layout_reads_retain_native_definition_graph_and_unresolved_result_semantics():
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
     result = build_typed_request_surface(root=RESOURCE_ROOT)
-    rows = [row for row in result['lanes'] if row['construction_shape'] == 'closed_read']
+    rows = [row for row in result['lanes'] if row['uri'] in LAYOUT_READ_URIS]
     assert len(rows) == 14
     assert {row['construction_shape'] for row in rows} == {'closed_read'}
     assert result['unresolved_references'] == []

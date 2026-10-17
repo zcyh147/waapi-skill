@@ -154,7 +154,9 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "type",
         "default",
         "display",
-        "restriction",
+        "dependencies",
+        "unit",
+        "availability",
         "typed_value_type",
     }
     assert looping["metadata"]["typed_value_type"] == "boolean"
@@ -187,12 +189,10 @@ def test_object_type_discovery_resolves_live_name_and_returns_compact_candidates
         "field": "name",
         "value": "IsLoopingEnabled",
     }
-    assert {
-        "supports",
-        "ui",
-        "audioEngineId",
-        "dependencies",
-    } <= set(detailed_looping["metadata"])
+    assert detailed_looping["metadata"] == {
+        "name": "IsLoopingEnabled", "type": "Boolean", "default": False,
+        "display": {"name": "IsLoopingEnabled"}, "dependencies": [],
+    }
     assert result["selection_required"] is True
     assert result["exact_live_name_required_for_mutation"] is True
 
@@ -457,23 +457,17 @@ def test_dependency_candidate_preserves_overlap_with_an_explicit_enable_query() 
     assert [row["name"] for row in result["candidates"]] == [
         "MaxSoundPerInstance"
     ]
-    assert result["dependency_candidates"] == [
-        {
-            "name": "UseMaxSoundPerInstance",
-            "kind": "property",
-            "matched_queries": ["maximum playback instances enabled"],
-            "required_by": ["MaxSoundPerInstance"],
-            "dependency_requirements": [],
-            "metadata": {
-                "name": "UseMaxSoundPerInstance",
-                "type": "Boolean",
-                "default": False,
-                "display": {"name": "Limit Sound Instances"},
-                "restriction": {},
-                "typed_value_type": "boolean",
-            },
-        }
-    ]
+    dependency = result["dependency_candidates"][0]
+    assert {key: value for key, value in dependency.items() if key != "metadata"} == {
+        "name": "UseMaxSoundPerInstance", "kind": "property",
+        "matched_queries": ["maximum playback instances enabled"],
+        "required_by": ["MaxSoundPerInstance"], "dependency_requirements": [],
+    }
+    assert dependency["metadata"]["name"] == "UseMaxSoundPerInstance"
+    assert dependency["metadata"]["type"] == "Boolean"
+    assert dependency["metadata"]["default"] is False
+    assert dependency["metadata"]["typed_value_type"] == "boolean"
+    assert dependency["metadata"]["unit"] == {"status": "unknown", "value": None}
 
 
 def test_dependency_cycle_below_root_does_not_repeat_reads_or_exhaust_depth() -> None:
@@ -637,15 +631,9 @@ def test_compact_five_query_agent_result_stays_below_terminal_visibility_bound()
     assert len(compact["dependency_candidates"]) == 5
     assert compact_bytes <= MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES
     assert len(json.dumps(detailed, ensure_ascii=False, indent=2)) > compact_bytes
-    assert all(
-        set(row["metadata"]).isdisjoint(
-            {"supports", "ui", "audioEngineId", "dependencies"}
-        )
-        for row in (
-            *compact["candidates"],
-            *compact["dependency_candidates"],
-        )
-    )
+    assert all("audioEngineId" not in row["metadata"] for row in compact["candidates"])
+    assert all(row["metadata"]["supports"]["rtpc"] == "Exclusive" for row in compact["candidates"])
+    assert all(row["metadata"]["unit"] == {"status": "unknown", "value": None} for row in compact["candidates"])
     assert all(
         row["metadata"]["range"] == {"min": -200.0, "max": 200.0}
         for row in compact["candidates"]
@@ -692,6 +680,39 @@ def test_non_self_or_unresolvable_dependencies_are_reported_not_guessed() -> Non
         for call in reader.calls
         if call[0] == GET_PROPERTY_INFO_URI
     ] == ["OutputBus"]
+
+
+@pytest.mark.parametrize("context", ["Self", "Parent", "AssocParent"])
+def test_visibility_metadata_is_disclosed_without_a_mutation_dependency(context) -> None:
+    dependency = {"type": "property", "action": "Show", "context": context,
+                  "property": "RTPCRamping", "conditions": [{"restriction": {
+                      "type": "enum", "values": [{"value": 1}]}}]}
+    reader = MetadataReader(names=["SlewRateUp"], info={
+        "SlewRateUp": {"name": "SlewRateUp", "type": "Real64", "dependencies": [dependency]},
+    })
+    result = discover_metadata(read_call=reader, class_id=65552, queries=["SlewRateUp"]).as_dict()
+    assert result["dependency_closure_complete"] is True
+    assert result["unresolved_dependencies"] == []
+    assert result["dependency_candidates"] == []
+    assert result["candidates"][0]["same_object_dependencies"] == []
+    assert result["candidates"][0]["dependency_requirements"] == [
+        {**dependency, "required_values": [], "visibility_only": True},
+    ]
+
+
+def test_reference_presence_disclosure_and_detail_preserve_native_metadata_presence() -> None:
+    dependency = {"type": "reference", "action": "Enable", "context": "Self",
+                  "property": "UserAuxSend0", "conditions": [{"referenceIsSet": True}]}
+    native = {"name": "UserAuxSend0", "type": "", "restriction": {"type": "reference"}}
+    reader = MetadataReader(names=["UserAuxSendVolume0", "UserAuxSend0"], info={
+        "UserAuxSendVolume0": {"name": "UserAuxSendVolume0", "type": "Real64", "dependencies": [dependency]},
+        "UserAuxSend0": native,
+    })
+    result = discover_metadata(read_call=reader, class_id=65552, queries=["UserAuxSendVolume0"], limit=1)
+    assert result.as_dict()["candidates"][0]["dependency_requirements"] == [
+        {**dependency, "required_values": [], "required_presence": True},
+    ]
+    assert result.as_dict(detail=True)["dependency_candidates"][0]["metadata"] == native
 
 
 def test_is_master_bus_visibility_predicate_is_terminal_not_a_property_edge() -> None:

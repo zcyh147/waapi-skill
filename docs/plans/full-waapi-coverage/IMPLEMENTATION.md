@@ -33,8 +33,10 @@ references. No main merge is authorized.
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
   [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
-- Next implementation frontier: #177 (conditions), #181 (queries/metadata) and
-  #188 (Authoring layouts/views), in separate prepared worktrees. #180 remains
+- Active implementation frontier: #177 (conditions), #181 (queries/metadata) and
+  #188 (Authoring layouts/views), in separate worktrees. Working agents now use
+  GPT-6.1 Sol with high reasoning, as explicitly requested; root owns decisions,
+  integration and native scheduling. #180 remains
   blocked by #178; do not infer readiness from family proximity.
 - Read-only object/plugin condition research is retained for #177/#178/#179.
   It includes integer enums/ranges, parent contexts, reference requirements,
@@ -49,11 +51,52 @@ references. No main merge is authorized.
   in `condition-metadata-2021-r1` through `condition-metadata-2025-r1`.
 - No Fresh run has been authorized or started for this specification.
 
+## Functional implementation and native observations
+
+The following are partial implementation checkpoints, not closed tickets or
+final integrated acceptance:
+
+- #177 candidate `5d899f1e` passed 487 focused program tests. Its separate
+  native Show-condition probes passed both Self and Parent cases on all five
+  pinned Console builds: 10 passing nodes. For GameParameter.SlewRateUp and
+  Sound.Weight, both tested prerequisite values left the field enabled; writes
+  succeeded without changing the explicitly selected prerequisite. All source
+  full hashes and project mtimes stayed unchanged, all passing sandboxes were
+  removed, and no owned process remained. The 505 sealed source files stayed
+  unchanged during the sequence. Original pre-native fixture/configuration
+  failures remain retained; they grant no native credit.
+- These condition probes establish the sampled Show semantics. They do not
+  complete all condition grammar, plugin applicability or branch-ledger native
+  effect receipts. Original observations and independent evidence seals are
+  indexed by `condition-show-native-summary.json`. Subsequent dependency fix
+  `52579af7` removes the inaccurate blanket requirement that existing-plugin
+  condition handling wait for new plugin creation work; all exact obligation
+  identities, owners and unresolved evidence remain intact.
+- #181 progress candidate `bd23a024` has 703 focused passing tests for metadata
+  listing, detail pagination, useful field summaries, generated continuations
+  and large-field acquisition. Query, Media Pool, peaks, result alternatives
+  and exact branch evidence remain active work.
+- #188 early read candidate `0afd7004` exposes five bounded Authoring reads.
+  Root captured them on both pinned 2024.1 and 2025.1 Authoring builds through
+  the public Gateway: 10 schema/read invocations per host, original source
+  hashes and mtimes unchanged, clean owned-process shutdown and stable frozen
+  source. `layout-read-native-summary.json` indexes original responses/seals.
+  The Designer observations establish actual read serialization, including
+  childless Splitter rows and repeated identical view identities. Several
+  reflected definitions disagree with these native responses. This is not
+  setLayout input acceptance, a mutation effect, or complete layout coverage;
+  closed constructors, scoped identities and write verification remain #188.
+
+The two Authoring capture roots retain their private runtime directories with
+their original evidence. No owned Wwise process remains. All three working
+branches are released from their capture freezes and continue implementation.
+
 Ignored durable coordination state is under `.waapi-skill-state/full-coverage/`:
 `active-checkpoint.json`, `program-faa704ff-result.json`, independent
 `*-evidence-seal.json` files, original capture roots, derived catalogs and
 `research/` notes. Preserve these before archiving worktrees. Original failed
-roots and verdicts remain unchanged. No native process remains running.
+roots and verdicts remain unchanged. No owned native process remains running;
+unrelated pre-existing Wine helpers are never terminated by this work.
 
 ## Standing completion rules
 

@@ -15,6 +15,7 @@ GATEWAY = "skills/waapi-skill/scripts/gateway.py"
 
 # These are reviewed family entrypoints, not claims about each enum alternative.
 FAMILY_MODULES = {
+    "authoring-layout-partial": "authoring_layout.py",
     "generic-cli-console": "cli_console_business.py",
     "generic-core-media-build": "media_build_business.py",
     "generic-core-project-object": "core_business.py",
@@ -31,6 +32,7 @@ FAMILY_MODULES = {
 
 
 FAMILY_FINDINGS = {
+    "authoring-layout-partial": "Seven closed reads and scoped switch construction are partial #188 implementation; original UI definitions/OneOf interpretation, remaining layout mutations, exact branch bindings and required native effects remain unresolved. No historical host/UI family PASS is inherited.",
     "generic-cli-console": "CLI option spelling, repeatable bank/platform/language rows, default omission and hook exclusions need exact declaration-to-native correspondence; process success is not generated-bank verification.",
     "generic-core-media-build": "Import path/source replacement and SoundBank inclusion/build alternatives need independent public value mapping and output verification, including partial results.",
     "generic-core-project-object": "Reference/property, identity, destination and conflict-mode alternatives need exact target-type and dependency mappings; route attribution does not prove each nested value.",
@@ -52,6 +54,7 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
     from wwise_waapi.business_adapters import business_adapter, business_adapter_operations
     from wwise_waapi.native_surface_policy import validate_native_surface_policy
     from wwise_waapi.builders.schema import SemanticSchemaValidator
+    from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
 
     # This validates selector completeness against the independently packaged
     # reflection, including normalized-equivalence evidence requirements.
@@ -138,6 +141,11 @@ def enrich_inventory(inventory, root, public, schemas, policy, *, digest):
                                source(LIB + "builders/query.py")]
             row["compiler_attribution"] = "fixed_query_entrypoint_not_branch_proof"
             row["verifier_source"] = [source(GATEWAY, "validate_query_business_view_result")]
+        if uri in LAYOUT_READ_URIS:
+            row["public_contracts"] = [source(LIB + "authoring_layout.py", "layout_read_contract")]
+            row["compiler"] = [source(LIB + "authoring_layout.py", "layout_read_arguments")]
+            row["compiler_attribution"] = "closed_layout_read_entrypoint_not_branch_proof"
+            row["verifier_source"] = [source(LIB + "authoring_layout.py", "validate_layout_read_result")]
         row["branch_mapping"] = "source_attribution_joined; see per-branch mapping"
 
     inventory["family_findings"] = FAMILY_FINDINGS

@@ -17,10 +17,10 @@
   },
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
-    "gateway_parser_sha256": "f3904e09a85028fbff1a1078b381a9f321ad1137b6d9b0059fe15aa4834ba0ea",
-    "operation_contract_sha256": "206b88bf1d1810dbe876745c0c952208b965b92b0e74d69b3ba93878e0243617",
-    "public_continuation_sha256": "2904c6b6e9f45047ba553e786cf3cf4f2424a54edbf67e0f8d5f6180205ded11",
-    "typed_request_surface_sha256": "cbdccf1679c6f534b501cf3f67b503c376fa6a155d0cf8f085306ad86c0a031c"
+    "gateway_parser_sha256": "95ef97b4b5da6880295919ffec6cb2c22c1955fbdcba8ba879ace6f7d7ec4e60",
+    "operation_contract_sha256": "6a23d3b55db2a6526be907f7a15680bb1898ca8e01d1f737dc7686d696b93fdb",
+    "public_continuation_sha256": "b71ec601a1328c08db7eef6f40923cd58f6d534b94cd0cbe1f6d02e66727e6af",
+    "typed_request_surface_sha256": "3d88ee827197f529aff3cb264b2dec9db8ad375e2602a050182f754faed8ce7e"
   },
   "ownership_classes": {
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request.",
@@ -137,6 +137,14 @@
   ],
   "native_lane_rules": [
     {
+      "id": "authoring-layout-partial",
+      "disposition": "migration_required",
+      "owner_issue": 188,
+      "match": {"uris": ["ak.wwise.ui.layout.getCurrentLayoutName", "ak.wwise.ui.layout.getElementRectangle", "ak.wwise.ui.layout.getLayout", "ak.wwise.ui.layout.getLayoutNames", "ak.wwise.ui.layout.getViewHandle", "ak.wwise.ui.layout.getViewInstances", "ak.wwise.ui.layout.getViewTypes", "ak.wwise.ui.layout.switchLayout"]},
+      "leaked_mechanics": [],
+      "audit_evidence": "Partial #188 implementation provides seven closed bounded reads and one scoped-handle switch Draft on 2024.1/2025.1. Actual public continuations and contract fields remain inventoried. Original native definition contradictions and capital OneOf semantics remain unresolved; complete layout migration and required effect evidence are not established. These exact rows receive no historical host/UI family completion seal or inherited execution credit."
+    },
+    {
       "id": "generic-topics",
       "disposition": "already_deep",
       "owner_issue": null,
@@ -233,7 +241,12 @@
       "audit_evidence": "The public project-setting-business/v1 and source-control-business/v1 Adapters cover all 30 executable Game Parameter, Sound active-source, and source-control lanes; three sourceControl.setProvider lanes retain the human-owned provider/credential boundary, and the remaining ten Undo end/cancel lanes are explicitly compound-only through waapi.undoGroup. Callers bind exact project objects or provide closed range outcomes, exact platform names, bounded source-file search intent, exact commit messages, and project/originals/exact file locators. Game Parameter names use a Gateway-fixed typed-name binding and dedicated range flags. The Gateway owns type and relationship validation, native GUID fields, range enums, live project and Originals roots, absolute path construction, link/reparse rejection, aligned move arrays, result projection, revisions, Preview, authorization, verification, and the sole continuation. Typed construction is blocked before connection and no legacy fallback exists. Packaged candidate 98d9e70 passed macOS Program 4126/2 skipped; final evidence candidate a0a0178 passed native-Windows Program 4111/17 skipped and macOS Non-live 9324/111 skipped/27 deselected. The 2025.1 project-setting plus external source-control proportional real workflow passed on both hosts at 590a416, and the final packaged Skill passed Fresh Agent plus verify-only cumulatively on macOS and Windows with clean task/process teardown."
     }
   ],
-  "ticket_blueprints": {},
+  "ticket_blueprints": {
+    "authoring-layout-partial": {
+      "title": "Complete ordinary Authoring layout business contracts and evidence",
+      "scope": "Retain the exact 2024.1/2025.1 layout read and switch rows while #188 resolves native definition interpretation, remaining layout constructors and mutations, public-route validation, and required effect evidence."
+    }
+  },
   "completed_family_seals": {
     "generic-core-project-object": {
       "github_issue": 84,
@@ -276,7 +289,7 @@
       "rows_sha256": "7446dd701ea343d3a089f452c82ad1ec40c3ca261764d78adfda4a147e31db18"
     }
   },
-  "ticket_issue_numbers": {},
+  "ticket_issue_numbers": {"authoring-layout-partial": 188},
   "field_ownership_rules": {
     "gateway_derivation_names": ["acknowledge", "transform"],
     "fixed_gateway_derivation_names": ["advanced_return", "api", "array_handle", "choice_handle", "map_handle", "member_key", "parent_schema_token", "return", "return_field", "schema_digest", "select", "shape", "typed_advanced", "typed_append", "typed_choose", "typed_choose_dynamic", "typed_map_correct", "typed_map_put", "typed_map_remove", "typed_present", "typed_schema_digest", "typed_set", "typed_structured", "page", "selection"],
