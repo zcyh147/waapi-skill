@@ -9073,6 +9073,65 @@ def _compound_business_outcome_key(plan: Mapping[str, Any]) -> str:
     return canonical_sha256(identity)
 
 
+def _compound_platform_guid(value: Any) -> bool:
+    return isinstance(value, str) and _PLUGIN_GUID.fullmatch(value) is not None
+
+
+def _compound_field_outcome_scope(
+    prepared: PreparedOperation, *, version: str, read: ReadCall, evidence: dict[str, Any],
+) -> Mapping[str, Any] | None:
+    """Bind field scope without equating selector spelling with independence."""
+    plan = prepared.verification_plan
+    kind = plan.get("kind")
+    if kind not in {"same-guid-property", "same-guid-reference", "object-linked-state"}:
+        return None
+    evidence["compound_platform_scope_version"] = 1
+    object_id = plan.get("object_id")
+    field = plan.get("field", plan.get("property"))
+    platform = plan.get("platform")
+    scope: dict[str, Any] = {"object_id": object_id, "field": field, "platform": platform, "kind": "unknown"}
+    if kind == "object-linked-state":
+        return {**scope, "kind": "all"}
+    needs_current = kind == "same-guid-property" and platform is None
+    needs_alias = isinstance(platform, str) and not _compound_platform_guid(platform)
+    if needs_current or needs_alias:
+        if version == "2021.1":
+            raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN",
+                "The compound field needs a live effective-platform binding that this pinned lane does not yet provide.",
+                details={"field": field, "implementation_obligation": "current_platform_or_global_linkage_observer"})
+        context = read(GET_PROJECT_INFO_URI, {}, {})
+        if needs_current:
+            platform = context.get("currentPlatformId")
+            if not _compound_platform_guid(platform):
+                raise OperationContractError("INVALID_READBACK", "Compound current-platform binding requires one canonical currentPlatformId.")
+            expected = evidence.setdefault("compound_current_platform", platform)
+            if not _same_identity(expected, platform):
+                raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "Current platform changed during compound preparation.")
+        else:
+            rows = context.get("platforms")
+            matches = [row for row in rows if isinstance(row, Mapping) and row.get("name") == platform] if isinstance(rows, list) else []
+            if len(matches) != 1 or not _compound_platform_guid(matches[0].get("id")):
+                raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "The explicit platform name did not resolve exactly in live project platforms.", details={"platform": platform})
+            previous = evidence.setdefault("compound_platform_aliases", {}).setdefault(str(platform), matches[0]["id"])
+            if not _same_identity(previous, matches[0]["id"]):
+                raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN", "A platform name changed identity during compound preparation.")
+            platform = matches[0]["id"]
+    scope["platform"] = platform
+    # setReference's platform links the reference; its omission is not documented
+    # as setProperty's current-platform shorthand. Do not share that inference.
+    if kind == "same-guid-property" and version in {"2023.1", "2024.1", "2025.1"}:
+        info = prepared.pre_state.get("field_info", {})
+        if isinstance(info, Mapping) and info.get("supports", {}).get("unlink") is True and _compound_platform_guid(platform):
+            args = {"object": object_id, "property": field, "platform": platform}
+            result = read(OBJECT_IS_LINKED_URI, args, {})
+            linked = result.get("linked")
+            if type(linked) is not bool:
+                raise OperationContractError("INVALID_READBACK", "Compound linkage observation requires an explicit linked boolean.")
+            evidence.setdefault("compound_linkage_guards", []).append({"args": args, "linked": linked})
+            scope["kind"] = "all" if linked else "platform"
+    return scope
+
+
 def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> PreparedOperation:
     """Resolve live identities/metadata and build one immutable semantic preview."""
 
@@ -9103,6 +9162,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         execution_plan = build_undo_group_execution_plan(request.version, arguments)
         prepared_children: list[Mapping[str, Any]] = []
         outcome_owners: dict[str, int] = {}
+        platform_outcomes: dict[tuple[str, str], list[tuple[int, Mapping[str, Any]]]] = {}
         for index, child_plan in enumerate(execution_plan["calls"]):
             child_request = parse_operation_request(
                 child_plan["child_request"],
@@ -9112,9 +9172,25 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 prepared_children.append(dict(child_plan))
                 continue
             child_prepared = prepare_operation(child_request, read_call=read)
-            outcome_key = _compound_business_outcome_key(
-                child_prepared.verification_plan
-            )
+            child_verification = child_prepared.verification_plan
+            scope = _compound_field_outcome_scope(child_prepared, version=request.version, read=read, evidence=metadata)
+            if scope is not None:
+                field_key = (_identity_key(scope["object_id"]), str(scope["field"]))
+                for previous_index, previous_scope in platform_outcomes.get(field_key, []):
+                    same_platform = (_same_identity(scope["platform"], previous_scope["platform"])
+                        if _compound_platform_guid(scope["platform"]) and _compound_platform_guid(previous_scope["platform"])
+                        else scope["platform"] == previous_scope["platform"])
+                    if scope["kind"] == "all" or previous_scope["kind"] == "all" or same_platform:
+                        raise OperationContractError("UNDO_GROUP_OVERLAPPING_OUTCOME",
+                            "Compound field children affect the same effective platform scope.",
+                            details={"first_index": previous_index, "second_index": index, "field": scope["field"]})
+                    if scope["kind"] != "platform" or previous_scope["kind"] != "platform":
+                        raise OperationContractError("UNDO_GROUP_PLATFORM_SCOPE_UNPROVEN",
+                            "Distinct platform selectors need live unlinked scope evidence before their outcomes can be composed.",
+                            details={"first_index": previous_index, "second_index": index,
+                                     "field": scope["field"], "implementation_obligation": "effective_platform_and_linkage_scope"})
+                platform_outcomes.setdefault(field_key, []).append((index, scope))
+            outcome_key = _compound_business_outcome_key(child_verification)
             previous = outcome_owners.get(outcome_key)
             if previous is not None:
                 raise OperationContractError(
@@ -14076,6 +14152,56 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                             for key in ("args", "options", "request_validation")
                         )
                     passed = passed and binding_ok
+        current_platform_children = [
+            child for child in actual_plan.get("calls", [])
+            if isinstance(child, Mapping)
+            and isinstance(child.get("prepared_operation"), Mapping)
+            and child["prepared_operation"].get("verification_plan", {}).get("kind") == "same-guid-property"
+            and child["prepared_operation"]["verification_plan"].get("platform") is None
+        ] if isinstance(actual_plan, Mapping) else []
+        if current_platform_children:
+            expected_platform = pre_state.get("compound_current_platform")
+            actual_platform = None
+            if version != "2021.1" and _compound_platform_guid(expected_platform):
+                context = read_call(GET_PROJECT_INFO_URI, {}, {})
+                actual_platform = context.get("currentPlatformId") if isinstance(context, Mapping) else None
+                child_readbacks.append({"role": "compound-current-platform", "uri": GET_PROJECT_INFO_URI,
+                    "args": {}, "options": {}, "result": dict(context) if isinstance(context, Mapping) else context})
+            platform_unchanged = _compound_platform_guid(actual_platform) and _same_identity(actual_platform, expected_platform)
+            passed = passed and platform_unchanged
+            child_assertions.append({"name": "compound omitted property platform unchanged", "passed": platform_unchanged,
+                                     "evidence": {"expected": expected_platform, "actual": actual_platform}})
+        platform_field_children = [child for child in actual_plan.get("calls", [])
+            if isinstance(child, Mapping) and isinstance(child.get("prepared_operation"), Mapping)
+            and child["prepared_operation"].get("verification_plan", {}).get("kind") in
+                {"same-guid-property", "same-guid-reference", "object-linked-state"}
+        ] if isinstance(actual_plan, Mapping) else []
+        if platform_field_children:
+            scope_bound = pre_state.get("compound_platform_scope_version") == 1
+            passed = passed and scope_bound
+            child_assertions.append({"name": "compound effective platform scopes were prepared", "passed": scope_bound})
+        aliases = pre_state.get("compound_platform_aliases", {})
+        if aliases:
+            context = read_call(GET_PROJECT_INFO_URI, {}, {})
+            rows = context.get("platforms") if isinstance(context, Mapping) else None
+            child_readbacks.append({"role": "compound-platform-aliases", "uri": GET_PROJECT_INFO_URI,
+                "args": {}, "options": {}, "result": dict(context) if isinstance(context, Mapping) else context})
+            for name, expected_id in aliases.items():
+                matches = [row for row in rows if isinstance(row, Mapping) and row.get("name") == name] if isinstance(rows, list) else []
+                unchanged = len(matches) == 1 and _same_identity(matches[0].get("id"), expected_id)
+                passed = passed and unchanged
+                child_assertions.append({"name": "compound platform name still resolves to its sealed GUID", "passed": unchanged,
+                    "evidence": {"name": name, "expected": expected_id, "actual": matches}})
+        for guard in pre_state.get("compound_linkage_guards", []):
+            args = guard["args"]
+            result = read_call(OBJECT_IS_LINKED_URI, args, {})
+            actual_linked = result.get("linked") if isinstance(result, Mapping) else None
+            unchanged = type(actual_linked) is bool and actual_linked is guard["linked"]
+            passed = passed and unchanged
+            child_readbacks.append({"role": "compound-linkage", "uri": OBJECT_IS_LINKED_URI,
+                "args": dict(args), "options": {}, "result": dict(result) if isinstance(result, Mapping) else result})
+            child_assertions.append({"name": "compound field linkage unchanged", "passed": unchanged,
+                "evidence": {"args": dict(args), "expected": guard["linked"], "actual": actual_linked}})
         assertions.append(
             {
                 "name": "waapi.undoGroup execution plan still matches the immutable reviewed composite",
