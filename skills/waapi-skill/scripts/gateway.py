@@ -14607,6 +14607,7 @@ def dispatch_command(
                 dispatcher=dispatcher, common=common, live_info=live_info)
             if context != args.result_record["context"]:
                 raise GatewayResultShapeError("Query configuration, project or host session changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
         advanced_preview = getattr(args, "advanced_query_preview", None)
         if advanced_preview is not None:
@@ -14709,6 +14710,7 @@ def dispatch_command(
         if custom_kind_clarification is not None:
             if args.result_page is not None:
                 raise GatewayResultShapeError("The original query type selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
@@ -14726,6 +14728,7 @@ def dispatch_command(
         if custom_field_clarification is not None:
             if args.result_page is not None:
                 raise GatewayResultShapeError("The original query field selection changed; restart the original read",
+                    details={"native_query_dispatched": False, "restart_original_read": True},
                     error_code="QUERY_RESULT_CONTINUATION_CHANGED")
             return {
                 "ok": True,
@@ -23069,6 +23072,7 @@ def _query_result_presence_contract() -> dict[str, Any]:
             "completion": "projection_complete certifies delivery of that observation only, never query exhaustion or mutation selection",
             "continuation": "short Gateway-issued --result-query and --result-page; 900 seconds; repeat identical bounded read and verify complete result, resolved fields, configuration, project and host session",
             "detail": "--detail preserves diagnostics; oversized semantic_preview is retained in page entries",
+            "entries_encoding": "json-pointer-entries normally; json-document-fragments for oversized native keys/pointers. Concatenate document fragments by character offset to recover the exact observation, never mutation authority",
             "page_stdout_utf8_bytes": 32768},
     }
 
@@ -23472,7 +23476,7 @@ def _query_result_context(args, *, env, connection, detected_version, dispatcher
 def _finish_object_query_result(args, payload, *, native, envelope, env, connection,
                                 detected_version, dispatcher, common, live_info):
     from wwise_waapi.canonical import canonical_json_bytes, canonical_sha256
-    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, build_page, parse_offset
+    from wwise_waapi.object_query_result_pages import ObjectQueryPlanStore, QueryResultPageError, QueryResultProjectionLimitError, build_page, parse_offset
     if not payload.get("ok"):
         return payload
     if args.result_page is None and len(canonical_json_bytes(
@@ -23518,11 +23522,13 @@ def _finish_object_query_result(args, payload, *, native, envelope, env, connect
                 "semantic_preview_source": "agent_result.entries/semantic_preview" if detail_fragment_required else "inline_when_detail_requested",
                 "identity_rule": "Exact identity fields are retained or explicitly omitted; fragments never certify a mutation selection"},
             objects_source="agent_result.objects", agent_result=page)
-        if probe_gateway_json_document_size(result, 28 * 1024) != "ok":
-            raise QueryResultPageError("The query page with diagnostics exceeds its bounded output; refine the original read")
+        if probe_gateway_json_document_size(project_successful_query_object_payload(result, detail=args.detail), 28 * 1024) != "ok":
+            raise QueryResultProjectionLimitError("The query page with diagnostics exceeds its bounded output; refine the original read")
         return result
     except QueryResultPageError as exc:
-        raise GatewayResultShapeError(str(exc), error_code=exc.code) from exc
+        raise GatewayResultShapeError(str(exc),
+            details={"native_query_dispatched": True, "projection_complete": False, "call": dispatch_call_summary(native)},
+            error_code=exc.code) from exc
 
 
 def project_successful_query_object_payload(

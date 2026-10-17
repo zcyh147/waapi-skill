@@ -17,6 +17,30 @@ class QueryResultPageError(ValueError):
     code = "QUERY_RESULT_CONTINUATION_CHANGED"
 
 
+class QueryResultProjectionLimitError(QueryResultPageError):
+    code = "QUERY_RESULT_PROJECTION_LIMIT_EXCEEDED"
+
+
+def _has_oversized_pointer(value: Any) -> bool:
+    # Count escaped pointer bytes without first copying a giant native key into
+    # every descendant path. Use document fragments when a path cannot fit.
+    pending = [(value, 0)]
+    while pending:
+        item, prefix_bytes = pending.pop()
+        if isinstance(item, Mapping):
+            children = ((key, child) for key, child in item.items())
+        elif isinstance(item, list):
+            children = ((str(index), child) for index, child in enumerate(item))
+        else:
+            continue
+        for key, child in children:
+            size = prefix_bytes + 1 + len(key.encode("utf-8")) + key.count("~") + key.count("/")
+            if size > 2048:
+                return True
+            pending.append((child, size))
+    return False
+
+
 def validate_plan(plan: Mapping[str, Any]) -> None:
     argv = plan.get("argv") if isinstance(plan, dict) else None
     if (not isinstance(plan, dict) or set(plan) != {"argv"} or not isinstance(argv, list) or not argv
@@ -62,7 +86,12 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
         observation["native_observation"] = payload["native_observation"]
     if payload.get("detail_fragment_required"):
         observation["semantic_preview"] = payload["semantic_preview"]
-    entries = detail_entries(observation)
+    encoded_observation = canonical_json_bytes(observation)
+    document_fragments = _has_oversized_pointer(observation)
+    # Canonical traversal makes entry positions stable when only native object
+    # member order changes; arrays retain their exact native order.
+    entries = detail_entries(encoded_observation.decode("utf-8") if document_fragments
+                             else json.loads(encoded_observation))
     if not 0 <= offset < len(entries):
         raise QueryResultPageError("Query result page is outside the exact observation")
     # Identity atoms remain exact or explicitly omitted. No previews can be
@@ -79,13 +108,17 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
     while True:
         complete = end == len(entries)
         result = {"objects": headers, "entries": entries[offset:end],
+            "entries_encoding": "json-document-fragments" if document_fragments else "json-pointer-entries",
+            **({"entry_reconstruction": "Concatenate value strings in offset order, then read the single JSON document; native field names and values remain exact"}
+               if document_fragments else {}),
             "projection_complete": complete, "identity_header_row_count": len(headers),
             "identity_headers_complete": (len(headers) == len(payload["objects"])
                 and all(all(isinstance(header.get(key), str) for key in ("id", "name", "type", "path"))
                         for header in headers)),
             "query_exhaustion": "not_certified_by_projection_completion",
             "page": {"offset": offset, "next_offset": end, "total_positions": len(entries),
-                "position_unit": "lossless JSON entries with exact pointers and string offsets",
+                "position_unit": ("canonical JSON document string fragments with exact character offsets" if document_fragments
+                    else "lossless JSON entries with exact pointers and string offsets"),
                 "native_read": "repeat_same_bounded_read_and_verify_entire_result",
                 "native_result_sha256": binding["native_result_sha256"],
                 "expires_at": expires_at, "mutation_authority": False}}
@@ -94,5 +127,5 @@ def build_page(payload: Mapping[str, Any], *, offset: int, binding: Mapping[str,
         if len(json.dumps(result, ensure_ascii=False, indent=2).encode("utf-8")) <= 20 * 1024:
             return result
         if end <= offset + 1:
-            raise QueryResultPageError("One query entry or identity inventory exceeds the bounded projection; refine the original read")
+            raise QueryResultProjectionLimitError("One query entry or identity inventory exceeds the bounded projection; refine the original read")
         end = offset + max(1, (end - offset) // 2)

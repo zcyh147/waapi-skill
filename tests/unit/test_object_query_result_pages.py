@@ -117,6 +117,9 @@ def test_query_result_pages_reject_changed_result_context_and_selection(tmp_path
         task.field = 'Unrelated'
     code, rejected = task.run(*argv)
     assert code == 2, rejected
+    if change != 'extra-query':
+        assert rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
+    assert rejected['error_code'] not in {'TypeError', 'KeyError'}
     assert 'agent_result' not in rejected or rejected['agent_result'] is None
     if change in {'session', 'project', 'configuration', 'extra-query'}:
         assert not any(uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}
@@ -339,3 +342,117 @@ def test_paged_query_identity_headers_are_complete_only_when_every_exact_identit
     assert page['identity_headers_complete'] is True
     assert {key: page['objects'][0][key] for key in ('id', 'name', 'type', 'path')} == {
         key: task.row[key] for key in ('id', 'name', 'type', 'path')}
+
+
+class LongFieldTask(QueryTask):
+    def call(self, uri, args=None, options=None):
+        if uri.endswith('getPropertyInfo'):
+            self.calls.append((uri, args, options))
+            return {'name': self.field, 'type': 'Real32', 'display': {'name': 'Owned value'}}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('key_style', ['ascii', 'escaped-unicode', 'astral'])
+def test_query_pages_recover_exact_native_map_key_larger_than_one_fragment_page(tmp_path, version, key_style, monkeypatch):
+    if key_style == 'astral':
+        import types
+        original = gateway.transaction_next_command
+        def windows_command(*args, **kwargs):
+            actual = gateway.os
+            gateway.os = types.SimpleNamespace(**{**vars(actual), 'name': 'nt'})
+            try:
+                return original(*args, **kwargs)
+            finally:
+                gateway.os = actual
+        monkeypatch.setattr(gateway, 'transaction_next_command', windows_command)
+    task = LongFieldTask(tmp_path, version)
+    task.field = 'NativeProperty' + {'ascii': 'A' * 25000, 'escaped-unicode': '声~/' * 9000, 'astral': '𝄞🎧/' * 5000}[key_style]
+    task.row['notes'] += '\\quoted " /~\n🎧\t'
+    task.row['@' + task.field] = 12.5
+    page = task.first('--include-field', 'Owned value')
+    seen = []
+    while True:
+        assert len(json.dumps(page, ensure_ascii=False, indent=2).encode()) <= 32 * 1024
+        assert page['agent_result']['entries_encoding'] == 'json-document-fragments'
+        assert list(page)[-1] == 'agent_result'
+        assert page['agent_result']['page']['mutation_authority'] is False
+        for entry in page['agent_result']['entries']:
+            assert entry['value'].encode('utf-8').decode('utf-8') == entry['value']
+        seen.extend(page['agent_result']['entries'])
+        if page['agent_result']['projection_complete']:
+            break
+        command = page['agent_result']['next_command']
+        assert len(json.dumps(command['gateway_argv']).encode()) < 512
+        assert len(command['shell_command'].encode()) < 8192
+        if key_style == 'astral':
+            assert '-EncodedCommand' in command['shell_command']
+        code, page = task.run(*command['gateway_argv'])
+        assert code == 0, json.dumps(page)
+    recovered = json.loads(''.join(entry['value'] for entry in seen))
+    assert recovered == {'objects': [{
+        'id': PROJECT_GUID, 'name': 'Sound', 'type': 'Sound', 'path': task.row['path'],
+        'notes': task.row['notes'], 'properties': {task.field: 12.5}}]}
+    assert all(options['return'][-1] == '@' + task.field for uri, args, options in task.calls
+               if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'})
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_query_pointer_page_positions_remain_stable_when_native_object_member_order_changes(tmp_path, version):
+    class ReorderedTask(QueryTask):
+        def call(self, uri, args=None, options=None):
+            if uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}:
+                self.row['parent'] = dict(reversed(tuple(self.row['parent'].items())))
+            return super().call(uri, args, options)
+    task = ReorderedTask(tmp_path, version)
+    parent_name = 'Parent' + '声' * 16000
+    task.row['parent'] = {'id': PROJECT_GUID, 'name': parent_name}
+    page = task.first('--include', 'parent')
+    entries = []
+    while True:
+        assert page['agent_result']['entries_encoding'] == 'json-pointer-entries'
+        entries.extend(page['agent_result']['entries'])
+        if page['agent_result']['projection_complete']:
+            break
+        code, page = task.run(*page['agent_result']['next_command']['gateway_argv'])
+        assert code == 0, page
+    assert ''.join(entry['value'] for entry in entries if entry['pointer'] == '/objects/0/parent/name') == parent_name
+    assert [entry['value'] for entry in entries if entry['pointer'] == '/objects/0/parent/id'] == [PROJECT_GUID]
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('change', ['result', 'session', 'field'])
+def test_document_fragment_query_pages_reject_changed_native_observation_and_selection(tmp_path, version, change):
+    task = LongFieldTask(tmp_path, version)
+    task.field = 'NativeProperty' + 'A' * 25000
+    task.row['@' + task.field] = 12.5
+    first = task.first('--include-field', 'Owned value')
+    assert first['agent_result']['entries_encoding'] == 'json-document-fragments'
+    argv = first['agent_result']['next_command']['gateway_argv']
+    before = len(task.calls)
+    if change == 'result':
+        task.row['@' + task.field] = 13.5
+    elif change == 'session':
+        task.info['sessionId'] = '{33333333-3333-3333-3333-333333333333}'
+    else:
+        task.row.pop('@' + task.field)
+        task.field = 'NativeProperty' + 'B' * 25000
+        task.row['@' + task.field] = 12.5
+    code, rejected = task.run(*argv)
+    assert code == 2 and rejected['error_code'] == 'QUERY_RESULT_CONTINUATION_CHANGED', rejected
+    assert rejected['details']['projection_complete'] is False if change != 'session' else rejected['details']['native_query_dispatched'] is False
+    assert 'agent_result' not in rejected
+    if change == 'session':
+        assert not any(uri.endswith('object.get') and args != {'waql': 'from type Project take 1'}
+                       for uri, args, _ in task.calls[before:])
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_non_utf8_native_surrogate_is_rejected_without_lossy_query_projection(tmp_path, version):
+    task = QueryTask(tmp_path, version)
+    task.row['notes'] = chr(0xD800)
+    code, result = task.run('query-object', '--exact-id', PROJECT_GUID, '--include', 'notes')
+    assert code == 2, result
+    assert result['call']['error_code'] == 'RESULT_NOT_JSON'
+    assert result['agent_result'] is None
+    json.dumps(result, ensure_ascii=False).encode('utf-8')
