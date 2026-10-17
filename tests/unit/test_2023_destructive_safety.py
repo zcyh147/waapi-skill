@@ -176,7 +176,6 @@ def _configure_2023_paths(
     monkeypatch.setattr(live_env, "WWISE_2023_1_CONSOLE_PATH", console_path)
     monkeypatch.setattr(live_env, "WWISE_2023_1_SAMPLE_PROJECT_PATH", sample_project_path)
     monkeypatch.setattr(live_env, "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT", sample_project_path.parent)
-    monkeypatch.setattr(destructive_2023_sandbox, "WWISE_2023_1_CONSOLE_PATH", console_path)
     monkeypatch.setattr(destructive_2023_sandbox, "WWISE_2023_1_SAMPLE_PROJECT_PATH", sample_project_path)
     monkeypatch.setattr(
         live_env,
@@ -236,3 +235,60 @@ def _sandbox_project(*, source_project: Path, sandbox_root: Path, sandbox_projec
             expected_project_identity=source_project.stem,
         ),
     )
+
+
+def test_2023_destructive_sandbox_uses_configured_source_from_another_checkout(tmp_path, monkeypatch):
+    import json
+    console = _make_console(tmp_path / "WwiseConsole.sh")
+    local = _make_project(tmp_path / "current-checkout" / "tests" / "_org" / "2023.1" / "SampleProject.wproj")
+    configured = _make_project(tmp_path / "configured-checkout" / "tests" / "_org" / "2023.1" / "SampleProject.wproj")
+    _configure_2023_paths(monkeypatch, console_path=console, sample_project_path=local)
+    config = tmp_path / "live-environment.json"
+    config.write_text(json.dumps({"versions": {"2023.1": {
+        "wwise_console": str(console), "sample_project": str(configured)}}}))
+    env = {"WWISE_LIVE": "1", "WWISE_DESTRUCTIVE": "1", "WWISE_VERSION": "2023.1",
+           "WWISE_TEST_CONFIG": str(config)}
+    before = destructive_2023_sandbox.hash_mutation_bearing_project_files(configured.parent)
+    selected = require_2023_live_destructive_prerequisites(env)
+    assert selected.sample_project_source == configured.resolve()
+    sandbox_root = tmp_path / "owned-sandbox"
+    copied = _make_project(sandbox_root / "copy" / "SampleProject.wproj")
+    sandbox = _sandbox_project(source_project=configured, sandbox_root=sandbox_root, sandbox_project=copied)
+    target = require_2023_sandbox_copy_target(env, sandbox)
+    assert target.active_destructive_project == copied.resolve()
+    assert destructive_2023_sandbox.hash_mutation_bearing_project_files(configured.parent) == before
+
+
+@pytest.mark.parametrize("fault", ["wrong-source", "inside-source", "contains-source", "active-source"])
+def test_2023_configured_source_keeps_exact_copy_and_immutable_root_guards(tmp_path, monkeypatch, fault):
+    import json
+    from tests.destructive.support.sandbox_fixture import SandboxFixtureError
+    console = _make_console(tmp_path / "WwiseConsole.sh")
+    local = _make_project(tmp_path / "local-source" / "SampleProject.wproj")
+    configured = _make_project(tmp_path / "configured-source" / "SampleProject.wproj")
+    _configure_2023_paths(monkeypatch, console_path=console, sample_project_path=local)
+    config = tmp_path / "live-environment.json"
+    config.write_text(json.dumps({"versions": {"2023.1": {
+        "wwise_console": str(console), "sample_project": str(configured)}}}))
+    env = {"WWISE_TEST_CONFIG": str(config)}
+    source = local if fault == "wrong-source" else configured
+    root = (configured.parent / "runtime" if fault == "inside-source" else
+            tmp_path if fault == "contains-source" else
+            configured.parent if fault == "active-source" else tmp_path / "owned")
+    copied = configured if fault == "active-source" else _make_project(root / "copy" / "SampleProject.wproj")
+    sandbox = _sandbox_project(source_project=source, sandbox_root=root, sandbox_project=copied)
+    before = destructive_2023_sandbox.hash_mutation_bearing_project_files(configured.parent)
+    with pytest.raises((LiveEnvironmentError, SandboxFixtureError)):
+        require_2023_sandbox_copy_target(env, sandbox)
+    assert destructive_2023_sandbox.hash_mutation_bearing_project_files(configured.parent) == before
+
+
+def test_2023_prerequisites_keep_default_pin_without_an_explicit_config(tmp_path, monkeypatch):
+    console = _make_console(tmp_path / "WwiseConsole.sh")
+    local = _make_project(tmp_path / "local-source" / "SampleProject.wproj")
+    other = _make_project(tmp_path / "other-source" / "SampleProject.wproj")
+    _configure_2023_paths(monkeypatch, console_path=console, sample_project_path=local)
+    env = {"WWISE_LIVE": "1", "WWISE_DESTRUCTIVE": "1", "WWISE_VERSION": "2023.1",
+           "WWISE_SAMPLE_PROJECT_PATH": str(other)}
+    with pytest.raises(LiveEnvironmentError, match="exact 2023.1 SampleProject"):
+        require_2023_live_destructive_prerequisites(env)

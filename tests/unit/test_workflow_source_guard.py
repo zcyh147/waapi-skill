@@ -928,3 +928,66 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
     if version == "2021.1":
         assert any(args == {"waql": "from type Event where shortId = 123 take 65"}
                    for args, _options in dispatches)
+
+
+@pytest.mark.parametrize(("projection", "fault"), [("full", None), ("compact", None),
+    ("compact", "verification-digest"), ("compact", "assertion-count")])
+def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence(tmp_path, workflow, projection, fault):
+    matrix = importlib.import_module("tests.destructive.test_gateway_transaction_matrix")
+    from copy import deepcopy
+    from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, ROOT
+    from tests.unit.test_field_interface_closure_gateway import SECOND
+
+    class Client(OwnedGraphTask):
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getProjectInfo":
+                # Existing large-project native response fixture forces the
+                # real bounded stdout producer to compact verification evidence.
+                response = super().call(uri, args, options)
+                return ({**response, "directories": {"cache": "x" * 13_000}}
+                        if projection == "compact" else response)
+            if uri == "ak.wwise.core.object.create":
+                self.calls.append((uri, deepcopy(args), deepcopy(options)))
+                assert args["parent"] == SECOND
+                assert args["type"] == "ActorMixer" and args["name"] == "LegacyProbe"
+                assert args["notes"] == "Created once through public Draft"
+                self.objects[ROOT] = {"id": ROOT, "name": "LegacyProbe", "type": "ActorMixer",
+                    "path": self.objects[SECOND]["path"] + "\\LegacyProbe",
+                    "parent": {"id": SECOND}, "notes": args["notes"]}
+                return {"id": ROOT, "name": "LegacyProbe"}
+            return super().call(uri, args, options)
+
+    client = Client(tmp_path, "2023.1", "object.create")
+    commands = []
+
+    def gateway(command, *, live):
+        commands.append(list(command))
+        code, payload = matrix.waapi_gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), *command], env=client.env,
+            client_factory=lambda _url: client)
+        assert code == 0, payload
+        if command[0] == "verify" and fault is not None:
+            if fault == "verification-digest":
+                payload["stdout_projection"]["verification_canonical_sha256"] = "0" * 64
+            else:
+                payload["verification"]["passed_assertion_count"] += 1
+        return payload
+
+    runtime = SimpleNamespace(version="2023.1", state_dir=tmp_path / "state", gateway=gateway)
+    def complete():
+        return matrix._complete_business_object_create(runtime,
+            parent_segments=("Actor-Mixer Hierarchy", "Default Work Unit"),
+            name="LegacyProbe", notes="Created once through public Draft")
+
+    if fault is not None:
+        with pytest.raises(AssertionError):
+            complete()
+    else:
+        result = complete()
+        assert result["verify"]["verified"] is True
+        assert ("assertions" in result["verify"]["verification"]) is (projection == "full")
+        assert result["verification_evidence"]["assertions"]
+        assert all(item["passed"] is True for item in result["verification_evidence"]["assertions"])
+    assert client.objects[ROOT]["parent"] == {"id": SECOND}
+    assert len([uri for uri, _args, _options in client.calls if uri.endswith("object.create")]) == 1
+    assert len([command for command in commands if command[0] == "execute"]) == 1
