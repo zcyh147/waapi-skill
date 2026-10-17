@@ -132,9 +132,10 @@ def test_explicit_stages_configure_verified_created_object_once(tmp_path: Path, 
     preserved = deepcopy(task.objects[EXISTING])
     parent = task.bind(FIRST)
     kind = task.discover_kind("GameParameter")
-    code, failed = task.step("draft-discover-fields", "--type-handle", kind, "--meaning", "InitialValue")
-    assert code == 2, failed
-    recovery = failed["details"]["rejected_candidates"][0]["details"]["new_object_workflow"]
+    # Class/default planning now supports this scalar grammar. Explicit staging
+    # remains valid when the user wants independently authorized field changes.
+    code, discovered = task.step("draft-discover-fields", "--type-handle", kind, "--meaning", "InitialValue")
+    assert code == 0, discovered
     code, declared = task.step("draft-declare-new", "--declaration-id", "control", "--parent-handle", parent,
                                "--name", "WeatherIntensity", "--kind", kind)
     assert code == 0, declared
@@ -147,7 +148,6 @@ def test_explicit_stages_configure_verified_created_object_once(tmp_path: Path, 
     # Use the exact independently verified creation identity, not a repeated class lookup.
     created_id = created["agent_result"]["business_result"]["verified_root"]["id"]
     assert created_id == CREATED
-    assert recovery["configuration_identity"] == "verified_created_object_GUID"
     calls_before_configuration = len(task.calls)
     for meaning, value in (("Min", -12), ("Max", 36), ("InitialValue", 7)):
         task.start_configuration(created_id, meaning, value)

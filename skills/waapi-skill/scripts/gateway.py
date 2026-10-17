@@ -3091,6 +3091,8 @@ def build_parser() -> argparse.ArgumentParser:
     _add_business_draft_binding_arguments(draft_bind_object)
     object_selector = draft_bind_object.add_mutually_exclusive_group(required=True)
     object_selector.add_argument("--object-id")
+    object_selector.add_argument("--verified-created-from", metavar="TRANSACTION",
+        help="Bind the independently verified root of one durable creation transaction; recheck its exact identity")
     object_selector.add_argument("--object-path-segment", action="append")
     object_selector.add_argument(
         "--exact-type-name",
@@ -18126,6 +18128,8 @@ def _business_object_selector_from_namespace(
             expected_path=complete_path,
             expected_name=args.scoped_child_name,
         )
+    if args.verified_created_from is not None:
+        return _BusinessObjectSelector(request={}, kind="verified-created-root")
     if args.object_id is not None:
         if not _canonical_guid(args.object_id):
             raise GatewayInputError(
@@ -18323,6 +18327,35 @@ def _open_business_binding(
     )
 
 
+def _verified_created_root_identity(verification: Mapping[str, Any]) -> dict[str, str] | None:
+    """Use the verifier's structured identity witness, even if a field failed."""
+    witnesses = [row.get("evidence") for row in verification.get("assertions", [])
+                 if isinstance(row, Mapping) and row.get("kind") == "verified_created_root_identity"
+                 and row.get("passed") is True]
+    if len(witnesses) != 1 or not isinstance(witnesses[0], Mapping):
+        return None
+    try:
+        value = normalize_live_object_identity(witnesses[0])
+    except ValueError:
+        return None
+    return {"id": value.object_id, "name": value.name, "type": value.object_type, "path": value.path}
+
+
+def _created_root_business_result(verification: Mapping[str, Any], transaction_id: str) -> dict[str, Any]:
+    identity = _verified_created_root_identity(verification)
+    return {
+        "contract": "waapi-skill.verified-created-root/v1",
+        "identity_status": "verified" if identity is not None else "unavailable",
+        "verified_root": identity,
+        "configuration_complete": verification.get("business_state_verified") is True,
+        "configuration_complete_scope": "this_creation_declaration_only_followup_fields_require_separate_verification",
+        "next_change": "bind_the_verified_creation_transaction_and_revalidate_live_name_type_path",
+        "configuration_binding": {"selector": "--verified-created-from", "transaction_id": transaction_id,
+                                  "scope": "created_root_only", "requires_separate_Draft_and_Preview": True},
+        "repeat_creation": False,
+    }
+
+
 def dispatch_business_object_binding(
     args: argparse.Namespace,
     *,
@@ -18405,6 +18438,29 @@ def dispatch_business_object_binding(
     if not isinstance(closed_selector, _BusinessObjectSelector):
         raise GatewayInputError(
             "Business object selector preflight evidence is unavailable."
+        )
+    if args.verified_created_from is not None:
+        snapshot = resolve_transaction_store(args, env=env).load_snapshot(args.verified_created_from)
+        artifact = snapshot.preview.artifact
+        request = artifact.get("request", {})
+        if (request.get("operation") != "object.create" or snapshot.record.state not in {
+                TransactionState.VERIFIED, TransactionState.VERIFICATION_FAILED}):
+            raise GatewayInputError("Staged configuration requires recorded independent creation verification; diagnose uncertainty without replaying creation.")
+        if artifact.get("connection_configuration") != selected_connection_binding(env):
+            raise GatewayInputError("Creation connection configuration changed; its identity cannot authorize this staged binding.")
+        current_guard = build_project_guard(endpoint=common["endpoint"], version=detected_version,
+                                            live_info=live_info, project=binding.project)
+        if artifact.get("project_guard") != current_guard:
+            raise GatewayInputError("Creation project/runtime context changed; stop staged configuration and diagnose the exact object read-only.")
+        verifications = [event.get("details", {}).get("verification", {}) for event in snapshot.events
+                         if event.get("event_type") == "verification_recorded"]
+        identity = (_verified_created_root_identity(verifications[0]) if len(verifications) == 1 else None)
+        if identity is None:
+            raise GatewayInputError("No independent verified created-root identity is sealed; diagnose the object read-only and never guess or repeat creation.")
+        closed_selector = _BusinessObjectSelector(
+            request={"from": {"id": [identity["id"]]}}, kind="verified-created-root",
+            expected_id=identity["id"], expected_name=identity["name"],
+            expected_type=identity["type"], expected_path=identity["path"],
         )
     raw = binding.read_call(
         OBJECT_GET_URI,
@@ -21493,6 +21549,8 @@ def _dispatch_transaction_command_with_execution_lease(
             ),
             "automatic_retry": False,
         }
+        if sealed_request.get("operation") == "object.create":
+            payload["creation_result"] = _created_root_business_result(verification.as_dict(), transaction_id)
         if verification.ok:
             transaction_request = require_mapping(
                 artifact.get("request"),
@@ -21508,29 +21566,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 cleanup=payload["cleanup"],
             )
             if transaction_request.get("operation") == "object.create":
-                execution_payload = execution_result.get("result")
-                root_id = execution_payload.get("id") if isinstance(execution_payload, Mapping) else None
-                identities: list[dict[str, Any]] = []
-                for readback in verification.readbacks:
-                    result = readback.get("result")
-                    rows = result.get("return") if isinstance(result, Mapping) else None
-                    if not isinstance(rows, list):
-                        continue
-                    for row in rows:
-                        if not isinstance(row, Mapping) or row.get("id") != root_id:
-                            continue
-                        identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
-                        if (_canonical_guid(identity["id"])
-                                and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
-                                and identity not in identities):
-                            identities.append(identity)
-                agent_result["business_result"] = {
-                    "contract": "waapi-skill.verified-created-root/v1",
-                    "identity_status": "verified" if len(identities) == 1 else "unavailable",
-                    "verified_root": identities[0] if len(identities) == 1 else None,
-                    "next_change": "bind_the_verified_GUID_and_revalidate_live_name_type_path",
-                    "repeat_creation": False,
-                }
+                agent_result["business_result"] = _created_root_business_result(verification.as_dict(), transaction_id)
             transaction_arguments = transaction_request.get("arguments")
             transaction_api = (
                 transaction_arguments.get("api")
@@ -25601,6 +25637,9 @@ def _business_next_action_binding(
     check = [*base, "draft-check", *binding]
     by_id = operation_draft_prefix_copy_binding(object_bind_prefix)
     by_id["append"] = ["--object-id", "<exact-guid>"]
+    by_verified_creation = operation_draft_prefix_copy_binding(object_bind_prefix)
+    by_verified_creation["append"] = ["--verified-created-from", "<creation-transaction-id>"]
+    by_verified_creation["requires"] = "sealed_independent_root_identity_and_fresh_exact_GUID_name_type_path_match"
     by_path_segments = operation_draft_prefix_copy_binding(object_bind_prefix)
     by_path_segments["append_repeated"] = [
         "--object-path-segment",
@@ -25609,6 +25648,7 @@ def _business_next_action_binding(
     by_path_segments["segment_order"] = "root_to_leaf"
     object_binding = {
         "by_id": by_id,
+        "by_verified_creation": by_verified_creation,
         "by_path_segments": by_path_segments,
         "selection_rule": (
             "user_supplied_complete_path_requires_by_path_segments; "

@@ -5353,6 +5353,7 @@ def _prepare_object_create_plugin(
         _raise_plugin_operation_error(exc)
 
     property_metadata: list[dict[str, Any]] = []
+    property_infos = []
     for metadata_request in plugin_property_metadata_requests(descriptor):
         raw_args = metadata_request["args"]
         info = _read_property_info(
@@ -5360,7 +5361,25 @@ def _prepare_object_create_plugin(
             class_id=descriptor.class_id,
             name=str(raw_args["property"]),
         )
+        _require_object_property_value(info, next(prop.value for prop in descriptor.properties if prop.name == str(raw_args["property"])))
+        property_infos.append(info)
         property_metadata.append(info.as_dict())
+
+    default_evidence = []
+    if any(info.dependencies for info in property_infos):
+        from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+        try:
+            evidence = class_default_evidence(
+                infos=tuple(property_infos), scope={"classId": descriptor.class_id}, read_call=read,
+                supplied_values={prop.name: prop.value for prop in descriptor.properties},
+                validate_scalar=_require_object_property_value,
+            )
+            if evidence["derived_properties"]:
+                raise NewObjectDefaultError("Declare the disclosed plugin prerequisite explicitly in this creation Preview.",
+                    error_code="REFERENCE_ACTIVATION_REQUIRED", details={"prerequisites": evidence["derived_properties"], "mutation_dispatched": False})
+            default_evidence.append(evidence)
+        except NewObjectDefaultError as exc:
+            raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
 
     plugin_prestate = _read_plugin_prestate(
         version=request.version,
@@ -5416,6 +5435,7 @@ def _prepare_object_create_plugin(
         "plan": plan_payload,
         "snapshot": plugin_prestate,
         "property_metadata": property_metadata,
+        **({"new_object_default_evidence": default_evidence} if default_evidence else {}),
     }
     verification: dict[str, Any] = {
         "kind": "object-plugin-created",
@@ -5434,6 +5454,8 @@ def _prepare_object_create_plugin(
             "platform": descriptor.platform,
         },
     }
+    if default_evidence:
+        verification["new_object_default_evidence"] = default_evidence
     if plugin_prestate["kind"] == "fixed_effect_references":
         verification["pre_effect_references"] = dict(
             plugin_prestate["fixed_effects"]
@@ -6955,26 +6977,6 @@ def _prepare_object_node_specs(
             spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
-        if canonical_type == "GameParameter":
-            from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
-            supplied_values = {descriptor.name: descriptor.value for descriptor in node.properties}
-            for property_info in tuple(property_info_by_name.values()):
-                if not property_info.dependencies:
-                    continue
-                try:
-                    evidence = game_parameter_default_evidence(
-                        class_name=canonical_type, info=property_info,
-                        scope={"classId": type_info.class_id}, read_call=read,
-                        supplied_values=supplied_values,
-                    )
-                except NewObjectDefaultError as exc:
-                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_CONFLICT", str(exc),
-                        details={"field": property_info.name, "request_path": node.request_path}) from exc
-                if evidence is None:
-                    raise OperationContractError("NEW_OBJECT_DEPENDENCY_UNSUPPORTED",
-                        "This new GameParameter field has an unreviewed class dependency; create then configure the verified object separately.",
-                        details={"field": property_info.name, "request_path": node.request_path})
-                spec.setdefault("new_object_default_evidence", []).append(evidence)
         for descriptor in node.references:
             info = _read_property_info_cached(
                 read,
@@ -6983,16 +6985,7 @@ def _prepare_object_node_specs(
                 name=descriptor.name,
             )
             _require_object_reference_metadata(info)
-            activation_properties = _apply_reference_activation_dependencies(
-                info,
-                read=read,
-                class_id=type_info.class_id,
-                property_specs=spec["properties"],
-                property_info_by_name=property_info_by_name,
-                derived_properties=node_derived_properties,
-                request_path=descriptor.request_path,
-                property_info_cache=property_info_cache,
-            )
+            property_info_by_name[descriptor.name.casefold()] = info
             resolved = _resolve_identity(
                 descriptor.target.as_dict(),
                 role=descriptor.request_path,
@@ -7003,9 +6996,30 @@ def _prepare_object_node_specs(
             roles[descriptor.request_path] = resolved
             resolved_references[descriptor.request_path] = resolved.object
             reference_spec = {"name": descriptor.name, "target_id": resolved.object}
-            if activation_properties:
-                reference_spec["activation_properties"] = list(activation_properties)
             spec["references"].append(reference_spec)
+        if any(info.dependencies for info in property_info_by_name.values()):
+            from .new_object_defaults import class_default_evidence, NewObjectDefaultError
+            try:
+                evidence = class_default_evidence(
+                    infos=tuple(property_info_by_name.values()),
+                    scope={"classId": type_info.class_id}, read_call=read,
+                    supplied_values={descriptor.name: descriptor.value for descriptor in node.properties},
+                    supplied_references={row["name"]: row["target_id"] for row in spec["references"]},
+                    validate_scalar=_require_object_property_value,
+                )
+            except NewObjectDefaultError as exc:
+                from .business_declarations import _dependent_new_object_workflow
+                selected = next(iter(property_info_by_name.values()))
+                workflow = _dependent_new_object_workflow(selected.name)
+                if (selected.type or "").casefold() in {"reference", "objectreference"} or selected.restriction.get("type") == "reference":
+                    workflow["configuration_operation"] = "object.setReference"
+                raise OperationContractError(exc.error_code, str(exc),
+                    details={"request_path": node.request_path, "new_object_workflow": workflow, **exc.details}) from exc
+            spec["new_object_default_evidence"] = [evidence]
+            for name, value in evidence["derived_properties"].items():
+                node_derived_properties[name] = value
+                spec["properties"].append({"name": name, "value": value,
+                    "metadata_type": evidence["metadata"][name]["type"], "derived": True})
         if node_derived_properties:
             derived_properties[node.request_path] = node_derived_properties
         specs.append(spec)
@@ -8715,6 +8729,8 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
             ),
             *(row.get("name") for row in spec.get("properties", []) if isinstance(row, Mapping)),
             *(row.get("name") for row in spec.get("references", []) if isinstance(row, Mapping)),
+            *(requirement["name"] for evidence in spec.get("new_object_default_evidence", [])
+              for requirement in evidence["requirements"]),
             *(
                 OBJECT_SET_IMPORT_READBACK_FIELDS
                 if isinstance(spec.get("import"), Mapping)
@@ -14486,23 +14502,27 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
     # metadata sealed at Preview before dispatching their single creation call.
     if isinstance(pre_state, Mapping):
         metadata_seen = set()
-        for node_key in ("object_create_nodes", "object_set_nodes"):
-            for node in pre_state.get(node_key, []):
-                for evidence in node.get("new_object_default_evidence", []):
-                    scope = evidence["class_scope"]
-                    for field, expected in evidence["metadata"].items():
-                        key = (scope.get("classId"), field)
-                        if key in metadata_seen:
-                            continue
-                        metadata_seen.add(key)
-                        args = {**scope, "property": field}
-                        result = read_call(GET_PROPERTY_INFO_URI, args, {})
-                        actual = parse_get_property_info_result(result).as_dict()
-                        readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
-                                          "args": args, "options": {}, "result": dict(result)})
-                        assertions.append({"name": f"new object class metadata {field} unchanged",
-                                           "passed": actual == expected,
-                                           "evidence": {"expected": expected, "actual": actual}})
+        condition_nodes = [*pre_state.get("object_create_nodes", []), *pre_state.get("object_set_nodes", [])]
+        if isinstance(pre_state.get("plugin_creation_guard"), Mapping):
+            condition_nodes.append(pre_state["plugin_creation_guard"])
+        for node in condition_nodes:
+            for evidence in node.get("new_object_default_evidence", []):
+                scope = evidence["class_scope"]
+                for field, expected in evidence["metadata"].items():
+                    key = (scope.get("classId"), field)
+                    if key in metadata_seen:
+                        continue
+                    metadata_seen.add(key)
+                    args = {**scope, "property": field}
+                    result = read_call(GET_PROPERTY_INFO_URI, args, {})
+                    actual = parse_get_property_info_result(result).as_dict()
+                    readbacks.append({"role": "new-object-class-default", "uri": GET_PROPERTY_INFO_URI,
+                                      "args": args, "options": {}, "result": dict(result)})
+                    assertions.append({"name": f"new object class metadata {field} unchanged",
+                                       "passed": actual == expected and ("default" in result) == evidence["default_presence"][field],
+                                       "evidence": {"expected": expected, "actual": actual,
+                                                    "expected_default_present": evidence["default_presence"][field],
+                                                    "actual_default_present": "default" in result}})
 
     graph_guard = pre_state.get("object_graph_guard") if isinstance(pre_state, Mapping) else None
     if isinstance(graph_guard, Mapping):
@@ -16819,6 +16839,9 @@ def verify_prepared_operation(
             "readback_fields",
             "readback_view",
         }
+        default_evidence = plan.get("new_object_default_evidence", [])
+        if default_evidence:
+            base_plan_fields.add("new_object_default_evidence")
         if descriptor.kind == "source" or descriptor.placement == "shareset":
             expected_plan_fields = base_plan_fields
             expected_placement_kind = "effect_shareset_child" if descriptor.placement == "shareset" else "source_child"
@@ -17017,6 +17040,22 @@ def verify_prepared_operation(
         )
         if len(plugin_rows) != 1:
             return _verification(operation, assertions, readbacks)
+        if default_evidence:
+            fields = _dedupe_fields(["id", *("@" + requirement["name"]
+                for item in default_evidence for requirement in item["requirements"])])
+            condition_rows = read_object(object_id=plugin_id, fields=fields,
+                                         language=descriptor.language, platform=descriptor.platform)
+            exact = len(condition_rows) == 1 and _same_identity(condition_rows[0].get("id"), plugin_id)
+            for item in default_evidence:
+                for requirement in item["requirements"]:
+                    name = requirement["name"]
+                    row = condition_rows[0] if exact else {}
+                    expected = requirement["effective_value"]
+                    passed = (_reference_requirement_matches(row, name, expected)
+                              if requirement["kind"] == "reference" else
+                              _has_field(row, name) and condition_values_equal(_field_value(row, name), expected))
+                    check(f"created plug-in prerequisite {name} is independently verified", exact and passed,
+                          {"expected": expected, "rows": condition_rows})
         try:
             evidence = verify_created_plugin_row(
                 descriptor,
@@ -17271,6 +17310,18 @@ def verify_prepared_operation(
                     row.get("path") == expected_path,
                     {"expected": expected_path, "actual": row.get("path")},
                 )
+            if kind == "object-create-graph" and parent_request_path is None and not spec.get("preexisting_id"):
+                identity = {key: row.get(key) for key in ("id", "name", "type", "path")}
+                relation = ("owner" if spec.get("collection") not in {None, "children"} else "parent")
+                identity_ok = (
+                    result_node is not None and _same_identity(row.get("id"), object_id)
+                    and _object_type_matches(row.get("type"), spec) and name_ok
+                    and _same_identity(_reference_identity(row.get(relation)), expected_parent_id)
+                    and (expected_path is None or row.get("path") == expected_path)
+                    and all(isinstance(identity[key], str) and identity[key] for key in ("name", "type", "path"))
+                )
+                assertions.append({"name": "created root identity is independently verified",
+                    "kind": "verified_created_root_identity", "passed": bool(identity_ok), "evidence": identity})
             if spec.get("notes_supplied") is True:
                 check(
                     f"{request_path} notes match",
@@ -17295,6 +17346,15 @@ def verify_prepared_operation(
                     if field_spec.get("derived") else _typed_value_equal(actual, expected, str(field_spec.get("metadata_type", ""))),
                     {"expected": expected, "actual": actual, "metadata_type": field_spec.get("metadata_type")},
                 )
+            for evidence in spec.get("new_object_default_evidence", []):
+                for requirement in evidence["requirements"]:
+                    name = requirement["name"]
+                    expected = requirement["effective_value"]
+                    passed = (_reference_requirement_matches(row, name, expected)
+                              if requirement["kind"] == "reference" else
+                              _has_field(row, name) and condition_values_equal(_field_value(row, name), expected))
+                    check(f"{request_path}.{name} creation prerequisite is independently verified", passed,
+                          {"expected": expected, "actual": _field_value(row, name), "source": requirement["source"]})
             for field_spec in spec.get("references", []):
                 if not isinstance(field_spec, Mapping):
                     continue

@@ -1766,15 +1766,14 @@ def _is_boolean_override_terminal(info):
 
 
 def _new_class_field_evidence(registry, info, live_scope, read_call):
-    from .new_object_defaults import game_parameter_default_evidence, NewObjectDefaultError
+    from .new_object_defaults import class_default_evidence, NewObjectDefaultError
     names = {row["name"] for row in registry.as_dict()["types"]
              if row["class_id"] == live_scope.get("classId")}
     if len(names) != 1:
         return None
     try:
-        return game_parameter_default_evidence(
-            class_name=next(iter(names)), info=info, scope=live_scope, read_call=read_call,
-        )
+        return class_default_evidence(infos=(info,), scope=live_scope,
+                                      read_call=read_call, discovery=True)
     except NewObjectDefaultError:
         return None
 
@@ -1786,6 +1785,9 @@ def _dependent_new_object_workflow(meaning: str) -> dict[str, Any]:
         "creation_verification": "required_before_configuration",
         "configuration_operation": "object.setProperty",
         "configuration_identity": "verified_created_object_GUID",
+        "configuration_binding": "draft-bind-object --verified-created-from CREATION_TRANSACTION",
+        "identity_source": "sealed_independent_root_identity_then_fresh_exact_GUID_name_type_path",
+        "configuration_failure_identity": "independent_root_identity_can_survive_failed_field_verification",
         "configuration_meaning": meaning,
         "field_selection": "rediscover_in_object_scope_and_copy_Field_Handle",
         "authorization": "each_Preview_uses_current_modification_policy",
