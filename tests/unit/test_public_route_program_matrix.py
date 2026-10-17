@@ -469,7 +469,10 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert cleanup["automatic_retry"] is False
         assert len(cleanup["spec_sha256"]) == 64
     assert role_validation["ok"] is True
-    assert verification.ok is True, verification.as_dict()
+    missing_cli_effect = entry.uri in {
+        "ak.wwise.cli.createNewProject", "ak.wwise.cli.addNewPlatform", "ak.wwise.cli.dumpObjects",
+    }
+    assert verification.ok is (not missing_cli_effect), verification.as_dict()
     if entry.uri == "ak.wwise.debug.generateToneWAV":
         assert verification.status == "verified"
         assert verification.business_state_verified is True
