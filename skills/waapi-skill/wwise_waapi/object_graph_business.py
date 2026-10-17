@@ -30,6 +30,8 @@ from .operation_plugin import (
     MAX_PLUGIN_NAME_LENGTH,
     MAX_PLUGIN_NOTES_LENGTH,
     MAX_PLUGIN_PROPERTIES,
+    PLUGIN_KINDS,
+    PLUGIN_TYPE_CATEGORIES,
 )
 from .object_capabilities import (
     object_child_capability,
@@ -864,18 +866,16 @@ def _materialize_create_plugin(
             action="use only the disclosed plug-in business fields",
         )
     role = fields["plugin_role"]
-    if role not in {"source", "effect"}:
+    if role not in PLUGIN_KINDS:
         raise _repair(
             session,
             "FIELD_VALUE_UNAVAILABLE",
             field="plugin_role",
-            choices=["source", "effect"],
+            choices=["source", "effect", "sink", "metadata"],
             action="choose the requested Wwise plug-in role",
         )
     type_handle = session.handles.resolve_type(fields["plugin_type_handle"])
-    accepted_categories = (
-        {"source"} if role == "source" else {"effect", "audiodevice"}
-    )
+    accepted_categories = {PLUGIN_TYPE_CATEGORIES[role].casefold()}
     if type_handle.type_category.casefold() not in accepted_categories:
         raise _repair(
             session,
@@ -969,12 +969,13 @@ def _materialize_create_plugin(
             action="provide one bounded Field Handle to business value map",
         )
     properties: list[dict[str, Any]] = []
+    references: list[dict[str, Any]] = []
     for handle, business_value in dynamic.items():
         field = session.handles.bound_field(handle)
         if (
             field.scope_kind != "class"
             or field.scope_value not in {type_handle.class_id, type_handle.name}
-            or field.field_kind != "property"
+            or field.field_kind not in {"property", "reference"}
         ):
             raise _repair(
                 session,
@@ -983,16 +984,13 @@ def _materialize_create_plugin(
                 rejected_handle=field.handle,
                 action="discover the property for the selected plug-in type",
             )
-        properties.append(
-            {
-                "name": field.token,
-                "value": session.handles.validate_field_value(
-                    field,
-                    business_value,
-                ),
-            }
-        )
-    if len(properties) > MAX_PLUGIN_PROPERTIES:
+        value = session.handles.validate_field_value(field, business_value)
+        if field.field_kind == "reference":
+            chosen = session.handles.resolve_object(value)
+            references.append({"name": field.token, "target": {"kind": "id", "value": chosen.object_id}})
+        else:
+            properties.append({"name": field.token, "value": value})
+    if len(properties) + len(references) > MAX_PLUGIN_PROPERTIES:
         raise _repair(
             session,
             "PLUGIN_PROPERTY_LIMIT_EXCEEDED",
@@ -1003,6 +1001,8 @@ def _materialize_create_plugin(
         )
     if properties:
         plugin["properties"] = properties
+    if references:
+        plugin["references"] = references
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",

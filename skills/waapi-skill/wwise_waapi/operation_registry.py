@@ -711,10 +711,21 @@ _PLUGIN_PROPERTY_ARGUMENT_SCHEMA: Mapping[str, Any] = {
 _PLUGIN_CREATION_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     "type": "object",
     "required": ["kind", "name", "class_id"],
-    "optional": ["notes", "platform", "language", "properties", "placement"],
+    "optional": ["notes", "platform", "language", "properties", "placement", "references"],
     "additionalProperties": False,
     "properties": {
-        "kind": {"type": "string", "enum": ["source", "effect"]},
+        "kind": {"type": "string", "enum": ["source", "effect", "sink", "metadata"]},
+        "references": {
+            "type": "array", "maxItems": 32,
+            "items": {
+                "type": "object", "required": ["name", "target"],
+                "additionalProperties": False,
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "target": IDENTITY_ARGUMENT_SCHEMA,
+                },
+            },
+        },
         "placement": {"type": "string", "enum": ["owner", "shareset"], "default": "owner"},
         "name": {"type": "string", "minLength": 1, "maxLength": 255},
         "class_id": {
@@ -2546,7 +2557,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         OBJECT_SET_URI,
         "object-mutation",
         (
-            "Create one owner-local Source/Effect or standalone Effect ShareSet through "
+            "Create one owner-local Source/Effect or independent Effect, Sink, or Metadata ShareSet through "
             "the version-correct Wwise object topology with a live Type Handle."
         ),
         ("target", "plugin"),
@@ -2565,14 +2576,14 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "Source plug-ins are create-only children of Sound or Voice targets",
             "Wwise 2022.1 owner Effects use the first proven-empty @Effect0 through @Effect3 reference",
             "Wwise 2023.1 and later owner Effects append one EffectSlot and verify its @Effect reference",
-            "standalone Effect ShareSets are children of an Effects Work Unit and verify their own parent/class/name/properties",
+            "independent Effect, Sink and Metadata ShareSets are children of a matching Effects, Audio Devices or Metadata Work Unit and verify parent/class/name/fields and sibling preservation",
             "pre-existing plug-in identities are sealed before dispatch; replacement, raw replaceAll, and caller-authored object.set payloads are rejected",
             "the returned association and post-read id/name/type/classId/parent/owner must bind uniquely to the immutable plan",
         ),
         supported_versions=("2022.1", "2023.1", "2024.1", "2025.1"),
         selection_guidance=_selection_guidance(
             use_when=(
-                "The user asks to attach a local Source/Effect or create an independent Effect ShareSet from live plug-in discovery.",
+                "The user asks to attach a local Source/Effect or create an independent Effect, Sink or Metadata ShareSet from live plug-in discovery.",
             ),
             avoid_when=(
                 "The request is ordinary object creation with no plug-in semantics.",
@@ -5002,20 +5013,20 @@ def _sealed_plugin_property_validation(
             "INVALID_PREVIEW",
             "object.createPlugin property validation must be an ordered array.",
         )
-    if len(value) != len(descriptor.properties):
+    if len(value) != len(descriptor.fields):
         raise OperationContractError(
             "INVALID_PREVIEW",
             "object.createPlugin property validation count does not match the "
             "immutable descriptor.",
             details={
-                "expected": len(descriptor.properties),
+                "expected": len(descriptor.fields),
                 "actual": len(value),
             },
         )
 
     validated: list[ValidatedPluginProperty] = []
     for index, (raw_row, requested) in enumerate(
-        zip(value, descriptor.properties)
+        zip(value, descriptor.fields)
     ):
         if (
             not isinstance(raw_row, Mapping)
@@ -5147,11 +5158,13 @@ def _read_plugin_prestate(
     descriptor: PluginCreationDescriptor,
     read: ReadCall,
 ) -> dict[str, Any]:
+    catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
+    plugins = [row for row in catalog if row.class_id == descriptor.class_id
+               and row.type.casefold() == descriptor.object_type.casefold()]
+    if len(plugins) != 1:
+        raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected plug-in class and kind are no longer available.")
+    plugin_type = plugins[0].as_dict()
     if descriptor.placement == "shareset":
-        catalog = parse_get_types_result(read(OBJECT_GET_TYPES_URI, {}, {}))
-        plugins = [row for row in catalog if row.class_id == descriptor.class_id and row.type.casefold() == "effect"]
-        if len(plugins) != 1:
-            raise OperationContractError("PLUGIN_TYPE_UNAVAILABLE", "The selected Effect plug-in is no longer available.")
         args = {"from": {"id": [target_id]}, "transform": [{"select": ["children"]}]}
         options = {"return": ["id", "name", "type", "parent"]}
         rows = _rows(read(OBJECT_GET_URI, args, options))
@@ -5169,7 +5182,7 @@ def _read_plugin_prestate(
         if len({value.casefold() for value in ids}) != len(ids):
             raise OperationContractError("INVALID_READBACK", "ShareSet children contain duplicate identities.")
         return {"kind": "shareset_children", "uri": OBJECT_GET_URI, "args": args, "options": options,
-                "rows": normalized, "plugin_type": plugins[0].as_dict(), "preexisting_plugin_ids": ids}
+                "rows": normalized, "plugin_type": plugin_type, "preexisting_plugin_ids": ids}
 
     if descriptor.kind == "source":
         fields = ("id", "name", "type", "parent")
@@ -5186,6 +5199,7 @@ def _read_plugin_prestate(
         )
         return {
             "kind": "source_children",
+            "plugin_type": plugin_type,
             "uri": OBJECT_GET_URI,
             "args": args,
             "options": options,
@@ -5235,6 +5249,7 @@ def _read_plugin_prestate(
             )
         return {
             "kind": "fixed_effect_references",
+            "plugin_type": plugin_type,
             "uri": OBJECT_GET_URI,
             "args": args,
             "options": options,
@@ -5319,6 +5334,7 @@ def _read_plugin_prestate(
         )
     return {
         "kind": "effect_slots",
+        "plugin_type": plugin_type,
         "uri": OBJECT_GET_URI,
         "args": owner_readback["args"],
         "options": owner_readback["options"],
@@ -5366,6 +5382,8 @@ def _prepare_object_create_plugin(
 
     property_metadata: list[dict[str, Any]] = []
     property_infos = []
+    reference_roles = {}
+    reference_conditions = []
     for metadata_request in plugin_property_metadata_requests(descriptor):
         raw_args = metadata_request["args"]
         info = _read_property_info(
@@ -5373,7 +5391,15 @@ def _prepare_object_create_plugin(
             class_id=descriptor.class_id,
             name=str(raw_args["property"]),
         )
-        _require_object_property_value(info, next(prop.value for prop in descriptor.properties if prop.name == str(raw_args["property"])))
+        selected = next(prop for prop in descriptor.fields if prop.name == str(raw_args["property"]))
+        if selected in descriptor.references:
+            _require_object_reference_metadata(info, allow_hierarchy=True)
+            resolved = _resolve_identity({"kind": "id", "value": selected.value}, role="plugin.reference." + selected.name, read=read)
+            _require_reference_target_allowed(info, resolved, read=read, conditions=reference_conditions,
+                platform=descriptor.platform, wwise_version=request.version)
+            reference_roles["plugin.reference." + selected.name] = resolved
+        else:
+            _require_object_property_value(info, selected.value)
         property_infos.append(info)
         property_metadata.append(info.as_dict())
 
@@ -5384,6 +5410,7 @@ def _prepare_object_create_plugin(
             evidence = class_default_evidence(
                 infos=tuple(property_infos), scope={"classId": descriptor.class_id}, read_call=read,
                 supplied_values={prop.name: prop.value for prop in descriptor.properties},
+                supplied_references={ref.name: ref.value for ref in descriptor.references},
                 validate_scalar=_require_object_property_value,
             )
             if evidence["derived_properties"]:
@@ -5468,6 +5495,8 @@ def _prepare_object_create_plugin(
     }
     if default_evidence:
         verification["new_object_default_evidence"] = default_evidence
+    if plugin_prestate["kind"] == "shareset_children":
+        verification["preexisting_children"] = list(plugin_prestate["rows"])
     if plugin_prestate["kind"] == "fixed_effect_references":
         verification["pre_effect_references"] = dict(
             plugin_prestate["fixed_effects"]
@@ -5489,8 +5518,8 @@ def _prepare_object_create_plugin(
     }
     return (
         preview,
-        {"target": target},
-        {"plugin_creation_guard": guard},
+        {"target": target, **reference_roles},
+        {"plugin_creation_guard": guard, **({"reference_target_conditions": reference_conditions} if reference_conditions else {})},
         verification,
         cleanup,
     )
@@ -7206,9 +7235,9 @@ def _read_property_info(
         raise AssertionError("object_id or class_id is required")
     try:
         result = read(GET_PROPERTY_INFO_URI, args, {})
-        if object_id is not None and isinstance(result, Mapping) and ("name" not in result or "type" not in result):
+        if isinstance(result, Mapping) and ("name" not in result or "type" not in result):
             names = parse_property_and_reference_names_result(read(
-                GET_PROPERTY_AND_REFERENCE_NAMES_URI, {"object": object_id}, {},
+                GET_PROPERTY_AND_REFERENCE_NAMES_URI, ({"object": object_id} if object_id is not None else {"classId": class_id}), {},
             ))
             info = bind_get_property_info_result(result, field_token=name, available_names=tuple(row.name for row in names))
         else:
@@ -16915,8 +16944,8 @@ def verify_prepared_operation(
         if default_evidence:
             base_plan_fields.add("new_object_default_evidence")
         if descriptor.kind == "source" or descriptor.placement == "shareset":
-            expected_plan_fields = base_plan_fields
-            expected_placement_kind = "effect_shareset_child" if descriptor.placement == "shareset" else "source_child"
+            expected_plan_fields = base_plan_fields | ({"preexisting_children"} if descriptor.placement == "shareset" else set())
+            expected_placement_kind = f"{descriptor.kind}_shareset_child" if descriptor.placement == "shareset" else "source_child"
             placement_shape_matches = (
                 placement.get("collection") == "children"
             )
@@ -17028,8 +17057,30 @@ def verify_prepared_operation(
         )
 
         created_id = result_binding["created_id"]
+        if descriptor.placement == "shareset":
+            # Native success and the new object's readback cannot establish
+            # preservation of the independent Work Unit children.
+            before = plan.get("preexisting_children")
+            if not isinstance(before, list) or not all(isinstance(row, Mapping) for row in before):
+                raise OperationContractError("INVALID_PREVIEW", "ShareSet preservation pre-state is malformed.")
+            after_rows = read_direct_children(object_id=target_id, fields=("id", "name", "type", "parent"))
+            try:
+                after = []
+                for row in after_rows:
+                    child_id = _plugin_guid(row.get("id"), field="shareset_child.id")
+                    parent_id = _plugin_guid(row.get("parent"), field="shareset_child.parent")
+                    if not _same_identity(parent_id, target_id) or not isinstance(row.get("name"), str) or not isinstance(row.get("type"), str):
+                        raise OperationContractError("INVALID_READBACK", "ShareSet child ownership is malformed.")
+                    after.append({"id": child_id, "name": row["name"], "type": row["type"], "parent": parent_id})
+                expected = [dict(row) for row in before] + [{"id": created_id, "name": descriptor.name, "type": descriptor.object_type, "parent": target_id}]
+                order = lambda row: row["id"].casefold()
+                preserved = sorted(after, key=order) == sorted(expected, key=order)
+            except OperationContractError as exc:
+                check("ShareSet creation preserves every unrelated child", False, exc.as_dict())
+            else:
+                check("ShareSet creation preserves every unrelated child", preserved, {"expected": expected, "actual": after})
         expected_parent_id = target_id
-        if expected_placement_kind in {"source_child", "effect_shareset_child"}:
+        if expected_placement_kind == "source_child" or descriptor.placement == "shareset":
             plugin_id = created_id
             placement_evidence: dict[str, Any] = {
                 "kind": expected_placement_kind

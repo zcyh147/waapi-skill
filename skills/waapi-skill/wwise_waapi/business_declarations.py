@@ -1110,8 +1110,7 @@ def bind_live_field(
         )
     try:
         info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": token}, {})
-        info = (bind_get_property_info_result(info_result, field_token=token, available_names=exact_names)
-                if scope_kind == "object" else parse_get_property_info_result(info_result))
+        info = bind_get_property_info_result(info_result, field_token=token, available_names=exact_names)
     except (TypeError, ValueError) as exc:
         raise _error(
             "METADATA_READBACK_INVALID",
@@ -1275,9 +1274,8 @@ def revalidate_live_field(
                 action="refresh live metadata and use the new field handle",
             )
         info_result = read_call(GET_PROPERTY_INFO_URI, {**live_scope, "property": field.token}, {})
-        info = (bind_get_property_info_result(info_result, field_token=field.token,
+        info = bind_get_property_info_result(info_result, field_token=field.token,
                                              available_names=tuple(row.name for row in names))
-                if field.scope_kind == "object" else parse_get_property_info_result(info_result))
     except BusinessDeclarationError:
         raise
     except (TypeError, ValueError) as exc:
