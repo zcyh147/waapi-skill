@@ -120,6 +120,7 @@ def build_object_get_query(
     *,
     path: str | None = None,
     object_id: str | None = None,
+    object_ids: Sequence[str] | None = None,
     type: str | None = None,
     search: str | None = None,
     query: str | None = None,
@@ -152,7 +153,15 @@ def build_object_get_query(
             details=source_note.as_dict(),
         )
 
-    source = _source_clause(path=path, object_id=object_id, type=type, search=search, query=query)
+    if object_ids is not None:
+        if (not 1 <= len(object_ids) <= MAX_STRUCTURED_SOURCE_ITEMS
+                or len(set(object_ids)) != len(object_ids)
+                or any(value is not None for value in (path, object_id, type, search, query))):
+            raise SemanticValidationError(SemanticErrorCode.AMBIGUOUS_OBJECT_IDENTITY,
+                "Resolved read candidates require 1..64 distinct canonical GUIDs and no other source.")
+        source = "from object " + ", ".join(_quote_literal(_object_guid_specifier(value)) for value in object_ids)
+    else:
+        source = _source_clause(path=path, object_id=object_id, type=type, search=search, query=query)
     clauses = [source]
     clauses.extend(_select_clauses(select))
     predicate_clause = _where_clause(where)

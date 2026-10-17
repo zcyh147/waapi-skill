@@ -196,6 +196,50 @@ def validate_semantic_payload(
     return validator.validate(uri, args=args, options=options)
 
 
+def validate_resolved_semantic_payload(
+    uri: str, args: Mapping[str, Any], options: Mapping[str, Any], *, version: str,
+) -> SchemaValidationResult:
+    """Validate Gateway-owned native requests against reachable pinned definitions.
+
+    Unlike conservative reflection validation, unresolved references cannot
+    establish a match here. Reuse the same constraint walker and its budgets.
+    """
+    from wwise_waapi.schema_inventory import load_definition_graph, resolve_schema_reference, SchemaInventoryError
+
+    graph = load_definition_graph(version)
+    schema = SemanticSchemaValidator(version=version).schema_for(uri)
+
+    class ResolvedWalker(_SchemaWalker):
+        context: Mapping[str, Any]
+
+        def validate(self, node, value, *, path, depth=0):
+            if depth > SCHEMA_VALIDATION_MAX_DEPTH:
+                raise _schema_error(uri, version, "Resolved schema exceeds the validation depth budget", section=path, maximum_depth=SCHEMA_VALIDATION_MAX_DEPTH)
+            reference = node.get("$ref", node.get("#ref"))
+            if reference is not None:
+                self.nodes += 1
+                if self.nodes > SCHEMA_VALIDATION_MAX_NODES:
+                    raise _schema_error(uri, version, "Resolved schema exceeds the validation node budget", section=path, maximum_nodes=SCHEMA_VALIDATION_MAX_NODES)
+                try:
+                    resolved = resolve_schema_reference(reference, root_schema=self.context, graph=graph)
+                except SchemaInventoryError as exc:
+                    raise _schema_error(uri, version, "Native schema reference cannot be resolved", section=path) from exc
+                previous = self.context
+                self.context = previous if resolved.document_name == "<schema>" else graph.documents[resolved.document_name]
+                try:
+                    self.validate(resolved.target, value, path=path, depth=depth + 1)
+                finally:
+                    self.context = previous
+                node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
+            super().validate(node, value, path=path, depth=depth)
+
+    walker = ResolvedWalker(uri=uri, version=version)
+    for section, payload in (("args", args), ("options", options)):
+        walker.context = schema.get(section + "Schema", {})
+        walker.validate(walker.context, dict(payload), path=section)
+    return SchemaValidationResult(uri=uri, version=version, section="request", validated_nodes=walker.nodes)
+
+
 def validate_semantic_result(
     uri: str,
     result: Any,
