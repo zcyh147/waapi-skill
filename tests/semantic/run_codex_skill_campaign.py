@@ -6948,6 +6948,15 @@ def _validate_heavy_v3_broker_records(
     # CodexGatewayBroker intentionally rejects an empty full protocol.
     if not steps:
         return
+    compound_children = any(step.subcommand == "draft-start-undo-child" for step in steps)
+    if compound_children:
+        from tests.semantic.support.codex_gateway_broker import validate_operation_draft_protocol_steps
+        # Use the same checked-child handoff reader as the business runner,
+        # only after its exact parent/child capability graph is validated.
+        try:
+            validate_operation_draft_protocol_steps(steps)
+        except ValueError as exc:
+            raise CampaignEvidenceError("compound child continuation protocol is invalid") from exc
     continuation_errors = gateway_continuation_binding_errors(
         command_records,
         records,
@@ -6955,6 +6964,7 @@ def _validate_heavy_v3_broker_records(
             "nt" if options.windows_powershell_core_host is not None else "posix"
         ),
         windows_powershell_core_host=options.windows_powershell_core_host,
+        allow_compound_checked_child_handoff=compound_children,
     )
     if continuation_errors:
         raise CampaignEvidenceError(
@@ -6983,6 +6993,15 @@ def _validate_heavy_v3_broker_records(
         ),
         existing_state_directory=task_root / "broker" / "state",
     )
+    archive_draft_ids: list[str] = []
+    for step, record in zip(steps, records, strict=True):
+        if step.subcommand not in {"draft-start", "draft-start-undo-child"}:
+            continue
+        source_payload = record.get("payload") if isinstance(record, Mapping) else None
+        issued = source_payload.get("draft") if isinstance(source_payload, Mapping) else None
+        if not isinstance(issued, Mapping) or not isinstance(issued.get("draft_id"), str):
+            raise CampaignEvidenceError("archived Draft start lacks its issued record identity")
+        archive_draft_ids.append(issued["draft_id"])
     record_keys = {
         "sequence",
         "step_name",
@@ -7090,6 +7109,7 @@ def _validate_heavy_v3_broker_records(
                 payload, step=step, replay=replay, task_root=task_root,
                 skill_source=options.skill_source,
                 expected_policy=expected_project_modification_policy,
+                archive_draft_ids=tuple(archive_draft_ids),
             )
         )
         _validate_heavy_v3_gateway_payload(
@@ -7334,6 +7354,7 @@ def _canonical_sha256(value: Any) -> str:
 def _validate_heavy_v3_compact_policy_binding(
     payload: Mapping[str, Any], *, step: Any, replay: Any,
     task_root: Path, skill_source: Path, expected_policy: str,
+    archive_draft_ids: Sequence[str] | None = None,
 ) -> bool:
     """Bind intentionally context-free public continuations to their own flow.
 
@@ -7349,8 +7370,9 @@ def _validate_heavy_v3_compact_policy_binding(
     from wwise_waapi.transactions import load_transaction_archive_snapshot
 
     draft_delta = step.subcommand in DRAFT_GATEWAY_SUBCOMMANDS - DRAFT_START_SUBCOMMANDS - {"preview-from-draft"}
+    child_start = step.subcommand == "draft-start-undo-child"
     transaction_review = step.subcommand == "transaction-show"
-    if not (draft_delta or transaction_review):
+    if not (draft_delta or child_start or transaction_review):
         return False
     if payload.get("ok") is not True or payload.get("command") != step.subcommand:
         raise CampaignEvidenceError("context-free continuation is not an exact public success")
@@ -7363,10 +7385,10 @@ def _validate_heavy_v3_compact_policy_binding(
         connection = {"config_path": str(selected.external_path), "waapi_host": config.waapi_host,
                       "waapi_port": config.waapi_port, "wwise_version": config.wwise_version}
         state = task_root / "broker" / "state"
-        if draft_delta:
+        if draft_delta or child_start:
             start = replay._draft_start_for_step(step)
-            source = replay._payloads_by_step.get(start.name)
-            if not isinstance(source, Mapping) or start.subcommand != "draft-start":
+            source = payload if child_start else replay._payloads_by_step.get(start.name)
+            if not isinstance(source, Mapping) or start.subcommand not in DRAFT_START_SUBCOMMANDS:
                 raise ValueError("compact Draft lacks its own validated start")
             issued = source.get("draft")
             if not isinstance(issued, Mapping):
@@ -7375,7 +7397,9 @@ def _validate_heavy_v3_compact_policy_binding(
             authority = source.get("task_authority")
             if not isinstance(draft_id, str) or not isinstance(authority, str):
                 raise ValueError("compact Draft lacks its issued authority")
-            durable = load_operation_draft_archive_records(state, (draft_id,))[draft_id]
+            records = load_operation_draft_archive_records(state,
+                (draft_id,) if archive_draft_ids is None else archive_draft_ids)
+            durable = records[draft_id]
             binding = durable.connection_binding
             response = payload.get("draft")
             typed_read = payload.get("typed_request")
@@ -7393,6 +7417,24 @@ def _validate_heavy_v3_compact_policy_binding(
                         and response.get("contract") == "waapi-skill.operation-draft/v1"
                         and response.get("draft_id") == draft_id and response.get("binding") == issued.get("binding")))):
                 raise ValueError("compact Draft does not preserve its own durable binding")
+            if start.subcommand == "draft-start-undo-child":
+                owner = start.arguments[0] if start.arguments else None
+                parent_source = replay._payloads_by_step.get(owner.step) if isinstance(owner, ResponseBinding) else None
+                parent_issued = parent_source.get("draft") if isinstance(parent_source, Mapping) else None
+                parent_id = parent_issued.get("draft_id") if isinstance(parent_issued, Mapping) else None
+                parent = records.get(parent_id)
+                if (parent is None or parent.operation != "waapi.undoGroup"
+                        or parent_source.get("command") != "draft-start"
+                        or parent.authority_digest != operation_draft_authority_digest(parent_source.get("task_authority"))
+                        or durable.connection_binding != parent.connection_binding
+                        or durable.composition.get("compound_parent") != {
+                            "draft_id": parent_id, "task_authority": parent_source.get("task_authority"),
+                            "expected_revision": parent_issued.get("revision"),
+                        }
+                        or child_start and (response.get("revision") != 1
+                            or not durable.audit or durable.audit[0].get("event_type") != "started")):
+                    raise ValueError("compact child does not preserve its original parent-owned policy binding")
+                source = parent_source
             if step.subcommand == "draft-check" and not direct_read:
                 check = response.get("check")
                 revision = response.get("revision")

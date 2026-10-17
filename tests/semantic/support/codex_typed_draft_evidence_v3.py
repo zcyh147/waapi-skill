@@ -9,9 +9,11 @@ from tests.semantic.support.codex_gateway_broker import (
     DraftTypedActionArgument,
     DraftTypedActionBatchArgument,
     GatewayInvocationError,
+    ResponseBinding,
     dependency_free_draft_action_block,
     draft_compact_action_result,
     project_required_metadata_tokens,
+    validate_operation_draft_protocol_steps,
 )
 from tests.semantic.support.codex_gateway_contracts import gateway_payload_contracts
 
@@ -567,7 +569,7 @@ def validate_typed_draft_evidence(
             zip(steps, broker_records, strict=False),
             start=1,
         ):
-            if step.subcommand != "draft-start":
+            if step.subcommand not in {"draft-start", "draft-start-undo-child"}:
                 continue
             record = _mapping(raw_record, label=f"Composer Broker record {index}")
             payload = _record_payload(
@@ -575,7 +577,7 @@ def validate_typed_draft_evidence(
                 index=index,
                 subcommand=step.subcommand,
             )
-            draft = _draft_projection(payload, command="draft-start")
+            draft = _draft_projection(payload, command=step.subcommand)
             draft_id = draft.get("draft_id")
             if not isinstance(draft_id, str) or not draft_id:
                 _fail("draft-start evidence is missing its issued Draft id")
@@ -589,6 +591,12 @@ def validate_typed_draft_evidence(
             if draft_ids
             else {}
         )
+        if any(step.subcommand == "draft-start-undo-child" for step in steps):
+            return _validate_compound_child_draft_evidence(
+                state_directory=state_directory, steps=steps,
+                broker_records=broker_records, durable_records=durable_records,
+                allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            )
         return _validate_typed_draft_evidence(
             state_directory=state_directory,
             steps=steps,
@@ -648,6 +656,126 @@ def _composer_flow_step_indexes(
     )
 
 
+def _validate_compound_child_draft_evidence(
+    *, state_directory: Path, steps: Sequence[Any],
+    broker_records: Sequence[Mapping[str, Any]],
+    durable_records: Mapping[str, OperationDraftRecord],
+    allow_cleaned_file_evidence: bool,
+) -> Mapping[str, Any]:
+    """Join separately checked, parent-owned records to the one sealed parent."""
+    from wwise_waapi.compound_undo_business import build_compound_undo_child_snapshot
+
+    validate_operation_draft_protocol_steps(steps)
+    starts = [step for step in steps if step.subcommand == "draft-start"]
+    if len(starts) != 1:
+        _fail("Compound child archive requires exactly one owning parent start")
+    parent_start = starts[0]
+    child_starts = [step for step in steps if step.subcommand == "draft-start-undo-child"]
+    payloads: dict[str, Mapping[str, Any]] = {}
+    arguments: dict[str, tuple[str, ...]] = {}
+    for index, (step, record) in enumerate(zip(steps, broker_records, strict=True), start=1):
+        if record.get("step_name") != step.name or step.name in payloads:
+            _fail("Compound child Broker records have duplicate or reordered owners")
+        payload = _record_payload(record, index=index, subcommand=step.subcommand)
+        actual = _subcommand_arguments(_gateway_arguments(record, index=index), step.subcommand)
+        expected: list[str] = []
+        for argument in step.arguments:
+            if isinstance(argument, str):
+                expected.append(argument)
+            elif isinstance(argument, ResponseBinding):
+                value: Any = payloads.get(argument.step)
+                for token in argument.pointer.lstrip("/").split("/"):
+                    if not isinstance(value, Mapping) or token not in value:
+                        _fail("Compound child argument lacks its prior issued response binding")
+                    value = value[token]
+                if type(value) not in {str, int}:
+                    _fail("Compound child argument binding is not one exact scalar")
+                expected.append(str(value))
+            else:
+                _fail("Compound child archive requires closed business command arguments")
+        if actual != tuple(expected):
+            _fail("Compound child argv differs from its own issued capability or revision")
+        payloads[step.name], arguments[step.name] = payload, actual
+
+    parent_id = _draft_projection(payloads[parent_start.name], command="draft-start")["draft_id"]
+    parent_authority = payloads[parent_start.name].get("task_authority")
+    parent = durable_records[parent_id]
+    if parent.operation != "waapi.undoGroup" or parent.composition is None:
+        _fail("Compound child archive does not have its exact Undo parent")
+    parent_session = BusinessDeclarationSession.from_dict(parent.composition["business_session"])
+    if parent_session.context.task_authority_digest != operation_draft_authority_digest(parent_authority):
+        _fail("Compound parent context differs from its issued authority")
+    declarations = [step for step in steps if step.subcommand == "draft-declare-undo-plan"]
+    (declaration,) = declarations
+    declaration_argv = arguments[declaration.name]
+    declaration_revision = int(_option(declaration_argv, "--expected-revision"))
+    ordered_pairs = [declaration_argv[index + 1:index + 3]
+                     for index, value in enumerate(declaration_argv) if value == "--child-draft"]
+    child_capabilities = {
+        payloads[step.name]["draft"]["draft_id"]: payloads[step.name].get("task_authority")
+        for step in child_starts
+    }
+    if (len(ordered_pairs) != len(child_starts)
+            or len({pair[0] for pair in ordered_pairs}) != len(child_starts)
+            or dict(ordered_pairs) != child_capabilities):
+        _fail("Compound parent declaration does not consume every issued child exactly once")
+
+    flows: list[Mapping[str, Any]] = []
+    covered: set[int] = set()
+    for start in (parent_start, *child_starts):
+        if not start.name.endswith(".draft-start"):
+            _fail("Compound child start lacks its exact owning flow prefix")
+        indexes = _composer_flow_step_indexes(steps, start.name[:-len(".draft-start")])
+        if covered.intersection(indexes):
+            _fail("Compound child archive has overlapping flow owners")
+        covered.update(indexes)
+        flows.append(_validate_typed_draft_evidence(
+            state_directory=state_directory, steps=tuple(steps[index] for index in indexes),
+            broker_records=tuple(broker_records[index] for index in indexes),
+            durable_records=durable_records, allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            start_subcommand=start.subcommand,
+        ))
+    if covered != set(range(len(steps))):
+        _fail("Compound child archive contains commands without an owning flow")
+    by_id = {flow["draft_id"]: flow for flow in flows}
+    snapshots = []
+    for child_id, child_authority in ordered_pairs:
+        child = durable_records[child_id]
+        if child.composition is None:
+            _fail("Compound child is missing its original composition")
+        if child.composition.get("compound_parent") != {
+            "draft_id": parent_id, "task_authority": parent_authority,
+            "expected_revision": declaration_revision,
+        }:
+            _fail("Compound child does not belong to its exact parent authority and revision")
+        child_session = BusinessDeclarationSession.from_dict(child.composition["business_session"])
+        if (child.connection_binding != parent.connection_binding
+                or child_session.context.task_authority_digest != operation_draft_authority_digest(child_authority)
+                or any(getattr(child_session.context, field) != getattr(parent_session.context, field)
+                       for field in ("project_id", "project_path", "wwise_version", "wwise_build"))):
+            _fail("Compound child differs from its own authority or parent project/configuration")
+        check = child.check
+        if (child.state is not OperationDraftState.EDITABLE or child.seal is not None
+                or not isinstance(check, Mapping) or not isinstance(parent.check, Mapping)
+                or check.get("source_revision") != child.revision - 1
+                or check.get("schema_digest") != child.schema_digest
+                or check.get("composer_digest") != child.composer_digest
+                or check.get("live_version") != child.version
+                or check.get("project_guard") != parent.check.get("project_guard")):
+            _fail("Compound child lacks its exact current checked snapshot and parent guard")
+        snapshots.append(build_compound_undo_child_snapshot(version=parent.version,
+            source_draft_id=child_id, source_revision=child.revision,
+            request=by_id[child_id]["canonical_request"]))
+    if parent_session.settings["undo_plan"]["children"] != snapshots:
+        _fail("Compound parent ordered snapshots differ from its checked original child records")
+    evidence = {"contract": TYPED_DRAFT_EVIDENCE_CONTRACT, "flow_count": len(flows),
+                "flows": flows, "flows_sha256": canonical_sha256(flows),
+                "compound_children_sha256": canonical_sha256(snapshots)}
+    if len(canonical_json_bytes(evidence)) > MAX_TYPED_DRAFT_EVIDENCE_BYTES:
+        _fail("Compound child evidence exceeds its fixed archive byte ceiling")
+    return evidence
+
+
 def _validate_business_draft_evidence(
     *,
     state_directory: Path,
@@ -659,6 +787,7 @@ def _validate_business_draft_evidence(
     steps: Sequence[Any],
     payloads: Sequence[Mapping[str, Any]],
     allow_cleaned_file_evidence: bool,
+    compound_child: bool = False,
 ) -> Mapping[str, Any]:
     event_options: list[frozenset[str]] = []
     response_revisions: list[int] = []
@@ -668,11 +797,14 @@ def _validate_business_draft_evidence(
         no_event = step.subcommand == "draft-inspect" or (
             step.subcommand == "draft-discover-fields" and "--list" in step.arguments
         )
-        if (step.subcommand.startswith("draft-")
+        child_start = compound_child and step.subcommand == "draft-start-undo-child"
+        if (step.subcommand.startswith("draft-") and not child_start
                 and step.subcommand not in _BUSINESS_DRAFT_EVENT_OPTIONS
                 and step.subcommand != "draft-inspect"):
             _fail("Business Draft command has no exact business event or read-only policy")
-        options = _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
+        # Child creation starts its own original record; it is never a parent
+        # mutation or a generic business command event fallback.
+        options = frozenset({"started"}) if child_start else _BUSINESS_DRAFT_EVENT_OPTIONS.get(step.subcommand)
         if options is not None and not no_event:
             event_options.extend(
                 (frozenset({"seal_reserved"}), frozenset({"sealed"}))
@@ -973,10 +1105,11 @@ def _validate_typed_draft_evidence(
     broker_records: Sequence[Mapping[str, Any]],
     durable_records: Mapping[str, OperationDraftRecord],
     allow_cleaned_file_evidence: bool = False,
+    start_subcommand: str = "draft-start",
 ) -> Mapping[str, Any]:
     if len(steps) != len(broker_records):
         _fail("Composer Broker record count does not match the sealed protocol")
-    starts = [step for step in steps if step.subcommand == "draft-start"]
+    starts = [step for step in steps if step.subcommand == start_subcommand]
     if len(starts) > 1:
         prefixes: list[str] = []
         for start in starts:
@@ -1032,10 +1165,10 @@ def _validate_typed_draft_evidence(
         arguments_by_step.append(arguments)
 
     start_index = next(
-        index for index, step in enumerate(steps) if step.subcommand == "draft-start"
+        index for index, step in enumerate(steps) if step.subcommand == start_subcommand
     )
     start_payload = payloads[start_index]
-    start_draft = _draft_projection(start_payload, command="draft-start")
+    start_draft = _draft_projection(start_payload, command=start_subcommand)
     draft_id = start_draft.get("draft_id")
     authority = start_payload.get("task_authority")
     binding = _mapping(start_draft.get("binding"), label="draft-start binding")
@@ -1075,6 +1208,7 @@ def _validate_typed_draft_evidence(
             steps=steps,
             payloads=payloads,
             allow_cleaned_file_evidence=allow_cleaned_file_evidence,
+            compound_child=start_subcommand == "draft-start-undo-child",
         )
 
     composition = new_composition(operation, version)

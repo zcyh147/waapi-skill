@@ -3383,11 +3383,13 @@ def _validate_compound_undo_draft_protocol_steps(
             if owned[-1].subcommand != "preview-from-draft":
                 raise ValueError("compound Undo parent must end in one Preview")
         else:
-            if owned[-1].subcommand != "draft-check":
+            changing = [step for step in owned if step.subcommand != "draft-inspect"
+                        and not (step.subcommand == "draft-discover-fields" and "--list" in step.arguments)]
+            if changing[-1].subcommand != "draft-check":
                 raise ValueError(
                     "compound Undo child Draft must end checked without a child Preview"
                 )
-            if indexes[owned[-1].name] >= indexes[declaration.name]:
+            if indexes[changing[-1].name] >= indexes[declaration.name]:
                 raise ValueError(
                     "compound Undo children must be checked before parent declaration"
                 )
