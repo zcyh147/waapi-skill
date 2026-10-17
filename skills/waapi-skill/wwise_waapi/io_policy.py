@@ -678,9 +678,10 @@ def validate_isolated_io(
     registry = contract_registry or ExecutionContractRegistry()
     try:
         from .authoring_core_manifest import requires_core_supplement
+        from .authoring_model_business import MODEL_OPERATIONS
 
         execution_contract = (registry.authoring_ui_describe(version, uri)
-                              if requires_core_supplement(version, uri) else registry.describe(version, uri))
+                              if requires_core_supplement(version, uri) or uri in MODEL_OPERATIONS else registry.describe(version, uri))
     except ExecutionContractError as exc:
         raise IOPolicyError(
             "EXECUTION_CONTRACT_ERROR",
@@ -806,9 +807,10 @@ def _load_reflected_schema(
 ) -> Mapping[str, Any]:
     try:
         from .authoring_core_manifest import requires_core_supplement
+        from .authoring_model_business import MODEL_OPERATIONS
 
         manifest = (manifest_store.load_authoring_ui_profile(version)
-                    if requires_core_supplement(version, uri) else manifest_store.load(version))
+                    if requires_core_supplement(version, uri) or uri in MODEL_OPERATIONS else manifest_store.load(version))
     except Exception as exc:  # noqa: BLE001 - normalized to a stable policy boundary
         raise IOPolicyError(
             "MANIFEST_SCHEMA_UNAVAILABLE",

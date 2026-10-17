@@ -248,6 +248,21 @@ def load_definition_graph(
     )
 
 
+def load_authoring_definition_graph(version: str) -> DefinitionGraph:
+    """Use the sealed independent Authoring graph without changing Console truth."""
+    from .native_catalog import load_native_catalog
+    catalog = load_native_catalog(version, 'wwise-authoring')
+    payload = catalog['definitions']
+    unsigned = {key: value for key, value in payload.items() if key != 'inventory_sha256'}
+    if (payload.get('contract') != DEFINITION_GRAPH_CONTRACT or payload.get('version') != version
+            or payload.get('wwise_build') != catalog['provenance']['build']
+            or _canonical_sha256(unsigned) != payload.get('inventory_sha256')):
+        raise SchemaInventoryError('Independent Authoring definition graph identity/digest mismatch')
+    return DefinitionGraph(contract=payload['contract'], version=version, wwise_build=payload['wwise_build'],
+        source_file_names=tuple(payload['source_file_names']), documents=MappingProxyType(payload['documents']),
+        inventory_sha256=payload['inventory_sha256'])
+
+
 def validate_packaged_typed_request_surface(
     *,
     root: Path = DEFAULT_MANIFEST_ROOT,

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
+from .authoring_model_business import MODEL_OPERATIONS, model_business_contract, materialize_model_business
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, layout_business_contract_data, materialize_layout_business_request
 from .authoring_ui_business_contracts import authoring_ui_business_contract_data
 from .exact_artifact_business_contracts import (
@@ -1002,7 +1003,14 @@ _LAYOUT_BUSINESS_DEFINITION = {
     "auto_apply_preview": True, "settings_are_complete_declaration": True,
 }
 
+_MODEL_BUSINESS_DEFINITION = {**_LAYOUT_BUSINESS_DEFINITION, "family": "authoring-model-business",
+    "contract_builder": model_business_contract, "materializer": materialize_model_business,
+    "update_commands": frozenset({"draft-declare-model-plan"}),
+    "initial_projection_actions": ("declare-model-plan", "inspect", "cancel"),
+    "active_projection_actions": ("declare-model-plan", "check", "inspect", "cancel")}
+
 _BUSINESS_ADAPTERS = {
+    **{op: _bind_adapter(op, {**_MODEL_BUSINESS_DEFINITION, "auto_apply_preview": op != "ak.wwise.ui.model.getState"}) for op in MODEL_OPERATIONS},
     **{operation: _bind_adapter(operation, _LAYOUT_BUSINESS_DEFINITION) for operation in LAYOUT_MUTATION_URIS},
     **{
         operation: _bind_adapter(operation, _HOST_UI_DEBUG_DEFINITION)

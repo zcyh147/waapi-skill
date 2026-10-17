@@ -198,6 +198,7 @@ def validate_semantic_payload(
 
 def validate_resolved_semantic_payload(
     uri: str, args: Mapping[str, Any], options: Mapping[str, Any], *, version: str,
+    authoring_ui_profile: bool = False,
 ) -> SchemaValidationResult:
     """Validate Gateway-owned native requests against reachable pinned definitions.
 
@@ -206,8 +207,12 @@ def validate_resolved_semantic_payload(
     """
     from wwise_waapi.schema_inventory import load_definition_graph, resolve_schema_reference, SchemaInventoryError
 
-    graph = load_definition_graph(version)
-    schema = SemanticSchemaValidator(version=version).schema_for(uri)
+    if authoring_ui_profile:
+        from wwise_waapi.schema_inventory import load_authoring_definition_graph
+        graph = load_authoring_definition_graph(version)
+    else:
+        graph = load_definition_graph(version)
+    schema = SemanticSchemaValidator(version=version, authoring_ui_profile=authoring_ui_profile).schema_for(uri)
 
     class ResolvedWalker(_SchemaWalker):
         context: Mapping[str, Any]

@@ -9,6 +9,7 @@ import math
 import os
 import queue
 import re
+import secrets
 import shlex
 import stat
 import sys
@@ -46,6 +47,8 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
     layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
 )
 from wwise_waapi.layout_blueprint import validate_blueprint  # noqa: E402
+from wwise_waapi.authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, VERSIONS as MODEL_VERSIONS, model_business_contract, model_catalog_rows, validate_model_plan, PINNED as MODEL_PINNED, model_resource_roles  # noqa: E402
+from wwise_waapi.authoring_resources import AuthoringResourceStore  # noqa: E402
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
     LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor, validate_layout_call,
@@ -604,7 +607,7 @@ OFFLINE_COMMANDS = frozenset(
     }
 )
 GATEWAY_RESULT_CONTRACT = "waapi-skill.gateway-result/v1"
-AUTHORING_HOST_REQUIRED_URIS = LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
+AUTHORING_HOST_REQUIRED_URIS = MODEL_OPERATIONS | LAYOUT_MUTATION_URIS | LAYOUT_READ_URIS | AUTHORING_UI_COMMAND_URIS | AUTHORING_UI_OBSERVATION_TOPICS | AUTHORING_CORE_URIS | {"ak.wwise.ui.getSelectedFiles"}
 TOPIC_STREAM_RECORD_CONTRACT = "waapi-skill.topic-stream/v1"
 GATEWAY_CONFIG_CONTRACT = "waapi-skill.config/v2"
 GATEWAY_SESSION_CONTEXT_CONTRACT = "waapi-skill.session-context/v2"
@@ -2638,6 +2641,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_business_draft_binding_arguments(draft_declare_cli_console_plan)
     add_cli_console_plan_arguments(draft_declare_cli_console_plan)
+    draft_model_plan = subparsers.add_parser("draft-declare-model-plan", help="Declare an owned Authoring window/model/widget outcome")
+    _add_business_draft_binding_arguments(draft_model_plan)
+    draft_model_plan.add_argument("--plan", required=True)
     draft_layout_plan = subparsers.add_parser("draft-declare-layout-plan", help="Declare one closed Authoring layout outcome")
     _add_business_draft_binding_arguments(draft_layout_plan)
     draft_layout_plan.add_argument("--layout-handle", required=True)
@@ -4671,7 +4677,7 @@ def transaction_capability(version: str, api: str) -> CapabilityRecord:
     """Resolve offline construction/guard facts, not permission to dispatch."""
     catalog = CapabilityCatalog()
     return (catalog.authoring_ui_describe(version, api)
-            if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS else catalog.describe(version, api))
+            if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS else catalog.describe(version, api))
 
 
 def authoring_host_required_payload(
@@ -7006,6 +7012,8 @@ def operation_composer_input_contract(
 def operation_draft_schema_digest(operation: str, version: str) -> str:
     """Bind named-operation and exact-URI Drafts to their owning schema."""
 
+    if operation in MODEL_OPERATIONS:
+        return canonical_sha256(model_business_contract(operation, version))
     if operation in LAYOUT_MUTATION_URIS:
         return canonical_sha256(layout_business_contract_data(operation, version))
     if operation.startswith("ak."):
@@ -7175,7 +7183,9 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
     """Expose one reviewed Core declaration without reflected typed fields."""
 
     contract = (
-        layout_business_contract_data(api, version)
+        model_business_contract(api, version)
+        if api in MODEL_OPERATIONS
+        else layout_business_contract_data(api, version)
         if api in LAYOUT_MUTATION_URIS
         else host_ui_debug_business_contract_data(api, version)
         if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS
@@ -7226,6 +7236,8 @@ def core_business_route_payload(version: str, api: str) -> dict[str, Any]:
 
 
 def core_business_route_available(api: str, version: str) -> bool:
+    if api in MODEL_OPERATIONS:
+        return version in MODEL_VERSIONS
     if api in LAYOUT_MUTATION_URIS:
         return version in layout_mutation_versions(api)
     if api in HOST_UI_DEBUG_BUSINESS_OPERATIONS:
@@ -10022,6 +10034,7 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
             (
                 *layout_catalog_rows(),
                 *layout_business_catalog_rows(),
+                *model_catalog_rows(),
                 *cli_console_business_catalog_rows(),
                 *host_ui_debug_business_catalog_rows(),
                 *core_business_catalog_rows(),
@@ -10687,6 +10700,7 @@ def sealed_read_transaction_contract(
             call_args,
             call_options,
             version=version,
+            authoring_ui_profile=api in MODEL_OPERATIONS,
         )
     except (SemanticValidationError, TypeError, ValueError):
         return None
@@ -13444,6 +13458,48 @@ def dispatch_business_source_control_plan(
     return payload
 
 
+def authoring_resource_context(args: argparse.Namespace, *, env: Mapping[str, str], connection: GatewayConnection,
+    detected_version: str, live_info: Mapping[str, Any], dispatcher: WwiseDispatcher) -> dict[str, Any]:
+    project, _ = current_project(dispatcher, connection=connection, version=detected_version)
+    identity = MetadataSessionIdentity.from_live_context(endpoint=connection.url, live_info=live_info,
+        project=project, resource_digest=MODEL_PINNED[detected_version])
+    return {'session': identity.as_dict(), 'configuration': selected_connection_binding(env), 'project_path': project['path']}
+
+
+def dispatch_business_model_plan(args: argparse.Namespace, *, env: Mapping[str, str], connection: GatewayConnection,
+    detected_version: str, live_info: Mapping[str, Any], dispatcher: WwiseDispatcher, common: Mapping[str, Any]) -> dict[str, Any]:
+    state_dir = resolve_transaction_state_directory(args, env=env)
+    pending = OperationDraftStore(state_dir).inspect(args.draft_id, task_authority=args.task_authority)
+    if pending.operation not in MODEL_OPERATIONS:
+        raise GatewayInputError('This Draft does not expose an Authoring resource plan')
+    boundary = live_authoring_api_boundary(pending.operation, command=args.command, live_info=live_info, common=common)
+    if boundary is not None:
+        return boundary
+    binding = _open_business_binding(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    plan = validate_model_plan(pending.operation, detected_version,
+        parse_json_object(args.plan, '--plan', max_document_bytes=256 * 1024))
+    context = authoring_resource_context(args, env=env, connection=connection, detected_version=detected_version,
+        live_info=live_info, dispatcher=dispatcher)
+    resource_store = AuthoringResourceStore(state_dir)
+    resources = {field: resource_store.resolve(plan[field], context=context, kind=kind)
+        for field, kind in model_resource_roles(pending.operation).items()}
+    if pending.operation == 'ak.wwise.ui.model.registerWafm':
+        resources['registration_name'] = 'Gateway_' + secrets.token_hex(16)
+    descriptor = {'context': context, 'plan': plan, 'resources': resources}
+    descriptor['sha256'] = canonical_sha256(descriptor)
+    adapter = business_adapter(pending.operation)
+    def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
+        candidate = current.with_settings({'authoring_model_plan': plan, 'authoring_model_binding': descriptor})
+        adapter.materialize(candidate)
+        return candidate
+    record = binding.store.apply_business_update(args.draft_id, task_authority=args.task_authority,
+        expected_revision=args.expected_revision, schema_digest=operation_draft_schema_digest(pending.operation, detected_version),
+        composer_digest=operation_composer_digest(pending.operation, detected_version), context=binding.context,
+        update=update, event_type='settings.revised')
+    return operation_draft_payload(args.command, record, offline=False, state_dir=args.state_dir, task_authority=args.task_authority)
+
+
 def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str, str],
     connection: GatewayConnection, detected_version: str, live_info: Mapping[str, Any],
     dispatcher: WwiseDispatcher, common: Mapping[str, Any]) -> dict[str, Any]:
@@ -13604,6 +13660,9 @@ def dispatch_command(
         "detected_version": detected_version,
         "is_command_line": bool(live_info.get("isCommandLine")),
     }
+    if args.command == "draft-declare-model-plan":
+        return dispatch_business_model_plan(args, env=env, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher, common=common)
     if args.command == "draft-declare-layout-plan":
         return dispatch_business_layout_plan(args, env=env, connection=connection,
             detected_version=detected_version, live_info=live_info, dispatcher=dispatcher, common=common)
@@ -16042,7 +16101,7 @@ def dispatch_operation_draft_check(
             inspected.operation,
             live_info=live_info,
         )
-        if capability.execution_contract["effect"] == "read":
+        if capability.execution_contract["effect"] == "read" and inspected.operation not in MODEL_OPERATIONS:
             project, _ = current_project(
                 dispatcher, connection=connection, version=detected_version,
             )
@@ -21154,6 +21213,20 @@ def _dispatch_transaction_command_with_execution_lease(
             env=env,
             read_only_transaction=read_transaction_contract is not None,
         )
+        if call_uri in MODEL_OPERATIONS:
+            model_binding = request_payload['arguments']['model_binding']
+            context = authoring_resource_context(args, env=env, connection=connection,
+                detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+            if context != model_binding['context']:
+                raise GatewayInputError('Authoring host/session/configuration changed after Preview; create a new Preview')
+            resource_store = AuthoringResourceStore(resolve_transaction_state_directory(args, env=env))
+            for field, kind in model_resource_roles(call_uri).items():
+                receipt = resource_store.resolve(model_binding['plan'][field], context=context, kind=kind)
+                if receipt != model_binding['resources'][field]:
+                    raise GatewayInputError('Authoring resource ownership changed after Preview')
+            if call_uri in {'ak.wwise.ui.window.close', 'ak.wwise.ui.model.destroyHandle'}:
+                field = 'window' if call_uri.endswith('window.close') else 'model'
+                resource_store.consume(model_binding['plan'][field], context=context, transaction_id=transaction_id)
         store.begin_execution(
             transaction_id,
             expected_authorization=record.state,
@@ -21537,6 +21610,23 @@ def _dispatch_transaction_command_with_execution_lease(
                 if isinstance(transaction_arguments, Mapping)
                 else None
             )
+            if transaction_api in {'ak.wwise.ui.window.create', 'ak.wwise.ui.model.registerWafm', 'ak.wwise.ui.model.createHandle'}:
+                model_binding = transaction_arguments['model_binding']
+                context = authoring_resource_context(args, env=env, connection=connection,
+                    detected_version=detected_version, live_info=live_info, dispatcher=dispatcher)
+                if context != model_binding['context']:
+                    raise GatewayInputError('Authoring session changed after creation; retain the transaction and never repeat creation')
+                resource_kind = 'window' if transaction_api.endswith('window.create') else 'model' if transaction_api.endswith('model.createHandle') else 'template'
+                native_id = (execution_result['result']['windowID'] if resource_kind == 'window' else
+                    execution_result['result']['handleID'] if resource_kind == 'model' else model_binding['resources']['registration_name'])
+                description = (dict(model_binding['plan']) if resource_kind != 'model' else
+                    {'template': model_binding['resources']['template']['description'], 'window': model_binding['plan']['window']})
+                parents = [model_binding['plan']['window'], model_binding['plan']['template']] if resource_kind == 'model' else []
+                receipt = AuthoringResourceStore(resolve_transaction_state_directory(args, env=env)).issue(transaction_id=transaction_id, context=context,
+                    kind=resource_kind, native_id=native_id, description=description, parents=parents)
+                agent_result['business_result'] = {'resource_handle': receipt['handle'], 'resource_kind': resource_kind,
+                    'observable_effect_verified': False, 'cleanup_required': True,
+                    'cleanup_route': ['request-schema', 'ak.wwise.ui.window.close'], 'automatic_retry': False}
             if transaction_api in {TRANSPORT_CREATE_URI, TRANSPORT_DESTROY_URI}:
                 if project is None:  # pragma: no cover - invariant project guard
                     raise GatewayResultShapeError(
@@ -26921,7 +27011,7 @@ def _business_next_action_binding(
                 "native_request_input": "forbidden",
             },
         }
-    if adapter.family == "authoring-layout-business":
+    if adapter.family in {"authoring-model-business", "authoring-layout-business"}:
         declaration = business_contract['declaration']
         shared = {'contract': 'waapi-skill.business-draft-next-action/v1',
             'responsibility_split': business_contract['responsibility_split'],
@@ -26932,7 +27022,7 @@ def _business_next_action_binding(
             return {**shared, 'required_next_phase': 'check_complete_layout_plan',
                 'check': {**operation_draft_prefix_copy_binding(check), 'append': []}}
         return {**shared, 'required_next_phase': 'declare_complete_layout_plan',
-            'declaration': {**operation_draft_prefix_copy_binding([*base, 'draft-declare-layout-plan', *binding],
+            'declaration': {**operation_draft_prefix_copy_binding([*base, declaration['subcommand'], *binding],
                 append_action='copy_verbatim_then_append_disclosed_layout_fields'),
                 'required_fields': declaration['required_fields'], 'optional_fields': declaration['optional_fields'],
                 'input_forms': declaration['input_forms'], 'submit_once': True, 'native_request_input': 'forbidden'}}
@@ -28814,7 +28904,7 @@ def operation_draft_payload(
     """Project bounded lifecycle facts without inventing adapter-owned fields."""
 
     read_only_draft = (
-        record.operation not in LAYOUT_MUTATION_URIS
+        record.operation not in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS
         and record.operation.startswith("ak.")
         and public_typed_contract(record.version, record.operation).effect == "read"
     )
@@ -30643,6 +30733,8 @@ def transaction_read_call(
         if call_sink is not None:
             call_sink.append(dispatch_call_summary(result))
         payload = result.get("result")
+        if uri == MODEL_READ_URI and isinstance(payload, list):
+            return payload
         if not isinstance(payload, Mapping):
             raise OperationContractError(
                 "INVALID_READBACK",
