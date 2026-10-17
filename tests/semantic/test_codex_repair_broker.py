@@ -71,3 +71,25 @@ def test_read_only_repair_rejects_write_lane_before_dispatch(tmp_path, argv):
     policy.begin_turn(1)
     with pytest.raises(ExpansionPolicyError):
         policy.prepare(argv, state_directory=tmp_path)
+
+
+def test_supported_offline_version_schema_crosses_authenticated_repair_broker(tmp_path):
+    from tests.unit.test_field_interface_closure_gateway import gateway
+    code, schema = gateway.execute_gateway(["--version", "2025.1", "query-schema"])
+    assert code == 0
+    prepared = PreparedExpansionCase(prompt="Read only", operation="ak.wwise.core.object.get", policy="read_only",
+        before={}, read_object_ids=frozenset({TARGET}), relationship_sources=frozenset(), read_includes=frozenset(),
+        required_assertions=frozenset({"read_refinement"}), approve_preview=lambda _: False,
+        snapshot=lambda: {}, verify=lambda *_: {})
+    policy = RepairBrokerPolicy(prepared=prepared, version="2025.1", skill_source=SKILL, scoped_paths={})
+    policy.begin_turn(1)
+    fake = tmp_path / "transport"
+    (fake / "scripts").mkdir(parents=True)
+    (fake / "scripts/run.py").write_text("print(" + repr(json.dumps(schema)) + ")")
+    with CodexGatewayBroker(skill_source=fake, expected_steps=(), runner_environment={}, transport="tcp",
+            expansion_outcome_policy=policy, expected_wwise_version="2025.1") as broker:
+        reply = broker._handle_request({"token": broker._token, "interpreter": "python",
+            "argv": [str(broker.runner_path), "gateway.py", "--version", "2025.1", "query-schema"]})
+        assert reply["exit_code"] == 0, reply
+        record = broker.evidence().records[0]
+        assert record.authenticated and record.accepted and record.succeeded

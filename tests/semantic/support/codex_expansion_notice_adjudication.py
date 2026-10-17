@@ -335,7 +335,7 @@ def _validate_partial_public_query(payload, argv, gate):
         raise ValueError('partial exact query returned another identity')
 
 
-def _authenticated_event_receipt(event, record, normalized, *, exact=False):
+def _authenticated_event_receipt(event, record, normalized, *, exact=False, command=None):
     """Existing Broker/event equality boundary, shared by read and Preview facts."""
     from tests.semantic.support.codex_c09_notice_adjudication import _decode
     item, payload = event['item'], record['payload']
@@ -347,7 +347,7 @@ def _authenticated_event_receipt(event, record, normalized, *, exact=False):
             or not isinstance(payload, Mapping)
             or record.get('payload_sha256') != canonical_digest(payload)
             or (canonical_digest(from_event) != canonical_digest(payload) if exact else from_event != payload)
-            or payload.get('command') != normalized[3]
+            or payload.get('command') != (command or normalized[3])
             or tuple(record['gateway_arguments']) != normalized[3:]):
         raise ValueError('event differs from authenticated Broker receipt')
     return payload
@@ -451,7 +451,13 @@ def _public_read_evidence(events, command_records, *, version, broker_records, r
         if command is None:
             continue
         normalized = normalized_gateway_command_argv(command.argv, expected_wwise_version=version)
-        if len(normalized) < 4 or normalized[3] not in _PUBLIC_READ_RESULT_KEYS:
+        if len(normalized) < 4:
+            continue
+        argv = normalized[3:]
+        if argv[0].startswith('-') and gate is not None:
+            from tests.semantic.support.codex_repair_gateway_argv import repair_command_argv
+            argv = repair_command_argv(argv, parser=gate.public_parser, version=version)
+        if argv[0] not in _PUBLIC_READ_RESULT_KEYS:
             continue
         matches = [(index, row) for index, row in enumerate(records) if index not in used
             and tuple(normalized_gateway_command_argv(row['model_argv'], expected_wwise_version=version))[1:] == normalized[1:]
@@ -460,8 +466,8 @@ def _public_read_evidence(events, command_records, *, version, broker_records, r
             raise ValueError('public read lacks admitted Broker evidence')
         index, record = matches[0]
         used.add(index)
-        argv, payload = tuple(record['gateway_arguments']), record['payload']
-        _authenticated_event_receipt(event, record, normalized)
+        payload = record['payload']
+        _authenticated_event_receipt(event, record, normalized, command=argv[0])
         gate.admit(argv)
         complete = gate.observe(payload)
         if not complete:
@@ -469,7 +475,7 @@ def _public_read_evidence(events, command_records, *, version, broker_records, r
                 continue  # Recognized failed/clarification receipts grant no acquired facts.
             _validate_partial_public_query(payload, argv, gate)
         reads.append({'event_position': position, 'broker_sequence': record['sequence'],
-            'gateway_arguments': list(argv), 'payload_sha256': record['payload_sha256'],
+            'gateway_arguments': list(record['gateway_arguments']), 'payload_sha256': record['payload_sha256'],
             'broker_record_sha256': canonical_digest(record),
             'scope_complete': (complete and not (payload.get('complete') is False or payload.get('truncated') is True
                 or isinstance(payload.get('response_integrity'), Mapping) and (

@@ -20,6 +20,7 @@ SERVICE_TIER = "default"
 REMAINING_SUFFIX = ("REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4")
 FINAL_PAIR = ("REPAIR25-F3", "REPAIR25-F4")
 FINAL_SINGLETON = ("REPAIR25-F4",)
+REMAINING_F3 = ("REPAIR25-F3",)
 OPTIONAL_F2_RETRY = ("REPAIR25-F2",)
 OPTIONAL_F2_F3_RETRY = ("REPAIR25-F2", "REPAIR25-F3")
 BUDGET = {"fresh_tasks": 4, "user_turns": 4, "model_calls": 4,
@@ -115,8 +116,8 @@ class RepairProfile:
 def load_repair_profile(path: Path, *, unit_ids: Sequence[str] = (),
                         versions: Sequence[str] = ()) -> RepairProfile:
     # Selection support does not authorize a launch; retries require new user approval.
-    if tuple(unit_ids) not in {(), ("REPAIR25-F1", "REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"), REMAINING_SUFFIX, FINAL_PAIR, FINAL_SINGLETON, OPTIONAL_F2_RETRY, OPTIONAL_F2_F3_RETRY} or tuple(versions) not in {(), ("2025.1",)}:
-        raise ValueError("repair selection requires all four workflows or the ordered F2-F4 / F3-F4 / F4 continuations or explicit F2 / F2-F3 retries on 2025.1")
+    if tuple(unit_ids) not in {(), ("REPAIR25-F1", "REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"), REMAINING_SUFFIX, FINAL_PAIR, FINAL_SINGLETON, REMAINING_F3, OPTIONAL_F2_RETRY, OPTIONAL_F2_F3_RETRY} or tuple(versions) not in {(), ("2025.1",)}:
+        raise ValueError("repair selection requires all four workflows or the ordered F2-F4 / F3-F4 / F4 / F3 continuations or explicit F2 / F2-F3 retries on 2025.1")
     source = load_closed_business_profile_source(path, contract=PROFILE_CONTRACT,
         profile_id=PROFILE_ID, model=MODEL, reasoning_effort=REASONING_EFFORT,
         service_tier=SERVICE_TIER, expected_unit_count=4, error_type=ValueError,

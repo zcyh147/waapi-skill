@@ -29,6 +29,8 @@ class RepairBrokerPolicy(ExpansionBrokerPolicy):
         return self.read_complete if self.prepared.policy == "read_only" else super().complete
 
     def prepare(self, argv, *, state_directory):
+        from tests.semantic.support.codex_repair_gateway_argv import repair_command_argv
+        argv = repair_command_argv(argv, parser=self.parser, version=self.version)
         if self.prepared.policy == "read_only" and (not argv or argv[0] not in {
                 "status", "operations", "query-schema", "operation-schema", "request-schema", "query-object", "metadata"}):
             raise ExpansionPolicyError("repair read-only workflow cannot prepare or execute a transaction")

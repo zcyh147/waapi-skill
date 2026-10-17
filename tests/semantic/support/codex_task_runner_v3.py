@@ -1720,7 +1720,7 @@ def run_expansion_codex_task(
         "inputs_sha256": options.campaign_inputs_sha256,
         "platform_name": os.name,
         "skill_source": str(options.skill_source.resolve()),
-        "trusted_python": str(Path(sys.executable).resolve()),
+        "trusted_python": str(Path(sys.executable).absolute()),
         "windows_powershell_core_host": (asdict(options.windows_powershell_core_host)
                                          if options.windows_powershell_core_host else None),
         "scoped_paths": dict(scoped_paths),
