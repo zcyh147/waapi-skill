@@ -31,6 +31,7 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project
 from .canonical import canonical_json_bytes, canonical_sha256
+from .object_inline_curve import InlineCurveError, prepare_inline_curve, observe_inline_curve_proof
 from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches, lifecycle_snapshot_equal
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
@@ -103,6 +104,7 @@ from .operation_import import (
     verify_regular_file_proof as verify_import_file_proof,
 )
 from .operation_object import (
+    ObjectCurveDescriptor,
     DEFAULT_MAX_CHILDREN_PER_NODE,
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_FIELDS_PER_NODE,
@@ -828,7 +830,10 @@ _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
     "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
                    "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"},
-                       {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA}]}},
+                       {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA},
+                       {"type": "object", "required": ["curve_points"], "additionalProperties": False,
+                        "properties": {"curve_points": {"type": "array", "maxItems": 256,
+                                                          "items": _RTPC_POINT_ARGUMENT_SCHEMA}}}]}},
 }
 
 _OBJECT_CREATE_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
@@ -5827,6 +5832,15 @@ def _prepare_object_set(
                     field_name=descriptor.name,
                     platform=platform,
                 )
+            if isinstance(descriptor.target, ObjectCurveDescriptor):
+                try:
+                    value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
+                                                        scope={"object": target.object}, types=type_catalog)
+                except (InlineCurveError, MetadataRestrictionError) as exc:
+                    raise OperationContractError(exc.error_code, str(exc)) from exc
+                trusted[f"@{descriptor.name}"] = value
+                target_spec["references"].append({"name": descriptor.name, "curve": value, "curve_proof": proof})
+                continue
             identities = []
             for offset, target_descriptor in enumerate(descriptor.targets):
                 role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
@@ -5837,7 +5851,7 @@ def _prepare_object_set(
             value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
             trusted[f"@{descriptor.name}"] = value
             target_spec["references"].append({"name": descriptor.name, "target_id": value})
-        desired_references = {row["name"].casefold(): row["target_id"] for row in target_spec["references"]}
+        desired_references = {row["name"].casefold(): row.get("target_id", row.get("curve")) for row in target_spec["references"]}
         for info, resolved in reference_targets:
             _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
                 platform=platform, desired_references=desired_references,
@@ -6582,6 +6596,11 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
     }
+    curve_guards = [field["curve_proof"] for spec in node_specs for field in spec.get("references", []) if "curve_proof" in field]
+    if curve_guards:
+        if len(node_specs) + len(curve_guards) > DEFAULT_MAX_NODES:
+            raise OperationContractError("NODE_LIMIT_EXCEEDED", "Inline curves and their owners exceed the single bounded node budget.")
+        state["inline_curve_guards"] = list({canonical_json_bytes(proof): proof for proof in curve_guards}.values())
     if condition_metadata_guards:
         state["condition_metadata_guards"] = condition_metadata_guards
     if related_conditions:
@@ -7211,6 +7230,15 @@ def _prepare_object_node_specs(
             )
             _require_object_reference_metadata(info)
             property_info_by_name[descriptor.name.casefold()] = info
+            if isinstance(descriptor.target, ObjectCurveDescriptor):
+                try:
+                    value, proof = prepare_inline_curve(descriptor.target, token=descriptor.name, metadata=info,
+                                                        scope={"classId": type_info.class_id}, types=type_catalog)
+                except (InlineCurveError, MetadataRestrictionError) as exc:
+                    raise OperationContractError(exc.error_code, str(exc)) from exc
+                resolved_references[descriptor.request_path] = value
+                spec["references"].append({"name": descriptor.name, "curve": value, "curve_proof": proof})
+                continue
             identities = []
             for offset, target_descriptor in enumerate(descriptor.targets):
                 role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
@@ -7228,7 +7256,7 @@ def _prepare_object_node_specs(
                     infos=tuple(property_info_by_name.values()),
                     scope={"classId": type_info.class_id}, read_call=read,
                     supplied_values={descriptor.name: descriptor.value for descriptor in node.properties},
-                    supplied_references={row["name"]: row["target_id"] for row in spec["references"]},
+                    supplied_references={row["name"]: row.get("target_id", row.get("curve")) for row in spec["references"]},
                     validate_scalar=_require_object_property_value,
                 )
             except NewObjectDefaultError as exc:
@@ -14470,6 +14498,22 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
     assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
+    curve_type_cache: dict[str, Any] = {}
+    for expected in pre_state.get("inline_curve_guards", []) if isinstance(pre_state, Mapping) else []:
+        def curve_read(uri, args, options):
+            if uri == "ak.wwise.core.object.getTypes" and uri in curve_type_cache:
+                return curve_type_cache[uri]
+            result = read_call(uri, args, options)
+            if uri == "ak.wwise.core.object.getTypes":
+                curve_type_cache[uri] = result
+            readbacks.append({"role": "inline-curve-field-metadata", "uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+            return result
+        try:
+            actual = observe_inline_curve_proof(expected, read=curve_read)
+        except (ValueError, TypeError) as exc:
+            actual = {"error": str(exc)}
+        assertions.append({"name": "inline curve field and class evidence unchanged", "passed": _native_snapshot_equal(actual, expected),
+                           "evidence": {"expected": expected, "actual": actual}})
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
     source = roles.get("object") if isinstance(roles, Mapping) else None
     if isinstance(field_before, Mapping) and isinstance(source, Mapping):
@@ -16111,6 +16155,23 @@ def verify_prepared_operation(
             )
         return normalized
 
+    curve_type_cache: dict[str, Any] = {}
+    for expected in prepared.get("pre_state", {}).get("inline_curve_guards", []):
+        def curve_read(uri, args, options):
+            if uri == "ak.wwise.core.object.getTypes" and uri in curve_type_cache:
+                return curve_type_cache[uri]
+            result = read_call(uri, args, options)
+            readbacks.append({"role": "inline-curve-field-metadata", "uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+            if uri == "ak.wwise.core.object.getTypes":
+                curve_type_cache[uri] = result
+            return result
+        try:
+            actual = observe_inline_curve_proof(expected, read=curve_read)
+        except (ValueError, TypeError) as exc:
+            actual = {"error": str(exc)}
+        check("inline curve field and class evidence unchanged after execution", _native_snapshot_equal(actual, expected),
+              {"expected": expected, "actual": actual})
+
     kind = plan.get("kind")
     if kind == "ui-command-plan":
         raw_ui_plan = plan.get("plan")
@@ -17731,6 +17792,18 @@ def verify_prepared_operation(
                 if not isinstance(field_spec, Mapping):
                     continue
                 field_name = field_spec.get("name")
+                if "curve" in field_spec:
+                    curve = _field_value(row, str(field_name))
+                    curve_type = curve.get("type") if isinstance(curve, Mapping) else None
+                    curve_id = curve.get("id") if isinstance(curve, Mapping) else None
+                    if _valid_object_id(curve_id):
+                        curve_rows = read_object(object_id=curve_id, fields=("id", "type"))
+                        curve_type = curve_rows[0].get("type") if len(curve_rows) == 1 and _same_identity(curve_rows[0].get("id"), curve_id) else None
+                    points = curve.get("points") if isinstance(curve, Mapping) else None
+                    check(f"{request_path}.{field_name} inline Curve class and points match",
+                          curve_type == "Curve" and _native_snapshot_equal(points, field_spec["curve"]["points"]),
+                          {"expected": field_spec["curve"], "actual": curve, "observed_type": curve_type})
+                    continue
                 actual = _reference_identity(_field_value(row, str(field_name)))
                 check(
                     f"{request_path}.{field_name} reference matches",
@@ -21267,8 +21340,8 @@ def _validate_nested_request_shape(
                 on_name_conflict=conflict,
                 replace_owned=replace_owned_root_supplied,
             )
-            if any(isinstance(reference.target, tuple) for item in normalized.nodes for reference in item.references):
-                raise OperationContractError("NATIVE_VALUE_UNION_UNAVAILABLE", "Pinned object.create propertyValue accepts scalar references or null, never arrays.")
+            if any(isinstance(reference.target, (tuple, ObjectCurveDescriptor)) for item in normalized.nodes for reference in item.references):
+                raise OperationContractError("NATIVE_VALUE_UNION_UNAVAILABLE", "Pinned object.create propertyValue accepts scalar references or null, never arrays or inline curves.")
         except ObjectOperationContractError as exc:
             raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         return
@@ -21407,11 +21480,12 @@ def _validate_nested_request_shape(
                     item.get("properties", []),
                     request_path=f"$.objects[{index}].properties",
                 )
-                normalize_reference_descriptors(
+                normalized_references = normalize_reference_descriptors(
                     item.get("references", []),
                     request_path=f"$.objects[{index}].references",
                     allow_unions=True,
                 )
+                total_nodes += sum(isinstance(reference.target, ObjectCurveDescriptor) for reference in normalized_references)
                 if "import" in item:
                     if version not in OBJECT_SET_IMPORT_VERSIONS:
                         raise OperationContractError(
@@ -21432,7 +21506,8 @@ def _validate_nested_request_shape(
                     allow_language=True,
                     allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
                 )
-                total_nodes += len(forest.nodes)
+                total_nodes += len(forest.nodes) + sum(isinstance(reference.target, ObjectCurveDescriptor)
+                    for node in forest.nodes for reference in node.references)
                 lists = normalize_object_lists(
                     item.get("lists", []),
                     request_path=f"$.objects[{index}].lists",
@@ -21443,7 +21518,8 @@ def _validate_nested_request_shape(
                 nested_lists = [descriptor for node in [*forest.nodes, *(node for descriptor in lists for node in descriptor.nodes)] for descriptor in node.lists]
                 saw_list_assignment = saw_list_assignment or bool(lists) or bool(nested_lists)
                 list_nodes = sum(len(descriptor.nodes) for descriptor in lists)
-                total_nodes += list_nodes
+                total_nodes += list_nodes + sum(isinstance(reference.target, ObjectCurveDescriptor)
+                    for descriptor in lists for node in descriptor.nodes for reference in node.references)
                 if row_list_mode == "append" and any(
                     not descriptor.objects for descriptor in lists
                 ):

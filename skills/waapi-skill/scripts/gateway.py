@@ -16787,6 +16787,11 @@ def _parse_object_graph_business_fields(
             bound = session.handles.bound_field(handle)
             if operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.strip() == "null":
                 dynamic[handle] = None
+            elif operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.lstrip().startswith("{"):
+                try:
+                    dynamic[handle] = json.loads(raw)
+                except ValueError as exc:
+                    raise GatewayInputError("Inline curve input requires a closed curve_points document") from exc
             elif operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.lstrip().startswith("["):
                 try:
                     value = json.loads(raw)
@@ -19422,6 +19427,16 @@ def dispatch_business_field_discovery(
             if binding.record.operation == "object.set":
                 value_input["accepted_forms"].append("json_array_of_bound_object_handles")
                 value_input["maximum_array_members"] = 32
+                from wwise_waapi.object_inline_curve import require_inline_curve_field
+                try:
+                    require_inline_curve_field(metadata.get("restriction", {}))
+                    inline_curve_eligible = True
+                except ValueError:
+                    inline_curve_eligible = False
+                if inline_curve_eligible:
+                    value_input["accepted_forms"].append("json_curve_points")
+                    value_input["curve_points"] = {"keys": ["x", "y", "shape"], "maximum_points": 256,
+                        "applicability": "fresh_explicit_Curve_type_allowance_and_custom_target_restrictions"}
         label_detail = "metadata_detail.field.choices" if detail_projection is not None else "metadata.restriction.values"
         if "enum_labels" in restrictions:
             restrictions["enum_labels"] = [dict(row) for row in restrictions["enum_labels"]]

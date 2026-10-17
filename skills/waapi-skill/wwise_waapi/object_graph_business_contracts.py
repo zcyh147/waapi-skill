@@ -334,6 +334,13 @@ def object_graph_business_contract_data(
             "reference_values": {
                 "forms": ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"],
                 "maximum_array_members": 32,
+                "inline_curve": {
+                    "input": {"curve_points": "array_of_x_y_shape_points"},
+                    "maximum_points": 256,
+                    "native_type": "Gateway_owned_exact_live_Curve_class",
+                    "applicability": "fresh_explicit_Curve_type_allowance;_custom_target_classifier_requirements_must_be_proven",
+                    "verification": "exact_owner_field_points_and_independent_Curve_class_readback",
+                },
                 "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
             },
             "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},

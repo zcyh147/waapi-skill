@@ -25,6 +25,7 @@ from .operation_object import (
     DEFAULT_MAX_NAME_LENGTH,
     DEFAULT_MAX_NODES,
     normalize_object_list_name,
+    normalize_curve_points,
 )
 from .operation_plugin import (
     MAX_PLUGIN_NAME_LENGTH,
@@ -482,9 +483,15 @@ def _resolve_native_object_type(
 
 
 def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any, *, allow_arrays: bool) -> dict[str, Any]:
-    if isinstance(value, list) and not allow_arrays:
+    if isinstance(value, (list, Mapping)) and not allow_arrays:
         raise _repair(session, "NATIVE_VALUE_UNION_UNAVAILABLE", field="field_values",
-                      action="object.create accepts one bound reference or null; reference arrays belong to available object.set lanes")
+                      action="object.create accepts one bound reference or null; complex reference values belong to available object.set lanes")
+    if isinstance(value, Mapping):
+        if set(value) != {"curve_points"}:
+            raise _repair(session, "INLINE_CURVE_INPUT_INVALID", field="field_values",
+                          action="provide only curve_points; native type, IDs and field tokens remain Gateway-owned")
+        points = normalize_curve_points(value["curve_points"], request_path="$.business.curve_points")
+        return {"name": field.token, "target": {"curve_points": [point.as_dict() for point in points]}}
     if value is None:
         return {"name": field.token, "target": None}
     values = value if isinstance(value, list) else [value]

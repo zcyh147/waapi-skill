@@ -208,14 +208,25 @@ class ObjectPropertyDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class ObjectCurveDescriptor:
+    points: tuple[RtpcCurvePoint, ...]
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"curve_points": [point.as_dict() for point in self.points]}
+
+    def native_value(self) -> dict[str, Any]:
+        return {"type": "Curve", "points": [point.as_dict() for point in self.points]}
+
+
+@dataclass(frozen=True, slots=True)
 class ObjectReferenceDescriptor:
     request_path: str
     name: str
-    target: ObjectIdentityDescriptor | tuple[ObjectIdentityDescriptor, ...] | None
+    target: ObjectIdentityDescriptor | tuple[ObjectIdentityDescriptor, ...] | ObjectCurveDescriptor | None
 
     @property
     def targets(self) -> tuple[ObjectIdentityDescriptor, ...]:
-        if self.target is None:
+        if self.target is None or isinstance(self.target, ObjectCurveDescriptor):
             return ()
         return self.target if isinstance(self.target, tuple) else (self.target,)
 
@@ -792,6 +803,55 @@ def normalize_reference_descriptors(
     return _normalize_references(payload, request_path=request_path, limits=limits, allow_unions=allow_unions)
 
 
+def normalize_curve_points(points_payload: Any, *, request_path: str, maximum_points: int = DEFAULT_MAX_RTPC_POINTS,
+                           minimum_points: int = 0, require_increasing: bool = False, label: str = "CURVE") -> tuple[RtpcCurvePoint, ...]:
+    if not isinstance(points_payload, list):
+        raise ObjectOperationContractError(
+            f"INVALID_{label}_POINTS",
+            f"{request_path} must be an array.",
+            details={"path": f"{request_path}", "actual_type": type(points_payload).__name__},
+        )
+    if len(points_payload) < minimum_points or len(points_payload) > maximum_points:
+        raise ObjectOperationContractError(
+            f"{label}_POINT_LIMIT",
+            f"{request_path} must contain between {minimum_points} and {maximum_points} points.",
+            details={"path": f"{request_path}", "count": len(points_payload), "limit": maximum_points},
+        )
+
+    points: list[RtpcCurvePoint] = []
+    previous_x: int | float | None = None
+    for point_index, raw_point in enumerate(points_payload):
+        point_path = f"{request_path}[{point_index}]"
+        point = _mapping(raw_point, path=point_path)
+        _exact_fields(point, required=RTPC_POINT_FIELDS, optional=frozenset(), path=point_path)
+        x = _finite_number(point.get("x"), path=f"{point_path}.x")
+        y = _finite_number(point.get("y"), path=f"{point_path}.y")
+        shape = point.get("shape")
+        if shape not in RTPC_POINT_SHAPES:
+            raise ObjectOperationContractError(
+                f"INVALID_{label}_POINT_SHAPE",
+                f"{point_path}.shape is not a supported Wwise curve shape.",
+                details={
+                    "path": f"{point_path}.shape",
+                    "actual": shape,
+                    "allowed": sorted(RTPC_POINT_SHAPES),
+                },
+            )
+        if require_increasing and previous_x is not None and x <= previous_x:
+            raise ObjectOperationContractError(
+                f"INVALID_{label}_POINT_ORDER",
+                f"{request_path} x coordinates must be strictly increasing.",
+                details={
+                    "path": f"{point_path}.x",
+                    "previous_x": previous_x,
+                    "actual_x": x,
+                },
+            )
+        previous_x = x
+        points.append(RtpcCurvePoint(x=x, y=y, shape=shape))
+    return tuple(points)
+
+
 def normalize_rtpc_descriptors(
     payload: Any,
     *,
@@ -826,51 +886,8 @@ def normalize_rtpc_descriptors(
             path=f"{path}.control_input",
             limits=limits,
         )
-        points_payload = item.get("points")
-        if not isinstance(points_payload, list):
-            raise ObjectOperationContractError(
-                "INVALID_RTPC_POINTS",
-                f"{path}.points must be an array.",
-                details={"path": f"{path}.points", "actual_type": type(points_payload).__name__},
-            )
-        if not points_payload or len(points_payload) > point_limit:
-            raise ObjectOperationContractError(
-                "RTPC_POINT_LIMIT",
-                f"{path}.points must contain between 1 and {point_limit} points.",
-                details={"path": f"{path}.points", "count": len(points_payload), "limit": point_limit},
-            )
-
-        points: list[RtpcCurvePoint] = []
-        previous_x: int | float | None = None
-        for point_index, raw_point in enumerate(points_payload):
-            point_path = f"{path}.points[{point_index}]"
-            point = _mapping(raw_point, path=point_path)
-            _exact_fields(point, required=RTPC_POINT_FIELDS, optional=frozenset(), path=point_path)
-            x = _finite_number(point.get("x"), path=f"{point_path}.x")
-            y = _finite_number(point.get("y"), path=f"{point_path}.y")
-            shape = point.get("shape")
-            if shape not in RTPC_POINT_SHAPES:
-                raise ObjectOperationContractError(
-                    "INVALID_RTPC_POINT_SHAPE",
-                    f"{point_path}.shape is not a supported Wwise curve shape.",
-                    details={
-                        "path": f"{point_path}.shape",
-                        "actual": shape,
-                        "allowed": sorted(RTPC_POINT_SHAPES),
-                    },
-                )
-            if previous_x is not None and x <= previous_x:
-                raise ObjectOperationContractError(
-                    "INVALID_RTPC_POINT_ORDER",
-                    f"{path}.points x coordinates must be strictly increasing.",
-                    details={
-                        "path": f"{point_path}.x",
-                        "previous_x": previous_x,
-                        "actual_x": x,
-                    },
-                )
-            previous_x = x
-            points.append(RtpcCurvePoint(x=x, y=y, shape=shape))
+        points = normalize_curve_points(item.get("points"), request_path=f"{path}.points",
+            maximum_points=point_limit, minimum_points=1, require_increasing=True, label="RTPC")
 
         notes = item.get("notes")
         if notes is not None:
@@ -1024,7 +1041,10 @@ def materialize_waapi_node(
             result[f"@{prop.name}"] = prop.value
         for reference in current.references:
             target = resolved[reference.request_path]
-            if reference.target is None:
+            if isinstance(reference.target, ObjectCurveDescriptor):
+                if target != reference.target.native_value():
+                    raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "An inline curve requires its exact Gateway-owned points.")
+            elif reference.target is None:
                 if target is not None:
                     raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "A clear reference requires native null.")
             elif isinstance(reference.target, tuple):
@@ -1453,7 +1473,9 @@ def _normalize_references(
         _exact_fields(item, required=REFERENCE_FIELDS, optional=frozenset(), path=path)
         name = _field_name(item.get("name"), path=f"{path}.name", limits=limits)
         raw_target = item.get("target")
-        if raw_target is None and allow_unions:
+        if isinstance(raw_target, Mapping) and set(raw_target) == {"curve_points"} and allow_unions:
+            target = ObjectCurveDescriptor(normalize_curve_points(raw_target["curve_points"], request_path=f"{path}.target.curve_points"))
+        elif raw_target is None and allow_unions:
             target = None
         elif isinstance(raw_target, list) and allow_unions:
             if len(raw_target) > limits.max_fields_per_node:
