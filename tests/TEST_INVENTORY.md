@@ -746,3 +746,260 @@ Collected with `ci/test.sh --version all --mode matrix -- --collect-only -q`. Th
 | Final #51 Weapons batch-order repair gates on exact code candidate `fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` | macOS Program 4738 passed / 2 skipped; native-Windows Program 4715 passed / 25 skipped; macOS Non-live 10325 passed, 113 skipped, 27 deselected; focused object-set batch/Gateway/Broker regression 14/14; all exit 0 | Frozen exact-candidate roots `imac-int-2e60bce-r69-full12` and `iwin-int-2e60bce-r60-full12` each passed ten units and failed only INT22/INT25 Weapons before Gateway because the Broker compared commutative repeated-option placement literally. All four failures had the same argument-14 rejection; the source hashes/mtimes were unchanged and failed sandboxes were retained. The repair derives stable object-set fields from the operation contract, avoids rewriting an unchanged handle registry, and canonicalizes independent batch groups while checking every object, field, handle, and value. Its initially strict row-sequence oracle was superseded by the final semantic-harness correction below. Program and Non-live started neither Codex nor Wwise; declared platform/live skips receive no PASS credit. |
 | Final #51 independent-row oracle and public integration closure on exact candidate `0682c1a979f7ce5bfb648914914b7393148a6495` | Focused independent-row/Weapons regression passed 14/14. Native Windows root `iwin-int-0682c1a-r63-full12` passed 12/12 in one root plus identical verify-only. MacOS root `imac-int-0682c1a-r73-full12` passed 11/12; queued root `imac-int-0682c1a-r74-int22-rifle` passed the sole failed unit plus identical verify-only. | The packaged Skill tree is byte-identical to `0edaf1a`. Independent existing-object edits may be permuted, while missing, extra, duplicate, or changed rows and facts still fail closed; ordered create/import semantics are unchanged. The Mac failure was an Agent-only early stop after falsely calling `response_integrity.complete=true, truncated=false` truncated, so no code or harness change preceded the queued rerun. MacOS therefore has explicitly cumulative same-candidate 12/12 evidence, not a single-root claim; Windows has a single-root 12/12. Across 25 lifecycle records source hashes/mtimes were unchanged, PASS sandboxes were removed, the failed sandbox remained sealed, verify-only replays exited 0, and final LaunchAgent/Scheduled Task/Wwise checks were empty. |
 | Post-audit transaction execution-lease gates | Exact product candidate `4dadee360c736c18a7c616dd8f67a2ea31be1f00`: focused concurrency/lease regression passed 5/5 on macOS and native Windows; macOS Program passed 4743 / 2 platform skips; native-Windows Program passed 4720 / 25 platform skips. Test-only manifest-count successor `f17554acbd065f8d7cc25cea4afdf423d653b511` passed the exact self-check 1/1 on both hosts and full macOS Non-live 10330 / 113 skipped / 27 deselected. Every credited invocation exited 0. | A deterministic red test first reproduced the defect: while one fake WAAPI call held a transaction in `executing`, a concurrent verify changed it to `indeterminate`. The fix adds a separate non-blocking, cross-process execution lease held across validation, dispatch, and result persistence. A contender returns `execution_in_progress` without changing durable state; only a caller that acquires the lease and still observes `executing` may perform stale-owner recovery. Tests cover active execute versus verify, abandoned-state recovery without replay, successful execution followed by rejected re-execution, POSIX ownership/release, and real native-Windows `msvcrt` contention/release. The first Non-live run passed 10329 tests and exposed only the stale 180-node manifest expectation; after changing it to the measured 182 nodes, the focused check and complete rerun passed. Program and Non-live started neither Codex nor Wwise, so no Fresh Agent or real-Wwise evidence is claimed. |
+
+## Archived steering evidence
+
+The following records preserve historical statements moved from always-loaded
+agent guidance at `cba4eefb`. Their original candidates, failures and cumulative
+qualifications remain unchanged. They grant no evidence to later candidates.
+
+### Historical steering record: `AGENTS.md` lines 479–669 at `cba4eefb`
+
+Pre-review public `integration` candidate
+`ebcfde245bcbcacd2b8842e5ec205e7111b86743` passed all 12 units in one fresh
+root on each host: macOS `imac-int-ebcfde2-r67-full12` and native Windows
+`iwin-int-ebcfde2-r56-full12`. Both roots then passed identical
+`--resume --verify-only`. Across the 24 PASS lifecycle records, source-project
+full hashes and mtimes remained unchanged, passing sandboxes were removed, and
+final scoped-process checks were empty. The macOS LaunchAgent and Windows
+`InteractiveToken` / `Limited` Scheduled Tasks were deleted. This is
+independent single-root 12/12 evidence on both hosts, not cumulative repair-root
+credit. Review-repair code candidate
+`170e8e8f01cd5e931933c6fe76baff47d0683f57` later hardened playing and
+transport capability stores against Windows reparse points and resolved
+non-stable object-set batch `--field` names through live metadata, so the
+earlier root remains truthful evidence but is not final-candidate acceptance
+for that successor. That successor passed macOS Program 4737 / 2 skipped,
+native Windows Program 4714 / 25 skipped, and macOS Non-live 10322 / 113
+skipped / 27 deselected. Batch-order repair candidate
+`fd2f9ed2c9fd2336e76545b1aef6f0ce4e99acfe` then passed macOS Program 4738 /
+2 skipped, native Windows Program 4715 / 25 skipped, and macOS Non-live 10325 /
+113 skipped / 27 deselected before its targeted Weapons reruns.
+
+Final semantic-harness candidate
+`0682c1a979f7ce5bfb648914914b7393148a6495` keeps the packaged Skill tree
+byte-identical to `0edaf1a` and accepts permutations of independent existing-
+object edit rows while still rejecting missing, extra, duplicate, or changed
+objects, fields, handles, and values. Native-Windows root
+`iwin-int-0682c1a-r63-full12` passed the public `integration` profile 12/12 in
+one root plus identical verify-only. MacOS root
+`imac-int-0682c1a-r73-full12` passed 11/12; only INT22 Rifle stopped before
+Preview after the Agent incorrectly called an explicit
+`complete=true, truncated=false` response truncated. Fresh queued root
+`imac-int-0682c1a-r74-int22-rifle` then passed that sole unit plus identical
+verify-only without any code, suite, harness, or option change. MacOS therefore
+has same-candidate cumulative 12/12 evidence, not a single-root 12/12 claim.
+Every source hash and project mtime remained unchanged, passing sandboxes were
+removed, the failed sandbox stayed sealed, and all temporary LaunchAgents,
+Scheduled Tasks, and Wwise processes were cleared.
+
+Composer migration evidence is focused Adapter evidence, not public
+`integration` acceptance. For `object.set`, candidate
+`68697244063e02304eea79da54da502270be3704` passed Weather and Weapons on
+Wwise 2022.1/2025.1 in both macOS root `imac-flatrow-6869724-r1` and
+native-Windows root `i15-6869724-r1`; both four-unit roots also passed
+identical `--resume --verify-only` audits. For `audio.import`, macOS root
+`imac-import-6479595-r13-final6` at
+`6479595ea4b9a53c3351a4d1595c988e94ee5967` passed all six selected
+Weather/Rifle/Footsteps version units fresh and verify-only. Native-Windows
+root `iwin-import-f87b800-r2-interactive` passed four and failed two;
+`iwin-import-0be8266-r3-rifle-footsteps` then passed Footsteps and failed
+Rifle, and final fresh root `iwin-import-0be8266-r4-rifle` passed Rifle and
+its identical verify-only audit. The commits after `6479595` changed only
+program/semantic tests and harness support, not the packaged Skill tree. Thus
+all six Windows audio-import units have passing evidence cumulatively across
+three frozen roots, not one root or one Git candidate with a 6/6 result. Every
+recorded source hash/mtime stayed unchanged; PASS sandboxes were removed, FAIL
+sandboxes were sealed/quarantined, and scoped residual-process checks were
+empty.
+
+For Switch assignments, runtime candidate
+`d05f1ecdc3b33fca83866e75669c65039877edd6` passed the final macOS and
+native-Windows Program gates, macOS Non-live, and the closed add/remove
+workflow on native Windows Wwise 2022.1/2025.1. Route-only candidate
+`d45f75f5e75190d5b4e607a02aee2dcf38e73ab9` then passed macOS Program and
+the same real workflow on macOS 2022.1/2025.1. Fresh roots
+`imac-sab-d45f75f-r2` and `iwin-sab-d45f75f-r2` each passed the one-unit
+`switch_assignment_business_1` profile plus identical
+`--resume --verify-only`. Earlier `d05f1ec` roots on both hosts remain
+frozen FAILs because the Agents invented operation aliases; the Broker rejected
+them before Gateway or Wwise dispatch. No Fresh root executed a mutation, all
+temporary launch resources were removed, and scoped residual-process checks
+were empty.
+After the entry Skill was compacted, exact packaged-Skill candidate
+`b544197fb6b7455814fbb2079043a5a354daca59` repeated the same one-unit PASS
+plus identical verify-only in macOS root `imac-sab-b544197-r1` and
+native-Windows root `iwin-sab-b544197-r1`. Both roots retained sealed attempt
+manifests, started no Wwise process, executed no mutation, removed their
+temporary launch resources, and ended with zero scoped residual processes.
+
+Final deepened Switch-assignment candidate
+`c874917220cb7723d60f86a14cea72c5d15cca52` passed the one-unit profile
+fresh plus identical `--resume --verify-only` in macOS root
+`imac-sab-c874917-r1` and native-Windows root `iwin-sab-c874917-r1`.
+Both Agents followed the Gateway-owned copy-ready `draft-start`, then the fixed
+`switch_container`, `child`, and `state_or_switch` role continuations into one
+Preview; no Wwise process or mutation occurred. The Windows Fresh and replay
+used temporary `InteractiveToken`/`Limited` Scheduled Tasks. Both hosts ended
+with zero scoped residual processes and Windows retained zero matching tasks.
+Exact Program candidate `4c55ba6b53eeb4beff97e7b590686d78da7e612e`
+passed macOS 3659 / 2 skipped and native Windows 3646 / 15 skipped; later
+`c874917` changes only semantic evidence/protocol tests. MacOS Non-live at
+`d10dc23c4dd95eb865a5a768ac8a4e0885e6a233` passed 8639 / 110 skipped /
+27 deselected. The later packaged diffs are bounded to copy-ready business
+start/role continuations and compact audio-import receipts, covered by exact
+focused regressions (410 passed at `4389b6c`, 452 / 4 skipped at `4c55ba6`,
+and 76 passed at `c874917`); Switch native dispatch and verification did not
+change. Frozen Mac diagnostic root `imac-sab-d10dc23-r1` stopped after a
+successful schema read without issuing `draft-start`, received no PASS credit,
+and was not replayed.
+
+The completed 2026-07-31 macOS integration evidence is cumulative across frozen
+campaign roots, not one final-candidate 6/6 run. The initial `a12` root passed
+both Alarm and Harbor workflows on both versions and failed both Weather
+workflows. Fresh repaired roots `a20-int22-weather` and
+`a24-int25-weather` then passed the two Weather units. Thus all six unique
+profile units have passing evidence across those roots; do not report that
+`a12` itself passed 6/6 or that all six were rerun after the final repair.
+Every passing sandbox was removed, failed sandboxes were sealed and
+quarantined, and both source SampleProjects retained identical full hashes and
+mtimes. This older evidence belongs to the candidate before the
+structured-query request and closed mutation-selector migration.
+The roots named in this paragraph and the 2026-08-03 macOS paragraph below
+seal `runtime.platform=darwin`; later cross-host component reruns are recorded
+separately.
+
+The 2026-08-03 current-wording rerun is also cumulative, not one final-candidate
+6/6 run. `campaign-integration-workflows-v1-terra-20260803-current-r1` passed
+five units and failed `INT25-ALARM-DIAGNOSE-AND-REPAIR` before mutation because
+the Agent redundantly re-read the Action instead of following the already
+returned `Target.id`. The Skill query reference was then narrowed to forbid
+that duplicate hop. Fresh roots `r2-int25-alarm-action-hop` and
+`r3-int22-alarm-action-hop` passed both Alarm versions on the same repaired
+candidate, and both passed `--resume --verify-only`. Weather and Harbor had
+loaded only the unchanged operate reference in `r1`; all four passed there.
+Thus all six current prompt units have passing evidence across these roots,
+but there is still no single repaired-candidate 6/6 campaign. All eight
+recorded lifecycles preserved source hashes and mtimes; passing sandboxes were
+removed and the one failed sandbox remains quarantined. Those V1 roots do not
+validate the newer V2 fixture, routing, or workflow contracts.
+
+Later reruns used the legacy internal
+`integration_workflows_cross_version_6` component, not the public composed
+`integration` profile. At commit
+`9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
+`imac-wah-9e75a1a-r1` passed all six component units fresh and then passed
+`--resume --verify-only`. At commit
+`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
+`imac-wah-9b4de8f-r1` passed five units and failed one, while native-Windows
+root `iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots
+were frozen without verify-only replay. These results remain exact
+six-unit-component provenance and must not be reported as current public
+`integration` acceptance or combined into a unified 12/12 result.
+
+### Historical steering record: `AGENTS.md` lines 686–706 at `cba4eefb`
+
+The completed 2026-08-03 macOS evidence for that legacy component is
+cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
+both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. Thus all six
+unique units have passing evidence across those roots. Passing sandboxes were
+removed; failed or blocked diagnostic sandboxes were sealed and quarantined;
+every recorded source-project full hash and mtime remained unchanged. This
+grants no per-API coverage credit and proves only the exact Rifle, Footsteps,
+and Weapons workflow paths, not advanced WAQL or unrelated routes.
+
+The later native-Windows evidence for that legacy component is also cumulative.
+At commit `0dfea2b`,
+`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
+2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
+no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
+and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
+verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
+Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
+native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 result.
+
+### Historical steering record: `tests/AGENTS.md` lines 544–554 at `cba4eefb`
+
+The focused `modification_policy_9` campaign is separate from those historical
+v2 totals. Its sealed
+`campaign-modification-policy-9-c7` run passed 9/9 Wwise 2022.1 tasks and all
+15 turns using nine unique memory-isolated Codex Terra threads. It covered
+three repetitions each of `read_only`, question-style `ask_before_changes`,
+and same-turn `allow_changes`; all source-project hashes remained unchanged
+and every sandbox was cleaned. The six authorized writes each verified seven
+created objects through 46 passing business assertions. Preserve this exact
+scope: it is policy-interaction evidence for that frozen c7 candidate, not
+broad API, cross-version semantic coverage, or fresh evidence for later
+structured-query and closed-selector changes.
+
+### Historical steering record: `tests/AGENTS.md` lines 585–735 at `cba4eefb`
+
+Historical macOS evidence is split across three frozen 2026-07-31 roots. Initial
+`a12` passed the four Alarm/Harbor version units and failed both Weather units;
+fresh `a20-int22-weather` and `a24-int25-weather` roots passed the repaired
+Weather units. This is passing evidence for all six unique units across roots,
+not one single-candidate 6/6 campaign. Passing sandboxes were cleaned, failed
+sandboxes remain quarantined, and every lifecycle record reports unchanged
+source-project full hash and mtime. Those campaigns predate the structured
+`query-schema`/`query-object --request-json` migration, the separately
+disclosed bounded advanced-WAQL layer, and the removal of raw WAQL mutation
+selectors. Those V1 roots do not validate the newer routing contracts; keep
+the historical integration result attached only to its migration-before
+candidate. The V2 evidence below applies only to its exact workflow paths.
+The roots named in this paragraph and the 2026-08-03 macOS paragraph below
+seal `runtime.platform=darwin`; later cross-host component reruns are recorded
+separately.
+
+The natural-language prompt revision received a fresh 2026-08-03 campaign.
+`campaign-integration-workflows-v1-terra-20260803-current-r1` passed five of
+six units. The 2025.1 Alarm failed safely on turn one because the Agent added a
+redundant exact-ID Action lookup after the Event children row had already
+returned `ActionType` and `Target`; no mutation occurred. After a query-reference
+repair clarified that `Target.id` is the next Sound identity, fresh roots
+`r2-int25-alarm-action-hop` and `r3-int22-alarm-action-hop` passed the 2025.1
+and 2022.1 Alarm units on the same repaired candidate. Both repair roots pass
+`--resume --verify-only`. Weather and Harbor loaded only the unchanged operate
+reference and passed for both versions in `r1`. This gives all six current
+prompt units passing evidence across roots, not a single repaired-candidate
+6/6 run. All eight lifecycle records preserve source hashes and mtimes;
+passing sandboxes were cleaned and the failed sandbox remains quarantined.
+Those V1 roots do not validate the newer V2 fixture, routing, or workflow
+contracts.
+
+Later reruns used the legacy internal
+`integration_workflows_cross_version_6` component, not the public composed
+`integration` profile. At commit
+`9e75a1aea496abcb9ef2a61e1da685adb99f4b01`, macOS root
+`imac-wah-9e75a1a-r1` passed all six component units fresh and passed
+`--resume --verify-only`. At commit
+`9b4de8f618855091a424700b50ab8b0fd1989270`, macOS root
+`imac-wah-9b4de8f-r1` passed five units and failed one, and native-Windows root
+`iwin-wah-9b4de8f-r1` passed three and failed three; both failed roots were
+frozen without verify-only replay. These runs are exact legacy-component
+provenance, not current `integration` acceptance and not unified 12/12 evidence.
+
+### Historical steering record: `tests/AGENTS.md` lines 748–767 at `cba4eefb`
+
+The completed 2026-08-03 macOS evidence for that legacy component is
+cumulative across frozen roots, not one final-candidate 6/6 run. `r8` passed
+both Rifle units, `r12-2022` passed the
+2022.1 Weapons unit, `r23-2022-footsteps` passed the 2022.1 Footsteps unit, and
+`r24-2025-repairs` passed the 2025.1 Footsteps and Weapons units. All six unique
+units therefore have passing evidence across those roots. Passing sandboxes
+were removed; failed or blocked diagnostic sandboxes were sealed and
+quarantined; every recorded source-project full hash and mtime remained
+unchanged.
+
+The later native-Windows evidence for that legacy component is also cumulative.
+Commit `0dfea2b` root
+`windows-v2-six-0dfea2b-r1` attempted all six units, passed 2022.1 Rifle,
+2022.1 Footsteps, and 2025.1 Rifle, failed the other three, exited `1`, and had
+no verify-only replay. At `a516835`, `a516-w22-r1` passed 2022.1 Weapons fresh
+and verify-only; `a516-f25-r1` failed 2025.1 Footsteps and was frozen without
+verify-only. At `f1b6a51`, `f1b-f25-r1` and `f1b-w25-r1` passed 2025.1
+Footsteps and Weapons fresh and verify-only. All six V2 units therefore have
+native-Windows passing evidence across these frozen roots, but there is no
+single-root or single-candidate Windows 6/6 result.

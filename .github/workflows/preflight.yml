@@ -1,0 +1,32 @@
+name: Pure-code preflight
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: preflight-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      POETRY_VIRTUALENVS_IN_PROJECT: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: Install locked developer dependencies
+        run: |
+          python -m pip install poetry==2.2.1
+          poetry check --lock
+          poetry sync --only main,dev --no-root --no-interaction
+      - name: Check existing public routes, seals and terminal output
+        run: poetry run python ci/preflight.py
