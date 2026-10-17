@@ -947,3 +947,29 @@ def test_peak_read_preserves_zero_divisor_without_fabricating_normalized_samples
     assert payload["agent_result"]["decode_unavailable_reason"] == "zero_normalization_divisor"
     assert payload["agent_result"]["native_result"] == raw
     assert "channels" not in payload["agent_result"]
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("operation", [PEAKS_REGION_URI, PEAKS_TRIMMED_URI])
+def test_peak_read_can_preserve_native_channel_default_without_assuming_channel_count(tmp_path: Path, version: str, operation: str) -> None:
+    info = _info()
+    info["version"].update(year=int(version[:4]), displayName=f"v{version}.0.1")
+    project = _project(tmp_path)
+    identities = [{"return": [{"id": SOURCE_ID, "name": "Source", "type": "AudioFileSource", "path": "\\Source"}]}]
+    if version == "2021.1":
+        identities.insert(0, {"return": [{**project, "type": "Project", "filePath": project["path"], "path": "\\"}]})
+    raw = {"numChannels": 2, "peaksArrayLength": 1, "peaksBinaryStrings": ["AAAAAA==", "AAAAAA=="], "peaksDataSize": 4, "maxAbsValue": 32768}
+    client = FakeClient({"ak.wwise.core.getInfo": [info], "ak.wwise.core.getProjectInfo": [project],
+        "ak.wwise.core.object.get": identities, operation: [raw]})
+    command = ["core-call", operation, "--audio-source-id", SOURCE_ID, "--peak-pair-count", "1", "--channel-mode", "native-default"]
+    if operation == PEAKS_REGION_URI:
+        command += ["--start-seconds", "0", "--end-seconds", "1"]
+    code, payload = gateway.execute_gateway(command, env=_env(tmp_path, version=version), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["agent_result"]["channel_count"] == 2
+    assert payload["agent_result"]["channel_mode"] == "native-default"
+    assert "getCrossChannelPeaks" not in client.calls[-1][1]
+    assert [channel["pairs_normalized"] for channel in payload["agent_result"]["channels"]] == [[[0.0, 0.0]], [[0.0, 0.0]]]
+    schema_code, schema = gateway.execute_gateway(["--version", version, "request-schema", operation], env=_env(tmp_path), client_factory=lambda _: pytest.fail("offline schema connected"))
+    assert schema_code == 0, schema
+    assert "native-default" in schema["business_adapter"]["declaration"]["field_choices"]["channel_mode"]

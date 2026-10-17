@@ -287,15 +287,16 @@ def _materialize_peaks(
             f"peak_pair_count must be an integer from 1 through {MAX_PEAK_PAIR_COUNT}"
         )
     channel_mode = plan.get("channel_mode", "per-channel")
-    if channel_mode not in {"per-channel", "cross-channel"}:
+    if channel_mode not in {"per-channel", "cross-channel", "native-default"}:
         raise MediaBuildBusinessError(
-            "channel_mode must be per-channel or cross-channel"
+            "channel_mode must be per-channel, cross-channel or native-default"
         )
     args: dict[str, Any] = {
         "object": source_id,
         "numPeaks": count,
-        "getCrossChannelPeaks": channel_mode == "cross-channel",
     }
+    if channel_mode != "native-default":
+        args["getCrossChannelPeaks"] = channel_mode == "cross-channel"
     business_request: dict[str, Any] = {
         "audio_source_id": source_id,
         "peak_pair_count": count,

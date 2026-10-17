@@ -251,6 +251,11 @@ def media_build_business_contract_data(
             "optional_fields": list(row["optional_fields"]),
             "field_types": dict(row["field_types"]),
             "input_forms": dict(row["input_forms"]),
+            **({"field_choices": {"channel_mode": {
+                "per-channel": "separate peak data for each channel; Gateway default when the flag is omitted",
+                "cross-channel": "one peak stream across all channels",
+                "native-default": "omit the optional native channel mode; report the actual returned channel count without assuming its default",
+            }}} if operation in {PEAKS_REGION_URI, PEAKS_TRIMMED_URI} else {}),
         },
         "gateway_derivations": [
             "exact_object_selector",

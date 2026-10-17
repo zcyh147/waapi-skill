@@ -38,7 +38,7 @@ def add_media_build_read_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--peak-pair-count", type=int)
     parser.add_argument(
         "--channel-mode",
-        choices=("per-channel", "cross-channel"),
+        choices=("per-channel", "cross-channel", "native-default"),
     )
     parser.add_argument("--soundbank-id")
     parser.add_argument("--max-results", type=int)
