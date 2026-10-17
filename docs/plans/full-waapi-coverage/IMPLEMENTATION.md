@@ -283,7 +283,15 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   #194 now explicitly owns missing layout Draft taxonomy and the broader exact
   command/event replay policies; the larger Tone terminal gap remains #193 work.
   Original worker runs, r6 failures and original scalar evidence remain bound
-  to their original candidates. Combined validation is recorded separately below.
+  to their original candidates. Focused validation on clean `9cfa110f` retained
+  **372 passed, 1 failed and 11 Windows-only skips** in 157.38 seconds, exit 1;
+  the sole failure was a stale aggregate operation-schema seal after the five
+  `object.setReference` guidance changes. No runtime changed after that run.
+  Exact seal repair `b1fadd6e` restores the original aggregate by reverting only
+  those reviewed words and preserves the earlier layout-proof seal; its entire
+  affected digest file passed **16 tests** in 0.31 seconds, exit 0. Both original
+  results and empty process-group receipts remain separate. Full Program and
+  Non-live gates remain pending on the final integrated candidate.
 
 ## Standing completion rules
 

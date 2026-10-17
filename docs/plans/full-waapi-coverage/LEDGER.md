@@ -472,3 +472,12 @@ populated-marker semantics, larger terminal delivery and all other original
 scope remain owned. Source-level artifact verification and explicit boundaries
 are partial implementation, not completion of those obligations. Existing
 product receipts are not transferred to this successor.
+
+
+The r7 reproducibility checks pass for depth and release; branch
+`--check --require-complete` exits 2 because the unchanged product scope remains
+incomplete. Original focused `9cfa110f` reports 372 passed / 1 stale schema-seal
+failure / 11 Windows-only skips; the exact five-version guidance-seal repair
+`b1fadd6e` passes its entire 16-test file separately. Original failures stay
+preserved, no runtime changes follow the combined source run, and no broad or
+native acceptance is inferred from these focused results.
