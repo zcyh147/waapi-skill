@@ -630,6 +630,43 @@ Original receipts are retained under
 ignored `integration-partials-r18` and the query worktree's
 `native-5d7213cb-r1` roots.
 
+## Nineteenth integration checkpoint
+
+R19 combines fixed name-only Language GUID resolution `06c91530`, complete compact
+project snapshots `c6739d03`, exact observed Console result compatibility `8aef5e52`,
+planned documented Lists `33b0c9f8` and the reviewed owner-field collision repair
+`9ee53e9a`. The review found that an unrelated class List handle named Metadata
+could capture MetadataSlot's scalar Reference of the same name. The public RED
+and 13 focused controls remain worker evidence; the repair propagates only this
+owner declaration's selected List fields with array targets. R18's restored real
+child platform/language control remains unchanged. All original native format
+runs remain FAIL; [Console media facts](CONSOLE_MEDIA.md) retain literal results
+and source/receipt provenance without assigning effect credit.
+
+Sequential reviewed seals, interface/branch generation and both structural
+checks preserved **896 public rows / 227 URIs / 251 Program roster entries**,
+507 current contracts, all historical seals and the byte-exact 272,313 native
+obligations. R19 adds no native completion, absence claim or ticket closure.
+
+The single central preflight on `8be8eb2b` retained **824 passed / 1 failed in
+23.70 seconds**. Its newly added create-proof inverse reproduced the prior seal,
+but a later historical null-reference check rebuilt the current contract and
+reintroduced that proof. Test-only repair `e2905274` reuses the exact inverse
+helper; all historical seal values remain unchanged. That exact failed node plus
+20 deduplicated cross-seam controls passed **21 in 9.36 seconds** on the repair.
+The focus includes Language GUID proof in bound moves with drift refusal, compact
+media counts and duplicate preservation, narrow native-result acceptance/rejection,
+protected provider validation and planned List/scalar/class/owner/order controls.
+Both runs preserved all 1,852 tracked hashes and ended without owned processes.
+The 824 original passes and worker whole selections were not repeated: this is
+not a final-candidate 825-test or full Program PASS. Receipts and original worker
+failures remain under ignored `integration-partials-r19`.
+
+Root's separately completed hosted R18 run `39076934774` passed **825 in 50.47
+seconds** on exact `1111f998`; it is independent of local R18/R19 results. R20
+history/mapping and other moving work remain excluded. No native, Fresh or broad
+gate was started for this integration.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
