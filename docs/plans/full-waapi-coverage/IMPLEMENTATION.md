@@ -667,6 +667,51 @@ seconds** on exact `1111f998`; it is independent of local R18/R19 results. R20
 history/mapping and other moving work remain excluded. No native, Fresh or broad
 gate was started for this integration.
 
+## Twentieth integration checkpoint
+
+R20 adds fixed latest-project-history `df79898a`, exact central media mapping
+`715f5fba` and saved-baseline native preparation `3d05ddd1`. History receipts are
+scoped effect expectations, never selectors for a native stack entry. Seven
+pinned lanes use the closed business Draft with receipt integrity, runtime/project
+binding, prewrite drift checks and independent scoped readback; native head
+identity and effects outside that scope remain unobserved. The mapping verifier
+retains exact source/language/file/MediaID multisets, empty Work Unit storage,
+project mode and non-storage preservation; unknown containers remain unverified.
+The collector saves its private sandbox through Gateway before taking its
+independent baseline, requires business verification and retains failure bytes.
+
+Integration review reproduced false verification for conflicting XML Value and
+ValueList encodings in both project storage mode and plugin media filename. Four
+runtime guard lines reject dual encodings without choosing precedence. The two
+original public RED selections each retained **1 failed / 1 passed**; storage
+controls then passed **2 in 1.32 seconds** on `18f739c4`, and plugin controls
+passed **3 in 1.94 seconds** on `3172e35d`. Single attribute and nested encodings
+remain accepted. These are separate candidates and overlapping controls.
+
+Reviewed seals and serial interface/branch generation/checks preserved **896
+public rows / 227 URIs / 251 Program roster entries**, all historical seals and
+the byte-exact **272,313 native obligations**. Current registered contracts are
+514. Removing only the five internal history-binding fields reproduces the prior
+named-contract seal; no native evidence, requirement, owner or state was credited.
+
+The single central preflight on `03451653` retained **818 passed / 7 failed in
+25.70 seconds**. All seven failures were history matrix fixtures still supplying
+unbound empty native requests. Test-only `40362f01` uses the existing public
+owned-receipt Draft lifecycle, checks scoped verification, exact terminal result
+and execute-once behavior. The seven exact failures plus 12 deduplicated
+cross-seam cases passed **19 in 13.41 seconds** on that repair, including both
+final collector controls. Both runs preserved all 1,855 tracked hashes and ended
+without owned processes. No complete preflight rerun or final-candidate 825-test
+PASS is claimed. Original logs and proofs remain under ignored
+`integration-partials-r20`.
+
+Root separately reported hosted R19 run `39078615568` passing **825 in 48.28
+seconds** on exact `1e8cf27b`. Its later native 2025 attempt on fixed `3d05ddd1`
+remains **FAIL**: exact central media rows and storage checks passed, while model
+preservation failed. Representation-equivalence repair and later history work
+remain outside R20. No native, Fresh or broad gate was launched by this merger;
+program controls do not supply native effect credit.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
