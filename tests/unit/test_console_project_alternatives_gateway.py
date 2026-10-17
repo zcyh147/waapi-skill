@@ -5,6 +5,7 @@ project effects or permit any native process launch.
 """
 from copy import deepcopy
 import json
+from xml.etree import ElementTree as ET
 
 import pytest
 
@@ -28,10 +29,33 @@ class ConsoleProjectTask(FieldTask):
                 'type': 'Project', 'path': '\\', 'filePath': str(self.project_file)}]}
         if uri == CREATE:
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
-            self.created_file.write_text('<WwiseDocument Type="Project" />')
+            self.write_created_project(args)
             self.project_file = self.created_file
             return {}
         return super().call(uri, args, options)
+
+
+    def write_created_project(self, args):
+        document = ET.Element('WwiseDocument', Type='Project',
+            SchemaVersion={'2023.1': '119', '2024.1': '123', '2025.1': '133'}[self.version],
+            WwiseVersion='v' + self.version + '.0', WwiseBuild='1')
+        project = ET.SubElement(ET.SubElement(document, 'ProjectInfo'), 'Project',
+            Name='Created', ID='{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}')
+        platforms = ET.SubElement(project, 'Platforms')
+        rows = args.get('platforms', {'basePlatform': 'Windows'})
+        if isinstance(rows, dict):
+            rows = [rows]
+        for index, row in enumerate(rows):
+            ET.SubElement(platforms, 'Platform', Name=row.get('name', row['basePlatform']),
+                ReferencePlatform=row['basePlatform'], ID=f'{{CCCCCCCC-CCCC-CCCC-CCCC-{index + 1:012X}}}')
+        languages = ET.SubElement(project, 'LanguageList')
+        names = args.get('languages', ['English(US)'])
+        for index, name in enumerate(['SFX', *names]):
+            ET.SubElement(languages, 'Language', Name=name,
+                ID=f'{{DDDDDDDD-DDDD-DDDD-DDDD-{index + 1:012X}}}')
+        ET.SubElement(ET.SubElement(project, 'PropertyList'), 'Property', Name='DefaultLanguage',
+            Type='string', Value=names[0] if names else 'English(US)')
+        self.created_file.write_bytes(ET.tostring(document, encoding='utf-8'))
 
 
 @pytest.mark.parametrize('version', VERSIONS)
@@ -75,6 +99,9 @@ def test_console_create_preserves_optional_platform_names_and_same_base_rows(tmp
                       **({'languages': []} if shape == 'empty' else {})}]
     code, verified = task.run('verify', tx)
     assert code == 0, json.dumps(verified)
+    assert verified['verified'] is (shape != 'empty'), verified
+    if shape == 'empty':
+        assert verified['state'] == 'result_schema_checked', verified
     assert len([row for row in task.calls if row[0] == CREATE]) == 1
 
 
@@ -223,3 +250,113 @@ def test_console_platform_schema_and_continuation_disclose_pinned_choices(tmp_pa
         code, payload = task.step('draft-check')
     assert code != 0, payload
     assert all(choice in json.dumps(payload) for choice in expected), payload
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('failure', ['malformed', 'missing', 'wrong-project-id', 'wrong-platform', 'wrong-language', 'wrong-default-language', 'duplicate-project'])
+def test_console_create_cannot_verify_wrong_saved_project(tmp_path, version, failure):
+    task = ConsoleProjectTask(tmp_path, version)
+    code, payload = task.step('draft-declare-cli-console-plan',
+        '--value', 'project_file', str(task.created_file))
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, payload = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, payload
+    code, payload = task.run('execute', tx)
+    assert code == 0, payload
+    if failure == 'malformed':
+        task.created_file.write_text('<WwiseDocument Type="Project" />')
+    elif failure == 'missing':
+        task.created_file.unlink()
+    else:
+        document = ET.fromstring(task.created_file.read_bytes())
+        project = document.find('./ProjectInfo/Project')
+        if failure == 'wrong-project-id':
+            project.set('ID', '{EEEEEEEE-EEEE-EEEE-EEEE-EEEEEEEEEEEE}')
+        elif failure == 'wrong-platform':
+            project.find('./Platforms/Platform').set('ReferencePlatform', 'Android')
+        elif failure == 'wrong-language':
+            project.find("./LanguageList/Language[@Name='English(US)']").set('Name', 'French')
+        elif failure == 'wrong-default-language':
+            project.find('./PropertyList/Property').set('Value', 'French')
+        elif failure == 'duplicate-project':
+            document.find('ProjectInfo').append(deepcopy(project))
+        task.created_file.write_bytes(ET.tostring(document, encoding='utf-8'))
+    retained = task.created_file.read_bytes() if task.created_file.exists() else None
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'verification_failed', payload
+    assert payload.get('verified') is not True
+    assert payload['cleanup']['projection']['automatic_cleanup'] is False
+    assert (task.created_file.read_bytes() if task.created_file.exists() else None) == retained
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+def execute_console_creation(task, *extra, before_execute=None):
+    code, payload = task.step('draft-declare-cli-console-plan',
+        '--value', 'project_file', str(task.created_file), *extra)
+    assert code == 0, payload
+    code, payload = task.step('draft-check')
+    assert code == 0, payload
+    code, payload = task.step('preview-from-draft')
+    assert code == 0, payload
+    tx = payload['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, payload = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, payload
+    if before_execute:
+        before_execute()
+    code, payload = task.run('execute', tx)
+    return tx, code, payload
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_console_create_saves_requested_language_order_and_default(tmp_path, version):
+    task = ConsoleProjectTask(tmp_path, version)
+    tx, code, payload = execute_console_creation(task,
+        '--item', 'languages', 'French', '--item', 'languages', 'Japanese')
+    assert code == 0, payload
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['verified'] is True, payload
+    observed = [row for row in payload['verification']['readbacks'] if row.get('kind') == 'console-created-project-artifact']
+    assert observed[0]['default_language'] == 'French'
+    assert [row['Name'] for row in observed[0]['languages']] == ['SFX', 'French', 'Japanese']
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('drift', ['destination-appears', 'root-replaced'])
+def test_console_create_refuses_destination_drift_before_native_write(tmp_path, version, drift):
+    task = ConsoleProjectTask(tmp_path, version)
+    def change_destination():
+        if drift == 'destination-appears':
+            task.created_file.write_text('existing user file')
+        else:
+            task.created_file.parent.rename(tmp_path / 'retained-original-root')
+            task.created_file.parent.mkdir()
+    _, code, payload = execute_console_creation(task, before_execute=change_destination)
+    assert code != 0, payload
+    assert not any(row[0] == CREATE for row in task.calls)
+    if drift == 'destination-appears':
+        assert task.created_file.read_text() == 'existing user file'
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_console_create_observation_budget_is_unknown_not_a_proven_bad_effect(tmp_path, version):
+    task = ConsoleProjectTask(tmp_path, version)
+    tx, code, payload = execute_console_creation(task)
+    assert code == 0, payload
+    task.created_file.write_bytes(b' ' * (9 * 1024 * 1024))
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'executed_unverified', payload
+    assert payload['error_code'] == 'LIMIT_EXCEEDED'
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1

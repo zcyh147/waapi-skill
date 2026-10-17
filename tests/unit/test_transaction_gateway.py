@@ -7854,7 +7854,11 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
     year = int(version.split(".", 1)[0])
     is_command_line = not api.startswith("ak.wwise.ui.")
     state_dir = tmp_path / "state"
-    io_root = (tmp_path / "io-root").resolve()
+    io_root = (tmp_path / ("TargetProject" if api == "ak.wwise.console.project.create" else "io-root")).resolve()
+    if api == "ak.wwise.console.project.create":
+        # Native creation requires a matching folder/file basename. The owned
+        # existing directory and saved artifact are independent of transition.
+        io_root.mkdir()
     target_path = io_root / "TargetProject.wproj"
     current_path = (tmp_path / "current-project" / "CurrentProject.wproj").resolve()
     contract = ExecutionContractRegistry().authoring_ui_describe(version, api)
@@ -7908,7 +7912,20 @@ def test_every_project_transition_row_runs_one_complete_program_chain(
         if api.endswith(".close") and version in {"2021.1", "2022.1", "2023.1"}
         else {}
     )
-    execute_client = FakeClient(
+    class TransitionClient(FakeClient):
+        def call(self, uri, args=None, options=None):
+            returned = super().call(uri, args, options)
+            if uri == "ak.wwise.console.project.create":
+                schema_version = {"2023.1": 119, "2024.1": 123, "2025.1": 133}[version]
+                target_path.write_text(f'''<WwiseDocument Type="Project" SchemaVersion="{schema_version}" WwiseVersion="v{version}.0" WwiseBuild="1">
+<ProjectInfo><Project Name="TargetProject" ID="{PROJECT_GUID}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{{22222222-2222-2222-2222-222222222222}}" /></Platforms>
+<LanguageList><Language Name="English(US)" ID="{{33333333-3333-3333-3333-333333333333}}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>''', encoding="utf-8")
+            return returned
+
+    execute_client = TransitionClient(
         {
             "ak.wwise.core.getInfo": [
                 live_info(year=year, is_command_line=is_command_line)

@@ -27,7 +27,7 @@ from .layout_blueprint import declared_layout_matches, declared_layout_mismatche
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
-from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome
+from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
@@ -8865,6 +8865,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api == CONSOLE_CREATE_URI:
+            try:
+                verification = prepare_console_project_creation(call_args, execution_contract['io_audit'], request.version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == TONE_URI:
             try:
                 verification = prepare_tone_verification(call_args, execution_contract['io_audit'], request.version)
@@ -13682,6 +13687,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api == CONSOLE_CREATE_URI:
+            try:
+                validate_console_project_creation(prepared.get('verification_plan', {}), call_args, execution_contract['io_audit'], version)
+            except SoundBankContractError as exc:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
         if api == TONE_URI:
             plan = prepared.get('verification_plan', {})
             try:
@@ -15961,6 +15971,24 @@ def verify_prepared_operation(
             verification_strength = 'tone_wav_artifact' if business_state_verified else 'partial_tone_artifact'
             readbacks.append(observed)
             check('Requested Tone WAV artifact exists and matches its observable postconditions', True, observed)
+    elif kind == 'console-project-create':
+        business_state_verified = False
+        check_result_schema(CONSOLE_CREATE_URI, plan['version'])
+        try:
+            observed = inspect_created_project(plan)
+        except SoundBankContractError as exc:
+            if exc.error_code not in {'MISSING_ARTIFACT', 'INVALID_PROJECT_ARTIFACT', 'SYMLINK_NOT_ALLOWED'}:
+                raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+            check('Requested saved project artifact is present and valid', False,
+                {'code': exc.error_code, 'message': str(exc), **exc.details})
+        else:
+            readbacks.append(observed)
+            check('Requested project platforms were saved', observed['platforms_match'], observed['platforms'])
+            check('Requested project languages were saved', observed['languages_match'], observed['languages'])
+            check('Requested default language was saved', observed['default_language_matches'], observed['default_language'])
+            business_state_verified = not observed['unresolved']
+            success_status = 'verified' if business_state_verified else 'result_schema_checked'
+        verification_strength = 'saved_project_artifact'
     elif kind == "console-project-process":
         uri, version = plan['uri'], plan['version']
         check_result_schema(uri, version)

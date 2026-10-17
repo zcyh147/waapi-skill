@@ -21447,6 +21447,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     verification,
                     guard_validation=guard_validation,
                     project_call=project_call,
+                    project_creation=(request_payload.get('arguments', {}).get('api') == 'ak.wwise.console.project.create'),
                 )
         except Exception as exc:  # noqa: BLE001 - read-only verification may be retried manually
             return verification_deferred_payload(
@@ -30469,8 +30470,9 @@ def strengthen_project_transition_verification(
     *,
     guard_validation: Mapping[str, Any],
     project_call: Mapping[str, Any],
+    project_creation: bool = False,
 ) -> VerificationResult:
-    """Upgrade a generic result-schema receipt after a proven project transition."""
+    """Combine the transition with any independently observed creation effect."""
 
     if not verification.ok:
         return verification
@@ -30489,14 +30491,33 @@ def strengthen_project_transition_verification(
         "call": dispatch_call_summary(project_call),
         "project": transition.get("actual"),
     }
+    assertions = [*verification.assertions, assertion]
+    business_verified = True
+    if project_creation:
+        artifacts = [row for row in verification.readbacks
+            if row.get('kind') == 'console-created-project-artifact']
+        if len(artifacts) != 1:
+            raise GatewayInputError('Project creation requires its independent saved artifact observation')
+        saved = artifacts[0]['project']
+        actual = transition.get('actual', {})
+        identity_matches = (_canonical_guid(saved.get('id')) and _canonical_guid(actual.get('id'))
+            and saved['id'].upper() == actual['id'].upper()
+            and saved.get('name') == actual.get('name'))
+        assertions.append({'name': 'Saved project identity matches the observed open project',
+            'passed': identity_matches, 'evidence': {'saved': saved, 'live': actual}})
+        business_verified = verification.business_state_verified and identity_matches
+    passed = all(row.get('passed') is True for row in assertions)
     return VerificationResult(
         operation=verification.operation,
-        status="verified",
-        assertions=(*verification.assertions, assertion),
+        status=('verification_failed' if not passed else 'verified' if business_verified else 'result_schema_checked'),
+        assertions=tuple(assertions),
         readbacks=(*verification.readbacks, readback),
-        message="The returned WAAPI payload and live project transition postcondition both passed.",
+        message=('The returned WAAPI payload and live project transition postcondition both passed.' if not project_creation else
+            'Saved artifact identity does not match the observed project.' if not passed else
+            'The returned WAAPI payload and requested project transition/effect checks passed.' if business_verified else
+            'The project transition passed; requested artifact semantics remain explicitly unresolved.'),
         verification_strength=f"{verification.verification_strength}+project_transition_readback",
-        business_state_verified=True,
+        business_state_verified=business_verified,
     )
 
 
