@@ -192,3 +192,33 @@ def test_selected_large_enum_exposes_bounded_choices_and_accepts_last_disclosed_
     code, declared = task.step("draft-declare-field-change", "--object-handle", target,
                               "--field-handle", field["handle"], "--business-value", "999")
     assert code == 0, declared
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_selected_long_enum_label_can_be_inspected_and_declared(tmp_path: Path, version: str) -> None:
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    label = "声" * 24000
+    task.metadata = {"Mode": {"name": "Mode", "type": "int32", "restriction": {"type": "enum", "values": [{"value": 42, "displayName": label}]}}}
+    target = task.bind(FIRST)
+    code, listed = task.step("draft-discover-fields", "--object-handle", target, "--list")
+    assert code == 0, listed
+    code, acquired = task.step("draft-discover-fields", "--object-handle", target, "--selection", listed["agent_result"]["fields"][0]["selection"])
+    assert code == 0, acquired
+    assert len(json.dumps(acquired, ensure_ascii=False, indent=2).encode()) <= 64 * 1024
+    field = acquired["field_candidates"][0]
+    assert field["value_input"]["choices"][0]["labels_complete"] is False
+    assert field["value_input"]["choices"][0]["input"] == "choice:0"
+    item = acquired["metadata_detail"]["field"]["choices"]["items"][0]
+    assert item["detail_required"] is True
+    command = item["next_command"]
+    fragments = []
+    while command:
+        code, page = task.run(*command["gateway_argv"])
+        assert code == 0, page
+        result = page["agent_result"]
+        fragments.extend(entry["value"] for entry in result["entries"] if entry["pointer"] == "/displayName")
+        command = result.get("next_command")
+    assert "".join(fragments) == label
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+        "--field-handle", field["handle"], "--business-value", "choice:0")
+    assert code == 0, declared

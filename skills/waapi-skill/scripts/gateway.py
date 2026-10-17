@@ -18366,6 +18366,19 @@ def dispatch_business_field_discovery(
         )
         restrictions = dict(bound.restrictions)
         value_input = field_value_input(session, bound, choice_limit=20 if detail_projection is not None else None)
+        label_detail = "metadata_detail.field.choices" if detail_projection is not None else "metadata.restriction.values"
+        if "enum_labels" in restrictions:
+            restrictions["enum_labels"] = [dict(row) for row in restrictions["enum_labels"]]
+            for row in restrictions["enum_labels"]:
+                if len(row["label"].encode("utf-8")) > 512:
+                    row["label"] = row["label"].encode("utf-8")[:512].decode("utf-8", errors="ignore")
+                    row["label_complete"] = False
+                    row["label_detail"] = label_detail
+        for choice in value_input.get("choices", []):
+            if any(len(label.encode("utf-8")) > 512 for label in choice["labels"]):
+                choice["labels"] = [label.encode("utf-8")[:512].decode("utf-8", errors="ignore") for label in choice["labels"]]
+                choice["labels_complete"] = False
+                choice["label_detail"] = label_detail
         if detail_projection is not None:
             if len(label.encode("utf-8")) > 1024:
                 label = bound.token

@@ -1374,6 +1374,22 @@ def test_metadata_detail_preserves_native_presence_and_extended_fields(tmp_path:
     assert detailed["agent_result"]["complete"] is True
 
 
+@pytest.mark.parametrize("version", SUPPORTED_WWISE_VERSION_KEYS)
+def test_metadata_detail_counts_unknown_native_extension_in_read_budget(tmp_path: Path, version: str) -> None:
+    responses = _metadata_responses(tmp_path, version=version)
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "extension": "x" * (512 * 1024)}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version=version)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, detail = waapi_gateway.execute_gateway(["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"]],
+        env=env, client_factory=lambda _: client)
+    assert code == 2, detail
+    assert detail["error_code"] == "LIVE_METADATA_LIMIT_EXCEEDED"
+    assert detail["details"]["limit_bytes"] == 512 * 1024
+    assert "x" * 1024 not in json.dumps(detail)
+
+
 def test_metadata_large_detail_continuation_is_complete_and_snapshot_bound(tmp_path: Path) -> None:
     responses = _metadata_responses(tmp_path)
     text = "声\\\"" * 16000

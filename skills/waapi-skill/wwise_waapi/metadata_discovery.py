@@ -592,7 +592,7 @@ def _read_property_info(
             "getPropertyInfo returned metadata for a different field.",
             details={"requested": name, "actual": info.name},
         )
-    payload = info.as_dict()
+    payload = info.raw
     try:
         size = len(canonical_json_bytes(payload))
     except (TypeError, ValueError) as exc:
@@ -1567,6 +1567,8 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
             _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
             return payload
         except MetadataDiscoveryError as exc:
+            if complete_detail and exc.error_code == "LIVE_METADATA_LIMIT_EXCEEDED":
+                raise
             if exc.error_code in {"LIVE_METADATA_LIMIT_EXCEEDED", "DISCOVERY_RESULT_LIMIT_EXCEEDED"}:
                 raise MetadataDiscoveryError("METADATA_DETAIL_TOO_LARGE", "The selected field detail exceeds the bounded detail response; no detail was truncated.", details={"field": name, "selection": selection, "scope": scope, "cause": exc.as_dict(), "repair": "Inspect another listed field; this exact field requires a separately supported larger-detail reader."}) from exc
             raise
