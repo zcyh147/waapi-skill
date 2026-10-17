@@ -10,9 +10,11 @@ at `07c20232`. Do not merge main without a later explicit user request.
 All 21 English tickets (#175–#195) are published as native sub-issues; all
 36 blocking edges were verified. The proposal JSON preserves exact mappings.
 The implementation frontier starts with #175 (native catalogs), then #176
-(completion and ownership), then the unblocked functional slices. Track verified
-integration commits separately from issue closure; final main merge closes
-completed tickets through normal PR references.
+(completion and ownership), then the unblocked functional slices. Close a child ticket only after its implementation is integrated and its own
+acceptance evidence is complete, with an English evidence comment, so native
+blocking edges expose the next frontier. Keep the parent open through incomplete
+implementation and final acceptance; the draft PR carries the normal closing
+references. No main merge is authorized.
 
 ## Active work
 
