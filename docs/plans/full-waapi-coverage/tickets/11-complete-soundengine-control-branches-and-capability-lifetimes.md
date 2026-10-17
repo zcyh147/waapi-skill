@@ -94,3 +94,15 @@ acceptance remain implementation/evidence work under this ticket. Existing
 Profiler capture reads are not automatically a live-resource oracle. No native
 process, network client, Console/Authoring launch or Fresh task was used for
 this source batch, and no branch/family completion credit is assigned.
+
+Root review of fixed source `49fb1068` found a pending-publication gap despite
+its earlier scoped active-handle controls: `postEvent` could execute, then a
+separate `stopAll` could execute before the original post was verified, and late
+verification would still issue playing authority. The original public RED is
+retained. The successor binds Event/game-object provenance and publication state
+to each execution-ordered lifetime, and stop consumption invalidates matching
+pending receipts as well as active handles. Other Event/object scopes and
+unregister preserve publication. A retired/replaced lifetime now reports
+`playing_authority_unavailable`, retaining its specific reason, instead of
+mislabeling the condition as a filesystem persistence failure. This is authority
+bookkeeping evidence only; it adds no native stop/effect acceptance.

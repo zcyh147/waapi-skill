@@ -3176,3 +3176,112 @@ def test_playing_authority_storage_failure_stops_before_native_dispatch(
     assert rejected["native_dispatch_attempted"] is False
     assert rejected["automatic_retry"] is False
     assert client.soundengine_calls == before
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+def test_stop_all_prevents_late_publication_of_pending_playing_authority(tmp_path: Path, version: str) -> None:
+    env = _env(tmp_path, version)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path, version)
+    emitter, _ = _register_game_object_for_test(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Pending emitter", version=version,
+    )
+    post_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.postEvent", version=version,
+        declaration=["--event-handle", "<bound:event>", "--game-object-handle", emitter],
+        role_bindings=(("event", client.event_id),),
+    )
+    code, posted = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=post_preview,
+    )
+    assert code == 0, posted
+    stop_preview, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.stopAll", declaration=[], version=version,
+    )
+    code, stopped = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=stop_preview,
+    )
+    assert code == 0, stopped
+    before = list(client.soundengine_calls)
+    code, rejected = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", str(post_preview["transaction_id"])],
+        env=env, client_factory=lambda _url: client,
+    )
+    assert code == 2, rejected
+    assert rejected["status"] == "playing_authority_unavailable"
+    assert rejected["error_code"] == "PLAYING_HANDLE_LIFETIME_RETIRED"
+    assert rejected["agent_result"] is None
+    assert rejected["verified"] is False
+    assert rejected["automatic_retry"] is False
+    assert client.soundengine_calls == before
+
+
+@pytest.mark.parametrize("control_scope, rejected", (
+    ("object", True), ("other_object", False),
+    ("event_object", True), ("event_global", True), ("other_event", False),
+    ("unregister_object", False), ("unregister_global", False), ("event_pause", False),
+))
+def test_pending_playing_publication_respects_event_object_and_unregister_lifetimes(
+    tmp_path: Path, control_scope: str, rejected: bool,
+) -> None:
+    env = _env(tmp_path)
+    state_dir = tmp_path / "state"
+    client = _SoundEngineDraftClient(tmp_path)
+    emitter, _ = _register_game_object_for_test(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Pending emitter",
+    )
+    other, _ = _register_game_object_for_test(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client, name="Other emitter",
+    )
+    pending, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation="ak.soundengine.postEvent",
+        declaration=["--event-handle", "<bound:event>", "--game-object-handle", emitter],
+        role_bindings=(("event", client.event_id),),
+    )
+    code, posted = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=pending,
+    )
+    assert code == 0, posted
+    if control_scope.startswith("unregister"):
+        operation = "ak.soundengine.unregisterGameObj"
+        declaration = ["--all-game-objects"] if control_scope.endswith("global") else ["--game-object-handle", emitter]
+        roles = ()
+    elif control_scope.startswith("event") or control_scope == "other_event":
+        operation = "ak.soundengine.executeActionOnEvent"
+        declaration = ["--event-handle", "<bound:event>", "--action", "Pause" if control_scope == "event_pause" else "Stop"]
+        if control_scope.endswith("object"):
+            declaration.extend(["--game-object-handle", emitter])
+        roles = (("event", client.other_event_id if control_scope == "other_event" else client.event_id),)
+    else:
+        operation = "ak.soundengine.stopAll"
+        declaration = ["--game-object-handle", other if control_scope == "other_object" else emitter]
+        roles = ()
+    control, _ = _preview_soundengine_plan(
+        tmp_path=tmp_path, state_dir=state_dir, env=env, client=client,
+        operation=operation, declaration=declaration, role_bindings=roles,
+    )
+    code, executed = _execute_soundengine_without_verification(
+        state_dir=state_dir, env=env, client=client, previewed=control,
+    )
+    assert code == 0, executed
+    before = list(client.soundengine_calls)
+    code, verified = gateway.execute_gateway(
+        ["--state-dir", str(state_dir), "verify", str(pending["transaction_id"])],
+        env=env, client_factory=lambda _url: client,
+    )
+    if rejected:
+        assert code == 2, verified
+        assert verified["error_code"] == "PLAYING_HANDLE_LIFETIME_RETIRED"
+        assert verified["agent_result"] is None
+    else:
+        assert code == 0, verified
+        playing = verified["agent_result"]["business_result"]["playing_handle"]
+        code, declared = _declare_soundengine_plan_result(
+            state_dir=state_dir, env=env, client=client,
+            operation="ak.soundengine.stopPlayingID", declaration=["--playing-handle", playing],
+        )
+        assert code == 0, declared
+    assert client.soundengine_calls == before

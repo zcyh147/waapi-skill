@@ -21584,7 +21584,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     "error_type": type(exc).__name__,
                     "message": str(exc),
                     "soundengine_authority_revocation": soundengine_authority_revocation,
-                "automatic_retry": False,
+                    "automatic_retry": False,
                     **wire_path_output,
                 },
             )
@@ -21606,7 +21606,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 details={
                     "dispatch_result": result,
                     "soundengine_authority_revocation": soundengine_authority_revocation,
-                "automatic_retry": False,
+                    "automatic_retry": False,
                     **wire_path_output,
                 },
             )
@@ -21634,6 +21634,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 try:
                     RuntimePlayingHandleStore(store.state_dir).begin_lifetime(
                         playing_id=native_playing_id,
+                        event_id=call_args["event"], game_object_id=call_args.get("gameObject"),
                         context=_runtime_game_object_context_from_live(
                             endpoint=common["endpoint"], project=project,
                             detected_version=detected_version, live_info=live_info,
@@ -21667,7 +21668,7 @@ def _dispatch_transaction_command_with_execution_lease(
                     "playing_binding_validation": playing_binding_validation,
                     "game_object_collection_validation": game_object_collection_validation,
                     "soundengine_authority_revocation": soundengine_authority_revocation,
-                "automatic_retry": False,
+                    "automatic_retry": False,
                     **wire_path_output,
                 },
             )
@@ -22117,6 +22118,10 @@ def _dispatch_transaction_command_with_execution_lease(
                                 "soundengine_playback_not_started"
                                 if getattr(exc, "error_code", None)
                                 == "PLAYING_HANDLE_NOT_STARTED"
+                                else "playing_authority_unavailable"
+                                if getattr(exc, "error_code", None) in {
+                                    "PLAYING_HANDLE_LIFETIME_RETIRED", "PLAYING_HANDLE_GENERATION_DRIFT",
+                                }
                                 else "playing_handle_persistence_failed"
                             ),
                             "error_code": getattr(
