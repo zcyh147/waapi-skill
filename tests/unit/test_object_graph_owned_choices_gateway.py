@@ -52,11 +52,11 @@ class OwnedGraphTask(FieldTask):
                "notes": node.get("notes", "" if existing is None else existing["notes"]),
                **({"owner": {"id": parent}, "parent": None} if owned else {"parent": {"id": parent}})}
         self.objects[object_id] = row
-        row.update({key: deepcopy(value) for key, value in node.items() if key.startswith("@") and not isinstance(value, list)})
+        row.update({key: deepcopy(value) for key, value in node.items() if key.startswith("@") and key != "@CustomList"})
         children = [self._create(child, object_id) for child in node.get("children", [])]
         result = {"id": object_id, "name": row["name"], **({"children": children} if children else {})}
         for key, values in node.items():
-            if key.startswith("@") and isinstance(values, list):
+            if key == "@CustomList" and isinstance(values, list):
                 previous = row.get(key, [])
                 if self.list_mode == "replaceAll":
                     old_ids = {member["id"] for member in previous}
@@ -120,14 +120,25 @@ class OwnedGraphTask(FieldTask):
                 children = [self._create(child, row["id"]) for child in item.get("children", [])]
                 result_row = {"id": row["id"], "name": row["name"],
                               **({"children": children} if children else {})}
+                for key, value in item.items():
+                    if key.startswith("@") and key != "@CustomList":
+                        row[key] = deepcopy(value)
                 for key, values in item.items():
-                    if key.startswith("@") and isinstance(values, list):
+                    if key == "@CustomList" and isinstance(values, list):
                         previous = [member for member in row.get(key, []) if member["id"] in self.objects]
                         members = [self._create(member, row["id"], owned=True) for member in values]
                         previous = [member for member in previous if member["id"] in self.objects]
                         row[key] = [*previous, *({"id": member["id"]} for member in members if {"id": member["id"]} not in previous)]
                         result_row[key] = members
                 results.append(result_row)
+            if self.bad_result == "reverse-reference-array":
+                self.objects[FIRST]["@Targets"].reverse()
+            elif self.bad_result == "omit-reference-array":
+                del self.objects[FIRST]["@Targets"]
+            elif self.bad_result == "retain-cleared-reference":
+                self.objects[FIRST]["@Target"] = SECOND
+            elif self.bad_result == "omit-cleared-reference":
+                del self.objects[FIRST]["@Target"]
             if self.bad_result == "alter-unrequested":
                 for row in self.objects.values():
                     if row["name"] == "Wind":
@@ -641,3 +652,101 @@ def test_set_replace_rename_keeps_source_identity_and_replaces_exact_sibling(tmp
     assert task.objects[FIRST]["name"] == "Layers" and ROOT not in task.objects and CHILD not in task.objects
     wind = task.objects["{77777777-7777-7777-7777-777777777777}"]
     assert wind["parent"] == {"id": FIRST} and wind["notes"] == "Keep wind"
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_reference_array_uses_only_bound_handles_and_verifies_ordered_guids(tmp_path: Path, version: str) -> None:
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"}}
+    owner, target = task.bind(FIRST), task.bind(SECOND)
+    field = task.discover(owner, "Target objects")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
+                               "--field-value", field, "  " + json.dumps([target, owner]) + "  ")
+    assert code == 0, declared
+    tx, shown = task.preview()
+    args = shown["artifact"]["prepared_operation"]["dispatch"]["args"]
+    assert args["objects"] == [{"object": FIRST, "@Targets": [SECOND, FIRST]}]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("bad_result", (None, "retain-cleared-reference", "omit-cleared-reference"))
+def test_set_reference_null_clears_the_exact_field_with_independent_readback(
+    tmp_path: Path, version: str, bad_result: str | None,
+) -> None:
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.metadata["Target"] = {"name": "Target", "type": "Reference", "display": {"name": "Target object"}}
+    task.objects[FIRST]["@Target"] = SECOND
+    owner = task.bind(FIRST)
+    field = task.discover(owner, "Target object")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
+                               "--field-value", field, "null")
+    assert code == 0, declared
+    tx, shown = task.preview()
+    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"] == [{"object": FIRST, "@Target": None}]
+    task.bad_result = bad_result
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if bad_result is None else 2) and verified["verified"] is (bad_result is None), json.dumps(verified)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("form", ("array", "empty-array", "null"))
+def test_create_reference_unions_use_class_field_evidence_and_exact_bound_targets(
+    tmp_path: Path, version: str, form: str,
+) -> None:
+    task = OwnedGraphTask(tmp_path, version, "object.create")
+    task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"}}
+    owner, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step("draft-discover-fields", "--semantic-kind", "actor-mixer", "--meaning", "Target objects")
+    assert code == 0, discovered
+    field = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    value = [target, owner] if form == "array" else [] if form == "empty-array" else None
+    code, declared = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
+                               "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList",
+                               "--field-value", field, json.dumps(value))
+    assert code == 0, declared
+    tx, shown = task.preview()
+    expected = [SECOND, FIRST] if form == "array" else [] if form == "empty-array" else None
+    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["@Targets"] == expected
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("bad_result", ("reverse-reference-array", "omit-reference-array"))
+def test_set_reference_array_verification_detects_reordered_or_missing_native_fields(
+    tmp_path: Path, version: str, bad_result: str,
+) -> None:
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"}}
+    owner, target = task.bind(FIRST), task.bind(SECOND)
+    field = task.discover(owner, "Target objects")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
+                               "--field-value", field, json.dumps([target, owner]))
+    assert code == 0, declared
+    tx, shown = task.preview()
+    task.bad_result = bad_result
+    code, verified = task.finish(tx, shown)
+    assert code == 2 and verified["verified"] is False, verified
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("bad_value", ("raw-id", "too-many", "wrong-type"))
+def test_set_reference_arrays_reject_unbound_oversized_or_disallowed_targets_without_draft_change(
+    tmp_path: Path, version: str, bad_value: str,
+) -> None:
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"},
+        "restriction": {"type": "reference", "restrictions": [{"type": ["WorkUnit"]}]}}
+    owner, target = task.bind(FIRST), task.bind(SECOND)
+    field = task.discover(owner, "Target objects")
+    value = [SECOND] if bad_value == "raw-id" else [target] * 33 if bad_value == "too-many" else [target, owner]
+    code, before = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0, before
+    code, rejected = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
+                               "--field-value", field, json.dumps(value))
+    assert code == 2, rejected
+    code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0 and after["draft"] == before["draft"], after
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)

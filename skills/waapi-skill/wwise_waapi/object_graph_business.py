@@ -481,6 +481,21 @@ def _resolve_native_object_type(
     return kind.native_object_type
 
 
+def _compile_graph_field_reference(session: BusinessDeclarationSession, field: Any, value: Any) -> dict[str, Any]:
+    if value is None:
+        return {"name": field.token, "target": None}
+    values = value if isinstance(value, list) else [value]
+    if len(values) > DEFAULT_MAX_FIELDS_PER_NODE:
+        raise _repair(session, "OBJECT_GRAPH_REFERENCE_LIMIT_EXCEEDED", field="field_values",
+                      action="split the reference array into a bounded request")
+    identities = []
+    for item in values:
+        handle = session.handles.validate_field_value(field, item)
+        target = session.handles.resolve_object(handle)
+        identities.append({"kind": "id", "value": target.object_id})
+    return {"name": field.token, "target": identities if isinstance(value, list) else identities[0]}
+
+
 def _compile_create_fields(
     session: BusinessDeclarationSession,
     declaration: BusinessDeclaration,
@@ -652,17 +667,11 @@ def _compile_create_fields(
                 action="set one business meaning through one field only",
             )
         used_tokens.add(field.token)
-        normalized = session.handles.validate_field_value(field, business_value)
         if field.field_kind == "property":
+            normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            target = session.handles.resolve_object(normalized)
-            references.append(
-                {
-                    "name": field.token,
-                    "target": {"kind": "id", "value": target.object_id},
-                }
-            )
+            references.append(_compile_graph_field_reference(session, field, business_value))
     _validate_compiled_field_limit(
         session,
         properties=properties,
@@ -1257,17 +1266,11 @@ def _compile_existing_set_fields(
         used_tokens.add(field.token)
         if field.platform is not None:
             platforms.add(field.platform)
-        normalized = session.handles.validate_field_value(field, business_value)
         if field.field_kind == "property":
+            normalized = session.handles.validate_field_value(field, business_value)
             properties.append({"name": field.token, "value": normalized})
         else:
-            target = session.handles.resolve_object(normalized)
-            references.append(
-                {
-                    "name": field.token,
-                    "target": {"kind": "id", "value": target.object_id},
-                }
-            )
+            references.append(_compile_graph_field_reference(session, field, business_value))
     _validate_compiled_field_limit(
         session,
         properties=properties,

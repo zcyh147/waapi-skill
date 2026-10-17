@@ -331,6 +331,11 @@ def object_graph_business_contract_data(
                 "continuation",
             ],
             "legacy_shallow_composer_public": False,
+            "reference_values": {
+                "forms": ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"],
+                "maximum_array_members": 32,
+                "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
+            },
             "creation_boundaries": {"Action": dict(ACTION_CREATION_BOUNDARY)},
             "safety": {
                 "immutable_preview": True,
@@ -365,6 +370,11 @@ def object_graph_business_contract_data(
                 "descendants": "ordinary_recursive_children",
             },
             "bound_field_handle_container": "field_values",
+            "reference_values": {
+                "forms": ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"],
+                "maximum_array_members": 32,
+                "verification": "ordered_canonical_GUIDs_or_native_null_from_exact_field_readback",
+            },
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
             "planned_parent": "copy_previous_declaration_result_handle",
         },

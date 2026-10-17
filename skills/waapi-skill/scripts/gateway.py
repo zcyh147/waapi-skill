@@ -16785,12 +16785,23 @@ def _parse_object_graph_business_fields(
             if handle in dynamic:
                 raise GatewayInputError("One Field Handle was supplied twice")
             bound = session.handles.bound_field(handle)
-            dynamic[handle] = _parse_bound_field_business_value(
-                bound,
-                raw,
-                field="bound business field",
-                session=session,
-            )
+            if operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.strip() == "null":
+                dynamic[handle] = None
+            elif operation in {"object.create", "object.set"} and bound.field_kind == "reference" and raw.lstrip().startswith("["):
+                try:
+                    value = json.loads(raw)
+                except ValueError as exc:
+                    raise GatewayInputError("Reference arrays require a JSON array of bound object handles") from exc
+                if not isinstance(value, list) or len(value) > 32 or not all(isinstance(item, str) for item in value):
+                    raise GatewayInputError("Reference arrays require at most 32 bound object handles")
+                dynamic[handle] = value
+            else:
+                dynamic[handle] = _parse_bound_field_business_value(
+                    bound,
+                    raw,
+                    field="bound business field",
+                    session=session,
+                )
         fields["field_values"] = dynamic
     return fields
 
@@ -19406,6 +19417,9 @@ def dispatch_business_field_discovery(
         )
         restrictions = dict(bound.restrictions)
         value_input = field_value_input(session, bound, choice_limit=20 if detail_projection is not None else None)
+        if binding.record.operation in {"object.create", "object.set"} and bound.field_kind == "reference":
+            value_input["accepted_forms"] = ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"]
+            value_input["maximum_array_members"] = 32
         label_detail = "metadata_detail.field.choices" if detail_projection is not None else "metadata.restriction.values"
         if "enum_labels" in restrictions:
             restrictions["enum_labels"] = [dict(row) for row in restrictions["enum_labels"]]

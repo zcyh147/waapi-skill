@@ -211,10 +211,20 @@ class ObjectPropertyDescriptor:
 class ObjectReferenceDescriptor:
     request_path: str
     name: str
-    target: ObjectIdentityDescriptor
+    target: ObjectIdentityDescriptor | tuple[ObjectIdentityDescriptor, ...] | None
+
+    @property
+    def targets(self) -> tuple[ObjectIdentityDescriptor, ...]:
+        if self.target is None:
+            return ()
+        return self.target if isinstance(self.target, tuple) else (self.target,)
 
     def as_dict(self) -> dict[str, Any]:
-        return {"name": self.name, "target": self.target.as_dict()}
+        target = None if self.target is None else (
+            [item.as_dict() for item in self.target]
+            if isinstance(self.target, tuple) else self.target.as_dict()
+        )
+        return {"name": self.name, "target": target}
 
 
 @dataclass(frozen=True, slots=True)
@@ -775,10 +785,11 @@ def normalize_reference_descriptors(
     *,
     request_path: str = "$.references",
     limits: ObjectTreeLimits = ObjectTreeLimits(),
+    allow_unions: bool = False,
 ) -> tuple[ObjectReferenceDescriptor, ...]:
     """Normalize reference descriptors without resolving their target identities."""
 
-    return _normalize_references(payload, request_path=request_path, limits=limits)
+    return _normalize_references(payload, request_path=request_path, limits=limits, allow_unions=allow_unions)
 
 
 def normalize_rtpc_descriptors(
@@ -954,7 +965,7 @@ def request_topology_edges(nodes: Sequence[ObjectNodeDescriptor]) -> tuple[Objec
 def materialize_waapi_node(
     node: ObjectNodeDescriptor,
     *,
-    resolved_references: Mapping[str, ObjectId] | None = None,
+    resolved_references: Mapping[str, ObjectId | list[ObjectId] | None] | None = None,
     materialized_imports: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build one trusted native WAAPI child object from normalized descriptors.
@@ -1013,7 +1024,16 @@ def materialize_waapi_node(
             result[f"@{prop.name}"] = prop.value
         for reference in current.references:
             target = resolved[reference.request_path]
-            _require_object_id(target, path=reference.request_path)
+            if reference.target is None:
+                if target is not None:
+                    raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "A clear reference requires native null.")
+            elif isinstance(reference.target, tuple):
+                if not isinstance(target, list) or len(target) != len(reference.target):
+                    raise ObjectOperationContractError("REFERENCE_BINDING_MISMATCH", "The reference array bindings are incomplete.")
+                for item in target:
+                    _require_object_id(item, path=reference.request_path)
+            else:
+                _require_object_id(target, path=reference.request_path)
             result[f"@{reference.name}"] = target
         if current.children:
             result["children"] = [build(child) for child in current.children]
@@ -1317,6 +1337,7 @@ class _NormalizationState:
             mapping.get("references", []),
             request_path=f"{request_path}.references",
             limits=self.limits,
+            allow_unions=True,
         )
         if len(properties) + len(references) > self.limits.max_fields_per_node:
             raise ObjectOperationContractError(
@@ -1423,6 +1444,7 @@ def _normalize_references(
     *,
     request_path: str,
     limits: ObjectTreeLimits,
+    allow_unions: bool = False,
 ) -> tuple[ObjectReferenceDescriptor, ...]:
     rows = _descriptor_rows(payload, request_path=request_path, limit=limits.max_fields_per_node)
     result: list[ObjectReferenceDescriptor] = []
@@ -1430,7 +1452,16 @@ def _normalize_references(
         path = f"{request_path}[{index}]"
         _exact_fields(item, required=REFERENCE_FIELDS, optional=frozenset(), path=path)
         name = _field_name(item.get("name"), path=f"{path}.name", limits=limits)
-        target = _normalize_identity(item.get("target"), path=f"{path}.target", limits=limits)
+        raw_target = item.get("target")
+        if raw_target is None and allow_unions:
+            target = None
+        elif isinstance(raw_target, list) and allow_unions:
+            if len(raw_target) > limits.max_fields_per_node:
+                raise ObjectOperationContractError("REFERENCE_LIMIT_EXCEEDED", "A reference array exceeds its bound.")
+            target = tuple(_normalize_identity(value, path=f"{path}.target[{offset}]", limits=limits)
+                           for offset, value in enumerate(raw_target))
+        else:
+            target = _normalize_identity(raw_target, path=f"{path}.target", limits=limits)
         result.append(ObjectReferenceDescriptor(path, name, target))
     _reject_duplicate_descriptor_names(result, path=request_path)
     return tuple(result)

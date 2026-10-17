@@ -818,6 +818,13 @@ _OBJECT_CREATE_TYPE_TOKEN_DESCRIPTION = (
     "Wwise 2025.1 reflects an Actor Mixer as PropertyContainer, but its "
     "object.create request token remains ActorMixer."
 )
+_OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
+    **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
+    "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
+                   "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"},
+                       {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA}]}},
+}
+
 _OBJECT_CREATE_TYPE_TOKEN_SCHEMA: Mapping[str, Any] = {
     "type": "string",
     "minLength": 1,
@@ -867,7 +874,7 @@ _OBJECT_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
         "name": {"type": "string", "minLength": 1},
         "notes": {"type": "string"},
         "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-        "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+        "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
             "description": "Recursive closed object-node DSL; depth 8 and 128 total nodes.",
@@ -970,7 +977,7 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
             "supported_versions": ["2023.1", "2024.1", "2025.1"],
         },
         "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-        "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+        "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
         "children": {
             "type": "array",
             "description": (
@@ -2278,7 +2285,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 },
                 "notes": {"type": "string"},
                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-                "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+                "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                 "list": _OBJECT_LIST_NAME_SCHEMA,
                 "auto_add_to_source_control": {"type": "boolean", "default": False},
@@ -2692,7 +2699,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                                     "enum": ["fail", "rename", "merge", "replace"],
                                 },
                                 "properties": {"type": "array", "items": _OBJECT_PROPERTY_ARGUMENT_SCHEMA},
-                                "references": {"type": "array", "items": _OBJECT_REFERENCE_ARGUMENT_SCHEMA},
+                                "references": {"type": "array", "items": _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA},
                                 "import": {
                                     **_OBJECT_SET_IMPORT_ARGUMENT_SCHEMA,
                                     "supported_versions": ["2023.1", "2024.1", "2025.1"],
@@ -5665,6 +5672,7 @@ def _prepare_object_set(
         references = normalize_reference_descriptors(
             item.get("references", []),
             request_path=f"$.objects[{index}].references",
+            allow_unions=True,
         )
         children = normalize_object_forest(
             item.get("children", []),
@@ -5813,17 +5821,16 @@ def _prepare_object_set(
                     field_name=descriptor.name,
                     platform=platform,
                 )
-            resolved = _resolve_identity(
-                descriptor.target.as_dict(),
-                role=descriptor.request_path,
-                read=read,
-                identity_cache=identity_cache,
-            )
-            reference_targets.append((info, resolved))
-            roles[descriptor.request_path] = resolved
-            trusted[f"@{descriptor.name}"] = resolved.object
-            reference_spec = {"name": descriptor.name, "target_id": resolved.object}
-            target_spec["references"].append(reference_spec)
+            identities = []
+            for offset, target_descriptor in enumerate(descriptor.targets):
+                role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
+                resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                reference_targets.append((info, resolved))
+                roles[role] = resolved
+                identities.append(resolved.object)
+            value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
+            trusted[f"@{descriptor.name}"] = value
+            target_spec["references"].append({"name": descriptor.name, "target_id": value})
         desired_references = {row["name"].casefold(): row["target_id"] for row in target_spec["references"]}
         for info, resolved in reference_targets:
             _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
@@ -7194,17 +7201,16 @@ def _prepare_object_node_specs(
             )
             _require_object_reference_metadata(info)
             property_info_by_name[descriptor.name.casefold()] = info
-            resolved = _resolve_identity(
-                descriptor.target.as_dict(),
-                role=descriptor.request_path,
-                read=read,
-                identity_cache=identity_cache,
-            )
-            _require_reference_target_allowed(info, resolved)
-            roles[descriptor.request_path] = resolved
-            resolved_references[descriptor.request_path] = resolved.object
-            reference_spec = {"name": descriptor.name, "target_id": resolved.object}
-            spec["references"].append(reference_spec)
+            identities = []
+            for offset, target_descriptor in enumerate(descriptor.targets):
+                role = descriptor.request_path + (f"[{offset}]" if isinstance(descriptor.target, tuple) else "")
+                resolved = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                _require_reference_target_allowed(info, resolved)
+                roles[role] = resolved
+                identities.append(resolved.object)
+            value = None if descriptor.target is None else identities if isinstance(descriptor.target, tuple) else identities[0]
+            resolved_references[descriptor.request_path] = value
+            spec["references"].append({"name": descriptor.name, "target_id": value})
         if any(info.dependencies for info in property_info_by_name.values()):
             from .new_object_defaults import class_default_evidence, NewObjectDefaultError
             try:
@@ -21386,6 +21392,7 @@ def _validate_nested_request_shape(
                 normalize_reference_descriptors(
                     item.get("references", []),
                     request_path=f"$.objects[{index}].references",
+                    allow_unions=True,
                 )
                 if "import" in item:
                     if version not in OBJECT_SET_IMPORT_VERSIONS:
@@ -22936,6 +22943,11 @@ def _reference_requirement_matches(row: Mapping[str, Any], name: str, expected: 
     value = _field_value(row, name)
     if expected is None:
         return _reference_value_is_null(value)
+    if isinstance(expected, list):
+        return isinstance(value, list) and len(value) == len(expected) and all(
+            isinstance(_reference_identity(actual), str) and _same_identity(_reference_identity(actual), identity)
+            for actual, identity in zip(value, expected)
+        )
     actual = _reference_identity(value)
     return isinstance(actual, str) and _PLUGIN_GUID.fullmatch(actual) is not None and _same_identity(actual, expected)
 
