@@ -21809,7 +21809,7 @@ def _require_reference_target_allowed(
     _restriction_context["validated"].add(validation_key)
 
 
-def _read_shared_reference_target(target_id, *, read, platform, version):
+def _read_shared_reference_target(target_id, *, read, platform, version, require_match=True):
     """Prove SDK ShareSet relations without interpreting an omitted owner field."""
     from .builders.query import WaqlQueryBuilder, STRUCTURED_QUERY_CONTRACT
     options = {"return": ["id", "parent"]}
@@ -21819,11 +21819,16 @@ def _read_shared_reference_target(target_id, *, read, platform, version):
     if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
         raise OperationContractError("INVALID_READBACK", "Shared-only target must resolve exactly the chosen GUID.")
     parent = rows[0].get("parent")
-    if _reference_value_is_null(parent) or isinstance(parent, Mapping) and "id" not in parent:
+    if "parent" not in rows[0] or isinstance(parent, Mapping) and "id" not in parent:
         raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a fresh canonical parent relationship.")
-    parent_id = _reference_identity(parent)
-    if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
-        raise OperationContractError("INVALID_READBACK", "Shared-only target parent must expose a canonical GUID.")
+    if _reference_value_is_null(parent):
+        if require_match:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a non-null parent relationship.")
+        parent_id = None
+    else:
+        parent_id = _reference_identity(parent)
+        if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
+            raise OperationContractError("INVALID_READBACK", "Shared-only target parent must expose a canonical GUID.")
     preview = WaqlQueryBuilder(version=version).build({
         "contract": STRUCTURED_QUERY_CONTRACT,
         "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},
@@ -21837,11 +21842,11 @@ def _read_shared_reference_target(target_id, *, read, platform, version):
         query_options["platform"] = platform
     query = {"version": version, "args": dict(preview.envelope.args), "options": query_options}
     matches = _rows(read(OBJECT_GET_URI, query["args"], query_options))
-    if not matches:
+    if not matches and require_match:
         raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target does not satisfy the native owner-null ShareSet predicate.")
-    if len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id):
+    if matches and (len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id)):
         raise OperationContractError("INVALID_READBACK", "Owner-null predicate must return exactly the selected target GUID.")
-    return {"parent_id": parent_id, "owner_absent": True, "native_query": query}
+    return {"parent_id": parent_id, "owner_absent": bool(matches), "native_query": query}
 
 
 def _read_reference_target_classifiers(target_id, fields, *, read, platform):
@@ -21870,7 +21875,7 @@ def _reference_target_condition_assertions(pre_state, *, read, after_write):
     for condition in conditions:
         if condition.get("kind") == "shared_target":
             facts = _read_shared_reference_target(condition["target_id"], read=read,
-                platform=condition.get("platform"), version=condition["version"])
+                platform=condition.get("platform"), version=condition["version"], require_match=False)
             assertions.append({"name": f"reference {condition['reference']} retains native ShareSet classification",
                 "passed": _native_snapshot_equal(facts, condition["classification"]),
                 "evidence": {"target_id": condition["target_id"], "expected": condition["classification"], "actual": facts}})

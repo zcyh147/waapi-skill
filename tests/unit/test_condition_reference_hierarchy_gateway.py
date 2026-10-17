@@ -686,3 +686,115 @@ def test_child_of_reference_preview_treats_zero_guid_controller_as_unset(tmp_pat
     code, preview = task.step('preview-from-draft')
     assert code == 2 and preview['error_code'] == 'REFERENCE_ACTIVATION_REQUIRED', preview
     assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+def _execute_target_assignment(task):
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    return tx
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('observation', ['owner-present', 'null-parent'])
+def test_observed_false_shared_target_postcondition_is_terminal_without_second_write(tmp_path, version, observation):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = SharedReferenceTask(tmp_path, version)
+    tx = _execute_target_assignment(task)
+    if observation == 'owner-present':
+        task.shared = False
+    else:
+        task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed', verified
+    assert verified['verification']['status'] == 'verification_failed'
+    assert verified['automatic_retry'] is False
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.VERIFICATION_FAILED
+    events = store.read_events(tx)
+    assert events[-1]['event_type'] == 'verification_recorded'
+    assert events[-1]['to_state'] == 'verification_failed'
+    writes = [row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]
+    assert len(writes) == 1
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert [row for row in task.calls if row[0].endswith(('setReference', 'object.set'))] == writes
+
+
+@pytest.mark.parametrize('classifier,before,after', [('category', 'RecordedCategory', 'OtherCategory'),
+                                                    ('isPlayable', True, False)])
+def test_observed_false_category_or_playable_postcondition_is_terminal(tmp_path, classifier, before, after):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = before
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND][classifier] = after
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed', verified
+    assert TransactionStore(task.path / 'state').load(tx).state is TransactionState.VERIFICATION_FAILED
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('failure', ['malformed', 'transport', 'parent-omitted', 'parent-malformed'])
+def test_unavailable_shared_target_postread_stays_unverified_without_second_write(tmp_path, failure):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    tx = _execute_target_assignment(task)
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and options.get('return') == ['id', 'parent'] and failure.startswith('parent'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': SECOND, **({'parent': 7} if failure == 'parent-malformed' else {})}]}
+        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner = null take 1'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if failure == 'transport':
+                raise RuntimeError('controlled classifier read unavailable')
+            return {'return': [7]}
+        return normal_call(uri, args, options)
+    task.call = call
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred'
+    assert verified['automatic_retry'] is False
+    assert verified['manual_verification_retry_allowed'] is True
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    assert not any(event['event_type'] == 'verification_recorded' for event in store.read_events(tx))
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('classifier,before,after', [('category', 'RecordedCategory', None), ('isPlayable', True, 1)])
+def test_malformed_classifier_postread_remains_unknown_rather_than_proven_false(tmp_path, classifier, before, after):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = before
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND][classifier] = after
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred' and verified['automatic_retry'] is False
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    assert not any(event['event_type'] == 'verification_recorded' for event in store.read_events(tx))
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
