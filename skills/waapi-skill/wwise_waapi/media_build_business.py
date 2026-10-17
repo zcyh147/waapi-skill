@@ -16,6 +16,7 @@ from .host_paths import HostPathError, localize_waapi_host_path
 from .business_declarations import normalize_live_object_identity
 from .media_build_business_contracts import (
     MEDIA_POOL_GET_URI,
+    MEDIA_POOL_RETURN_ONLY_FIELDS,
     MEDIA_POOL_NUMBER_OPERATOR_TOKENS,
     MEDIA_POOL_SORT_DIRECTIONS,
     MEDIA_POOL_TEXT_OPERATOR_TOKENS,
@@ -420,11 +421,17 @@ def _materialize_media_pool(
         )
     field_bindings: dict[str, str] = {}
 
-    def bind(meaning: Any) -> str:
+    def bind(meaning: Any, *, return_option: bool = False) -> str:
         text = _bounded_text(meaning, field="field meaning")
         exact = field_bindings.get(text)
         if exact is None:
-            exact = _resolve_media_field(text, available_fields)
+            fixed_return = MEDIA_POOL_RETURN_ONLY_FIELDS.get(text.casefold())
+            if text not in available_fields and fixed_return is not None:
+                if not return_option:
+                    raise MediaBuildBusinessError("This return-only business field cannot be used as a native field filter; select a disclosed live field instead")
+                exact = fixed_return["field"]
+            else:
+                exact = _resolve_media_field(text, available_fields)
             field_bindings[text] = exact
         return exact
 
@@ -562,7 +569,7 @@ def _materialize_media_pool(
         sort_bindings.append(
             {
                 "meaning": str(meaning),
-                "field": bind(meaning),
+                "field": bind(meaning, return_option=True),
                 "direction": direction,
             }
         )
@@ -577,7 +584,7 @@ def _materialize_media_pool(
         if not key or keys.count(key) > 1:
             key = meaning
         output_bindings.append(
-            {"meaning": meaning, "field": bind(meaning), "key": key}
+            {"meaning": meaning, "field": bind(meaning, return_option=True), "key": key}
         )
     return_fields = list(
         dict.fromkeys(

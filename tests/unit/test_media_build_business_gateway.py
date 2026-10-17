@@ -1407,3 +1407,38 @@ def test_media_pool_exact_choice_does_not_hide_malformed_native_inventory_entrie
         env=_env(tmp_path), client_factory=lambda _: client)
     assert code == 2, payload
     assert MEDIA_POOL_GET_URI not in [call[0] for call in client.calls]
+
+
+def test_media_pool_return_only_score_size_markers_and_regions_do_not_require_discovered_fields(tmp_path: Path, media_pool_product_capture: dict) -> None:
+    schema_code, schema = gateway.execute_gateway(["request-schema", MEDIA_POOL_GET_URI], env=_env(tmp_path),
+        client_factory=lambda _: pytest.fail("return-only field schema connected"))
+    assert schema_code == 0, schema
+    assert set(schema["business_adapter"]["return_only_fields"]) == {"search-score", "file-size-bytes", "markers", "detected-regions"}
+    raw = {"return": [{"Path": "/Audio/Rain.wav", "FileId": "rain", "Score": 0.75, "Size": 4096,
+        "Markers": [{"name": "Impact", "time": 0.25}], "DetectedRegions": [{"start": 0.1, "end": 0.5}]}]}
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()] * 2, "ak.wwise.core.getProjectInfo": [_project(tmp_path)] * 2,
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Filename"]}] * 2,
+        MEDIA_POOL_GET_URI: [raw],
+    })
+    argv = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--include-field", "search-score",
+            "--include-field", "file-size-bytes", "--include-field", "markers", "--include-field", "detected-regions"]
+    code, payload = gateway.execute_gateway(argv, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1][2] == {"return": ["Path", "FileId", "Db", "Score", "Size", "Markers", "DetectedRegions"]}
+    assert payload["agent_result"]["items"][0]["values"] == {"search_score": 0.75, "file_size_bytes": 4096,
+        "markers": [{"name": "Impact", "time": 0.25}], "detected_regions": [{"start": 0.1, "end": 0.5}]}
+    assert payload["agent_result"]["field_bindings"] == [
+        {"meaning": "search-score", "field": "Score", "value_key": "search_score"},
+        {"meaning": "file-size-bytes", "field": "Size", "value_key": "file_size_bytes"},
+        {"meaning": "markers", "field": "Markers", "value_key": "markers"},
+        {"meaning": "detected-regions", "field": "DetectedRegions", "value_key": "detected_regions"}]
+    native_call = client.calls[-1]
+    rejected_argv = ["core-call", MEDIA_POOL_GET_URI, "--max-results", "2", "--text-filter", "search-score", "equals", "0.75"]
+    rejected_code, rejected = gateway.execute_gateway(rejected_argv, env=_env(tmp_path), client_factory=lambda _: client)
+    assert rejected_code == 2 and "return-only" in rejected["message"], rejected
+    assert [call[0] for call in client.calls].count(MEDIA_POOL_GET_URI) == 1
+    media_pool_product_capture.update({"gateway": {"argv": argv, "exit_code": code, "payload": payload},
+        "native_call": {"uri": native_call[0], "args": native_call[1], "options": native_call[2], "result": raw},
+        "media_pool_dispatch_count": 1,
+        "rejected_reads": [{"argv": rejected_argv, "exit_code": rejected_code, "payload": rejected}]})

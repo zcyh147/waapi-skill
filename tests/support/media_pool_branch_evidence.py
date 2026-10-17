@@ -60,7 +60,16 @@ def _git_candidate() -> str:
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=audit.ROOT, text=True).strip()
 
 
-def prepare_media_pool_capture(root: Path) -> Path:
+RETURN_OPTION_NODEID = "tests/unit/test_media_build_business_gateway.py::test_media_pool_return_only_score_size_markers_and_regions_do_not_require_discovered_fields"
+RETURN_OPTION_WITNESSES = [
+    ("get", f"/optionsSchema/@definition/waapi_definitions.json/definitions/mediaPoolReturnOption/anyOf/{choice}/enum/0",
+     f"/native_call/options/return/{index}", ["/optionsSchema/properties/return/items/$ref"])
+    for choice, index in ((0, 3), (4, 4), (5, 5), (6, 6))
+]
+
+
+def prepare_media_pool_capture(root: Path, *, nodeid: str = NODEID, witnesses=WITNESSES,
+                               extra_observation_pointers=None, reason=None, validation_symbol="_resolve_media_field") -> Path:
     """Run before pytest, from a clean candidate; retain each new capture root."""
     if subprocess.check_output(["git", "status", "--porcelain"], cwd=audit.ROOT, text=True).strip():
         raise ValueError("Media Pool product capture requires a clean committed candidate")
@@ -68,17 +77,22 @@ def prepare_media_pool_capture(root: Path) -> Path:
     inventory = audit.build_inventory()
     branches = {row["id"]: row for row in inventory["native_coverage"]["obligations"]}
     chosen = []
-    for suffix, pointer, observed, chain in WITNESSES:
+    for suffix, pointer, observed, chain in witnesses:
         branch = branches[_BASE + suffix + "|" + pointer]
         assert branch["owner_issue"] == 181
         chosen.append({"branch": branch, "observation_pointer": observed,
                        "reference_chain": [_BASE + suffix + "|" + edge for edge in chain]})
-    context = {"contract": "waapi-skill.media-pool-program-capture-context/v1", "nodeid": NODEID,
+    context = {"contract": "waapi-skill.media-pool-program-capture-context/v1", "nodeid": nodeid,
                "root": str(root.resolve()), "candidate_sha256": inventory["native_coverage"]["candidate_sha256"],
                "git_candidate": _git_candidate(), "relevant_sources": _source_seals(), "witnesses": chosen,
+               "reason": reason or "Exact 2025.1 Console Media Pool field witness through public discovery/read, native payload and result assertions, plus unrelated/ambiguous field controls. Injected-client behavior grants no native host acceptance.",
+               "validation_symbol": validation_symbol,
+               "extra_observation_pointers": extra_observation_pointers or ["/gateway/payload/agent_result", "/media_pool_dispatch_count",
+                   "/rejected_reads/0/payload/details/field_choices", "/rejected_reads/1/payload/details/field_choices",
+                   "/no_match/payload/agent_result/fields"],
                "routes": {suffix: next(row for row in inventory["routes"]
                           if row["id"] == "2025.1|function|ak.wwise.core.mediaPool." + suffix)
-                          for suffix in ("get", "getFields")}}
+                          for suffix in sorted({row[0] for row in witnesses})}}
     path = root / "context.json"
     _write(path, context)
     return path
@@ -108,7 +122,7 @@ def finish_media_pool_capture(capture: dict, phase_reports: dict, observed: dict
     outcome = "PASS" if passed else "FAIL"
     root = Path(capture["root"])
     bindings, requirements = {}, {}
-    for suffix in ("get", "getFields"):
+    for suffix in capture["routes"]:
         record = {"candidate_sha256": capture["candidate_sha256"], "scope_kind": "product",
                   "evidence_kind": "injected_client_program", "git_candidate": capture["git_candidate"],
                   "relevant_sources": capture["relevant_sources"],
@@ -130,7 +144,7 @@ def finish_media_pool_capture(capture: dict, phase_reports: dict, observed: dict
                 "construction": {"source": "skills/waapi-skill/wwise_waapi/media_pool_field_discovery.py#browse_media_pool_fields"
                     if suffix == "getFields" else "skills/waapi-skill/wwise_waapi/media_build_business.py#_materialize_media_pool", "selector": branch["pointer"]},
                 "validation": {"source": "skills/waapi-skill/wwise_waapi/media_pool_field_discovery.py#browse_media_pool_fields"
-                    if suffix == "getFields" else "skills/waapi-skill/wwise_waapi/media_build_business.py#_resolve_media_field", "selector": branch["pointer"]},
+                    if suffix == "getFields" else "skills/waapi-skill/wwise_waapi/media_build_business.py#" + capture["validation_symbol"], "selector": branch["pointer"]},
                 "verifier": {"source": "skills/waapi-skill/wwise_waapi/media_pool_field_discovery.py#browse_media_pool_fields"
                     if suffix == "getFields" else "skills/waapi-skill/wwise_waapi/media_build_business.py#_normalize_media_pool_result", "selector": branch["pointer"]},
                 "dispatch_pointer": "/field_discovery_call" if suffix == "getFields" else "/native_call",
@@ -140,14 +154,13 @@ def finish_media_pool_capture(capture: dict, phase_reports: dict, observed: dict
                 binding["reference_chain"] = witness["reference_chain"]
             checks = [{"pointer": pointer, "cardinality": branch["value"]} if branch["kind"] == "collection_cardinality"
                       else {"pointer": pointer, "equals": _observation(record, pointer)}]
-            checks.extend({"pointer": check, "equals": _observation(record, check)} for check in (
-                "/gateway/payload/agent_result", "/media_pool_dispatch_count", "/rejected_reads/0/payload/details/field_choices",
-                "/rejected_reads/1/payload/details/field_choices", "/no_match/payload/agent_result/fields"))
+            checks.extend({"pointer": check, "equals": _observation(record, check)}
+                          for check in capture["extra_observation_pointers"])
             record["branch_assertions"][branch["id"]] = {"native_shape_sha256": branch["shape_sha256"],
                 "native_route": branch["route"], "checks": checks}
             bindings[branch["id"]] = binding
             requirements[branch["id"]] = {"native_shape_sha256": branch["shape_sha256"], "categories": ["program", "native"],
-                "reason": "Exact 2025.1 Console Media Pool field witness through public discovery/read, native payload and result assertions, plus unrelated/ambiguous field controls. Injected-client behavior grants no native host acceptance."}
+                "reason": capture["reason"]}
         descriptor = _write(root / ("program-" + suffix + ".json"), record)
         for binding in bindings.values():
             if binding["branch_id"].startswith(_BASE + suffix + "|"):

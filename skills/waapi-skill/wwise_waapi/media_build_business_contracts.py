@@ -33,6 +33,14 @@ MEDIA_POOL_NUMBER_OPERATOR_TOKENS = (
 )
 MEDIA_POOL_SORT_DIRECTIONS = ("ascending", "descending")
 
+MEDIA_POOL_RETURN_ONLY_FIELDS = {
+    "search-score": {"field": "Score", "meaning": "native search relevance score"},
+    "file-size-bytes": {"field": "Size", "meaning": "native file size in bytes"},
+    "markers": {"field": "Markers", "meaning": "native marker names and times in seconds"},
+    "detected-regions": {"field": "DetectedRegions", "meaning": "native region start/end times in seconds"},
+}
+
+
 _CONTRACTS: dict[str, dict[str, Any]] = {
     PEAKS_REGION_URI: {
         "versions": _ALL_VERSIONS,
@@ -276,6 +284,9 @@ def media_build_business_contract_data(
             "result_bound": True,
         },
         "result_shape": row["result_shape"],
+        **({"return_only_fields": {name: dict(value) for name, value in MEDIA_POOL_RETURN_ONLY_FIELDS.items()},
+            "field_binding": row["field_binding"], "value_keys": row["value_keys"]}
+           if operation == MEDIA_POOL_GET_URI else {}),
         **({"result_projection": {
             "optional_native_fields": "preserve absence; return partial observation when decoding facts are missing",
             "zero_normalization_divisor": "retain native observation; normalized samples unavailable",
