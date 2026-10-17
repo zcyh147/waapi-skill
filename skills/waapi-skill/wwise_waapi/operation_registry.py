@@ -4273,10 +4273,17 @@ def _public_call_arguments(
         try:
             bound_files = validate_object_file_binding(api, source_control_binding)
             native_files = raw_args.get("files", [])
-            for row in bound_files:
-                path = str(Path(_localize_waapi_file_path(row["file_path"], field="source-control bound file path")).resolve(strict=False))
-                if path not in native_files:
-                    raise ValueError("A bound object file is not present in the sealed native file scope")
+            if "moves" in source_control_binding:
+                from .source_control_object_moves import validate_move_binding
+                pairs = validate_move_binding(source_control_binding, bound_files)
+                native_pairs = list(zip(native_files, raw_args.get("newFiles", [])))
+                if any(pair not in native_pairs for pair in pairs):
+                    raise ValueError("A bound move row is not present in the sealed native source/destination pairs")
+            else:
+                for row in bound_files:
+                    path = str(Path(_localize_waapi_file_path(row["file_path"], field="source-control bound file path")).resolve(strict=False))
+                    if path not in native_files:
+                        raise ValueError("A bound object file is not present in the sealed native file scope")
         except ValueError as exc:
             raise OperationContractError("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", str(exc)) from exc
     result_projection = arguments.get("result_projection")

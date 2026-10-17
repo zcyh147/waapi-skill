@@ -211,12 +211,51 @@ def source_control_business_contract_data(
         from .source_control_object_files import MAX_SOURCE_CONTROL_OBJECT_SCOPES
         payload["declaration"]["object_file_scopes"] = {
             "containing-file": {"cli": "--object-file <Object Handle>", "derived_from": "filePath"},
-            "original-media": {"cli": "--original-media-object <AudioFileSource Handle>", "derived_from": "originalFilePath",
-                               "sound_source_and_language_selection": "unfinished; bind the exact AudioFileSource instead"},
+            "original-media": {"cli": "--original-media-object <AudioFileSource Handle>", "derived_from": "originalFilePath"},
+            "sound-original-media": {
+                "selections": {"active": "--sound-active-media <Sound Handle> <language>",
+                    "language": "--sound-language-media <Sound Handle> <language>",
+                    "source": "--sound-source-media <Sound Handle> <AudioFileSource Handle> <language>"},
+                "language": "explicit_exact_Language_name_or_GUID; checked_against_selected_source",
+                "active": "fresh_activeSource_in_explicit_language; absent_GUID_requires_unique_matching_direct_child; Sound_and_source_originalFilePath_must_match",
+                "language_selection": "exactly_one_direct_AudioFileSource_in_the_explicit_language; otherwise_bind_an_exact_source",
+                "source_selection": "exact_bound_source_must_be_a_direct_child_of_the_Sound_in_the_explicit_language; need_not_be_active",
+                "maximum_children": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
+                "binding": "Sound_and_source_GUID_name_type_path_parent_language_exact_originalFilePath_and_file_stat; execution_rechecks",
+            },
             "maximum_scopes": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
             "file_input": "one_or_more_file_locators_or_object_file_scopes",
             "binding": "GUID_name_type_path_exact_accessor_and_ordinary_file_stat_rechecked_before_execution",
             "file_stat_scope": "device_inode_size_mtime_mode; not_file_content_or_provider_effect_proof",
+        }
+    if operation == SOURCE_CONTROL_MOVE_URI:
+        from .source_control_object_files import MAX_SOURCE_CONTROL_OBJECT_SCOPES
+        from .source_control_object_moves import MAX_MOVE_ROWS
+        payload["binding"]["identity"] = "exact_file_locators_or_row_bound_object_file_accessors"
+        payload["declaration"]["required_fields"].remove("moves")
+        payload["declaration"]["optional_fields"].extend(("moves", "object_moves"))
+        payload["declaration"]["field_types"]["object_moves"] = "closed_row_label_source_destination_choices"
+        payload["declaration"]["object_move_rows"] = {
+            "source_choices": {
+                "file": "--move-source-file <row> <project|originals|exact> <path>",
+                "object": "--move-source-object <row> <Object Handle> <containing-file|original-media>",
+                "sound-active": "--move-source-sound-active <row> <Sound Handle> <language>",
+                "sound-language": "--move-source-sound-language <row> <Sound Handle> <language>",
+                "sound-source": "--move-source-sound-source <row> <Sound Handle> <AudioFileSource Handle> <language>",
+            },
+            "destination_choices": {
+                "file": "--move-destination-file <row> <project|originals|exact> <path>",
+                "object-directory": "--move-destination-object <row> <Object Handle> <containing-file|original-media> <new-basename>",
+            },
+            "row_labels": "1..64_ASCII_letters_digits_period_underscore_hyphen; each_label_pairs_exactly_one_source_and_destination",
+            "order": "literal_move_pairs_first_then_labelled_rows_sorted_by_label",
+            "file_input": "at_least_one_literal_or_labelled_move; both_may_coexist",
+            "maximum_rows": MAX_MOVE_ROWS, "maximum_object_scopes": MAX_SOURCE_CONTROL_OBJECT_SCOPES,
+            "object_scopes": "containing-file=filePath; original-media=AudioFileSource.originalFilePath",
+            "sound_selection": "explicit_language_checked_against_direct_source; active_also_matches_Sound.activeSource_and_originalFilePath; language_requires_unique_child; source_requires_exact_bound_child",
+            "destination": "observed_object_file_directory_plus_explicit_single_filename; absence_and_anchor_file_rechecked_before_execution",
+            "conflicts": "duplicate_sources_duplicate_destinations_and_source_destination_intersections_rejected_across_all_rows",
+            "binding": "GUID_name_type_path_accessor_source_parent_language_and_ordinary_file_stat; not_provider_effect_proof",
         }
     if operation == SOURCE_CONTROL_SET_PROVIDER_URI:
         payload["binding"]["identity"] = "configured_private_profile_and_credential_file_content"

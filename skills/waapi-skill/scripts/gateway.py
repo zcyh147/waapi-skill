@@ -13766,6 +13766,13 @@ def dispatch_business_source_control_plan(
                 plan.pop("object_files"), read=binding.read_call)
         except ValueError as exc:
             raise GatewayInputError(str(exc)) from exc
+    if plan.get("object_moves"):
+        from wwise_waapi.source_control_object_moves import capture_move_inputs
+        try:
+            plan["object_move_inputs"] = capture_move_inputs(binding.record.operation, session,
+                plan.pop("object_moves"), read=binding.read_call)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     roots = _source_control_roots_from_project(binding.project)
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
@@ -27390,7 +27397,7 @@ def _business_next_action_binding(
                     "append": ["--object-id <chosen-exact-GUID>"],
                     "alternative_selector": "--object-path-segment <literal-name> (repeat)",
                     "purpose": "copy_returned_Object_Handle_to_a_disclosed_object_file_scope",
-                }} if "object_files" in business_contract["declaration"]["optional_fields"] else {}),
+                }} if {"object_files", "object_moves"} & set(business_contract["declaration"]["optional_fields"]) else {}),
                 "move_pair_flag": (
                     "--move <project|originals|exact> <source-path> "
                     "<project|originals|exact> <destination-path>"

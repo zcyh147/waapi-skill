@@ -1535,3 +1535,476 @@ def test_source_control_provider_ask_before_changes_does_not_dispatch_without_co
     code, refused = run("execute", preview["transaction_id"])
     assert code != 0 and client.calls == [], refused
     _assert_no_provider_secret_artifacts(state, evidence, secret, refused)
+
+
+def _sound_source_file_case(tmp_path, *, version="2025.1", mode="active", language="French", declaration_error=False, include_direct=False, prepare=None, move=False, plan_flags=None):
+    from tests.unit.test_object_graph_business_gateway import _info
+    sound_id = "{11111111-1111-1111-1111-111111111111}"
+    source_id = "{22222222-2222-2222-2222-222222222222}"
+    other_id = "{33333333-3333-3333-3333-333333333333}"
+    french_id = "{44444444-4444-4444-4444-444444444444}"
+    sfx_id = "{55555555-5555-5555-5555-555555555555}"
+    operation = "ak.wwise.core.sourceControl." + ("move" if move else "checkOut")
+    class Client(_SourceControlDraftClient):
+        def __init__(self):
+            super().__init__(tmp_path)
+            self.media = self.originals / "French" / "雨.wav"
+            self.media.parent.mkdir()
+            self.media.write_bytes(b"French fixture")
+            self.other_media = self.originals / "SFX" / "different.wav"
+            self.other_media.parent.mkdir()
+            self.other_media.write_bytes(b"SFX fixture")
+            self.sound = {"id": sound_id, "name": "Rain", "type": "Sound", "path": "\\Actor-Mixer Hierarchy\\Rain",
+                "activeSource": {"id": source_id, "name": "Localized recording"}, "originalFilePath": str(self.media)}
+            self.source = {"id": source_id, "name": "Localized recording", "type": "AudioFileSource", "path": self.sound["path"] + "\\Localized recording",
+                "parent": {"id": sound_id, "name": "Rain"}, "audioSource:language": {"id": french_id, "name": "French"}, "originalFilePath": str(self.media)}
+            self.other = {"id": other_id, "name": "Other recording", "type": "AudioFileSource", "path": self.sound["path"] + "\\Other recording",
+                "parent": {"id": sound_id, "name": "Rain"}, "audioSource:language": {"id": sfx_id, "name": "SFX"}, "originalFilePath": str(self.other_media)}
+            self.rows = {sound_id: self.sound, source_id: self.source, other_id: self.other}
+            self.rows[french_id] = {"id": french_id, "name": "French", "type": "Language", "path": "\\Languages\\French"}
+            self.rows[sfx_id] = {"id": sfx_id, "name": "SFX", "type": "Language", "path": "\\Languages\\SFX"}
+            self.children = [self.source, self.other]
+            self.calls = []
+        def call(self, uri, args=None, options=None):
+            self.calls.append((uri, args, options))
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.object.get":
+                if "waql" in args:
+                    assert args["waql"] == f'from object "{sound_id}" select children take 65'
+                    return {"return": [dict(row) for row in self.children]}
+                return {"return": [dict(self.rows[selected]) for selected in args["from"]["id"] if selected in self.rows]}
+            if uri == operation:
+                return {"log": []}
+            return super().call(uri, args, options)
+    client = Client()
+    if prepare is not None:
+        prepare(client)
+    env = _env(tmp_path, version=version)
+    state = tmp_path / "state"
+    def run(*argv):
+        return gateway.execute_gateway(["--state-dir", str(state), *argv], env=env, client_factory=lambda url: client)
+    code, phase = run("draft-start", operation)
+    assert code == 0, phase
+    draft, authority = phase["draft"]["draft_id"], phase["task_authority"]
+    handles = {}
+    for object_id in ([sound_id, source_id, other_id] if move else [sound_id, source_id] if mode == "source" or include_direct else [sound_id]):
+        code, phase = run("draft-bind-object", draft, "--task-authority", authority,
+            "--expected-revision", str(phase["draft"]["revision"]), "--object-id", object_id)
+        assert code == 0, phase
+        handles[object_id] = phase["bound_object"]["handle"]
+    selected = ([handles[sound_id], handles[source_id], language] if mode == "source" else [handles[sound_id], language])
+    flags = [f"--sound-{mode}-media", *selected]
+    if include_direct:
+        flags.extend(("--original-media-object", handles[source_id]))
+    if move:
+        flags = ["--move-source-sound-active", "rain", handles[sound_id], language,
+                 "--move-destination-object", "rain", handles[other_id], "original-media", "moved-雨.wav"]
+    if plan_flags is not None:
+        flags = plan_flags(client, handles)
+    code, phase = run("draft-declare-source-control-plan", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), *flags)
+    if declaration_error:
+        assert code == 2, phase
+        return client, state, phase, run
+    assert code == 0, phase
+    code, phase = run("draft-check", draft, "--task-authority", authority, "--expected-revision", str(phase["draft"]["revision"]))
+    assert code == 0, json.dumps(phase, ensure_ascii=False)
+    code, preview = run("preview-from-draft", draft, "--task-authority", authority,
+        "--expected-revision", str(phase["draft"]["revision"]), "--apply")
+    assert code == 0, preview
+    code, shown = run("transaction-show", preview["transaction_id"], "--summary-only")
+    assert code == 0, shown
+    code, confirmed = run(*shown["next_command"]["gateway_argv"])
+    assert code == 0, confirmed
+    return client, state, preview, run
+
+
+def test_sound_active_source_media_scope_binds_explicit_language_and_exact_source_file(tmp_path):
+    client, state, preview, run = _sound_source_file_case(tmp_path)
+    artifact = TransactionStore(state).load_preview(preview["transaction_id"]).artifact
+    row = artifact["request"]["arguments"]["source_control_binding"]["objects"][0]
+    assert row["type"] == "Sound" and row["source"]["id"] == client.source["id"]
+    assert row["media_selection"] == {"mode": "active", "language": "French"}
+    assert row["source"]["language"] == client.source["audioSource:language"]
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    calls = [call for call in client.calls if call[0].endswith("sourceControl.checkOut")]
+    assert calls == [("ak.wwise.core.sourceControl.checkOut", {"files": [str(client.media)]}, {})]
+    assert any(call[0].endswith("object.get") and call[2].get("language") == "French" for call in client.calls)
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["agent_result"]["verified"] is False, verified
+
+
+def test_sound_unique_language_media_scope_selects_source_independently_of_active_source(tmp_path):
+    client, _state, preview, run = _sound_source_file_case(tmp_path, mode="language", language="SFX")
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    calls = [call for call in client.calls if call[0].endswith("sourceControl.checkOut")]
+    assert calls == [("ak.wwise.core.sourceControl.checkOut", {"files": [str(client.other_media)]}, {})]
+
+
+def test_sound_explicit_source_media_scope_preserves_parent_language_and_exact_file(tmp_path):
+    client, _state, preview, run = _sound_source_file_case(tmp_path, mode="source", include_direct=True)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    calls = [call for call in client.calls if call[0].endswith("sourceControl.checkOut")]
+    assert calls == [("ak.wwise.core.sourceControl.checkOut", {"files": [str(client.media)]}, {})]
+
+
+@pytest.mark.parametrize("change", ["active-reference-name", "parent-name"])
+def test_sound_source_media_rejects_inconsistent_reference_names(tmp_path, change):
+    def prepare(client):
+        reference = client.sound["activeSource"] if change == "active-reference-name" else client.source["parent"]
+        reference["name"] = "Unrelated object"
+    client, _state, _error, _run = _sound_source_file_case(tmp_path, prepare=prepare, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_sound_source_media_disclosure_is_versioned_and_separates_three_selections(tmp_path, version):
+    code, result = gateway.execute_gateway(["--version", version, "request-schema", "ak.wwise.core.sourceControl.checkOut"],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail("offline disclosure connected"))
+    if version in {"2021.1", "2022.1"}:
+        assert code == 2 and "sound-original-media" not in json.dumps(result), result
+        return
+    assert code == 0, result
+    choices = result["business_adapter"]["declaration"]["object_file_scopes"]["sound-original-media"]
+    assert choices["language"] == "explicit_exact_Language_name_or_GUID; checked_against_selected_source"
+    assert choices["selections"] == {
+        "active": "--sound-active-media <Sound Handle> <language>",
+        "language": "--sound-language-media <Sound Handle> <language>",
+        "source": "--sound-source-media <Sound Handle> <AudioFileSource Handle> <language>",
+    }
+    assert choices["maximum_children"] == 64
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("mode", ["active", "language", "source"])
+def test_sound_media_selections_dispatch_exact_file_in_each_pinned_source_control_version(tmp_path, version, mode):
+    client, _state, preview, run = _sound_source_file_case(tmp_path, version=version, mode=mode)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.checkOut")] == [{"files": [str(client.media)]}]
+
+
+@pytest.mark.parametrize("change", ["active-source", "sound-name", "source-name", "source-parent", "source-language", "source-file", "file-stat"])
+def test_sound_media_scope_drift_stops_before_provider_dispatch(tmp_path, change):
+    client, _state, preview, run = _sound_source_file_case(tmp_path)
+    if change == "active-source":
+        client.sound["activeSource"] = {"id": client.other["id"], "name": client.other["name"]}
+        client.sound["originalFilePath"] = str(client.other_media)
+    elif change == "sound-name":
+        client.sound["name"] = "Renamed Sound"
+    elif change == "source-name":
+        client.source["name"] = "Renamed source"
+    elif change == "source-parent":
+        client.source["parent"] = {"id": client.other["id"]}
+    elif change == "source-language":
+        client.source["audioSource:language"] = client.other["audioSource:language"]
+    elif change == "source-file":
+        client.source["originalFilePath"] = str(client.other_media)
+    else:
+        client.media.write_bytes(b"changed fixture after Preview")
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0, result
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+@pytest.mark.parametrize("change", ["missing-source", "missing-file", "missing-language", "wrong-language", "wrong-parent", "inconsistent-active-file", "malformed-active", "missing-match", "multiple-matches", "duplicate-child", "overflow"])
+def test_sound_media_incomplete_or_ambiguous_selection_never_dispatches(tmp_path, change):
+    mode = "language" if change in {"missing-match", "multiple-matches", "duplicate-child", "overflow"} else "active"
+    def prepare(client):
+        if change == "missing-source":
+            del client.rows[client.source["id"]]
+        elif change == "missing-file":
+            del client.source["originalFilePath"]
+        elif change == "missing-language":
+            del client.source["audioSource:language"]
+        elif change == "wrong-language":
+            client.source["audioSource:language"] = client.other["audioSource:language"]
+        elif change == "wrong-parent":
+            client.source["parent"] = {"id": client.other["id"]}
+        elif change == "inconsistent-active-file":
+            client.sound["originalFilePath"] = str(client.other_media)
+        elif change == "malformed-active":
+            client.sound["activeSource"] = {"id": "broken"}
+        elif change == "missing-match":
+            client.children = [client.other]
+        elif change == "multiple-matches":
+            client.other["audioSource:language"] = client.source["audioSource:language"]
+        elif change == "duplicate-child":
+            client.children.append(dict(client.source))
+        else:
+            client.children = [dict(client.source)] * 65
+    client, _state, _error, _run = _sound_source_file_case(tmp_path, mode=mode, prepare=prepare, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+@pytest.mark.parametrize("mode", ["active", "language", "source"])
+def test_sound_source_language_guid_accepts_matching_id_only_native_reference(tmp_path, mode):
+    def prepare(client):
+        client.source["audioSource:language"].pop("name")
+    client, _state, preview, run = _sound_source_file_case(tmp_path, mode=mode,
+        language="{44444444-4444-4444-4444-444444444444}", prepare=prepare)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.checkOut")] == [{"files": [str(client.media)]}]
+
+
+def test_sound_explicit_source_can_be_inactive_but_must_still_belong_to_sound_and_language(tmp_path):
+    def prepare(client):
+        client.sound["activeSource"] = {"id": client.other["id"], "name": client.other["name"]}
+        client.sound["originalFilePath"] = str(client.other_media)
+    client, _state, preview, run = _sound_source_file_case(tmp_path, mode="source", prepare=prepare)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.checkOut")] == [{"files": [str(client.media)]}]
+
+
+def test_source_control_move_binds_sound_media_to_observed_destination_object_directory(tmp_path):
+    client, state, preview, run = _sound_source_file_case(tmp_path, move=True)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.move")] == [{
+        "files": [str(client.media)], "newFiles": [str(client.other_media.parent / "moved-雨.wav")]}]
+    artifact = TransactionStore(state).load_preview(preview["transaction_id"]).artifact
+    assert artifact["request"]["arguments"]["source_control_binding"]["moves"][0]["row_id"] == "rain"
+    code, verified = run("verify", preview["transaction_id"])
+    assert code == 0 and verified["agent_result"]["verified"] is False, verified
+
+
+@pytest.mark.parametrize("conflict", ["duplicate-source", "duplicate-destination", "crossed-source-destination"])
+def test_source_control_move_rejects_cross_row_file_conflicts_before_provider(tmp_path, conflict):
+    def flags(client, handles):
+        source = handles[client.source["id"]]
+        other = handles[client.other["id"]]
+        result = ["--move-source-object", "a", source, "original-media",
+                  "--move-destination-object", "a", other, "original-media", "first.wav"]
+        second_source = source if conflict == "duplicate-source" else other
+        second_name = "first.wav" if conflict == "duplicate-destination" else "second.wav"
+        if conflict == "crossed-source-destination":
+            # An existing literal row contributes a source equal to the first derived destination.
+            # Give the literal source an exact new path during declaration; the conflict must be
+            # rejected regardless of which per-file existence check runs first.
+            result.extend(("--move-source-file", "b", "originals", "SFX/first.wav",
+                           "--move-destination-file", "b", "originals", "SFX/second.wav"))
+            (client.other_media.parent / "first.wav").write_bytes(b"already a source")
+        else:
+            result.extend(("--move-source-object", "b", second_source, "original-media",
+                           "--move-destination-object", "b", other, "original-media", second_name))
+        return result
+    client, _state, _error, _run = _sound_source_file_case(tmp_path, move=True, plan_flags=flags, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.move") for call in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+def test_source_control_move_preserves_multiple_bound_rows_and_literal_pairs(tmp_path, version):
+    def flags(client, handles):
+        extra = client.originals / "literal.txt"
+        extra.write_text("literal source", encoding="utf-8")
+        return ["--move", "originals", "literal.txt", "originals", "renamed.txt",
+            "--move-source-sound-active", "a", handles[client.sound["id"]], "French",
+            "--move-destination-object", "a", handles[client.other["id"]], "original-media", "rain-new.wav",
+            "--move-source-object", "b", handles[client.other["id"]], "original-media",
+            "--move-destination-object", "b", handles[client.source["id"]], "original-media", "sfx-new.wav"]
+    client, state, preview, run = _sound_source_file_case(tmp_path, move=True, version=version, plan_flags=flags)
+    artifact = TransactionStore(state).load_preview(preview["transaction_id"]).artifact
+    binding = artifact["request"]["arguments"]["source_control_binding"]
+    assert [row["row_id"] for row in binding["moves"]] == [None, "a", "b"]
+    assert len(binding["objects"]) == 3
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.move")] == [{
+        "files": [str(client.originals / "literal.txt"), str(client.media), str(client.other_media)],
+        "newFiles": [str(client.originals / "renamed.txt"), str(client.other_media.parent / "rain-new.wav"), str(client.media.parent / "sfx-new.wav")]}]
+
+
+@pytest.mark.parametrize("change", ["destination-anchor-name", "destination-anchor-path", "destination-anchor-file", "destination-anchor-stat", "destination-appeared", "destination-link", "source-language", "source-stat"])
+def test_source_control_move_rechecks_each_endpoint_and_destination_absence(tmp_path, change):
+    client, _state, preview, run = _sound_source_file_case(tmp_path, move=True)
+    destination = client.other_media.parent / "moved-雨.wav"
+    if change == "destination-anchor-name":
+        client.other["name"] = "Different source identity"
+    elif change == "destination-anchor-path":
+        client.other["path"] += "Renamed"
+    elif change == "destination-anchor-file":
+        client.other["originalFilePath"] = str(client.media)
+    elif change == "destination-anchor-stat":
+        client.other_media.write_bytes(b"changed anchor file")
+    elif change == "destination-appeared":
+        destination.write_bytes(b"do not overwrite me")
+    elif change == "destination-link":
+        destination.symlink_to(client.media)
+    elif change == "source-language":
+        client.source["audioSource:language"] = client.other["audioSource:language"]
+    else:
+        client.media.write_bytes(b"changed source file")
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0, result
+    assert not any(call[0].endswith("sourceControl.move") for call in client.calls)
+
+
+@pytest.mark.parametrize("selection", ["sound-language", "sound-source", "exact-source", "literal-source", "containing-file"])
+def test_source_control_move_reuses_closed_source_choices_and_literal_destination(tmp_path, selection):
+    def prepare(client):
+        client.containing = client.project_root / "source.wwu"
+        client.containing.write_text("containing work unit", encoding="utf-8")
+        client.sound["filePath"] = str(client.containing)
+    def flags(client, handles):
+        if selection == "sound-language":
+            source = ["--move-source-sound-language", "row", handles[client.sound["id"]], "French"]
+        elif selection == "sound-source":
+            source = ["--move-source-sound-source", "row", handles[client.sound["id"]], handles[client.source["id"]], "French"]
+        elif selection == "exact-source":
+            source = ["--move-source-object", "row", handles[client.source["id"]], "original-media"]
+        elif selection == "containing-file":
+            source = ["--move-source-object", "row", handles[client.sound["id"]], "containing-file"]
+        else:
+            source = ["--move-source-file", "row", "originals", "French/雨.wav"]
+        return [*source, "--move-destination-file", "row", "originals", "new.wav"]
+    client, _state, preview, run = _sound_source_file_case(tmp_path, move=True, prepare=prepare, plan_flags=flags)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    expected_source = client.containing if selection == "containing-file" else client.media
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.move")] == [{
+        "files": [str(expected_source)], "newFiles": [str(client.originals / "new.wav")]}]
+
+
+@pytest.mark.parametrize("invalid", ["missing-destination", "duplicate-source-choice", "bad-label", "traversing-basename", "existing-destination", "wrong-object-scope"])
+def test_source_control_move_invalid_closed_rows_never_dispatch(tmp_path, invalid):
+    def flags(client, handles):
+        label = "bad label" if invalid == "bad-label" else "row"
+        source = ["--move-source-object", label, handles[client.source["id"]], "original-media"]
+        if invalid == "missing-destination":
+            return source
+        if invalid == "duplicate-source-choice":
+            source += source
+        basename = "../escape.wav" if invalid == "traversing-basename" else "different.wav" if invalid == "existing-destination" else "new.wav"
+        scope = "guessed" if invalid == "wrong-object-scope" else "original-media"
+        return [*source, "--move-destination-object", label, handles[client.other["id"]], scope, basename]
+    client, _state, _error, _run = _sound_source_file_case(tmp_path, move=True, plan_flags=flags, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.move") for call in client.calls)
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_source_control_move_discloses_repeated_closed_row_choices_and_object_binding(tmp_path, version):
+    code, result = gateway.execute_gateway(["--version", version, "request-schema", "ak.wwise.core.sourceControl.move"],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail("offline disclosure connected"))
+    if version in {"2021.1", "2022.1"}:
+        assert code == 2 and "object_move_rows" not in json.dumps(result), result
+        return
+    assert code == 0, result
+    declaration = result["business_adapter"]["declaration"]
+    assert "object_moves" in declaration["optional_fields"] and "moves" not in declaration["required_fields"]
+    choices = declaration["object_move_rows"]
+    assert choices["maximum_rows"] == 256 and choices["maximum_object_scopes"] == 64
+    assert choices["source_choices"] == {
+        "file": "--move-source-file <row> <project|originals|exact> <path>",
+        "object": "--move-source-object <row> <Object Handle> <containing-file|original-media>",
+        "sound-active": "--move-source-sound-active <row> <Sound Handle> <language>",
+        "sound-language": "--move-source-sound-language <row> <Sound Handle> <language>",
+        "sound-source": "--move-source-sound-source <row> <Sound Handle> <AudioFileSource Handle> <language>",
+    }
+    assert choices["destination_choices"]["object-directory"] == "--move-destination-object <row> <Object Handle> <containing-file|original-media> <new-basename>"
+    code, started = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "draft-start", "ak.wwise.core.sourceControl.move"],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail("offline start connected"))
+    assert code == 0, started
+    assert "draft-bind-object" in started["draft"]["next_action_binding"]["declaration"]["optional_object_file_binding"]["fixed_argv_prefix"]
+
+
+@pytest.mark.parametrize("approved", [False, True])
+def test_source_control_move_object_directory_still_requires_existing_io_authority(tmp_path, approved):
+    def prepare(client):
+        client.external = tmp_path / "outside-project.wav"
+        client.external.write_bytes(b"external destination anchor")
+        client.other["originalFilePath"] = str(client.external)
+    def flags(client, handles):
+        return ["--move-source-object", "row", handles[client.source["id"]], "original-media",
+            "--move-destination-object", "row", handles[client.other["id"]], "original-media", "new.wav",
+            *(["--io-root", str(tmp_path)] if approved else [])]
+    client, _state, result, run = _sound_source_file_case(tmp_path, move=True, prepare=prepare, plan_flags=flags, declaration_error=not approved)
+    if approved:
+        code, result = run("execute", result["transaction_id"])
+        assert code == 0, result
+        assert [call[1] for call in client.calls if call[0].endswith("sourceControl.move")] == [{
+            "files": [str(client.media)], "newFiles": [str(tmp_path / "new.wav")]}]
+    else:
+        assert not any(call[0].endswith("sourceControl.move") for call in client.calls)
+
+
+def test_source_control_move_literal_source_can_use_bound_destination_directory(tmp_path):
+    def flags(client, handles):
+        return ["--move-source-file", "literal", "originals", "French/雨.wav",
+            "--move-destination-object", "literal", handles[client.other["id"]], "original-media", "literal-new.wav"]
+    client, _state, preview, run = _sound_source_file_case(tmp_path, move=True, plan_flags=flags)
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.move")] == [{
+        "files": [str(client.media)], "newFiles": [str(client.other_media.parent / "literal-new.wav")]}]
+
+
+@pytest.mark.parametrize("literal_form", ["labelled", "legacy", "mixed"])
+def test_source_control_move_literal_rows_also_seal_destination_absence(tmp_path, literal_form):
+    def flags(client, handles):
+        if literal_form == "labelled":
+            return ["--move-source-file", "row", "originals", "French/雨.wav",
+                    "--move-destination-file", "row", "originals", "literal-new.wav"]
+        result = ["--move", "originals", "French/雨.wav", "originals", "literal-new.wav"]
+        if literal_form == "mixed":
+            result.extend(("--move-source-object", "bound", handles[client.other["id"]], "original-media",
+                "--move-destination-object", "bound", handles[client.source["id"]], "original-media", "another-new.wav"))
+        return result
+    client, _state, preview, run = _sound_source_file_case(tmp_path, move=True, plan_flags=flags)
+    (client.originals / "literal-new.wav").write_bytes(b"arrived after Preview; preserve me")
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0, result
+    assert not any(call[0].endswith("sourceControl.move") for call in client.calls)
+
+
+def test_sound_unique_language_selection_is_rechecked_when_a_second_source_appears(tmp_path):
+    client, _state, preview, run = _sound_source_file_case(tmp_path, mode="language")
+    client.other["audioSource:language"] = dict(client.source["audioSource:language"])
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0, result
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+@pytest.mark.parametrize("change", ["parent", "language"])
+def test_sound_explicit_source_relationship_is_rechecked_before_provider_dispatch(tmp_path, change):
+    client, _state, preview, run = _sound_source_file_case(tmp_path, mode="source")
+    if change == "parent":
+        client.source["parent"] = {"id": client.other["id"]}
+    else:
+        client.source["audioSource:language"] = dict(client.other["audioSource:language"])
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0, result
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+def test_sound_active_media_accepts_name_only_reference_only_after_unique_scoped_source_readback(tmp_path):
+    def prepare(client):
+        client.sound["activeSource"].pop("id")
+    client, state, preview, run = _sound_source_file_case(tmp_path, prepare=prepare)
+    artifact = TransactionStore(state).load_preview(preview["transaction_id"]).artifact
+    row = artifact["request"]["arguments"]["source_control_binding"]["objects"][0]
+    assert row["active_source"] == {"name": "Localized recording"}
+    assert row["source"]["id"] == client.source["id"]
+    code, result = run("execute", preview["transaction_id"])
+    assert code == 0, result
+    assert [call[1] for call in client.calls if call[0].endswith("sourceControl.checkOut")] == [{"files": [str(client.media)]}]
+
+
+@pytest.mark.parametrize("invalid", ["present-malformed-id", "missing-name-match", "ambiguous-name"])
+def test_sound_active_name_reference_never_hides_invalid_or_ambiguous_identity(tmp_path, invalid):
+    def prepare(client):
+        client.sound["activeSource"] = {"name": client.source["name"]}
+        if invalid == "present-malformed-id":
+            client.sound["activeSource"]["id"] = "broken"
+        elif invalid == "missing-name-match":
+            client.sound["activeSource"]["name"] = "No such source"
+        else:
+            client.other["name"] = client.source["name"]
+            client.other["audioSource:language"] = dict(client.source["audioSource:language"])
+    client, _state, _error, _run = _sound_source_file_case(tmp_path, prepare=prepare, declaration_error=True)
+    assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)

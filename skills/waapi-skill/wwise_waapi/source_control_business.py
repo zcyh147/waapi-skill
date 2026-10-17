@@ -417,7 +417,7 @@ def materialize_source_control_business_request(
     if operation == SOURCE_CONTROL_COMMIT_URI:
         allowed.add("commit_message")
     if operation == SOURCE_CONTROL_MOVE_URI:
-        allowed = {"moves", "io_root"}
+        allowed = {"moves", "io_root", "object_move_inputs"}
     required = {"moves"} if operation == SOURCE_CONTROL_MOVE_URI else {"files"}
     if operation == SOURCE_CONTROL_COMMIT_URI:
         required.add("commit_message")
@@ -427,6 +427,7 @@ def materialize_source_control_business_request(
             field="source_control_plan",
             action="submit exactly the disclosed fields for this source-control action",
         )
+    object_move_binding = None
     if operation in _FILE_OPERATIONS:
         paths = ([] if plan.get("files") == [] and plan.get("object_file_binding") else _file_paths(
             plan.get("files"), roots=roots, io_root=explicit_io_root,
@@ -463,6 +464,25 @@ def materialize_source_control_business_request(
         all_paths = paths
     elif operation == SOURCE_CONTROL_MOVE_URI:
         moves = plan.get("moves")
+        literal_count = len(moves) if isinstance(moves, list) else 0
+        if plan.get("object_move_inputs"):
+            from .source_control_object_moves import materialize_move_inputs
+            def resolve_move_file(locator: Any, *, derived: bool) -> Path:
+                return _locator_path(locator, roots=roots,
+                    io_root=(explicit_io_root or roots["project"]) if derived else explicit_io_root,
+                    field="object_moves")
+            try:
+                derived_moves, object_move_binding = materialize_move_inputs(plan["object_move_inputs"], resolve_file=resolve_move_file)
+            except ValueError as exc:
+                _repair("SOURCE_CONTROL_OBJECT_FILE_BINDING_INVALID", field="object_moves", action=str(exc))
+            # The derived paths have already passed exactly the same root checks.
+            # Use project-relative locators where possible, retaining explicit I/O authority elsewhere.
+            for move in derived_moves:
+                for side, locator in move.items():
+                    path = Path(locator["path"])
+                    if path.is_relative_to(roots["project"]):
+                        move[side] = {"scope": "project", "path": path.relative_to(roots["project"]).as_posix()}
+            moves = [*moves, *derived_moves] if isinstance(moves, list) else moves
         if (
             not isinstance(moves, Sequence)
             or isinstance(moves, (str, bytes, bytearray))
@@ -494,6 +514,15 @@ def materialize_source_control_business_request(
                 io_root=explicit_io_root,
                 field=f"moves[{index}].destination",
             )
+            sources.append(source)
+            destinations.append(destination)
+        source_keys = [os.path.normcase(str(path)) for path in sources]
+        destination_keys = [os.path.normcase(str(path)) for path in destinations]
+        if (len(set(source_keys)) != len(source_keys) or len(set(destination_keys)) != len(destination_keys)
+            or set(source_keys) & set(destination_keys)):
+            _repair("SOURCE_CONTROL_MOVES_CONFLICT", field="moves",
+                    action="choose distinct sources and destinations with no source/destination intersection")
+        for index, (source, destination) in enumerate(zip(sources, destinations)):
             if not source.is_file() or path_is_link_or_reparse(source):
                 _repair(
                     "SOURCE_CONTROL_SOURCE_MISSING",
@@ -512,13 +541,18 @@ def materialize_source_control_business_request(
                     field=f"moves[{index}].destination",
                     action="choose a destination inside an existing ordinary directory",
                 )
-            sources.append(source)
-            destinations.append(destination)
         native_args = {
             "files": [str(path) for path in sources],
             "newFiles": [str(path) for path in destinations],
         }
         all_paths = [*sources, *destinations]
+        object_move_binding = object_move_binding or {"objects": [], "moves": []}
+        object_move_binding["moves"] = [
+            *({"row_id": None, "source_index": None, "destination_index": None, "basename": None,
+               "source_path": str(source), "destination_path": str(destination)}
+              for source, destination in zip(sources[:literal_count], destinations[:literal_count])),
+            *object_move_binding["moves"],
+        ]
     else:  # pragma: no cover - contract registry invariant
         raise ValueError("unsupported source-control business operation")
     arguments: dict[str, Any] = {
@@ -528,6 +562,8 @@ def materialize_source_control_business_request(
     }
     if plan.get("object_file_binding"):
         arguments["source_control_binding"] = dict(plan["object_file_binding"])
+    if object_move_binding is not None:
+        arguments["source_control_binding"] = object_move_binding
     if operation in _MUTATIONS:
         arguments["io_root"] = str(
             _mutation_io_root(
