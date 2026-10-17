@@ -15,6 +15,31 @@ def condition(name="ListenerRelativeRouting", value=True):
             "context": "Self", "property": name, "type": "property"}
 
 
+@pytest.mark.parametrize("version", VERSIONS)
+@pytest.mark.parametrize("operation", ["object.setProperty", "object.setReference", "object.set"])
+def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_path, version, operation):
+    task = FieldTask(tmp_path, version, "object.setProperty")
+    code, payload = task.run("--version", version, "operation-schema", operation)
+    assert code == 0, payload
+    if version == "2021.1" and operation == "object.set":
+        assert payload["operation"]["availability"]["status"] == "unsupported_version"
+        return
+    condition_contract = payload["business_adapter"]["activation_prerequisites"]
+    assert condition_contract["contract"] == "waapi-skill.existing-field-conditions/v1"
+    assert condition_contract["owner"] == "gateway"
+    scalar = condition_contract["conditions"]["property"]
+    assert scalar["restrictions"] == ["enum", "range"]
+    assert scalar["satisfied_value"] == "preserve_exact_native_value"
+    assert scalar["multiple_choices"] == "require_explicit_user_value_when_current_value_does_not_satisfy"
+    assert condition_contract["conditions"]["reference"]["condition"] == "referenceIsSet_boolean"
+    assert condition_contract["conditions"]["visibility"]["prerequisite_write"] is False
+    assert condition_contract["conditions"]["association_owner"]["source_type"] == "ObjectSettingAssociation"
+    assert condition_contract["safety"]["related_object_writes"] == "separately_preview_and_authorize"
+    assert condition_contract["safety"]["revalidate"] == ["identities", "relationships", "metadata", "prerequisite_values"]
+    assert condition_contract["atomic_batch_alternative"] == ("object.set" if version != "2021.1" else None)
+    assert task.calls == []
+
+
 class AttenuationTask(FieldTask):
     def __init__(self, path, version, kind="Sound", operation="object.set"):
         super().__init__(path, version, operation)
