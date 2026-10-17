@@ -12,6 +12,7 @@ from .authorization import (
     AUTHORIZATION_MODE_POLICY,
     accepted_authorization_modes_for_operation,
 )
+from .console_project_operations import CLI_PROJECT_FILE_URIS
 from .canonical import canonical_sha256, sha256_hex
 from .execution_contracts import (
     CONTEXT_RUNTIME_ONLY_POST_EXECUTION_URIS,
@@ -423,12 +424,17 @@ def validate_transaction_context_runtime_guards(
         }
         or not isinstance(verification_plan, Mapping)
         or dict(verification_plan)
-        != {
+        != ({
+            "kind": "console-project-process",
+            "uri": api,
+            "version": version,
+            "base_result_strategy": "result_schema",
+        } if api in CLI_PROJECT_FILE_URIS else {
             "kind": "result-schema",
             "uri": api,
             "version": version,
             "strategy": "result_schema",
-        }
+        })
         or not isinstance(sealed_contract, Mapping)
     ):
         raise TransactionGuardError(

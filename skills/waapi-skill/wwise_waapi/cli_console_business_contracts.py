@@ -5,6 +5,11 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .console_project_operations import (
+    CLI_PROJECT_FILE_URIS, MAX_PROJECT_FILE_BYTES, MAX_PROJECT_XML_NODES,
+    MAX_PROJECT_XML_DEPTH, MAX_PROJECT_DECLARATION_ROWS,
+)
+
 
 CLI_CONSOLE_BUSINESS_CONTRACT = "waapi-skill.cli-console-business/v1"
 ALL_VERSIONS = ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1")
@@ -28,6 +33,11 @@ _COMMON_TYPES: dict[str, str] = {
     "verbosity": "console_verbosity",
     "stop_on_load_issues": "boolean",
     "source_control": "source_control_policy",
+}
+
+_EXPLICIT_EMPTY_COLLECTIONS = {
+    "ak.wwise.cli.createNewProject": ("platforms",),
+    "ak.wwise.console.project.create": ("platforms", "languages"),
 }
 
 
@@ -597,6 +607,19 @@ def cli_console_native_field_ownership(
     }
 
 
+def platform_creation_choices(version: str) -> list[str]:
+    """Disclose the pinned native enum, without claiming installed availability."""
+    from .schema_inventory import load_definition_graph, resolve_schema_reference
+
+    graph = load_definition_graph(version)
+    target = resolve_schema_reference('#/definitions/platformToCreateArg',
+        root_schema={}, graph=graph).target
+    choices = target['properties']['basePlatform']['enum']
+    if not isinstance(choices, list) or not choices or any(not isinstance(value, str) for value in choices):
+        raise ValueError('Pinned platform creation choices are malformed')
+    return list(choices)
+
+
 def cli_console_business_contract_data(
     operation: str,
     version: str,
@@ -646,15 +669,29 @@ def cli_console_business_contract_data(
             "public_fields": public_fields,
             "field_types": field_types,
             "input_forms": {
-                field: _input_form(field, field_types[field])
+                field: _input_form(field, field_types[field], allow_empty=field in _EXPLICIT_EMPTY_COLLECTIONS.get(operation, ()), version=version)
                 for field in public_fields
             },
+            **({"explicit_empty_collections": list(_EXPLICIT_EMPTY_COLLECTIONS[operation])}
+               if operation in _EXPLICIT_EMPTY_COLLECTIONS else {}),
             **(
                 {"constraints": deepcopy(row["constraints"])}
                 if row["constraints"]
                 else {}
             ),
         },
+        **({"result_semantics": {
+            "documented_process_outcomes": {"0": "success", "1": "errors_with_possible_partial_effects", "2": "warnings_only"},
+            "earlier_media_id_empty_result": "no_process_outcome_reported",
+            "unknown_outcome": "executed_unverified_no_automatic_retry",
+            "file_effect_verification": "independent_observation_required",
+        }} if operation in CLI_PROJECT_FILE_URIS else {}),
+        **({'effect_verification': {
+            'saved_project': 'bounded_UTF8_WPROJ_and_live_transition_identity',
+            'requested_fields': ['platforms', 'languages', 'first_language_is_default'],
+            'explicit_empty_effect': 'native_semantics_unresolved_no_business_acceptance',
+            'limits': {'project_bytes': MAX_PROJECT_FILE_BYTES, 'xml_nodes': MAX_PROJECT_XML_NODES, 'xml_depth': MAX_PROJECT_XML_DEPTH, 'platform_or_language_rows': MAX_PROJECT_DECLARATION_ROWS},
+        }} if operation == 'ak.wwise.console.project.create' else {}),
         "gateway_derivations": [
             "native_option_names_and_negative_flags",
             "version_specific_field_availability",
@@ -680,7 +717,7 @@ def cli_console_business_contract_data(
     }
 
 
-def _input_form(field: str, field_type: str) -> dict[str, Any]:
+def _input_form(field: str, field_type: str, *, allow_empty=False, version=None) -> dict[str, Any]:
     if field_type in {
         "platform_name_list",
         "language_name_list",
@@ -689,13 +726,25 @@ def _input_form(field: str, field_type: str) -> dict[str, Any]:
         "network_address_list",
         "http_origin_list",
     }:
-        return {"flag": "--item", "arguments": [field, "<value>"], "repeatable": True}
+        result = {"flag": "--item", "arguments": [field, "<value>"], "repeatable": True}
+        if allow_empty:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+        return result
     if field_type.endswith("_mappings"):
-        return {
+        result = {
             "flag": "--mapping",
             "arguments": [field, "<key>", "<value>"],
             "repeatable": True,
         }
+        if field_type == "platform_creation_mappings":
+            result['base_platform_choices'] = platform_creation_choices(version)
+            result['choice_scope'] = 'pinned_schema_values_not_installed_availability'
+            result['row_order'] = 'preserve_declaration_order_across_named_and_unnamed_forms'
+            result["unnamed_platform_form"] = {"flag": "--item", "arguments": [field, "<base_platform>"], "repeatable": True}
+            result["meaning"] = "One base platform per unnamed row, or base platform and explicit name per mapping; the same base may have distinct named rows. Omission preserves the native project default."
+        if allow_empty:
+            result["empty_form"] = {"flag": "--empty", "arguments": [field], "repeatable": False}
+        return result
     if field_type == "boolean":
         return {
             "flag": "--toggle",
