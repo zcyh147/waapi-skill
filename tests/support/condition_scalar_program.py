@@ -1,0 +1,159 @@
+"""Original exact scalar program batches; requirements are reviewed separately."""
+from __future__ import annotations
+
+from copy import deepcopy
+import hashlib
+import json
+from pathlib import Path
+import tempfile
+
+from tests.maintenance.branch_audit_completion import pointer_value
+from tests.support.condition_branch_evidence import prepare_condition_capture, validate_condition_frozen_source
+from tests.maintenance import branch_coverage_audit as audit
+
+
+_SOURCES = ["tests/support/condition_scalar_program.py", "tests/support/condition_scalar_batch.py",
+            "tests/maintenance/condition_parent_sources.py", "tests/unit/test_condition_scalar_program.py",
+            "tests/unit/test_scalar_condition_product_gateway.py", "tests/unit/test_condition_scalar_batch_evidence.py",
+            "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz"]
+
+
+def _encoded(document):
+    return (json.dumps(document, sort_keys=True, ensure_ascii=False, indent=2) + "\n").encode()
+
+
+def _write(path, document):
+    path.write_bytes(_encoded(document))
+    return {"artifact": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+
+
+def _exact(observed, expected):
+    return type(observed) is type(expected) and audit.digest(observed) == audit.digest(expected)
+
+
+def prepare_program_batch(root: Path, nodeids: list[str], plan: dict, inventory: dict, *, scope_kind="controlled") -> dict:
+    """Use the caller's one frozen inventory; never rebuild it per field."""
+    if not nodeids or len(set(nodeids)) != len(nodeids) or scope_kind not in {"product", "controlled"}:
+        raise ValueError("exact selected original nodes required")
+    if scope_kind == "product":
+        raise ValueError("product batch requires reviewed native-effect linkage on coherent source; source models alone are insufficient")
+    capture = prepare_condition_capture(root, nodeids[0], create_output=False, inventory=inventory)
+    branches = {b["id"]: b for b in inventory["native_coverage"]["obligations"]}
+    for group in plan["groups"]:
+        for member in group["members"]:
+            branch = branches[member["id"]]
+            if (branch["owner_issue"] != 177 or branch["shape_sha256"] != member["shape_sha256"]
+                    or branch["source_file_sha256"] != member["source_file_sha256"]):
+                raise ValueError("exact scalar source member differs from frozen inventory")
+    capture["relevant_sources"].update({name: hashlib.sha256((audit.ROOT / name).read_bytes()).hexdigest() for name in _SOURCES})
+    root.mkdir(parents=True, exist_ok=False)
+    capture.update(scope_kind=scope_kind, nodeids=list(nodeids), plan=deepcopy(plan), reports={}, observations={},
+                   branches=branches, routes={r["id"]: r for r in inventory["routes"]})
+    capture["plan_artifact"] = _write(root / "plan.json", plan)
+    capture["sources_artifact"] = _write(root / "sources.json", {
+        "candidate_sha256": capture["candidate_sha256"], "git_candidate": capture["git_candidate"],
+        "relevant_sources": capture["relevant_sources"]})
+    return capture
+
+
+def _validate_observation(group, observed):
+    model, field = group["model"], group["field"]
+    if not _exact(observed["observations"]["metadata"], model["metadata"][field]):
+        raise ValueError("original public metadata differs from predeclared source model")
+    before, after = observed["observations"]["before"], observed["observations"]["after"]
+    if any(type(before.get(k)) is not type(v) or before.get(k) != v for k, v in model["before"].items()):
+        raise ValueError("original prerequisite values differ from predeclared source model")
+    if not _exact(after, {**before, field: model["requested"]}):
+        raise ValueError("original field change or prerequisite preservation differs")
+    call = observed["native_call"]
+    if (call["uri"] != "ak.wwise.core.object.setProperty" or not _exact(call["args"], {
+            "object": before["id"], "property": field, "value": model["requested"]})):
+        raise ValueError("exact selected field dispatch differs")
+    gateway = observed["gateway"]
+    if (gateway["exit_code"] != 0 or gateway["payload"].get("ok") is not True
+            or gateway["payload"].get("verified") is not True or not gateway["argv"]):
+        raise ValueError("original successful Gateway verification missing")
+    for member in group["members"]:
+        value = pointer_value(observed, member["observation_pointer"])
+        if not _exact(value, member["expected"]):
+            raise ValueError("exact source alternative observation differs")
+
+
+def finish_program_node(capture: dict, nodeid: str, reports: dict, observations: dict) -> None:
+    """Seal raw observations now; publish only after every actual teardown report."""
+    root = capture["root"]
+    if nodeid not in capture["nodeids"] or nodeid in capture["reports"]:
+        raise ValueError("wrong or repeated original node")
+    if set(capture["observations"]) & set(observations):
+        raise ValueError("another original node already owns this exact field observation")
+    capture["reports"][nodeid] = deepcopy(reports)
+    capture["observations"].update({key: {"nodeid": nodeid, "observed": deepcopy(value)} for key, value in observations.items()})
+    _write(root / f"observations-{len(capture['reports'])}.json", {"nodeid": nodeid, "reports": reports, "observations": observations})
+    if set(capture["reports"]) != set(capture["nodeids"]):
+        return
+    if not all(capture["reports"][node].get(phase) == "passed"
+               for node in capture["nodeids"] for phase in ("setup", "call", "teardown")):
+        _write(root / "outcome.json", {"outcome": "FAIL", "reports": capture["reports"], "acceptance": "withheld"})
+        return
+    groups = {g["id"]: g for g in capture["plan"]["groups"]}
+    if set(capture["observations"]) != set(groups):
+        raise ValueError("missing or extra original field observations")
+    validate_condition_frozen_source(capture)
+    if audit.digest(json.loads((root / "plan.json").read_text())) != audit.digest(capture["plan"]):
+        raise ValueError("predeclared original plan changed")
+    for identity, group in groups.items():
+        _validate_observation(group, capture["observations"][identity]["observed"])
+    destination = root / "published"
+    if destination.exists():
+        raise ValueError("original program publication is immutable")
+    stage = Path(tempfile.mkdtemp(prefix=".program-pending-", dir=root))
+    bindings = {}
+    seal = {"contract": "waapi-skill.condition-scalar-program-batch/v1", "outcome": "PASS",
+            "candidate_sha256": capture["candidate_sha256"], "scope_kind": capture["scope_kind"],
+            "plan_sha256": capture["plan_artifact"]["sha256"], "sources_sha256": capture["sources_artifact"]["sha256"],
+            "reports": capture["reports"], "groups": sorted(groups),
+            "exact_members": sorted(m["id"] for g in groups.values() for m in g["members"])}
+    seal_path = root / "batch-final.json"
+    seal_descriptor = {"artifact": str(seal_path), "sha256": hashlib.sha256(_encoded(seal)).hexdigest()}
+    relevant = ["skills/waapi-skill/wwise_waapi/operation_registry.py",
+                "skills/waapi-skill/wwise_waapi/metadata_restrictions.py", *_SOURCES]
+    for identity, group in groups.items():
+        entry = capture["observations"][identity]
+        observed = entry["observed"]
+        record = {"candidate_sha256": capture["candidate_sha256"], "git_candidate": capture["git_candidate"],
+                  "scope_kind": capture["scope_kind"], "evidence_kind": "injected_client_program",
+                  "invocation": {"phase": "final", "outcome": "PASS", "node_outcomes": [
+                      {"nodeid": node, "outcome": "PASS"} for node in capture["nodeids"]]},
+                  **deepcopy(observed), "branch_assertions": {},
+                  "artifacts": [capture["plan_artifact"], capture["sources_artifact"], seal_descriptor]}
+        route = capture["routes"][group["version"] + "|function|ak.wwise.core.object.setProperty"]
+        for member in group["members"]:
+            branch = capture["branches"][member["id"]]
+            checks = [{"pointer": member["observation_pointer"], "equals": deepcopy(member["expected"])},
+                      {"pointer": "/gateway/payload/agent_result", "equals": deepcopy(observed["gateway"]["payload"]["agent_result"])},
+                      {"pointer": "/observations/before", "equals": deepcopy(observed["observations"]["before"])},
+                      {"pointer": "/observations/after", "equals": deepcopy(observed["observations"]["after"])}]
+            record["branch_assertions"][branch["id"]] = {"native_shape_sha256": branch["shape_sha256"], "native_route": None, "checks": checks}
+            bindings[branch["id"]] = {"branch_id": branch["id"], "native_shape_sha256": branch["shape_sha256"],
+                "public_route": route["id"], "public_route_sha256": audit.digest(route),
+                "input": {"gateway_argv": observed["gateway"]["argv"], "selector": group["source_parent_key"]},
+                **{key: {"source": source, "selector": branch["pointer"]} for key, source in {
+                    "construction": "skills/waapi-skill/wwise_waapi/operation_registry.py#_apply_reference_activation_dependencies",
+                    "validation": "skills/waapi-skill/wwise_waapi/metadata_restrictions.py#condition_restriction",
+                    "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation"}.items()},
+                "observation_pointer": member["observation_pointer"], "gateway_observation_pointer": "/gateway/payload/agent_result",
+                "native_hosts": ["wwise-console"], "relevant_sources": relevant, "evidence": {}}
+        path = stage / (identity + ".json")
+        descriptor = _write(path, record)
+        descriptor["artifact"] = str(destination / path.name)
+        for member in group["members"]:
+            bindings[member["id"]]["evidence"]["program"] = {**descriptor, "nodeid": entry["nodeid"]}
+    _write(stage / "bindings.json", {"contract": "waapi-skill.branch-bindings/v1", "bindings": bindings})
+    _write(stage / "outcome.json", {"outcome": "PASS", "reports": capture["reports"],
+        "functional_coverage": "program_only_effective_native_metadata_and_requirements_unverified",
+        "requirements_state": "pending_review", "exact_observed_members": len(bindings)})
+    stage.rename(destination)
+    validate_condition_frozen_source(capture)
+    pending = root / ".batch-final.pending"
+    pending.write_bytes(_encoded(seal))
+    pending.rename(seal_path)
