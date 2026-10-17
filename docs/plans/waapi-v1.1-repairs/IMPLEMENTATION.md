@@ -36,7 +36,7 @@ claimed. User projects, including Lyra, are outside the test scope.
 - #172: formal four-workflow Fresh profile, authenticated evidence, native oracles,
   notice checks and archive verification implemented. Actual Fresh acceptance is
   incomplete: all four workflows have now been attempted within the expanded
-  five-attempt budget. F1 and F4 have business PASS; F2 and F3 do not.
+  nine-attempt approved budget. F1, F3 and F4 have business PASS; F2 remains incomplete.
 
 ## Completed validation
 
@@ -65,27 +65,28 @@ candidate/version evidence; these are component tests, not Fresh acceptance.
 
 ## Fresh results and remaining decision
 
-The user approved an F1 rerun plus the unattempted F2–F4. Five actual attempts
-are complete. F1 passed its independent business checks; its raw campaign stays
-BLOCKED on a subsequently fixed archive reader. F4 passed task/matrix/campaign
-and identical verify-only with 78 unchanged evidence files. F2 received the
-wrong reference from the harness and did not complete; the framework is fixed.
-F3 chose an existing-object range operation for a creation task and did not
-complete. No original root was regraded and no four-case PASS is claimed.
+Nine approved actual attempts are complete. F1, F3 and F4 have independently
+established business PASS on separately identified candidates. The latest
+`0b063181` root passed F3 and failed F2 (selected 1/2); no failed root was replayed.
+F2 autonomously refined a no-match query to the correct unique target but then
+invented a metadata command and did not retrieve required range/default values.
+That partial result is not full F2 PASS. All source projects remained unchanged.
 
-See the [acceptance record](../../research/waapi-v11-repairs-acceptance-2026-10-17.md)
-for exact candidates, original verdicts, usage, preserved source state and
-framework repairs. The installed Skill is unchanged from the completed full
-Program/Non-live gates. Additional Fresh attempts require user approval;
-alternatively the user may explicitly accept delivery with the two limitations.
-Until that decision, keep PR #173 draft. Do not merge it to main.
+The repeated F3 wrong-route selection led to a reviewed, guidance-only product
+repair: distinguish new GameParameter creation with range/default from editing
+an existing range. Five-version public disclosure and related regression passed
+987 tests / 11 Windows-only skips; both inventory checks passed. The installed
+Skill is byte-identical to the original full-gate candidate only through
+`55063fa8`; final guidance-only successor evidence is separately identified.
+
+See the [acceptance record](../../research/waapi-v11-repairs-acceptance-2026-10-17.md).
+Further Fresh needs new approval, or the user may accept the remaining F2
+limitation. Until that decision, keep PR #173 draft. Do not merge to main.
 
 ## Evidence retention
 
-Previously relocated component evidence is byte-inventoried in
-`.waapi-skill-state/repair-evidence/relocation-manifest.json`. That manifest is
-immutable. Additional evidence receives separate preservation records.
-All eleven completed worktrees have been archived after verified evidence
-copies. The final supplement is `supplement-archive-final-8239aba3`; its manifest
-records nine preserved files (12458 bytes). Failed/blocked roots are never
-deleted merely to make the run look clean.
+All twelve completed managed worktrees were archived after byte-verified copies.
+Original and supplementary manifests under `.waapi-skill-state/repair-evidence/`
+remain separate. The final supplement `supplement-query-routing-963a9f5a`
+preserves five files (9898 bytes), including test-result summaries, not full stdout.
+Failed/blocked campaign roots and their quarantines remain untouched.

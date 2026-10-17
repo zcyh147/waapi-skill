@@ -39,3 +39,21 @@ implementer evidence, not another full gate or Fresh acceptance.
 
 These reports are preserved in the separate local supplement
 `.waapi-skill-state/repair-evidence/supplement-archive-final-8239aba3/reviews/`.
+
+## Final query-prefix and creation-routing follow-up
+
+`223a4506` / `208148d7` / `896d66cc` repair parser-based classification, exact
+interpreter identity and the still-authorized F3 selector. Review found a P2:
+accepted-call parsing was incorrectly reapplied to proven initial refusals.
+`b2b27c1c` resolved it with narrow authenticated refusal interpretation and full
+archive/scheduler negatives; follow-up found no new issue. Accepted calls remain
+strict, and missing/tampered proof still blocks.
+
+Routing-only `963a9f5a`, merged `0b063181`, clarifies new GameParameter creation
+versus existing-range editing across compact directories and schemas. Independent
+review found no actionable issue. The source diff changes no compiler, payload,
+dispatch or Fresh prompt. The five-version public tests preserve version boundaries.
+Subsequent r9 F3 PASS is actual Agent evidence; r9 F2 remains FAIL.
+
+Reports are preserved under the separate
+`.waapi-skill-state/repair-evidence/supplement-query-routing-963a9f5a/reviews/`.

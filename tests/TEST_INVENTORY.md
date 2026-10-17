@@ -12,11 +12,14 @@ Candidate `e8ca72d3` passed Program **6942 / 3 skipped** and Non-live
 repairs received focused validation, not relabeled full-gate runs. Native
 component tests cover all five GameParameter/dependency lanes and supported
 2022.1–2025.1 standalone ShareSet lanes, with an explicit 2021.1 boundary.
-Five approved actual Fresh attempts covered all four workflows. F1 and F4 have
-independent business PASS; F4 also has a selected 1/1 all-PASS root and identical
-verify-only. F2 and F3 did not complete, so full Fresh acceptance is not claimed. See the
-[dated acceptance checkpoint](../docs/research/waapi-v11-repairs-acceptance-2026-10-17.md)
-for exact candidate boundaries, raw verdicts, retained evidence and review.
+Nine approved actual Fresh attempts covered all four workflows. F1, F3 and F4
+have independent business PASS; F4 also has a selected 1/1 all-PASS root and
+identical verify-only. Latest candidate `0b063181` passed F3 and failed F2 in a
+selected 1/2 root, which was not replayed. F2 found the renamed target but did
+not retrieve required range/default fields. Final routing-disclosure regression
+passed 987 tests / 11 Windows-only skips; this is not a repeated full gate.
+See the [dated acceptance checkpoint](../docs/research/waapi-v11-repairs-acceptance-2026-10-17.md)
+for exact candidates, raw verdicts, retained evidence and review.
 No native-Windows acceptance is claimed.
 
 ## 1.1.0 release validation (2026-10-10)

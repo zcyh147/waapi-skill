@@ -46,18 +46,18 @@
     "windows_acceptance": false,
     "skip_scope": "See complete log: live/destructive lanes, native Windows checks and absent optional historical evidence are not PASS credit."
   },
-  "status": "approved_batch_finished_acceptance_decision_pending",
-  "integration_repair_candidate": "2a2d8a206e5e15ee8ca0c29293288f84e6570c39",
-  "fresh_actual_attempts": 5,
+  "status": "nine_attempts_complete_f2_acceptance_decision_pending",
+  "integration_repair_candidate": "0b0631818c7b88d44d4334469b34c4118656d13c",
+  "fresh_actual_attempts": 9,
   "fresh_unattempted": [],
   "windows_acceptance": false,
   "fresh_business_pass": [
     "F1",
+    "F3",
     "F4"
   ],
   "fresh_not_completed": [
-    "F2",
-    "F3"
+    "F2"
   ],
   "additional_fresh_authorized": false,
   "fresh_batch": {
@@ -394,6 +394,282 @@
       "source_mtime_after_ns": 1785701407051832215,
       "source_mtime_before_ns": 1785701407051832215,
       "version": "2025.1"
+    }
+  },
+  "additional_batch": {
+    "authorization": "Explicit user approval F2 and F3 once each",
+    "additional_attempts": 2,
+    "attempts": [
+      {
+        "candidate": "cb50f12900378dc489d70a8596adf53fba78a9e9",
+        "root": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7",
+        "status": "BLOCKED",
+        "task_status": "FAIL",
+        "actual_agent_attempts": 1,
+        "attempted": [
+          "REPAIR25-F2"
+        ],
+        "pending_authorized": [
+          "REPAIR25-F3"
+        ],
+        "agent_seconds": 20.823726624716073,
+        "usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 60416,
+          "input_tokens": 73767,
+          "output_tokens": 468,
+          "reasoning_output_tokens": 218
+        },
+        "cause": "Harness classified leading offline --version as mutation in Broker and archive; legal query-schema rejected before Gateway dispatch.",
+        "gateway_arguments": [
+          "--version",
+          "2025.1",
+          "query-schema"
+        ],
+        "source_unchanged": true,
+        "sandbox_retained": true,
+        "root_replayed": false,
+        "evidence": [
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-task-result.json",
+            "sha256": "024f0b380bde7b92b26fdd1523f82bbc749b1b31fbfbf202c0404ec659a197db"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-broker.json",
+            "sha256": "a751d4b4cebdd607ac6274c910e17e9ede816a1a3d63f27b81fd9219b040a277"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/lifecycle.json",
+            "sha256": "09920e201b0e66ca9cd191b20c51c5efc87a2b351b9ce15af1ba02d9d32858e1"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/attempts/attempt-000001/runs/heavy-v3/classification.json",
+            "sha256": "60996b5c64487c71ec32012f1d85813ca2f299dca38bc5d3c635af78e0ff8270"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/consolidated-summary.json",
+            "sha256": "78b3a586f5154c39888ca79ae6ac2dffab36a1ef125ef7d6bbbbfa5390cabe90"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/codex-facts.json",
+            "sha256": "d4ea73359bd22fe2c585e8c9792f131ea6bfb07fbfec96c721212c32460bb7a6"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r7/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/events.jsonl",
+            "sha256": "bb86fd9667f8f6a55860d9630ace49f162af23fc29b447069be729d775341262"
+          }
+        ]
+      },
+      {
+        "candidate": "55063fa8c62000c5cac0c1fea168a8f2c5966519",
+        "root": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8",
+        "status": "FAIL",
+        "task_status": "FAIL",
+        "actual_agent_attempts": 1,
+        "attempted": [
+          "REPAIR25-F3"
+        ],
+        "pending_authorized": [],
+        "agent_seconds": 21.51933137513697,
+        "usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 114176,
+          "input_tokens": 135389,
+          "output_tokens": 1008,
+          "reasoning_output_tokens": 381
+        },
+        "cause": "Repeated route selection: existing-object setRange selected for new GameParameter creation; Draft rejected before dispatch. No Agent Preview/Execute.",
+        "source_unchanged": true,
+        "sandbox_retained": true,
+        "root_replayed": false,
+        "evidence": [
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/expansion-task-result.json",
+            "sha256": "4e6f55a8e6f4c4c8b1cf80bbd947f3ecb49369ffe61bef4ca516d7e39b462715"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/expansion-broker.json",
+            "sha256": "996c76802a72dee004216fefba850e760c95e20addabcc7ebd17dfde5a10c4b6"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/turns/turn-01/codex-facts.json",
+            "sha256": "210778ba1e47c3e7e1d4b2e777aedb607c7cab2924c2979a4137e165f7823f04"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/codex-task/turns/turn-01/events.jsonl",
+            "sha256": "6c04e833ffb53ab218b458afebf0445a1f0013d059c487fbd9bb91c5fc87d9f4"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F3/evidence/lifecycle.json",
+            "sha256": "201dcc5c71e01c490a5d81e2bde90496d7bb772a225d795c1e210ed72aafbe08"
+          },
+          {
+            "path": "skills/waapi-skill-workspace/imac-v11-repairs-final-f3-r8/consolidated-summary.json",
+            "sha256": "e26b17413671543b466faca0df7d47970a0b63517e0d0fabb2c16b7acc7f517a"
+          }
+        ]
+      }
+    ],
+    "total_actual_attempts": 7,
+    "all_attempts_usage": {
+      "input_tokens": 1551348,
+      "cached_input_tokens": 1368832,
+      "output_tokens": 11166,
+      "agent_seconds": 244.56984758377075
+    },
+    "remaining_authorized_attempts": 0
+  },
+  "latest_checkpoint": {
+    "actual_attempts": 9,
+    "business_pass": [
+      "F1",
+      "F3",
+      "F4"
+    ],
+    "not_completed": [
+      "F2"
+    ],
+    "remaining_authorized_attempts": 0,
+    "all_attempts_usage": {
+      "input_tokens": 2252910,
+      "cached_input_tokens": 1996032,
+      "output_tokens": 17051,
+      "agent_seconds": 414.41109341662377
+    },
+    "latest_root": {
+      "candidate": "0b0631818c7b88d44d4334469b34c4118656d13c",
+      "root": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9",
+      "status": "FAIL",
+      "selected_result": "1/2",
+      "units": [
+        {
+          "unit_id": "REPAIR25-F2",
+          "status": "FAIL",
+          "agent_seconds": 50.53855687472969,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 130304,
+            "input_tokens": 149553,
+            "output_tokens": 1613,
+            "reasoning_output_tokens": 756
+          },
+          "assertions": {
+            "complete_snapshots": true,
+            "media_unchanged": true,
+            "other_objects_unchanged": true,
+            "read_refinement": false,
+            "source_unchanged": true,
+            "target_cardinality": true,
+            "target_identity": true,
+            "target_values": true
+          },
+          "material_gates": {
+            "broker_provenance": false,
+            "completed_turn": true,
+            "cumulative_agent_budget": true,
+            "final_response_present": true,
+            "memory_isolated": true,
+            "no_collaboration": true,
+            "no_discovery_or_direct_waapi": true,
+            "no_write_like_commands": true,
+            "one_target_skill": true,
+            "only_authenticated_gateway_and_skill_reads": true,
+            "only_packaged_references": true,
+            "policy_checkpoint": false,
+            "source_and_workspace_unchanged": true,
+            "visible_preview_notice": true
+          },
+          "source_unchanged": true,
+          "sandbox_retained": true,
+          "assessment": "No-match followed by unique fallback without new permission is observed; required Min/Max/InitialValue were not read. Full F2 remains FAIL.",
+          "evidence": [
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-task-result.json",
+              "sha256": "5567fd88e1737b1850d3c7eaa94f6b661952a77c684d906ae83b0f28bd5e6769"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/turns/turn-01/codex-facts.json",
+              "sha256": "6afce05f0b465a6b733e2d31ae5807bce447f0a122192976b5d57e23991e0c1b"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-broker.json",
+              "sha256": "ee5cd6792990cbce35dd02aee80ef0100631aadb7bd7bf9c65312c2d81b7e7ce"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/codex-task/expansion-oracle.json",
+              "sha256": "3c9251eeb6e2344540451892b9067a8097dede0b601ee6bd612b60f68876997a"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/001-REPAIR25-F2/evidence/lifecycle.json",
+              "sha256": "c60d4acfa90a5e296fe83a421a36026ae4f3547b0a8d2a59276a111de256ef82"
+            }
+          ]
+        },
+        {
+          "unit_id": "REPAIR25-F3",
+          "status": "PASS",
+          "agent_seconds": 119.30268895812333,
+          "usage": {
+            "cache_write_input_tokens": 0,
+            "cached_input_tokens": 496896,
+            "input_tokens": 552009,
+            "output_tokens": 4272,
+            "reasoning_output_tokens": 1730
+          },
+          "assertions": {
+            "complete_snapshots": true,
+            "media_unchanged": true,
+            "other_objects_unchanged": true,
+            "source_unchanged": true,
+            "target_cardinality": true,
+            "target_identity": true,
+            "target_values": true
+          },
+          "material_gates": {
+            "broker_provenance": true,
+            "completed_turn": true,
+            "cumulative_agent_budget": true,
+            "final_response_present": true,
+            "memory_isolated": true,
+            "no_collaboration": true,
+            "no_discovery_or_direct_waapi": true,
+            "no_write_like_commands": true,
+            "one_target_skill": true,
+            "only_authenticated_gateway_and_skill_reads": true,
+            "only_packaged_references": true,
+            "policy_checkpoint": true,
+            "source_and_workspace_unchanged": true,
+            "visible_preview_notice": true
+          },
+          "source_unchanged": true,
+          "sandbox_retained": false,
+          "assessment": "Business PASS: one exact GameParameter with requested values, preserved before-state, concrete notice before execution, accurate final answer.",
+          "evidence": [
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/expansion-task-result.json",
+              "sha256": "639aba314107a8a9dcc271e5910a88bdafaf3eea410f23ac7e159c391bfb9ef5"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/turns/turn-01/codex-facts.json",
+              "sha256": "4e5827c04f85341f18003bc069b016d9f59c65fe3210628860e66f29e7e70a79"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/expansion-broker.json",
+              "sha256": "cf2894608af29238f5f18d6d1a63923c5a98ca6e1f613071cb710f620978e3a9"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/codex-task/expansion-oracle.json",
+              "sha256": "0b85a09334932be1f8de76713508d5dfade8863eee8cbd90dbc31530d7b612d5"
+            },
+            {
+              "path": "skills/waapi-skill-workspace/imac-v11-repairs-retry-f2-f3-r9/attempts/attempt-000001/runs/heavy-v3/matrix/scenarios/002-REPAIR25-F3/evidence/lifecycle.json",
+              "sha256": "60972551ebb3abc18947b75125d13ca6c0d92733ad9d95421d9c1ba907eb7be0"
+            }
+          ]
+        }
+      ],
+      "verify_only_run": false,
+      "reason_no_verify_only": "Root contains an ordinary F2 FAIL; original failed roots are not replayed."
     }
   }
 }

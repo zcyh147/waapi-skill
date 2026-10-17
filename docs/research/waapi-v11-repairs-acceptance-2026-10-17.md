@@ -1,136 +1,136 @@
 # WAAPI v1.1 repairs: acceptance checkpoint
 
-Status: implementation and deterministic validation complete; the approved Fresh
-batch has finished with two business passes and two incomplete workflows. Current
-executed candidate: `2a2d8a20`. PR #173 remains draft pending the user’s acceptance decision.
+Implementation and review are complete. Nine approved actual Fresh attempts
+provide business PASS for F1, F3 and F4; F2 remains incomplete. Latest executed
+candidate: `0b0631818c7b88d44d4334469b34c4118656d13c`. PR #173 stays draft pending
+the user's decision about the remaining Fresh limitation. No automatic rerun.
 
-## Completed development gates
+## Development and native evidence
 
-Frozen candidate `e8ca72d3710a94ea2067ad484ae7fdc74587e0d4` passed:
+| Gate / candidate | Result |
+| --- | --- |
+| Five-version Program / `e8ca72d3` | 6942 passed, 3 skipped; exit 0, 460.09 seconds |
+| Full Non-live / `e8ca72d3` | 18009 passed, 127 skipped, 34 deselected; exit 0, 1270.59 seconds |
+| Final routing disclosure / `963a9f5a`, merged `0b063181` | 987 passed, 11 Windows-only skipped; exit 0, 48.82 seconds; includes 15 five-version public disclosure cases |
 
-| Gate | Passed | Skipped | Deselected | Seconds |
-| --- | ---: | ---: | ---: | ---: |
-| Fixed five-version Program | 6942 | 3 | — | 460.09 |
-| Full Non-live | 18009 | 127 | 34 | 1270.59 |
+The adjacent JSON preserves full-gate log hashes. Skips grant no PASS credit.
+The packaged Skill stayed byte-identical through `55063fa8`. The final successor
+changes four product files only for catalog/schema routing descriptions: new
+GameParameter creation with range/default versus an existing parameter's range
+edit. It changes no compiler, payload, dispatch or Fresh prompt. Its focused
+results are not another full Program/Non-live run. Both generated inventory
+checks pass; source/contract seals were refreshed without changing coverage
+counts or classifications.
 
-Both commands exited 0 and left their candidate clean. The adjacent JSON record
-contains log digests. Windows-only and live/optional-evidence skips grant no PASS
-credit. These are the exact full-gate candidates, not a claim that every later
-harness commit received another full run. Subsequent code changes are confined to
-the test framework; the packaged Skill remains byte-identical to `e8ca72d3`.
+Native public Gateway component evidence:
 
-The startup repair passed 161 focused tests. The subsequent Draft metadata
-Broker/archive repair passed 767 focused tests with 6 native-Windows skips;
-112 overlapping final checks passed. Review follow-up passed 66 affected tests.
-Selections overlap and must not be added into one new total.
-
-## Native component evidence
-
-- Same-call public Gateway GameParameter creation passed 2021.1–2025.1 on
-  `90018ae0`, independently checking Min=-12, Max=36, InitialValue=7 and identity.
+- GameParameter creation with Min=-12, Max=36, InitialValue=7 passed all five
+  versions on `90018ae0`, with exact identity readback.
 - Attenuation dependency preparation/readback passed all five versions on
-  `700a8477`, plus a 2025.1 false-routing setup on `813c993f`. See
-  [the native acceptance record](../../tests/ATTENUATION_NATIVE_ACCEPTANCE.md).
+  `700a8477`, plus 2025.1 false-routing setup on `813c993f`. See
+  [native acceptance](../../tests/ATTENUATION_NATIVE_ACCEPTANCE.md).
 - Independent ShareSet creation passed 2022.1–2025.1 on `df8e0610`. The 2021.1
-  packaged boundary remains explicit. The rejected classic-create encoding is
-  a scoped probe, not universal native impossibility; see
-  [the source-backed investigation](shareset-2021-classic-create-feasibility.md).
-- All four formal 2025.1 fixture preparations passed on `c6119274` without
-  starting Codex. Their source hashes/mtime stayed unchanged and their sandboxes
-  were removed. This grants no Fresh acceptance credit.
+  packaged boundary is explicit. A rejected classic-create encoding is not
+  universal native impossibility; see [investigation](shareset-2021-classic-create-feasibility.md).
+- Four formal 2025.1 fixture preparations passed on `c6119274` without Codex.
+  All used owned sandboxes and preserved source hash/mtime.
 
-These component candidates are separately identified evidence, not a single
-all-version live campaign. No native-Windows acceptance is claimed.
+These are separately identified component candidates, not a single all-version
+live campaign. No native-Windows acceptance is claimed.
 
-## Fresh attempts and business assessment
+## Fresh results
 
-The user approved one F1 rerun together with the still-unattempted F2–F4.
-Exactly five real Agent attempts have now been consumed across four unique
-workflows. There were no Windows Fresh tasks or version multiplication.
+All actual runs used Mac Wwise 2025.1, Terra / medium / default. The original
+four-attempt budget received explicit additions of one, two, and two attempts.
+Exactly nine Agent attempts have been consumed; none remain authorized.
 
-| Root / candidate | Actual Agent attempts | Independent business assessment | Raw result |
+| Root suffix / candidate | Attempts | Business outcome | Original verdict |
 | --- | ---: | --- | --- |
-| `imac-v11-repairs-first4-r1` / `e8ca72d3` | 0 | No Agent or Wwise launch; sealed-digest parser guard rejected startup | Campaign BLOCKED |
-| `imac-v11-repairs-first4-r2` / `063eb519` | 1, F1 | No Agent Preview/Execute; Draft browse revision rejected by Broker | Task FAIL; campaign BLOCKED |
-| `imac-v11-repairs-first4-r3` / `80b653c0` | 1, F1 | **Business PASS**: only PreDelay 25→24, all other settings/objects/media/source unchanged; authorization and notice pass | Task/matrix unit PASS; campaign BLOCKED on stale archive field contract |
-| `imac-v11-repairs-remaining3-r4` / `459455b2` | 1, F2 | **Not completed**: harness forced the operate reference for a read-only query, then the guessed query was rejected before dispatch | Task FAIL; campaign BLOCKED on rejected-read evidence |
-| `imac-v11-repairs-remaining2-r5` / `4b64ae3c` | 1, F3 | **Not completed**: Agent selected existing-parameter `setRange` for new-object creation; Draft admission rejected before dispatch | Task FAIL; campaign BLOCKED because legacy refusal lacks structured proof |
-| `imac-v11-repairs-final-f4-r6` / `2a2d8a20` | 1, F4 | **Business PASS**: exactly one independent RoomVerb Effect, class 7733251, correct parent/name, owner null; prior state preserved | Task/matrix/campaign PASS, selected **1/1**, plus identical verify-only |
+| `first4-r1` / `e8ca72d3` | 0 | Startup guard stopped before Agent/Wwise | Campaign BLOCKED |
+| `first4-r2` / `063eb519` | F1 | Broker rejected legitimate unchanged browse revision; no Agent write | Task FAIL; campaign BLOCKED |
+| `first4-r3` / `80b653c0` | F1 | **Business PASS**: only PreDelay 25→24; all material checks pass | Task/matrix unit PASS; campaign BLOCKED on archive field contract |
+| `remaining3-r4` / `459455b2` | F2 | Harness supplied wrong task reference; no project query/write | Task FAIL; campaign BLOCKED |
+| `remaining2-r5` / `4b64ae3c` | F3 | Existing-object setRange selected for creation; no Draft/Preview/write | Task FAIL; campaign BLOCKED on missing legacy rejection proof |
+| `final-f4-r6` / `2a2d8a20` | F4 | **Business PASS**: one independent RoomVerb Effect, exact parent/name/class, owner null | Selected 1/1 task/matrix/campaign PASS; identical verify-only |
+| `retry-f2-f3-r7` / `cb50f129` | F2 | Legal offline `--version 2025.1 query-schema` misclassified by harness; zero Gateway dispatch | Task FAIL; campaign BLOCKED; F3 unattempted |
+| `final-f3-r8` / `55063fa8` | F3 | Repeated existing-object setRange selection for new-object task; no Agent write | Task/matrix/campaign FAIL |
+| `retry-f2-f3-r9` / `0b063181` | F2, F3 | F2 incomplete; **F3 Business PASS** | Selected 1/2; F2 FAIL, F3 PASS; campaign FAIL |
 
-F4 verify-only exited 0 and left all 78 inventoried campaign files byte-identical.
-It started no Agent or Wwise. F1 has a separate evidence-backed business
-assessment under TEST_ACCEPTANCE.md; its raw BLOCKED campaign was not replayed,
-regraded, or relabeled. None of these roots is a single-root four-workflow PASS.
-F2 and F3 have no successful Fresh business evidence.
+Every root name above has prefix `imac-v11-repairs-` beneath the local
+`skills/waapi-skill-workspace/`. Raw failures were neither replayed nor regraded.
+Only the originally all-PASS r6 root received identical verify-only; exit 0 and
+all 78 inventoried files unchanged. The mixed r9 root was not replayed.
 
-Manual final-answer/notice review found no material discrepancy for F1 or F4.
-F1 correctly reported native range 0–1000, default 25 and undisclosed units.
-F4 correctly reported the independent ShareSet without a Sound/Bus attachment.
-Both provided the required concrete notice before their one execution.
+### Latest F2: partial outcome, full case FAIL
 
-All five attempts retained source full hashes and project mtimes. Passing
-sandboxes were removed, failed sandboxes quarantined, and no scoped Wwise
-executable remained. The complete usage totals are 1342192 input tokens,
-1194240 cached input tokens, 9690 output tokens and 202.2268 Agent seconds.
-These are recorded usage fields, not a monetary estimate. Non-Agent fixture,
-program-test and framework repair time is separate.
+The Agent read query-schema, queried the absent `Repair_WindSpeed`, received
+explicit read-refinement permission, and independently found the unique
+`Repair_WindVelocity` without asking for new approval. It then invented
+`metadata list --object <GUID>`, which the public parser does not accept. The
+requested Min/Max/InitialValue were never read. The final answer truthfully
+reported the found identity and missing values; no project changes occurred.
 
-### Framework repairs after the first attempt
+Thus autonomous refinement is observed, but the complete F2 business obligation
+is not met. The independent fixture's values do not substitute for Agent-visible
+reads. The public query reference/schema disclose custom field projection through
+`--include-field`; this attempt does not demonstrate a new business implementation
+fault. It remains an ordinary FAIL, not a framework-only business PASS.
 
-- Admit only the intended sealed repair child; preserve model/version/selection
-  restrictions.
-- Preserve Draft list/page revisions and incremented selection revisions; prove
-  the actual Gateway producer through authenticated Broker, notice and archive.
-- Validate the current Preview's closed connection configuration and its match
-  to endpoint/version. Current repair records require the binding; legacy
-  reading remains a separately closed variant.
-- For current repair plans, seal and enforce the correct reference schedule:
-  read-only uses query; mutations use operate. The historical F2 instructions
-  were wrong and remain recorded as such. The installed Skill already gave the
-  correct routing instruction; it was not changed to compensate for the harness.
-- Preserve ordinary read-refusal FAILs with independently recomputed complete
-  assertion maps. A future initial policy refusal has an authenticated closed
-  zero-dispatch marker only before any Draft, transaction or execution
-  reservation; incomplete proof, tampering and later-phase claims still stop.
-  Old unmarked unknown refusals, including r5, remain BLOCKED.
-- Permit only documented, explicit remaining-work selections. These enabled
-  still-authorized F2–F4, F3–F4 and finally F4 without repeating earlier cases.
-  Counts and budgets reflect the actual selection; they do not earn four-case
-  acceptance credit.
+### Latest F3: independently verified creation
 
-These test-framework changes passed focused regressions and independent review.
-Reported selections include 239 and 114 passes; 2153 and 119 passes; follow-up
-171 and 22 passes; and 683 passes / 6 native-Windows skips with overlapping
-178, 40 and 122 passing selections. They overlap and are not added into a new
-aggregate. The packaged Skill remains byte-identical to the full-gate candidate.
-The preparation-only exact F2 / ordered F2–F3 selectors (`8239aba3`, merged at
-`60cf0ead`) passed 56 focused tests and independent review. They neither start
-Agent runs nor authorize further budget.
+The Agent selected object.create, discovered the type and fields, refined its
+field meanings when needed, produced one immutable Preview, gave concrete notice,
+then executed and verified one transaction. Independent snapshots show exactly
+one new GameParameter `Repair_WindRange`, Min=-12, Max=36, InitialValue=7, at
+`\Game Parameters\Default Work Unit\Repair_WindRange`. All prior objects and
+media remain identical; Preview before/after snapshots match. All seven business
+assertions and material turn gates passed. The final answer matches that evidence.
+This is F3 PASS on r9's exact candidate, not a four-case or single-root full PASS.
 
-### Remaining decision
+F1's separate assessment preserves its raw archive BLOCKED verdict. F1/F4 notice
+and final-answer reviews found no material discrepancy. F1 reports native range
+0–1000, default 25 and undisclosed units without inventing milliseconds.
 
-The approved Agent budget is exhausted. F2 needs a fresh valid test after its
-harness repair. F3 remains a genuine route-selection failure under its frozen
-instructions; no missing native creation capability was demonstrated and no
-product routing change was made solely to obtain a green retry. Additional F2
-or F2–F3 attempts require a new user decision. The alternative is explicit
-acceptance of delivery with these Fresh limitations. Until then, PR #173 stays
-draft and full Fresh acceptance is not claimed.
+## Repairs and proportional validation
 
-## Audit, review and evidence retention
+Framework repairs covered startup profile admission, Draft revision semantics,
+metadata receipt scope/argv spelling, connection-configuration archives, correct
+read-only reference scheduling, failed assertion recomputation, and authenticated
+zero-dispatch refusal evidence. Explicit remaining-work selectors never grant
+run authorization. Old unmarked failures stay BLOCKED.
 
-Both generated inventory checks passed. The branch audit retains 849 routes,
-24310 structural occurrences and explicit unknown business mappings; structural
-consistency does not establish complete business coverage. See
-[the audit](../branch-coverage-audit.md) and
-[review closeout](waapi-v11-repairs-review-2026-10-17.md).
+The r7 repair uses the Gateway parser for accepted command classification while
+preserving raw argv and exact authentication hashes. It also fixes the exact
+lexical interpreter identity in test-produced plans. The latter was a pure-test
+finding, not an observed Fresh failure. Marked wrong/live-version refusals remain
+FAIL and permit later units only with intact zero-dispatch proof; unmarked or
+tampered evidence stops. Focused regression passed 596 tests, four additional
+negative controls, and 231 follow-up tests; overlapping selections are not summed.
+The review's P2 on refused-prefix interpretation was fixed and re-reviewed.
 
-All eleven completed managed worktrees were archived after verified evidence
-preservation. The final supplement contains nine files (12458 bytes), including
-four captured test-result summaries and five review reports. These summaries
-are not full stdout logs.
-Original native evidence is indexed under `.waapi-skill-state/repair-evidence/`;
-its first relocation manifest is immutable. Additional fixture and repair
-records use separate supplementary manifests. Original Fresh roots remain in
-the main workspace. Tickets #163–#172 are linked to draft PR #173; the PR is not
-ready while the agreed Fresh acceptance remains incomplete.
+Two F3 failures motivated the final structured routing disclosure; its 987-test
+regression and independent review passed, followed by r9 F3 PASS. See
+[review closeout](waapi-v11-repairs-review-2026-10-17.md). Earlier framework focused
+counts remain in preserved summaries and Git history, not a combined full gate.
+
+## Protection, usage, audit and remaining decision
+
+Every actual attempt preserved source-project full hash and project mtime.
+Passing sandboxes were removed, failed sandboxes quarantined, and scoped Wwise
+processes cleared. One-shot LaunchAgents for r7/r8/r9 were removed. Total recorded
+usage: 2252910 input tokens, 1996032 cached input tokens, 17051 output tokens,
+414.4111 Agent seconds. These are usage fields, not monetary estimates; fixture
+and development-test work is separate.
+
+The branch audit retains 849 routes, 24310 structural occurrences and explicit
+unknown business mappings; structural consistency is not complete business
+coverage. See [audit](../branch-coverage-audit.md). All twelve completed managed
+worktrees were archived after verified evidence preservation. Immutable original
+relocation records and separate supplements live under
+`.waapi-skill-state/repair-evidence/`; the final supplement preserves five files
+(9898 bytes), including captured result summaries rather than full stdout.
+Original Fresh roots remain in the main workspace.
+
+F2 remains the sole incomplete Fresh workflow. Additional execution requires a
+new user budget decision; the alternative is explicit acceptance of this delivery
+limitation. Tickets #163–#172 remain linked to draft PR #173; no main merge occurs.
