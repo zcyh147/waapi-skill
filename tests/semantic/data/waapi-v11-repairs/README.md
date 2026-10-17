@@ -21,7 +21,8 @@ from the sealed campaign evidence. Executor is gpt-5.6-terra, medium reasoning,
 default service tier. Each task has
 600 cumulative Agent seconds and at most 96 Gateway calls; the batch has at most
 2400 Agent seconds. No automatic retry or version multiplication. The only
-smaller selections are the explicitly documented F2–F4, F3–F4 and F4 continuations below.
+smaller selections are the documented F2–F4, F3–F4 and F4 continuations and
+optional F2 or ordered F2–F3 retries below. Selector support is not launch authorization.
 Fixture setup calls and native preflight are deterministic runner work and are
 recorded separately from Agent transactions. No Windows acceptance is claimed.
 
@@ -196,3 +197,28 @@ skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
 
 A 1/1 result would cover F4 only. Preserve F1's separate business assessment,
 F2/F3 failures, and all original campaign verdicts in the overall report.
+
+
+## Optional retries after r6: new approval required
+
+The authorized attempts have been spent. F4 passed in
+`imac-v11-repairs-remaining1-r6`; this does not erase F2/F3 failures or change
+F1's separately recorded business assessment and original campaign verdict.
+The continuation sections above describe the authorization available at those
+historical checkpoints, not permission for another run.
+
+For a future user decision, the existing formal campaign additionally accepts
+exactly `--case-id REPAIR25-F2`, or exactly ordered
+`--case-id REPAIR25-F2 --case-id REPAIR25-F3`. F2 alone has one fresh CLI task,
+one user turn, zero transactions and at most 600 Agent seconds. The pair has
+two fresh CLI tasks, two user turns, one transaction and at most 1200 Agent
+seconds. Both retain 2025.1, gpt-5.6-terra, medium reasoning, default service
+tier, 96 Gateway calls per task, zero model reviewers and zero automatic retries.
+
+**Neither selection may launch without new explicit user approval.** The user
+may approve F2 alone, approve both, or retain the existing failures and close
+with those limits. No task is automatically scheduled by this support. Any
+approved attempt needs a new root and frozen candidate. Default/all-four and
+previous continuation selections are unchanged; other subsets, duplicates and
+permutations remain rejected. A selected 1/1 or 2/2 root never establishes a
+four-workflow PASS, and no original root is modified or regraded.
