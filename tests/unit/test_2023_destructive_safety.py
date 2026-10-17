@@ -236,3 +236,25 @@ def _sandbox_project(*, source_project: Path, sandbox_root: Path, sandbox_projec
             expected_project_identity=source_project.stem,
         ),
     )
+
+
+def test_2023_destructive_sandbox_uses_configured_source_from_another_checkout(tmp_path, monkeypatch):
+    import json
+    console = _make_console(tmp_path / "WwiseConsole.sh")
+    local = _make_project(tmp_path / "current-checkout" / "tests" / "_org" / "2023.1" / "SampleProject.wproj")
+    configured = _make_project(tmp_path / "configured-checkout" / "tests" / "_org" / "2023.1" / "SampleProject.wproj")
+    _configure_2023_paths(monkeypatch, console_path=console, sample_project_path=local)
+    config = tmp_path / "live-environment.json"
+    config.write_text(json.dumps({"versions": {"2023.1": {
+        "wwise_console": str(console), "sample_project": str(configured)}}}))
+    env = {"WWISE_LIVE": "1", "WWISE_DESTRUCTIVE": "1", "WWISE_VERSION": "2023.1",
+           "WWISE_TEST_CONFIG": str(config)}
+    before = destructive_2023_sandbox.hash_mutation_bearing_project_files(configured.parent)
+    selected = require_2023_live_destructive_prerequisites(env)
+    assert selected.sample_project_source == configured.resolve()
+    sandbox_root = tmp_path / "owned-sandbox"
+    copied = _make_project(sandbox_root / "copy" / "SampleProject.wproj")
+    sandbox = _sandbox_project(source_project=configured, sandbox_root=sandbox_root, sandbox_project=copied)
+    target = require_2023_sandbox_copy_target(env, sandbox)
+    assert target.active_destructive_project == copied.resolve()
+    assert destructive_2023_sandbox.hash_mutation_bearing_project_files(configured.parent) == before
