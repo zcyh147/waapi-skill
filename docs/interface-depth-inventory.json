@@ -622,95 +622,6 @@
       "sha256": "49f8dbd003ce549687d191be12c431ee6db39e011451800787f9806ccddd3880"
     },
     {
-      "model_values": [
-        {
-          "name": "api",
-          "path": [
-            "arguments",
-            "api"
-          ],
-          "required": true,
-          "schema_sha256": "1ed1796af95a25bc4bce22323917d0f1b14902b916e271603b8068883d5c6430",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "args",
-          "path": [
-            "arguments",
-            "args"
-          ],
-          "required": false,
-          "schema_sha256": "38f7806618ef78b46d664b702dae5ecd839ff6799a62df81b10ecdfba7be0389",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": false,
-          "schema_sha256": "2e9d2baeef7ef41632a29ad8cef4c1fb7b604a5552404e4d1fcce947698a326a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "layout_binding",
-          "path": [
-            "arguments",
-            "layout_binding"
-          ],
-          "required": false,
-          "schema_sha256": "70c6f01036a5f207ec59c8a7eed05764177b4ac3a2d7af575b7aad6ee5fb1fe1",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "model_binding",
-          "path": [
-            "arguments",
-            "model_binding"
-          ],
-          "required": false,
-          "schema_sha256": "1b21336c1785c0d7deeb597cc6b7f4efb538c1815b670901240f756c370a75d9",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "options",
-          "path": [
-            "arguments",
-            "options"
-          ],
-          "required": false,
-          "schema_sha256": "8791674b56076efcfc7201dfb713c9a3999ce9db0af68f0bb08100a2b8782f21",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "result_projection",
-          "path": [
-            "arguments",
-            "result_projection"
-          ],
-          "required": false,
-          "schema_sha256": "375640e641f4d641e3110b4f94c483867247738652b067babd7ad43f98e92d17",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        }
-      ],
-      "sha256": "4dfe6d3f600505641d30e430d879b9dea9c96d0da206c33e41b061326debd4a2"
-    },
-    {
       "model_values": [],
       "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
     },
@@ -886,6 +797,107 @@
         }
       ],
       "sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83"
+    },
+    {
+      "model_values": [
+        {
+          "name": "api",
+          "path": [
+            "arguments",
+            "api"
+          ],
+          "required": true,
+          "schema_sha256": "1ed1796af95a25bc4bce22323917d0f1b14902b916e271603b8068883d5c6430",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "args",
+          "path": [
+            "arguments",
+            "args"
+          ],
+          "required": false,
+          "schema_sha256": "38f7806618ef78b46d664b702dae5ecd839ff6799a62df81b10ecdfba7be0389",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "arguments",
+            "io_root"
+          ],
+          "required": false,
+          "schema_sha256": "2e9d2baeef7ef41632a29ad8cef4c1fb7b604a5552404e4d1fcce947698a326a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "layout_binding",
+          "path": [
+            "arguments",
+            "layout_binding"
+          ],
+          "required": false,
+          "schema_sha256": "70c6f01036a5f207ec59c8a7eed05764177b4ac3a2d7af575b7aad6ee5fb1fe1",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "model_binding",
+          "path": [
+            "arguments",
+            "model_binding"
+          ],
+          "required": false,
+          "schema_sha256": "1b21336c1785c0d7deeb597cc6b7f4efb538c1815b670901240f756c370a75d9",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "options",
+          "path": [
+            "arguments",
+            "options"
+          ],
+          "required": false,
+          "schema_sha256": "8791674b56076efcfc7201dfb713c9a3999ce9db0af68f0bb08100a2b8782f21",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "result_projection",
+          "path": [
+            "arguments",
+            "result_projection"
+          ],
+          "required": false,
+          "schema_sha256": "375640e641f4d641e3110b4f94c483867247738652b067babd7ad43f98e92d17",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "source_control_binding",
+          "path": [
+            "arguments",
+            "source_control_binding"
+          ],
+          "required": false,
+          "schema_sha256": "c9f32f332f0b84963e3d7b0ea7fa8de796940d3bb795148b62a90d59cb874559",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        }
+      ],
+      "sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae"
     },
     {
       "model_values": [
@@ -174371,7 +174383,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 896
   },
-  "inventory_sha256": "9759a731328c30d6b63f0b8ebd1ac6dcb735329420c9457dccc17dc9b25ad991",
+  "inventory_sha256": "eef9cafa03bfe5def568c1619de575335795b1b895deee44904c1baedc49ccd2",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -208121,10 +208133,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "4dfe6d3f600505641d30e430d879b9dea9c96d0da206c33e41b061326debd4a2",
+      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "6d985467777380dd4bd819433d160caa9acdebde3af358fb34ffe5bd4877cd93",
+      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208148,10 +208160,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "4dfe6d3f600505641d30e430d879b9dea9c96d0da206c33e41b061326debd4a2",
+      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "6d985467777380dd4bd819433d160caa9acdebde3af358fb34ffe5bd4877cd93",
+      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208175,10 +208187,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "4dfe6d3f600505641d30e430d879b9dea9c96d0da206c33e41b061326debd4a2",
+      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "6d985467777380dd4bd819433d160caa9acdebde3af358fb34ffe5bd4877cd93",
+      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208202,10 +208214,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "4dfe6d3f600505641d30e430d879b9dea9c96d0da206c33e41b061326debd4a2",
+      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "6d985467777380dd4bd819433d160caa9acdebde3af358fb34ffe5bd4877cd93",
+      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208229,10 +208241,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "4dfe6d3f600505641d30e430d879b9dea9c96d0da206c33e41b061326debd4a2",
+      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "6d985467777380dd4bd819433d160caa9acdebde3af358fb34ffe5bd4877cd93",
+      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208401,8 +208413,8 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "9dfa171753d150a5032390b3a6fbcb239984b0fce26db865b326e8710dc1deab",
-    "operation_contract_sha256": "1bbd2eb0f779bcdca6a3efd25584a4fb94dc37c727f94e9a827801d8680f8033",
+    "gateway_parser_sha256": "fba19150fcd78a20bb5363b20f7b592a6b78f2264f934589d4d1a848be4091d5",
+    "operation_contract_sha256": "050826b618901c477c2d3d0d94b5973037ccb042ae16a010fd00c5d2bfb9a321",
     "public_continuation_sha256": "4eaea29d106bd9c0cf73756ac89a55cdb5f377a37872b1bffb982f022c7f96d6",
     "typed_request_surface_sha256": "667ce63d93b3a38f1d14d7348ae82fe728e731f24021ec868c687f2a2a5b87c7"
   },

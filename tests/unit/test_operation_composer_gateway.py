@@ -333,6 +333,22 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "a4f68b59f0d6b6646f5b18d09521e6b126e06364ebd1b06946e8d64e62911c82"
+    )
+    # Only the internal waapi.call contracts add the exact object-file proof.
+    # Removing that one reviewed field must retain every earlier contract seal.
+    def before_source_file_binding(version):
+        contract = operation_request_machine_contract("waapi.call", version)
+        contract["optional_arguments"].remove("source_control_binding")
+        contract["argument_contract"]["optional"].remove("source_control_binding")
+        assert contract["argument_contract"]["properties"].pop("source_control_binding") == {
+            "type": "object", "description": "Gateway-owned exact object-to-file scope proof; never forwarded.",
+        }
+        return contract
+
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        non_object_set_digests[f"waapi.call@{version}"] = canonical_sha256(before_source_file_binding(version))
+    assert canonical_sha256(non_object_set_digests) == (
         "5babd9b4fa6e0993a23a1a79267967dc59fb66e41c5b10ce4638b34c1c4507bd"
     )
     # Only the five Undo Group contracts add this closed cancellation choice.
@@ -414,7 +430,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     # The only new named contract field is the internal owned model proof.
     # Removing that exact addition must reproduce the earlier reviewed seal.
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("waapi.call", version)
+        contract = before_source_file_binding(version)
         contract["optional_arguments"].remove("model_binding")
         contract["argument_contract"]["optional"].remove("model_binding")
         assert contract["argument_contract"]["properties"].pop("model_binding") == {
@@ -443,7 +459,7 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
     )
     # Retain the earlier layout-proof review and its original aggregate seal.
     for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
-        contract = operation_request_machine_contract("waapi.call", version)
+        contract = before_source_file_binding(version)
         contract["optional_arguments"].remove("model_binding")
         contract["argument_contract"]["optional"].remove("model_binding")
         contract["argument_contract"]["properties"].pop("model_binding")
