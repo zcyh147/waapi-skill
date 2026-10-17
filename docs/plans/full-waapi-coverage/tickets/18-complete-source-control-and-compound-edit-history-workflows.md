@@ -1,6 +1,6 @@
 # 18: Complete source-control and compound edit-history workflows
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [18: Complete source-control and compound edit-history workflows](https://github.com/zcyh147/waapi-skill/issues/192).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can perform supported source-control and compound edit-history operations 
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

@@ -1,6 +1,6 @@
 # 17: Complete specialized project and object authoring operations
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [17: Complete specialized project and object authoring operations](https://github.com/zcyh147/waapi-skill/issues/191).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can perform the native-specific authoring operations that generic object e
 
 ## Blocked by
 
-- Draft 03: Support native metadata conditions for existing-object changes
+- [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177)
 
 ## Completion boundary
 

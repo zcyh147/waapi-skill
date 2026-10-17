@@ -1,6 +1,6 @@
 # 21: Complete integrated five-version coverage and scoped acceptance
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [21: Complete integrated five-version coverage and scoped acceptance](https://github.com/zcyh147/waapi-skill/issues/195).
 
 ## Parent
 
@@ -25,7 +25,7 @@ The integrated Skill is ready for delivery only when every in-scope native-suppo
 
 ## Blocked by
 
-- Draft 20: Validate Skill discovery and formal-harness compatibility end to end
+- [20: Validate Skill discovery and formal-harness compatibility end to end](https://github.com/zcyh147/waapi-skill/issues/194)
 
 ## Completion boundary
 

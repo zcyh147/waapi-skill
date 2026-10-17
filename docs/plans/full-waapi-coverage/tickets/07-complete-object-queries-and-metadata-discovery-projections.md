@@ -1,6 +1,6 @@
 # 07: Complete object queries and metadata discovery projections
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [07: Complete object queries and metadata discovery projections](https://github.com/zcyh147/waapi-skill/issues/181).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can express valid in-scope read semantics and inspect every applicable pro
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

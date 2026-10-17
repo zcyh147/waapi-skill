@@ -1,6 +1,6 @@
 # 09: Complete SoundBank definition, conversion and build options
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [09: Complete SoundBank definition, conversion and build options](https://github.com/zcyh147/waapi-skill/issues/183).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can manage inclusions, process definitions, convert external sources and g
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

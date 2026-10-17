@@ -1,6 +1,6 @@
 # 19: Complete permitted host-control and remaining fixed Core contracts
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [19: Complete permitted host-control and remaining fixed Core contracts](https://github.com/zcyh147/waapi-skill/issues/193).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users receive complete permitted host-control/fixed Core inputs and truthful ter
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

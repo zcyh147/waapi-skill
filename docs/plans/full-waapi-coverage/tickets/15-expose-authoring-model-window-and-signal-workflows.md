@@ -1,6 +1,6 @@
 # 15: Expose Authoring model, window and signal workflows
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [15: Expose Authoring model, window and signal workflows](https://github.com/zcyh147/waapi-skill/issues/189).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can use native-supported ordinary Authoring model/window/signal capabiliti
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

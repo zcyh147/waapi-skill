@@ -1,6 +1,6 @@
 # 06: Complete generic object graph and lifecycle operations
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [06: Complete generic object graph and lifecycle operations](https://github.com/zcyh147/waapi-skill/issues/180).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can create or edit valid object trees and perform copy, move, rename, dele
 
 ## Blocked by
 
-- Draft 04: Complete conditional configuration of newly created objects
+- [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178)
 
 ## Completion boundary
 

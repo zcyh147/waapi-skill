@@ -1,6 +1,6 @@
 # 01: Establish complete five-version native catalogs and schema discovery
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [01: Establish complete five-version native catalogs and schema discovery](https://github.com/zcyh147/waapi-skill/issues/175).
 
 ## Parent
 
@@ -24,7 +24,7 @@ A maintainer can inspect the complete independently evidenced Console and in-sco
 
 ## Blocked by
 
-None (can start after the breakdown is approved).
+None.
 
 ## Completion boundary
 

@@ -1,7 +1,7 @@
 # Full WAAPI coverage: ticket proposal
 
 Parent: [Complete WAAPI business coverage across Wwise 2021.1–2025.1](https://github.com/zcyh147/waapi-skill/issues/174).
-Status: draft for user review. No child issues, native dependency edges, implementation, live collection or Fresh runs have been created or started.
+Status: user-approved and published on 2026-10-17. All 21 native sub-issue links and 36 native blocking edges were verified. Implementation is active on codex/full-waapi-coverage; no Fresh run has been authorized.
 
 ## Review summary
 
@@ -65,10 +65,9 @@ not a postponed first integration of otherwise incomplete components.
 - All functional slices 03–19 → 20.
 - 20 → 21 (01–19 are transitive prerequisites). Every later mandatory same-parent child also blocks 21 and any affected routing integration.
 
-The exact machine-readable edges are in ticket-proposal.json. On approval,
-publish each ticket as a native GitHub sub-issue of the parent, then create native
-blocking links in a second pass. Preserve the parent specification unchanged.
-No implementation begins from this review draft.
+The exact machine-readable edges are in ticket-proposal.json. The approved tickets are native GitHub sub-issues of the parent, with native
+blocking links verified after creation. The parent specification remains unchanged.
+The machine-readable proposal maps every local draft ID to its published issue.
 
 ## No missing-family escape
 
@@ -89,3 +88,27 @@ No implementation begins from this review draft.
 - The complete source inventory, including every residual group, must reconcile
   to exact owned branches or justified native/policy boundaries. Anything that
   cannot be assigned creates new in-scope implementation work and blocks 21.
+
+## Published issues
+
+- [01: Establish complete five-version native catalogs and schema discovery](https://github.com/zcyh147/waapi-skill/issues/175)
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
+- [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177)
+- [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178)
+- [05: Complete plugin creation for Source, owner Effect and ShareSet placements](https://github.com/zcyh147/waapi-skill/issues/179)
+- [06: Complete generic object graph and lifecycle operations](https://github.com/zcyh147/waapi-skill/issues/180)
+- [07: Complete object queries and metadata discovery projections](https://github.com/zcyh147/waapi-skill/issues/181)
+- [08: Complete audio import, reimport and replacement workflows](https://github.com/zcyh147/waapi-skill/issues/182)
+- [09: Complete SoundBank definition, conversion and build options](https://github.com/zcyh147/waapi-skill/issues/183)
+- [10: Complete Console project and file-operation alternatives](https://github.com/zcyh147/waapi-skill/issues/184)
+- [11: Complete SoundEngine control branches and capability lifetimes](https://github.com/zcyh147/waapi-skill/issues/185)
+- [12: Complete runtime inspection, profiling and transport workflows](https://github.com/zcyh147/waapi-skill/issues/186)
+- [13: Complete Topic filtering, event shapes and monitoring outcomes](https://github.com/zcyh147/waapi-skill/issues/187)
+- [14: Expose complete ordinary Authoring layout and view workflows](https://github.com/zcyh147/waapi-skill/issues/188)
+- [15: Expose Authoring model, window and signal workflows](https://github.com/zcyh147/waapi-skill/issues/189)
+- [16: Complete Authoring project, remote and command workflows](https://github.com/zcyh147/waapi-skill/issues/190)
+- [17: Complete specialized project and object authoring operations](https://github.com/zcyh147/waapi-skill/issues/191)
+- [18: Complete source-control and compound edit-history workflows](https://github.com/zcyh147/waapi-skill/issues/192)
+- [19: Complete permitted host-control and remaining fixed Core contracts](https://github.com/zcyh147/waapi-skill/issues/193)
+- [20: Validate Skill discovery and formal-harness compatibility end to end](https://github.com/zcyh147/waapi-skill/issues/194)
+- [21: Complete integrated five-version coverage and scoped acceptance](https://github.com/zcyh147/waapi-skill/issues/195)

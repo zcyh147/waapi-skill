@@ -1,6 +1,6 @@
 # 03: Support native metadata conditions for existing-object changes
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Valid property and reference changes work across applicable object classes becau
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

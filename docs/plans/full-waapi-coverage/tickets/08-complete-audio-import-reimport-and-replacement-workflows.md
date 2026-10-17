@@ -1,6 +1,6 @@
 # 08: Complete audio import, reimport and replacement workflows
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [08: Complete audio import, reimport and replacement workflows](https://github.com/zcyh147/waapi-skill/issues/182).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can import, update and replace media and object structures with all in-sco
 
 ## Blocked by
 
-- Draft 04: Complete conditional configuration of newly created objects
+- [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178)
 
 ## Completion boundary
 

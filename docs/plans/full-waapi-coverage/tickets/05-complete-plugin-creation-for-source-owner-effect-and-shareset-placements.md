@@ -1,6 +1,6 @@
 # 05: Complete plugin creation for Source, owner Effect and ShareSet placements
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [05: Complete plugin creation for Source, owner Effect and ShareSet placements](https://github.com/zcyh147/waapi-skill/issues/179).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can create every in-scope native-supported plugin placement with the corre
 
 ## Blocked by
 
-- Draft 04: Complete conditional configuration of newly created objects
+- [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178)
 
 ## Completion boundary
 

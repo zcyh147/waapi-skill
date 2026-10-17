@@ -1,6 +1,6 @@
 # 14: Expose complete ordinary Authoring layout and view workflows
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [14: Expose complete ordinary Authoring layout and view workflows](https://github.com/zcyh147/waapi-skill/issues/188).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can inspect and manipulate the reflected ordinary Authoring layouts and vi
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

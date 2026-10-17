@@ -1,6 +1,6 @@
 # 02: Make branch completion and gap ownership executable
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176).
 
 ## Parent
 
@@ -24,7 +24,7 @@ The coverage checker explains exactly which native-supported uses are unavailabl
 
 ## Blocked by
 
-- Draft 01: Establish complete five-version native catalogs and schema discovery
+- [01: Establish complete five-version native catalogs and schema discovery](https://github.com/zcyh147/waapi-skill/issues/175)
 
 ## Completion boundary
 

@@ -1,6 +1,6 @@
 # 20: Validate Skill discovery and formal-harness compatibility end to end
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [20: Validate Skill discovery and formal-harness compatibility end to end](https://github.com/zcyh147/waapi-skill/issues/194).
 
 ## Parent
 
@@ -24,23 +24,23 @@ An Agent following only the Skill and Gateway discoveries can reach every comple
 
 ## Blocked by
 
-- Draft 03: Support native metadata conditions for existing-object changes
-- Draft 04: Complete conditional configuration of newly created objects
-- Draft 05: Complete plugin creation for Source, owner Effect and ShareSet placements
-- Draft 06: Complete generic object graph and lifecycle operations
-- Draft 07: Complete object queries and metadata discovery projections
-- Draft 08: Complete audio import, reimport and replacement workflows
-- Draft 09: Complete SoundBank definition, conversion and build options
-- Draft 10: Complete Console project and file-operation alternatives
-- Draft 11: Complete SoundEngine control branches and capability lifetimes
-- Draft 12: Complete runtime inspection, profiling and transport workflows
-- Draft 13: Complete Topic filtering, event shapes and monitoring outcomes
-- Draft 14: Expose complete ordinary Authoring layout and view workflows
-- Draft 15: Expose Authoring model, window and signal workflows
-- Draft 16: Complete Authoring project, remote and command workflows
-- Draft 17: Complete specialized project and object authoring operations
-- Draft 18: Complete source-control and compound edit-history workflows
-- Draft 19: Complete permitted host-control and remaining fixed Core contracts
+- [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177)
+- [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178)
+- [05: Complete plugin creation for Source, owner Effect and ShareSet placements](https://github.com/zcyh147/waapi-skill/issues/179)
+- [06: Complete generic object graph and lifecycle operations](https://github.com/zcyh147/waapi-skill/issues/180)
+- [07: Complete object queries and metadata discovery projections](https://github.com/zcyh147/waapi-skill/issues/181)
+- [08: Complete audio import, reimport and replacement workflows](https://github.com/zcyh147/waapi-skill/issues/182)
+- [09: Complete SoundBank definition, conversion and build options](https://github.com/zcyh147/waapi-skill/issues/183)
+- [10: Complete Console project and file-operation alternatives](https://github.com/zcyh147/waapi-skill/issues/184)
+- [11: Complete SoundEngine control branches and capability lifetimes](https://github.com/zcyh147/waapi-skill/issues/185)
+- [12: Complete runtime inspection, profiling and transport workflows](https://github.com/zcyh147/waapi-skill/issues/186)
+- [13: Complete Topic filtering, event shapes and monitoring outcomes](https://github.com/zcyh147/waapi-skill/issues/187)
+- [14: Expose complete ordinary Authoring layout and view workflows](https://github.com/zcyh147/waapi-skill/issues/188)
+- [15: Expose Authoring model, window and signal workflows](https://github.com/zcyh147/waapi-skill/issues/189)
+- [16: Complete Authoring project, remote and command workflows](https://github.com/zcyh147/waapi-skill/issues/190)
+- [17: Complete specialized project and object authoring operations](https://github.com/zcyh147/waapi-skill/issues/191)
+- [18: Complete source-control and compound edit-history workflows](https://github.com/zcyh147/waapi-skill/issues/192)
+- [19: Complete permitted host-control and remaining fixed Core contracts](https://github.com/zcyh147/waapi-skill/issues/193)
 
 ## Completion boundary
 

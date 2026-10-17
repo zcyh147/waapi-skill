@@ -1,6 +1,6 @@
 # 16: Complete Authoring project, remote and command workflows
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [16: Complete Authoring project, remote and command workflows](https://github.com/zcyh147/waapi-skill/issues/190).
 
 ## Parent
 
@@ -24,7 +24,7 @@ Users can use the existing Authoring project/remote/selection/command capabiliti
 
 ## Blocked by
 
-- Draft 02: Make branch completion and gap ownership executable
+- [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)
 
 ## Completion boundary
 

@@ -1,6 +1,6 @@
 # 04: Complete conditional configuration of newly created objects
 
-Status: draft for user review; not yet published or authorized for implementation.
+Status: approved for implementation on 2026-10-17. Published as [04: Complete conditional configuration of newly created objects](https://github.com/zcyh147/waapi-skill/issues/178).
 
 ## Parent
 
@@ -24,7 +24,7 @@ A user can create an object with its requested valid initial fields even when th
 
 ## Blocked by
 
-- Draft 03: Support native metadata conditions for existing-object changes
+- [03: Support native metadata conditions for existing-object changes](https://github.com/zcyh147/waapi-skill/issues/177)
 
 ## Completion boundary
 
