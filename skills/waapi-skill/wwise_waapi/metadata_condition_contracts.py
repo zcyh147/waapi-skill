@@ -27,6 +27,14 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
                 "action": "Enable", "context": "Self", "condition": "referenceIsSet_boolean",
                 "target": "explicit_user_selected_bound_object_or_separate_clear_preview",
                 "satisfied_identity": "preserve_and_revalidate_canonical_GUID_or_native_null",
+                "target_hierarchy": {
+                    "restriction": "childOfReference", "scope": "exact_existing_object",
+                    "target_parent": "canonical_GUID_of_the_controlling_reference",
+                    "atomic_value": "explicit_prospective_controlling_reference",
+                    "single_field_repair": "separately_preview_and_verify_the_selected_controlling_reference",
+                    "revalidate_and_verify": ["controlling_reference", "target_parent", "controller_metadata"],
+                    "derived_writes": False,
+                },
             },
             "visibility": {
                 "action": "Show", "contexts": ["Self", "Parent", "AssocParent"],
@@ -58,6 +66,6 @@ def existing_field_condition_contract(version: str) -> dict[str, Any]:
             "verify_prerequisites_after_execution": True,
             "verify_condition_metadata_after_execution": True,
             "unknown_conditions_cycles_or_conflicts": "reject_before_dispatch",
-            "maximum_depth": 8, "maximum_fields": 16, "maximum_related_conditions": 16,
+            "maximum_depth": 16, "maximum_fields": 16, "maximum_related_conditions": 16,
         },
     }

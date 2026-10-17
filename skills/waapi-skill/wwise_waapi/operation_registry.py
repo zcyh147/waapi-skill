@@ -2484,7 +2484,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         constraints=(
             "target=null is an explicit closed clear operation and is rejected when live metadata contains a notNull restriction",
             "a non-null target is live-resolved and checked against live reference type restrictions",
-            "non-null references require their live Boolean activation closure already satisfied; missing prerequisites require separate Field Handle property Previews, or object.set on 2022.1+",
+            "non-null references require their live activation prerequisites already satisfied; use separate Field Handle Previews, or explicit object.set declarations on 2022.1+",
+            "childOfReference binds the chosen target parent to the exact controlling reference; explicit atomic reference changes use the declared future parent and both relationships are revalidated and verified",
             "when a prior successful Gateway read returned an exact id for object or target, copy that id exactly; do not retype its path or name",
         ),
         selection_guidance=_selection_guidance(
@@ -5484,6 +5485,7 @@ def _prepare_object_set(
     field_snapshots: list[dict[str, Any]] = []
     condition_metadata_guards: list[dict[str, Any]] = []
     related_conditions: list[dict[str, Any]] = []
+    reference_target_conditions: list[dict[str, Any]] = []
     children_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     list_subtree_snapshots: list[dict[str, Any]] = []
@@ -5679,6 +5681,7 @@ def _prepare_object_set(
             target_spec["properties"].append(
                 {"name": descriptor.name, "value": descriptor.value, "metadata_type": info.type}
             )
+        reference_targets = []
         for descriptor in references:
             info = _read_property_info_cached(
                 read,
@@ -5686,7 +5689,7 @@ def _prepare_object_set(
                 object_id=target.object,
                 name=descriptor.name,
             )
-            _require_object_reference_metadata(info)
+            _require_object_reference_metadata(info, allow_hierarchy=True)
             property_info_by_name[descriptor.name.casefold()] = info
             if platform is not None:
                 _require_platform_field_enabled(
@@ -5701,12 +5704,16 @@ def _prepare_object_set(
                 read=read,
                 identity_cache=identity_cache,
             )
-            _require_reference_target_allowed(info, resolved)
+            reference_targets.append((info, resolved))
             roles[descriptor.request_path] = resolved
             trusted[f"@{descriptor.name}"] = resolved.object
             reference_spec = {"name": descriptor.name, "target_id": resolved.object}
             target_spec["references"].append(reference_spec)
         desired_references = {row["name"].casefold(): row["target_id"] for row in target_spec["references"]}
+        for info, resolved in reference_targets:
+            _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
+                platform=platform, desired_references=desired_references,
+                conditions=reference_target_conditions, property_info_cache=property_info_cache)
         reference_requirements: dict[str, Any] = {}
         for descriptor in (*properties, *references):
             activation_properties = _apply_reference_activation_dependencies(
@@ -6325,6 +6332,8 @@ def _prepare_object_set(
         state["condition_metadata_guards"] = condition_metadata_guards
     if related_conditions:
         state["related_conditions"] = related_conditions
+    if reference_target_conditions:
+        state["reference_target_conditions"] = reference_target_conditions
     if has_imports or requested_languages:
         state["import_guard"] = import_guard
     return preview, roles, state, verification, cleanup
@@ -7309,7 +7318,7 @@ def _is_finite_waapi_number(value: Any) -> bool:
     return math.isfinite(converted)
 
 
-def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> None:
+def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord, *, allow_hierarchy=False) -> None:
     restriction_type = metadata.restriction.get("type")
     reference = restriction_type == "reference" or (isinstance(metadata.type, str) and metadata.type.casefold() in {"reference", "objectreference"})
     if not reference:
@@ -7319,7 +7328,7 @@ def _require_object_reference_metadata(metadata: PropertyInfoMetadataRecord) -> 
             details={"reference": metadata.name, "metadata_type": metadata.type},
         )
     restrictions = metadata.restriction.get("restrictions")
-    if isinstance(restrictions, list) and any(
+    if not allow_hierarchy and isinstance(restrictions, list) and any(
         isinstance(row, Mapping) and row.get("childOfReference") is not None for row in restrictions
     ):
         raise OperationContractError(
@@ -7425,7 +7434,7 @@ def _append_association_condition(requirements, *, source, owner, property_name,
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
 
 
-def _condition_metadata_assertions(pre_state, *, read):
+def _condition_metadata_assertions(pre_state, *, read, after_write=False):
     """Keep the exact selected condition metadata valid through verification."""
     assertions = []
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
@@ -7459,6 +7468,7 @@ def _condition_metadata_assertions(pre_state, *, read):
             assertions.append({"name": f"selected native metadata {name} unchanged",
                                "passed": _native_snapshot_equal(observed, selected["metadata"]),
                                "evidence": {"expected": selected["metadata"], "actual": observed}})
+    assertions.extend(_reference_target_condition_assertions(pre_state, read=read, after_write=after_write))
     return assertions
 
 
@@ -7735,7 +7745,7 @@ def _apply_reference_activation_dependencies(
         ):
             raise OperationContractError(
                 "CONSTRAINED_REFERENCE_BOUNDARY",
-                "Only same-object Enable dependencies with an override or exact Boolean condition are supported.",
+                "This context requires a supported same-object Enable scalar or override dependency.",
                 details={
                     "reference": metadata.name,
                     "request_path": request_path,
@@ -9382,7 +9392,11 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 _require_reference_clear_allowed(info)
             else:
                 roles["target"] = target
-                _require_reference_target_allowed(info, target)
+                reference_conditions = []
+                _require_reference_target_allowed(info, target, source_id=source.object, read=read,
+                    platform=platform, conditions=reference_conditions)
+                if reference_conditions:
+                    metadata["reference_target_conditions"] = reference_conditions
             preview = PropertyReferenceBuilder(version=request.version).set_reference(
                 object=source,
                 reference=field_value,
@@ -15601,7 +15615,7 @@ def verify_prepared_operation(
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
-    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call, after_write=True))
 
     def check_result_schema(uri: str, version: str) -> None:
         try:
@@ -21486,6 +21500,9 @@ def _import_file_path_key(value: Any) -> HostPathKey | None:
 def _require_reference_target_allowed(
     metadata: PropertyInfoMetadataRecord,
     target: ResolvedObject,
+    *, source_id=None, read=None, platform=None, conditions=None,
+    desired_references=None, property_info_cache=None, _restriction_path=(),
+    _restriction_context=None,
 ) -> None:
     try:
         allowed_types = set(reference_allowed_types(metadata.restriction))
@@ -21495,18 +21512,16 @@ def _require_reference_target_allowed(
             str(exc),
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         ) from exc
-    if not allowed_types:
-        return
     target_type = target.row.get("type")
-    if not isinstance(target_type, str) or not target_type:
+    if allowed_types and (not isinstance(target_type, str) or not target_type):
         raise OperationContractError(
             "INVALID_READBACK",
             "Reference target readback must expose a type when live restrictions are present.",
             details={"reference": metadata.name, "target": target.as_dict()},
         )
-    target_token = reference_type_token(target_type)
+    target_token = reference_type_token(target_type) if isinstance(target_type, str) else None
     allowed_tokens = {reference_type_token(value) for value in allowed_types}
-    if target_token not in allowed_tokens:
+    if allowed_types and target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
             "Reference target type is not allowed by live getPropertyInfo restrictions.",
@@ -21516,6 +21531,105 @@ def _require_reference_target_allowed(
                 "allowed_types": sorted(allowed_types),
             },
         )
+    parent_fields = []
+    for row in metadata.restriction.get("restrictions", []):
+        if not isinstance(row, Mapping) or "childOfReference" not in row:
+            continue
+        name = row["childOfReference"]
+        if set(row) != {"childOfReference"} or not isinstance(name, str) or _REFERENCE_ACTIVATION_FIELD_NAME.fullmatch(name) is None:
+            raise OperationContractError("INVALID_METADATA", "Reference parent restriction must name one exact reference field.")
+        if name not in parent_fields:
+            parent_fields.append(name)
+    if not parent_fields:
+        return
+    if source_id is None or read is None or conditions is None:
+        raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
+            "Reference hierarchy constraints need an exact existing object and a separately scoped field Preview.",
+            details={"reference": metadata.name, "parent_references": parent_fields, "mutation_dispatched": False})
+    if _restriction_context is None:
+        _restriction_context = {"fields": set(), "values": {}, "identities": {}, "validated": set()}
+    if property_info_cache is None:
+        property_info_cache = {}
+    validation_key = (metadata.name.casefold(), _identity_key(target.object))
+    if validation_key in _restriction_context["validated"]:
+        return
+    path = (*_restriction_path, metadata.name.casefold())
+    for name in parent_fields:
+        if name.casefold() in path:
+            raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference hierarchy constraints contain a cycle.")
+        _restriction_context["fields"].add(name.casefold())
+        if len(_restriction_context["fields"]) > MAX_CONDITION_CONTROLLERS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference hierarchy exceeds the finite controller budget.")
+        info = (_read_property_info_cached(read, cache=property_info_cache, name=name, object_id=source_id)
+                if property_info_cache is not None else _read_property_info(read, name=name, object_id=source_id))
+        _require_object_reference_metadata(info, allow_hierarchy=True)
+        if info.name != name:
+            raise OperationContractError("INVALID_METADATA", "Reference parent metadata names a different field.")
+        if name.casefold() not in _restriction_context["values"]:
+            _restriction_context["values"][name.casefold()] = _rows(read(OBJECT_GET_URI, {"from": {"id": [source_id]}}, {
+                "return": ["id", name], **({"platform": platform} if platform is not None else {})}))
+        rows = _restriction_context["values"][name.casefold()]
+        if len(rows) != 1 or not _same_identity(rows[0].get("id"), source_id) or not _has_field(rows[0], name):
+            raise OperationContractError("INVALID_READBACK", "Reference parent field must resolve on the exact source object.")
+        current = _field_value(rows[0], name)
+        before = None if _reference_value_is_null(current) else _reference_identity(current)
+        expected = desired_references.get(name.casefold(), before) if desired_references is not None else before
+        if expected is None:
+            raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "Choose and separately preview the controlling reference first.", details={
+                "object_id": source_id, "reference": metadata.name, "mutation_dispatched": False,
+                "prerequisite_changes": [{"operation": "object.setReference", "object_id": source_id,
+                    "discovery_meaning": name, "selection": "live_discovered_Field_Handle", "required_presence": True,
+                    "target_selection": "user_chosen_exact_object", **({"platform": platform} if platform is not None else {})}]})
+        if (not isinstance(expected, str) or _PLUGIN_GUID.fullmatch(expected) is None
+                or (before is not None and (not isinstance(before, str) or _PLUGIN_GUID.fullmatch(before) is None))):
+            raise OperationContractError("INVALID_READBACK", "Reference parent must expose a canonical GUID or native null.")
+        actual_parent = _reference_identity(target.row.get("parent"))
+        if not isinstance(actual_parent, str) or _PLUGIN_GUID.fullmatch(actual_parent) is None:
+            raise OperationContractError("INVALID_READBACK", "Chosen reference target must expose its exact parent GUID.")
+        if not _same_identity(actual_parent, expected):
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Chosen reference target is not a child of the controlling reference.", details={
+                "reference": metadata.name, "target_id": target.object, "parent_reference": name,
+                "required_parent_id": expected, "actual_parent_id": actual_parent})
+        parent = _resolve_identity({"kind": "id", "value": expected}, role="reference_parent", read=read,
+            identity_cache=_restriction_context["identities"])
+        _require_reference_target_allowed(info, parent, source_id=source_id, read=read, platform=platform,
+            conditions=conditions, desired_references=desired_references, property_info_cache=property_info_cache,
+            _restriction_path=path, _restriction_context=_restriction_context)
+        condition = {"source_id": source_id, "target_id": target.object, "reference": metadata.name,
+            "parent_reference": name, "before_parent_id": before, "parent_id": expected,
+            "controller_metadata": info.as_dict(), "controller_native_metadata": dict(info.raw), "platform": platform}
+        if condition not in conditions:
+            conditions.append(condition)
+    _restriction_context["validated"].add(validation_key)
+
+
+def _reference_target_condition_assertions(pre_state, *, read, after_write):
+    conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
+    assertions = []
+    for condition in conditions:
+        source, target, name = condition["source_id"], condition["target_id"], condition["parent_reference"]
+        options = {"return": ["id", "parent", name]}
+        if condition.get("platform") is not None:
+            options["platform"] = condition["platform"]
+        identities = [source] if _same_identity(source, target) else [source, target]
+        rows = _rows(read(OBJECT_GET_URI, {"from": {"id": identities}}, options))
+        owners = [row for row in rows if _same_identity(row.get("id"), source)]
+        targets = [row for row in rows if _same_identity(row.get("id"), target)]
+        expected = condition["parent_id"] if after_write else condition["before_parent_id"]
+        actual = None
+        valid = len(rows) == len(identities) and len(owners) == len(targets) == 1 and _has_field(owners[0], name)
+        if valid:
+            value = _field_value(owners[0], name)
+            actual = None if _reference_value_is_null(value) else _reference_identity(value)
+            valid = ((actual is None and expected is None) or _same_identity(actual, expected)) and _same_identity(
+                _reference_identity(targets[0].get("parent")), condition["parent_id"])
+        info = _read_property_info(read, object_id=source, name=name)
+        valid = valid and _native_snapshot_equal(info.as_dict(), condition["controller_metadata"]) and _native_snapshot_equal(
+            dict(info.raw), condition["controller_native_metadata"])
+        assertions.append({"name": f"reference {condition['reference']} retains exact {name} parent scope", "passed": valid,
+            "evidence": {"expected_source_reference": expected, "actual_source_reference": actual,
+                "required_parent_id": condition["parent_id"], "rows": rows}})
+    return assertions
 
 
 def _require_reference_clear_allowed(
