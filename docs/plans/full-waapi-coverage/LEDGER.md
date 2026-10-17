@@ -220,12 +220,12 @@ Repeat with the same arguments plus `--check` to verify the saved result. A
 finished ticket can still produce exit 2 because other product obligations
 remain open. Use controlled scope only for checker tests, never to rename a
 partial product result complete. The committed inventory currently has 272,313
-obligations: 270,323 unresolved, 1,874 missing implementation and 116 exact
+obligations: 270,363 unresolved, 1,834 missing implementation and 116 exact
 approved exclusions. These are accounting rows, not distinct API or bug counts.
 
 The integrated #177/#181/#188 partials retain every original native obligation
-identity, shape and owner. The public source partition now contains 872 exact
-version/function/Topic rows; the 23 new 2024.1/2025.1 layout read and mutation rows
+identity, shape and owner. The public source partition now contains 874 exact
+version/function/Topic rows; the 25 new 2024.1/2025.1 layout read and mutation rows
 remain explicitly assigned to #188 as migration required in the interface-depth
 policy. Existing completed family seals remain unchanged. Public route presence
 reduces missing-route accounting only; no branch bindings, evidence requirements,
@@ -243,3 +243,16 @@ on 2025.1 only, and moves existing Media Pool getFields to a bounded fixed
 metadata command. The native denominator and exact ownership stay unchanged;
 56 newly linked obligations move from missing implementation to unresolved.
 No separate product evidence is recaptured or inherited for this successor.
+
+The fourth integration adds only these exact public route keys:
+`2024.1|function|ak.wwise.ui.layout.undockView` and
+`2025.1|function|ak.wwise.ui.layout.undockView`; no existing key is removed.
+Forty original native obligations move from missing implementation to unresolved.
+All 272,313 ID/shape/owner tuples, ten independent catalog seals, five original
+definition files, detailed native selector policy and completed family seals
+remain unchanged. All 25 layout rows stay migration required under #188.
+Structured 2022–2025 Short ID support retains 2021 mapping as unresolved; original
+native alternatives and all remaining requirements remain in the denominator.
+Neither these route linkages nor controlled producer/lifecycle tests establish
+native effects, exact accepted branch evidence or ticket completion. The new
+shared Authoring adapter and condition native fixture remain not launch-ready.

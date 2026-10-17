@@ -236,7 +236,64 @@ def read_category_run(descriptor, base):
             or residual.get('sandbox') != 'deleted' or residual.get('residual_processes') != []
             or residual.get('process_cleanup') != 'cleaned'):
         raise ValueError('native source preservation/cleanup/candidate mismatch')
+    if any(row.get('category') == 'authoring-layout' for row in run['categories']):
+        validate_authoring_batch_finalization(run, base)
     return dict(context, candidate=run['candidate'], record=run)
+
+
+def validate_authoring_batch_finalization(run, base):
+    """New shared Authoring rows need the whole completed batch publication."""
+    import hashlib
+    import json
+    from pathlib import Path
+    try:
+        categories = run['categories']
+        descriptors = [row['batch_finalization'] for row in categories]
+        if not descriptors or any(row != descriptors[0] for row in descriptors):
+            raise ValueError('node finalization links differ')
+        seal = read_sealed_artifact(descriptors[0], base)
+        invocation = run['invocation']
+        lifecycle = seal['lifecycle']
+        if (seal['contract'] != 'waapi-skill.authoring-batch-finalization/v1' or seal['outcome'] != 'PASS'
+                or any(seal[key] != run[key] for key in ('candidate', 'version', 'host', 'transactions'))
+                or any(seal[key] != invocation[key] for key in ('selected_test_nodeids', 'node_outcomes', 'started_at_unix_ns'))
+                or any(row['outcome'] != 'PASS' for row in seal['node_outcomes'])
+                or {row['nodeid'] for row in categories} != set(seal['selected_test_nodeids'])
+                or len(categories) != len(seal['selected_test_nodeids'])
+                or lifecycle['final_status'] != 'PASS' or lifecycle['sandbox_retained'] is not False or lifecycle['errors']
+                or lifecycle['source_hash_after']['digest'] != run['source']['hash_after']
+                or lifecycle['source_mtime_after_ns'] != run['source']['mtime_after_ns']
+                or seal['resources'].get('residual_processes') != []
+                or seal['resources']['cleanup_report']['process_exited'] is not True
+                or seal['resources']['cleanup_report']['residual_processes'] != []
+                or seal['resources']['cleanup_report']['wine_prefix'] != seal['resources']['owned_prefix']
+                or seal['resources']['fresh_inspection']['row_count'] < 1
+                or seal['resources']['port']['released'] is not True
+                or seal['source_context']['candidate'] != run['candidate']):
+            raise ValueError('batch context or final proof differs')
+        for category in categories:
+            nodeid = category['nodeid']
+            observation = category['observation_artifact']
+            if observation != seal['observations'][nodeid]:
+                raise ValueError('node observation links differ')
+            raw = Path(observation['path']).read_bytes()
+            if len(raw) != observation['bytes'] or hashlib.sha256(raw).hexdigest() != observation['sha256']:
+                raise ValueError('node original observation seal differs')
+            original = json.loads(raw)
+            if (original['nodeid'] != nodeid or original['candidate'] != run['candidate']
+                    or original['source_context'] != seal['source_context']):
+                raise ValueError('node original context differs')
+            for artifact in original['artifacts'].values():
+                root = Path(artifact['path'])
+                for entry in artifact['files']:
+                    path = (root / entry['path']).resolve()
+                    if not path.is_relative_to(root.resolve()):
+                        raise ValueError('node artifact escaped its archive')
+                    content = path.read_bytes()
+                    if len(content) != entry['bytes'] or hashlib.sha256(content).hexdigest() != entry['sha256']:
+                        raise ValueError('node archived evidence differs')
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f'Authoring batch finalization is incomplete: {exc}') from exc
 
 
 def read_metadata_run(descriptor, base):

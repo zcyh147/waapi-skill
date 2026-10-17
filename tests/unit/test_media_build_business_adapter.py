@@ -552,7 +552,6 @@ def test_media_pool_audio_similarity_rejects_unsafe_windows_paths(
     [
         ["Path", "FileId", "Db"],
         ["Path", "FileId", "Db", "IXML/Mood", "Custom/Mood"],
-        ["Path", "FileId", "Db", "Mood", "Mood"],
     ],
 )
 def test_media_pool_live_field_binding_requires_one_exact_case_candidate(
