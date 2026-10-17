@@ -1106,7 +1106,12 @@ def _prospective_native_runtime(tmp_path, workflow, version, family, *, fault=No
                     rows = [] if fault == "missing-target" else [self.objects[HIERARCHY_TARGET]]
                 elif expression.startswith('from object "'):
                     self.calls.append((uri, deepcopy(args), deepcopy(options)))
-                    rows = [deepcopy(self.objects[expression.split('"')[1]])]
+                    identity = expression.split('"')[1]
+                    if identity.startswith("\\"):
+                        assert identity == self.objects[FIRST]["path"], expression
+                        rows = [deepcopy(self.objects[FIRST])]
+                    else:
+                        rows = [deepcopy(self.objects[identity])]
                     if fault == "independent-reference" and rows[0]["id"] == CREATED:
                         rows[0]["DefaultSwitchOrState"] = HIERARCHY_GROUP
                 else:
