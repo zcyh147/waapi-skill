@@ -386,3 +386,161 @@ def test_curve_probe_reference_read_uses_existing_public_gateway_contract(tmp_pa
     if version != "2021.1":
         assert payload["objects"][0]["curve_points"] == [{"x": 0, "y": -6, "shape": "Linear"}]
     assert all(uri in {"ak.wwise.core.getInfo", "ak.wwise.core.object.get"} for uri, _args, _options in calls)
+
+
+def _owned_probe_runtime(tmp_path, workflow, *, version="2025.1", missing_list=False, overflow=False):
+    import json
+    import uuid
+
+    runtime, commands = _curve_probe_runtime(tmp_path, workflow, version=version)
+    ids = {name: "{" + str(uuid.UUID(int=index)) + "}" for index, name in enumerate(
+        ("sound", "rtpc", "bus", "effect", "music", "group", "slot"), start=1)}
+    def row(name, kind, owner=None):
+        return {"id": ids[name], "name": name, "type": kind, "path": "\\" + name,
+                "parent": None, "owner": {"id": ids[owner]} if owner else None}
+    sound, music = row("sound", "Sound"), row("music", "MusicSwitchContainer")
+    rtpc, bus = row("rtpc", "RTPC", "sound"), row("bus", "Bus")
+    effect = row("effect", "Effect" if version < "2023.1" else "EffectSlot", "sound")
+    group, slot = row("group", "SwitchGroup"), row("slot", "MusicArgumentsSlot", "music")
+    rows = {value["id"]: value for value in (sound, music, rtpc, bus, effect, group, slot)}
+    effect_field = "Effect0" if version < "2023.1" else "Effects"
+    hops = {(ids["sound"], "OutputBus"): [bus], (ids["sound"], "RTPC"): [rtpc],
+            (ids["sound"], effect_field): [effect], (ids["music"], "Arguments"): [slot if version == "2025.1" else group],
+            (ids["slot"], "Argument"): [group]}
+
+    def gateway(command):
+        command = list(command)
+        commands.append(command)
+        assert command[0] in {"config-show", "status", "metadata", "query-object", "query-schema"}
+        payload = {"ok": True, "detected_version": version,
+                   "endpoint": {"host": "127.0.0.1", "port": 31337, "url": "ws://127.0.0.1:31337/waapi"}}
+        if command[:2] == ["metadata", "types"]:
+            payload["agent_result"] = {"complete": True, "types": [
+                {"name": kind, "selection": kind + "-type"} for kind in ("Sound", "MusicSwitchContainer", "RTPC")]}
+        elif command[:2] == ["metadata", "list"]:
+            fields = ["OutputBus", effect_field, *([] if missing_list else ["RTPC"])] if command[3] == ids["sound"] else (
+                ["Arguments"] if command[3] == ids["music"] else ["Argument"])
+            payload["agent_result"] = {"complete": True, "fields": [{"name": name, "selection": name + "-field"} for name in fields]}
+        elif command[:2] == ["metadata", "detail"]:
+            payload["agent_result"] = {"complete": True, "metadata": {"restriction": {"type": "reference"}, "fixtureOptional": None}}
+        elif command[0] == "query-object":
+            if "--exact-id" in command:
+                found = [rows[command[command.index("--exact-id") + 1]]]
+            elif "--type-selection" in command:
+                found = [music if command[2] == "MusicSwitchContainer-type" else sound]
+            else:
+                expression = command[command.index("--advanced-waql") + 1]
+                if expression.startswith("from type RTPC"):
+                    found = [sound]
+                elif expression.startswith("from project where owner.id"):
+                    found = [rtpc, effect] if ids["sound"] in expression else ([slot] if version == "2025.1" else [])
+                else:
+                    owner = expression.split('"')[1]
+                    field = expression.split("select @")[1]
+                    found = hops[owner, field]
+                    if overflow and field == "RTPC":
+                        found = found * 5
+            payload.update(objects=found, limit_reached=len(found) == int(command[command.index("--max-results") + 1])
+                           if "--max-results" in command else False)
+        path = Path(runtime.env["WWISE_EVIDENCE_DIR"]) / (uuid.uuid4().hex + ".json")
+        path.write_text(json.dumps({"fixture_only": True, "command": command, "result": payload}))
+        return 0, payload
+
+    runtime.raw_gateway = gateway
+    return runtime, commands, ids
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_owned_list_probe_retains_sample_only_graph_and_fresh_metadata(tmp_path, workflow, version):
+    import json
+    runtime, commands, ids = _owned_probe_runtime(tmp_path, workflow, version=version)
+    category = workflow._collect_owned_list_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "PASS", observed
+    assert observed["complete_owned_list_discovery_proven"] is False
+    assert observed["field_cardinality_permission_proven"] is False
+    assert observed["mutation_authority"] is False
+    assert observed["owner_comparisons"][0]["missing_known_owned_ids"] == []
+    assert observed["native_evidence"] and observed["calls"]
+    details = [call for call in observed["calls"] if call["gateway_argv"][:2] == ["metadata", "detail"]]
+    assert "name" not in details[0]["payload"]["agent_result"]["metadata"]
+    assert "type" not in details[0]["payload"]["agent_result"]["metadata"]
+    assert all("Curve" not in " ".join(command) for command in commands)
+    if version == "2025.1":
+        assert any(f'from object "{ids["slot"]}" select @Argument' in command for command in commands)
+    else:
+        assert not any(part.endswith("select @Argument") for command in commands for part in command)
+
+
+@pytest.mark.parametrize("fault", ("missing-list", "row-overflow", "metadata-error", "paging-overflow", "owner-filter"))
+def test_owned_list_probe_keeps_incomplete_observation_blocked(tmp_path, workflow, fault):
+    import json
+    runtime, commands, ids = _owned_probe_runtime(tmp_path, workflow,
+        missing_list=fault == "missing-list", overflow=fault == "row-overflow")
+    original = runtime.raw_gateway
+
+    def gateway(command):
+        code, payload = original(command)
+        if fault == "metadata-error" and list(command[:2]) == ["metadata", "detail"]:
+            return 2, {"ok": False, "error_code": "fixture-metadata-rejected", "original_raw_error": {"fixture": None}}
+        if fault == "paging-overflow" and list(command[:2]) == ["metadata", "list"]:
+            payload["agent_result"].update(complete=False, next_command={"gateway_argv": list(command)})
+        if fault == "owner-filter" and any(str(value).startswith("from project where owner.id") for value in command):
+            payload["objects"][0]["owner"] = None
+        return code, payload
+
+    runtime.raw_gateway = gateway
+    category = workflow._collect_owned_list_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked", observed
+    expected = {"missing-list": "field_not_uniquely_listed_gateway_discovery_boundary",
+                "row-overflow": "query_row_bound_reached", "metadata-error": "public_read_rejected",
+                "paging-overflow": "metadata_page_bound_reached", "owner-filter": "owner_filter_readback_mismatch"}[fault]
+    assert any(row["reason"] == expected for row in observed["boundaries"])
+    assert len(commands) <= 96 and len(observed["calls"]) == len(commands)
+    if fault == "missing-list":
+        assert not any(command[-1] == "RTPC-field" for command in commands)
+        assert any(f'from object "{ids["sound"]}" select @RTPC' in command for command in commands)
+    if fault == "metadata-error":
+        assert any(row["payload"].get("original_raw_error") == {"fixture": None} for row in observed["calls"])
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp_path, workflow, version):
+    from tests.unit.test_object_graph_business_gateway import _info
+
+    runtime, _commands, ids = _owned_probe_runtime(tmp_path, workflow, version=version)
+    effect = "Effect0" if version < "2023.1" else "Effects"
+    expressions = ['from type RTPC select owner where type = "Sound"',
+                   f'from object "{ids["sound"]}" select @RTPC',
+                   f'from object "{ids["sound"]}" select @OutputBus',
+                   f'from object "{ids["sound"]}" select @{effect}',
+                   f'from project where owner.id = "{ids["sound"]}"']
+    if version >= "2023.1":
+        expressions.append(f'from object "{ids["music"]}" select @Arguments')
+    if version == "2025.1":
+        expressions.append(f'from object "{ids["slot"]}" select @Argument')
+    observed = []
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            assert uri == "ak.wwise.core.object.get", (uri, args, options)
+            observed.append(args["waql"])
+            assert options["return"] == ["id", "name", "type", "path", "parent", "owner"]
+            return {"return": [{"id": ids["rtpc"], "name": "", "type": "RTPC", "path": "\\RTPC",
+                                "parent": None, "owner": {"id": ids["sound"]}}]}
+
+        def disconnect(self):
+            pass
+
+    for expression in expressions:
+        code, payload = workflow.waapi_gateway.execute_gateway([
+            "--state-dir", str(runtime.state_dir), "query-object", "--advanced-waql", expression,
+            "--max-results", "5", "--include", "parent", "--include", "owner"],
+            env=runtime.env, client_factory=lambda _url: Client())
+        assert code == 0, payload
+        rows = payload.get("objects", payload.get("agent_result"))
+        assert rows[0]["owner"]["id"] == ids["sound"] and rows[0]["parent"] is None
+    assert observed == [expression + " take 5" for expression in expressions]
