@@ -112,6 +112,56 @@ def test_member_predicate_cannot_be_replaced_by_a_different_same_controller_shap
         batch.scalar_plan(manifest)
 
 
+def test_enum_values_and_range_bounds_require_distinct_predeclared_behavioral_workflows():
+    plan = batch.scalar_plan(batch.scalar_manifest(Path(__file__).parents[2]))
+    gain = next(g for g in plan["groups"] if g["version"] == "2025.1" and g["field"] == "GainBand1")
+    flows = {flow["id"]: flow for flow in gain["workflows"]}
+    values = [m for m in gain["members"] if m["alternative"].startswith("Enumeration/2/value/")
+              and m["source_attributes"]["Name"] == "FilterTypeBand1"]
+    assert {m["expected"] for m in values} == {4, 5, 6}
+    for member in values:
+        assert len(member["behavioral_workflow_ids"]) == 1
+        flow = flows[member["behavioral_workflow_ids"][0]]
+        assert flow["before"]["FilterTypeBand1"] == member["expected"]
+        assert flow["before"]["OnOffBand1"] is True
+    time = next(g for g in plan["groups"] if g["version"] == "2025.1" and g["field"] == "EnvelopeStopPlayback")
+    shape = next(m for m in time["members"] if m["alternative"] == "Range/2")
+    flows = {flow["id"]: flow for flow in time["workflows"]}
+    assert {flows[i]["before"]["TimeModLoops"] for i in shape["behavioral_workflow_ids"]} == {1, 50, 100}
+    assert time["negative_controls"][0]["before"]["TimeModLoops"] == 0
+    assert time["negative_controls"][0]["expected_error_code"] == "REFERENCE_ACTIVATION_REQUIRED"
+
+
+def test_conflicting_sibling_choices_remain_exactly_unresolved_per_source_occurrence():
+    # Controlled source fixture: duplicate controller constraints have distinct slots.
+    def dependency(values):
+        return '<PropertyDependency Name="Mode" Action="Enable"><Condition><Enumeration Type="int32">' + ''.join(
+            '<Value>' + str(value) + '</Value>' for value in values) + '</Enumeration></Condition></PropertyDependency>'
+    parent = '<Property Name="Gain" Type="Real64"><DefaultValue>0</DefaultValue><Dependencies>' + dependency([4, 5, 6]) + dependency([4, 5]) + '</Dependencies></Property>'
+    cases = []
+    for index, values in enumerate(([4, 5, 6], [4, 5])):
+        identity = 'controlled-source-slot-' + str(index)
+        alternatives = [('condition', None), ('Enumeration/2', None), *[
+            ('Enumeration/2/value/' + str(i), str(value)) for i, value in enumerate(values)]]
+        cases.append({'id': identity, 'version': '2025.1', 'build': '2025.1.7.9143', 'class': None,
+            'receiver': {'source_parent_key': 'controlled-parent', 'kind': 'Property', 'field': 'Gain',
+                'source_scope_kind': 'source-property', 'source_declared_type': 'Real64', 'source_default': 0.0},
+            'source_scope_error': None, 'source_parent_xml': parent, 'source_dependency_index': index,
+            'source_scope_fields': {'Gain': parent, 'Mode': '<Property Name="Mode" Type="int32"><DefaultValue>4</DefaultValue></Property>'},
+            'attributes': {'Name': 'Mode', 'Action': 'Enable'}, 'controller': 'Mode',
+            'predicate': {'kind': 'enum', 'type': 'int32', 'values': values},
+            'members': [{'id': identity + '/' + alternative, 'shape_sha256': 'c' * 64,
+                'source_file_sha256': 'd' * 64, 'alternative': alternative, 'value': value} for alternative, value in alternatives]})
+    plan = batch.scalar_plan({'occurrences': cases})
+    members = {m['id']: m for g in plan['groups'] for m in g['members']}
+    unresolved = {m['id']: m for m in plan['unresolved']}
+    assert 'controlled-source-slot-0/Enumeration/2/value/2' in unresolved
+    assert 'controlled-source-slot-0/Enumeration/2' in unresolved
+    assert 'controlled-source-slot-1/Enumeration/2' in members
+    assert 'conflicts' in unresolved['controlled-source-slot-0/Enumeration/2/value/2']['reason']
+    assert len(members) + len(unresolved) == 9
+
+
 def test_parent_collector_refuses_a_changed_installed_file_before_extracting_its_type(tmp_path):
     from tests.maintenance.condition_parent_sources import collect
     (tmp_path / "docs").mkdir()

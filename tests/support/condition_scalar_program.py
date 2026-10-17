@@ -56,12 +56,12 @@ def prepare_program_batch(root: Path, nodeids: list[str], plan: dict, inventory:
     return capture
 
 
-def _validate_observation(group, observed):
+def _validate_observation(group, observed, before_values):
     model, field = group["model"], group["field"]
     if not _exact(observed["observations"]["metadata"], model["metadata"][field]):
         raise ValueError("original public metadata differs from predeclared source model")
     before, after = observed["observations"]["before"], observed["observations"]["after"]
-    if any(type(before.get(k)) is not type(v) or before.get(k) != v for k, v in model["before"].items()):
+    if any(type(before.get(k)) is not type(v) or before.get(k) != v for k, v in before_values.items()):
         raise ValueError("original prerequisite values differ from predeclared source model")
     if not _exact(after, {**before, field: model["requested"]}):
         raise ValueError("original field change or prerequisite preservation differs")
@@ -77,6 +77,45 @@ def _validate_observation(group, observed):
         value = pointer_value(observed, member["observation_pointer"])
         if not _exact(value, member["expected"]):
             raise ValueError("exact source alternative observation differs")
+
+
+def _validate_group(group, bundle):
+    flows = {flow["id"]: flow for flow in group["workflows"]}
+    if set(bundle.get("workflows", {})) != set(flows):
+        raise ValueError("missing or extra original behavioral workflows; metadata disclosure is insufficient")
+    controls = {control["id"]: control for control in group["negative_controls"]}
+    if set(bundle.get("negative_controls", {})) != set(controls):
+        raise ValueError("missing or extra original outside-value controls")
+    for identity, flow in flows.items():
+        _validate_observation(group, bundle["workflows"][identity], flow["before"])
+    for member in group["members"]:
+        selected = member["behavioral_workflow_ids"]
+        if not selected or any(identity not in flows for identity in selected):
+            raise ValueError("exact member behavioral workflow linkage missing")
+        controller = member["source_attributes"]["Name"]
+        values = [flows[identity]["before"][controller] for identity in selected]
+        alternative = member["alternative"]
+        if "/value/" in alternative and (len(values) != 1 or not _exact(values[0], member["expected"])):
+            raise ValueError("enum value behavior does not use that actual controller value")
+        if alternative.startswith("Enumeration/") and "/value/" not in alternative:
+            if {audit.digest(v) for v in values} != {audit.digest(v["value"]) for v in member["expected"]["values"]}:
+                raise ValueError("enumeration behavior does not exercise every declared choice")
+        if alternative.startswith("Range/"):
+            low, high = member["expected"]["min"], member["expected"]["max"]
+            middle = (low + high) // 2 if type(low) is int and type(high) is int else (low + high) / 2
+            if {audit.digest(v) for v in values} != {audit.digest(v) for v in (low, middle, high)}:
+                raise ValueError("range behavior lacks endpoints or representative interior")
+            if not any(control["source_member"] == member["id"] for control in controls.values()):
+                raise ValueError("range behavior lacks a source-bounded outside-value control")
+    for identity, control in controls.items():
+        observed = bundle["negative_controls"][identity]
+        gateway = observed["gateway"]
+        payload = gateway["payload"]
+        codes = [payload.get("error_code"), *(issue.get("error_code") for issue in payload.get("details", {}).get("issues", []))]
+        if (gateway["exit_code"] != 2 or control["expected_error_code"] not in codes
+                or observed["mutation_calls"] != [] or not _exact(observed["before"], observed["after"])
+                or any(not _exact(observed["before"].get(k), value) for k, value in control["before"].items())):
+            raise ValueError("outside-value control lacks truthful public refusal and zero mutation")
 
 
 def finish_program_node(capture: dict, nodeid: str, reports: dict, observations: dict) -> None:
@@ -102,7 +141,7 @@ def finish_program_node(capture: dict, nodeid: str, reports: dict, observations:
     if audit.digest(json.loads((root / "plan.json").read_text())) != audit.digest(capture["plan"]):
         raise ValueError("predeclared original plan changed")
     for identity, group in groups.items():
-        _validate_observation(group, capture["observations"][identity]["observed"])
+        _validate_group(group, capture["observations"][identity]["observed"])
     destination = root / "published"
     if destination.exists():
         raise ValueError("original program publication is immutable")
@@ -119,35 +158,10 @@ def finish_program_node(capture: dict, nodeid: str, reports: dict, observations:
                 "skills/waapi-skill/wwise_waapi/metadata_restrictions.py", *_SOURCES]
     for identity, group in groups.items():
         entry = capture["observations"][identity]
-        observed = entry["observed"]
-        record = {"candidate_sha256": capture["candidate_sha256"], "git_candidate": capture["git_candidate"],
-                  "scope_kind": capture["scope_kind"], "evidence_kind": "injected_client_program",
-                  "invocation": {"phase": "final", "outcome": "PASS", "node_outcomes": [
-                      {"nodeid": node, "outcome": "PASS"} for node in capture["nodeids"]]},
-                  **deepcopy(observed), "branch_assertions": {},
-                  "artifacts": [capture["plan_artifact"], capture["sources_artifact"], seal_descriptor]}
-        route = capture["routes"][group["version"] + "|function|ak.wwise.core.object.setProperty"]
-        for member in group["members"]:
-            branch = capture["branches"][member["id"]]
-            checks = [{"pointer": member["observation_pointer"], "equals": deepcopy(member["expected"])},
-                      {"pointer": "/gateway/payload/agent_result", "equals": deepcopy(observed["gateway"]["payload"]["agent_result"])},
-                      {"pointer": "/observations/before", "equals": deepcopy(observed["observations"]["before"])},
-                      {"pointer": "/observations/after", "equals": deepcopy(observed["observations"]["after"])}]
-            record["branch_assertions"][branch["id"]] = {"native_shape_sha256": branch["shape_sha256"], "native_route": None, "checks": checks}
-            bindings[branch["id"]] = {"branch_id": branch["id"], "native_shape_sha256": branch["shape_sha256"],
-                "public_route": route["id"], "public_route_sha256": audit.digest(route),
-                "input": {"gateway_argv": observed["gateway"]["argv"], "selector": group["source_parent_key"]},
-                **{key: {"source": source, "selector": branch["pointer"]} for key, source in {
-                    "construction": "skills/waapi-skill/wwise_waapi/operation_registry.py#_apply_reference_activation_dependencies",
-                    "validation": "skills/waapi-skill/wwise_waapi/metadata_restrictions.py#condition_restriction",
-                    "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation"}.items()},
-                "observation_pointer": member["observation_pointer"], "gateway_observation_pointer": "/gateway/payload/agent_result",
-                "native_hosts": ["wwise-console"], "relevant_sources": relevant, "evidence": {}}
-        path = stage / (identity + ".json")
-        descriptor = _write(path, record)
-        descriptor["artifact"] = str(destination / path.name)
-        for member in group["members"]:
-            bindings[member["id"]]["evidence"]["program"] = {**descriptor, "nodeid": entry["nodeid"]}
+        bundle = entry["observed"]
+        raw = _write(root / ("observed-" + identity + ".json"), entry)
+        for flow_id in sorted({member["behavioral_workflow_ids"][0] for member in group["members"]}):
+            _publish_flow(stage, destination, capture, group, entry, bundle, flow_id, raw, seal_descriptor, relevant, bindings)
     _write(stage / "bindings.json", {"contract": "waapi-skill.branch-bindings/v1", "bindings": bindings})
     _write(stage / "outcome.json", {"outcome": "PASS", "reports": capture["reports"],
         "functional_coverage": "program_only_effective_native_metadata_and_requirements_unverified",
@@ -157,3 +171,52 @@ def finish_program_node(capture: dict, nodeid: str, reports: dict, observations:
     pending = root / ".batch-final.pending"
     pending.write_bytes(_encoded(seal))
     pending.rename(seal_path)
+
+
+def _publish_flow(stage, destination, capture, group, entry, bundle, flow_id, raw, seal_descriptor, relevant, bindings):
+    observed = bundle["workflows"][flow_id]
+    members = [m for m in group["members"] if m["behavioral_workflow_ids"][0] == flow_id]
+    summaries = {identity: {"before": value["observations"]["before"], "after": value["observations"]["after"],
+        "gateway_argv": value["gateway"]["argv"], "verified": value["gateway"]["payload"]["verified"],
+        "agent_result": value["gateway"]["payload"]["agent_result"], "native_call": value["native_call"]}
+        for identity, value in bundle["workflows"].items()}
+    record = {"candidate_sha256": capture["candidate_sha256"], "git_candidate": capture["git_candidate"],
+              "scope_kind": capture["scope_kind"], "evidence_kind": "injected_client_program",
+              "invocation": {"phase": "final", "outcome": "PASS", "node_outcomes": [
+                  {"nodeid": node, "outcome": "PASS"} for node in capture["nodeids"]]},
+              **deepcopy(observed), "branch_assertions": {},
+              "behavioral_workflows": deepcopy(summaries), "negative_controls": deepcopy(bundle["negative_controls"]),
+              "artifacts": [capture["plan_artifact"], capture["sources_artifact"], raw, seal_descriptor]}
+    route = capture["routes"][group["version"] + "|function|ak.wwise.core.object.setProperty"]
+    for member in members:
+        branch = capture["branches"][member["id"]]
+        checks = [{"pointer": member["observation_pointer"], "equals": deepcopy(member["expected"])},
+                  {"pointer": "/gateway/payload/agent_result", "equals": deepcopy(observed["gateway"]["payload"]["agent_result"])},
+                  {"pointer": "/observations/before", "equals": deepcopy(observed["observations"]["before"])},
+                  {"pointer": "/observations/after", "equals": deepcopy(observed["observations"]["after"])}]
+        controller = audit.escape(member["source_attributes"]["Name"])
+        field = audit.escape(group["field"])
+        for identity in member["behavioral_workflow_ids"]:
+            summary = summaries[identity]
+            checks.extend([
+                {"pointer": f"/behavioral_workflows/{identity}/before/{controller}", "equals": summary["before"][member["source_attributes"]["Name"]]},
+                {"pointer": f"/behavioral_workflows/{identity}/after/{field}", "equals": summary["after"][group["field"]]},
+                {"pointer": f"/behavioral_workflows/{identity}/verified", "equals": True},
+                {"pointer": f"/behavioral_workflows/{identity}/agent_result", "equals": deepcopy(summary["agent_result"])}])
+        for identity, control in bundle["negative_controls"].items():
+            checks.append({"pointer": f"/negative_controls/{identity}", "equals": deepcopy(control)})
+        record["branch_assertions"][branch["id"]] = {"native_shape_sha256": branch["shape_sha256"], "native_route": None, "checks": checks}
+        bindings[branch["id"]] = {"branch_id": branch["id"], "native_shape_sha256": branch["shape_sha256"],
+            "public_route": route["id"], "public_route_sha256": audit.digest(route),
+            "input": {"gateway_argv": observed["gateway"]["argv"], "selector": group["source_parent_key"] + ":" + flow_id},
+            **{key: {"source": source, "selector": branch["pointer"]} for key, source in {
+                "construction": "skills/waapi-skill/wwise_waapi/operation_registry.py#_apply_reference_activation_dependencies",
+                "validation": "skills/waapi-skill/wwise_waapi/metadata_restrictions.py#condition_restriction",
+                "verifier": "skills/waapi-skill/wwise_waapi/operation_registry.py#verify_prepared_operation"}.items()},
+            "observation_pointer": member["observation_pointer"], "gateway_observation_pointer": "/gateway/payload/agent_result",
+            "native_hosts": ["wwise-console"], "relevant_sources": relevant, "evidence": {}}
+    path = stage / (group["id"] + "-" + flow_id + ".json")
+    descriptor = _write(path, record)
+    descriptor["artifact"] = str(destination / path.name)
+    for member in members:
+        bindings[member["id"]]["evidence"]["program"] = {**descriptor, "nodeid": entry["nodeid"]}

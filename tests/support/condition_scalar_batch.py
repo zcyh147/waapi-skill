@@ -88,8 +88,9 @@ def scalar_manifest(root: Path) -> dict:
                 receiver = ({"kind": match[1], "field": match[2]} if match else
                             {"kind": "inherited-base", "field": None})
                 receiver["native_type"] = None
-                receiver["source_scope_kind"] = ("inner-type-property" if "/InnerTypes/" in row["path"]
-                                                  else "source-property" if match else "inherited-base")
+                receiver["source_scope_kind"] = ("inner-type-property" if "/InnerTypes/" in row["path"] else
+                    "object-base-property" if match and row["path"].split("/")[1].startswith("ObjectBase[") else
+                    "source-property" if match else "inherited-base")
                 parent_key = "|".join((build, corpus["name"], row["file"], row["path"]))
                 parent = parents[parent_key]
                 if (hashlib.sha256(parent["xml"].encode()).hexdigest() != parent["parent_xml_sha256"]
@@ -251,7 +252,8 @@ def scalar_model(case: dict) -> dict:
     if field == controller:
         raise ValueError("self-referential scalar predicate needs separate review")
     metadata = {name: _source_metadata(raw) for name, raw in case["source_scope_fields"].items()}
-    dependencies = [d for info in metadata.values() for d in info.get("dependencies", [])]
+    active = _active_fields(metadata, field)
+    dependencies = [d for name, info in metadata.items() if name in active for d in info.get("dependencies", [])]
     controller_before = {}
     for name, info in metadata.items():
         if name == field:
@@ -317,7 +319,8 @@ def scalar_plan(manifest: dict) -> dict:
                               for case in cases for member in case["members"])
             continue
         group = {"id": audit.digest(key), "source_parent_key": key, "version": first["version"],
-                 "build": first["build"], "field": model["field"], "model": model, "members": []}
+                 "build": first["build"], "class": deepcopy(first["class"]),
+                 "receiver": deepcopy(first["receiver"]), "field": model["field"], "model": model, "members": []}
         for case in cases:
             index = case["source_dependency_index"]
             source_node = ET.fromstring(case["source_parent_xml"]).findall("./Dependencies/*")[index]
@@ -345,10 +348,120 @@ def scalar_plan(manifest: dict) -> dict:
                         pointer += f"/values/{value_index}/value"
                 group["members"].append({"id": member["id"], "shape_sha256": member["shape_sha256"],
                     "source_file_sha256": member["source_file_sha256"], "alternative": alternative,
+                    "source_predicate_type": case["predicate"]["type"], "source_occurrence_id": case["id"],
                     "source_attributes": deepcopy(case["attributes"]), "source_value": deepcopy(member["value"]),
                     "observation_pointer": pointer, "expected": deepcopy(expected)})
+        _plan_behaviors(group, unresolved)
         groups.append(group)
     return {"contract": "waapi-skill.condition-scalar-program-plan/v1",
             "credit": "none_before_original_observation_and_reviewed_requirements",
             "requirements_state": "pending_review", "source_manifest_sha256": audit.digest(manifest),
             "groups": groups, "unresolved": unresolved}
+
+
+def _active_fields(metadata, field):
+    active, pending = set(), [field]
+    while pending:
+        name = pending.pop()
+        if name in active:
+            continue
+        active.add(name)
+        pending.extend(d["property"] for d in metadata[name].get("dependencies", []) if d["action"] == "Enable")
+    return active
+
+
+def _allows(restriction, value):
+    def equal(expected):
+        if isinstance(value, bool) or isinstance(expected, bool):
+            return type(value) is type(expected) and value == expected
+        return value == expected
+    if restriction["type"] == "enum":
+        return any(equal(v["value"]) for v in restriction["values"])
+    return not isinstance(value, bool) and restriction["min"] <= value <= restriction["max"]
+
+
+def _valid_field_value(info, value):
+    kind = info["type"].lower()
+    if kind == "bool":
+        valid = type(value) is bool
+    elif kind == "string":
+        valid = type(value) is str
+    elif kind.startswith(("int", "uint")):
+        bits = int(re.search(r"[0-9]+$", kind)[0])
+        minimum, maximum = (0, 2 ** bits - 1) if kind.startswith("uint") else (-(2 ** (bits - 1)), 2 ** (bits - 1) - 1)
+        valid = type(value) is int and minimum <= value <= maximum
+    else:
+        valid = type(value) in {int, float} and math.isfinite(value)
+    return valid and ("restriction" not in info or _allows(info["restriction"], value))
+
+
+def _satisfies(model, before):
+    metadata, field = model["metadata"], model["field"]
+    if any(not _valid_field_value(info, before[name]) for name, info in metadata.items() if name != field):
+        return False
+    after = {**before, field: model["requested"]}
+    if not _valid_field_value(metadata[field], after[field]):
+        return False
+    for name in _active_fields(metadata, field):
+        for dependency in metadata[name].get("dependencies", []):
+            if dependency["action"] == "Enable" and not all(
+                    _allows(c["restriction"], state[dependency["property"]])
+                    for c in dependency["conditions"] for state in (before, after)):
+                return False
+    return True
+
+
+def _plan_behaviors(group, unresolved):
+    model, field = group["model"], group["field"]
+    workflows, controls = {}, {}
+    def add(before):
+        if not _satisfies(model, before):
+            return None
+        identity = audit.digest({"before": before, "requested": model["requested"]})
+        workflows.setdefault(identity, {"id": identity, "before": deepcopy(before), "requested": model["requested"]})
+        return identity
+    representative = add(model["before"])
+    if representative is None:
+        unresolved.extend({"id": m["id"], "shape_sha256": m["shape_sha256"],
+            "reason": "source model representative does not satisfy complete active sibling/recursive constraints"} for m in group["members"])
+        group.update(members=[], workflows=[], negative_controls=[])
+        return
+    pending_members, shape_values = [], {}
+    for member in group["members"]:
+        controller = member["source_attributes"]["Name"]
+        alternative = member["alternative"]
+        required = [representative]
+        if "/value/" in alternative:
+            before = {**model["before"], controller: deepcopy(member["expected"])}
+            flow = add(before)
+            shape_values.setdefault(member["source_occurrence_id"], []).append(flow)
+            required = [flow]
+        elif alternative.startswith("Range/"):
+            minimum, maximum = member["expected"]["min"], member["expected"]["max"]
+            middle = (minimum + maximum) // 2 if type(minimum) is int and type(maximum) is int else (minimum + maximum) / 2
+            required = [add({**model["before"], controller: value}) for value in dict.fromkeys((minimum, middle, maximum))]
+            for value in (minimum - 1, maximum + 1):
+                if _valid_field_value(model["metadata"][controller], value):
+                    before = {**model["before"], controller: value}
+                    if not _satisfies(model, before):
+                        control_id = audit.digest(before)
+                        controls[control_id] = {"id": control_id, "before": before,
+                            "expected_error_code": "REFERENCE_ACTIVATION_REQUIRED", "source_member": member["id"]}
+                        break
+        if any(value is None for value in required):
+            unresolved.append({"id": member["id"], "shape_sha256": member["shape_sha256"],
+                "reason": "source alternative conflicts with active sibling/recursive prerequisites or the controller's declared domain; behavioral reachability requires review"})
+            continue
+        member["behavioral_workflow_ids"] = list(dict.fromkeys(required))
+        pending_members.append(member)
+    members = []
+    for member in pending_members:
+        if member["alternative"].startswith("Enumeration/") and "/value/" not in member["alternative"]:
+            choices = shape_values[member["source_occurrence_id"]]
+            if any(value is None for value in choices):
+                unresolved.append({"id": member["id"], "shape_sha256": member["shape_sha256"],
+                    "reason": "enumeration disclosure contains a source alternative whose behavioral reachability conflicts with the combined prerequisites"})
+                continue
+            member["behavioral_workflow_ids"] = list(dict.fromkeys(choices))
+        members.append(member)
+    group.update(members=members, workflows=list(workflows.values()), negative_controls=list(controls.values()))
