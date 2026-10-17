@@ -4206,7 +4206,7 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
 
     def query(stage: str, source: Sequence[str], *, maximum: int = 5, sample: bool = False) -> list[dict[str, Any]]:
         payload = read(stage, ["query-object", *source, "--max-results", str(maximum),
-                               "--include", "parent", "--include", "owner"])
+                               "--include", "parent", "--include", "owner", "--include", "class-id"])
         if payload.get("ok") is not True:
             return []
         if payload.get("projection_complete") is False or payload.get("status") == "partial":
@@ -4221,6 +4221,10 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
         for row in rows:
             canonical(row.get("id"))
             assert isinstance(row.get("type"), str) and row["type"], row
+            if "class_id" not in row:
+                boundary(stage, "class_id_output_missing", object_id=row["id"])
+            elif not isinstance(row["class_id"], int) or isinstance(row["class_id"], bool):
+                boundary(stage, "class_id_output_not_integer", object_id=row["id"], value=row["class_id"])
             for key in ("parent", "owner"):
                 if key not in row:
                     boundary(stage, "relationship_output_missing", field=key, object_id=row["id"])
@@ -4247,7 +4251,7 @@ def _collect_owned_list_metadata_probe(runtime: _WorkflowSandboxRuntime) -> dict
         observation["relationships"].append({"owner_id": owner, "field": field, "members": rows})
         for row in rows:
             exact = query(row["id"] + "-exact", ["--exact-id", row["id"]], maximum=2)
-            if len(exact) != 1 or any(exact[0].get(key) != row.get(key) for key in ("id", "type", "parent", "owner")):
+            if len(exact) != 1 or any(exact[0].get(key) != row.get(key) for key in ("id", "type", "class_id", "parent", "owner")):
                 boundary(row["id"], "exact_readback_relationship_changed")
         return rows
 

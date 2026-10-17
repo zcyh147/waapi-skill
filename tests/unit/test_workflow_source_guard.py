@@ -555,7 +555,7 @@ def _owned_probe_runtime(tmp_path, workflow, *, version="2025.1", missing_list=F
         ("sound", "rtpc", "bus", "effect", "music", "group", "slot"), start=1)}
     def row(name, kind, owner=None):
         return {"id": ids[name], "name": name, "type": kind, "path": "\\" + name,
-                "parent": None, "owner": {"id": ids[owner]} if owner else None}
+                "parent": None, "owner": {"id": ids[owner]} if owner else None, "class_id": 1234}
     sound, music = row("sound", "Sound"), row("music", "MusicSwitchContainer")
     rtpc, bus = row("rtpc", "RTPC", "sound"), row("bus", "Bus")
     effect = row("effect", "Effect" if version < "2023.1" else "EffectSlot", "sound")
@@ -687,9 +687,12 @@ def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp
                 return _info(version)
             assert uri == "ak.wwise.core.object.get", (uri, args, options)
             observed.append(args["waql"])
-            assert options["return"] == ["id", "name", "type", "path", "parent", "owner"]
-            return {"return": [{"id": ids["rtpc"], "name": "", "type": "RTPC", "path": "\\RTPC",
-                                "parent": None, "owner": {"id": ids["sound"]}}]}
+            assert options["return"] == ["id", "name", "type", "path", "parent", "owner", "classId"]
+            slot = version == "2025.1" and "select @Arguments" in args["waql"]
+            return {"return": [{"id": ids["slot"] if slot else ids["rtpc"], "name": "",
+                                "type": "PluginInnerObject" if slot else "RTPC", "path": "\\RTPC",
+                                "parent": None, "owner": {"id": ids["sound"]},
+                                "classId": 5832704 if slot else 1441808}]}
 
         def disconnect(self):
             pass
@@ -697,11 +700,14 @@ def test_owned_probe_reads_use_existing_public_gateway_with_owned_projection(tmp
     for expression in expressions:
         code, payload = workflow.waapi_gateway.execute_gateway([
             "--state-dir", str(runtime.state_dir), "query-object", "--advanced-waql", expression,
-            "--max-results", "5", "--include", "parent", "--include", "owner"],
+            "--max-results", "5", "--include", "parent", "--include", "owner", "--include", "class-id"],
             env=runtime.env, client_factory=lambda _url: Client())
         assert code == 0, payload
         rows = payload.get("objects", payload.get("agent_result"))
         assert rows[0]["owner"]["id"] == ids["sound"] and rows[0]["parent"] is None
+        slot = version == "2025.1" and "select @Arguments" in expression
+        assert rows[0]["class_id"] == (5832704 if slot else 1441808)
+        assert rows[0]["type"] == ("PluginInnerObject" if slot else "RTPC")
     assert observed == [expression + " take 5" for expression in expressions]
 
 
@@ -1224,3 +1230,26 @@ def test_owned_list_probe_keeps_generic_member_type_and_exact_class_id_observati
     assert observed["complete_owned_list_discovery_proven"] is False
     assert observed["field_cardinality_permission_proven"] is False and observed["mutation_authority"] is False
     assert all("class-id" in command for command in commands if command[0] == "query-object")
+
+
+@pytest.mark.parametrize("missing", ("owner", "class_id"))
+def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_path, workflow, missing):
+    runtime, _commands, ids = _owned_probe_runtime(tmp_path, workflow)
+    original = runtime.raw_gateway
+
+    def gateway(command):
+        code, payload = original(command)
+        if command[0] == "query-object":
+            for row in payload["objects"]:
+                if row["id"] == ids["slot"]:
+                    row.pop(missing, None)
+        return code, payload
+
+    runtime.raw_gateway = gateway
+    category = workflow._collect_owned_list_metadata_probe(runtime)
+    observed = json.loads(Path(category["observation_path"]).read_text())
+    assert category["status"] == "blocked"
+    members = next(row["members"] for row in observed["relationships"] if row["field"] == "Arguments")
+    assert missing not in members[0] and members[0]["parent"] is None
+    expected = "relationship_output_missing" if missing == "owner" else "class_id_output_missing"
+    assert any(row["reason"] == expected for row in observed["boundaries"])
