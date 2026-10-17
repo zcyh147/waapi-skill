@@ -3246,6 +3246,8 @@ def test_reference_restriction_flags_fail_closed_when_not_provable(
                         )
                     ]
                 },
+                # Fresh classifier observation deliberately omits isPlayable.
+                {"return": [{"id": target_id}]},
             ],
             "ak.wwise.core.object.getPropertyInfo": [
                 {

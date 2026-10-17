@@ -1146,6 +1146,7 @@ def bind_live_field(
             info.restriction,
             field_kind=field_kind,
             value_type=value_type,
+            allow_target_classifiers=scope_kind == "object",
         )
     except MetadataRestrictionError as exc:
         raise _error(
@@ -1715,6 +1716,7 @@ def _restrictions_from_live_metadata(
     *,
     field_kind: str,
     value_type: str,
+    allow_target_classifiers: bool = False,
 ) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
     if restriction.get("type") == "range":
@@ -1742,8 +1744,13 @@ def _restrictions_from_live_metadata(
         if labels:
             normalized["enum_labels"] = labels
     if field_kind == "reference":
-        allowed = reference_allowed_types(restriction)
-        if allowed:
+        allowed = reference_allowed_types(restriction, allow_target_classifiers=allow_target_classifiers)
+        # A type-only handle must not discard a possible category alternative.
+        # The exact existing-object Preview owns classification and mixed-shape
+        # admission; the original metadata remains sealed in its digest.
+        has_categories = any(isinstance(row, Mapping) and "category" in row
+                             for row in restriction.get("restrictions") or [])
+        if allowed and not has_categories:
             normalized["allowed_target_types"] = list(allowed)
     return normalized
 

@@ -1,11 +1,119 @@
 """Exact installed scalar members are declared before original public witnesses."""
 from pathlib import Path
 from copy import deepcopy
+import base64
+import gzip
+import hashlib
 import json
+import xml.etree.ElementTree as ET
 
 import pytest
 
 from tests.support import condition_scalar_batch as batch
+
+
+def test_exact_gameparameter_consumer_maps_only_35_original_min_max_members():
+    root = Path(__file__).parents[2]
+    original = batch.scalar_plan(batch.scalar_manifest(root))
+    successor = batch.scalar_plan(batch.scalar_manifest(root, resolve_exact_receivers=True))
+    groups = [g for g in successor['groups'] if g['model'].get('source_receiver')]
+    assert len(groups) == 10
+    assert {(g['version'], g['field']) for g in groups} == {
+        (version, field) for version in ('2021.1', '2022.1', '2023.1', '2024.1', '2025.1') for field in ('Min', 'Max')}
+    mapped = {m['id']: m for g in groups for m in g['members']}
+    assert len(mapped) == 35
+    old_unresolved = {m['id']: m for m in original['unresolved']}
+    assert all(old_unresolved[i]['reason'] == 'source_controller_declaration_unresolved:BindToBuiltInParam'
+               and old_unresolved[i]['shape_sha256'] == m['shape_sha256'] for i, m in mapped.items())
+    assert {r['id'] for r in successor['unresolved']} == set(old_unresolved) - set(mapped)
+    assert [g for g in successor['groups'] if not g['model'].get('source_receiver')] == original['groups']
+    for group in groups:
+        model = group['model']
+        receiver = model['source_receiver']
+        assert receiver['native_type'] == 'GameParameter'
+        assert receiver['source_consumer_pointer'] == 'PluginModule/WwiseObject[GameParameter]'
+        assert receiver['source_base_pointer'] == 'PluginModule/ObjectBase[GameParameterMinMax]'
+        assert receiver['native_class_fixture']['provenance']['public_gateway_pass'] is False
+        assert receiver['instance_applicability'] == 'unverified'
+        assert model['metadata'][group['field']]['type'] == 'Real64'
+        assert model['metadata']['BindToBuiltInParam']['type'] == 'int16'
+        assert {f['before']['BindToBuiltInParam'] for f in group['workflows']} == ({0} if group['field'] == 'Min' else {0, 1})
+        assert model['provenance']['effective_native_metadata'] == 'unobserved'
+        assert model['provenance']['native_effect'] == 'unverified'
+
+
+@pytest.fixture(scope='module')
+def gameparameter_successor_plan():
+    return batch.scalar_plan(batch.scalar_manifest(Path(__file__).parents[2], resolve_exact_receivers=True))
+
+
+@pytest.mark.parametrize('version', ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1'])
+@pytest.mark.parametrize('field', ['Min', 'Max'])
+def test_mapped_receiver_uses_exact_gameparameter_in_actual_public_workflows(tmp_path, gameparameter_successor_plan, version, field):
+    from tests.unit.test_scalar_condition_product_gateway import run_scalar_public_group
+    group = next(g for g in gameparameter_successor_plan['groups'] if g['version'] == version and g['field'] == field)
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    assert len(observed['workflows']) == (1 if field == 'Min' else 2)
+    for flow in observed['workflows'].values():
+        assert flow['observations']['before']['type'] == 'GameParameter'
+        assert flow['observations']['after']['type'] == 'GameParameter'
+        assert flow['input_fact_provenance']['instance_identity'] == 'explicit_program_model_of_exact_source_receiver_not_live_identity'
+        assert flow['gateway']['payload']['verified'] is True
+
+
+@pytest.mark.parametrize('damage', ['second-consumer', 'missing-consumer', 'wrong-class', 'native-type', 'native-enum', 'native-dependency', 'native-null-restriction', 'native-null-dependencies', 'unmatched-corpus-seal'])
+def test_receiver_mapping_refuses_ambiguous_source_or_incompatible_class_metadata(tmp_path, damage):
+    root = Path(__file__).parents[2]
+    sources = json.loads((root / 'docs/branch-coverage-condition-sources.json').read_text())
+    snapshot = json.loads(gzip.decompress((root / 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz').read_bytes()))
+    key = '2025.1.7.9143|condition|WObjects/WObjects.xml'
+    xml = ET.fromstring(base64.b64decode(snapshot['files'][key]['bytes_base64']))
+    consumer = next(n for n in xml if n.tag == 'WwiseObject' and n.get('Name') == 'GameParameter')
+    if damage == 'second-consumer':
+        other = deepcopy(consumer)
+        other.set('Name', 'OtherReceiver')
+        xml.append(other)
+    elif damage == 'missing-consumer':
+        xml.remove(consumer)
+    elif damage == 'wrong-class':
+        consumer.set('PluginID', '999')
+    raw = ET.tostring(xml, encoding='utf-8')
+    digest = hashlib.sha256(raw).hexdigest()
+    snapshot['files'][key] = {'sha256': digest, 'bytes_base64': base64.b64encode(raw).decode()}
+    for parent in snapshot['parents'].values():
+        if damage != 'unmatched-corpus-seal' and (parent['build'], parent['corpus'], parent['file']) == ('2025.1.7.9143', 'condition', 'WObjects/WObjects.xml'):
+            parent['source_file_sha256'] = digest
+    for corpus in sources['corpora']:
+        for lane in corpus['lanes']:
+            if damage != 'unmatched-corpus-seal' and corpus['name'] == 'condition' and lane['build'] == '2025.1.7.9143':
+                next(f for f in lane['files'] if f['path'] == 'WObjects/WObjects.xml')['sha256'] = digest
+    (tmp_path / 'docs').mkdir()
+    (tmp_path / 'docs/branch-coverage-condition-sources.json').write_text(json.dumps(sources))
+    path = tmp_path / 'tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz'
+    path.parent.mkdir(parents=True)
+    path.write_bytes(gzip.compress(json.dumps(snapshot).encode(), mtime=0))
+    fixtures = tmp_path / 'tests/fixtures/gameparameter-metadata'
+    fixtures.mkdir()
+    for original in (root / 'tests/fixtures/gameparameter-metadata').glob('*.json'):
+        document = json.loads(original.read_text())
+        if original.stem == '2025.1':
+            if damage == 'native-type': document['metadata']['Min']['type'] = 'bool'
+            if damage == 'native-enum': document['metadata']['BindToBuiltInParam']['restriction']['values'].pop()
+            if damage == 'native-dependency': document['metadata']['Max']['dependencies'][0]['conditions'][0]['restriction']['values'].pop()
+            if damage == 'native-null-restriction': document['metadata']['Min']['restriction'] = None
+            if damage == 'native-null-dependencies': document['metadata']['BindToBuiltInParam']['dependencies'] = None
+        (fixtures / original.name).write_text(json.dumps(document))
+    if damage == 'unmatched-corpus-seal':
+        with pytest.raises(ValueError, match='complete installed source snapshot differs from pinned corpus'):
+            batch.scalar_manifest(tmp_path, resolve_exact_receivers=True)
+        return
+    plan = batch.scalar_plan(batch.scalar_manifest(tmp_path, resolve_exact_receivers=True))
+    affected = {'Min'} if damage in {'native-type', 'native-null-restriction'} else {'Max'} if damage == 'native-dependency' else {'Min', 'Max'}
+    assert not any(g['version'] == '2025.1' and g['field'] in affected and g['model'].get('source_receiver') for g in plan['groups'])
+    refused = [m for m in plan['unresolved'] if m['id'].startswith('2025.1|') and 'ObjectBase[GameParameterMinMax]' in m['id']]
+    assert len(refused) == (3 if affected == {'Min'} else 4 if affected == {'Max'} else 7)
+    assert all(('ambiguous' in m['reason'] if damage in {'second-consumer', 'missing-consumer', 'wrong-class'}
+                else 'native class fixture differs' in m['reason']) for m in refused)
 
 
 def test_scalar_manifest_retains_every_exact_source_alternative_and_unknown_receiver():

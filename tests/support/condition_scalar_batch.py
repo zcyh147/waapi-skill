@@ -38,7 +38,7 @@ def _scalar(text, kind):
     return int(value)
 
 
-def scalar_manifest(root: Path) -> dict:
+def scalar_manifest(root: Path, *, resolve_exact_receivers=False) -> dict:
     """Declare exact alternatives without claiming native type or applicability."""
     source = audit.load(root / "docs/branch-coverage-condition-sources.json")
     parent_bytes = (root / "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz").read_bytes()
@@ -125,6 +125,15 @@ def scalar_manifest(root: Path) -> dict:
                 branches = by_occurrence[prefix]
                 if not branches:
                     raise ValueError("installed scalar member was not assigned an exact obligation")
+                scope_key = "|".join((build, corpus["name"], row["file"]))
+                if parent_document["files"][scope_key]["sha256"] != parent["source_file_sha256"]:
+                    raise ValueError("complete installed source snapshot differs from pinned corpus")
+                scope = _source_scope(source_roots[scope_key], row["path"])
+                if (resolve_exact_receivers and corpus["name"] == "condition" and row["file"] == "WObjects/WObjects.xml"
+                        and row["path"] in {f"PluginModule/ObjectBase[GameParameterMinMax]/Properties/Property[{name}]/Dependencies"
+                                            for name in ("Min", "Max")}):
+                    scope = _gameparameter_receiver_scope(root, version, source_roots[scope_key], row["path"],
+                                                        parent_document["files"][scope_key]["sha256"])
                 members = [{"id": branch["id"], "shape_sha256": branch["shape_sha256"],
                             "source_file_sha256": branch["source_file_sha256"],
                             "alternative": branch["business_dimensions"]["alternative"],
@@ -135,7 +144,7 @@ def scalar_manifest(root: Path) -> dict:
                               "class": deepcopy(row.get("class")), "xml": row["xml"],
                               "source_parent_xml": parent["xml"],
                               "source_dependency_index": sibling_position,
-                              **_source_scope(source_roots["|".join((build, corpus["name"], row["file"]))], row["path"]),
+                              **scope,
                               "attributes": deepcopy(attrs), "controller": attrs["Name"],
                               "predicate": predicate, "receiver": receiver, "members": members,
                               "native_applicability": "unverified"})
@@ -143,6 +152,59 @@ def scalar_manifest(root: Path) -> dict:
             "source_sha256": audit.digest(source), "parent_artifact_sha256": hashlib.sha256(parent_bytes).hexdigest(),
             "evidence_kind": "installed_definition_only",
             "occurrences": cases}
+
+
+def _gameparameter_receiver_scope(root, version, source_root, pointer, source_sha256):
+    """Reviewed exact direct receiver, not a generic base-to-native-type rule."""
+    consumers = [node for node in source_root if any(
+        ref.get("Name") == "GameParameterMinMax" for ref in node.findall("./ObjectBaseRef"))]
+    if (len(consumers) != 1 or consumers[0].tag != "WwiseObject"
+            or any(consumers[0].get(key) != value for key, value in
+                   {"Name": "GameParameter", "CompanyID": "1", "PluginID": "23"}.items())):
+        return {"source_scope_fields": {}, "source_scope_error": "exact GameParameter direct consumer is absent or ambiguous"}
+    consumer = consumers[0]
+    consumer_pointer = "PluginModule/WwiseObject[GameParameter]"
+    scope = _source_scope(source_root, pointer.replace("PluginModule/ObjectBase[GameParameterMinMax]", consumer_pointer))
+    if scope["source_scope_error"]:
+        return scope
+    fixture_path = f"tests/fixtures/gameparameter-metadata/{version}.json"
+    raw = (root / fixture_path).read_bytes()
+    fixture = json.loads(raw)
+    def semantic(info):
+        if isinstance(info, list):
+            return [semantic(value) for value in info]
+        if isinstance(info, dict):
+            return {key: semantic(value) for key, value in info.items() if key != "displayName"}
+        return info
+    try:
+        if (fixture["provenance"]["kind"] != "isolated-native-registry-feasibility"
+                or fixture["provenance"]["public_gateway_pass"] is not False):
+            raise ValueError("native class fixture provenance differs")
+        compared = {}
+        for name, source in scope["source_scope_fields"].items():
+            expected = _source_metadata(source)
+            native = fixture["metadata"][name]
+            if (not isinstance(native, dict)
+                    or any(key in native and not isinstance(native[key], kind)
+                           for key, kind in (("restriction", dict), ("dependencies", list)))):
+                raise ValueError("native class fixture differs from exact receiver source declarations")
+            observed = {key: deepcopy(native[key]) for key in ("name", "type", "default") if key in native}
+            observed.update({key: deepcopy(native[key]) for key in ("restriction", "dependencies") if native.get(key)})
+            if audit.digest(semantic(expected)) != audit.digest(semantic(observed)):
+                raise ValueError("native class fixture differs from exact receiver source declarations")
+            compared[name] = deepcopy(native)
+    except (KeyError, ValueError) as exc:
+        return {"source_scope_fields": scope["source_scope_fields"], "source_scope_error": str(exc)}
+    base = next(node for node in source_root if node.tag == "ObjectBase" and node.get("Name") == "GameParameterMinMax")
+    scope["source_receiver"] = {"native_type": "GameParameter", "source_consumer_pointer": consumer_pointer,
+        "source_base_pointer": "PluginModule/ObjectBase[GameParameterMinMax]", "source_file_sha256": source_sha256,
+        "source_consumer_attributes": dict(consumer.attrib),
+        "source_consumer_xml_sha256": hashlib.sha256(ET.tostring(consumer, encoding="utf-8")).hexdigest(),
+        "source_base_xml_sha256": hashlib.sha256(ET.tostring(base, encoding="utf-8")).hexdigest(),
+        "native_class_fixture": {"path": fixture_path, "sha256": hashlib.sha256(raw).hexdigest(),
+                                 "provenance": deepcopy(fixture["provenance"]), "metadata": compared},
+        "instance_applicability": "unverified"}
+    return scope
 
 
 def _source_scope(root, pointer):
@@ -303,13 +365,16 @@ def scalar_model(case: dict) -> dict:
         # Public number inputs are parsed as floats, independently of source bound types.
         requested = float(requested)
     return {"field": field, "controller": controller,
+            **({"source_receiver": deepcopy(case["source_receiver"])} if "source_receiver" in case else {}),
             "metadata": metadata,
             "before": {field: before, **controller_before}, "requested": requested,
             "provenance": {"predicate": "exact_installed_definition_model", "isolated_predicate_only": False,
                            "dependent_type": "exact_installed_parent_Property_Type",
                            "controller_recursive_metadata": "exact_scoped_installed_declarations",
                            "source_inheritance": "source_ObjectBaseRef_composition_only_not_live_applicability",
-                           "instance_identity": "explicit_program_model_native_class_applicability_unavailable",
+                           "instance_identity": ("explicit_program_model_of_exact_source_receiver_not_live_identity"
+                                                 if "source_receiver" in case else
+                                                 "explicit_program_model_native_class_applicability_unavailable"),
                            "effective_native_metadata": "unobserved", "native_effect": "unverified"}}
 
 

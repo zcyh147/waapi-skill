@@ -252,3 +252,576 @@ def test_malformed_reference_constraint_cannot_become_an_unrestricted_target(tmp
     code, checked = task.step('draft-check')
     assert code == 2 and checked['error_code'] == 'INVALID_METADATA', checked
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('classifier,value,accepted', [
+    ('category', 'RecordedCategory', True), ('category', 'OtherCategory', False),
+    ('isPlayable', True, True), ('isPlayable', False, False),
+])
+def test_native_target_classifier_controls_the_selected_reference(tmp_path, version, classifier, value, accepted):
+    """RPC schema model; effective instance metadata/native effects remain unverified."""
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = value
+    rows = [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable']
+    task.metadata['Attenuation']['restriction']['restrictions'] = rows
+    task.declare()
+    code, checked = task.step('draft-check')
+    if not accepted:
+        assert code == 2 and checked['error_code'] == 'INVALID_REFERENCE_TARGET', checked
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+    reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')
+             and classifier in options.get('return', [])]
+    assert reads and all(args == {'from': {'id': [SECOND]}} for args, _ in reads)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('classifier,initial,changed', [('category', 'RecordedCategory', 'OtherCategory'),
+                                                      ('isPlayable', True, False)])
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_native_target_classifier_is_revalidated_and_verified(tmp_path, version, classifier, initial, changed, phase):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = initial
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if phase == 'before':
+        task.objects[SECOND][classifier] = changed
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.objects[SECOND][classifier] = changed
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_target_classifier_accessors_are_declared_by_the_exact_version(version):
+    root = Path(__file__).parents[2]
+    definitions = json.loads((root / 'skills/waapi-skill/resources/manifest' / version / 'definitions.json').read_text())
+    properties = definitions['documents']['waapi_definitions.json']['definitions']['objectReturn']['properties']
+    assert properties['category']['type'] == 'string'
+    assert properties['isPlayable']['type'] == 'boolean'
+    assert 'isShared' not in properties
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('classifier,value', [('category', None), ('category', True), ('category', '__missing__'),
+                                              ('isPlayable', None), ('isPlayable', 1), ('isPlayable', '__missing__')])
+def test_unavailable_or_malformed_target_classifier_cannot_authorize_a_write(tmp_path, version, classifier, value):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    if value != '__missing__':
+        task.objects[SECOND][classifier] = value
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    task.declare()
+    code, checked = task.step('draft-check')
+    expected = 'CONSTRAINED_REFERENCE_BOUNDARY' if value == '__missing__' else 'INVALID_READBACK'
+    assert code == 2 and checked['error_code'] == expected, checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('classifier,value', [('category', 'RecordedCategory'), ('isPlayable', True)])
+def test_atomic_reference_assignment_retains_native_classifier_guards(tmp_path, version, classifier, value):
+    task = AttenuationTask(tmp_path, version, operation='object.set')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = value
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    task.declare()
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('matched', ['type', 'category'])
+def test_mixed_type_category_admission_semantics_are_not_guessed(tmp_path, version, matched):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND]['category'] = 'RecordedCategory' if matched == 'category' else 'OtherCategory'
+    task.metadata['Attenuation']['restriction']['restrictions'] = [
+        {'type': ['Attenuation' if matched == 'type' else 'Effect']}, {'category': ['RecordedCategory']}]
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_atomic_target_classifier_drift_cannot_verify_a_changed_target(tmp_path, phase):
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.set')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND].update(category='RecordedCategory', isPlayable=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = [{'category': ['RecordedCategory']}, 'playable']
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if phase == 'before':
+        task.objects[SECOND]['isPlayable'] = False
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.objects[SECOND]['category'] = 'OtherCategory'
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('invalid_rows', [[], [{'id': GROUP, 'category': 'RecordedCategory'}],
+    [{'id': SECOND, 'category': 'RecordedCategory'}, {'id': SECOND, 'category': 'RecordedCategory'}]])
+def test_target_classifier_read_requires_one_exact_selected_guid(tmp_path, invalid_rows):
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.metadata['Attenuation']['restriction']['restrictions'] = [{'category': ['RecordedCategory']}]
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and 'category' in options.get('return', []):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': invalid_rows}
+        return normal_call(uri, args, options)
+    task.call = call
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'INVALID_READBACK', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_target_classifier_reads_keep_the_selected_platform_scope(tmp_path, version):
+    task = AttenuationTask(tmp_path, version, operation='object.setReference')
+    platform = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND]['category'] = 'RecordedCategory'
+    task.metadata['Attenuation']['restriction']['restrictions'] = [{'category': ['RecordedCategory']}]
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return normal_call(uri, args, options)
+    task.call = call
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step('draft-discover-fields', '--object-handle', source,
+                                '--meaning', 'Attenuation', '--platform', platform)
+    assert code == 0, discovered
+    field = discovered['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-field-change', '--object-handle', source,
+                              '--field-handle', field, '--target-handle', target)
+    assert code == 0, declared
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    reads = [options for uri, _, options in task.calls if uri.endswith('object.get') and 'category' in options.get('return', [])]
+    assert reads and all(options['platform'] == platform for options in reads)
+
+
+class SharedReferenceTask(AttenuationTask):
+    """SDK relationship model; predicate outcome is independent of JSON omission."""
+    def __init__(self, path, version, *, shared=True, operation='object.setReference'):
+        super().__init__(path, version, operation=operation)
+        self.shared = shared
+        self.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+        self.objects[SECOND]['parent'] = {'id': GROUP}
+        self.metadata['Attenuation']['restriction']['restrictions'] = [
+            {'type': ['Attenuation'], 'sharedOnlyTypes': ['Attenuation']}]
+
+    def call(self, uri, args=None, options=None):
+        expected = f'from object "{SECOND}" where owner = null take 1'
+        if uri.endswith('object.get') and args.get('waql') == expected:
+            self.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert options['return'] == ['id']
+            return {'return': [{'id': SECOND}] if self.shared else []}
+        return super().call(uri, args, options)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('shared', [True, False])
+def test_shared_only_target_uses_an_owned_native_predicate_not_owner_omission(tmp_path, version, shared):
+    task = SharedReferenceTask(tmp_path, version, shared=shared)
+    assert 'owner' not in task.objects[SECOND]
+    task.declare()
+    code, checked = task.step('draft-check')
+    if not shared:
+        assert code == 2 and checked['error_code'] == 'INVALID_REFERENCE_TARGET', checked
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('drift', ['owner-before', 'parent-before', 'owner-after', 'parent-after'])
+def test_shared_only_owner_predicate_and_parent_are_guarded_through_verification(tmp_path, version, drift):
+    task = SharedReferenceTask(tmp_path, version)
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    def change():
+        if drift.startswith('owner'):
+            task.shared = False
+        else:
+            task.objects[SECOND]['parent'] = {'id': OTHER}
+    if drift.endswith('before'):
+        change()
+    code, executed = task.run('execute', tx)
+    if drift.endswith('before'):
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    change()
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('response', [None, [], {}, {'return': None}, {'return': [7]}, {'return': [{}]},
+    {'return': [{'id': GROUP}]}, {'return': [{'id': SECOND}, {'id': SECOND}]},
+    {'return': [{'id': SECOND}, {'id': GROUP}]}])
+def test_shared_only_predicate_rejects_malformed_duplicate_extra_or_wrong_identity(tmp_path, response):
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner = null take 1'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return response
+        return normal_call(uri, args, options)
+    task.call = call
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'INVALID_READBACK', checked
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('parent', [None, {}, {'id': 'not-a-guid'}, 7])
+def test_shared_only_predicate_never_replaces_the_canonical_parent_fact(tmp_path, parent):
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    task.objects[SECOND]['parent'] = parent
+    task.declare()
+    code, checked = task.step('draft-check')
+    expected = 'CONSTRAINED_REFERENCE_BOUNDARY' if parent is None or parent == {} else 'INVALID_READBACK'
+    assert code == 2 and checked['error_code'] == expected, checked
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_shared_only_classification_supports_an_atomic_reference_preview(tmp_path, version):
+    task = SharedReferenceTask(tmp_path, version, operation='object.set')
+    task.declare()
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+
+
+def test_shared_only_2021_metadata_extension_is_not_assumed_to_have_later_semantics(tmp_path):
+    task = SharedReferenceTask(tmp_path, '2021.1')
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+    assert not any(uri.endswith(('setReference', 'object.set')) or 'owner = null' in (args or {}).get('waql', '')
+                   for uri, args, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_shared_only_predicate_keeps_the_selected_platform_and_read_meaning(tmp_path, version):
+    task = SharedReferenceTask(tmp_path, version)
+    platform = '{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}'
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return normal_call(uri, args, options)
+    task.call = call
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step('draft-discover-fields', '--object-handle', source,
+                                '--meaning', 'Attenuation', '--platform', platform)
+    assert code == 0, discovered
+    field = discovered['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-field-change', '--object-handle', source,
+                              '--field-handle', field, '--target-handle', target)
+    assert code == 0, declared
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    reads = [(args, options) for uri, args, options in task.calls if uri.endswith('object.get')
+             and ('parent' in options.get('return', []) or 'owner = null' in args.get('waql', ''))]
+    classification_reads = [(args, options) for args, options in reads
+                            if options.get('return') in (['id', 'parent'], ['id'])]
+    assert classification_reads and all(options['platform'] == platform for _, options in classification_reads)
+    predicates = [args['waql'] for args, options in classification_reads if 'waql' in args]
+    assert predicates and set(predicates) == {f'from object "{SECOND}" where owner = null take 1'}
+
+
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_same_id(tmp_path, monkeypatch, phase):
+    from wwise_waapi.builders.query import WaqlQueryBuilder
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    normal_build = WaqlQueryBuilder.build
+    normal_call = task.call
+    def changed_build(self, request):
+        result = normal_build(self, request)
+        result.envelope.args['waql'] = result.envelope.args['waql'].replace('owner = null', 'owner != null')
+        return result
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner != null take 1'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': SECOND}]}
+        return normal_call(uri, args, options)
+    task.call = call
+    if phase == 'before':
+        monkeypatch.setattr(WaqlQueryBuilder, 'build', changed_build)
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    monkeypatch.setattr(WaqlQueryBuilder, 'build', changed_build)
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+NULL_GUID = '{00000000-0000-0000-0000-000000000000}'
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_shared_only_preview_cannot_certify_a_native_null_guid_parent(tmp_path, version):
+    task = SharedReferenceTask(tmp_path, version)
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    task.declare()
+    code, checked = task.step('draft-check')
+    if code == 2:
+        assert checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 2 and preview['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', preview
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_shared_only_parent_drift_to_native_null_guid_cannot_write_or_verify(tmp_path, version, phase):
+    task = SharedReferenceTask(tmp_path, version)
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if phase == 'before':
+        task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_child_of_reference_preview_treats_zero_guid_controller_as_unset(tmp_path, version):
+    task = DefaultSwitchTask(tmp_path, version)
+    task.declare_default()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    task.objects[FIRST]['SwitchGroupOrStateGroup'] = {'id': NULL_GUID}
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, preview = task.step('preview-from-draft')
+    assert code == 2 and preview['error_code'] == 'REFERENCE_ACTIVATION_REQUIRED', preview
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+def _execute_target_assignment(task):
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    code, executed = task.run('execute', tx)
+    assert code == 0, executed
+    return tx
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('observation', ['owner-present', 'null-parent'])
+def test_observed_false_shared_target_postcondition_is_terminal_without_second_write(tmp_path, version, observation):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = SharedReferenceTask(tmp_path, version)
+    tx = _execute_target_assignment(task)
+    if observation == 'owner-present':
+        task.shared = False
+    else:
+        task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed', verified
+    assert verified['verification']['status'] == 'verification_failed'
+    assert verified['automatic_retry'] is False
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.VERIFICATION_FAILED
+    events = store.read_events(tx)
+    assert events[-1]['event_type'] == 'verification_recorded'
+    assert events[-1]['to_state'] == 'verification_failed'
+    writes = [row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]
+    assert len(writes) == 1
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert [row for row in task.calls if row[0].endswith(('setReference', 'object.set'))] == writes
+
+
+@pytest.mark.parametrize('classifier,before,after', [('category', 'RecordedCategory', 'OtherCategory'),
+                                                    ('isPlayable', True, False)])
+def test_observed_false_category_or_playable_postcondition_is_terminal(tmp_path, classifier, before, after):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = before
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND][classifier] = after
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed', verified
+    assert TransactionStore(task.path / 'state').load(tx).state is TransactionState.VERIFICATION_FAILED
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('failure', ['malformed', 'transport', 'parent-omitted', 'parent-malformed'])
+def test_unavailable_shared_target_postread_stays_unverified_without_second_write(tmp_path, failure):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    tx = _execute_target_assignment(task)
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and options.get('return') == ['id', 'parent'] and failure.startswith('parent'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': SECOND, **({'parent': 7} if failure == 'parent-malformed' else {})}]}
+        if uri.endswith('object.get') and args.get('waql', '').endswith('where owner = null take 1'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if failure == 'transport':
+                raise RuntimeError('controlled classifier read unavailable')
+            return {'return': [7]}
+        return normal_call(uri, args, options)
+    task.call = call
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred'
+    assert verified['automatic_retry'] is False
+    assert verified['manual_verification_retry_allowed'] is True
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    assert not any(event['event_type'] == 'verification_recorded' for event in store.read_events(tx))
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('classifier,before,after', [('category', 'RecordedCategory', None), ('isPlayable', True, 1)])
+def test_malformed_classifier_postread_remains_unknown_rather_than_proven_false(tmp_path, classifier, before, after):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = AttenuationTask(tmp_path, '2025.1', operation='object.setReference')
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND][classifier] = before
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'category': ['RecordedCategory']}] if classifier == 'category' else ['playable'])
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND][classifier] = after
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred' and verified['automatic_retry'] is False
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    assert not any(event['event_type'] == 'verification_recorded' for event in store.read_events(tx))
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1
+
+
+def test_shared_only_canonical_null_parent_id_cannot_hide_behind_additional_pointer_fields(tmp_path):
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID, 'extra_native_fact': True}
+    task.declare()
+    code, checked = task.step('draft-check')
+    if code == 2:
+        assert checked['error_code'] in {'CONSTRAINED_REFERENCE_BOUNDARY', 'INVALID_READBACK'}, checked
+        return
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 2, preview
+
+
+def test_scalar_null_guid_parent_postread_is_malformed_not_a_proven_missing_parent(tmp_path):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = SharedReferenceTask(tmp_path, '2025.1')
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND]['parent'] = NULL_GUID
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred'
+    assert TransactionStore(task.path / 'state').load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'object.set'))]) == 1

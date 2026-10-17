@@ -5715,7 +5715,8 @@ def _prepare_object_set(
         for info, resolved in reference_targets:
             _require_reference_target_allowed(info, resolved, source_id=target.object, read=read,
                 platform=platform, desired_references=desired_references,
-                conditions=reference_target_conditions, property_info_cache=property_info_cache)
+                conditions=reference_target_conditions, property_info_cache=property_info_cache,
+                wwise_version=request.version)
         reference_requirements: dict[str, Any] = {}
         for descriptor in (*properties, *references):
             activation_properties = _apply_reference_activation_dependencies(
@@ -9427,7 +9428,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 roles["target"] = target
                 reference_conditions = []
                 _require_reference_target_allowed(info, target, source_id=source.object, read=read,
-                    platform=platform, conditions=reference_conditions)
+                    platform=platform, conditions=reference_conditions, wwise_version=request.version)
                 if reference_conditions:
                     metadata["reference_target_conditions"] = reference_conditions
             preview = PropertyReferenceBuilder(version=request.version).set_reference(
@@ -21657,9 +21658,11 @@ def _require_reference_target_allowed(
     *, source_id=None, read=None, platform=None, conditions=None,
     desired_references=None, property_info_cache=None, _restriction_path=(),
     _restriction_context=None,
+    wwise_version=None,
 ) -> None:
     try:
-        allowed_types = set(reference_allowed_types(metadata.restriction))
+        allowed_types = set(reference_allowed_types(metadata.restriction,
+            allow_target_classifiers=read is not None and conditions is not None))
     except MetadataRestrictionError as exc:
         raise OperationContractError(
             exc.error_code,
@@ -21667,7 +21670,11 @@ def _require_reference_target_allowed(
             details={"reference": metadata.name, "restriction": dict(metadata.restriction)},
         ) from exc
     target_type = target.row.get("type")
-    if allowed_types and (not isinstance(target_type, str) or not target_type):
+    restrictions = metadata.restriction.get("restrictions") or []
+    category_rows = [row for row in restrictions if isinstance(row, Mapping) and "category" in row]
+    ambiguous_categories = len(category_rows) > 1 or bool(category_rows) and any(
+        isinstance(row, Mapping) and "type" in row for row in restrictions)
+    if allowed_types and not ambiguous_categories and (not isinstance(target_type, str) or not target_type):
         raise OperationContractError(
             "INVALID_READBACK",
             "Reference target readback must expose a type when live restrictions are present.",
@@ -21675,7 +21682,7 @@ def _require_reference_target_allowed(
         )
     target_token = reference_type_token(target_type) if isinstance(target_type, str) else None
     allowed_tokens = {reference_type_token(value) for value in allowed_types}
-    if allowed_types and target_token not in allowed_tokens:
+    if allowed_types and not ambiguous_categories and target_token not in allowed_tokens:
         raise OperationContractError(
             "INVALID_REFERENCE_TARGET",
             "Reference target type is not allowed by live getPropertyInfo restrictions.",
@@ -21685,6 +21692,7 @@ def _require_reference_target_allowed(
                 "allowed_types": sorted(allowed_types),
             },
         )
+    requires_shared = False
     for row in metadata.restriction.get("restrictions", []):
         if not isinstance(row, Mapping):
             continue  # String flags and malformed entries are handled by reference_allowed_types.
@@ -21699,17 +21707,36 @@ def _require_reference_target_allowed(
                     or {reference_type_token(value) for value in shared} - {reference_type_token(value) for value in types}):
                 raise OperationContractError("INVALID_METADATA", "Shared-only reference types must be a subset of the allowed type array.")
             if target_token in {reference_type_token(value) for value in shared}:
-                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
-                    "This chosen target type requires a proven Shared-object classifier; type or path alone is insufficient.",
-                    details={"reference": metadata.name, "target_id": target.object, "shared_only_types": shared})
+                requires_shared = True
         elif "category" in row:
             if set(row) != {"category"} or not isinstance(row["category"], list) or not all(isinstance(value, str) for value in row["category"]):
                 raise OperationContractError("INVALID_METADATA", "Reference category restriction must be an exact string array.")
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
-                "Native reference categories require a separately proven target classifier.",
-                details={"reference": metadata.name, "categories": row["category"]})
         elif set(row) != {"childOfReference"}:
             raise OperationContractError("INVALID_METADATA", "Reference restriction has an unknown object shape.")
+    if ambiguous_categories:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+            "Combined native type/category rows require separately established admission semantics.")
+    if requires_shared:
+        if read is None or conditions is None or wwise_version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only classification requires its pinned existing-object scope.")
+        facts = _read_shared_reference_target(target.object, read=read, platform=platform, version=wwise_version)
+        condition = {"kind": "shared_target", "target_id": target.object, "reference": metadata.name,
+            "classification": facts, "version": wwise_version, "platform": platform}
+        if condition not in conditions:
+            conditions.append(condition)
+    classifier_fields = (["category"] if category_rows else []) + (["isPlayable"] if "playable" in restrictions else [])
+    if classifier_fields:
+        if read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Target classifiers require an exact existing scoped Preview.")
+        facts = _read_reference_target_classifiers(target.object, classifier_fields, read=read, platform=platform)
+        if (category_rows and facts["category"] not in category_rows[0]["category"]
+                or "isPlayable" in facts and facts["isPlayable"] is not True):
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        classifier_condition = {"kind": "target_classifier", "target_id": target.object,
+            "reference": metadata.name, "classifiers": facts, "platform": platform}
+        if classifier_condition not in conditions:
+            conditions.append(classifier_condition)
     parent_fields = []
     for row in metadata.restriction.get("restrictions", []):
         if not isinstance(row, Mapping) or "childOfReference" not in row:
@@ -21773,7 +21800,7 @@ def _require_reference_target_allowed(
             identity_cache=_restriction_context["identities"])
         _require_reference_target_allowed(info, parent, source_id=source_id, read=read, platform=platform,
             conditions=conditions, desired_references=desired_references, property_info_cache=property_info_cache,
-            _restriction_path=path, _restriction_context=_restriction_context)
+            _restriction_path=path, _restriction_context=_restriction_context, wwise_version=wwise_version)
         condition = {"source_id": source_id, "target_id": target.object, "reference": metadata.name,
             "parent_reference": name, "before_parent_id": before, "parent_id": expected,
             "controller_metadata": info.as_dict(), "controller_native_metadata": dict(info.raw), "platform": platform}
@@ -21782,10 +21809,86 @@ def _require_reference_target_allowed(
     _restriction_context["validated"].add(validation_key)
 
 
+def _read_shared_reference_target(target_id, *, read, platform, version, require_match=True):
+    """Prove SDK ShareSet relations without interpreting an omitted owner field."""
+    from .builders.query import WaqlQueryBuilder, STRUCTURED_QUERY_CONTRACT
+    options = {"return": ["id", "parent"]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Shared-only target must resolve exactly the chosen GUID.")
+    parent = rows[0].get("parent")
+    if "parent" not in rows[0] or isinstance(parent, Mapping) and "id" not in parent:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a fresh canonical parent relationship.")
+    if parent is None:
+        parent_id = None
+    else:
+        parent_id = _reference_identity(parent)
+        if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
+            raise OperationContractError("INVALID_READBACK", "Shared-only target parent must expose a canonical GUID.")
+        if _reference_value_is_null(parent_id):
+            parent_id = None
+    if parent_id is None and require_match:
+        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a non-null parent relationship.")
+    preview = WaqlQueryBuilder(version=version).build({
+        "contract": STRUCTURED_QUERY_CONTRACT,
+        "source": {"kind": "object", "objects": [{"kind": "id", "value": target_id}]},
+        "transforms": [
+            {"kind": "where", "predicate": {"kind": "compare", "path": ["owner"], "operator": "=", "value": None}},
+            {"kind": "take", "value": 1}],
+        "return": ["id"],
+    })
+    query_options = dict(preview.envelope.options)
+    if platform is not None:
+        query_options["platform"] = platform
+    query = {"version": version, "args": dict(preview.envelope.args), "options": query_options}
+    matches = _rows(read(OBJECT_GET_URI, query["args"], query_options))
+    if not matches and require_match:
+        raise OperationContractError("INVALID_REFERENCE_TARGET", "The selected target does not satisfy the native owner-null ShareSet predicate.")
+    if matches and (len(matches) != 1 or not _same_identity(matches[0].get("id"), target_id)):
+        raise OperationContractError("INVALID_READBACK", "Owner-null predicate must return exactly the selected target GUID.")
+    return {"parent_id": parent_id, "owner_absent": bool(matches), "native_query": query}
+
+
+def _read_reference_target_classifiers(target_id, fields, *, read, platform):
+    options = {"return": ["id", *fields]}
+    if platform is not None:
+        options["platform"] = platform
+    rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [target_id]}}, options))
+    if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
+        raise OperationContractError("INVALID_READBACK", "Native target classifier must resolve exactly the selected GUID.")
+    facts = {}
+    for field in fields:
+        if field not in rows[0]:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Native target classifier is unavailable for this exact object.",
+                details={"target_id": target_id, "classifier": field})
+        value = rows[0][field]
+        if not (isinstance(value, str) and value if field == "category" else isinstance(value, bool)):
+            raise OperationContractError("INVALID_READBACK", "Native target classifier has an invalid value.",
+                details={"target_id": target_id, "classifier": field})
+        facts[field] = value
+    return facts
+
+
 def _reference_target_condition_assertions(pre_state, *, read, after_write):
     conditions = pre_state.get("reference_target_conditions", []) if isinstance(pre_state, Mapping) else []
     assertions = []
     for condition in conditions:
+        if condition.get("kind") == "shared_target":
+            facts = _read_shared_reference_target(condition["target_id"], read=read,
+                platform=condition.get("platform"), version=condition["version"], require_match=False)
+            assertions.append({"name": f"reference {condition['reference']} retains native ShareSet classification",
+                "passed": _native_snapshot_equal(facts, condition["classification"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classification"], "actual": facts}})
+            continue
+        if condition.get("kind") == "target_classifier":
+            facts = _read_reference_target_classifiers(condition["target_id"], condition["classifiers"],
+                read=read, platform=condition.get("platform"))
+            assertions.append({"name": f"reference {condition['reference']} retains native target classification",
+                "passed": _native_snapshot_equal(facts, condition["classifiers"]),
+                "evidence": {"target_id": condition["target_id"], "expected": condition["classifiers"], "actual": facts}})
+            continue
         source, target, name = condition["source_id"], condition["target_id"], condition["parent_reference"]
         options = {"return": ["id", "parent", name]}
         if condition.get("platform") is not None:

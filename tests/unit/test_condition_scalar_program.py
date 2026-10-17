@@ -26,6 +26,56 @@ def source_inputs():
     return {**plan, "groups": [group]}, inventory, branches
 
 
+@pytest.fixture(scope='module')
+def exact_receiver_inputs():
+    root = Path(__file__).parents[2]
+    plan = condition_scalar_batch.scalar_plan(condition_scalar_batch.scalar_manifest(root, resolve_exact_receivers=True))
+    group = next(g for g in plan['groups'] if g['version'] == '2025.1' and g['field'] == 'Max')
+    ids = {m['id'] for m in group['members']} | {condition_branch_evidence.SHOW_BRANCH_ID}
+    branches = {b['id']: b for b in installed_obligations(root, digest=audit.digest, load=audit.load) if b['id'] in ids}
+    inventory = {'native_coverage': {'candidate_sha256': 'c' * 64, 'obligations': list(branches.values())},
+        'routes': [{'id': '2025.1|function|ak.wwise.core.object.setProperty'}]}
+    return {**plan, 'groups': [group]}, inventory
+
+
+@pytest.mark.parametrize('damage', ['wrong-receiver', 'missing-model-provenance'])
+def test_exact_receiver_producer_refuses_generic_identity_or_missing_source_model_provenance(tmp_path, request, exact_receiver_inputs, damage):
+    plan, inventory = deepcopy(exact_receiver_inputs)
+    group = plan['groups'][0]
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [request.node.nodeid], plan, inventory)
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    for flow in observed['workflows'].values():
+        if damage == 'wrong-receiver':
+            flow['observations']['before']['type'] = 'Sound'
+            flow['observations']['after']['type'] = 'Sound'
+        else:
+            del flow['input_fact_provenance']
+    with pytest.raises(ValueError, match='exact source receiver'):
+        producer.finish_program_node(capture, request.node.nodeid,
+            {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}, {group['id']: observed})
+    assert not (capture['root'] / 'batch-final.json').exists()
+
+
+def test_exact_receiver_controlled_producer_seals_original_class_fixture_and_each_member(tmp_path, request, exact_receiver_inputs):
+    plan, inventory = deepcopy(exact_receiver_inputs)
+    group = plan['groups'][0]
+    capture = producer.prepare_program_batch(tmp_path / 'capture', [request.node.nodeid], plan, inventory)
+    fixture = group['model']['source_receiver']['native_class_fixture']
+    assert capture['relevant_sources'][fixture['path']] == fixture['sha256']
+    observed = run_scalar_public_group(tmp_path / 'workflow', group)
+    producer.finish_program_node(capture, request.node.nodeid,
+        {'setup': 'passed', 'call': 'passed', 'teardown': 'passed'}, {group['id']: observed})
+    published = capture['root'] / 'published'
+    bindings = json.loads((published / 'bindings.json').read_text())['bindings']
+    assert set(bindings) == {m['id'] for m in group['members']}
+    branches = {b['id']: b for b in inventory['native_coverage']['obligations']}
+    for identity, binding in bindings.items():
+        assert evidence_result(binding['evidence']['program'], branches[identity], 'c' * 64,
+            'program', 'controlled', published, binding) == ('passed', None)
+        assert evidence_result(binding['evidence']['program'], branches[identity], 'c' * 64,
+            'program', 'product', published, binding)[0] == 'missing'
+
+
 def test_original_batch_has_explicit_per_id_observations_without_product_credit(tmp_path, request, source_inputs):
     plan, inventory, branches = deepcopy(source_inputs)
     capture = producer.prepare_program_batch(tmp_path / "capture", [request.node.nodeid], plan, inventory,

@@ -17,6 +17,7 @@ _SOURCES = ["tests/support/condition_scalar_requirements.py", requirements.PROGR
             "tests/maintenance/condition_parent_sources.py", "tests/unit/test_condition_scalar_program.py",
             "tests/unit/test_scalar_condition_product_gateway.py", "tests/unit/test_condition_scalar_batch_evidence.py",
             "tests/fixtures/metadata-conditions/self-scalar-source-parents.json.gz"]
+_SOURCES += [f"tests/fixtures/gameparameter-metadata/{version}.json" for version in audit.VERSIONS]
 
 
 def _encoded(document):
@@ -95,6 +96,11 @@ def _validate_observation(group, observed, before_values):
     if not _exact(observed["observations"]["metadata"], model["metadata"][field]):
         raise ValueError("original public metadata differs from predeclared source model")
     before, after = observed["observations"]["before"], observed["observations"]["after"]
+    if 'source_receiver' in model and (
+            before.get('type') != model['source_receiver']['native_type']
+            or after.get('type') != model['source_receiver']['native_type']
+            or not _exact(observed.get('input_fact_provenance'), model['provenance'])):
+        raise ValueError('original exact source receiver or program-model provenance differs')
     if any(type(before.get(k)) is not type(v) or before.get(k) != v for k, v in before_values.items()):
         raise ValueError("original prerequisite values differ from predeclared source model")
     if not _exact(after, {**before, field: model["requested"]}):

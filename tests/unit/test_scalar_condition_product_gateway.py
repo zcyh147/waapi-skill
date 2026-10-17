@@ -14,6 +14,8 @@ def run_scalar_public_workflow(path, group, *, before_values=None):
     path.mkdir()
     model = group["model"]
     task = ScalarPropertyTask(path, group["version"])
+    if 'source_receiver' in model:
+        task.objects[FIRST]['type'] = model['source_receiver']['native_type']
     task.metadata = deepcopy(model["metadata"])
     task.objects[FIRST].update(deepcopy(model["before"] if before_values is None else before_values))
     target = task.bind(FIRST)
@@ -57,6 +59,8 @@ def run_scalar_public_group(path, group, *, observed=None):
         child = path / control["id"]
         child.mkdir()
         task = ScalarPropertyTask(child, group["version"])
+        if 'source_receiver' in group['model']:
+            task.objects[FIRST]['type'] = group['model']['source_receiver']['native_type']
         task.metadata = deepcopy(group["model"]["metadata"])
         task.objects[FIRST].update(deepcopy(control["before"]))
         before = deepcopy(task.objects)
