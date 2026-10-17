@@ -1938,8 +1938,8 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     }
     assert payload["summary"]["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
-        "fixed_command": 56,
-        "manifest_dispatch": 111,
+        "fixed_command": 57,
+        "manifest_dispatch": 110,
         "transaction_operation": 489,
         "unsupported_boundary": 6,
     }
@@ -1953,6 +1953,16 @@ def test_capability_matrix_is_available_offline_without_config_or_client(tmp_pat
     assert payload["returned_count"] == 0
     assert payload["truncated"] is False
     assert "capabilities" not in payload
+    # The sole route reclassification is the disclosed fixed Media Pool field read.
+    code, fields = waapi_gateway.execute_gateway(
+        ["describe", "ak.wwise.core.mediaPool.getFields", "--all-versions"],
+        env=gateway_env(tmp_path), client_factory=client_factory,
+    )
+    assert code == 0 and called is False
+    assert fields["availability"]["2024.1"]["available"] is False
+    interface = fields["availability"]["2025.1"]["capability"]["interface"]
+    assert interface["preferred_route"] == "fixed_command"
+    assert interface["gateway_commands"] == ["metadata media-pool-fields"]
 
 
 def test_object_types_searches_packaged_catalog_without_connecting(
@@ -3514,7 +3524,7 @@ def test_query_object_broad_results_remain_gateway_bounded(tmp_path: Path) -> No
     assert client.calls[-1][1] == {"waql": "from type Sound take 2"}
 
 
-def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
+def test_query_object_preserves_absent_null_and_present_mixed_type_fields(
     tmp_path: Path,
 ) -> None:
     rows = [
@@ -3532,6 +3542,12 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
             "audioSource:language": {"id": "{language}", "name": "SFX"},
         },
     ]
+    # Absence is unknown; only an explicit native null is null.
+    rows.append({
+        "id": "{null-source}", "name": "silent_source", "type": "AudioFileSource",
+        "path": r"\Actor-Mixer Hierarchy\Default Work Unit\Weather\Silent\silent_source",
+        "audioSource:language": None,
+    })
     client = FakeClient(
         {
             "ak.wwise.core.getInfo": live_info(year=2023),
@@ -3552,18 +3568,26 @@ def test_query_object_projects_not_applicable_mixed_type_fields_as_null(
             "--include",
             "source-language",
             "--max-results",
-            "2",
+            "3",
         ],
         env=set_gateway_config(gateway_env(tmp_path), wwise_version="2023.1"),
         client_factory=lambda url: client,
     )
 
     assert exit_code == 0, payload
-    assert payload["objects"][0]["source_language"] is None
+    assert "source_language" not in payload["objects"][0]
+    assert payload["objects"][0]["unavailable_fields"] == ["source_language"]
     assert payload["objects"][1]["source_language"] == {
         "id": "{language}",
         "name": "SFX",
     }
+
+    assert payload["objects"][2]["source_language"] is None
+    assert "unavailable_fields" not in payload["objects"][1]
+    assert "unavailable_fields" not in payload["objects"][2]
+    assert payload["agent_result"] == payload["objects"]
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1][2] == {"return": ["id", "name", "type", "path", "audioSource:language"]}
 
 
 def test_query_object_exact_path_uses_from_object_without_doubled_separators(
@@ -4852,12 +4876,17 @@ def test_metadata_types_uses_fixed_builder_and_result_parser(tmp_path: Path) -> 
 
     assert exit_code == 0
     assert payload["operation"] == "types"
-    assert payload["normalized"][0]["name"] == "Sound"
-    assert "raw" not in payload["normalized"][0]
-    assert "extra" not in payload["normalized"][0]
+    result = payload["agent_result"]
+    assert result["contract"] == "waapi-skill.metadata-types-page/v1"
+    assert result["types"] == [{"classId": 1, "name": "Sound", "type": "Sound", "extra": "preserved"}]
+    assert result["available_count"] == result["total_count"] == 1
+    assert result["offset"] == result["remaining_count"] == 0
+    assert result["complete"] is True and result["next_page"] is None
+    assert result["mutation_authority"] is False
     assert "summary_only" not in payload
-    assert "agent_result" not in payload
-    assert client.calls[-1][0] == "ak.wwise.core.object.getTypes"
+    assert "normalized" not in payload
+    assert list(payload)[-1] == "agent_result"
+    assert client.calls[-1] == ("ak.wwise.core.object.getTypes", {}, {})
 
 
 
