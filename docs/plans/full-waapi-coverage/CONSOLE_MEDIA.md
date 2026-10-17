@@ -35,12 +35,21 @@ identity lists exceeded the 512 KiB snapshot limit. Repair `c6739d03` hashes eac
 complete sorted per-file identity/media multiset and retains counts; file/XML
 collection, byte limits and race/preservation checks remain. The successor reached
 execution and produced the central file, then exposed the process-result mismatch.
-The 2024/2025 preservation checks also found unrelated saved-model changes:
-Auro references/effects were removed and McDSP properties changed representation.
-Keep those checks; future native acceptance needs suitable isolated fixtures.
+The 2024/2025 preservation checks found saved XML changes outside media storage.
+Compare those changes with the actual immutable Preview, after sandbox setup:
+the fixture already isolates optional plugins in 2022 and Auro in 2025. An
+original-source-versus-final-file comparison cannot distinguish that setup from
+native command effects. In particular, the 2022 prepared snapshot contains 748
+media rows, matching the 748 central rows; the source project's extra plugin row
+was removed by setup, not lost by this command. Prepared counts match central
+counts on all five versions. Non-media XML differences against the actual Preview
+remain separately recorded and require interpretation; do not weaken preservation
+or infer a business PASS merely from matching counts.
 
 Durable local receipt index: query worktree
 `.waapi-skill-state/full-coverage/console-format-native-summary.json`.
+The corrected prepared-baseline comparison is
+`console-media-actual-preview-comparison.json` in that same directory.
 Original run/category/dispatcher records are under
 `console-format-native-5d7213cb-r1` and `console-format-native-c6739d03-r1`.
 All source-project hashes/mtimes and tracked candidates remained unchanged;
