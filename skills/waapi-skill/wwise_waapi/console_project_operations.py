@@ -184,7 +184,9 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
         expected_platforms = [expected_platforms]
     remaining = list(platforms)
     platform_matches = True
-    for expected in expected_platforms:
+    # Match exact named constraints before base-only rows can consume them.
+    # This changes observation matching, never the declared native row order.
+    for expected in sorted(expected_platforms, key=lambda row: 'name' not in row):
         matches = [row for row in remaining if row['ReferencePlatform'] == expected['basePlatform']
             and ('name' not in expected or row['Name'] == expected['name'])]
         if not matches:

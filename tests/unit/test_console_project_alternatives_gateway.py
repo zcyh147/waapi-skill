@@ -332,6 +332,33 @@ def test_console_create_saves_requested_language_order_and_default(tmp_path, ver
 
 
 @pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('missing_named', [False, True])
+def test_console_create_matches_named_platform_before_base_only_saved_rows(tmp_path, version, missing_named):
+    task = ConsoleProjectTask(tmp_path, version)
+    tx, code, payload = execute_console_creation(task,
+        '--item', 'platforms', 'Windows', '--mapping', 'platforms', 'Windows', 'Custom')
+    assert code == 0, payload
+    document = ET.fromstring(task.created_file.read_bytes())
+    platforms = document.find('./ProjectInfo/Project/Platforms')
+    rows = list(platforms)
+    assert [row.get('Name') for row in rows] == ['Windows', 'Custom']
+    if missing_named:
+        rows[1].set('Name', 'Unrequested')
+    platforms[:] = list(reversed(rows))
+    task.created_file.write_bytes(ET.tostring(document, encoding='utf-8'))
+    retained = task.created_file.read_bytes()
+    code, verified = task.run('verify', tx)
+    if missing_named:
+        assert code != 0 and verified['state'] == 'verification_failed', verified
+    else:
+        assert code == 0 and verified['verified'] is True, verified
+    assert task.created_file.read_bytes() == retained
+    code, repeated = task.run('execute', tx)
+    assert code != 0, repeated
+    assert len([row for row in task.calls if row[0] == CREATE]) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
 @pytest.mark.parametrize('drift', ['destination-appears', 'root-replaced'])
 def test_console_create_refuses_destination_drift_before_native_write(tmp_path, version, drift):
     task = ConsoleProjectTask(tmp_path, version)
