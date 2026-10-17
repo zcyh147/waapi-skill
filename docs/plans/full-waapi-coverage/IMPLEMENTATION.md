@@ -609,7 +609,23 @@ R18 also includes fixed documented List discovery `c989fd14` and Sound/media/mov
 scopes `745213c2`: explicit source/language identities and bound move endpoints
 remain revalidated before dispatch. Their worker selections remain on their
 original candidates; provider effects and native list/write obligations remain
-unproved. Final reconciled-candidate preflight/focus are recorded separately.
+unproved. Sequential inventory generation and both structural checks preserved
+896 public rows / 227 URIs / 251 Program roster entries and the byte-exact
+272,313 native-obligation artifact, including historical owners and evidence.
+
+The single R18 central preflight on `cb38ee6c` retained **822 passed / 3 failed
+in 22.80 seconds**. The three provider matrix rows still synthesized native
+arguments without the now-required private-profile proof. Test-only repair
+`6a4a1af8` uses the existing public Draft helper and protects secret-bearing
+results; it preserves schema-only verification, no provider-effect claim and
+execute-once behavior. Those three exact rows plus 18 deduplicated cross-seam
+controls passed **21 in 9.02 seconds** on that repair. The selection includes
+the restored real-child platform/language guard, List class/path/owner checks,
+prospective-reference collectors and source-control status/Sound/move boundaries.
+Both runs preserved all 1,851 tracked hashes and ended without owned processes.
+The 822 original passes and earlier 20-node repair were not repeated; this is
+not a final-candidate 825-test or full Program PASS. No native or Fresh run was
+started for this integration.
 Original receipts are retained under
 ignored `integration-partials-r18` and the query worktree's
 `native-5d7213cb-r1` roots.
