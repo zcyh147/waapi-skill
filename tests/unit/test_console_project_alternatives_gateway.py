@@ -943,3 +943,41 @@ def test_cli_project_model_has_a_disclosed_directory_depth_budget(tmp_path):
     code, payload = task.step('draft-check')
     assert code != 0 and payload['error_code'] == 'LIMIT_EXCEEDED', payload
     assert not any(row[0] == task.operation for row in task.calls)
+
+
+def test_cli_dump_unavailable_read_remains_a_structured_unknown_outcome(tmp_path, monkeypatch):
+    import os
+    class Dump(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri == self.operation:
+                self.output.write_text('{"fixture":true}')
+            return super().call(uri, args, options)
+    task = Dump(tmp_path, '2025.1', 'ak.wwise.cli.dumpObjects')
+    task.output = tmp_path / 'objects.json'
+    tx = task.execute_plan('--value', 'output_file', str(task.output))
+    inode = task.output.stat().st_ino
+    original = os.fdopen
+    matched = 0
+    class UnavailableRead:
+        def __init__(self, opened):
+            self.opened = opened
+        def __enter__(self):
+            self.opened.__enter__()
+            return self
+        def __exit__(self, *args):
+            return self.opened.__exit__(*args)
+        def read(self, *args):
+            raise OSError('Injected filesystem read failure')
+        def fileno(self):
+            return self.opened.fileno()
+    def fdopen(descriptor, *args, **kwargs):
+        nonlocal matched
+        selected = os.fstat(descriptor).st_ino == inode
+        if selected:
+            matched += 1
+        opened = original(descriptor, *args, **kwargs)
+        return UnavailableRead(opened) if selected and matched == 2 else opened
+    monkeypatch.setattr(os, 'fdopen', fdopen)
+    code, payload = task.run('verify', tx)
+    assert code != 0 and payload['state'] == 'executed_unverified', payload
+    assert payload['error_code'] == 'INVALID_FILE', payload
