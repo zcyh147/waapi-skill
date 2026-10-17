@@ -7,6 +7,7 @@ from typing import Any
 from .business_declarations import SUPPORTED_BUSINESS_KINDS, SUPPORTED_WWISE_VERSIONS
 from .business_fields import ACTION_DURATION_FIELDS, ACTION_DURATION_SEMANTICS, OBJECT_BUSINESS_FIELD_TYPES
 from .metadata_condition_contracts import existing_field_condition_contract
+from .operation_object import OBJECT_SET_REFERENCE_ARRAY_VERSIONS
 
 
 OBJECT_GRAPH_BUSINESS_CONTRACT = "waapi-skill.object-graph-business/v1"
@@ -332,8 +333,9 @@ def object_graph_business_contract_data(
             ],
             "legacy_shallow_composer_public": False,
             "reference_values": {
-                "forms": ["bound_object_handle", "json_array_of_bound_object_handles", "null_to_clear_reference"],
-                "maximum_array_members": 32,
+                "forms": ["bound_object_handle", "null_to_clear_reference"] +
+                         (["json_array_of_bound_object_handles"] if version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS else []),
+                **({"maximum_array_members": 32} if version in OBJECT_SET_REFERENCE_ARRAY_VERSIONS else {}),
                 "inline_curve": {
                     "input": {"curve_points": "array_of_x_y_shape_points"},
                     "maximum_points": 256,

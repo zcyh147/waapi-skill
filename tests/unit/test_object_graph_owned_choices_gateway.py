@@ -653,15 +653,65 @@ def test_set_reference_array_uses_only_bound_handles_and_verifies_ordered_guids(
     task = OwnedGraphTask(tmp_path, version, "object.set")
     task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"}}
     owner, target = task.bind(FIRST), task.bind(SECOND)
-    field = task.discover(owner, "Target objects")
+    code, discovered = task.step("draft-discover-fields", "--object-handle", owner, "--meaning", "Target objects")
+    assert code == 0, discovered
+    candidate = discovered["meaning_results"][0]["candidates"][0]
+    assert ("json_array_of_bound_object_handles" in candidate["value_input"]["accepted_forms"]) is (version != "2022.1")
+    field = candidate["handle"]
+    code, before = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0, before
     code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
                                "--field-value", field, "  " + json.dumps([target, owner]) + "  ")
+    if version == "2022.1":
+        assert code == 2 and declared["error_code"] == "NATIVE_VALUE_UNION_UNAVAILABLE", declared
+        code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+        assert code == 0 and after["draft"] == before["draft"], after
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
     assert code == 0, declared
     tx, shown = task.preview()
     args = shown["artifact"]["prepared_operation"]["dispatch"]["args"]
     assert args["objects"] == [{"object": FIRST, "@Targets": [SECOND, FIRST]}]
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_new_set_descendant_reference_array_uses_the_same_version_boundary(tmp_path: Path, version: str) -> None:
+    task = OwnedGraphTask(tmp_path, version, "object.set")
+    task.metadata["Targets"] = {"name": "Targets", "type": "Reference", "display": {"name": "Target objects"}}
+    owner, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step("draft-discover-fields", "--semantic-kind", "sound-sfx", "--meaning", "Target objects")
+    assert code == 0, discovered
+    field = discovered["meaning_results"][0]["candidates"][0]["handle"]
+    code, before = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+    assert code == 0, before
+    code, declared = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle", owner,
+        "--kind", "sound-sfx", "--name", "Rain", "--field-value", field, json.dumps([target, owner]))
+    if version == "2022.1":
+        assert code == 2 and declared["error_code"] == "NATIVE_VALUE_UNION_UNAVAILABLE", declared
+        code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
+        assert code == 0 and after["draft"] == before["draft"], after
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    assert code == 0, declared
+    tx, shown = task.preview()
+    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]["children"][0]["@Targets"] == [SECOND, FIRST]
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, json.dumps(verified)
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_reference_array_business_schema_matches_each_pinned_lane(tmp_path: Path, version: str) -> None:
+    from tests.unit.test_object_graph_business_gateway import _offline
+    code, schema = _offline(tmp_path, "operation-schema", "object.set", version=version)
+    if version == "2021.1":
+        assert code == 0 and schema["operation"]["availability"]["status"] == "unsupported_version", schema
+        return
+    assert code == 0, schema
+    reference_values = schema["business_adapter"]["reference_values"]
+    assert ("json_array_of_bound_object_handles" in reference_values["forms"]) is (version != "2022.1")
+    assert "curve_points" in reference_values["inline_curve"]["input"]
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
@@ -716,7 +766,7 @@ def test_create_reference_unions_use_class_field_evidence_and_exact_bound_target
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", VERSIONS[2:])
 @pytest.mark.parametrize("bad_result", ("reverse-reference-array", "omit-reference-array"))
 def test_set_reference_array_verification_detects_reordered_or_missing_native_fields(
     tmp_path: Path, version: str, bad_result: str,
@@ -734,7 +784,7 @@ def test_set_reference_array_verification_detects_reordered_or_missing_native_fi
     assert code == 2 and verified["verified"] is False, verified
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("version", VERSIONS[2:])
 @pytest.mark.parametrize("bad_value", ("raw-id", "too-many", "wrong-type"))
 def test_set_reference_arrays_reject_unbound_oversized_or_disallowed_targets_without_draft_change(
     tmp_path: Path, version: str, bad_value: str,

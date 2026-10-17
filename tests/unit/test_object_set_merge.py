@@ -10,6 +10,7 @@ from wwise_waapi.operation_registry import (  # pyright: ignore[reportMissingImp
     PREPARED_OPERATION_CONTRACT,
     OperationContractError,
     list_operation_specs,
+    operation_request_machine_contract,
     parse_operation_request,
     prepare_operation,
     validate_prepared_roles,
@@ -25,6 +26,38 @@ SECOND_TARGET_ID = "{30000000-0000-0000-0000-000000000005}"
 NEW_CHILD_ID = "{30000000-0000-0000-0000-000000000006}"
 UNKNOWN_TARGET_ID = "{30000000-0000-0000-0000-000000000007}"
 EXTRA_CHILD_ID = "{30000000-0000-0000-0000-000000000008}"
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("placement", ["existing", "child", "list"])
+def test_reference_string_array_matches_the_exact_versioned_set_contract(version: str, placement: str) -> None:
+    reference = {"name": "Arguments", "target": [{"kind": "id", "value": SECOND_TARGET_ID}]}
+    row = {"object": {"kind": "id", "value": TARGET_ID}}
+    node = {"type": "Sound", "name": "Child", "references": [reference]}
+    if placement == "existing":
+        row["references"] = [reference]
+    elif placement == "child":
+        row["children"] = [node]
+    else:
+        row["lists"] = [{"name": "RTPC", "objects": [node]}]
+    payload = {"contract": OPERATION_REQUEST_CONTRACT, "version": version, "operation": "object.set", "arguments": {"objects": [row]}}
+    if version in {"2021.1", "2022.1"}:
+        with pytest.raises(OperationContractError) as rejected:
+            parse_operation_request(payload)
+        assert rejected.value.error_code == ("UNAVAILABLE_IN_VERSION" if version == "2021.1" else "NATIVE_VALUE_UNION_UNAVAILABLE")
+    else:
+        assert parse_operation_request(payload).operation == "object.set"
+
+
+@pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
+def test_reference_string_array_schema_is_versioned_without_removing_curves_or_owned_lists(version: str) -> None:
+    schema = operation_request_machine_contract("object.set", version)["argument_contract"]
+    target = schema["properties"]["objects"]["items"]["properties"]["references"]["items"]["properties"]["target"]["oneOf"]
+    assert any(branch.get("type") == "array" for branch in target) is (version != "2022.1")
+    assert any("curve_points" in branch.get("properties", {}) for branch in target)
+    assert "lists" in schema["properties"]["objects"]["items"]["properties"]
+
+
 TARGET_PATH = r"\Actor-Mixer Hierarchy\Default Work Unit\SetTarget"
 SECOND_TARGET_PATH = r"\Actor-Mixer Hierarchy\Default Work Unit\SecondTarget"
 NEW_CHILD_PATH = SECOND_TARGET_PATH + r"\NewChild"

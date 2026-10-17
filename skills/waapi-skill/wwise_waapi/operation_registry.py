@@ -105,6 +105,7 @@ from .operation_import import (
 )
 from .operation_object import (
     ObjectCurveDescriptor,
+    OBJECT_SET_REFERENCE_ARRAY_VERSIONS,
     DEFAULT_MAX_CHILDREN_PER_NODE,
     DEFAULT_MAX_DEPTH,
     DEFAULT_MAX_FIELDS_PER_NODE,
@@ -832,7 +833,8 @@ _OBJECT_GRAPH_REFERENCE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
     **_OBJECT_REFERENCE_ARGUMENT_SCHEMA,
     "properties": {**_OBJECT_REFERENCE_ARGUMENT_SCHEMA["properties"],
                    "target": {"oneOf": [IDENTITY_ARGUMENT_SCHEMA, {"type": "null"},
-                       {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA},
+                       {"type": "array", "maxItems": 32, "items": IDENTITY_ARGUMENT_SCHEMA,
+                        "supported_versions": sorted(OBJECT_SET_REFERENCE_ARRAY_VERSIONS)},
                        {"type": "object", "required": ["curve_points"], "additionalProperties": False,
                         "properties": {"curve_points": {"type": "array", "maxItems": 256,
                                                           "items": _RTPC_POINT_ARGUMENT_SCHEMA}}}]}},
@@ -21609,6 +21611,14 @@ def _validate_nested_request_shape(
                 list_nodes = sum(len(descriptor.nodes) for descriptor in lists)
                 total_nodes += list_nodes + sum(isinstance(reference.target, ObjectCurveDescriptor)
                     for descriptor in lists for node in descriptor.nodes for reference in node.references)
+                all_references = [*normalized_references,
+                    *(reference for node in forest.nodes for reference in node.references),
+                    *(reference for descriptor in lists for node in descriptor.nodes for reference in node.references)]
+                if version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS and any(
+                    isinstance(reference.target, tuple) for reference in all_references
+                ):
+                    raise OperationContractError("NATIVE_VALUE_UNION_UNAVAILABLE",
+                        "String reference arrays require the pinned object.set 2023.1-2025.1 alternative; the recursive owned objectArray is a separate branch.")
                 if row_list_mode == "append" and any(
                     not descriptor.objects for descriptor in lists
                 ):
@@ -23219,6 +23229,7 @@ def _operation_argument_contract(
 ) -> dict[str, Any]:
     contract = _json_mapping(value)
     if version is not None and operation in {
+        "object.set",
         "audio.importTabDelimited",
         "lua.executeCliFile",
         "lua.executeCoreFile",
