@@ -367,7 +367,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
         "versions": _ALL_VERSIONS,
         "execution_shape": "draft_mutation",
         "required_fields": ("remote_host",),
-        "optional_fields": ("application_name", "command_port"),
+        "optional_fields": ("application_name", "command_port", "notification_port"),
         "optional_fields_by_version": {
             "2021.1": ("application_name", "command_port", "notification_port"),
         },
@@ -728,6 +728,7 @@ def runtime_inspection_business_contract_data(
             "input_forms": {
                 name: {
                     **value,
+                    **({"range": [0, 65535]} if operation == REMOTE_CONNECT_URI and name in {"command_port", "notification_port"} else {}),
                     **({"value_forms": {
                         "named": list(PROFILER_CURSOR_MEANINGS),
                         "integer_milliseconds": {"minimum": 0, "encoding": "ASCII decimal string", "maximum_input_bytes": 1024, "bound_owner": "Gateway request resource policy"},
@@ -736,6 +737,22 @@ def runtime_inspection_business_contract_data(
                 for name, value in row["input_forms"].items()
                 if name in exposed_fields
             },
+            **({"field_semantics": {
+                "notification_port": {
+                    "native_effect": "paired_notification_port" if version == "2021.1" else "unused",
+                    "selector_used_by_native": version == "2021.1",
+                    "target_identity_evidence": False,
+                    "requirement": "paired with command_port and application_name" if version == "2021.1" else "accepted and preserved; no target or notification effect is promised",
+                },
+                "remote_host": {"identity": "exact native console.host observation; no DNS, computer-name or IP alias inference"},
+                "command_port": {"identity": "fresh discovery descriptors provide corroboration only; connected status exposes neither port nor a proven process-unique key"},
+            }, "verification": {
+                "status_observer": "ak.wwise.core.remote.getConnectionStatus",
+                "port_observer": "ak.wwise.core.remote.getAvailableConsoles",
+                "maximum_discovered_consoles": 256,
+                "port_effect": "unknown even for one matching discovery row; never infer connected-instance identity or claim complete port verification",
+                "unresolved_identity": "partial_remote_target_observation; never full business verification",
+            }} if operation == REMOTE_CONNECT_URI else {}),
             **({"value_choices": value_choices} if value_choices else {}),
             **({"result_view_meanings": {
                 "summary": "Curated capture-frame names and measurements",
