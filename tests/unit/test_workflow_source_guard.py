@@ -930,7 +930,9 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
                    for args, _options in dispatches)
 
 
-def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence(tmp_path, workflow):
+@pytest.mark.parametrize(("projection", "fault"), [("full", None), ("compact", None),
+    ("compact", "verification-digest"), ("compact", "assertion-count")])
+def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence(tmp_path, workflow, projection, fault):
     matrix = importlib.import_module("tests.destructive.test_gateway_transaction_matrix")
     from copy import deepcopy
     from tests.unit.test_object_graph_owned_choices_gateway import OwnedGraphTask, ROOT
@@ -941,7 +943,9 @@ def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence
             if uri == "ak.wwise.core.getProjectInfo":
                 # Existing large-project native response fixture forces the
                 # real bounded stdout producer to compact verification evidence.
-                return {**super().call(uri, args, options), "directories": {"cache": "x" * 13_000}}
+                response = super().call(uri, args, options)
+                return ({**response, "directories": {"cache": "x" * 13_000}}
+                        if projection == "compact" else response)
             if uri == "ak.wwise.core.object.create":
                 self.calls.append((uri, deepcopy(args), deepcopy(options)))
                 assert args["parent"] == SECOND
@@ -962,14 +966,28 @@ def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence
             ["--state-dir", str(tmp_path / "state"), *command], env=client.env,
             client_factory=lambda _url: client)
         assert code == 0, payload
+        if command[0] == "verify" and fault is not None:
+            if fault == "verification-digest":
+                payload["stdout_projection"]["verification_canonical_sha256"] = "0" * 64
+            else:
+                payload["verification"]["passed_assertion_count"] += 1
         return payload
 
     runtime = SimpleNamespace(version="2023.1", state_dir=tmp_path / "state", gateway=gateway)
-    result = matrix._complete_business_object_create(runtime,
-        parent_segments=("Actor-Mixer Hierarchy", "Default Work Unit"),
-        name="LegacyProbe", notes="Created once through public Draft")
-    assert result["verify"]["verified"] is True
-    assert "assertions" not in result["verify"]["verification"]
+    def complete():
+        return matrix._complete_business_object_create(runtime,
+            parent_segments=("Actor-Mixer Hierarchy", "Default Work Unit"),
+            name="LegacyProbe", notes="Created once through public Draft")
+
+    if fault is not None:
+        with pytest.raises(AssertionError):
+            complete()
+    else:
+        result = complete()
+        assert result["verify"]["verified"] is True
+        assert ("assertions" in result["verify"]["verification"]) is (projection == "full")
+        assert result["verification_evidence"]["assertions"]
+        assert all(item["passed"] is True for item in result["verification_evidence"]["assertions"])
     assert client.objects[ROOT]["parent"] == {"id": SECOND}
     assert len([uri for uri, _args, _options in client.calls if uri.endswith("object.create")]) == 1
     assert len([command for command in commands if command[0] == "execute"]) == 1

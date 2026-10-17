@@ -19,7 +19,6 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     ENV_WWISE_VERSION,
     LiveEnvironmentContract,
     LiveEnvironmentError,
-    WWISE_2023_1_CONSOLE_PATH,
     WWISE_2023_1_SAMPLE_PROJECT_PATH,
     path_is_under,
     path_is_under_immutable_sample_source,
