@@ -2005,6 +2005,7 @@ def build_parser() -> argparse.ArgumentParser:
         "operation",
         choices=(
             "types",
+            "media-pool-fields",
             "list",
             "detail",
             "discover",
@@ -5809,12 +5810,14 @@ def preflight_metadata_input(
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
     args.detail = False
 
-    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation != "detail":
+    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation not in {"detail", "media-pool-fields"}:
         raise GatewayInputError("metadata --detail-page requires detail --selection")
     if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
         raise GatewayInputError("metadata --detail-item requires a nonnegative typed choices/dependencies item index")
 
-    if args.operation == "types":
+    if args.operation in {"types", "media-pool-fields"}:
+        if args.operation == "media-pool-fields" and resolve_catalog_versions(args, env=env) != ("2025.1",):
+            raise GatewayInputError("Media Pool field discovery requires the Wwise 2025.1 contract")
         if (
             path_segments
             or semantic_kind is not None
@@ -5823,14 +5826,17 @@ def preflight_metadata_input(
             or args.platform
             or args.curve_role
         ):
-            raise GatewayInputError("metadata types accepts no business input")
-        if args.selection is not None or not 1 <= args.page_size <= 64:
-            raise GatewayInputError("metadata types accepts --page and --page-size 1..64, not --selection")
+            raise GatewayInputError(f"metadata {args.operation} accepts no business input")
+        if ((args.operation == "types" and args.selection is not None) or not 1 <= args.page_size <= 64
+                or args.selection is not None and args.page is not None
+                or args.detail_page is not None and args.selection is None
+                or args.detail_view != "raw" or args.detail_item is not None):
+            raise GatewayInputError(f"metadata {args.operation} requires --page-size 1..64 and compatible paging/selection inputs")
         if len(meanings) > MAX_METADATA_DISCOVERY_QUERIES or any(
             not meaning.strip() or meaning != meaning.strip()
             or len(meaning) > MAX_METADATA_DISCOVERY_QUERY_CHARS for meaning in meanings
         ) or sum(map(len, meanings)) > MAX_METADATA_DISCOVERY_TOTAL_QUERY_CHARS:
-            raise GatewayInputError("metadata types --meaning must contain bounded, trimmed lexical filters")
+            raise GatewayInputError(f"metadata {args.operation} --meaning must contain bounded, trimmed lexical filters")
         return
 
     if args.operation in {"discover", "property-state"}:
@@ -6974,6 +6980,7 @@ def public_typed_contract(version: str, api: str) -> Any:
 
 def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
     """Describe one deep fixed route without exposing its native request schema."""
+    from wwise_waapi.media_pool_field_discovery import media_pool_field_discovery_contract
 
     def command_requires_business_values(command: str) -> bool:
         return (
@@ -6985,7 +6992,7 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
             "profiler-voice-contributions",
             "debug-validate-call",
             }
-            and command != "metadata types"
+            and command not in {"metadata types", "metadata media-pool-fields"}
         )
 
     commands = [
@@ -7054,6 +7061,8 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         "input_shape": "fixed_business_command",
         "native_request_fields_disclosed": False,
         "commands": commands,
+        **({"business_contract": media_pool_field_discovery_contract()}
+           if capability.uri == "ak.wwise.core.mediaPool.getFields" else {}),
         "continuation": (
             commands[0]
             if len(commands) == 1
@@ -14628,6 +14637,54 @@ def dispatch_command(
             "agent_result": business_rows if result.get("ok") else None,
         }
     if args.command == "metadata":
+        if args.operation == "media-pool-fields":
+            from wwise_waapi.media_pool_field_discovery import browse_media_pool_fields
+            from wwise_waapi.metadata_discovery import MetadataDiscoveryError
+            api = "ak.wwise.core.mediaPool.getFields"
+            capability = live_capability(detected_version, api, live_info=live_info)
+            result = dispatch(dispatcher, api, connection=connection, version=detected_version, args={}, options={},
+                result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
+                operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+            base = {**common, "operation": args.operation, "metadata_authority": "live-waapi", "call": dispatch_call_summary(result)}
+            if not result.get("ok"):
+                return {"ok": False, "status": "error", **base, "agent_result": None}
+            filters = [token for meaning in args.queries or () for token in ("--meaning", meaning)]
+            page_size, fragment_size = args.page_size, 2048
+            while True:
+                try:
+                    validate_semantic_result(api, result["result"], version=detected_version)
+                    fields = browse_media_pool_fields(result["result"], context={"configuration": selected_connection_binding(env),
+                        "endpoint": common["endpoint"], "version": detected_version, "live_info": live_info},
+                        meanings=args.queries or (), page=args.page, page_size=page_size,
+                        selection=args.selection, detail_page=args.detail_page, fragment_size=fragment_size)
+                    if fields.get("next_page"):
+                        fields["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                            "--page-size", str(args.page_size), "--page", fields["next_page"]])
+                    for field in fields.get("fields", []):
+                        if field.get("detail_required"):
+                            field["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                                "--selection", field["selection"]])
+                    if fields.get("next_detail_page"):
+                        fields["next_command"] = transaction_next_command("metadata", ["metadata", "media-pool-fields", *filters,
+                            "--selection", args.selection, "--detail-page", fields["next_detail_page"]])
+                    if probe_gateway_json_document_size({**base, "agent_result": fields}, 28 * 1024) == "ok":
+                        break
+                    if args.selection is not None and fragment_size > 1:
+                        fragment_size //= 2
+                    elif args.selection is None and page_size > 1:
+                        page_size -= 1
+                    else:
+                        raise MetadataDiscoveryError("DISCOVERY_RESULT_LIMIT_EXCEEDED", "The complete Media Pool field page and continuation exceed the bounded output")
+                except (SemanticValidationError, MetadataDiscoveryError) as exc:
+                    evidence = {"call": dispatch_call_summary(result)}
+                    if probe_gateway_json_document_size(result["result"], 64 * 1024) == "ok":
+                        evidence["native_observation"] = result["result"]
+                    else:
+                        evidence["native_observation_boundary"] = {"complete": False, "inline_limit_bytes": 64 * 1024,
+                            "evidence_path": result.get("evidence_path")}
+                    raise GatewayResultShapeError(str(exc), details=evidence,
+                        error_code=getattr(exc, "error_code", "MEDIA_POOL_FIELDS_INVALID")) from exc
+            return {"ok": True, "status": "partial" if fields.get("projection_complete") is False else "ok", **base, "agent_result": fields}
         if args.operation == "types":
             from wwise_waapi.metadata_discovery import browse_metadata_types
             metadata_calls: list[dict[str, Any]] = []
