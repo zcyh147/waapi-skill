@@ -1505,10 +1505,15 @@ def _materialize_set(
                 evidence = resolve_planned_list_evidence(session, descriptor["name"], owner_handle=owner_handle)
                 documented_bindings.append({**evidence, "planned_owner": {
                     "result_handle": owner_handle, "request_path": request_path}})
+            # Only this declaration's validated class-scoped List selections
+            # certify arrays. Another class may expose a scalar with this token
+            # (Sound.Metadata List versus MetadataSlot.Metadata Reference).
+            declared_fields = [session.handles.bound_field(handle)
+                for handle in new_by_result[owner_handle].fields.get("field_values", {})]
             for reference in node.get("references", []):
-                fields = [field for field in session.handles.as_dict()["fields"]
-                    if field["field_kind"] == "list" and field["scope_kind"] == "class" and field["token"] == reference["name"]]
-                if fields:
+                fields = [field for field in declared_fields if field.field_kind == "list"
+                    and field.scope_kind == "class" and field.token == reference["name"]]
+                if fields and isinstance(reference["target"], list):
                     evidence = resolve_planned_list_evidence(session, reference["name"], owner_handle=owner_handle)
                     documented_bindings.append({**evidence, "reference_targets": [target["value"] for target in reference["target"]],
                         "planned_owner": {"result_handle": owner_handle, "request_path": request_path}})

@@ -1449,3 +1449,72 @@ def test_documented_list_alias_clears_merged_planned_owner_and_keeps_other_graph
     assert code == 0 and verified["verified"] is True, verified
     assert old_slot not in task.objects and task.objects[ROOT]["notes"] == "Keep owner"
     assert task.objects[FIRST] == keep
+
+
+@pytest.mark.parametrize("fault", (None, "wrong-target-type", "reference-effect"))
+def test_planned_metadata_slot_scalar_reference_stays_distinct_from_sound_metadata_list(tmp_path, fault):
+    """2025 Objects Reference: Sound.Metadata List; MetadataSlot.Metadata Reference."""
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    task.types.extend(({"classId": 1638416, "name": "WorkUnit", "type": "WObject"},
+        {"classId": 5308432, "name": "Metadata", "type": "WObject"}))
+    metadata_id = "{55555555-5555-5555-5555-555555555555}"
+    task.objects[metadata_id] = {"id": metadata_id, "name": "Room metadata", "type": "Sound" if fault == "wrong-target-type" else "Metadata",
+        "classId": 5308432, "path": r"\Metadata\Default Work Unit\Room metadata", "parent": {"id": PROJECT_GROUP}, "notes": "Keep metadata"}
+    parent, target = task.bind(SECOND), task.bind(metadata_id)
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args.get("classId") == 5570560, args
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": ["Metadata"]}
+            assert args["property"] == "Metadata"
+            return {"name": "Metadata", "type": "Reference", "display": {"name": "Metadata"},
+                "restriction": {"type": "reference", "restrictions": [{"type": ["Metadata"]}, "notNull"]}}
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": SECOND, "children": [{"type": "Sound", "name": "New sound",
+                "@Metadata": [{"type": "MetadataSlot", "name": "Room slot", "@Metadata": metadata_id}]}]}]
+            task.objects[ROOT] = {"id": ROOT, "name": "New sound", "type": "Sound", "classId": 65552,
+                "path": task.objects[SECOND]["path"] + r"\New sound", "parent": {"id": SECOND}, "notes": "", "@Metadata": [{"id": "{77777777-7777-7777-7777-777777777777}"}]}
+            slot = "{77777777-7777-7777-7777-777777777777}"
+            task.objects[slot] = {"id": slot, "name": "Room slot", "type": "PluginInnerObject", "classId": 5570560,
+                "path": task.objects[ROOT]["path"] + r"\Room slot", "owner": {"id": ROOT}, "notes": "",
+                "@Metadata": {"id": SECOND if fault == "reference-effect" else metadata_id}}
+            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "New sound",
+                "@Metadata": [{"id": slot, "name": "Room slot"}]}]}]}
+        return original(uri, args, options)
+    task.call = call
+    kinds = {}
+    for name in ("Sound", "MetadataSlot"):
+        code, types = task.step("draft-discover-types", "--role", "object", "--meaning", name)
+        assert code == 0, types
+        kinds[name] = types["type_candidates"][0]["handle"]
+    code, listed = task.step("draft-discover-fields", "--type-handle", kinds["Sound"], "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    choice = next(row for row in listed["agent_result"]["items"] if row["name"] == "Metadata")
+    code, selected = task.step("draft-discover-fields", "--type-handle", kinds["Sound"], "--field-source", "documented-lists", "--selection", choice["selection"])
+    assert code == 0, selected
+    list_field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    code, selected = task.step("draft-discover-fields", "--type-handle", kinds["MetadataSlot"], "--meaning", "Metadata")
+    assert code == 0, selected
+    scalar_field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    code, owner = task.step("draft-declare-new", "--declaration-id", "owner", "--parent-handle", parent,
+        "--name", "New sound", "--kind", kinds["Sound"])
+    assert code == 0, owner
+    code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", owner["draft"]["declared_object"]["result_handle"],
+        "--name", "Room slot", "--kind", kinds["MetadataSlot"], "--field", "object_list", list_field, "--field-value", scalar_field, target)
+    if fault == "wrong-target-type":
+        assert code == 2 and declared["error_code"] == "REFERENCE_TARGET_TYPE_MISMATCH", declared
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    assert code == 0, declared
+    tx, shown = task.preview()
+    prepared = shown["artifact"]["prepared_operation"]
+    assert len(prepared["pre_state"]["documented_planned_list_guards"]) == 1
+    assert "documented_planned_reference_guards" not in prepared["pre_state"]
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get("verified") is True) == (fault is None), verified
+    assert any(uri.endswith("getPropertyInfo") and args.get("classId") == 5570560 and args.get("property") == "Metadata"
+        for uri, args, _ in task.calls)
