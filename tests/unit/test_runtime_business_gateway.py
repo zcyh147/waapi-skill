@@ -626,7 +626,7 @@ def test_runtime_schema_discloses_accepted_business_meanings_and_position_forms(
         channels += ["source-control", "lua"]
     expectations = {
         LOG_GET_URI: {"log_channel": channels},
-        GET_VOICES_URI: {"result_view": ["summary", "identity", "diagnostics"]},
+        GET_VOICES_URI: {"result_view": ["summary", "identity", "diagnostics", "capture-defaults", "empty-selection"]},
         "ak.wwise.core.transport.executeAction": {
             "audition_action": ["play", "stop", "pause", "toggle-play-stop", "play-directly"],
             "transport_scope": ["one-transport", "all-active"],
@@ -962,6 +962,45 @@ def test_transport_unknown_destroy_outcome_consumes_authority_before_dispatch(tm
         env=_env(tmp_path), client_factory=lambda _url: client)
     assert code == 2 and result["error_code"] == "TRANSPORT_HANDLE_RETIRED", result
     assert attempts == ["ak.wwise.core.transport.destroy"]
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("subject", ("Busses", "AudioObjects"))
+def test_profiler_diagnostics_requests_every_pinned_native_projection_field(tmp_path: Path, version: str, subject: str) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    operation = "ak.wwise.core.profiler.get" + subject
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        if uri == operation:
+            return {"return": []}
+        return original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", operation,
+        "--profiler-position", "123", "--result-view", "diagnostics"], env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 0, payload
+    returned = next(options["return"] for uri, _args, options in calls if uri == operation)
+    expected = ({"mixerID"} if version in {"2021.1", "2022.1"} else {"effectCount"}) if subject == "Busses" else {"busID", "effectClassID", "effectIndex"}
+    assert expected <= set(returned)
+    if subject == "Busses":
+        assert ("effectCount" if version in {"2021.1", "2022.1"} else "mixerID") not in returned
+
+
+@pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
+@pytest.mark.parametrize("view,expected", (("capture-defaults", {}), ("empty-selection", {"return": []})))
+def test_profiler_native_default_and_explicit_empty_projection_remain_distinct(tmp_path: Path, version: str, view: str, expected: dict) -> None:
+    client = _RuntimeControlDraftClient(tmp_path, version=version)
+    original = client.call
+    calls = []
+    def call(uri, args=None, options=None):
+        calls.append((uri, args, options))
+        return {"return": []} if uri == GET_VOICES_URI else original(uri, args, options)
+    client.call = call
+    code, payload = gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), "core-call", GET_VOICES_URI,
+        "--profiler-position", "123", "--result-view", view], env=_env(tmp_path, version=version), client_factory=lambda _url: client)
+    assert code == 0, payload
+    assert next(options for uri, _args, options in calls if uri == GET_VOICES_URI) == expected
 
 
 def test_transport_state_read_maps_gateway_handle_without_exposing_native_id(

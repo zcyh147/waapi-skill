@@ -1657,7 +1657,7 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--profiler-cursor")
     core_call.add_argument(
         "--result-view",
-        choices=("summary", "identity", "diagnostics"),
+        choices=("summary", "identity", "diagnostics", "capture-defaults", "empty-selection"),
     )
     core_call.add_argument("--bus-instance-handle")
     core_call.add_argument("--voice-instance-handle")
@@ -12184,7 +12184,7 @@ def dispatch_runtime_inspection_business_read(
             matches = [row for row in check_rows if isinstance(row, Mapping) and row.get("pipelineID") == binding["native_id"]] if isinstance(check_rows, list) else []
             if len(matches) != 1 or any(matches[0].get(key) != value for key, value in binding["identity"].items()):
                 raise GatewayInputError("Profiler capture instance identity changed or is unavailable; refresh the original read")
-        if args.api.endswith(("getVoices", "getBusses", "getAudioObjects")):
+        if args.api.endswith(("getVoices", "getBusses", "getAudioObjects")) and args.runtime_inspection_business_request.get("result_view") in {"summary", "identity", "diagnostics"}:
             identity_fields = ["busGUID", "gameObjectID"] if args.api.endswith("getAudioObjects") else ["objectGUID", "gameObjectID"]
             request["options"] = {"return": list(dict.fromkeys([*request["options"]["return"], *identity_fields]))}
     if not isinstance(request, Mapping):  # pragma: no cover - preflight invariant

@@ -202,6 +202,18 @@ PROFILER_RETURN_VIEWS = {
 TRANSPORT_SCOPE_CHOICES = ("one-transport", "all-active")
 AUDITION_MEDIA_CHOICES = ("originals", "converted")
 
+
+def profiler_return_views(operation: str, version: str) -> dict[str, tuple[str, ...] | None]:
+    """Five pinned definitions own the projection deltas, not URI equality."""
+    views = dict(PROFILER_RETURN_VIEWS[operation])
+    if operation == PROFILER_GET_AUDIO_OBJECTS_URI:
+        views["diagnostics"] = (*views["diagnostics"], "busID", "effectClassID", "effectIndex")
+    if operation == PROFILER_GET_BUSSES_URI:
+        views["diagnostics"] = (*views["diagnostics"], "mixerID" if version in {"2021.1", "2022.1"} else "effectCount")
+    views["capture-defaults"] = None
+    views["empty-selection"] = ()
+    return views
+
 PROFILER_CAPTURE_DATA_CHOICES = {
     "2021.1": (
         "api-calls", "audio-objects", "auxiliary-sends", "cpu", "inactive-game-syncs",
@@ -616,7 +628,7 @@ def runtime_inspection_business_contract_data(
         if field in exposed_fields:
             value_choices[field] = list(meanings)
     if "result_view" in exposed_fields:
-        value_choices["result_view"] = list(PROFILER_RETURN_VIEWS[operation])
+        value_choices["result_view"] = list(profiler_return_views(operation, version))
     if "profiler_cursor" in exposed_fields:
         value_choices["profiler_cursor"] = list(PROFILER_CURSOR_MEANINGS)
     if operation == PROFILER_ENABLE_DATA_URI:
@@ -725,6 +737,13 @@ def runtime_inspection_business_contract_data(
                 if name in exposed_fields
             },
             **({"value_choices": value_choices} if value_choices else {}),
+            **({"result_view_meanings": {
+                "summary": "Curated capture-frame names and measurements",
+                "identity": "Capture-frame object and instance identities",
+                "diagnostics": "Every field in this version's reflected projection definition",
+                "capture-defaults": "Use Wwise's default projection by omitting field selection",
+                "empty-selection": "Submit an explicit empty field selection",
+            }} if "result_view" in exposed_fields else {}),
         },
         **(
             {}

@@ -17,6 +17,7 @@ from .runtime_inspection_business_contracts import (
     LOG_SEVERITY_MEANINGS as _LOG_SEVERITIES,
     AUDITION_ACTION_MEANINGS as _AUDITION_ACTIONS,
     PROFILER_RETURN_VIEWS as _PROFILER_RETURN_VIEWS,
+    profiler_return_views,
     LOG_GET_URI,
     LOG_ADD_ITEM_URI,
     LOG_CLEAR_URI,
@@ -333,12 +334,13 @@ def materialize_runtime_inspection_business_request(
     options: dict[str, Any] = {}
     if operation in _PROFILER_RETURN_VIEWS:
         view = "summary" if result_view is None else result_view
-        projection = _PROFILER_RETURN_VIEWS[operation].get(view)
-        if projection is None:
+        views = profiler_return_views(operation, version)
+        if view not in views:
             raise RuntimeInspectionBusinessError(
-                "result_view must be summary, identity, or diagnostics"
+                "result_view must be one of: " + ", ".join(views)
             )
-        options["return"] = list(projection)
+        if views[view] is not None:
+            options["return"] = list(views[view])
     elif result_view is not None:
         raise RuntimeInspectionBusinessError(
             "result_view is not accepted by this fixed-shape Profiler read"
