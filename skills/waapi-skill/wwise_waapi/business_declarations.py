@@ -35,6 +35,7 @@ from .metadata_restrictions import (
     reference_allowed_types,
     reference_type_token,
     supports_property_prerequisite_workflow,
+    is_master_bus_visibility_dependency,
 )
 
 
@@ -1168,7 +1169,9 @@ def bind_live_field(
             new_object_workflow=_dependent_new_object_workflow(token),
             action="For a new object, complete and verify creation without this field, then configure the verified GUID through a separate property Preview; creation alone does not complete configuration",
         )
-    if enabled_dependency_fields:
+    structural_enabled_proof = scope_kind == "object" and any(
+        is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
+    if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
             _UNLINKED_PLATFORM_GUID if platform is None else platform
         )
@@ -1190,7 +1193,7 @@ def bind_live_field(
                 field=token,
                 action="refresh the live property-enabled state before continuing",
             ) from exc
-        if not enabled and not supports_property_prerequisite_workflow(info.dependencies):
+        if not enabled and (structural_enabled_proof or not supports_property_prerequisite_workflow(info.dependencies)):
             raise _error(
                 "FIELD_DISABLED",
                 field=token,
@@ -1306,7 +1309,9 @@ def revalidate_live_field(
             new_object_workflow=_dependent_new_object_workflow(field.token),
             action="Use the verified created GUID to rediscover this field in object scope and configure it through a separate property Preview; never repeat completed creation",
         )
-    if enabled_dependency_fields:
+    structural_enabled_proof = field.scope_kind == "object" and any(
+        is_master_bus_visibility_dependency(item) and item["value"] is True for item in info.dependencies)
+    if enabled_dependency_fields or structural_enabled_proof:
         enabled_platform = (
             _UNLINKED_PLATFORM_GUID
             if effective_platform is None
@@ -1330,7 +1335,7 @@ def revalidate_live_field(
                 field=field.token,
                 action="refresh the live property-enabled state before Preview",
             ) from exc
-        if not enabled and not supports_property_prerequisite_workflow(info.dependencies):
+        if not enabled and (structural_enabled_proof or not supports_property_prerequisite_workflow(info.dependencies)):
             raise _error(
                 "FIELD_DISABLED",
                 field=field.token,

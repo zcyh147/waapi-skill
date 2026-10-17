@@ -24,7 +24,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -73,6 +73,7 @@ from .metadata_restrictions import (
     MetadataRestrictionError,
     condition_values_equal,
     is_terminal_override_dependency,
+    is_master_bus_visibility_dependency,
     reference_allowed_types,
     reference_type_token,
 )
@@ -5731,6 +5732,7 @@ def _prepare_object_set(
         if any(info.dependencies for info in property_info_by_name.values()):
             condition_metadata_guards.append({
                 "object_id": target.object,
+                "platform": platform,
                 "fields": [info.as_dict() for info in property_info_by_name.values()],
             })
         for property_name, value in derived_target_properties.items():
@@ -7422,6 +7424,31 @@ def _append_association_condition(requirements, *, source, owner, property_name,
         raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Related condition count exceeds 16.")
 
 
+def _condition_metadata_assertions(pre_state, *, read):
+    """Keep the exact selected condition metadata valid through verification."""
+    assertions = []
+    condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
+    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
+    if isinstance(condition_metadata, Mapping):
+        condition_metadata_groups.append(condition_metadata)
+    for condition_metadata in condition_metadata_groups:
+        for expected in condition_metadata["fields"]:
+            name = expected.get("field_binding", {}).get("token", expected["name"])
+            observed = _read_property_info(read, object_id=condition_metadata["object_id"], name=name).as_dict()
+            assertions.append({"name": f"condition metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, expected),
+                               "evidence": {"expected": expected, "actual": observed}})
+            if any(is_master_bus_visibility_dependency(item) and item["value"] is True
+                   for item in expected.get("dependencies", [])):
+                args = {"object": condition_metadata["object_id"], "property": name,
+                        "platform": condition_metadata.get("platform") or "{00000000-0000-0000-0000-000000000000}"}
+                result = read(OBJECT_IS_PROPERTY_ENABLED_URI, args, {})
+                assertions.append({"name": f"structurally visible field {name} remains enabled",
+                    "passed": isinstance(result, Mapping) and result.get("return") is True,
+                    "evidence": {"uri": OBJECT_IS_PROPERTY_ENABLED_URI, "args": args, "result": result}})
+    return assertions
+
+
 def _related_condition_assertions(requirements, *, read):
     assertions = []
     readbacks = []
@@ -7497,9 +7524,12 @@ def _apply_reference_activation_dependencies(
             continue
         # Reflected attenuation metadata also describes UI visibility. This
         # exact Show rule is not an activation requirement or an implied write.
-        if (dependency.get("value") is False
-                and dependency == {"type": "isMasterBus", "value": False,
-                                   "action": "Show", "context": "Self"}):
+        if is_master_bus_visibility_dependency(dependency):
+            if dependency["value"] is True:
+                if object_id is None:
+                    raise OperationContractError("FIELD_OBJECT_SCOPE_REQUIRED", "Master-bus visibility needs fresh enabled-state proof on the selected existing object.")
+                _require_platform_field_enabled(read, object_id=object_id, field_name=metadata.name,
+                    platform=platform or "{00000000-0000-0000-0000-000000000000}")
             continue
         if dependency.get("type") == "reference" and reference_requirements is not None:
             expected_fields = {"type", "action", "context", "property", "conditions"}
@@ -8837,15 +8867,18 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 verification.update(expected_name=binding['layout_name'], view_type=call_args['name'],
                     coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args},
                     existing_view_ids=[row['viewID'] for row in observed['instances'] if row['viewName'] == call_args['name']])
-            elif api == LAYOUT_CLOSE_URI:
+            elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
                 binding = arguments['layout_binding']
                 if current['name'] != binding['layout_name']:
-                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Closing a view requires its discovered layout to be current')
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Changing a view requires its discovered layout to be current')
                 try:
-                    validate_layout_view_binding(binding, read=read)
+                    observed_view = validate_layout_view_binding(binding, read=read)
                 except ValueError as exc:
                     raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
                 verification.update(expected_name=binding['layout_name'], view_id=call_args['viewID'])
+                if api == LAYOUT_UNDOCK_URI:
+                    verification.update(view_type=observed_view['viewName'],
+                        coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args})
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -9248,6 +9281,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if info.dependencies:
                 metadata["condition_metadata"] = {
                     "object_id": source.object,
+                    "platform": platform,
                     "fields": [info.as_dict(), *(item.as_dict() for item in activation_metadata.values())],
                 }
         field_before_result = read(
@@ -13599,9 +13633,9 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         raise ValueError('The layout for view creation is no longer current')
                     if view_creation_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_view_prestate'):
                         raise ValueError('View catalog or instances changed after preview; inspect and preview again')
-                elif api == LAYOUT_CLOSE_URI:
+                elif api in {LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI}:
                     if current.get('name') != arguments['layout_binding']['layout_name']:
-                        raise ValueError('The layout for view closing is no longer current')
+                        raise ValueError('The layout for the view mutation is no longer current')
                     validate_layout_view_binding(arguments['layout_binding'], read=layout_guard_read)
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
@@ -13971,18 +14005,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
-    condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
-    condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
-    if isinstance(condition_metadata, Mapping):
-        condition_metadata_groups.append(condition_metadata)
-    for condition_metadata in condition_metadata_groups:
-        for expected in condition_metadata["fields"]:
-            name = expected.get("field_binding", {}).get("token", expected["name"])
-            args = {"object": condition_metadata["object_id"], "property": name}
-            observed = _read_property_info(read_call, object_id=condition_metadata["object_id"], name=name).as_dict()
-            assertions.append({"name": f"condition metadata {name} unchanged",
-                               "passed": _native_snapshot_equal(observed, expected),
-                               "evidence": {"expected": expected, "actual": observed}})
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
     field_before = pre_state.get("field_before") if isinstance(pre_state, Mapping) else None
     source = roles.get("object") if isinstance(roles, Mapping) else None
     if isinstance(field_before, Mapping) and isinstance(source, Mapping):
@@ -15560,6 +15583,7 @@ def verify_prepared_operation(
     related_assertions, related_reads = _related_condition_assertions(related, read=read_call)
     assertions.extend(related_assertions)
     readbacks.extend(related_reads)
+    assertions.extend(_condition_metadata_assertions(pre_state, read=read_call))
 
     def check_result_schema(uri: str, version: str) -> None:
         try:
@@ -15892,6 +15916,27 @@ def verify_prepared_operation(
             else:
                 readbacks.append(absent)
                 check('Temporary layout is absent after unregister', True, absent)
+        elif uri == LAYOUT_UNDOCK_URI:
+            observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+            instances = canonical_view_instances(observed)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+            matches = [row for row in instances if _same_identity(row['viewID'], plan['view_id'])]
+            floating = len(matches) == 1 and matches[0]['viewName'] == plan['view_type'] and matches[0].get('viewIsDocked') is False
+            check('The discovered view is independently observed floating', floating, {'view_id': plan['view_id'], 'actual': matches})
+            if floating and plan.get('coordinates'):
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                in_scope = current.get('name') == plan['expected_name']
+                check('Floating placement remains in the reviewed current layout', in_scope, current)
+                if in_scope:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': plan['view_id']}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': plan['view_id']}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('Floating view ' + edge + ' matches its declared position', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge)})
         elif uri == LAYOUT_CLOSE_URI:
             observed, pending = {}, True
             for poll in range(16):

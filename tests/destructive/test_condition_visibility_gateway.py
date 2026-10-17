@@ -14,6 +14,7 @@ from tests.destructive.test_attenuation_activation_gateway import PublicDraft, c
 from tests.destructive.support.category_evidence import exact_transaction_outcomes
 from tests.destructive.support.exact_real_evidence import append_finalized_scenario_evidence
 from tests.support.exact_evidence_finalization import register_exact_evidence_finalizer
+from tests.support.condition_branch_evidence import prepare_condition_native_capture, publish_condition_native_capture
 from tests.semantic.support.codex_expansion_runtime import fixture_gateway
 from tests.semantic.support.codex_heavy_project_runner_v3 import OwnedDirectWaapiCall
 from tests.semantic.support.codex_scenario_lifecycle_v3 import ScenarioLifecycle
@@ -43,6 +44,7 @@ def test_show_visibility_does_not_change_native_prerequisite(relation, request):
     started_at_unix_ns = time.time_ns()
     version = os.environ["WWISE_VERSION"]
     root = Path(os.environ["WAAPI_CONDITION_PROBE_ROOT"]).resolve() / relation.lower()
+    capture = prepare_condition_native_capture(root / "evidence" / "branch-evidence", request.node.nodeid, version, relation)
     private_home = root / "owned" / "wwise-user-home" if sys.platform == "darwin" else None
     prefix = private_home / "Library/Application Support/Wwise2019/Bottles/Wwise2019x64" if private_home else None
     lifecycle = ScenarioLifecycle(
@@ -145,6 +147,7 @@ def test_show_visibility_does_not_change_native_prerequisite(relation, request):
                     nodeid=request.node.nodeid, phase_reports=reports,
                     started_at_unix_ns=started_at_unix_ns, lifecycle=result.as_dict(), sandbox=runtime.sandbox,
                     host=evidence["host"], observation_path=observation_path, transactions=transactions,
+                    original_publisher=lambda record: publish_condition_native_capture(capture, record, observation_path),
                 ))
             assert result.final_status == status and closed, result.as_dict()
             assert status == "PASS", reason

@@ -97,7 +97,8 @@ def condition_restriction(conditions: Any) -> dict[str, Any]:
         values = restriction["values"]
         if isinstance(values, list) and values and all(
             isinstance(row, Mapping) and "value" in row and set(row) <= {"value", "displayName"}
-            and isinstance(row["value"], (str, bool, int, float))
+            and ("displayName" not in row or isinstance(row["displayName"], str))
+            and isinstance(row["value"], (bool, int, float))
             and (not isinstance(row["value"], float) or math.isfinite(row["value"]))
             for row in values
         ):
@@ -122,6 +123,14 @@ def is_terminal_override_dependency(name: str, metadata_type: str | None, depend
     return isinstance(metadata_type, str) and metadata_type.casefold() in {"bool", "boolean"} and dependency == {
         "type": "override", "action": "Enable", "context": "Self", "property": name,
     }
+
+
+def is_master_bus_visibility_dependency(dependency: Mapping[str, Any]) -> bool:
+    """Recognize the exact structural Show predicate without inferring topology."""
+    return (set(dependency) == {"type", "value", "action", "context"}
+            and dependency.get("type") == "isMasterBus"
+            and type(dependency.get("value")) is bool
+            and dependency.get("action") == "Show" and dependency.get("context") == "Self")
 
 
 def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
