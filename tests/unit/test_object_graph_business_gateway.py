@@ -3,6 +3,7 @@ from __future__ import annotations
 from tests.support.gateway_config import set_gateway_config
 
 import importlib.util
+import base64
 import json
 import sys
 from collections import deque
@@ -2594,3 +2595,173 @@ def test_public_graph_preview_bounds_recursive_schema_reference_expansion(
     test_public_graph_preview_validates_reachable_native_definitions(
         tmp_path, "2025.1", "object.create", "reference-cycle", monkeypatch,
     )
+
+
+INLINE_PCM_PADDED = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+INLINE_PCM_UNPADDED = "UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
+
+
+def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True):
+    """Drive the actual public Draft/Preview with only the native client faked."""
+    from tests.unit.test_object_native_surface import _project_info
+
+    root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+              "path": rf"\{root}\Default Work Unit"}
+    project = _project(tmp_path)
+    project_root = Path(project["path"]).parent
+    complete_project = _project_info(project_root, language="SFX")
+    complete_project.update(project)
+    project = complete_project
+    calls = []
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            calls.append(uri)
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [
+                    {"classId": 1, "name": "PropertyContainer" if version == "2025.1" else "ActorMixer", "type": "WObject"},
+                    {"classId": 2, "name": "Sound", "type": "Sound"},
+                ]}
+            if uri == "ak.wwise.core.object.get":
+                if args == {"waql": "from type Project take 1"}:
+                    return {"return": [{**project, "type": "Project"}]}
+                if args.get("from", {}).get("id") == [PARENT_ID] and not args.get("transform"):
+                    return {"return": [parent]}
+                return {"return": []}
+            raise AssertionError(f"Unexpected native call {uri}: {args}")
+
+        def disconnect(self):
+            pass
+
+    def invoke(*argv):
+        return gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path, version), client_factory=lambda _url: Client(),
+        )
+
+    code, started = invoke("draft-start", "object.set")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    revision = started["draft"]["revision"]
+
+    def update(command, *argv):
+        nonlocal revision
+        code, payload = invoke(command, draft_id, "--task-authority", authority,
+                               "--expected-revision", str(revision), *argv)
+        if code == 0 and "draft" in payload:
+            revision = payload["draft"]["revision"]
+        return code, payload
+
+    code, bound = update("draft-bind-object", "--object-id", PARENT_ID)
+    assert code == 0, bound
+    handle = bound["bound_object"]["handle"]
+    if nested:
+        code, group = update("draft-declare-new", "--declaration-id", "weather",
+                             "--parent-handle", handle, "--name", "Weather", "--kind", "actor-mixer")
+        assert code == 0, group
+        handle = group["draft"]["declared_object"]["result_handle"]
+    code, sound = update("draft-declare-new", "--declaration-id", "rain",
+                         "--parent-handle", handle, "--name", "Rain", "--kind", "sound-sfx")
+    assert code == 0, sound
+    code, added = update("draft-add-media", "--declaration-id", "rain", "--inline-wav", source_value,
+                         "--kind", "sound-sfx", "--language", "SFX")
+    if code != 0:
+        return code, added, calls
+    code, checked = update("draft-check")
+    if code != 0:
+        return code, checked, calls
+    code, previewed = update("preview-from-draft")
+    if code != 0:
+        return code, previewed, calls
+    code, shown = invoke("transaction-show", previewed["transaction_id"])
+    assert code == 0, shown
+    return code, shown["artifact"]["prepared_operation"], calls
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("source_form", ["padded", "unpadded", "extra-padding"])
+@pytest.mark.parametrize("nested", [False, True], ids=["direct", "nested"])
+def test_public_object_set_inline_wav_reaches_immutable_preview_unchanged(tmp_path, version, source_form, nested):
+    encoded = INLINE_PCM_PADDED if source_form == "padded" else INLINE_PCM_UNPADDED
+    source = "Inline.wav|" + encoded + ("=" if source_form == "extra-padding" else "")
+    code, prepared, calls = _public_inline_wav_preview(tmp_path, version, source, nested=nested)
+    assert code == 0, json.dumps(prepared)
+    node = prepared["dispatch"]["args"]["objects"][0]["children"][0]
+    if nested:
+        node = node["children"][0]
+    actual = node["import"]["files"][0]["audioFileBase64"]
+    assert actual == "Inline.wav|" + encoded
+    assert base64.b64decode(actual.partition("|")[2], validate=True) == base64.b64decode(encoded, validate=True)
+    validation = prepared["semantic_preview"]["envelope"]["metadata"]["schema_validation"]
+    assert validation["unresolved_refs"] == []
+    assert validation["compatibility_rules"] == [{
+        "rule_id": "object-set-inline-wav-canonical-base64/v1", "uri": "ak.wwise.core.object.set",
+        "version": version, "document": "waapi_definitions.json", "definition_pointer": "/definitions/oneImportFile",
+        "field": "audioFileBase64", "reflected_definition_sha256": "e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac",
+        "native_observation_build": {"2023.1": "2023.1.19.8928", "2024.1": "2024.1.13.9056", "2025.1": "2025.1.7.9143"}[version],
+        "section": "args.objects[0].children[0]" + (".children[0]" if nested else "") + ".import.files[0].audioFileBase64",
+    }]
+    assert "ak.wwise.core.object.set" not in calls
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("bad_source", ["alphabet", "broken-padding", "not-wave", "too-large", "unsafe-path"])
+def test_public_object_set_inline_wav_keeps_existing_input_rejections(tmp_path, version, bad_source):
+    source = {
+        "alphabet": "Inline.wav|" + INLINE_PCM_UNPADDED[:-1] + "!",
+        "broken-padding": "Inline.wav|" + INLINE_PCM_PADDED[:-2],
+        "not-wave": "Inline.wav|" + base64.b64encode(b"this is not WAV").decode(),
+        "too-large": "Inline.wav|" + base64.b64encode(b"RIFF0000WAVE" + b"\0" * (180 * 1024)).decode(),
+        "unsafe-path": "../Inline.wav|" + INLINE_PCM_UNPADDED,
+    }[bad_source]
+    code, rejected, calls = _public_inline_wav_preview(tmp_path, version, source)
+    assert code == 2, rejected
+    assert "transaction_id" not in rejected
+    assert "ak.wwise.core.object.set" not in calls
+    assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("changed_member", ["base64-pattern", "another-member"])
+def test_public_object_set_inline_wav_stops_on_definition_drift(tmp_path, version, changed_member, monkeypatch):
+    import copy
+    from dataclasses import replace
+    import wwise_waapi.schema_inventory as inventory
+
+    resolve = inventory.resolve_schema_reference
+
+    def drifted(reference, **kwargs):
+        resolved = resolve(reference, **kwargs)
+        if resolved.pointer == "/definitions/oneImportFile":
+            target = copy.deepcopy(resolved.target)
+            if changed_member == "base64-pattern":
+                target["properties"]["audioFileBase64"]["pattern"] = ".*"
+            else:
+                target["properties"]["language"]["description"] += " changed source"
+            return replace(resolved, target=target)
+        return resolved
+
+    monkeypatch.setattr(inventory, "resolve_schema_reference", drifted)
+    code, rejected, calls = _public_inline_wav_preview(tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED)
+    assert code == 2 and rejected["error_code"] == "SemanticValidationError", rejected
+    assert "compatibility definition changed" in rejected["message"]
+    assert "ak.wwise.core.object.set" not in calls
+    assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+def test_inline_wav_compatibility_rejects_noncanonical_compiler_output(tmp_path, version):
+    from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+    from wwise_waapi.builders.common import SemanticValidationError
+
+    code, prepared, _calls = _public_inline_wav_preview(tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED)
+    assert code == 0, prepared
+    args = prepared["dispatch"]["args"]
+    args["objects"][0]["children"][0]["children"][0]["import"]["files"][0]["audioFileBase64"] += "="
+    with pytest.raises(SemanticValidationError, match="must already use its canonical"):
+        validate_resolved_semantic_payload("ak.wwise.core.object.set", args, {}, version=version)
