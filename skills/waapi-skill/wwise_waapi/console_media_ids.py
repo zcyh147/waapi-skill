@@ -65,6 +65,8 @@ def work_unit_records(document):
                 if len(fields) != 1:
                     raise ValueError('Plugin media filename is not unique')
                 field = fields[0]
+                if 'Value' in field.attrib and field.find('ValueList') is not None:
+                    raise ValueError('Plugin media filename has multiple value encodings')
                 values = field.findall('./ValueList/Value')
                 filename = field.get('Value') if not values else (values[0].text if len(values) == 1 and not values[0].attrib else None)
             else:
