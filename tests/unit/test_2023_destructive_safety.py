@@ -176,7 +176,6 @@ def _configure_2023_paths(
     monkeypatch.setattr(live_env, "WWISE_2023_1_CONSOLE_PATH", console_path)
     monkeypatch.setattr(live_env, "WWISE_2023_1_SAMPLE_PROJECT_PATH", sample_project_path)
     monkeypatch.setattr(live_env, "INSTALLED_SAMPLE_PROJECT_2023_1_ROOT", sample_project_path.parent)
-    monkeypatch.setattr(destructive_2023_sandbox, "WWISE_2023_1_CONSOLE_PATH", console_path)
     monkeypatch.setattr(destructive_2023_sandbox, "WWISE_2023_1_SAMPLE_PROJECT_PATH", sample_project_path)
     monkeypatch.setattr(
         live_env,
