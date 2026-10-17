@@ -1016,6 +1016,8 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     ('2025.1', 'AudioFileSource', 'already-central'),
     ('2025.1', 'AudioFileSource', 'mode-conflicting-encodings'),
     ('2025.1', 'AudioFileSource', 'mode-value-list'),
+    ('2025.1', 'PluginMediaSource', 'plugin-conflicting-encodings'),
+    ('2025.1', 'PluginMediaSource', 'plugin-value-list'),
     *[('2025.1', 'AudioFileSource', change) for change in ['media-id', 'source-id', 'filename',
         'language-id', 'other-language', 'duplicate-source', 'duplicate-media', 'missing-media',
         'mode-unchanged', 'work-unit-ids-remain', 'unrelated-property', 'unrelated-same-name-property']],
@@ -1083,7 +1085,13 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
         source_kind, Name='Renamed source', ID='{33333333-3333-3333-3333-333333333333}')
     if source_kind == 'PluginMediaSource':
         ET.SubElement(source, 'ParentPluginID').text = '27267154'
-        ET.SubElement(ET.SubElement(source, 'PropertyList'), 'Property', Name='DataFileName', Type='string', Value='Keep.wav')
+        field = ET.SubElement(ET.SubElement(source, 'PropertyList'), 'Property', Name='DataFileName', Type='string', Value='Keep.wav')
+        if change in {'plugin-conflicting-encodings', 'plugin-value-list'}:
+            if change == 'plugin-conflicting-encodings':
+                field.set('Value', 'Other.wav')
+            else:
+                del field.attrib['Value']
+            ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'Keep.wav'
     else:
         ET.SubElement(source, 'Language').text = 'SFX'
         ET.SubElement(source, 'AudioFile' if source_kind == 'AudioFileSource' else 'MidiFile').text = 'Keep.wav'
@@ -1102,7 +1110,7 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central', 'mode-value-list'}:
+    if change not in {None, 'already-central', 'mode-value-list', 'plugin-value-list'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         code, payload = task.run('execute', tx)
