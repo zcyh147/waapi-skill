@@ -312,7 +312,7 @@ def discover_metadata(
         "inspection_limit": MAX_METADATA_DISCOVERY_FALLBACK_DETAIL_SCAN,
     }
     info_by_name = {
-        name: _read_property_info(read_call, live_scope_args, name, maximum_bytes=(MAX_METADATA_DISCOVERY_RESULT_BYTES if exact_field is not None else MAX_METADATA_DISCOVERY_INFO_BYTES))
+        name: _read_property_info(read_call, live_scope_args, name, maximum_bytes=MAX_METADATA_DISCOVERY_RESULT_BYTES)
         for name in detail_names
     }
 
@@ -398,7 +398,7 @@ def discover_metadata(
         unresolved_dependencies=unresolved_dependencies,
         fallback_detail_scan=fallback_detail_scan,
     )
-    _require_result_size(result.as_dict(detail=exact_field is not None))
+    _require_result_size(result.as_dict(detail=True))
     return result
 
 
@@ -1030,6 +1030,7 @@ def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
     name = str(candidate["name"])
     metadata = candidate["metadata"]
     assert isinstance(metadata, Mapping)
+    compact = _compact_metadata(metadata)
     return {
         "name": name,
         "kind": candidate["kind"],
@@ -1041,7 +1042,8 @@ def _compact_candidate_payload(candidate: Mapping[str, Any]) -> dict[str, Any]:
             metadata,
             owner_name=name,
         ),
-        "metadata": _compact_metadata(metadata),
+        "metadata": compact,
+        **({"metadata_details_complete": False} if compact.get("detail_required") else {}),
     }
 
 
@@ -1108,6 +1110,20 @@ def _compact_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
             for key in ("min", "max")
             if key in compact_restriction
         }
+    if len(canonical_json_bytes(payload)) > 2048:
+        if isinstance(restriction, Mapping):
+            payload["restriction"] = {key: restriction[key] for key in ("type", "min", "max") if key in restriction}
+            if isinstance(restriction.get("values"), list):
+                payload["restriction"]["value_count"] = len(restriction["values"])
+            if isinstance(restriction.get("restrictions"), list):
+                payload["restriction"]["restriction_count"] = len(restriction["restrictions"])
+        if isinstance(metadata.get("dependencies"), list):
+            payload.pop("dependencies", None)
+            payload["dependency_count"] = len(metadata["dependencies"])
+        for key in ("default", "display", "supports"):
+            if key in payload and len(canonical_json_bytes(payload[key])) > 1024:
+                payload[key] = {"status": "available_in_selected_detail"}
+        payload["detail_required"] = True
     return payload
 
 
@@ -1487,7 +1503,9 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                     object: str | int | None = None, page_size: int = 20,
                     page: str | None = None, selection: str | None = None,
                     detail_page: str | None = None, complete_detail: bool = False,
-                    project_detail: bool = True, detail_view: str = "raw") -> dict[str, Any]:
+                    project_detail: bool = True, detail_view: str = "raw",
+                    select_fields: Sequence[str] | None = None,
+                    detail_item: int | None = None) -> dict[str, Any]:
     """Read an inventory page or exact detail using a read-only scoped locator.
 
     Locators are content addressed, not mutation capabilities. They bind the
@@ -1510,6 +1528,10 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
     def locator(kind: str, index: int) -> str:
         digest = hashlib.sha256(canonical_json_bytes([kind, snapshot, issued, index])).hexdigest()
         return f"{kind}.{issued}.{index}.{digest}"
+    if select_fields is not None:
+        if not all(name in names for name in select_fields):
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "A discovered field left the live scope; discover again.")
+        return {"fields": [{"name": name, "selection": locator("mf1", names.index(name))} for name in select_fields]}
     token = selection or page
     if token is not None:
         try:
@@ -1539,9 +1561,9 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                 try:
                     _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
                 except MetadataDiscoveryError:
-                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view)
+                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view, item_index=detail_item)
                 if detail_page is not None or detail_view != "raw":
-                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view)
+                    return project_detail_page(metadata, selection=selection, scope=scope, cursor=detail_page, view=detail_view, item_index=detail_item)
             _require_result_size(payload, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
             return payload
         except MetadataDiscoveryError as exc:

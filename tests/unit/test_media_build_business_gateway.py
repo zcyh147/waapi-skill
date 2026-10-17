@@ -716,3 +716,45 @@ def test_operations_catalog_lists_all_media_business_routes(tmp_path: Path) -> N
         "<api>",
     ]
     assert all(row["next_command"] for row in rows.values())
+
+
+def test_media_pool_projection_distinguishes_unavailable_fields_from_explicit_null(tmp_path: Path) -> None:
+    client = FakeClient({
+        "ak.wwise.core.getInfo": [_info()],
+        "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+        "ak.wwise.core.mediaPool.getFields": [{"return": ["Path", "FileId", "Db", "WAV/Duration", "IXML/Scene"]}],
+        MEDIA_POOL_GET_URI: [{"return": [
+            {"Path": "/Audio/NoScene.wav", "FileId": "one", "WAV/Duration": 1.0},
+            {"Path": "/Audio/NullScene.wav", "FileId": "two", "IXML/Scene": None, "WAV/Duration": 2.0},
+        ]}],
+    })
+    code, payload = gateway.execute_gateway([
+        "core-call", MEDIA_POOL_GET_URI, "--max-results", "10", "--include-field", "scene",
+        "--include-field", "duration-seconds"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    items = payload["agent_result"]["items"]
+    assert items[0]["values"] == {"duration_seconds": 1.0}
+    assert items[0]["unavailable_values"] == ["scene"]
+    assert items[1]["values"] == {"scene": None, "duration_seconds": 2.0}
+    assert "unavailable_values" not in items[1]
+    assert client.calls[-1] == (MEDIA_POOL_GET_URI, {"maxResults": 10}, {"return": ["Path", "FileId", "Db", "IXML/Scene", "WAV/Duration"]})
+
+
+def test_media_pool_empty_search_and_empty_text_filter_are_preserved(tmp_path: Path) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+                         "ak.wwise.core.mediaPool.getFields": [{"return": ["Path", "FileId", "Db", "Filename"]}],
+                         MEDIA_POOL_GET_URI: [{"return": []}]})
+    code, payload = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "5", "--search-text", "", "--text-filter", "filename", "equals", ""], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert payload["agent_result"]["items"] == []
+    assert client.calls[-1] == (MEDIA_POOL_GET_URI, {"maxResults": 5, "searchText": "", "filters": [{"type": "field", "field": "Filename", "operator": "equals", "value": ""}]}, {"return": ["Path", "FileId", "Db", "Filename"]})
+
+
+@pytest.mark.parametrize("weight", [-0.25, 1.25])
+def test_media_pool_finite_weights_reach_native_without_clamping(tmp_path: Path, weight: float) -> None:
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], "ak.wwise.core.getProjectInfo": [_project(tmp_path)],
+                         "ak.wwise.core.mediaPool.getFields": [{"return": ["Path", "FileId", "Db"]}],
+                         MEDIA_POOL_GET_URI: [{"return": []}]})
+    code, payload = gateway.execute_gateway(["core-call", MEDIA_POOL_GET_URI, "--max-results", "5", "--weighted-audio-description", "rain", str(weight)], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, payload
+    assert client.calls[-1][1] == {"maxResults": 5, "filters": [{"type": "audioDescription", "value": "rain", "weight": weight}]}

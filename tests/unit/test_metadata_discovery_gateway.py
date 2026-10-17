@@ -1537,3 +1537,76 @@ def test_metadata_field_list_continuation_is_executable_and_scope_complete(tmp_p
     assert code == 0, second
     assert [row["name"] for row in listed["agent_result"]["fields"] + second["agent_result"]["fields"]] == ["Pitch", "Volume"]
     assert second["agent_result"]["complete"] is True
+
+
+def test_large_enum_lexical_discovery_reaches_exact_typed_detail(tmp_path: Path) -> None:
+    responses = _metadata_responses(tmp_path, names=("Mode", "ModeNearby"))
+    native = {"name": "Mode", "type": "int32", "restriction": {"type": "enum", "values": [
+        {"value": index, "displayName": f"Mode {index}"} for index in range(1000)]}}
+    responses[GET_PROPERTY_INFO_URI] = native
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    code, discovered = waapi_gateway.execute_gateway(["metadata", "discover", "--kind", "all-sounds", "--meaning", "Mode"], env=env, client_factory=lambda _: client)
+    assert code == 0, discovered
+    candidate = discovered["agent_result"]["candidates"][0]
+    assert candidate["name"] == "Mode"
+    assert candidate["metadata"]["restriction"] == {"type": "enum", "value_count": 1000}
+    assert candidate["metadata_details_complete"] is False
+    assert len(json.dumps(discovered, ensure_ascii=False, indent=2).encode()) < 32 * 1024
+    code, detail = waapi_gateway.execute_gateway(candidate["next_command"]["gateway_argv"], env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    assert detail["agent_result"]["field"]["name"] == "Mode"
+    assert detail["agent_result"]["field"]["choices"]["items"] == native["restriction"]["values"][:20]
+
+
+def test_large_dependency_discovery_reaches_complete_typed_detail(tmp_path: Path) -> None:
+    responses = _metadata_responses(tmp_path, version="2025.1")
+    dependencies = [{"type": "isMasterBus", "action": "Show", "context": "Self", "value": False} for _ in range(1000)]
+    responses[GET_PROPERTY_INFO_URI] = {"name": "Volume", "type": "Real32", "dependencies": dependencies}
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path, version="2025.1")
+    code, discovered = waapi_gateway.execute_gateway(["metadata", "discover", "--kind", "all-sounds", "--meaning", "Volume"], env=env, client_factory=lambda _: client)
+    assert code == 0, discovered
+    candidate = discovered["agent_result"]["candidates"][0]
+    assert candidate["metadata"]["dependency_count"] == 1000
+    assert "dependencies" not in candidate["metadata"]
+    pages = []
+    command = candidate["next_command"]
+    while command:
+        code, detail = waapi_gateway.execute_gateway(command["gateway_argv"], env=env, client_factory=lambda _: client)
+        assert code == 0, detail
+        page = detail["agent_result"]
+        pages.extend(page["items"])
+        command = page.get("next_command")
+    assert pages == dependencies
+
+
+@pytest.mark.parametrize("view", ["choices", "dependencies"])
+def test_single_large_typed_metadata_item_has_lossless_item_continuation(tmp_path: Path, view: str) -> None:
+    responses = _metadata_responses(tmp_path)
+    text = "声" * 12000
+    row = {"value": 1, "displayName": text} if view == "choices" else {"type": "property", "action": "Show", "context": "Self", "property": "Mode", "extension": text}
+    native = {"name": "Volume", "type": "Real32"}
+    native.update({"restriction": {"type": "enum", "values": [row]}} if view == "choices" else {"dependencies": [row]})
+    responses[GET_PROPERTY_INFO_URI] = native
+    client = FakeClient(responses)
+    env = _gateway_env(tmp_path)
+    code, listed = waapi_gateway.execute_gateway(["metadata", "list", "--kind", "all-sounds"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    code, detail = waapi_gateway.execute_gateway(["metadata", "detail", "--kind", "all-sounds", "--selection", listed["agent_result"]["fields"][0]["selection"], "--detail-view", view], env=env, client_factory=lambda _: client)
+    assert code == 0, detail
+    page = detail["agent_result"]
+    assert page["field"]["name"] == "Volume"
+    assert len(page["items"]) == 1
+    item = page["items"][0]
+    assert item["detail_required"] is True
+    fragments = []
+    command = item["next_command"]
+    while command:
+        code, detail = waapi_gateway.execute_gateway(command["gateway_argv"], env=env, client_factory=lambda _: client)
+        assert code == 0, detail
+        value = detail["agent_result"]
+        assert len(json.dumps(value, ensure_ascii=False, indent=2).encode()) <= 28 * 1024
+        fragments.extend(entry["value"] for entry in value["entries"] if entry["pointer"] == ("/displayName" if view == "choices" else "/extension"))
+        command = value.get("next_command")
+    assert "".join(fragments) == text

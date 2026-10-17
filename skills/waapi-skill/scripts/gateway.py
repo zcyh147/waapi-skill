@@ -2057,6 +2057,7 @@ def build_parser() -> argparse.ArgumentParser:
     metadata.add_argument("--selection")
     metadata.add_argument("--detail-page", help="Copy the exact continuation from a metadata detail page")
     metadata.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
+    metadata.add_argument("--detail-item", type=int)
     metadata.add_argument("--platform")
     metadata.add_argument(
         "--curve-role",
@@ -3090,6 +3091,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_discover_fields.add_argument("--page-size", type=int, default=20)
     draft_discover_fields.add_argument("--detail-page")
     draft_discover_fields.add_argument("--detail-view", choices=("raw", "choices", "dependencies"), default="raw")
+    draft_discover_fields.add_argument("--detail-item", type=int)
     field_mode.add_argument(
         "--meaning",
         action="append",
@@ -5748,8 +5750,10 @@ def preflight_metadata_input(
     args.limit = DEFAULT_METADATA_DISCOVERY_LIMIT
     args.detail = False
 
-    if (args.detail_page is not None or args.detail_view != "raw") and args.operation != "detail":
+    if (args.detail_page is not None or args.detail_view != "raw" or args.detail_item is not None) and args.operation != "detail":
         raise GatewayInputError("metadata --detail-page requires detail --selection")
+    if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
+        raise GatewayInputError("metadata --detail-item requires a nonnegative typed choices/dependencies item index")
 
     if args.operation == "types":
         if (
@@ -14346,7 +14350,7 @@ def dispatch_command(
                     context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
                     object_type=args.object_type, class_id=args.class_id, object=args.object,
                     page_size=args.page_size, page=args.page, selection=args.selection,
-                    complete_detail=True, detail_page=args.detail_page, detail_view=args.detail_view,
+                    complete_detail=True, detail_page=args.detail_page, detail_view=args.detail_view, detail_item=args.detail_item,
                 )
                 scope_argv = []
                 for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
@@ -14356,11 +14360,17 @@ def dispatch_command(
                     scope_argv.extend(["--path-segment", segment])
                 if result.get("next_page"):
                     result["next_command"] = transaction_next_command("metadata", ["metadata", "list", *scope_argv, "--page-size", str(args.page_size), "--page", result["next_page"]])
-                def continue_detail(target, view):
+                def continue_detail(target, view, item=None):
+                    extra = ["--detail-item", str(item)] if item is not None else []
                     if target.get("next_detail_page"):
-                        target["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", args.selection, "--detail-view", view, "--detail-page", target["next_detail_page"]])
+                        target["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", args.selection, "--detail-view", view, *extra, "--detail-page", target["next_detail_page"]])
+                    if target.get("detail_required"):
+                        target["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", args.selection, "--detail-view", target["detail_view"], "--detail-item", str(target["detail_item"])])
+                    for row in target.get("items", []):
+                        if isinstance(row, Mapping) and row.get("detail_required"):
+                            continue_detail(row, row["detail_view"], row["detail_item"])
                 def decorate_detail(page):
-                    continue_detail(page, args.detail_view)
+                    continue_detail(page, args.detail_view, args.detail_item)
                     for key in ("choices", "dependency_page"):
                         continue_detail(page["field"][key], page["field"][key]["detail_view"])
                 if "field" in result:
@@ -14391,7 +14401,25 @@ def dispatch_command(
                     "metadata_authority": "live-waapi",
                     **metadata_call_evidence_projection(metadata_calls),
                 }
-                payload["agent_result"] = discovery.as_dict(detail=False)
+                projected = discovery.as_dict(detail=False)
+                detail_candidates = [row for row in projected["candidates"] if row.get("metadata_details_complete") is False]
+                if detail_candidates:
+                    from wwise_waapi.metadata_discovery import browse_metadata
+                    selections = browse_metadata(
+                        read_call=transaction_read_call(dispatcher, connection=connection, version=detected_version),
+                        context={"endpoint": dict(common["endpoint"]), "version": detected_version, "live_info": dict(live_info), "project": project},
+                        object_type=args.object_type, class_id=args.class_id, object=args.object,
+                        select_fields=[row["name"] for row in detail_candidates],
+                    )
+                    scope_argv = []
+                    for flag, value in (("--kind", args.metadata_semantic_kind), ("--custom-kind", args.metadata_custom_kind_meaning), ("--exact-id", args.metadata_exact_id)):
+                        if value is not None:
+                            scope_argv.extend([flag, value])
+                    for segment in args.metadata_path_segments or []:
+                        scope_argv.extend(["--path-segment", segment])
+                    for candidate, selected in zip(detail_candidates, selections["fields"], strict=True):
+                        candidate["next_command"] = transaction_next_command("metadata", ["metadata", "detail", *scope_argv, "--selection", selected["selection"], "--detail-view", "choices" if candidate["metadata"].get("restriction", {}).get("type") == "enum" else "dependencies"])
+                payload["agent_result"] = projected
                 return payload
             candidates = tuple(discovery.candidates)
             if len(candidates) != 1:
@@ -17986,6 +18014,8 @@ def dispatch_business_field_discovery(
     """Bind bounded live candidates without accepting a model-authored token."""
 
     meanings = tuple(args.meanings or ())
+    if args.detail_item is not None and (args.detail_view == "raw" or args.detail_item < 0):
+        raise GatewayInputError("--detail-item requires a nonnegative typed choices/dependencies item index")
     if not (args.list_fields or args.selection) and (
         not 1 <= len(meanings) <= MAX_METADATA_DISCOVERY_QUERIES
         or any(
@@ -18079,7 +18109,7 @@ def dispatch_business_field_discovery(
     )
     if args.page and not args.list_fields:
         raise GatewayInputError("--page requires --list")
-    if (args.detail_page or args.detail_view != "raw") and not args.selection:
+    if (args.detail_page or args.detail_view != "raw" or args.detail_item is not None) and not args.selection:
         raise GatewayInputError("--detail-page requires --selection")
     detail_projection = None
     if args.list_fields or args.selection:
@@ -18097,17 +18127,28 @@ def dispatch_business_field_discovery(
                 _require_result_size(browsed, maximum_bytes=MAX_METADATA_DISCOVERY_AGENT_RESULT_BYTES, pretty=True)
             except MetadataDiscoveryError:
                 from wwise_waapi.metadata_detail import detail_page
-                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view)
+                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view, item_index=args.detail_item)
             if (args.detail_page or args.detail_view != "raw") and detail_projection is None:
                 from wwise_waapi.metadata_detail import detail_page
-                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view)
-        def detail_continuation(result, revision, view=None):
+                detail_projection = detail_page(browsed["metadata"], selection=args.selection, scope=browsed["scope"], cursor=args.detail_page, view=args.detail_view, item_index=args.detail_item)
+        def detail_continuation(result, revision, view=None, item=None):
             if result.get("next_detail_page"):
                 scope_flag, scope_handle = (("--object-handle", args.object_handle) if args.object_handle else ("--type-handle", args.type_handle) if args.type_handle else ("--semantic-kind", args.semantic_kind))
                 continuation = ["draft-discover-fields", args.draft_id, "--task-authority", args.task_authority, "--expected-revision", str(revision), scope_flag, scope_handle, "--selection", args.selection, "--detail-view", view or args.detail_view, "--detail-page", result["next_detail_page"]]
+                if item is not None or (view is None and args.detail_item is not None):
+                    continuation.extend(["--detail-item", str(item if item is not None else args.detail_item)])
                 if args.platform:
                     continuation.extend(["--platform", args.platform])
                 result["next_command"] = transaction_next_command("draft-discover-fields", continuation, state_dir=args.state_dir)
+            if result.get("detail_required"):
+                scope_flag, scope_handle = (("--object-handle", args.object_handle) if args.object_handle else ("--type-handle", args.type_handle) if args.type_handle else ("--semantic-kind", args.semantic_kind))
+                continuation = ["draft-discover-fields", args.draft_id, "--task-authority", args.task_authority, "--expected-revision", str(revision), scope_flag, scope_handle, "--selection", args.selection, "--detail-view", result["detail_view"], "--detail-item", str(result["detail_item"])]
+                if args.platform:
+                    continuation.extend(["--platform", args.platform])
+                result["next_command"] = transaction_next_command("draft-discover-fields", continuation, state_dir=args.state_dir)
+            for item_row in result.get("items", []):
+                if isinstance(item_row, Mapping) and item_row.get("detail_required"):
+                    detail_continuation(item_row, revision, item_row["detail_view"], item_row["detail_item"])
             if "field" in result:
                 for key in ("choices", "dependency_page"):
                     detail_continuation(result["field"][key], revision, result["field"][key]["detail_view"])

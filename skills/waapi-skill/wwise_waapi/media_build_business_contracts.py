@@ -149,7 +149,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "weighted_audio_descriptions": {
                 "flag": "--weighted-audio-description",
                 "repeatable": True,
-                "arguments": ["DESCRIPTION", "WEIGHT_0_TO_1"],
+                "arguments": ["DESCRIPTION", "FINITE_NATIVE_WEIGHT"],
             },
             "audio_similarity_files": {
                 "flag": "--audio-similarity-file",
@@ -158,7 +158,7 @@ _CONTRACTS: dict[str, dict[str, Any]] = {
             "weighted_audio_similarity_files": {
                 "flag": "--weighted-audio-similarity-file",
                 "repeatable": True,
-                "arguments": ["ABSOLUTE_AUDIO_FILE", "WEIGHT_0_TO_1"],
+                "arguments": ["ABSOLUTE_AUDIO_FILE", "FINITE_NATIVE_WEIGHT"],
             },
             "return_field_meanings": {
                 "flag": "--include-field",

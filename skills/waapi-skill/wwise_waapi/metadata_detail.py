@@ -33,17 +33,21 @@ def detail_entries(value: Any, pointer: str = "") -> list[dict[str, Any]]:
 
 def detail_page(metadata: Mapping[str, Any], *, selection: str,
                 scope: Mapping[str, Any], cursor: str | None,
-                view: str = "raw") -> dict[str, Any]:
+                view: str = "raw", item_index: int | None = None) -> dict[str, Any]:
     from .metadata_discovery import MetadataDiscoveryError, _require_result_size
     if view not in {"raw", "choices", "dependencies"}:
         raise MetadataDiscoveryError("INVALID_METADATA_DETAIL_VIEW", "Choose raw, choices or dependencies metadata detail")
-    snapshot = hashlib.sha256(canonical_json_bytes([selection, metadata, view])).hexdigest()
+    snapshot = hashlib.sha256(canonical_json_bytes([selection, metadata, view, item_index])).hexdigest()
     restriction = metadata.get("restriction")
     choices = restriction.get("values", []) if isinstance(restriction, Mapping) else []
     choices = choices if isinstance(choices, list) else []
     dependencies = metadata.get("dependencies", [])
     dependencies = dependencies if isinstance(dependencies, list) else []
     rows = detail_entries(metadata) if view == "raw" else choices if view == "choices" else dependencies
+    if item_index is not None:
+        if view == "raw" or isinstance(item_index, bool) or not isinstance(item_index, int) or not 0 <= item_index < len(rows):
+            raise MetadataDiscoveryError("INVALID_METADATA_DETAIL_ITEM", "Copy an item index from the selected typed metadata page")
+        rows = detail_entries(rows[item_index])
     offset = 0
     if cursor is not None:
         try:
@@ -54,29 +58,46 @@ def detail_page(metadata: Mapping[str, Any], *, selection: str,
             valid = False
         if not valid:
             raise MetadataDiscoveryError("METADATA_DETAIL_CHANGED", "The selected metadata detail or its scope changed, or its page is invalid; read the selected field again.")
-    end = min(len(rows), offset + (64 if view == "raw" else 20))
+    raw_view = view == "raw" or item_index is not None
+    end = min(len(rows), offset + (64 if raw_view else 20))
+    def typed_item(row: Any, index: int, kind: str) -> Any:
+        if len(canonical_json_bytes(row)) <= 1024:
+            return row
+        return {**({key: value for key, value in row.items()
+                    if key in {"value", "type", "action", "context", "property", "displayName"}
+                    and len(canonical_json_bytes(value)) <= 256} if isinstance(row, Mapping) else {}),
+                "detail_required": True, "detail_item": index, "detail_view": kind}
     def typed_page(kind: str, values: list[Any]) -> dict[str, Any]:
-        start, stop = (offset, end) if view == kind else (0, min(20, len(values)))
-        digest = hashlib.sha256(canonical_json_bytes([selection, metadata, kind])).hexdigest()
-        return {"items": values[start:stop], "offset": start, "total_count": len(values),
+        start, stop = (offset, end) if view == kind and not raw_view else (0, min(20, len(values)))
+        items = [typed_item(values[index], index, kind) for index in range(start, stop)]
+        while len(items) > 1 and len(canonical_json_bytes(items)) > 3 * 1024:
+            items.pop()
+            stop -= 1
+        digest = hashlib.sha256(canonical_json_bytes([selection, metadata, kind, None])).hexdigest()
+        return {"items": items, "offset": start, "total_count": len(values),
+                "snapshot": digest,
                 "complete": stop == len(values),
                 "next_detail_page": f"md1.{stop}.{digest}" if stop < len(values) else None,
                 "detail_view": kind}
     field = {key: metadata[key] for key in ("name", "type", "default", "supports", "unit", "availability") if key in metadata}
     if isinstance(restriction, Mapping):
         field["constraints"] = {key: restriction[key] for key in ("type", "min", "max", "minInclusive", "maxInclusive") if key in restriction}
-    field["dependencies"] = dependencies[:20]
     field["dependency_page"] = typed_page("dependencies", dependencies)
+    field["dependencies"] = field["dependency_page"]["items"]
     field["choices"] = typed_page("choices", choices)
     while True:
-        if view == "choices":
+        if view == "choices" and not raw_view:
             field["choices"] = typed_page("choices", choices)
-        elif view == "dependencies":
+            end = offset + len(field["choices"]["items"])
+        elif view == "dependencies" and not raw_view:
             field["dependency_page"] = typed_page("dependencies", dependencies)
-            field["dependencies"] = dependencies[offset:end]
+            field["dependencies"] = field["dependency_page"]["items"]
+            end = offset + len(field["dependencies"])
+        page_rows = rows[offset:end] if raw_view else field["choices" if view == "choices" else "dependency_page"]["items"]
         result = {"contract": "waapi-skill.metadata-detail-page/v1", "selection": selection,
                   "scope": dict(scope), "snapshot": snapshot, "detail_view": view, "field": field,
-                  ("entries" if view == "raw" else "items"): rows[offset:end],
+                  **({"item_index": item_index} if item_index is not None else {}),
+                  ("entries" if raw_view else "items"): page_rows,
                   "offset": offset, "total_entries": len(rows), "remaining_entries": len(rows) - end,
                   "complete": end == len(rows), "next_detail_page": f"md1.{end}.{snapshot}" if end < len(rows) else None,
                   "mutation_authority": False}
@@ -101,8 +122,23 @@ def fit_detail_continuations(result: dict[str, Any], decorate: Any) -> dict[str,
         except MetadataDiscoveryError as exc:
             if exc.error_code != "DISCOVERY_RESULT_LIMIT_EXCEEDED":
                 raise
-            key = "entries" if result["detail_view"] == "raw" else "items"
+            key = "entries" if "entries" in result else "items"
             if len(result[key]) <= 1:
+                reduced = False
+                for field_name in ("choices", "dependency_page"):
+                    page = result["field"][field_name]
+                    if len(page["items"]) <= 1:
+                        continue
+                    page["items"].pop()
+                    stop = page["offset"] + len(page["items"])
+                    page["complete"] = stop == page["total_count"]
+                    page["next_detail_page"] = f"md1.{stop}.{page['snapshot']}"
+                    if field_name == "dependency_page":
+                        result["field"]["dependencies"] = page["items"]
+                    reduced = True
+                    break
+                if reduced:
+                    continue
                 raise
             result[key].pop()
             end = result["offset"] + len(result[key])
