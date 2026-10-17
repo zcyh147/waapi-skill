@@ -243,3 +243,11 @@ on 2025.1 only, and moves existing Media Pool getFields to a bounded fixed
 metadata command. The native denominator and exact ownership stay unchanged;
 56 newly linked obligations move from missing implementation to unresolved.
 No separate product evidence is recaptured or inherited for this successor.
+
+Ticket #188 additionally has fake-tested owned Mac Authoring strategy plumbing in
+the existing ScenarioLifecycle/sandbox/HeadlessLifecycle path. Exact build,
+private default bottle, copied-project roundtrip, readiness identity and cleanup
+failure controls passed without launching an installed tool or native client.
+This grants no branch/native effect credit. Consolidated driver installation,
+Windows ownership, cross-family integration and the remaining layout contracts
+and observations stay open; the Authoring permission-window hold remains active.

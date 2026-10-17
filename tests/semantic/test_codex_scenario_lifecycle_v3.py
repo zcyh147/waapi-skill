@@ -44,7 +44,7 @@ def _project_hash(value: str = "a" * 64) -> ProjectHash:
     )
 
 
-def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_error=False):
+def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_error=False, version="2022.1"):
     source_root = tmp_path / "immutable-source"
     source_root.mkdir()
     source_project = source_root / "SampleProject.wproj"
@@ -52,7 +52,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_
     fixed_hash = _project_hash()
 
     def fake_require(_env):
-        return SimpleNamespace(version="2022.1", sample_project_source=source_project)
+        return SimpleNamespace(version=version, sample_project_source=source_project)
 
     def fake_prepare(_env, *, sandbox_root: Path, hash_strategy: str):
         assert hash_strategy == "full"
@@ -65,7 +65,7 @@ def _install_fakes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, shutdown_
             source_root=str(source_root),
             sandbox_path=str(sandbox_path),
             sandbox_project_path=str(sandbox_project),
-            wwise_version="2022.1",
+            wwise_version=version,
             copy_duration_seconds=0.01,
             source_hash=fixed_hash,
             sandbox_hash=fixed_hash,
@@ -809,3 +809,55 @@ def test_prepared_receipt_failure_consumes_finish_without_repeating_shutdown(mon
     assert runtime.owned_root.exists()
     with pytest.raises(lifecycle_v3.ScenarioLifecycleError, match='not active'):
         owner.finish('BLOCKED')
+
+
+@pytest.mark.parametrize('version,build', [('2024.1', '2024.1.13.9056'), ('2025.1', '2025.1.7.9143')])
+@pytest.mark.parametrize('broken', [None, 'roundtrip', 'native-argv', 'host', 'build'])
+def test_owned_authoring_scenario_forwards_pinned_host_and_requires_project_proof(monkeypatch, tmp_path, version, build, broken):
+    _install_fakes(monkeypatch, tmp_path, version=version)
+    root = tmp_path / 'authoring-scenario'
+    home = root / 'owned/private-home'
+    captured = {}
+    def launch(sandbox, env, **kwargs):
+        captured.update(kwargs)
+        native = 'Z:\\private\\SampleProject.wproj'
+        proof = {'method': 'owned_winepath_roundtrip', 'project': str(sandbox.sandbox_project),
+                 'native_project': native, 'roundtrip_project': str(sandbox.sandbox_project), 'build': build}
+        if broken == 'roundtrip':
+            proof['roundtrip_project'] = str(tmp_path / 'user-project.wproj')
+        info = {'isCommandLine': broken == 'host', 'version': {
+            'year': int(version[:4]), 'major': 1, 'minor': int(build.split('.')[2]),
+            'build': int(build.split('.')[3]) + (1 if broken == 'build' else 0), 'displayName': build}}
+        return SimpleNamespace(host_kind='wwise-authoring', host='127.0.0.1', port=8080,
+            process=SimpleNamespace(pid=424242), ready_result=info,
+            command=['/owned/bin/wine', 'start.exe', '/wait',
+                     f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe',
+                     native if broken != 'native-argv' else 'Z:\\user-project.wproj'],
+            launch_cwd=sandbox.sandbox_root, launch_project_attestation=proof, launch_preparation=[])
+    monkeypatch.setattr(lifecycle_v3, 'launch_sandboxed_wwise', launch)
+    owner = lifecycle_v3.ScenarioLifecycle(scenario_id='authoring-layout-batch', version=version,
+        scenario_root=root, live_environment={'WWISE_TEST_CONFIG': 'unused'}, host_kind='wwise-authoring',
+        launch_environment_overrides={'HOME': str(home)}, lock_root=tmp_path / 'lock')
+    if broken:
+        with pytest.raises(lifecycle_v3.ScenarioLifecycleStartError, match='Authoring'):
+            owner.start()
+        assert owner._lock_acquired is False
+        assert (root / 'owned').exists()
+        return
+    runtime = owner.start()
+    assert captured == {'host_kind': 'wwise-authoring', 'wine_prefix_path': home / 'Library/Application Support/Wwise2019/Bottles/Wwise2019x64',
+                        'case_owned_root': root / 'owned'}
+    start = json.loads((runtime.evidence_root / 'start.json').read_text())
+    assert start['host_kind'] == 'wwise-authoring'
+    assert start['authoring_build'] == build
+    assert start['launch_project_attestation']['roundtrip_project'] == str(runtime.sandbox.sandbox_project)
+    assert start['get_info']['isCommandLine'] is False
+    assert owner._lock_acquired is True
+    owner.finish('BLOCKED', reason='fake launch proof only')
+
+
+def test_authoring_scenario_requires_private_home_before_allocating(tmp_path):
+    with pytest.raises(ValueError, match='private HOME'):
+        lifecycle_v3.ScenarioLifecycle(scenario_id='layout-batch', version='2025.1',
+            scenario_root=tmp_path / 'case', live_environment={}, host_kind='wwise-authoring')
+    assert not (tmp_path / 'case').exists()

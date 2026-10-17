@@ -71,3 +71,22 @@ The empty-registration seam does not establish complete layout construction.
 Native runs stay sequential and grouped under the existing lifecycle; additional
 Authoring launches are on hold because they require user interaction with access
 permission windows. Fresh semantic execution remains unauthorized.
+
+## Owned Mac lifecycle strategy milestone (2026-10-17)
+
+The existing ScenarioLifecycle and sandbox launch helper now forward an explicit
+Authoring host strategy into HeadlessLifecycle. The strategy pins the exact
+2024.1/2025.1 build from the independent native catalog, requires a fresh default
+Wine bottle under a private owned HOME, prepares that bottle with the selected
+bundle's fixed tools, and binds the copied project through a Wine path roundtrip.
+The existing lifecycle retains process ownership, readiness, shutdown and prefix
+cleanup. It rejects Console readiness, changed builds, aliased/unowned projects,
+changed launch arguments and an existing bottle before accepting a session.
+Bounded preparation and readiness records survive launch-proof failure.
+
+Focused fake-only lifecycle, sandbox, shared-batch, category and evidence-reader
+controls passed 214 cases. No installed preparation tool, Wwise process or native
+client was executed. This is code evidence only. The consolidated pytest driver
+still needs to construct and install the actual shared owner; native Windows
+process ownership and cross-family integration remain unfinished. No fixture is
+claimed launch-ready, and the user interaction hold remains in force.
