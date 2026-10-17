@@ -885,3 +885,30 @@ def test_older_compound_rejects_unpinned_cancel_option_before_parent_preview(tmp
         cancellation=cancellation, declaration_error="UNSUPPORTED_CANCELLATION_OPTION")
     assert not (state_dir / "transactions").exists()
     assert not any(row[0].startswith("ak.wwise.core.undo.") for row in client.calls)
+
+
+def test_compound_cancellation_observation_keeps_matching_read_contract_byte_limit(tmp_path):
+    from copy import deepcopy
+    client = _cancellation_client("2025.1")
+    original = client.call
+
+    def oversized_after_cancel(uri, native_args=None, options=None):
+        result = original(uri, native_args, options)
+        if (uri == "ak.wwise.core.object.get" and getattr(client, "cancelled", False)
+                and native_args.get("from", {}).get("id") == [OBJECT_GUID]):
+            result = deepcopy(result)
+            result["return"][0]["notes"] = "x" * (300 * 1024)
+        return result
+
+    client.call = oversized_after_cancel
+    state_dir, env, preview = _preview_cancellation_case(tmp_path, client, version="2025.1", cancellation="undo-changes")
+    code, result = waapi_gateway.execute_gateway([
+        "--state-dir", str(state_dir), "execute", preview["transaction_id"]],
+        env=env, client_factory=lambda _url: client)
+    assert code == 2 and result["status"] == "execution_cancelled", result
+    observed = result["compound_execution"]["cancellation_observation"]
+    assert observed["complete"] is False, observed
+    assert observed["pre_state_restored"] is False and result["rollback_verified"] is False
+    assert any(read.get("call", {}).get("error_code") == "RESULT_TOO_LARGE" for read in observed["readbacks"]), observed
+    assert result["verified"] is False and result["automatic_retry"] is False
+    assert len([uri for uri, _args, _options in client.calls if uri.endswith("cancelGroup")]) == 1
