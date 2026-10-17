@@ -369,6 +369,214 @@ def test_mixed_type_category_admission_semantics_are_not_guessed(tmp_path, versi
     assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
 
 
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('shape', ['mixed', 'repeated-category'])
+def test_every_disclosed_target_row_can_be_satisfied_without_boolean_combination_guessing(tmp_path, version, shape):
+    task = _joint_classifier_task(tmp_path, version, shape)
+    task.declare()
+    start = len(task.calls)
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    classifiers = [(args, options) for uri, args, options in task.calls[start:]
+                   if uri.endswith('object.get') and 'category' in options.get('return', [])]
+    assert len(classifiers) == 1
+    assert classifiers[0][0] == {'from': {'id': [SECOND]}}
+    assert classifiers[0][1]['return'] == (['id', 'type', 'category'] if shape == 'mixed' else ['id', 'category'])
+    before = deepcopy(task.objects)
+    preview, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert not preview['preview_summary'].get('derived_changes')
+    assert task.objects == {**before, FIRST: {**before[FIRST], 'Attenuation': {'id': SECOND}}}
+    writes = [args for uri, args, _ in task.calls if uri.endswith(('setReference', 'setProperty', 'object.set'))]
+    assert writes == [{'object': FIRST, 'reference': 'Attenuation', 'value': SECOND}]
+
+
+def _joint_classifier_task(path, version, shape, operation='object.setReference'):
+    task = AttenuationTask(path, version, operation=operation)
+    task.objects[FIRST].update(ListenerRelativeRouting=True, OverridePositioning=True)
+    task.objects[SECOND]['category'] = 'RecordedCategory'
+    task.metadata['Attenuation']['restriction']['restrictions'] = (
+        [{'type': ['Attenuation', 'Effect']}, {'category': ['RecordedCategory', 'OtherCategory']}]
+        if shape == 'mixed' else
+        [{'category': ['RecordedCategory', 'FirstCategory']}, {'category': ['SecondCategory', 'RecordedCategory']}])
+    return task
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('shape', ['mixed', 'repeated-category'])
+def test_atomic_reference_edit_can_satisfy_every_disclosed_target_row(tmp_path, version, shape):
+    task = _joint_classifier_task(tmp_path, version, shape, operation='object.set')
+    task.metadata['Attenuation']['restriction']['restrictions'].reverse()
+    task.declare()
+    preview, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert not preview['preview_summary'].get('derived_changes')
+    assert task.objects[FIRST]['Attenuation'] == {'id': SECOND}
+    writes = [row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]
+    assert len(writes) == 1 and writes[0][0].endswith('object.set')
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('category', ['FirstCategory', 'SecondCategory'])
+def test_partial_repeated_category_matches_remain_an_explicit_native_question(tmp_path, version, category):
+    task = _joint_classifier_task(tmp_path, version, 'repeated-category')
+    task.objects[SECOND]['category'] = category
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('shape', ['mixed', 'repeated-category'])
+@pytest.mark.parametrize('drift', ['category', 'raw-metadata'])
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_joint_classifier_and_raw_metadata_drift_cannot_write_or_report_success(tmp_path, version, shape, drift, phase):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = _joint_classifier_task(tmp_path, version, shape)
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    def change():
+        if drift == 'category':
+            task.objects[SECOND]['category'] = 'UnmatchedCategory'
+        else:
+            # Every membership still holds; only the sealed raw row order changes.
+            task.metadata['Attenuation']['restriction']['restrictions'].reverse()
+    if phase == 'before':
+        change()
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    change()
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed', verified
+    assert verified['automatic_retry'] is False
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.VERIFICATION_FAILED
+    assert store.read_events(tx)[-1]['event_type'] == 'verification_recorded'
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+@pytest.mark.parametrize('damage', ['missing-type', 'malformed-category', 'transport'])
+def test_unavailable_joint_classifier_postread_remains_unknown_without_second_write(tmp_path, version, damage):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = _joint_classifier_task(tmp_path, version, 'mixed')
+    tx = _execute_target_assignment(task)
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and 'category' in options.get('return', []):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            if damage == 'transport':
+                raise RuntimeError('controlled classifier read unavailable')
+            return {'return': [{'id': SECOND, 'category': 'RecordedCategory'}] if damage == 'missing-type'
+                    else [{'id': SECOND, 'type': 'Attenuation', 'category': None}]}
+        return normal_call(uri, args, options)
+    task.call = call
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'executed_unverified', verified
+    assert verified['status'] == 'verification_deferred'
+    assert verified['manual_verification_retry_allowed'] is True
+    assert verified['automatic_retry'] is False
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.EXECUTED_UNVERIFIED
+    assert not any(event['event_type'] == 'verification_recorded' for event in store.read_events(tx))
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_joint_classifier_type_fact_must_match_the_exact_bound_identity(tmp_path, version):
+    task = _joint_classifier_task(tmp_path, version, 'mixed')
+    task.declare()
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('object.get') and 'category' in options.get('return', []):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': [{'id': SECOND, 'type': 'Effect', 'category': 'RecordedCategory'}]}
+        return normal_call(uri, args, options)
+    task.call = call
+    code, checked = task.step('draft-check')
+    assert code == 2 and checked['error_code'] == 'INVALID_READBACK', checked
+    assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_joint_classifier_exact_type_drift_is_known_false_even_when_new_type_is_allowed(tmp_path, version):
+    from wwise_waapi.transactions import TransactionStore, TransactionState
+    task = _joint_classifier_task(tmp_path, version, 'mixed')
+    tx = _execute_target_assignment(task)
+    task.objects[SECOND]['type'] = 'Effect'
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified['state'] == 'verification_failed', verified
+    store = TransactionStore(task.path / 'state')
+    assert store.load(tx).state is TransactionState.VERIFICATION_FAILED
+    assert store.read_events(tx)[-1]['event_type'] == 'verification_recorded'
+    code, repeated = task.run('execute', tx)
+    assert code == 2, repeated
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_joint_classifier_read_keeps_the_explicit_selected_platform(tmp_path, version):
+    platform = '{77777777-7777-7777-7777-777777777777}'
+    task = _joint_classifier_task(tmp_path, version, 'mixed')
+    normal_call = task.call
+    def call(uri, args=None, options=None):
+        if uri.endswith('isPropertyEnabled'):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            return {'return': True}
+        return normal_call(uri, args, options)
+    task.call = call
+    source, target = task.bind(FIRST), task.bind(SECOND)
+    code, discovered = task.step('draft-discover-fields', '--object-handle', source,
+        '--meaning', 'Attenuation', '--platform', platform)
+    assert code == 0, discovered
+    field = discovered['meaning_results'][0]['candidates'][0]['handle']
+    code, declared = task.step('draft-declare-field-change', '--object-handle', source,
+        '--field-handle', field, '--target-handle', target)
+    assert code == 0, declared
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    reads = [options for uri, args, options in task.calls if uri.endswith('object.get')
+             and 'category' in options.get('return', [])]
+    assert reads and all(len(options['return']) == 3 and set(options['return']) == {'id', 'type', 'category'}
+                         and options['platform'] == platform for options in reads)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('shared', [False, True])
+def test_joint_target_classifiers_keep_independent_playable_and_shared_only_rules(tmp_path, version, shared):
+    task = SharedReferenceTask(tmp_path, version, shared=shared)
+    task.objects[SECOND].update(category='RecordedCategory', isPlayable=True)
+    task.metadata['Attenuation']['restriction']['restrictions'].extend([
+        {'category': ['RecordedCategory']}, 'playable'])
+    task.declare()
+    code, checked = task.step('draft-check')
+    if not shared:
+        assert code == 2 and checked['error_code'] == 'INVALID_REFERENCE_TARGET', checked
+        assert not any(uri.endswith(('setReference', 'setProperty', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    _, _, verified, _ = finish(task)
+    assert verified['verified'] is True
+    assert len([row for row in task.calls if row[0].endswith(('setReference', 'setProperty', 'object.set'))]) == 1
+
+
 @pytest.mark.parametrize('phase', ['before', 'after'])
 def test_atomic_target_classifier_drift_cannot_verify_a_changed_target(tmp_path, phase):
     task = AttenuationTask(tmp_path, '2025.1', operation='object.set')

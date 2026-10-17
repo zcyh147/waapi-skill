@@ -21713,9 +21713,35 @@ def _require_reference_target_allowed(
                 raise OperationContractError("INVALID_METADATA", "Reference category restriction must be an exact string array.")
         elif set(row) != {"childOfReference"}:
             raise OperationContractError("INVALID_METADATA", "Reference restriction has an unknown object shape.")
-    if ambiguous_categories:
-        raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
-            "Combined native type/category rows require separately established admission semantics.")
+    type_rows = [row for row in restrictions if isinstance(row, Mapping) and "type" in row]
+    classifier_fields = (["type"] if ambiguous_categories and type_rows else []) + (
+        ["category"] if category_rows else []) + (["isPlayable"] if "playable" in restrictions else [])
+    if classifier_fields:
+        if read is None or conditions is None:
+            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Target classifiers require an exact existing scoped Preview.")
+        facts = _read_reference_target_classifiers(target.object, classifier_fields, read=read, platform=platform)
+        if "isPlayable" in facts and facts["isPlayable"] is not True:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        if ambiguous_categories:
+            if "type" in facts and not _native_snapshot_equal(facts["type"], target_type):
+                raise OperationContractError("INVALID_READBACK", "Selected target type changed between exact identity and classifier observations.")
+            # Every disclosed row is independently satisfied. This sufficient
+            # proof does not assign AND/OR semantics to partial native matches.
+            all_satisfied = all(facts["category"] in row["category"] for row in category_rows) and all(
+                reference_type_token(facts["type"]) in {reference_type_token(value) for value in row["type"]}
+                for row in type_rows)
+            if not all_satisfied:
+                raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY",
+                    "Partially satisfied combined type/category rows require separately established native admission semantics.",
+                    details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        elif category_rows and facts["category"] not in category_rows[0]["category"]:
+            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
+                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
+        classifier_condition = {"kind": "target_classifier", "target_id": target.object,
+            "reference": metadata.name, "classifiers": facts, "platform": platform}
+        if classifier_condition not in conditions:
+            conditions.append(classifier_condition)
     if requires_shared:
         if read is None or conditions is None or wwise_version not in {"2022.1", "2023.1", "2024.1", "2025.1"}:
             raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only classification requires its pinned existing-object scope.")
@@ -21724,19 +21750,6 @@ def _require_reference_target_allowed(
             "classification": facts, "version": wwise_version, "platform": platform}
         if condition not in conditions:
             conditions.append(condition)
-    classifier_fields = (["category"] if category_rows else []) + (["isPlayable"] if "playable" in restrictions else [])
-    if classifier_fields:
-        if read is None or conditions is None:
-            raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Target classifiers require an exact existing scoped Preview.")
-        facts = _read_reference_target_classifiers(target.object, classifier_fields, read=read, platform=platform)
-        if (category_rows and facts["category"] not in category_rows[0]["category"]
-                or "isPlayable" in facts and facts["isPlayable"] is not True):
-            raise OperationContractError("INVALID_REFERENCE_TARGET", "Fresh native target classification does not satisfy live reference restrictions.",
-                details={"reference": metadata.name, "target_id": target.object, "classifiers": facts})
-        classifier_condition = {"kind": "target_classifier", "target_id": target.object,
-            "reference": metadata.name, "classifiers": facts, "platform": platform}
-        if classifier_condition not in conditions:
-            conditions.append(classifier_condition)
     parent_fields = []
     for row in metadata.restriction.get("restrictions", []):
         if not isinstance(row, Mapping) or "childOfReference" not in row:
@@ -21864,7 +21877,7 @@ def _read_reference_target_classifiers(target_id, fields, *, read, platform):
             raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Native target classifier is unavailable for this exact object.",
                 details={"target_id": target_id, "classifier": field})
         value = rows[0][field]
-        if not (isinstance(value, str) and value if field == "category" else isinstance(value, bool)):
+        if not (isinstance(value, str) and value if field in {"category", "type"} else isinstance(value, bool)):
             raise OperationContractError("INVALID_READBACK", "Native target classifier has an invalid value.",
                 details={"target_id": target_id, "classifier": field})
         facts[field] = value
