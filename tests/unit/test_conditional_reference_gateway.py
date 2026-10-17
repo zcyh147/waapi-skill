@@ -1189,11 +1189,11 @@ def test_association_owner_condition_depth_budget_includes_the_original_field(tm
         }]},
         "SwitchBehavior": {"name": "SwitchBehavior", "type": "int16", "dependencies": [condition("Step0")]},
     }
-    for index in range(7):
+    for index in range(16):
         name = f"Step{index}"
-        task.metadata[name] = {"name": name, "type": "bool", "dependencies": [condition(f"Step{index + 1}")] if index < 6 else []}
+        task.metadata[name] = {"name": name, "type": "bool", "dependencies": [condition(f"Step{index + 1}")] if index < 15 else []}
     task.objects[FIRST].update(name="", type="ObjectSettingAssociation", parent=None, owner={"id": SECOND}, ContinuePlay=False)
-    task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, **{f"Step{index}": True for index in range(7)})
+    task.objects[SECOND].update(type="SwitchContainer", SwitchBehavior=1, **{f"Step{index}": True for index in range(16)})
     target = task.bind(FIRST)
     field = task.discover(target, "ContinuePlay")
     code, declared = task.step("draft-declare-field-change", "--object-handle", target, "--field-handle", field,

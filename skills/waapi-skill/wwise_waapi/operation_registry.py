@@ -69,6 +69,7 @@ from .host_paths import (
 )
 from .io_policy import IOPolicyError, validate_isolated_io
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
+from .condition_limits import MAX_CONDITION_CONTROLLERS, MAX_CONDITION_PATH_FIELDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
     condition_values_equal,
@@ -7525,8 +7526,9 @@ def _apply_reference_activation_dependencies(
     if (object_id is None) == (class_id is None):  # pragma: no cover - internal invariant.
         raise AssertionError("object_id or class_id must be supplied exclusively")
 
-    if len(_activation_path) >= 8:
-        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency depth exceeds 8.")
+    if len(_activation_path) >= MAX_CONDITION_PATH_FIELDS:
+        raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Condition path exceeds the finite unique-field budget.",
+            details={"maximum_path_fields": MAX_CONDITION_PATH_FIELDS, "maximum_controller_fields": MAX_CONDITION_CONTROLLERS})
     path = (*_activation_path, metadata.name.casefold())
     all_fields = set() if _activation_fields is None else _activation_fields
     activation_names: list[str] = []
@@ -7573,8 +7575,8 @@ def _apply_reference_activation_dependencies(
             if name.casefold() in path:
                 raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.")
             all_fields.add(name.casefold())
-            if len(all_fields) > 16:
-                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
+            if len(all_fields) > MAX_CONDITION_CONTROLLERS:
+                raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
             if object_id is None:
                 raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED", "A reference prerequisite needs an explicit target or a staged object-scoped Preview.")
             reference_info = property_info_by_name.get(name.casefold())
@@ -7751,8 +7753,8 @@ def _apply_reference_activation_dependencies(
         if property_key in path:
             raise OperationContractError("REFERENCE_DEPENDENCY_CYCLE", "Reference activation dependencies contain a cycle.", details={"property": property_name})
         all_fields.add(property_key)
-        if len(all_fields) > 16:
-            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
+        if len(all_fields) > MAX_CONDITION_CONTROLLERS:
+            raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds the finite unique-field budget.")
         if property_key in seen_dependencies:
             prior = next(spec for spec in property_specs if str(spec["name"]).casefold() == property_key)
             if not condition_values_equal(prior["value"], required_value):
