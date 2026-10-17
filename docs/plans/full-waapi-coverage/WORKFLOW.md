@@ -4,6 +4,11 @@ Use this sequence for the current coverage implementation. Historical acceptance
 belongs in [the test inventory](../../../tests/TEST_INVENTORY.md); current Fresh
 scheduling and failure classification belong in [business acceptance](../../../tests/semantic/TEST_ACCEPTANCE.md).
 
+Every agent dispatch must explicitly set `fork_turns="none"`. Send only the
+objective, constraints, acceptance criteria, relevant document/code pointers and
+essential decisions not yet recorded. Require descendants to use the same rule;
+do not copy parent conversation history into a dispatch.
+
 1. Freeze one bounded batch of explicitly selected immutable worker refs. Workers
    run their relevant focused cases; keep later successors separate. Merge only
    the selected refs with one integration source owner.

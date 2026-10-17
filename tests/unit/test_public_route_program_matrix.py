@@ -6,6 +6,8 @@ import wave
 
 import pytest
 
+from wwise_waapi.console_project_operations import CLI_PROJECT_FILE_URIS
+
 from tests.support.public_route_probes import (
     ProgramCallClient,
     ProgramTopicClient,
@@ -98,6 +100,13 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         return
 
     args, options, expected_result = request_and_result_from_schema(entry.schema)
+    earlier_void = (entry.version in {"2021.1", "2022.1", "2023.1"} and entry.uri in {
+        "ak.wwise.cli.moveMediaIdsToSingleFile", "ak.wwise.cli.moveMediaIdsToWorkUnits",
+        "ak.wwise.cli.updateMediaIdsInSingleFile"})
+    if entry.uri in CLI_PROJECT_FILE_URIS:
+        # Independent documented successful process outcome; this proves no
+        # project/file effect. Older media-ID routes disclose no outcome field.
+        expected_result = {} if earlier_void else {"result": 0}
     if entry.uri == "ak.wwise.core.transport.create":
         # The reflected field is optional, but the business verifier requires
         # a real uint32 ID. Wwise 2022.1 may assign zero to the first transport.
@@ -119,7 +128,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
     io_root = PROBE_IO_ROOT
     prepared_before_dispatch = None
     role_validation_before_dispatch = None
-    tone_effect = None
+    artifact_effect = None
     if entry.uri == "ak.wwise.debug.generateToneWAV":
         # This row exercises the Registry/dispatcher seam, not full public or
         # native acceptance. Keep actual filesystem protections and artifact
@@ -140,7 +149,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert prepared_before_dispatch.as_dict()["verification_plan"]["before"]["file"] is None
         assert not output.exists()
 
-        def tone_effect(uri, call_args, call_options):
+        def artifact_effect(uri, call_args, call_options):
             assert (uri, call_args, call_options) == (entry.uri, {"path": str(output)}, {})
             assert not output.exists()
             # Literal source-default fixture: mono PCM16, 48000Hz, one second
@@ -148,6 +157,40 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
             with wave.open(str(output), "wb") as stream:
                 stream.setparams((1, 2, 48000, 0, "NONE", "not compressed"))
                 stream.writeframes(b"\x00\x00" * 48000)
+    elif entry.uri == "ak.wwise.console.project.create":
+        io_root = (tmp_path / "ProgramProbe").resolve()
+        io_root.mkdir()
+        output = io_root / "ProgramProbe.wproj"
+        args, options = {"path": str(output)}, {}
+        project_request = parse_operation_request({
+            "contract": OPERATION_REQUEST_CONTRACT, "version": entry.version,
+            "operation": "waapi.call", "arguments": {
+                "api": entry.uri, "args": args, "options": options, "io_root": str(io_root)}})
+        prepared_before_dispatch = prepare_operation(project_request,
+            read_call=lambda uri, call_args, call_options: {})
+        role_validation_before_dispatch = validate_prepared_roles(prepared_before_dispatch.as_dict(),
+            read_call=lambda uri, call_args, call_options: {})
+        assert role_validation_before_dispatch["ok"] is True
+        assert prepared_before_dispatch.as_dict()["verification_plan"]["before"]["exists"] is False
+        assert not output.exists()
+        # Literal independently specified default project, using the matching
+        # pinned SDK sample schema versions. The writer does not inspect args.
+        header = {
+            "2023.1": '<WwiseDocument Type="Project" SchemaVersion="119" WwiseVersion="v2023.1.0">',
+            "2024.1": '<WwiseDocument Type="Project" SchemaVersion="123" WwiseVersion="v2024.1.0">',
+            "2025.1": '<WwiseDocument Type="Project" SchemaVersion="133" WwiseVersion="v2025.1.0">',
+        }[entry.version]
+        project_xml = header + '''<ProjectInfo><Project Name="ProgramProbe" ID="{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}">
+<Platforms><Platform Name="Windows" ReferencePlatform="Windows" ID="{CCCCCCCC-CCCC-CCCC-CCCC-000000000001}" /></Platforms>
+<LanguageList><Language Name="SFX" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000001}" />
+<Language Name="English(US)" ID="{DDDDDDDD-DDDD-DDDD-DDDD-000000000002}" /></LanguageList>
+<PropertyList><Property Name="DefaultLanguage" Type="string" Value="English(US)" /></PropertyList>
+</Project></ProjectInfo></WwiseDocument>'''
+
+        def artifact_effect(uri, call_args, call_options):
+            assert (uri, call_args, call_options) == (entry.uri, {"path": str(output)}, {})
+            assert not output.exists()
+            output.write_text(project_xml, encoding="utf-8")
 
     request_validation = validate_semantic_payload(
         entry.uri,
@@ -155,7 +198,7 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         options,
         version=entry.version,
     )
-    client = ProgramCallClient(expected_result, on_call=tone_effect)
+    client = ProgramCallClient(expected_result, on_call=artifact_effect)
     result = WwiseDispatcher(client=client).dispatch(
         entry.uri,
         version=entry.version,
@@ -404,6 +447,26 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert observed["wav"]["frames"] == 48000
         assert observed["wav"]["nonzero_samples_by_channel"] == [0]
         assert len(observed["artifact"]["file"]["sha256"]) == 64
+    elif entry.uri == "ak.wwise.console.project.create":
+        assert verification.status == "verified"
+        assert verification.business_state_verified is True
+        assert verification.verification_strength == "saved_project_artifact"
+        observed = verification.readbacks[0]
+        assert observed["project"] == {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}", "name": "ProgramProbe"}
+        assert observed["platforms_match"] is True
+        assert observed["languages_match"] is True
+        assert observed["default_language"] == "English(US)"
+        assert observed["unresolved"] == []
+        assert len(observed["file_proof"]["sha256"]) == 64
+    elif entry.uri in CLI_PROJECT_FILE_URIS:
+        assert verification.status == "result_schema_checked"
+        assert verification.business_state_verified is False
+        assert verification.verification_strength == "documented_cli_process_outcome"
+        observed = verification.readbacks[0]
+        assert observed["business_effect_proven"] is False
+        assert observed["outcome"] == ("not_reported" if earlier_void else "success")
+        assert ("exit_code" not in observed) if earlier_void else observed["exit_code"] == 0
+        assert verification.message == "The documented Console command outcome passed; file and project effects remain unverified."
     elif entry.uri in BUSINESS_STATE_VERIFIED_APIS:
         assert verification.status == "verified"
         assert verification.business_state_verified is True
