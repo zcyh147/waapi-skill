@@ -110,8 +110,8 @@ def test_documented_arguments_assigns_existing_references_with_order_and_preserv
         for uri, args, _ in task.calls)
 
 
-def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, select=True, list_name="Metadata", clear=True):
-    task = OwnedGraphTask(tmp_path, version, "object.set")
+def _documented_metadata_clear_case(tmp_path, version="2025.1", *, alias=False, select=True, list_name="Metadata", clear=True, operation="object.set"):
+    task = OwnedGraphTask(tmp_path, version, operation)
     task.require_class_projection = True
     element_class = 5570560 if version == "2025.1" else 5308432
     element_name = "MetadataSlot" if version == "2025.1" else "Metadata"
@@ -248,6 +248,327 @@ def test_documented_list_guard_allows_requested_owner_rename_while_verifying_cla
     tx, shown = task.preview()
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, verified
+
+
+@pytest.mark.parametrize("conflict,fault", (("fail", None), ("rename", None), ("merge", None),
+    ("fail", "wrong-class"), ("fail", "wrong-owner"), ("fail", "reversed-order"), ("fail", "unrequested-notes"), ("fail", "wrong-requested-class"), ("fail", "alias"), ("fail", "wrong-handle-owner")))
+def test_documented_list_handle_places_created_root_and_verifies_native_class_owner_and_preservation(tmp_path, conflict, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False, operation="object.create", select=fault != "alias")
+    if conflict in {"rename", "merge"}:
+        task.objects[CHILD].update(name="New metadata", path=task.objects[FIRST]["path"] + r"\New metadata")
+    preserved = deepcopy(task.objects[CHILD])
+    code, configured = task.step("draft-business-configure", "--name-conflict", conflict)
+    assert code == 0, configured
+    code, types = task.step("draft-discover-types", "--role", "object", "--meaning", "Sound" if fault == "wrong-requested-class" else "MetadataSlot")
+    assert code == 0, types
+    owner = task.bind(SECOND) if fault == "wrong-handle-owner" else task.list_owner_handle
+    code, declared = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", owner,
+        "--name", "New metadata", "--kind", types["type_candidates"][0]["handle"],
+        "--field", "object_list", task.list_field_handle)
+    if fault == "wrong-handle-owner":
+        assert code == 2 and declared["error_code"] == "DOCUMENTED_LIST_SELECTION_REQUIRED", declared
+        assert "choices" in json.dumps(declared)
+        assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
+        return
+    assert code == 0, declared
+    if fault == "wrong-requested-class":
+        code, rejected = task.step("draft-check")
+        assert code == 2 and rejected["error_code"] == "DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", rejected
+        assert not any(uri.endswith("object.create") for uri, _, _ in task.calls)
+        return
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.create":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args == {"parent": FIRST, "type": "MetadataSlot", "name": "New metadata", "list": "Metadata",
+                "onNameConflict": conflict, "autoAddToSourceControl": False}
+            if conflict == "merge":
+                return {"id": CHILD, "name": "New metadata"}
+            result_name = "New metadata_01" if conflict == "rename" else "New metadata"
+            task.objects[ROOT] = {"id": ROOT, "name": result_name, "type": "PluginInnerObject", "classId": 5570560,
+                "path": task.objects[FIRST]["path"] + "\\" + result_name, "owner": {"id": FIRST}, "notes": ""}
+            task.objects[FIRST]["@Metadata"] = [{"id": CHILD}, {"id": ROOT}]
+            if fault == "wrong-class":
+                task.objects[ROOT]["classId"] = 1441808
+            elif fault == "wrong-owner":
+                task.objects[ROOT]["owner"] = {"id": SECOND}
+            elif fault == "reversed-order":
+                task.objects[FIRST]["@Metadata"].reverse()
+            elif fault == "unrequested-notes":
+                task.objects[CHILD]["notes"] = "Unexpected"
+            return {"id": ROOT, "name": result_name}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    success = fault in {None, "alias"}
+    assert code == (0 if success else 2), verified
+    assert (verified.get("verified") is True) == success, verified
+    if success:
+        assert task.objects[CHILD] == preserved and task.objects[FIRST]["notes"] == "Keep sound"
+
+
+@pytest.mark.parametrize("conflict,list_mode,slot_collision,drift", (("fail", "append", False, None), ("merge", "append", False, None), ("merge", "replace-all", False, None), ("rename", "append", False, None), ("replace", "append", False, None), ("merge", "append", True, None), ("merge", "append", False, "owner-class"), ("merge", "append", False, "member-class"), ("fail", "append", False, "live-class")))
+def test_documented_list_class_handle_builds_slot_under_planned_owner_in_same_transaction(tmp_path, conflict, list_mode, slot_collision, drift):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    task.types.append({"classId": 1638416, "name": "WorkUnit", "type": "WObject"})
+    old_slot = "{66666666-6666-6666-6666-666666666666}"
+    if conflict != "fail":
+        task.objects[ROOT] = {"id": ROOT, "name": "New sound", "type": "Sound", "classId": 65552,
+            "path": task.objects[SECOND]["path"] + r"\New sound", "parent": {"id": SECOND}, "notes": "Keep old owner",
+            "@Metadata": [{"id": old_slot}]}
+        slot_name = "New metadata" if slot_collision else "Old metadata"
+        task.objects[old_slot] = {"id": old_slot, "name": slot_name, "type": "PluginInnerObject", "classId": 5570560,
+            "path": task.objects[ROOT]["path"] + "\\" + slot_name, "owner": {"id": ROOT}, "notes": "Keep old metadata"}
+    preserved = deepcopy(task.objects)
+    initial = ["--list-behavior", list_mode] if list_mode == "replace-all" else []
+    code, configured = task.step("draft-business-configure", "--name-conflict", conflict, *initial)
+    assert code == 0, configured
+    parent = task.bind(SECOND)
+    code, owner_types = task.step("draft-discover-types", "--role", "object", "--meaning", "Sound")
+    assert code == 0, owner_types
+    owner_type = owner_types["type_candidates"][0]["handle"]
+    code, slot_types = task.step("draft-discover-types", "--role", "object", "--meaning", "MetadataSlot")
+    assert code == 0, slot_types
+    slot_type = slot_types["type_candidates"][0]["handle"]
+    code, listed = task.step("draft-discover-fields", "--type-handle", owner_type,
+        "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    choice = next(row for row in listed["agent_result"]["items"] if row["name"] == "Metadata")
+    code, selected = task.step("draft-discover-fields", "--type-handle", owner_type,
+        "--field-source", "documented-lists", "--selection", choice["selection"])
+    assert code == 0, selected
+    list_field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    code, owner = task.step("draft-declare-new", "--declaration-id", "new-sound", "--parent-handle", parent,
+        "--name", "New sound", "--kind", owner_type)
+    assert code == 0, json.dumps(owner)
+    owner_result = owner["draft"]["declared_object"]["result_handle"]
+    if list_mode == "replace-all":
+        code, incomplete = task.step("draft-check")
+        assert code == 2, incomplete
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+    code, slot = task.step("draft-declare-new", "--declaration-id", "slot", "--parent-handle", owner_result,
+        "--name", "New metadata", "--kind", slot_type, "--field", "object_list", list_field)
+    assert code == 0, slot
+    if list_mode != "replace-all":
+        code, configured = task.step("draft-business-configure", "--name-conflict", conflict, "--list-behavior", list_mode)
+        assert code == 0, configured
+    fresh_slot = old_slot if slot_collision else "{77777777-7777-7777-7777-777777777777}"
+    actual_owner = "{88888888-8888-8888-8888-888888888888}" if conflict in {"rename", "replace"} else ROOT
+    actual_owner_name = "New sound_01" if conflict == "rename" else "New sound"
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": SECOND, "children": [{"type": "Sound", "name": "New sound",
+                "@Metadata": [{"type": "MetadataSlot", "name": "New metadata"}]}]}]
+            assert args["listMode"] == ("replaceAll" if list_mode == "replace-all" else "append")
+            assert args["onNameConflict"] == conflict
+            if conflict == "replace":
+                del task.objects[ROOT], task.objects[old_slot]
+            if conflict == "merge" and list_mode == "replace-all":
+                del task.objects[old_slot]
+            keep_old = conflict == "merge" and list_mode == "append" and not slot_collision
+            task.objects[actual_owner] = {"id": actual_owner, "name": actual_owner_name, "type": "Sound", "classId": 65552,
+                "path": task.objects[SECOND]["path"] + "\\" + actual_owner_name, "parent": {"id": SECOND},
+                "notes": "Keep old owner" if conflict == "merge" else "",
+                "@Metadata": ([{"id": old_slot}] if keep_old else []) + [{"id": fresh_slot}]}
+            task.objects[fresh_slot] = {"id": fresh_slot, "name": "New metadata", "type": "PluginInnerObject", "classId": 5570560,
+                "path": task.objects[actual_owner]["path"] + r"\New metadata", "owner": {"id": actual_owner}, "notes": "Keep old metadata" if slot_collision else ""}
+            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": actual_owner, "name": actual_owner_name,
+                "@Metadata": [{"id": fresh_slot, "name": "New metadata"}]}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    guards = shown["artifact"]["prepared_operation"]["pre_state"]["documented_planned_list_guards"]
+    assert guards[0]["binding"]["planned_owner"] == {"result_handle": owner_result, "request_path": "$.objects[0].children[0]"}
+    if drift is not None:
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        if drift == "owner-class":
+            task.objects[ROOT]["classId"] = 2293776
+        elif drift == "member-class":
+            task.objects[old_slot]["classId"] = 1441808
+        else:
+            next(row for row in task.types if row["name"] == "Sound")["classId"] = 2293776
+        code, rejected = task.run("execute", tx)
+        assert code == 2 and rejected.get("executed") is not True, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    assert task.objects[CHILD] == preserved[CHILD] and task.objects[FIRST] == preserved[FIRST]
+    if conflict == "rename":
+        assert task.objects[ROOT] == preserved[ROOT] and task.objects[old_slot] == preserved[old_slot]
+    elif conflict == "merge" and list_mode == "append":
+        assert task.objects[old_slot] == preserved[old_slot]
+    elif conflict != "fail":
+        assert old_slot not in task.objects
+
+
+@pytest.mark.parametrize("fault", (None, "wrong-inner-class", "wrong-inner-owner", "missing-inner-membership", "changed-slot-reference", "changed-reference-notes", "missing-inner-result"))
+def test_documented_nested_lists_and_inline_slot_references_share_one_planned_graph(tmp_path, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    task.objects[SECOND]["path"] = r"\Interactive Music Hierarchy\Default Work Unit"
+    task.objects[FIRST]["parent"] = {"id": PROJECT_GROUP}
+    task.types.extend({"classId": class_id, "name": name, "type": "WObject"} for name, class_id in (
+        ("WorkUnit", 1638416), ("MusicSwitchContainer", 2293776), ("MusicArgumentsSlot", 5832704),
+        ("MultiSwitchEntry", 5439504), ("EntryPathSlot", 5767168), ("SwitchGroup", 1245200), ("Switch", 1310736)))
+    group_id, value_id = "{55555555-5555-5555-5555-555555555555}", "{66666666-6666-6666-6666-666666666666}"
+    task.objects[group_id] = {"id": group_id, "name": "Surface", "type": "SwitchGroup", "classId": 1245200,
+        "path": r"\Switches\Default Work Unit\Surface", "notes": "Keep group", "parent": {"id": PROJECT_GROUP}}
+    task.objects[value_id] = {"id": value_id, "name": "Wood", "type": "Switch", "classId": 1310736,
+        "path": task.objects[group_id]["path"] + r"\Wood", "notes": "Keep value", "parent": {"id": group_id}}
+    parent, group, value = task.bind(SECOND), task.bind(group_id), task.bind(value_id)
+    preserved = deepcopy(task.objects)
+    original = task.call
+    fields = {5832704: ("Argument", "Argument", ["SwitchGroup", "StateGroup"]),
+        5767168: ("EntryPathObject", "EntryPath Object", ["SwitchGroup", "Switch", "StateGroup", "State"])}
+    def call(uri, args=None, options=None):
+        if uri.endswith(("getPropertyAndReferenceNames", "getPropertyInfo")):
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            spec = fields.get(args.get("classId"))
+            if uri.endswith("getPropertyAndReferenceNames"):
+                return {"return": [spec[0]] if spec else []}
+            assert spec and args["property"] == spec[0], args
+            return {"name": spec[0], "type": "Reference", "display": {"name": spec[1]},
+                "restriction": {"type": "reference", "restrictions": [{"type": spec[2]}, "notNull"]}}
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": SECOND, "children": [{"type": "MusicSwitchContainer", "name": "Music",
+                "@Arguments": [{"type": "MusicArgumentsSlot", "name": "Surface argument", "@Argument": group_id}],
+                "@Entries": [{"type": "MultiSwitchEntry", "name": "Wood entry",
+                    "@EntryPath": [{"type": "EntryPathSlot", "name": "Wood path", "@EntryPathObject": value_id}]}]}]}]
+            arg, entry, path = "{77777777-7777-7777-7777-777777777777}", "{88888888-8888-8888-8888-888888888888}", "{99999999-9999-9999-9999-999999999999}"
+            music_path = task.objects[SECOND]["path"] + r"\Music"
+            task.objects[ROOT] = {"id": ROOT, "name": "Music", "type": "MusicSwitchContainer", "classId": 2293776,
+                "path": music_path, "parent": {"id": SECOND}, "notes": "", "@Arguments": [{"id": arg}], "@Entries": [{"id": entry}]}
+            task.objects[arg] = {"id": arg, "name": "Surface argument", "type": "PluginInnerObject", "classId": 5832704,
+                "path": music_path + r"\Surface argument", "owner": {"id": ROOT}, "notes": "", "@Argument": {"id": group_id}}
+            task.objects[entry] = {"id": entry, "name": "Wood entry", "type": "PluginInnerObject", "classId": 5439504,
+                "path": music_path + r"\Wood entry", "owner": {"id": ROOT}, "notes": "", "@EntryPath": [{"id": path}]}
+            task.objects[path] = {"id": path, "name": "Wood path", "type": "PluginInnerObject", "classId": 5767168,
+                "path": task.objects[entry]["path"] + r"\Wood path", "owner": {"id": entry}, "notes": "", "@EntryPathObject": {"id": value_id}}
+            if fault == "wrong-inner-class":
+                task.objects[path]["classId"] = 5832704
+            elif fault == "wrong-inner-owner":
+                task.objects[path]["owner"] = {"id": ROOT}
+            elif fault == "missing-inner-membership":
+                task.objects[entry]["@EntryPath"] = []
+            elif fault == "changed-slot-reference":
+                task.objects[path]["@EntryPathObject"] = {"id": group_id}
+            elif fault == "changed-reference-notes":
+                task.objects[value_id]["notes"] = "Unexpected"
+            result_path = [] if fault == "missing-inner-result" else [{"id": path, "name": "Wood path"}]
+            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "Music",
+                "@Arguments": [{"id": arg, "name": "Surface argument"}], "@Entries": [{"id": entry, "name": "Wood entry",
+                    "@EntryPath": result_path}]}]}]}
+        return original(uri, args, options)
+    task.call = call
+    kinds = {}
+    for name in ("MusicSwitchContainer", "MusicArgumentsSlot", "MultiSwitchEntry", "EntryPathSlot"):
+        code, types = task.step("draft-discover-types", "--role", "object", "--meaning", name)
+        assert code == 0, types
+        kinds[name] = types["type_candidates"][0]["handle"]
+    list_fields = {}
+    for owner_type, name in (("MusicSwitchContainer", "Arguments"), ("MusicSwitchContainer", "Entries"), ("MultiSwitchEntry", "EntryPath")):
+        code, listed = task.step("draft-discover-fields", "--type-handle", kinds[owner_type], "--field-source", "documented-lists", "--list")
+        assert code == 0, listed
+        choice = next(row for row in listed["agent_result"]["items"] if row["name"] == name)
+        code, selected = task.step("draft-discover-fields", "--type-handle", kinds[owner_type], "--field-source", "documented-lists", "--selection", choice["selection"])
+        assert code == 0, selected
+        list_fields[name] = selected["meaning_results"][0]["candidates"][0]["handle"]
+    references = {}
+    for owner_type, meaning in (("MusicArgumentsSlot", "Argument"), ("EntryPathSlot", "EntryPath Object")):
+        code, selected = task.step("draft-discover-fields", "--type-handle", kinds[owner_type], "--meaning", meaning)
+        assert code == 0, selected
+        references[owner_type] = selected["meaning_results"][0]["candidates"][0]["handle"]
+    handles = {}
+    for declaration_id, parent_handle, name, kind, extra in (
+        ("music", parent, "Music", "MusicSwitchContainer", []),
+        ("argument", "music", "Surface argument", "MusicArgumentsSlot", ["--field", "object_list", list_fields["Arguments"], "--field-value", references["MusicArgumentsSlot"], group]),
+        ("entry", "music", "Wood entry", "MultiSwitchEntry", ["--field", "object_list", list_fields["Entries"]]),
+        ("path", "entry", "Wood path", "EntryPathSlot", ["--field", "object_list", list_fields["EntryPath"], "--field-value", references["EntryPathSlot"], value])):
+        code, declared = task.step("draft-declare-new", "--declaration-id", declaration_id, "--parent-handle", handles.get(parent_handle, parent_handle),
+            "--name", name, "--kind", kinds[kind], *extra)
+        assert code == 0, declared
+        handles[declaration_id] = declared["draft"]["declared_object"]["result_handle"]
+    tx, shown = task.preview()
+    assert len(shown["artifact"]["prepared_operation"]["pre_state"]["documented_planned_list_guards"]) == 3
+    code, verified = task.finish(tx, shown)
+    assert code == (0 if fault is None else 2), verified
+    assert (verified.get("verified") is True) == (fault is None), verified
+    if fault is None:
+        assert task.objects[group_id] == preserved[group_id] and task.objects[value_id] == preserved[value_id]
+
+
+@pytest.mark.parametrize("version,fault", (("2022.1", "source-absent"), ("2023.1", None), ("2024.1", None), ("2025.1", "wrong-target-class"),
+    ("2023.1", "duplicate-targets"), ("2023.1", "owner-class-effect"), ("2024.1", "reversed-effect"), ("2023.1", "target-notes-effect"), ("2024.1", "target-class-before"), ("2023.1", "merge-owner")))
+def test_documented_reference_list_class_handle_assigns_array_on_planned_owner_without_property_info(tmp_path, version, fault):
+    task, _ = _documented_metadata_clear_case(tmp_path, version, clear=False)
+    task.types.extend({"classId": class_id, "name": name, "type": "WObject"} for name, class_id in (
+        ("WorkUnit", 1638416), ("MusicSwitchContainer", 2293776), ("SwitchGroup", 1245200), ("StateGroup", 458768)))
+    task.objects[SECOND]["path"] = r"\Interactive Music Hierarchy\Default Work Unit"
+    task.objects[FIRST]["parent"] = {"id": PROJECT_GROUP}
+    state_id, fresh_owner = "{55555555-5555-5555-5555-555555555555}", "{66666666-6666-6666-6666-666666666666}"
+    task.objects[ROOT] = {"id": ROOT, "name": "Surface", "type": "SwitchGroup", "classId": 1245200,
+        "path": r"\Switches\Default Work Unit\Surface", "parent": {"id": PROJECT_GROUP}, "notes": "Keep surface"}
+    task.objects[state_id] = {"id": state_id, "name": "Weather", "type": "StateGroup", "classId": 458768,
+        "path": r"\States\Default Work Unit\Weather", "parent": {"id": PROJECT_GROUP}, "notes": "Keep weather", "owner": None}
+    if fault == "merge-owner":
+        task.objects[fresh_owner] = {"id": fresh_owner, "name": "Music", "type": "MusicSwitchContainer", "classId": 2293776,
+            "path": task.objects[SECOND]["path"] + r"\Music", "parent": {"id": SECOND}, "notes": "Keep existing music", "@Arguments": []}
+        code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
+        assert code == 0, configured
+    parent, switch, state = task.bind(SECOND), task.bind(ROOT), task.bind(state_id)
+    preserved = deepcopy(task.objects)
+    code, types = task.step("draft-discover-types", "--role", "object", "--meaning", "MusicSwitchContainer")
+    assert code == 0, types
+    kind = types["type_candidates"][0]["handle"]
+    code, listed = task.step("draft-discover-fields", "--type-handle", kind, "--field-source", "documented-lists", "--list")
+    assert code == 0, listed
+    if fault == "source-absent":
+        assert "Arguments" not in {row["name"] for row in listed["agent_result"]["items"]}
+        assert listed["agent_result"]["native_unavailability_proven"] is False
+        return
+    choice = next(row for row in listed["agent_result"]["items"] if row["name"] == "Arguments")
+    code, selected = task.step("draft-discover-fields", "--type-handle", kind, "--field-source", "documented-lists", "--selection", choice["selection"])
+    assert code == 0, selected
+    field = selected["meaning_results"][0]["candidates"][0]["handle"]
+    code, declared = task.step("draft-declare-new", "--declaration-id", "music", "--parent-handle", parent,
+        "--name", "Music", "--kind", kind, "--field-value", field, json.dumps([state, state] if fault == "duplicate-targets" else [state, switch]))
+    assert code == 0, declared
+    if fault in {"wrong-target-class", "duplicate-targets", "target-class-before"}:
+        if fault == "target-class-before":
+            task.objects[ROOT]["classId"] = 5832704
+        code, rejected = task.step("draft-check")
+        assert code == 2, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": SECOND, "children": [{"type": "MusicSwitchContainer", "name": "Music", "@Arguments": [state_id, ROOT]}]}]
+            task.objects[fresh_owner] = {"id": fresh_owner, "name": "Music", "type": "MusicSwitchContainer", "classId": 2293776,
+                "path": task.objects[SECOND]["path"] + r"\Music", "parent": {"id": SECOND}, "notes": "Keep existing music" if fault == "merge-owner" else "", "@Arguments": [{"id": state_id}, {"id": ROOT}]}
+            if fault == "owner-class-effect":
+                task.objects[fresh_owner]["classId"] = 65552
+            elif fault == "reversed-effect":
+                task.objects[fresh_owner]["@Arguments"].reverse()
+            elif fault == "target-notes-effect":
+                task.objects[ROOT]["notes"] = "Unexpected"
+            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": fresh_owner, "name": "Music"}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    code, verified = task.finish(tx, shown)
+    success = fault in {None, "merge-owner"}
+    assert code == (0 if success else 2), verified
+    assert (verified.get("verified") is True) == success, verified
+    if success:
+        assert task.objects[ROOT] == preserved[ROOT] and task.objects[state_id] == preserved[state_id]
+    assert not any(uri.endswith("getPropertyInfo") and args.get("property") == "Arguments" for uri, args, _ in task.calls)
 
 
 def test_documented_list_exact_alias_resolves_at_preview_without_hidden_live_declaration(tmp_path):
@@ -480,9 +801,11 @@ class OwnedGraphTask(FieldTask):
         if uri.endswith("object.create"):
             self.calls.append((uri, deepcopy(args), deepcopy(options)))
             self.conflict = args.get("onNameConflict", "fail")
-            result = self._create(args, args["parent"], owned=True)
-            if {"id": ROOT} not in self.objects[args["parent"]]["@CustomList"]:
-                self.objects[args["parent"]]["@CustomList"].append({"id": ROOT})
+            result = self._create(args, args["parent"], owned="list" in args)
+            if "list" in args:
+                members = self.objects[args["parent"]].setdefault("@" + args["list"], [])
+                if {"id": result["id"]} not in members:
+                    members.append({"id": result["id"]})
             if self.bad_result == "owner":
                 self.objects[ROOT]["owner"] = {"id": SECOND}
             elif self.bad_result == "missing-child":
@@ -562,34 +885,6 @@ class OwnedGraphTask(FieldTask):
         return result
 
 
-@pytest.mark.parametrize("version", VERSIONS)
-@pytest.mark.parametrize("conflict", ("fail", "rename", "merge"))
-def test_owned_list_creation_reaches_native_dispatch_and_topology_verification(
-    tmp_path: Path, version: str, conflict: str,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.create")
-    owner = task.bind(FIRST)
-    code, configured = task.step("draft-business-configure", "--name-conflict", conflict)
-    assert code == 0, configured
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
-    assert code == 0, root
-    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
-                            root["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
-    assert code == 0, child
-    tx, shown = task.preview()
-    expected = {"parent": FIRST, "type": "ActorMixer", "name": "Layers", "list": "CustomList",
-                "children": [{"type": "Sound", "name": "Rain"}], "onNameConflict": conflict,
-                "autoAddToSourceControl": False}
-    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"] == expected
-    code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, verified
-    writes = [(uri, args, options) for uri, args, options in task.calls if uri.endswith("object.create")]
-    assert writes == [("ak.wwise.core.object.create", expected, {})]
-    assert task.objects[FIRST]["notes"] == "Keep owner"
-    # The created root is list-owned while its descendant has an ordinary parent.
-    assert task.objects[ROOT]["owner"] == {"id": FIRST}
-    assert task.objects[CHILD]["parent"] == {"id": ROOT}
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
@@ -629,123 +924,12 @@ def test_set_platform_and_target_conflict_survive_preview_execute_and_verify(
     assert (FIRST, "Mac") in views and (SECOND, "Windows") in views and (CHILD, "Mac") in views
 
 
-@pytest.mark.parametrize("bad_result", ("owner", "missing-child", "duplicate-child"))
-def test_owned_list_creation_does_not_certify_malformed_or_partial_native_effects(
-    tmp_path: Path, bad_result: str,
-) -> None:
-    task = OwnedGraphTask(tmp_path, "2025.1", "object.create")
-    owner = task.bind(FIRST)
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
-    assert code == 0, root
-    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
-                            root["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
-    assert code == 0, child
-    tx, shown = task.preview()
-    task.bad_result = bad_result
-    code, verified = task.finish(tx, shown)
-    assert code == 2, verified
-    assert verified.get("verified") is not True
-    assert verified["state"] in {"verification_failed", "executed_unverified"}, verified
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
-@pytest.mark.parametrize("outcome", (None, "missing-owned-membership", "wrong-owned-owner", "duplicate-owned-result"))
-def test_set_creates_recursive_owned_lists_and_regular_descendants_in_one_preview(
-    tmp_path: Path, version: str, outcome: str | None,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.set")
-    owner = task.bind(FIRST)
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer")
-    assert code == 0, root
-    code, member = task.step("draft-declare-new", "--declaration-id", "member", "--parent-handle",
-                             root["draft"]["declared_object"]["result_handle"], "--name", "List Group", "--kind", "actor-mixer",
-                             "--field", "object_list", "CustomList")
-    assert code == 0, member
-    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
-                            member["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx",
-                            "--field", "notes", "Nested rain")
-    assert code == 0, child
-    tx, shown = task.preview()
-    native = shown["artifact"]["prepared_operation"]["dispatch"]["args"]
-    assert native["objects"] == [{"object": FIRST, "children": [{"type": "ActorMixer", "name": "Layers",
-        "@CustomList": [{"type": "ActorMixer", "name": "List Group", "children": [
-            {"type": "Sound", "name": "Rain", "notes": "Nested rain"}]}]}]}]
-    task.bad_result = outcome
-    code, verified = task.finish(tx, shown)
-    if outcome is not None:
-        assert code == 2 and verified.get("verified") is not True, verified
-        return
-    assert code == 0 and verified["verified"] is True, verified
-    assert task.objects[CHILD]["owner"] == {"id": ROOT}
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
-@pytest.mark.parametrize("corrupt_unrequested", (False, True))
-def test_set_merges_nested_list_member_preserving_unrequested_children(
-    tmp_path: Path, version: str, corrupt_unrequested: bool,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.set")
-    old_child = "{77777777-7777-7777-7777-777777777777}"
-    root_type = "PropertyContainer" if version == "2025.1" else "ActorMixer"
-    task.objects[ROOT] = {"id": ROOT, "name": "Layers", "type": root_type,
-        "path": task.objects[FIRST]["path"] + r"\Layers", "parent": {"id": FIRST}, "notes": "Keep layers",
-        "@CustomList": [{"id": CHILD}]}
-    task.objects[CHILD] = {"id": CHILD, "name": "List Group", "type": root_type,
-        "path": task.objects[ROOT]["path"] + r"\List Group", "parent": None, "owner": {"id": ROOT}, "notes": "Keep group"}
-    task.objects[old_child] = {"id": old_child, "name": "Wind", "type": "Sound",
-        "path": task.objects[CHILD]["path"] + r"\Wind", "parent": {"id": CHILD}, "notes": "Keep wind"}
-    owner = task.bind(FIRST)
-    code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
-    assert code == 0, configured
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer")
-    assert code == 0, root
-    code, member = task.step("draft-declare-new", "--declaration-id", "member", "--parent-handle",
-                             root["draft"]["declared_object"]["result_handle"], "--name", "List Group", "--kind", "actor-mixer",
-                             "--field", "object_list", "CustomList")
-    assert code == 0, member
-    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
-                            member["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
-    assert code == 0, child
-    tx, shown = task.preview()
-    task.bad_result = "alter-unrequested" if corrupt_unrequested else None
-    code, verified = task.finish(tx, shown)
-    if corrupt_unrequested:
-        assert code == 2 and verified.get("verified") is not True, verified
-        return
-    assert code == 0 and verified["verified"] is True, verified
-    assert task.objects[ROOT]["notes"] == "Keep layers"
-    assert task.objects[CHILD]["notes"] == "Keep group"
-    assert task.objects[old_child]["notes"] == "Keep wind"
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
-def test_set_clears_list_on_merged_planned_owner_and_verifies_old_member_absence(
-    tmp_path: Path, version: str,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.set")
-    root_type = "PropertyContainer" if version == "2025.1" else "ActorMixer"
-    task.objects[ROOT] = {"id": ROOT, "name": "Layers", "type": root_type,
-        "path": task.objects[FIRST]["path"] + r"\Layers", "parent": {"id": FIRST}, "notes": "Keep layers", "@CustomList": [{"id": CHILD}]}
-    task.objects[CHILD] = {"id": CHILD, "name": "Old member", "type": "Sound",
-        "path": task.objects[ROOT]["path"] + r"\Old member", "parent": None, "owner": {"id": ROOT}, "notes": "Old"}
-    owner = task.bind(FIRST)
-    code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
-    assert code == 0, configured
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer")
-    assert code == 0, root
-    code, cleared = task.step("draft-clear-object-list", "--declaration-id", "layers",
-                              "--object-handle", root["draft"]["declared_object"]["result_handle"], "--list-name", "CustomList")
-    assert code == 0, cleared
-    tx, shown = task.preview()
-    assert shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"] == [
-        {"object": FIRST, "listMode": "replaceAll", "children": [{"type": "ActorMixer", "name": "Layers", "@CustomList": []}]}]
-    code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, json.dumps(verified, ensure_ascii=False)
-    assert CHILD not in task.objects
 
 
 @pytest.mark.parametrize("bad_name", ("@CustomList", "Custom List", "CustomList;other", ""))
@@ -769,32 +953,6 @@ def test_nested_list_name_rejection_keeps_the_business_draft_unchanged(
     assert task.calls == []
 
 
-@pytest.mark.parametrize("version", VERSIONS[1:])
-def test_nested_list_clear_preview_rejects_changed_membership_before_mutation(
-    tmp_path: Path, version: str,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.set")
-    root_type = "PropertyContainer" if version == "2025.1" else "ActorMixer"
-    task.objects[ROOT] = {"id": ROOT, "name": "Layers", "type": root_type,
-        "path": task.objects[FIRST]["path"] + r"\Layers", "parent": {"id": FIRST}, "notes": "Keep layers", "@CustomList": []}
-    owner = task.bind(FIRST)
-    code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
-    assert code == 0, configured
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer")
-    assert code == 0, root
-    code, cleared = task.step("draft-clear-object-list", "--declaration-id", "layers",
-                              "--object-handle", root["draft"]["declared_object"]["result_handle"], "--list-name", "CustomList")
-    assert code == 0, cleared
-    tx, shown = task.preview()
-    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
-    assert code == 0, confirmed
-    task.objects[CHILD] = {"id": CHILD, "name": "External", "type": "Sound", "notes": "Unreviewed",
-        "path": task.objects[ROOT]["path"] + r"\External", "parent": None, "owner": {"id": ROOT}}
-    task.objects[ROOT]["@CustomList"] = [{"id": CHILD}]
-    code, rejected = task.run("execute", tx)
-    assert code == 2, rejected
-    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
@@ -820,31 +978,6 @@ def test_set_keeps_reference_bindings_local_to_each_new_graph_root(
     assert [row["@OutputBus"] for row in writes[0]["objects"][0]["children"]] == [bus_id, bus_id]
 
 
-@pytest.mark.parametrize("version", VERSIONS)
-def test_create_merges_owned_list_root_and_descendants_preserving_existing_child(
-    tmp_path: Path, version: str,
-) -> None:
-    task = OwnedGraphTask(tmp_path, version, "object.create")
-    old_child = "{77777777-7777-7777-7777-777777777777}"
-    root_type = "PropertyContainer" if version == "2025.1" else "ActorMixer"
-    task.objects[FIRST]["@CustomList"] = [{"id": ROOT}]
-    task.objects[ROOT] = {"id": ROOT, "name": "Layers", "type": root_type,
-        "path": task.objects[FIRST]["path"] + r"\Layers", "parent": None, "owner": {"id": FIRST}, "notes": "Keep layers"}
-    task.objects[old_child] = {"id": old_child, "name": "Wind", "type": "Sound",
-        "path": task.objects[ROOT]["path"] + r"\Wind", "parent": {"id": ROOT}, "notes": "Keep wind"}
-    owner = task.bind(FIRST)
-    code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
-    assert code == 0, configured
-    code, root = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                           "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
-    assert code == 0, root
-    code, child = task.step("draft-declare-new", "--declaration-id", "rain", "--parent-handle",
-                            root["draft"]["declared_object"]["result_handle"], "--name", "Rain", "--kind", "sound-sfx")
-    assert code == 0, child
-    tx, shown = task.preview()
-    code, verified = task.finish(tx, shown)
-    assert code == 0 and verified["verified"] is True, json.dumps(verified)
-    assert task.objects[ROOT]["notes"] == "Keep layers" and task.objects[old_child]["notes"] == "Keep wind"
 
 
 class SetReplaceTask(OwnedGraphTask):
@@ -1187,7 +1320,7 @@ def test_create_reference_unions_use_class_field_evidence_and_exact_bound_target
     field = discovered["meaning_results"][0]["candidates"][0]["handle"]
     value = [target, owner] if form == "array" else [] if form == "empty-array" else None
     code, declared = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", owner,
-                               "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList",
+                               "--name", "Layers", "--kind", "actor-mixer",
                                "--field-value", field, json.dumps(value))
     if form != "null":
         if code == 0:
@@ -1241,3 +1374,78 @@ def test_set_child_replace_policy_does_not_authorize_existing_target_rename_coll
     code, rejected = task.step("draft-check")
     assert code == 2 and rejected["details"]["issues"][0]["error_code"] == "TARGET_EXISTS", rejected
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version,placement", [(version, placement) for version in VERSIONS
+    for placement in (("create",) if version == "2021.1" else ("create", "planned", "planned-clear"))])
+def test_fictitious_list_never_becomes_business_authority_for_created_or_planned_owner(tmp_path, version, placement):
+    """Former ActorMixer.CustomList/Sound effect fixtures had no field/class proof."""
+    operation = "object.create" if placement == "create" else "object.set"
+    task = OwnedGraphTask(tmp_path, version, operation)
+    task.objects[FIRST]["classId"] = 524304
+    owner = task.bind(FIRST)
+    if placement == "create":
+        code, declared = task.step("draft-declare-new", "--declaration-id", "root", "--parent-handle", owner,
+            "--name", "Layers", "--kind", "actor-mixer", "--field", "object_list", "CustomList")
+        assert code == 0, declared
+        code, rejected = task.step("draft-check")
+    else:
+        code, declared = task.step("draft-declare-new", "--declaration-id", "root", "--parent-handle", owner,
+            "--name", "Layers", "--kind", "actor-mixer")
+        assert code == 0, declared
+        result = declared["draft"]["declared_object"]["result_handle"]
+        if placement == "planned-clear":
+            code, rejected = task.step("draft-clear-object-list", "--declaration-id", "root",
+                "--object-handle", result, "--list-name", "CustomList")
+        else:
+            code, rejected = task.step("draft-declare-new", "--declaration-id", "member", "--parent-handle", result,
+                "--name", "Rain", "--kind", "sound-sfx", "--field", "object_list", "CustomList")
+    assert code == 2, rejected
+    assert "DOCUMENTED_LIST_SELECTION_REQUIRED" in json.dumps(rejected), rejected
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("drift", (None, "membership"))
+def test_documented_list_alias_clears_merged_planned_owner_and_keeps_other_graph_state(tmp_path, drift):
+    task, _ = _documented_metadata_clear_case(tmp_path, clear=False)
+    task.types.append({"classId": 1638416, "name": "WorkUnit", "type": "WObject"})
+    task.objects[ROOT] = {"id": ROOT, "name": "New sound", "type": "Sound", "classId": 65552,
+        "path": task.objects[SECOND]["path"] + r"\New sound", "parent": {"id": SECOND},
+        "notes": "Keep owner", "@Metadata": [{"id": "{77777777-7777-7777-7777-777777777777}"}]}
+    old_slot = "{77777777-7777-7777-7777-777777777777}"
+    task.objects[old_slot] = {"id": old_slot, "name": "Old metadata", "type": "PluginInnerObject", "classId": 5570560,
+        "path": task.objects[ROOT]["path"] + r"\Old metadata", "owner": {"id": ROOT}, "notes": "Old"}
+    keep = deepcopy(task.objects[FIRST])
+    parent = task.bind(SECOND)
+    code, configured = task.step("draft-business-configure", "--name-conflict", "merge")
+    assert code == 0, configured
+    code, owner = task.step("draft-declare-new", "--declaration-id", "owner", "--parent-handle", parent,
+        "--name", "New sound", "--kind", "sound-sfx")
+    assert code == 0, owner
+    code, cleared = task.step("draft-clear-object-list", "--declaration-id", "owner",
+        "--object-handle", owner["draft"]["declared_object"]["result_handle"], "--list-name", "Metadata")
+    assert code == 0, cleared
+    original = task.call
+    def call(uri, args=None, options=None):
+        if uri == "ak.wwise.core.object.set":
+            task.calls.append((uri, deepcopy(args), deepcopy(options)))
+            assert args["objects"] == [{"object": SECOND, "listMode": "replaceAll", "children": [
+                {"type": "Sound", "name": "New sound", "@Metadata": []}]}]
+            task.objects[ROOT]["@Metadata"] = []
+            del task.objects[old_slot]
+            return {"objects": [{"id": SECOND, "name": "Default Work Unit", "children": [{"id": ROOT, "name": "New sound"}]}]}
+        return original(uri, args, options)
+    task.call = call
+    tx, shown = task.preview()
+    if drift:
+        code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        task.objects[ROOT]["@Metadata"] = []
+        code, rejected = task.run("execute", tx)
+        assert code == 2 and rejected.get("executed") is not True, rejected
+        assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+        return
+    code, verified = task.finish(tx, shown)
+    assert code == 0 and verified["verified"] is True, verified
+    assert old_slot not in task.objects and task.objects[ROOT]["notes"] == "Keep owner"
+    assert task.objects[FIRST] == keep

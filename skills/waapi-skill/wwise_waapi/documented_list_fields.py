@@ -167,6 +167,90 @@ def resolve_live_list_evidence(version, owner_id, name, *, read):
     return field_evidence(catalog, row, scope, matches[0])
 
 
+def resolve_class_list_evidence(version, class_id, name):
+    from .business_declarations import business_repair
+    catalog, row, scope = scope_evidence(version, scope_kind="class", scope_value=class_id, read=None)
+    fields = row["lists"] if row else []
+    matches = [field for field in fields if field["name"] == name]
+    if len(matches) != 1:
+        raise business_repair("DOCUMENTED_LIST_SELECTION_REQUIRED", field="object_list",
+            action="choose one documented List of this exact planned class; unlisted source remains unresolved",
+            choices=[field["name"] for field in fields])
+    return field_evidence(catalog, row, scope, matches[0])
+
+
+def resolve_planned_list_evidence(session, value, *, owner_handle):
+    """Use the existing declaration's class; the result handle binds its occurrence."""
+    from .business_declarations import NewDescendantTarget, resolve_semantic_kind, business_repair
+    owners = [row for row in session.declarations if row.result_handle == owner_handle
+        and isinstance(row.target, NewDescendantTarget)]
+    if len(owners) != 1:
+        raise ValueError("The planned List owner declaration is not unique")
+    kind = owners[0].target.kind
+    if kind.startswith("bth1-"):
+        class_id = session.handles.resolve_type(kind).class_id
+    else:
+        metadata_type = resolve_semantic_kind(kind, version=session.context.wwise_version).metadata_object_type
+        classes = [row for row in load_catalog(session.context.wwise_version)["classes"] if row["name"] == metadata_type]
+        if len(classes) != 1:
+            raise business_repair("PLANNED_LIST_CLASS_EVIDENCE_REQUIRED", field="object_list",
+                action="discover the planned owner's exact live Type Handle and List declaration")
+        class_id = classes[0]["class_id"]
+    selected = session.handles.bound_field(value) if value.startswith("bfh1-") else None
+    name = selected.token if selected is not None else value
+    evidence = resolve_class_list_evidence(session.context.wwise_version, class_id, name)
+    if selected is not None and (selected.field_kind != "list" or selected.scope_kind != "class"
+            or selected.scope_value != class_id or selected.restrictions.get("documented_list") != evidence):
+        raise business_repair("FIELD_HANDLE_SCOPE_MISMATCH", field="object_list",
+            action="select the List for this planned owner's exact class")
+    return evidence
+
+
+def validate_planned_list_source(binding, *, read):
+    evidence = {key: value for key, value in binding.items() if key not in {"planned_owner", "reference_targets"}}
+    if evidence.get("scope", {}).get("scope_kind") != "class":
+        raise ValueError("A planned List owner requires class-scoped source evidence")
+    actual = resolve_class_list_evidence(evidence["version"], evidence["scope"]["class_id"], evidence["declaration"]["name"])
+    if actual != evidence:
+        raise ValueError("The planned List class/source changed")
+    catalog = load_catalog(evidence["version"])
+    row = next(row for row in catalog["classes"] if row["class_id"] == evidence["scope"]["class_id"])
+    result = read("ak.wwise.core.object.getTypes", {}, {})
+    types = result.get("return") if isinstance(result, Mapping) else None
+    matches = [item for item in types if isinstance(item, Mapping) and item.get("classId") == row["class_id"]
+        and not isinstance(item.get("classId"), bool) and item.get("name") == row["name"]] if isinstance(types, list) else []
+    if len(matches) != 1:
+        raise ValueError("The planned List owner class no longer matches exact live getTypes")
+    return evidence
+
+
+def observe_planned_list(binding, owner_id, *, read):
+    """Resolve a planned occurrence only after its real GUID is independently known."""
+    evidence = {key: value for key, value in binding.items() if key not in {"planned_owner", "reference_targets"}}
+    actual = resolve_live_list_evidence(evidence["version"], owner_id, evidence["declaration"]["name"], read=read)
+    if (actual["scope"]["class_id"] != evidence["scope"]["class_id"]
+            or any(actual[key] != evidence[key] for key in ("catalog_sha256", "source_member", "source_sha256", "declaration"))):
+        raise ValueError("The actual planned owner differs from its declared List class/source")
+    return observe_list_binding(actual, read=read)
+
+
+def planned_list_guard_assertions(guards, *, read, after_write=False):
+    assertions = []
+    for guard in guards:
+        try:
+            validate_planned_list_source(guard["binding"], read=read)
+            before = guard.get("before")
+            actual = (observe_planned_list(guard["binding"], before["evidence"]["scope"]["scope_value"], read=read)
+                if before is not None and not after_write else None)
+            passed = after_write or actual == before
+            evidence = {"expected": before, "actual": actual, "member_verification": "actual_result_GUID_in_graph_verifier"}
+        except (ValueError, KeyError, TypeError) as exc:
+            evidence, passed = {"error": str(exc)}, False
+        assertions.append({"name": "planned List source and pre-existing owner state remain bound",
+            "passed": bool(passed), "evidence": evidence})
+    return assertions
+
+
 def observe_list_binding(evidence, *, read, preserve_reference_ids=(), after_write=False):
     """Observe ordered member IDs, exact classes, and actual owner presence."""
     if not isinstance(evidence, Mapping) or evidence.get("kind") != "documented-list":
@@ -254,4 +338,76 @@ def list_guard_assertions(guards, *, read, after_write=False):
             actual, passed = {"error": str(exc)}, False
         assertions.append({"name": "documented list source, owner and exact member classes remain bound",
             "passed": bool(passed), "evidence": {"expected": guard, "actual": actual}})
+    return assertions
+
+
+def capture_slot_reference_targets(specs, roles):
+    """Preserve observed external targets, excluding objects changed by this graph."""
+    changed = {spec.get("target_id") or spec.get("preexisting_id") for spec in specs}
+    selected = {identity for spec in specs if "documented_list_element_class" in spec
+        for reference in spec.get("references", [])
+        for identity in (reference.get("target_id") if isinstance(reference.get("target_id"), list) else [reference.get("target_id")])
+        if isinstance(identity, str) and identity not in changed}
+    fields = {"id", "name", "type", "path", "parent", "owner", "notes", "classId"}
+    result = {}
+    for role in roles.values():
+        if role.object in selected:
+            row = {key: value for key, value in role.row.items() if key in fields}
+            if role.object in result and result[role.object] != row:
+                raise ValueError("External slot reference targets disagreed within this Preview")
+            result[role.object] = row
+    if set(result) != selected or len(result) > 128:
+        raise ValueError("Every external slot reference target requires a complete bounded observation")
+    return [result[identity] for identity in sorted(result)]
+
+
+def slot_reference_preservation_assertions(before, *, read):
+    if not before:
+        return []
+    fields = list(dict.fromkeys(key for row in before for key in row))
+    identities = [row["id"] for row in before]
+    result = read("ak.wwise.core.object.get", {"from": {"id": identities}}, {"return": fields})
+    rows = result.get("return") if isinstance(result, Mapping) else None
+    actual = {row.get("id"): row for row in rows if isinstance(row, Mapping)} if isinstance(rows, list) else {}
+    passed = (isinstance(rows, list) and len(rows) == len(before) == len(actual)
+        and set(actual) == set(identities) and all(
+            {key: actual[row["id"]][key] for key in row if key in actual[row["id"]]} == row for row in before))
+    return [{"name": "external slot reference target observations remain unchanged", "passed": bool(passed),
+        "evidence": {"expected": before, "actual": rows}}]
+
+
+def observe_planned_reference_targets(binding, *, read):
+    identities = binding.get("reference_targets")
+    if (not isinstance(identities, list) or len(identities) > 32 or len(set(identities)) != len(identities)
+            or any(not isinstance(value, str) or not re.fullmatch(r"\{[A-F0-9]{8}(?:-[A-F0-9]{4}){3}-[A-F0-9]{12}\}", value) for value in identities)):
+        raise ValueError("Planned reference Lists require bounded distinct canonical target GUIDs")
+    if not identities:
+        return []
+    result = read("ak.wwise.core.object.get", {"from": {"id": identities}},
+        {"return": ["id", "name", "type", "path", "classId", "parent", "owner", "notes"]})
+    rows = result.get("return") if isinstance(result, Mapping) else None
+    allowed = {item["class_id"] for item in binding["declaration"]["element_classes"]}
+    actual = {row.get("id"): row for row in rows if isinstance(row, Mapping)} if isinstance(rows, list) else {}
+    if (not isinstance(rows, list) or len(rows) != len(identities) or len(actual) != len(identities)
+            or set(actual) != set(identities) or binding["declaration"]["unresolved_element_types"]
+            or any(isinstance(row.get("classId"), bool) or row.get("classId") not in allowed for row in rows)):
+        raise ValueError("Each actual planned reference List target must have one exact permitted class")
+    return [actual[identity] for identity in identities]
+
+
+def planned_reference_guard_assertions(guards, *, read):
+    assertions = []
+    for guard in guards:
+        try:
+            validate_planned_list_source(guard["binding"], read=read)
+            actual = observe_planned_reference_targets(guard["binding"], read=read)
+            mutable = set(guard.get("changed_target_ids", []))
+            passed = all(({key: row.get(key) for key in ("id", "classId")} ==
+                {key: expected.get(key) for key in ("id", "classId")} if row["id"] in mutable else row == expected)
+                for row, expected in zip(actual, guard["targets"], strict=True))
+            evidence = {"expected": guard["targets"], "actual": actual}
+        except (ValueError, KeyError, TypeError) as exc:
+            evidence, passed = {"error": str(exc)}, False
+        assertions.append({"name": "planned reference List source, target classes and unchanged external state remain bound",
+            "passed": bool(passed), "evidence": evidence})
     return assertions

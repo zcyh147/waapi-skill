@@ -291,6 +291,7 @@ def object_graph_business_contract_data(
                     "list_behavior": ["append", "replace-all"],
                 },
                 "recursive_placement": "bound_or_planned_parent_handles;_ordinary_children_and_owned_lists_may_nest",
+                "planned_binding": "stable_declaration_result_handle_and_normalized_owner_path_plus_exact_class_source;_actual_GUID_class_owner_membership_verified_after_write",
                 "list_behavior_scope": "one_inherited_existing_target_row;_conflicting_descendant_choices_are_rejected",
                 "clear_subcommand": "draft-clear-object-list",
                 "clear_fields": [
@@ -378,7 +379,8 @@ def object_graph_business_contract_data(
             "field_value_types": {**OBJECT_CREATE_BUSINESS_VALUE_TYPES, "object_list": "string"},
             "object_list": {
                 "scope": "new_root_only",
-                "input": "exact_user_owned_wwise_object_list_name_without_at_prefix",
+                "input": "selected_List_Field_Handle_or_exact_source_proven_alias_for_this_owner",
+                "proof": "exact_version_class_source_and_actual_ordered_membership_and_owner",
                 "placement": "owned_list_instead_of_hierarchy_child",
                 "descendants": "ordinary_recursive_children",
             },

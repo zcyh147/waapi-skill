@@ -2284,6 +2284,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             "auto_add_to_source_control",
             "on_name_conflict",
             "replace_owned_root",
+            "documented_list_bindings",
         ),
         argument_contract=_object_contract(
             ("parent", "type", "name"),
@@ -2300,6 +2301,8 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "references": {"type": "array", "items": _OBJECT_CREATE_REFERENCE_ARGUMENT_SCHEMA},
                 "platform": PLATFORM_ARGUMENT_SCHEMA,
                 "list": _OBJECT_LIST_NAME_SCHEMA,
+                "documented_list_bindings": {"type": "array", "maxItems": 128, "items": {"type": "object"},
+                    "description": "Gateway-owned documented List source/owner proofs; never forwarded."},
                 "auto_add_to_source_control": {"type": "boolean", "default": False},
                 "children": {
                     "type": "array",
@@ -2331,6 +2334,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                 "auto_add_to_source_control",
                 "on_name_conflict",
                 "replace_owned_root",
+                "documented_list_bindings",
             ),
         ),
         identity_arguments=("parent", "replace_owned_root"),
@@ -4743,7 +4747,18 @@ def _prepare_object_create(
     merge_children_snapshots: list[dict[str, Any]] = []
     replace_subtree_snapshots: list[dict[str, Any]] = []
     list_before: list[dict[str, Any]] = []
+    documented_guards = []
     if list_name is not None:
+        from .documented_list_fields import resolve_live_list_evidence, observe_list_binding
+        proof = resolve_live_list_evidence(request.version, parent.object, list_name, read=read)
+        selected = arguments.get("documented_list_bindings", [])
+        if selected and selected != [proof]:
+            raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Selected List proof differs from its exact owner/class/source")
+        allowed_classes = {element["class_id"] for element in proof["declaration"]["element_classes"]}
+        if proof["declaration"]["unresolved_element_types"] or node_specs[0]["class_id"] not in allowed_classes:
+            raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "The requested root class is not proved by this exact List source")
+        node_specs[0]["documented_list_element_class"] = node_specs[0]["class_id"]
+        documented_guards.append(observe_list_binding(proof, read=read))
         list_before = _normalize_object_list_snapshot(
             _read_object_list(
                 parent.object,
@@ -4783,7 +4798,10 @@ def _prepare_object_create(
                 details={"list": list_name, "name": normalized.root.name, "rows": collisions},
             )
         if conflict == "merge" and collisions:
-            if not _object_type_matches(collisions[0].get("type"), node_specs[0]):
+            class_rows = _read_object_id_rows(collisions[0]["id"], fields=("id", "classId"), read=read)
+            if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                    or not _object_type_matches(collisions[0].get("type"), node_specs[0],
+                        actual_class_id=class_rows[0].get("classId"))):
                 raise OperationContractError(
                     "INVALID_TARGET_TYPE",
                     "object.create list merge collision has a different live object type.",
@@ -5070,7 +5088,14 @@ def _prepare_object_create(
             "source": "execution_result.id",
             "irreversible_preexisting_changes": conflict == "merge",
         }
-    return preview, roles, {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}, verification, cleanup
+    state = {"object_graph_guard": graph_guard, "object_create_nodes": node_specs}
+    if documented_guards:
+        state["documented_list_guards"] = documented_guards
+    from .documented_list_fields import capture_slot_reference_targets
+    reference_targets = capture_slot_reference_targets(node_specs, roles)
+    if reference_targets:
+        state["documented_list_reference_targets"] = reference_targets
+    return preview, roles, state, verification, cleanup
 
 
 def _raise_plugin_operation_error(exc: PluginOperationContractError) -> NoReturn:
@@ -5629,7 +5654,10 @@ def _prepare_object_set(
     arguments: Mapping[str, Any],
     read: ReadCall,
 ) -> tuple[SemanticPreview, dict[str, ResolvedObject], dict[str, Any], dict[str, Any], dict[str, Any]]:
-    documented_bindings = list(arguments.get("documented_list_bindings", []))
+    all_documented_bindings = list(arguments.get("documented_list_bindings", []))
+    planned_bindings = [binding for binding in all_documented_bindings if "planned_owner" in binding]
+    documented_bindings = [binding for binding in all_documented_bindings if "planned_owner" not in binding]
+    planned_guards = []
     raw_objects = _mapping_sequence(arguments.get("objects"), field="objects")
     conflict = str(arguments.get("on_name_conflict", "fail"))
     global_platform = (
@@ -5980,6 +6008,7 @@ def _prepare_object_set(
             derived_properties=derived_child_properties,
             identity_cache=identity_cache,
             property_info_cache=property_info_cache,
+            list_bindings=planned_bindings,
         )
         child_spec_by_path = {
             str(spec["request_path"]): spec for spec in child_specs
@@ -6111,7 +6140,7 @@ def _prepare_object_set(
                         "object.set merge path must resolve to at most one object.",
                         details={"path": expected_path, "rows": rows},
                     )
-                if rows and not _object_type_matches(rows[0].get("type"), child_spec):
+                if rows and not _object_type_matches(rows[0].get("type"), child_spec, actual_class_id=rows[0].get("classId")):
                     raise OperationContractError(
                         "INVALID_TARGET_TYPE",
                         "object.set merge collision has a different live object type.",
@@ -6242,6 +6271,7 @@ def _prepare_object_set(
                 derived_properties=derived_child_properties,
                 identity_cache=identity_cache,
                 property_info_cache=property_info_cache,
+                list_bindings=planned_bindings,
             )
             prepared_spec_by_path = {
                 str(spec["request_path"]): spec for spec in prepared_specs
@@ -6412,7 +6442,7 @@ def _prepare_object_set(
                 path_snapshots.append({"path": expected_path, "fields": fields, "platform": owner_spec.get("platform"), "rows": existing_rows})
                 owner_spec["expected_path"] = expected_path
                 if existing_rows:
-                    if not _object_type_matches(existing_rows[0].get("type"), owner_spec):
+                    if not _object_type_matches(existing_rows[0].get("type"), owner_spec, actual_class_id=existing_rows[0].get("classId")):
                         raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested descendant has another type.")
                     owner_spec["preexisting_id"] = existing_rows[0]["id"]
                     owner_spec["existing_path"] = existing_rows[0]["path"]
@@ -6420,8 +6450,25 @@ def _prepare_object_set(
                     owner_spec["preexisting_children"] = _read_direct_children(existing_rows[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
                     children_snapshots.append({"object_id": existing_rows[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": owner_spec["preexisting_children"]})
             for descriptor in node.lists:
-                if descriptor.name.casefold() in OBJECT_DEDICATED_LIST_NAMES:
-                    raise OperationContractError("DEDICATED_OPERATION_REQUIRED", "Specialized plug-in and RTPC lists use their dedicated operation.", details={"list": descriptor.name})
+                from .documented_list_fields import validate_planned_list_source, observe_planned_list
+                matches = [binding for binding in planned_bindings
+                    if binding.get("planned_owner", {}).get("request_path") == node.request_path
+                    and binding.get("declaration", {}).get("name") == descriptor.name]
+                if len(matches) != 1:
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Every planned List must bind one exact declaration result and source")
+                binding = matches[0]
+                if (binding.get("version") != request.version or binding["scope"].get("class_id") != owner_spec["class_id"]
+                        or not isinstance(binding["planned_owner"].get("result_handle"), str)):
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Planned owner occurrence/class/version differs from its List proof")
+                validate_planned_list_source(binding, read=read)
+                allowed_classes = {element["class_id"] for element in binding["declaration"]["element_classes"]}
+                if binding["declaration"]["unresolved_element_types"] or any(
+                        nested_specs[member.request_path]["class_id"] not in allowed_classes for member in descriptor.objects):
+                    raise OperationContractError("DOCUMENTED_LIST_ELEMENT_CLASS_INVALID", "Requested nested List member class is not proved by its owner declaration")
+                for member in descriptor.objects:
+                    nested_specs[member.request_path]["documented_list_element_class"] = nested_specs[member.request_path]["class_id"]
+                before_proof = observe_planned_list(binding, owner_spec["preexisting_id"], read=read) if owner_spec.get("preexisting_id") else None
+                planned_guards.append({"binding": binding, "before": before_proof})
                 if not descriptor.objects and row_list_mode != "replaceAll":
                     raise OperationContractError("NO_OP", "An empty nested object list requires replace-all.")
                 before_rows: list[dict[str, Any]] = []
@@ -6458,8 +6505,10 @@ def _prepare_object_set(
                                 subtree.update({"object_id": owner_id, "list": descriptor.name})
                             list_subtree_snapshots.extend(replacement_subtrees)
                         if row_conflict == "merge":
-                            if not _object_type_matches(collisions[0].get("type"), spec):
-                                raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested list member has another type.")
+                            class_rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [collisions[0]["id"]]}}, {"return": ["id", "classId"]}))
+                            if (len(class_rows) != 1 or not _same_identity(class_rows[0].get("id"), collisions[0]["id"])
+                                    or not _object_type_matches(collisions[0].get("type"), spec, actual_class_id=class_rows[0].get("classId"))):
+                                raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested list member has another type/class.")
                             spec["preexisting_id"] = collisions[0]["id"]
                             spec["existing_path"] = collisions[0].get("path")
                             fields = _object_spec_return_fields(spec)
@@ -6685,6 +6734,16 @@ def _prepare_object_set(
         "object_graph_guard": graph_guard,
         "object_set_nodes": node_specs,
     }
+    reference_guards = [guard for spec in node_specs for guard in spec.get("documented_reference_lists", [])]
+    changed_ids = {spec.get("target_id") or spec.get("preexisting_id") for spec in node_specs}
+    for guard in reference_guards:
+        guard["changed_target_ids"] = [row["id"] for row in guard["targets"] if row["id"] in changed_ids]
+    if reference_guards:
+        state["documented_planned_reference_guards"] = reference_guards
+    if len(planned_guards) + len(reference_guards) != len(planned_bindings):
+        raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Every planned List source must belong to one reachable owner occurrence")
+    if planned_guards:
+        state["documented_planned_list_guards"] = planned_guards
     if documented_bindings:
         if any(binding.get("version") != request.version for binding in documented_bindings):
             raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "List source evidence must belong to this exact Wwise version")
@@ -6694,6 +6753,10 @@ def _prepare_object_set(
                 for evidence in documented_bindings]
         except (ValueError, KeyError, TypeError) as exc:
             raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", str(exc)) from exc
+    from .documented_list_fields import capture_slot_reference_targets
+    reference_targets = capture_slot_reference_targets(node_specs, roles)
+    if reference_targets:
+        state["documented_list_reference_targets"] = reference_targets
     curve_guards = [field["curve_proof"] for spec in node_specs for field in spec.get("references", []) if "curve_proof" in field]
     if curve_guards:
         if len(node_specs) + len(curve_guards) > DEFAULT_MAX_NODES:
@@ -7305,6 +7368,7 @@ def _prepare_object_node_specs(
         tuple[str, str, str],
         PropertyInfoMetadataRecord,
     ],
+    list_bindings: Sequence[Mapping[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     specs: list[dict[str, Any]] = []
     for node in nodes:
@@ -7385,6 +7449,31 @@ def _prepare_object_node_specs(
             )
         reference_targets = []
         for descriptor in node.references:
+            documented = [binding for binding in list_bindings
+                if binding.get("planned_owner", {}).get("request_path") == node.request_path
+                and binding.get("declaration", {}).get("name") == descriptor.name and "reference_targets" in binding]
+            if documented:
+                from .documented_list_fields import validate_planned_list_source, observe_planned_reference_targets
+                if (len(documented) != 1 or documented[0].get("version") != version
+                        or documented[0].get("scope", {}).get("class_id") != type_info.class_id
+                        or version not in OBJECT_SET_REFERENCE_ARRAY_VERSIONS or not isinstance(descriptor.target, tuple)):
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "The planned reference List owner/source/version/shape does not match")
+                binding = documented[0]
+                validate_planned_list_source(binding, read=read)
+                identities = []
+                for offset, target_descriptor in enumerate(descriptor.targets):
+                    role = f"{descriptor.request_path}[{offset}]"
+                    target = _resolve_identity(target_descriptor.as_dict(), role=role, read=read, identity_cache=identity_cache)
+                    roles[role] = target
+                    identities.append(target.object)
+                if identities != binding["reference_targets"]:
+                    raise OperationContractError("DOCUMENTED_LIST_BINDING_INVALID", "Planned List target order differs from its exact declaration")
+                targets = observe_planned_reference_targets(binding, read=read)
+                spec.setdefault("documented_reference_lists", []).append({"binding": binding, "targets": targets})
+                spec["documented_list_owner_class"] = type_info.class_id
+                resolved_references[descriptor.request_path] = identities
+                spec["references"].append({"name": descriptor.name, "target_id": identities, "metadata_evidence": "documented-list"})
+                continue
             info = _read_property_info_cached(
                 read,
                 cache=property_info_cache,
@@ -7881,6 +7970,15 @@ def _condition_metadata_assertions(pre_state, *, read, after_write=False):
     if isinstance(pre_state, Mapping) and pre_state.get("documented_list_guards"):
         from .documented_list_fields import list_guard_assertions
         assertions.extend(list_guard_assertions(pre_state["documented_list_guards"], read=read, after_write=after_write))
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_planned_list_guards"):
+        from .documented_list_fields import planned_list_guard_assertions
+        assertions.extend(planned_list_guard_assertions(pre_state["documented_planned_list_guards"], read=read, after_write=after_write))
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_list_reference_targets"):
+        from .documented_list_fields import slot_reference_preservation_assertions
+        assertions.extend(slot_reference_preservation_assertions(pre_state["documented_list_reference_targets"], read=read))
+    if isinstance(pre_state, Mapping) and pre_state.get("documented_planned_reference_guards"):
+        from .documented_list_fields import planned_reference_guard_assertions
+        assertions.extend(planned_reference_guard_assertions(pre_state["documented_planned_reference_guards"], read=read))
     condition_metadata = pre_state.get("condition_metadata") if isinstance(pre_state, Mapping) else None
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
@@ -8457,10 +8555,11 @@ def _object_type_token(value: Any) -> str:
 
 
 def _object_type_matches(actual: Any, spec: Mapping[str, Any], *, actual_class_id: Any = None) -> bool:
-    if "documented_list_element_class" in spec:
+    class_proof = spec.get("documented_list_element_class", spec.get("documented_list_owner_class"))
+    if class_proof is not None:
         return (isinstance(actual, str) and bool(actual)
             and isinstance(actual_class_id, int) and not isinstance(actual_class_id, bool)
-            and actual_class_id == spec["documented_list_element_class"])
+            and actual_class_id == class_proof)
     token = _object_type_token(actual)
     return token in {
         _object_type_token(spec.get("requested_type")),
@@ -9160,7 +9259,7 @@ def _object_spec_return_fields(spec: Mapping[str, Any]) -> list[str]:
     return _dedupe_fields(
         [
             *IDENTITY_RETURN_FIELDS,
-            *(("classId",) if "documented_list_element_class" in spec else ()),
+            *(("classId",) if "documented_list_element_class" in spec or "documented_list_owner_class" in spec else ()),
             *(
                 ("owner",)
                 if spec.get("collection") not in {None, "children"}
@@ -19140,11 +19239,22 @@ def verify_prepared_operation(
                 if guard["evidence"]["scope"]["scope_value"] == owner_id
                 and guard["evidence"]["declaration"]["name"] == list_name
                 and "reference_targets" not in guard["evidence"]]
-            if documented:
-                if len(documented) != 1:
+            planned = [guard for guard in pre_state.get("documented_planned_list_guards", [])
+                if guard["binding"]["planned_owner"]["request_path"] == owner_path
+                and guard["binding"]["declaration"]["name"] == list_name]
+            if planned:
+                from .documented_list_fields import observe_planned_list
+                try:
+                    actual_planned = observe_planned_list(planned[0]["binding"], owner_id, read=read_call)
+                    check(f"{owner_path}.@{list_name} actual owner and member classes match the planned source", len(planned) == 1, actual_planned)
+                except (ValueError, KeyError, TypeError) as exc:
+                    check(f"{owner_path}.@{list_name} actual owner and member classes match the planned source", False, {"error": str(exc)})
+            if documented or planned:
+                if len(documented) + len(planned) != 1:
                     raise OperationContractError("INVALID_PREVIEW", "Ordered List verification requires one exact source guard")
+                before_proof = documented[0] if documented else planned[0].get("before") or {"members": []}
                 expected_order = ([] if list_mode == "replaceAll" else
-                    [row["id"] for row in documented[0]["members"]
+                    [row["id"] for row in before_proof["members"]
                      if _identity_key(row["id"]) not in replaced_set_ids])
                 for list_root_spec in list_root_specs:
                     object_id = resolved_id_by_path.get(str(list_root_spec.get("request_path")))
