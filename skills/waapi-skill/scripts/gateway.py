@@ -1645,6 +1645,7 @@ def build_parser() -> argparse.ArgumentParser:
                 | media_build_business_operations()
                 | runtime_inspection_business_read_operations()
                 | soundengine_control_business_read_operations()
+                | {"ak.wwise.core.sourceControl.getStatus"}
             )
         ),
     )
@@ -1669,6 +1670,10 @@ def build_parser() -> argparse.ArgumentParser:
     core_call.add_argument("--switch-group-id")
     core_call.add_argument("--game-object-handle")
     add_media_build_read_arguments(core_call)
+    core_call.add_argument("--project-file", action="append", default=[])
+    core_call.add_argument("--originals-file", action="append", default=[])
+    core_call.add_argument("--exact-file", action="append", default=[])
+    core_call.add_argument("--io-root")
 
     typed_zero_call = subparsers.add_parser(
         "typed-zero-call",
@@ -5123,6 +5128,24 @@ def preflight_core_business_input(
     versions = resolve_catalog_versions(args, env=env)
     if len(versions) != 1:
         raise GatewayInputError("core-call requires one exact Wwise version")
+    status_read_uri = "ak.wwise.core.sourceControl.getStatus"
+    if args.api == status_read_uri:
+        from wwise_waapi.source_control_status_read import status_file_plan
+        try:
+            source_control_business_contract_data(args.api, versions[0])
+            defaults = vars(build_parser().parse_args(["core-call", args.api]))
+            allowed = {"api", "command", "version", "timeout", "evidence_dir", "state_dir",
+                       "project_file", "originals_file", "exact_file", "io_root"}
+            unexpected = [key for key, value in vars(args).items() if key not in allowed and value != defaults.get(key)]
+            if unexpected:
+                raise ValueError("Status read accepts only its disclosed file locators and I/O root: " + ", ".join(unexpected))
+            args.source_status_plan = status_file_plan(args)
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
+        args.core_business_version = versions[0]
+        return
+    if args.project_file or args.originals_file or args.exact_file or args.io_root is not None:
+        raise GatewayInputError("Source-control file locators apply only to the getStatus read alternative")
     if (args.runtime_observation is not None or args.runtime_page is not None) and args.api not in runtime_inspection_business_read_operations():
         raise GatewayInputError("Runtime observation continuation is valid only for its original runtime-inspection operation")
     if args.api in soundengine_control_business_read_operations():
@@ -11836,6 +11859,55 @@ def dispatch_soundengine_business_read(
     }
 
 
+def dispatch_source_control_status_read(args, *, connection, detected_version, live_info, dispatcher, common):
+    """Observe each exact file through one catalog-proven read-only call."""
+    from wwise_waapi.source_control_status_read import observe_status_files, MAX_STATUS_NATIVE_BYTES
+    from wwise_waapi.source_control_business import materialize_source_control_business_request
+    from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+    project, project_call = current_project(dispatcher, connection=connection, version=detected_version)
+    assert project is not None
+    authority = "da1-" + canonical_sha256({"operation": args.api, "plan": args.source_status_plan})[:40]
+    context = _business_context_from_live(task_authority=authority, project=project,
+        detected_version=detected_version, live_info=live_info)
+    session = BusinessDeclarationSession.create(context).with_settings({
+        "source_control_roots": _source_control_roots_from_project(project), "source_control_plan": args.source_status_plan})
+    request = materialize_source_control_business_request(args.api, session)
+    files = request["arguments"]["args"]["files"]
+    capability = live_capability(detected_version, args.api, live_info=live_info)
+    if capability.execution_contract.get("effect") != "read":
+        raise GatewayInputError("Status observation requires the matching catalog read-only effect")
+    def read_file(path):
+        native_args = {"files": [path]}
+        request_validation = validate_resolved_semantic_payload(args.api, native_args, {}, version=detected_version)
+        try:
+            outcome = dispatch(dispatcher, args.api, connection=connection, version=detected_version,
+                args=native_args, options={}, allow_destructive=True,
+                result_limit_bytes=min(MAX_STATUS_NATIVE_BYTES, int(capability.execution_contract["result_limit_bytes"])),
+                operation_timeout=float(capability.execution_contract["timeout_seconds"]))
+        except GatewayTimeoutError as exc:
+            # Deadline exhaustion between file calls must retain earlier observations.
+            return {"ok": False, "call": {"api": args.api, "ok": False, "api_attempted": False,
+                    **exc.as_dict()}, "failure": exc.as_dict()}
+        if outcome.get("ok") is not True:
+            return {"ok": False, "call": dispatch_call_summary(outcome), "failure": dict(outcome)}
+        native = outcome.get("result")
+        try:
+            result_validation = validate_semantic_result(args.api, native, version=detected_version)
+        except SemanticValidationError as exc:
+            return {"ok": False, "call": dispatch_call_summary(outcome),
+                "failure": {"native_result": native, "validation": exc.as_dict()}}
+        return {"ok": True, "result": native, "call": dispatch_call_summary(outcome),
+            "schema_validation": {"request": request_validation.as_dict(), "result": result_validation.as_dict()}}
+    try:
+        report = observe_status_files(files, version=detected_version, call=read_file)
+    except ValueError as exc:
+        raise GatewayInputError(str(exc)) from exc
+    return {"ok": report["complete"], "status": "ok" if report["complete"] else "partial",
+            **common, "api_attempted": args.api, "complete": report["complete"],
+            "project_call": dispatch_call_summary(project_call), "read_only": True,
+            "mutation_dispatched": False, "provider_effects_verified": False, "agent_result": report}
+
+
 def dispatch_core_business_read(
     args: argparse.Namespace,
     *,
@@ -11852,6 +11924,9 @@ def dispatch_core_business_read(
         raise GatewayInputError(
             "Core business version changed after preflight; request-schema must be rerun"
         )
+    if args.api == "ak.wwise.core.sourceControl.getStatus":
+        return dispatch_source_control_status_read(args, connection=connection, detected_version=detected_version,
+            live_info=live_info, dispatcher=dispatcher, common=common)
     if args.api in soundengine_control_business_read_operations():
         return dispatch_soundengine_business_read(
             args,
@@ -16505,6 +16580,18 @@ def dispatch_operation_draft_check(
                 version=detected_version,
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
+            if inspected.operation == "ak.wwise.core.sourceControl.getStatus":
+                # The existing Draft now terminates as a read. Retain the closed
+                # request/I/O checks and fresh object-file proof it previously
+                # received during transaction preparation.
+                from wwise_waapi.operation_registry import prepare_operation
+                status_request = parse_operation_request(request_payload, expected_version=detected_version)
+                locality = local_filesystem_transaction_boundary(request_payload, command=args.command,
+                    endpoint_host=connection.host, common=common)
+                if locality is not None:
+                    return locality
+                prepare_operation(status_request, read_call=transaction_read_call(
+                    dispatcher, connection=connection, version=detected_version))
             result = dispatch(
                 dispatcher,
                 inspected.operation,
@@ -16512,6 +16599,7 @@ def dispatch_operation_draft_check(
                 version=detected_version,
                 args=request_args,
                 options=request_options,
+                allow_destructive=inspected.operation == "ak.wwise.core.sourceControl.getStatus",
                 result_limit_bytes=int(
                     capability.execution_contract["result_limit_bytes"]
                 ),

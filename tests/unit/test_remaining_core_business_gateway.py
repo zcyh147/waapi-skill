@@ -827,7 +827,7 @@ def test_source_file_usage_outputs_do_not_advertise_unpinned_source_control_rout
     assert "usage_output_choices" not in json.dumps(payload)
 
 
-def _source_control_object_file_case(tmp_path, *, version="2025.1", choice="--object-file", operation="ak.wwise.core.sourceControl.checkOut", live_type=None, declaration_error=None, object_count=1, external_containing=False, approve_external=False):
+def _source_control_object_file_case(tmp_path, *, version="2025.1", choice="--object-file", operation="ak.wwise.core.sourceControl.checkOut", live_type=None, declaration_error=None, object_count=1, external_containing=False, approve_external=False, before_check=None, check_error=None):
     from tests.unit.test_object_graph_business_gateway import _info
     state_dir = tmp_path / "state"
     object_id = "{11111111-1111-1111-1111-111111111111}"
@@ -878,9 +878,16 @@ def _source_control_object_file_case(tmp_path, *, version="2025.1", choice="--ob
         assert code == 2 and declaration_error in json.dumps(phase), phase
         return client, state_dir, phase, run
     assert code == 0, phase
+    if before_check is not None:
+        before_check(client)
     code, phase = run("draft-check", draft, "--task-authority", authority,
         "--expected-revision", str(phase["draft"]["revision"]))
+    if check_error:
+        assert code == 2 and check_error in json.dumps(phase), phase
+        return client, state_dir, phase, run
     assert code == 0, phase
+    if operation.endswith("getStatus"):
+        return client, state_dir, phase, run
     code, preview = run("preview-from-draft", draft, "--task-authority", authority,
         "--expected-revision", str(phase["draft"]["revision"]), "--apply")
     assert code == 0, preview
@@ -980,18 +987,21 @@ def test_source_control_two_objects_in_one_containing_file_are_one_native_file_s
 def test_source_control_file_actions_share_the_exact_object_scope_without_status_identity_inference(tmp_path, action):
     operation = "ak.wwise.core.sourceControl." + action
     client, state_dir, preview, run = _source_control_object_file_case(tmp_path, operation=operation)
-    code, executed = run("execute", preview["transaction_id"])
-    assert code == 0 and executed["executed"] is True, executed
+    if action == "getStatus":
+        assert preview["agent_result"] == {"log": [], "result": [{"owner": "fixture-owner", "status": "fixture-status"}]}
+        assert "transaction_id" not in preview
+    else:
+        code, executed = run("execute", preview["transaction_id"])
+        assert code == 0 and executed["executed"] is True, executed
     calls = [row for row in client.calls if row[0] == operation]
     expected = {"files": [str(client.containing)]}
     if action == "commit":
         expected["message"] = "Exact object-file changes"
     assert len(calls) == 1 and calls[0][1] == expected
-    code, verified = run("verify", preview["transaction_id"])
-    assert code == 0 and verified["agent_result"]["verified"] is False, verified
-    expected_result = ({"log": [], "result": [{"owner": "fixture-owner", "status": "fixture-status"}]}
-                       if action == "getStatus" else {"log": []})
-    assert verified["agent_result"]["result"] == expected_result
+    if action != "getStatus":
+        code, verified = run("verify", preview["transaction_id"])
+        assert code == 0 and verified["agent_result"]["verified"] is False, verified
+        assert verified["agent_result"]["result"] == {"log": []}
 
 
 @pytest.mark.parametrize("version", ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"))
@@ -1032,3 +1042,191 @@ def test_source_control_observed_external_file_can_use_an_exact_approved_io_root
     code, executed = run("execute", preview["transaction_id"])
     assert code == 0 and executed["executed"] is True, executed
     assert [row[1] for row in client.calls if row[0].endswith("checkOut")] == [{"files": [str(client.containing)]}]
+
+
+@pytest.mark.parametrize("version", ("2023.1", "2024.1", "2025.1"))
+def test_source_control_per_file_status_read_preserves_native_responses_under_read_only_policy(tmp_path, version):
+    from tests.unit.test_object_graph_business_gateway import _info
+    operation = "ak.wwise.core.sourceControl.getStatus"
+    class Client(_SourceControlDraftClient):
+        def __init__(self):
+            super().__init__(tmp_path)
+            self.calls = []
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == operation:
+                self.calls.append((args, options))
+                return {"result": [{"owner": "native-owner", "status": "native-status", "nativeID": "{11111111-1111-1111-1111-111111111111}"}], "log": []}
+            return super().call(uri, args, options)
+    client = Client()
+    env = _env(tmp_path, version=version)
+    config_path = Path(env["WAAPI_SKILL_CONFIG_PATH"])
+    config = json.loads(config_path.read_text())
+    config["project_modification_policy"] = "read_only"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    code, schema = gateway.execute_gateway(["--version", version, "request-schema", operation], env=env,
+        client_factory=lambda url: pytest.fail(f"offline schema connected to {url}"))
+    assert code == 0 and schema["business_adapter"]["read_alternative"]["subcommand"] == "core-call", schema
+    code, result = gateway.execute_gateway(["core-call", operation, "--project-file", "Events/A.wwu", "--originals-file", "雨.wav"],
+        env=env, client_factory=lambda _url: client)
+    assert code == 0 and result["complete"] is True, json.dumps(result, ensure_ascii=False)
+    paths = [str(client.project_root / "Events" / "A.wwu"), str(client.originals / "雨.wav")]
+    assert client.calls == [({"files": [path]}, {}) for path in paths]
+    observed = result["agent_result"]
+    assert [{"file": row["file"], "result": row["result"]} for row in observed["files"]] == [
+        {"file": path, "result": {"result": [{"owner": "native-owner", "status": "native-status",
+         "nativeID": "{11111111-1111-1111-1111-111111111111}"}], "log": []}} for path in paths]
+    assert all(row["call"]["ok"] is True and row["schema_validation"]["request"]["unresolved_refs"] == []
+               for row in observed["files"])
+    assert observed["provider_identity_verified"] is False
+    assert observed["provider_effects_verified"] is False
+    assert list(result)[-1] == "agent_result"
+
+
+def _source_status_read(tmp_path, responses, *, version="2025.1", flags=None, after_read=None, timeout=None):
+    from tests.unit.test_object_graph_business_gateway import _info
+    operation = "ak.wwise.core.sourceControl.getStatus"
+    class Client(_SourceControlDraftClient):
+        def __init__(self):
+            super().__init__(tmp_path)
+            self.calls = []
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == operation:
+                self.calls.append((args, options))
+                response = responses[len(self.calls) - 1]
+                if after_read is not None:
+                    after_read()
+                if isinstance(response, Exception):
+                    raise response
+                return response
+            return super().call(uri, args, options)
+    client = Client()
+    env = _env(tmp_path, version=version)
+    config_path = Path(env["WAAPI_SKILL_CONFIG_PATH"])
+    config = json.loads(config_path.read_text())
+    config["project_modification_policy"] = "read_only"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    argv = [*(["--timeout", str(timeout)] if timeout is not None else []), "core-call", operation, *(flags if flags is not None else
+            ["--project-file", "A.wwu", "--project-file", "B.wwu", "--project-file", "C.wwu"])]
+    code, result = gateway.execute_gateway(argv, env=env, client_factory=lambda _url: client)
+    return client, code, result
+
+
+def test_source_control_status_second_file_failure_keeps_first_exact_response_without_retry(tmp_path):
+    first = {"result": [{"owner": "native owner", "status": "checked out"}], "log": [{"message": "native log"}]}
+    client, code, result = _source_status_read(tmp_path, [first, RuntimeError("provider unavailable")])
+    assert code != 0 and result["complete"] is False, result
+    report = result["agent_result"]
+    assert report["incomplete_reason"] == "native_call_failed"
+    assert report["files"][0]["result"] == first
+    assert report["files"][1]["file"] == str(client.project_root / "B.wwu")
+    assert "provider unavailable" in json.dumps(report["files"][1]["failure"])
+    assert report["remaining_files"] == [str(client.project_root / "C.wwu")]
+    assert len(client.calls) == 2 and report["automatic_retry"] is False
+    assert report["provider_identity_verified"] is False and report["provider_effects_verified"] is False
+    assert list(result)[-1] == "agent_result"
+
+
+@pytest.mark.parametrize(("native", "reason"), [
+    ({"result": [{"owner": "preserved-owner"}], "log": []}, "status_not_observed"),
+    ({"result": [], "log": [{"message": "no status supplied"}]}, "status_not_observed"),
+    ({"result": [{"owner": True, "status": "checked out"}], "log": []}, "status_result_shape_invalid"),
+    ({"result": [{"owner": "native", "status": True}], "log": []}, "status_result_shape_invalid"),
+])
+def test_source_control_status_missing_or_wrong_typed_field_is_partial_with_exact_native_data(tmp_path, native, reason):
+    client, code, result = _source_status_read(tmp_path, [native])
+    assert code != 0 and result["complete"] is False, result
+    report = result["agent_result"]
+    assert report["incomplete_reason"] == reason
+    assert report["files"][0]["result"] == native
+    assert len(client.calls) == 1
+    assert report["remaining_files"] == [str(client.project_root / name) for name in ("B.wwu", "C.wwu")]
+
+
+def test_source_control_status_native_byte_overflow_is_bounded_failure_not_complete(tmp_path):
+    client, code, result = _source_status_read(tmp_path, [{"result": [{"status": "x" * (17 * 1024)}], "log": []}])
+    assert code != 0 and result["complete"] is False, result
+    report = result["agent_result"]
+    assert report["incomplete_reason"] == "native_call_failed"
+    failure = report["files"][0]["failure"]
+    assert failure["error_code"] == "RESULT_TOO_LARGE" and failure["details"]["limit_bytes"] == 16384
+    assert "x" * 1024 not in json.dumps(result)
+    assert len(client.calls) == 1 and len(report["remaining_files"]) == 2
+
+
+def test_source_control_status_cumulative_rows_overflow_retains_all_bounded_responses(tmp_path):
+    # Each result fits 16 KiB independently; together these legal anonymous rows exceed 4096.
+    native = {"result": [{"status": "ok"}], "log": [{} for _ in range(1050)]}
+    client, code, result = _source_status_read(tmp_path, [native] * 4, flags=[
+        flag for name in ("A", "B", "C", "D", "E") for flag in ("--project-file", f"{name}.wwu")])
+    assert code != 0 and result["complete"] is False, result
+    report = result["agent_result"]
+    assert report["incomplete_reason"] == "status_row_budget_exceeded", json.dumps(report)
+    assert report["observed_row_count"] == 4204
+    assert [row["result"] for row in report["files"]] == [native] * 4
+    assert len(client.calls) == 4 and report["remaining_files"] == [str(client.project_root / "E.wwu")]
+
+
+@pytest.mark.parametrize(("version", "flags"), [
+    ("2021.1", ["--project-file", "A.wwu"]),
+    ("2022.1", ["--project-file", "A.wwu"]),
+    ("2025.1", []),
+    ("2025.1", [flag for index in range(33) for flag in ("--project-file", f"{index}.wwu")]),
+    ("2025.1", ["--project-file", "A.wwu", "--object-id", "{11111111-1111-1111-1111-111111111111}"]),
+])
+def test_source_control_status_invalid_selection_stops_before_connection(tmp_path, version, flags):
+    code, result = gateway.execute_gateway(["core-call", "ak.wwise.core.sourceControl.getStatus", *flags],
+        env=_env(tmp_path, version=version), client_factory=lambda url: pytest.fail(f"invalid read connected to {url}"))
+    assert code == 2 and result["ok"] is False
+
+
+@pytest.mark.parametrize("flags", [
+    ["--project-file", "../outside.wwu"],
+    ["--exact-file", "/outside/A.wwu"],
+])
+def test_source_control_status_file_scope_cannot_escape_existing_io_policy(tmp_path, flags):
+    client, code, result = _source_status_read(tmp_path, [], flags=flags)
+    assert code != 0 and result["ok"] is False, result
+    assert client.calls == []
+
+
+def test_source_control_status_deadline_keeps_completed_file_before_next_call(tmp_path):
+    import time
+    count = [0]
+    def delay_second():
+        count[0] += 1
+        if count[0] == 2:
+            time.sleep(0.3)
+    first = {"result": [{"status": "native-status"}], "log": []}
+    client, code, result = _source_status_read(tmp_path, [first, first], after_read=delay_second, timeout=0.15)
+    assert code != 0 and result["complete"] is False, result
+    report = result["agent_result"]
+    assert report["files"][0]["result"] == first
+    assert report["files"][1]["failure"]["error_code"] == "TIMEOUT"
+    assert len(client.calls) == 2 and report["automatic_retry"] is False
+    assert report["remaining_files"] == [str(client.project_root / "C.wwu")]
+
+
+@pytest.mark.parametrize("action", ("delete", "commit"))
+def test_source_control_status_read_classification_keeps_write_transactions_policy_blocked(tmp_path, action):
+    operation = "ak.wwise.core.sourceControl." + action
+    client, state_dir, preview, run = _source_control_object_file_case(tmp_path, operation=operation)
+    config_path = tmp_path / "config.json"
+    config = json.loads(config_path.read_text())
+    config["project_modification_policy"] = "read_only"
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    code, result = run("execute", preview["transaction_id"])
+    assert code != 0 and "read_only" in json.dumps(result), result
+    assert not any(call[0] == operation for call in client.calls)
+
+
+def test_source_control_status_draft_rechecks_exact_object_file_before_terminal_read(tmp_path):
+    client, _state, result, _run = _source_control_object_file_case(tmp_path,
+        operation="ak.wwise.core.sourceControl.getStatus",
+        before_check=lambda client: client.row.__setitem__("filePath", str(client.project_root / "different.wwu")),
+        check_error="SOURCE_CONTROL_OBJECT_FILE_BINDING_CHANGED")
+    assert result["ok"] is False
+    assert not any(row[0].endswith("sourceControl.getStatus") for row in client.calls)

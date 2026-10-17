@@ -243,6 +243,18 @@ def source_control_business_contract_data(
             "custom_provider_escape_hatch": "forbidden",
         }
         return payload
+    if operation == SOURCE_CONTROL_GET_STATUS_URI:
+        from .source_control_status_read import MAX_STATUS_FILES, MAX_STATUS_NATIVE_BYTES, MAX_STATUS_REPORT_BYTES, MAX_STATUS_ROWS
+        payload["read_alternative"] = {"subcommand": "core-call",
+            "gateway_argv_prefix": ["core-call", operation], "append_only_disclosed_business_fields": True,
+            "file_locators": ["--project-file <relative-path>", "--originals-file <relative-path>",
+                              "--exact-file <absolute-path> --io-root <approved-root>"],
+            "maximum_files": MAX_STATUS_FILES, "native_bytes_per_call": MAX_STATUS_NATIVE_BYTES,
+            "maximum_report_bytes": MAX_STATUS_REPORT_BYTES, "maximum_status_and_log_rows": MAX_STATUS_ROWS,
+            "deadline": "one_shared_finite_Gateway_timeout; no_per_file_reset",
+            "native_call_scope": "one_exact_file_per_call; native response preserved within that file call",
+            "policy": "read_only_permitted", "provider_identity_and_effects": "not_verified",
+            "incomplete_or_overflow": "partial_or_failure; never_complete_pass"}
     payload["start"] = {
         "subcommand": "draft-start",
         "gateway_argv": ["draft-start", operation],

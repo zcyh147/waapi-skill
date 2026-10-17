@@ -743,7 +743,8 @@ class ExecutionContractRegistry:
             item_type=item_type,
             route=route,
             effect=effect,
-            gateway_commands=("request-schema",),
+            gateway_commands=(("request-schema", "core-call")
+                              if uri == "ak.wwise.core.sourceControl.getStatus" else ("request-schema",)),
             timeout_seconds=120.0 if route == "isolated_transaction" else 30.0,
             result_limit_bytes=1024 * 1024,
             verification_strategy=(
@@ -1051,6 +1052,9 @@ def validate_packaged_authoring_ui_execution_contracts(
 def classify_function_effect(uri: str) -> str:
     """Return the reviewed effect class used by safety and routing."""
 
+    if uri == "ak.wwise.core.sourceControl.getStatus":
+        # One-file status observations read provider state without changing it.
+        return "read"
     if uri.startswith(FILESYSTEM_OR_EXTERNAL_PREFIXES) or uri in FILESYSTEM_OR_EXTERNAL_URIS:
         return "external"
     operation = uri.rsplit(".", 1)[-1]
