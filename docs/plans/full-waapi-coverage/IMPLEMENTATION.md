@@ -552,9 +552,9 @@ The 800 original passes were not repeated; this is not a final-candidate
 owned processes. The native ledger remains byte-identical to R16; no native
 credit or ticket closure is claimed.
 
-The full Program gate on frozen R16 remains in progress at this checkpoint,
-with failures observed but no terminal verdict yet. R17 has not replaced that
-running checkout. No broad Non-live or Fresh rerun has been started.
+At the R17 checkpoint the full Program gate was still running on frozen R16;
+its terminal result and later exact-node repairs are recorded below. R17 did not
+replace that running checkout. No broad Non-live or Fresh rerun was started.
 
 Follow-up fixed `6ad03726` adds bounded per-file getStatus reads and permits
 them in read_only mode; its 27 focused checks passed in 3.98 seconds. It is not
@@ -590,10 +590,27 @@ accepted per-call graph reuse repair: **29.16 seconds** on `d483d670` and
 performance claim. The earlier cProfile run's deadline TIMEOUT remains a separate
 failure; its overhead may contribute. Four public schema-equivalence, fresh-byte
 tamper and alternate-root controls passed; no cross-call cache, plan-validation
-removal or deadline relaxation was introduced. R18 has not run its central
-preflight or final combined focus. The original full Program on frozen R16 is
-still in progress, with failures observed and no terminal verdict yet; its exact
-repairs remain pending for this batch. Original receipts are retained under
+removal or deadline relaxation was introduced.
+
+The original full Program gate on frozen R16 `49f5e2f0` terminated with
+**11,763 passed / 14 failed / 3 skipped in 3,907.33 seconds**, exit 1. All 1,837
+tracked hashes stayed unchanged and the owned process group ended. On R18
+`ce9adba4`, just those 14 nodes retained 11 failures while the three 30 ms Topic
+controls passed unchanged. Test-only repair `58f138a4` updates reviewed schema
+and lifecycle-choice assertions, retained query guidance, valid saved-project
+fixtures and post-cancel readback expectations. It gives three schema/matching
+controls a one-second test budget while preserving deadline/cleanup negatives
+and all production limits. The original 14 plus six necessary neighboring
+controls passed **20 in 3.78 seconds** on that exact repair, with all 1,850 tracked
+hashes unchanged and no owned processes. This is a focused repair result, not
+a new full Program PASS.
+
+R18 also includes fixed documented List discovery `c989fd14` and Sound/media/move
+scopes `745213c2`: explicit source/language identities and bound move endpoints
+remain revalidated before dispatch. Their worker selections remain on their
+original candidates; provider effects and native list/write obligations remain
+unproved. Final reconciled-candidate preflight/focus are recorded separately.
+Original receipts are retained under
 ignored `integration-partials-r18` and the query worktree's
 `native-5d7213cb-r1` roots.
 

@@ -595,6 +595,119 @@
     {
       "model_values": [
         {
+          "name": "api",
+          "path": [
+            "arguments",
+            "api"
+          ],
+          "required": true,
+          "schema_sha256": "1ed1796af95a25bc4bce22323917d0f1b14902b916e271603b8068883d5c6430",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "stable_business_declaration"
+        },
+        {
+          "name": "args",
+          "path": [
+            "arguments",
+            "args"
+          ],
+          "required": false,
+          "schema_sha256": "38f7806618ef78b46d664b702dae5ecd839ff6799a62df81b10ecdfba7be0389",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "io_root",
+          "path": [
+            "arguments",
+            "io_root"
+          ],
+          "required": false,
+          "schema_sha256": "2e9d2baeef7ef41632a29ad8cef4c1fb7b604a5552404e4d1fcce947698a326a",
+          "shape": "scalar",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "exact_user_artifact"
+        },
+        {
+          "name": "layout_binding",
+          "path": [
+            "arguments",
+            "layout_binding"
+          ],
+          "required": false,
+          "schema_sha256": "70c6f01036a5f207ec59c8a7eed05764177b4ac3a2d7af575b7aad6ee5fb1fe1",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "model_binding",
+          "path": [
+            "arguments",
+            "model_binding"
+          ],
+          "required": false,
+          "schema_sha256": "1b21336c1785c0d7deeb597cc6b7f4efb538c1815b670901240f756c370a75d9",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "options",
+          "path": [
+            "arguments",
+            "options"
+          ],
+          "required": false,
+          "schema_sha256": "8791674b56076efcfc7201dfb713c9a3999ce9db0af68f0bb08100a2b8782f21",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "provider_profile_binding",
+          "path": [
+            "arguments",
+            "provider_profile_binding"
+          ],
+          "required": false,
+          "schema_sha256": "fd7986ae80a9b7ce98679abd1216330ebc220ae57a9c55deb5c71b020e8ed908",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "result_projection",
+          "path": [
+            "arguments",
+            "result_projection"
+          ],
+          "required": false,
+          "schema_sha256": "375640e641f4d641e3110b4f94c483867247738652b067babd7ad43f98e92d17",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        },
+        {
+          "name": "source_control_binding",
+          "path": [
+            "arguments",
+            "source_control_binding"
+          ],
+          "required": false,
+          "schema_sha256": "c9f32f332f0b84963e3d7b0ea7fa8de796940d3bb795148b62a90d59cb874559",
+          "shape": "object",
+          "transport_ownership": "gateway_derivation",
+          "value_ownership": "reviewed_adapter"
+        }
+      ],
+      "sha256": "30861e07bcf613237f0d266a926f32d4862d1e885ad8faefd9a1d5548d0ab5fa"
+    },
+    {
+      "model_values": [
+        {
           "name": "script_file",
           "path": [
             "declaration",
@@ -797,107 +910,6 @@
         }
       ],
       "sha256": "4f817751ee99433a905c368da26e4b2f24b6cb92bafee37c017c594ad0289a83"
-    },
-    {
-      "model_values": [
-        {
-          "name": "api",
-          "path": [
-            "arguments",
-            "api"
-          ],
-          "required": true,
-          "schema_sha256": "1ed1796af95a25bc4bce22323917d0f1b14902b916e271603b8068883d5c6430",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "stable_business_declaration"
-        },
-        {
-          "name": "args",
-          "path": [
-            "arguments",
-            "args"
-          ],
-          "required": false,
-          "schema_sha256": "38f7806618ef78b46d664b702dae5ecd839ff6799a62df81b10ecdfba7be0389",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "io_root",
-          "path": [
-            "arguments",
-            "io_root"
-          ],
-          "required": false,
-          "schema_sha256": "2e9d2baeef7ef41632a29ad8cef4c1fb7b604a5552404e4d1fcce947698a326a",
-          "shape": "scalar",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "exact_user_artifact"
-        },
-        {
-          "name": "layout_binding",
-          "path": [
-            "arguments",
-            "layout_binding"
-          ],
-          "required": false,
-          "schema_sha256": "70c6f01036a5f207ec59c8a7eed05764177b4ac3a2d7af575b7aad6ee5fb1fe1",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "model_binding",
-          "path": [
-            "arguments",
-            "model_binding"
-          ],
-          "required": false,
-          "schema_sha256": "1b21336c1785c0d7deeb597cc6b7f4efb538c1815b670901240f756c370a75d9",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "options",
-          "path": [
-            "arguments",
-            "options"
-          ],
-          "required": false,
-          "schema_sha256": "8791674b56076efcfc7201dfb713c9a3999ce9db0af68f0bb08100a2b8782f21",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "result_projection",
-          "path": [
-            "arguments",
-            "result_projection"
-          ],
-          "required": false,
-          "schema_sha256": "375640e641f4d641e3110b4f94c483867247738652b067babd7ad43f98e92d17",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        },
-        {
-          "name": "source_control_binding",
-          "path": [
-            "arguments",
-            "source_control_binding"
-          ],
-          "required": false,
-          "schema_sha256": "c9f32f332f0b84963e3d7b0ea7fa8de796940d3bb795148b62a90d59cb874559",
-          "shape": "object",
-          "transport_ownership": "gateway_derivation",
-          "value_ownership": "reviewed_adapter"
-        }
-      ],
-      "sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae"
     },
     {
       "model_values": [
@@ -174383,7 +174395,7 @@
     "contract": "waapi-skill.typed-request-surface/v1",
     "total_lanes": 896
   },
-  "inventory_sha256": "eef9cafa03bfe5def568c1619de575335795b1b895deee44904c1baedc49ccd2",
+  "inventory_sha256": "75e2b037f608d9efd75217a3215d2ba0d3f5e7bccf9da5938c522ffe5bd218ea",
   "mechanic_owners": {
     "ambiguous_continuation_selection": "gateway_derivation",
     "batch_layout": "gateway_derivation",
@@ -206003,7 +206015,7 @@
       "argument_contract_sha256": "e125e857e8b0276a354a8b19f62674e33ad9758ca46b3e0b4226a4370f0ac77d",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "dabdbb033e0635f54513adfb02a22782c06a27fd8c3d1db86f465000d3971e2b",
+      "contract_sha256": "9255b5affb4f84a61c4913c314a137816b7e13d60948169b43769f129d334db9",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206030,7 +206042,7 @@
       "argument_contract_sha256": "e125e857e8b0276a354a8b19f62674e33ad9758ca46b3e0b4226a4370f0ac77d",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "af8a31e3831aa904eb2f1bd56287cc083d164fe1713d2f114587696ce8046ba1",
+      "contract_sha256": "79cb5ca4e8b4a9f740a1e588df0652d219de901c019710a5ae1afd1aefade1f1",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206057,7 +206069,7 @@
       "argument_contract_sha256": "e125e857e8b0276a354a8b19f62674e33ad9758ca46b3e0b4226a4370f0ac77d",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "bc27bee1ddb97a9622d098b3d51d8a52f0f1f7e4dc482ac0546dd4d1045cc21c",
+      "contract_sha256": "5b0d171f31fd76988ea1a8ecfd774d545f7053eb4fa9716173414336b911a67f",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -206084,7 +206096,7 @@
       "argument_contract_sha256": "e125e857e8b0276a354a8b19f62674e33ad9758ca46b3e0b4226a4370f0ac77d",
       "audit_evidence": "The public object-graph-business/v1 Adapters accept named hierarchy outcomes, plug-in roles, stable business fields including the unambiguous ignore-parent-instance-limit intent, exact user artifacts, references, and RTPC points; bind opaque object, field, plug-in-type, control-input, and output-bus handles; compile exact Wwise types, paths, metadata scope/tokens, dependency order, batch row and Switch-assignment counts, revisions, native requests, and phase-relevant copy-ready continuations into one Preview inside the Gateway. #123 removes unavailable Action-creation duration disclosure and explicitly rejects new Action declarations through the shared new-object resolver; existing Action edits and import-owned Event/Action generation remain supported. This is a prohibited creation boundary, not positive Action-creation evidence. The pre-#78 Composer action vocabulary, ambiguous override-parent field, caller-supplied batch counts, and normal fallback are removed. #78 retains five-version deterministic and exact macOS/Windows 2022.1 and 2025.1 real-host evidence; repaired-candidate Terra Fresh Agent Weather remains an open release gate rather than inherited evidence. v1.1 review: standalone WorkUnit-child ShareSet placement is distinct from owner effects; 2022.1-2025.1 native evidence is scoped, while 2021.1 remains a packaged boundary with the classic plugin-name encoding rejected and alternate native topology unresolved. Reviewed live GameParameter class defaults permit the tested same-call Min/Max/InitialValue case only. Route depth is not exhaustive business-combination coverage; see the branch audit.",
       "classification": "named-object-creation-graph",
-      "contract_sha256": "efa012511d74c6e85f3153e8c07fa9e4bc8bbb6bf4e99c74e180e332c0dd91f7",
+      "contract_sha256": "bba1953043f2591f569670cddd13419a51e1c574ac2cb6f54b15a7d7a9bb71a4",
       "disposition": "already_deep",
       "input_mode": "business_declaration",
       "leaked_mechanics": [],
@@ -208133,10 +208145,10 @@
       "version": "2025.1"
     },
     {
-      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
+      "argument_contract_sha256": "30861e07bcf613237f0d266a926f32d4862d1e885ad8faefd9a1d5548d0ab5fa",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
+      "contract_sha256": "07e9e61da06f1bf51cbf6f2c61e1197894263ac174b01cbdfeeb8dec3fefec1f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208160,10 +208172,10 @@
       "version": "2021.1"
     },
     {
-      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
+      "argument_contract_sha256": "30861e07bcf613237f0d266a926f32d4862d1e885ad8faefd9a1d5548d0ab5fa",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
+      "contract_sha256": "07e9e61da06f1bf51cbf6f2c61e1197894263ac174b01cbdfeeb8dec3fefec1f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208187,10 +208199,10 @@
       "version": "2022.1"
     },
     {
-      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
+      "argument_contract_sha256": "30861e07bcf613237f0d266a926f32d4862d1e885ad8faefd9a1d5548d0ab5fa",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
+      "contract_sha256": "07e9e61da06f1bf51cbf6f2c61e1197894263ac174b01cbdfeeb8dec3fefec1f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208214,10 +208226,10 @@
       "version": "2023.1"
     },
     {
-      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
+      "argument_contract_sha256": "30861e07bcf613237f0d266a926f32d4862d1e885ad8faefd9a1d5548d0ab5fa",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
+      "contract_sha256": "07e9e61da06f1bf51cbf6f2c61e1197894263ac174b01cbdfeeb8dec3fefec1f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208241,10 +208253,10 @@
       "version": "2024.1"
     },
     {
-      "argument_contract_sha256": "6ddfedb097637024e0374aa9a89c577a2952b8523530c0d91cf0ba11a5dd8aae",
+      "argument_contract_sha256": "30861e07bcf613237f0d266a926f32d4862d1e885ad8faefd9a1d5548d0ab5fa",
       "audit_evidence": "waapi.call is an internal canonical transaction representation, absent from normal operation discovery, and cannot accept a model-authored native request document.",
       "classification": "named-internal-canonical-boundary",
-      "contract_sha256": "3e41d013a1243e57f96e5700fb0d6ea3d58b290ff93c4e5de1c5f896edf8364e",
+      "contract_sha256": "07e9e61da06f1bf51cbf6f2c61e1197894263ac174b01cbdfeeb8dec3fefec1f",
       "disposition": "prohibited_boundary",
       "input_mode": "internal_canonical",
       "leaked_mechanics": [],
@@ -208413,9 +208425,9 @@
     "stable_business_declaration": "A prompt-derived business value remains visible in the public request."
   },
   "source_contracts": {
-    "gateway_parser_sha256": "fba19150fcd78a20bb5363b20f7b592a6b78f2264f934589d4d1a848be4091d5",
-    "operation_contract_sha256": "050826b618901c477c2d3d0d94b5973037ccb042ae16a010fd00c5d2bfb9a321",
-    "public_continuation_sha256": "4eaea29d106bd9c0cf73756ac89a55cdb5f377a37872b1bffb982f022c7f96d6",
+    "gateway_parser_sha256": "59f3f2be4df5a66a1f2ecffa8b06381f09d97de115395653435eea87e62f9294",
+    "operation_contract_sha256": "645f5a2679e894ab4faf28e2b02f0ea921243c71c783ee72deaecb88372c728b",
+    "public_continuation_sha256": "55a28cf658cb17667adc81e217b21ef0cc96786be8ad00d5f8056866b8be28bd",
     "typed_request_surface_sha256": "667ce63d93b3a38f1d14d7348ae82fe728e731f24021ec868c687f2a2a5b87c7"
   },
   "summary": {
