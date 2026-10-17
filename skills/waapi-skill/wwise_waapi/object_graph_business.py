@@ -779,11 +779,38 @@ def _materialize_create(
 
     def compile_node(row: BusinessDeclaration) -> dict[str, Any]:
         assert isinstance(row.target, NewDescendantTarget)
+        fields = dict(row.fields)
+        object_list = fields.pop("object_list", None)
+        if object_list is not None and row is not roots[0]:
+            raise _repair(
+                session,
+                "OBJECT_CREATE_DESCENDANT_LIST_UNAVAILABLE",
+                field="object_list",
+                action="object.create accepts list placement only on its root; use object.set for recursive lists",
+            )
+        base = BusinessDeclaration(
+            declaration_id=row.declaration_id,
+            result_handle=row.result_handle,
+            target=row.target,
+            fields=fields,
+        )
         node = {
             "type": _resolve_native_object_type(session, row.target.kind),
             "name": row.target.name,
-            **_compile_create_fields(session, row),
+            **_compile_create_fields(session, base),
         }
+        if object_list is not None:
+            try:
+                node["list"] = normalize_object_list_name(
+                    object_list, request_path="$.business.object_list",
+                )
+            except Exception as exc:
+                raise _repair(
+                    session,
+                    "OBJECT_CREATE_LIST_NAME_INVALID",
+                    field="object_list",
+                    action="provide one exact Wwise object-list name without an @ prefix",
+                ) from exc
         child_rows = children.get(row.result_handle, [])
         if child_rows:
             for child in child_rows:
@@ -808,11 +835,12 @@ def _materialize_create(
         **root_node,
         **_compile_create_settings(session),
     }
-    _validate_specialized_relationship(
-        session,
-        parent_type=parent.object_type,
-        child_type=root_node["type"],
-    )
+    if "list" not in root_node:
+        _validate_specialized_relationship(
+            session,
+            parent_type=parent.object_type,
+            child_type=root_node["type"],
+        )
     return parse_operation_request(
         {
             "contract": "waapi-skill.operation-request/v1",
@@ -1029,6 +1057,7 @@ def _compile_existing_set_fields(
         "clear_object_lists",
         "list_behavior",
         "media_files",
+        "name_conflict",
         "new_name",
         "platform",
     }
@@ -1049,6 +1078,7 @@ def _compile_existing_set_fields(
             "field_values",
             "list_behavior",
             "media_files",
+            "name_conflict",
             "new_name",
             "platform",
         }
@@ -1060,6 +1090,17 @@ def _compile_existing_set_fields(
         fields=stable_fields,
     )
     compiled = _compile_create_fields(session, stable_declaration)
+    if "name_conflict" in fields:
+        conflict = fields["name_conflict"]
+        if conflict not in {"fail", "rename", "merge"}:
+            raise _repair(
+                session,
+                "FIELD_VALUE_UNAVAILABLE",
+                field="name_conflict",
+                choices=["fail", "rename", "merge"],
+                action="choose one disclosed collision outcome for this target's new children and list members",
+            )
+        compiled["on_name_conflict"] = conflict
     if "new_name" in fields:
         semantics = object_identity_semantics(source.object_type)
         if not semantics.mutable_intrinsic_name:
@@ -1359,7 +1400,7 @@ def _materialize_set(
                 action="give every exact target at least one requested outcome",
             )
     settings = dict(session.settings)
-    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict"}
+    allowed_settings = {"add_to_source_control", "list_behavior", "name_conflict", "platform"}
     unexpected_settings = sorted(set(settings) - allowed_settings)
     if unexpected_settings:
         raise _repair(
@@ -1369,6 +1410,14 @@ def _materialize_set(
             action="use one disclosed object.set batch setting",
         )
     arguments: dict[str, Any] = {"objects": rows}
+    if "platform" in settings:
+        platform = settings["platform"]
+        if not isinstance(platform, str) or not platform.strip():
+            raise _repair(
+                session, "FIELD_VALUE_TYPE_MISMATCH", field="platform",
+                action="provide one exact user-requested Wwise platform",
+            )
+        arguments["platform"] = platform
     conflict = settings.get("name_conflict", "fail")
     if conflict not in {"fail", "rename", "merge"}:
         raise _repair(

@@ -17282,6 +17282,7 @@ def dispatch_offline_business_draft_update(
                     "add_to_source_control",
                     "list_behavior",
                     "name_conflict",
+                    "platform",
                 )
                 if inspected.operation == "object.set"
                 else (
@@ -27771,6 +27772,7 @@ def _business_next_action_binding(
                     "append": [
                         "[--name-conflict fail|rename|merge]",
                         "[--list-behavior append|replace-all]",
+                        "[--platform <exact-user-platform>]",
                         "[--add-to-source-control|--no-add-to-source-control]",
                     ],
                 },

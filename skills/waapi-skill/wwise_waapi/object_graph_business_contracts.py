@@ -241,6 +241,7 @@ def object_graph_business_contract_data(
                     "loop",
                     "max_instances",
                     "media_files",
+                    "name_conflict",
                     "new_name",
                     "notes",
                     "object_list",
@@ -255,11 +256,17 @@ def object_graph_business_contract_data(
                     **OBJECT_BUSINESS_FIELD_TYPES,
                     "language": "string",
                     "list_behavior": "string",
+                    "name_conflict": "string",
                     "new_name": "string",
                     "object_list": "string",
                     "platform": "string",
                 },
                 "field_semantics": ACTION_DURATION_SEMANTICS,
+                "existing_target_choices": {
+                    "name_conflict": ["fail", "rename", "merge"],
+                    "scope": "new_children_and_list_members_of_this_existing_target",
+                    "overrides": "batch_name_conflict",
+                },
             },
             "object_list_declaration": {
                 "member_fields": {
@@ -290,6 +297,7 @@ def object_graph_business_contract_data(
             "settings": {
                 "name_conflict": ["fail", "rename", "merge"],
                 "list_behavior": ["append", "replace-all"],
+                "platform": "exact_user_requested_platform;_per_target_platform_overrides",
                 "add_to_source_control": "boolean",
             },
             "gateway_derivations": [
@@ -331,9 +339,15 @@ def object_graph_business_contract_data(
         "declaration": {
             "subcommand": "draft-declare-new",
             "target_fields": ["parent_handle", "name", "kind"],
-            "stable_fields": dict(OBJECT_CREATE_BUSINESS_VALUE_TYPES),
+            "stable_fields": {**OBJECT_CREATE_BUSINESS_VALUE_TYPES, "object_list": "string"},
             "field_semantics": {},
-            "field_value_types": dict(OBJECT_CREATE_BUSINESS_VALUE_TYPES),
+            "field_value_types": {**OBJECT_CREATE_BUSINESS_VALUE_TYPES, "object_list": "string"},
+            "object_list": {
+                "scope": "new_root_only",
+                "input": "exact_user_owned_wwise_object_list_name_without_at_prefix",
+                "placement": "owned_list_instead_of_hierarchy_child",
+                "descendants": "ordinary_recursive_children",
+            },
             "bound_field_handle_container": "field_values",
             "semantic_kinds": list(SUPPORTED_BUSINESS_KINDS),
             "planned_parent": "copy_previous_declaration_result_handle",
