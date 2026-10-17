@@ -18300,6 +18300,30 @@ def verify_prepared_operation(
                                     ),
                                 )
                             ]
+                            # Importing into an already-declared Sound creates
+                            # an AudioFileSource below that Sound. The ancestor
+                            # helper intentionally excludes the sealed target;
+                            # include it only with the exact active-source edge
+                            # and the target identity/name already requested.
+                            target_sound_matches = (
+                                _object_type_token(requested_source_type) == "sound"
+                                and _object_type_token(row.get("type")) == "sound"
+                                and _same_identity(row.get("id"), object_id)
+                                and _object_type_matches(row.get("type"), spec)
+                                and _import_created_name_matches(
+                                    row.get("name"), spec.get("requested_name"),
+                                    on_name_conflict=effective_conflict,
+                                )
+                                and len(ancestor_chain) == 1
+                                and _object_type_token(matched_row.get("type")) == "audiofilesource"
+                                and _same_identity(_parent_value(matched_row.get("parent")), object_id)
+                                and _same_identity(
+                                    _reference_identity(_field_value(row, "activeSource")),
+                                    matched_row.get("id"),
+                                )
+                            )
+                            if target_sound_matches:
+                                type_matches.append(row)
                             unique_type_ids = {
                                 _identity_key(candidate.get("id"))
                                 for candidate in type_matches
@@ -18318,6 +18342,7 @@ def verify_prepared_operation(
                                     "expected_object_name": expected_object_name,
                                     "matches": type_matches,
                                     "ancestor_chain": ancestor_chain,
+                                    "sealed_target_is_requested_sound": target_sound_matches,
                                 },
                             )
                         if type_ok and ancestor_chain:

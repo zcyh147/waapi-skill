@@ -2601,22 +2601,44 @@ INLINE_PCM_PADDED = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA
 INLINE_PCM_UNPADDED = "UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
 
 
-def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True):
+def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, verification_case=None):
     """Drive the actual public Draft/Preview with only the native client faked."""
     from tests.unit.test_object_native_surface import _project_info
 
     root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
     parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
               "path": rf"\{root}\Default Work Unit"}
+    container_import = verification_case == "container-import"
+    if container_import:
+        parent.update(name="Weather", notes="", type="PropertyContainer" if version == "2025.1" else "ActorMixer",
+                      path=parent["path"] + r"\Weather")
     project = _project(tmp_path)
     project_root = Path(project["path"]).parent
     complete_project = _project_info(project_root, language="SFX")
     complete_project.update(project)
     project = complete_project
     calls = []
+    executed = False
+    copied = project_root / "Originals" / "SFX" / "Inline.wav"
+    sound = {"id": SECOND_ACTION_ID, "name": "Rain", "type": "Sound", "notes": "",
+             "path": parent["path"] + r"\Rain", "parent": {"id": PARENT_ID},
+             "activeSource": {"id": THIRD_ACTION_ID}, "originalFilePath": str(copied)}
+    source = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource", "notes": "",
+              "path": sound["path"] + r"\Inline", "parent": {"id": SECOND_ACTION_ID},
+              "audioSource:language": {"id": CONTROL_ID, "name": "SFX"}, "originalFilePath": str(copied)}
+    if container_import:
+        sound.update(name="Inline", path=parent["path"] + r"\Inline")
+        source["path"] = sound["path"] + r"\Inline"
+    if verification_case == "wrong-active-source":
+        sound["activeSource"] = {"id": CONTROL_ID}
+    elif verification_case == "wrong-parent":
+        source["parent"] = {"id": CONTROL_ID}
+    elif verification_case == "wrong-source-type":
+        source["type"] = "SourcePlugin"
 
     class Client:
         def call(self, uri, args=None, options=None):
+            nonlocal executed
             calls.append(uri)
             if uri == "ak.wwise.core.getInfo":
                 return _info(version)
@@ -2632,7 +2654,32 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True):
                     return {"return": [{**project, "type": "Project"}]}
                 if args.get("from", {}).get("id") == [PARENT_ID] and not args.get("transform"):
                     return {"return": [parent]}
+                if executed:
+                    ids = args.get("from", {}).get("id")
+                    if args.get("transform"):
+                        rows = ([sound, source] if container_import and args["transform"] == [{"select": ["descendants"]}]
+                                else [sound] if ids == [PARENT_ID] else [source])
+                        if verification_case == "extra-child" and ids == [SECOND_ACTION_ID] and args["transform"] == [{"select": ["children"]}]:
+                            rows = [*rows, {"id": CONTROL_ID, "name": "Unexpected", "type": "Sound",
+                                           "path": sound["path"] + r"\Unexpected", "parent": {"id": SECOND_ACTION_ID}}]
+                        return {"return": rows}
+                    if ids == [SECOND_ACTION_ID]:
+                        return {"return": [sound]}
+                    if ids == [THIRD_ACTION_ID]:
+                        return {"return": [source]}
                 return {"return": []}
+            if uri == "ak.wwise.core.object.set" and verification_case is not None:
+                executed = True
+                copied.parent.mkdir(parents=True)
+                audio = base64.b64decode(source_value.partition("|")[2])
+                copied.write_bytes(audio[:-1] + b"\1" if verification_case == "wrong-bytes" else audio)
+                if container_import:
+                    return {"objects": [{"id": PARENT_ID, "name": parent["name"],
+                                         "import": {"logs": [], "objects": [sound, source]}}]}
+                return {"objects": [{"id": PARENT_ID, "name": parent["name"], "children": [{
+                    **{key: sound[key] for key in ("id", "name", "type", "path", "parent", "notes")},
+                    "import": {"logs": [], "objects": [source]},
+                }]}]}
             raise AssertionError(f"Unexpected native call {uri}: {args}")
 
         def disconnect(self):
@@ -2665,9 +2712,14 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True):
                              "--parent-handle", handle, "--name", "Weather", "--kind", "actor-mixer")
         assert code == 0, group
         handle = group["draft"]["declared_object"]["result_handle"]
-    code, sound = update("draft-declare-new", "--declaration-id", "rain",
-                         "--parent-handle", handle, "--name", "Rain", "--kind", "sound-sfx")
-    assert code == 0, sound
+    code, declared_sound = (
+        update("draft-declare-existing", "--declaration-id", "rain", "--object-handle", handle,
+               "--field", "notes", "")
+        if container_import else
+        update("draft-declare-new", "--declaration-id", "rain",
+               "--parent-handle", handle, "--name", "Rain", "--kind", "sound-sfx")
+    )
+    assert code == 0, declared_sound
     code, added = update("draft-add-media", "--declaration-id", "rain", "--inline-wav", source_value,
                          "--kind", "sound-sfx", "--language", "SFX")
     if code != 0:
@@ -2680,6 +2732,14 @@ def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True):
         return code, previewed, calls
     code, shown = invoke("transaction-show", previewed["transaction_id"])
     assert code == 0, shown
+    if verification_case is not None:
+        transaction_id = previewed["transaction_id"]
+        code, confirmed = invoke("confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        code, dispatched = invoke("execute", transaction_id)
+        assert code == 0, json.dumps(dispatched)
+        code, verified = invoke("verify", transaction_id)
+        return code, verified, calls
     return code, shown["artifact"]["prepared_operation"], calls
 
 
@@ -2765,3 +2825,25 @@ def test_inline_wav_compatibility_rejects_noncanonical_compiler_output(tmp_path,
     args["objects"][0]["children"][0]["children"][0]["import"]["files"][0]["audioFileBase64"] += "="
     with pytest.raises(SemanticValidationError, match="must already use its canonical"):
         validate_resolved_semantic_payload("ak.wwise.core.object.set", args, {}, version=version)
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("placement", ["valid", "container-import"], ids=["declared-sound", "container"])
+def test_public_object_set_inline_wav_verifies_sound_source_and_direct_children(tmp_path, version, placement):
+    code, verified, calls = _public_inline_wav_preview(
+        tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED, nested=False, verification_case=placement,
+    )
+    assert code == 0 and verified["state"] == "verified", json.dumps(verified)
+    assert verified["verification"]["business_state_verified"] is True
+    assert calls.count("ak.wwise.core.object.set") == 1
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("fault", ["wrong-active-source", "wrong-parent", "extra-child", "wrong-bytes", "wrong-source-type"])
+def test_public_object_set_inline_wav_verifier_rejects_broken_media_relationships(tmp_path, version, fault):
+    code, verified, calls = _public_inline_wav_preview(
+        tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED, nested=False, verification_case=fault,
+    )
+    assert code == 2 and verified["state"] == "verification_failed", verified
+    assert verified["verification"]["business_state_verified"] is False
+    assert calls.count("ak.wwise.core.object.set") == 1
