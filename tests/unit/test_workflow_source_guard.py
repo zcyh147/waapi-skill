@@ -1253,3 +1253,65 @@ def test_owned_probe_projection_preserves_missing_outputs_and_explicit_null(tmp_
     assert missing not in members[0] and members[0]["parent"] is None
     expected = "relationship_output_missing" if missing == "owner" else "class_id_output_missing"
     assert any(row["reason"] == expected for row in observed["boundaries"])
+
+
+@pytest.mark.parametrize("wrong_media", [False, True])
+def test_media_native_collector_saves_baseline_and_retains_failed_artifacts(tmp_path, workflow, wrong_media):
+    from xml.etree import ElementTree as ET
+    from tests.unit.test_console_project_alternatives_gateway import CliProjectTask, saved_fixture_project
+
+    class Client(CliProjectTask):
+        def call(self, uri, args=None, options=None):
+            if uri.endswith("project.save"):
+                self.calls.append((uri, args, options))
+                tree = ET.parse(self.unit)
+                tree.find(".//MediaID").set("ID", "123456")
+                tree.write(self.unit)
+                return {}
+            if uri == self.operation:
+                self.project_file.with_suffix(".mediaid").write_text('''<WwiseDocument Type="MediaIDs">
+<MediaIDInfo><MediaIDs><Language ID="393239870" Name="SFX"><File Name="Keep.wav">
+<WObject ID="{33333333-3333-3333-3333-333333333333}"><MediaID ID="123456"/></WObject>
+</File></Language></MediaIDs></MediaIDInfo></WwiseDocument>'''.replace("123456", "654321" if wrong_media else "123456"))
+                tree = ET.parse(self.unit)
+                source = tree.find(".//AudioFileSource")
+                source.remove(source.find("MediaIDList"))
+                tree.write(self.unit)
+                tree = ET.parse(self.project_file)
+                ET.SubElement(tree.find("./ProjectInfo/Project/PropertyList"), "Property",
+                              Name="MediaIDsInSingleFile", Type="bool", Value="True")
+                tree.write(self.project_file)
+            return super().call(uri, args, options)
+
+    client = Client(tmp_path, "2025.1", "ak.wwise.cli.moveMediaIdsToSingleFile")
+    client.unit = saved_fixture_project(client)
+    tree = ET.parse(client.unit)
+    source = ET.SubElement(ET.SubElement(tree.find(".//Sound"), "ChildrenList"),
+        "AudioFileSource", Name="Keep", ID="{33333333-3333-3333-3333-333333333333}")
+    ET.SubElement(source, "Language").text = "SFX"
+    ET.SubElement(source, "AudioFile").text = "Keep.wav"
+    ET.SubElement(ET.SubElement(source, "MediaIDList"), "MediaID", ID="111")
+    tree.write(client.unit)
+    commands = []
+
+    def gateway(command, *, live):
+        commands.append(list(command))
+        code, payload = client.run(*command)
+        assert code == 0, payload
+        return payload
+
+    runtime = SimpleNamespace(gateway=gateway, version="2025.1", category_results=[],
+        sandbox=SimpleNamespace(sandbox_project=client.project_file))
+    if wrong_media:
+        with pytest.raises(AssertionError):
+            workflow.test_cli_console_media_id_file_observation(runtime)
+    else:
+        workflow.test_cli_console_media_id_file_observation(runtime)
+    category, = runtime.category_results
+    assert category["status"] == ("FAIL" if wrong_media else "PASS")
+    assert category["mapping_file"]["content_base64"]
+    assert category["source_work_unit_after"]["content_base64"]
+    assert category["baseline_media_pairs"] == [["{33333333-3333-3333-3333-333333333333}", "123456"]]
+    writes = [uri for uri, _, _ in client.calls if uri.endswith("project.save") or uri == client.operation]
+    assert writes == ["ak.wwise.core.project.save", client.operation]
+    assert sum(command[0] == "execute" for command in commands) == 2

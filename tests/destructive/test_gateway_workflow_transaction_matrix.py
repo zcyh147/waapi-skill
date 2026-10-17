@@ -2101,38 +2101,72 @@ def test_cli_console_business_object_dump(
 def test_cli_console_media_id_file_observation(
     workflow_sandbox_runtime: _WorkflowSandboxRuntime,
 ) -> None:
-    """Retain the native central-file representation without inventing its format.
+    """Verify central storage against the saved private sandbox's media rows.
 
-    Run this terminal CLI node in its own process/lifecycle. Its capture is
-    prerequisite evidence for the mapping oracle, not business acceptance.
+    Run this terminal CLI node in its own lifecycle. The setup save establishes
+    the baseline after normal fixture normalization and Wwise serialization;
+    it grants no coverage credit to the media operation.
     """
     runtime = workflow_sandbox_runtime
     project = runtime.sandbox.sandbox_project
     mapping = project.with_suffix(".mediaid")
-    assert not mapping.exists(), "This observation requires the original Work Unit storage fixture"
+    _save_sandbox_project(runtime)
+    assert not mapping.exists(), "This case requires the original Work Unit storage fixture"
     work_units = sorted(project.parent.rglob("*.wwu"))
     assert len(work_units) <= 512
     sample = sample_observation = None
+    expected = []
+    total_bytes = 0
     for path in work_units:
         candidate = observe_console_file(path, io_root=project.parent)
-        if b"<MediaID " in base64.b64decode(candidate["content_base64"], validate=True):
-            sample, sample_observation = path, candidate
-            break
-    assert sample is not None, "A media-ID-free project cannot establish the central mapping format"
+        raw = base64.b64decode(candidate["content_base64"], validate=True)
+        total_bytes += len(raw)
+        assert total_bytes <= 256 * 1024 * 1024
+        for owner in ET.fromstring(raw).iter():
+            for media in owner.findall("./MediaIDList/MediaID"):
+                assert owner.get("ID") and media.get("ID")
+                expected.append([owner.attrib["ID"].upper(), media.attrib["ID"]])
+                assert len(expected) <= 100000
+                if sample is None:
+                    sample, sample_observation = path, candidate
+    assert sample is not None, "A media-ID-free project cannot establish migration effects"
     observation = {
         "category": "cli-media-id-file-format-observation", "status": "FAIL",
-        "verifier_strength": "native_file_format_observation_only_not_business_acceptance",
+        "verifier_strength": "gateway_exact_mapping_and_independent_saved_media_pairs",
         "source_work_unit": sample_observation,
+        "baseline_media_pairs": sorted(expected),
+        "baseline_setup": "public_gateway_project_save_before_capture",
     }
     runtime.category_results.append(observation)
-    draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
-    _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
-        ["--value", "project_file", str(project)], live=True)
-    result = _complete_core_result_schema_draft(runtime, draft)
-    observation["transaction_id"] = result["verify"]["transaction_id"]
-    observation["mapping_file"] = observe_console_file(mapping, io_root=project.parent)
-    observation["source_work_unit_after"] = observe_console_file(sample, io_root=project.parent)
-    observation["status"] = "PASS"
+    try:
+        draft = _start_business_draft(runtime, "ak.wwise.cli.moveMediaIdsToSingleFile")
+        _update_business_draft(runtime, draft, "draft-declare-cli-console-plan",
+            ["--value", "project_file", str(project)], live=True)
+        result = _complete_business_draft(runtime, draft)
+        observation["transaction_id"] = result["verify"]["transaction_id"]
+        captured = observe_console_file(mapping, io_root=project.parent)
+        document = ET.fromstring(base64.b64decode(captured["content_base64"], validate=True))
+        actual = [[owner.attrib["ID"].upper(), media.attrib["ID"]]
+            for owner in document.findall("./MediaIDInfo/MediaIDs/Language/File/WObject")
+            for media in owner.findall("MediaID")]
+        assert sorted(actual) == sorted(expected), "Saved source/media multiset differs from central mapping"
+        for path in work_units:
+            captured_unit = observe_console_file(path, io_root=project.parent)
+            tree = ET.fromstring(base64.b64decode(captured_unit["content_base64"], validate=True))
+            assert not tree.findall(".//MediaIDList/MediaID"), path
+        observation["status"] = "PASS"
+    finally:
+        capture_errors = []
+        # Preserve diagnostic bytes even when Gateway verification rejects the
+        # result. This is local artifact capture, never another native attempt.
+        for key, path in (("mapping_file", mapping), ("source_work_unit_after", sample)):
+            try:
+                observation[key] = observe_console_file(path, io_root=project.parent)
+            except Exception as exc:
+                observation[key] = {"capture_error": str(exc)}
+                capture_errors.append(key)
+                observation["status"] = "FAIL"
+    assert not capture_errors, capture_errors
 
 
 @pytest.mark.live
