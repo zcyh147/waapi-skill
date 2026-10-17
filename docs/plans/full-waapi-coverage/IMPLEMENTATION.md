@@ -104,6 +104,26 @@ final integrated acceptance:
   three newly linked view version rows grant no verified or native effect credit.
   All three tickets and their exact branch/native obligations stay open. No
   product receipt is recaptured or inherited for this successor.
+- Full Non-live on exact clean third integration `f8f3a9ab` **failed**:
+  **19324 passed, 15 failed, 127 skipped, 41 deselected**, exit 1, in
+  1923.11 seconds. The original `nonlive-f8f3a9ab-r1-result.json` seals log
+  SHA-256 `32d20e9ad2ca12d18912f92ad48bf3b6b43996fd01fa5b1553107adcf7319bf5`
+  and empty owned-process state. Two notice-discovery consumer failures belong
+  to #177; twelve query, Media Pool and documentation failures belong to #181;
+  one fixed Program manifest count/order expectation needs integration repair.
+  Preserve this FAIL separately from later focused repairs and broad gates.
+- Fourth partial integration adds strict condition enum and live master-bus
+  visibility checks through post-execution verification; exact existing-plugin,
+  Parent and association program fixtures; original native-producer atomic
+  publication controls; exact Media Pool field mappings and return-only fields;
+  structured Short ID selectors for 2022.1–2025.1 with an explicit unresolved
+  2021.1 boundary; scoped undock with independent optional coordinates; and
+  shared Authoring lifecycle/producer/consumer controls after final teardown.
+  Authoring launch strategy, native Windows resource attestation and full
+  cross-family ownership remain incomplete. These fixtures are not launch-ready.
+  Original candidate-specific product receipts are not transferred to this
+  successor. All #177/#181/#188 implementation and native proof obligations
+  remain open; no new native execution or completion credit is claimed.
 - New Authoring launches are on hold after the user reported repeated access
   permission prompts. Continue implementation and pure-code validation; group
   remaining GUI effect tests on a frozen integrated candidate and explain the
