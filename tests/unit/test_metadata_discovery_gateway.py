@@ -1587,10 +1587,10 @@ def test_type_inventory_retains_schema_optional_missing_facts(tmp_path: Path, ve
     env = _gateway_env(tmp_path, version=version)
     code, observed = waapi_gateway.execute_gateway(["metadata", "types"], env=env, client_factory=lambda _: client)
     assert code == 0, observed
-    assert observed["agent_result"]["types"] == rows
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in observed["agent_result"]["types"]] == rows
     code, filtered = waapi_gateway.execute_gateway(["metadata", "types", "--meaning", "WObject"], env=env, client_factory=lambda _: client)
     assert code == 0, filtered
-    assert filtered["agent_result"]["types"] == [{"type": "WObject"}]
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in filtered["agent_result"]["types"]] == [{"type": "WObject"}]
     code, scoped = waapi_gateway.execute_gateway(["metadata", "list", "--custom-kind", "Sound"], env=env, client_factory=lambda _: client)
     assert code == 0, scoped
     assert (GET_NAMES_URI, {"classId": 65552}, {}) in client.calls
@@ -1662,11 +1662,11 @@ def test_metadata_types_pages_preserve_native_rows_and_bind_filter(tmp_path: Pat
         code, response = run(pages[-1]["next_command"]["gateway_argv"])
         assert code == 0, response
         pages.append(response["agent_result"])
-    assert [row for page in pages for row in page["types"]] == rows
+    assert [{key: value for key, value in row.items() if key != "selection"} for page in pages for row in page["types"]] == rows
     assert [len(page["types"]) for page in pages] == [17, 17, 17, 17, 7]
     code, filtered = run(["metadata", "types", "--meaning", "Sound074"])
     assert code == 0, filtered
-    assert filtered["agent_result"]["types"] == [rows[-1]]
+    assert [{key: value for key, value in row.items() if key != "selection"} for row in filtered["agent_result"]["types"]] == [rows[-1]]
     code, rejected = run([*stale_argv, "--meaning", "Sound074"])
     assert code == 2 and rejected["error_code"] == "METADATA_SELECTION_SCOPE_CHANGED", rejected
     rows[0]["name"] = "Changed"

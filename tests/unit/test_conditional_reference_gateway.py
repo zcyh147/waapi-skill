@@ -86,12 +86,15 @@ def test_public_existing_field_schema_discloses_gateway_condition_ownership(tmp_
     assert scalar["satisfied_value"] == "preserve_exact_native_value"
     assert scalar["multiple_choices"] == "require_explicit_user_value_when_current_value_does_not_satisfy"
     assert condition_contract["conditions"]["reference"]["condition"] == "referenceIsSet_boolean"
+    assert condition_contract["conditions"]["reference"]["target_hierarchy"]["restriction"] == "childOfReference"
+    assert condition_contract["conditions"]["reference"]["target_hierarchy"]["atomic_value"] == "explicit_prospective_controlling_reference"
     assert condition_contract["conditions"]["visibility"]["prerequisite_write"] is False
     assert condition_contract["conditions"]["visibility"]["master_bus"]["topology_changes"] is False
     assert condition_contract["conditions"]["association_owner"]["source_type"] == "ObjectSettingAssociation"
     assert condition_contract["conditions"]["association_owner"]["recursive_prerequisites"] == ["property", "override", "reference"]
     assert condition_contract["safety"]["related_object_writes"] == "separately_preview_and_authorize"
     assert condition_contract["safety"]["verify_condition_metadata_after_execution"] is True
+    assert condition_contract["safety"]["maximum_depth"] == 16
     assert condition_contract["safety"]["revalidate"] == ["identities", "relationships", "metadata", "prerequisite_values"]
     assert condition_contract["atomic_batch_alternative"] == ("object.set" if version != "2021.1" else None)
     assert task.calls == []

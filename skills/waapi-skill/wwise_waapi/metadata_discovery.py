@@ -1483,7 +1483,8 @@ __all__ = [
 def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
                           meanings: Sequence[str] = (), page: str | None = None,
                           page_size: int = 20, selection: str | None = None,
-                          detail_page: str | None = None, decorate: Any = None) -> dict[str, Any]:
+                          detail_page: str | None = None, decorate: Any = None,
+                          project_detail: bool = True) -> dict[str, Any]:
     """Lossless live type inventory, with explicit lexical filtering and pages."""
     import hashlib
     import time
@@ -1512,6 +1513,8 @@ def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
             raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Type inventory, host, build or session changed; list types again.")
         if issued > now or now - issued > 900:
             raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Type selection expired; list types again.")
+        if not project_detail:
+            return {"selected_type": dict(all_rows[index])}
         from .metadata_detail import detail_page as project_detail
         return project_detail(all_rows[index], selection=selection, scope={"kind": "live-type-inventory"}, cursor=detail_page)
     filters = tuple(meaning.casefold() for meaning in meanings)
@@ -1537,9 +1540,11 @@ def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
     end = min(len(rows), offset + page_size)
     from .metadata_detail import bounded_native_header
     def project(row: dict[str, Any]) -> dict[str, Any]:
-        if len(canonical_json_bytes(row)) <= 4096:
-            return row
-        return {**bounded_native_header(row), "selection": type_locator(all_rows.index(row)),
+        reserved = {"selection", "details_complete", "detail_command", "query_command", "fields_command"}
+        if len(canonical_json_bytes(row)) <= 4096 and not reserved.intersection(row):
+            return {**row, "selection": type_locator(all_rows.index(row))}
+        header = bounded_native_header({key: value for key, value in row.items() if key not in reserved})
+        return {**header, "selection": type_locator(all_rows.index(row)),
                 "details_complete": False}
     while True:
         result = {"contract": "waapi-skill.metadata-types-page/v1", "types": [project(row) for row in rows[offset:end]],
@@ -1567,6 +1572,18 @@ def resolve_metadata_type_selection(*, read_call: ReadCall, context: Mapping[str
     if isinstance(class_id, bool) or not isinstance(class_id, int) or not 0 <= class_id <= 0xFFFFFFFF:
         raise MetadataDiscoveryError("METADATA_CLASS_ID_UNAVAILABLE", "Selected live type omits the class ID required for class metadata; choose an exact object scope.")
     return class_id
+
+
+def resolve_metadata_type_name_selection(*, read_call: ReadCall, context: Mapping[str, Any], selection: str) -> str:
+    """Resolve a disclosed current inventory row without copying caller type text."""
+    result = browse_metadata_types(read_call=read_call, context=context, selection=selection,
+                                  project_detail=False)
+    name = result["selected_type"].get("name")
+    if not isinstance(name, str) or not name:
+        raise MetadataDiscoveryError("METADATA_TYPE_NAME_UNAVAILABLE", "Selected native type omits a name; select another current row.")
+    if not all(character.isalnum() or character in ("_", ".") for character in name):
+        raise MetadataDiscoveryError("METADATA_TYPE_QUERY_SYNTAX_UNAVAILABLE", "Selected native name cannot be represented by the supported WAQL type identifier; no query was dispatched.")
+    return name
 
 
 def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],

@@ -485,7 +485,12 @@ def test_query_schema_discloses_one_business_continuation_without_typed_facts(
         }
         assert payload["sources"]["short_id_candidates"] == "--short-id <uint32> --short-id-kind <business-kind> --max-results <1..1000>"
         assert payload["source_rules"]["short_id"]["mutation_authority"] is False
-        assert {key: value for key, value in payload["source_rules"].items() if key != "short_id"} == {
+        assert payload["sources"]["selected_native_kind"] == "--type-selection <Gateway-issued live type selection>"
+        selected_kind = payload["source_rules"]["selected_native_kind"]
+        assert selected_kind["mutation_authority"] is False
+        assert "900-second expiry" in selected_kind["binding"]
+        assert "without alias inference or retry" in selected_kind["native_queryability"]
+        assert {key: value for key, value in payload["source_rules"].items() if key not in {"short_id", "selected_native_kind"}} == {
             "exactly_one_source": True,
             "common_kind_is_a_source": (
                 "--kind is valid only when no path, id, search, or Query Editor "

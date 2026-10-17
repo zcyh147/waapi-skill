@@ -460,6 +460,29 @@ query failures, source closure/admission and partial layout constructors retain
 all unproven applicability, native effects and downstream delivery obligations.
 
 
+The seventh combined partial merges only fixed query `b95bddbb`, reference
+hierarchy/classifier safety `7ed7a105` and Tone artifact verification `c253c5ae`.
+Reconciliation retains every original 272,313 native ID/shape/owner tuple,
+independent catalog/definition, detailed native policy and historical family
+seal. All 878 public route keys remain unchanged; there is no branch-state
+transition or native/Fresh acceptance credit. The actual Program roster is 241
+unique entries without whole-file/exact-node overlap. Unknown reference target
+classifiers, native query type spelling/2021 Short-ID mapping, Tone waveform and
+populated-marker semantics, larger terminal delivery and all other original
+scope remain owned. Source-level artifact verification and explicit boundaries
+are partial implementation, not completion of those obligations. Existing
+product receipts are not transferred to this successor.
+
+
+The r7 reproducibility checks pass for depth and release; branch
+`--check --require-complete` exits 2 because the unchanged product scope remains
+incomplete. Original focused `9cfa110f` reports 372 passed / 1 stale schema-seal
+failure / 11 Windows-only skips; the exact five-version guidance-seal repair
+`b1fadd6e` passes its entire 16-test file separately. Original failures stay
+preserved, no runtime changes follow the combined source run, and no broad or
+native acceptance is inferred from these focused results.
+
+
 ## #193 terminal-capacity and path-race successor
 
 The successor to `c253c5ae` makes the original long-marker request survive exact

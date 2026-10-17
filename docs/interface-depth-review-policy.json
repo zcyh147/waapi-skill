@@ -17,9 +17,9 @@
   },
   "source_review": "docs/research/waapi-v11-inventory-source-review.md",
   "source_contracts": {
-    "gateway_parser_sha256": "00eb6373c2a043a7c2bc7e587cbbd12e16aabd0903704b231d051e43fe94a081",
-    "operation_contract_sha256": "de138bb31b2c4ff5d79bbe706bc65b4dd6c544b920327bb7528b2fc62e042f08",
-    "public_continuation_sha256": "ff994dd16e58f2c412a6014d9c2659d1ced776a30b436988745167322f8463e8",
+    "gateway_parser_sha256": "8d60ac051953f0201f717983e80c0249e837810a4f0b8a974f27c92dd5188b3c",
+    "operation_contract_sha256": "eb219a226469e82b34fc8b6813e8e222a7d925d9db53d104afc95477a315a710",
+    "public_continuation_sha256": "0770d8481f676ba5c41c22ade8327e71dd4eff025bcbf1b258c985fe046be6e2",
     "typed_request_surface_sha256": "5a60a7057fc4d526efd91b683018021ebe42840b3a37f99fbc7a059e76185259"
   },
   "ownership_classes": {
