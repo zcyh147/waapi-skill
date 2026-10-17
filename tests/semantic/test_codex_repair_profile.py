@@ -64,7 +64,7 @@ def test_documented_remaining_suffix_has_three_tasks_two_transactions_and_no_f1(
         "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}
 
 
-@pytest.mark.parametrize("ids", [("REPAIR25-F3",), ("REPAIR25-F1", "REPAIR25-F4"),
+@pytest.mark.parametrize("ids", [("REPAIR25-F1",), ("REPAIR25-F1", "REPAIR25-F4"),
     ("REPAIR25-F3", "REPAIR25-F2"), ("REPAIR25-F2", "REPAIR25-F2"),
     ("REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F3"),
     ("REPAIR25-F4", "REPAIR25-F3"), ("REPAIR25-F3", "REPAIR25-F3"),
@@ -96,4 +96,12 @@ def test_explicit_retry_selectors_have_only_their_requested_budget(ids, transact
     assert tuple(unit.unit_id for unit in profile.units) == ids
     assert profile.budget == {"fresh_tasks": len(ids), "user_turns": len(ids), "model_calls": len(ids),
         "transactions": transactions, "hard_seconds_per_task": 600, "hard_seconds_total": 600 * len(ids),
+        "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}
+
+
+def test_final_authorized_f3_has_one_task_turn_transaction_and_600_seconds():
+    profile = load_repair_profile(PROFILE, unit_ids=("REPAIR25-F3",))
+    assert [unit.case_id for unit in profile.units] == ["F3"]
+    assert profile.budget == {"fresh_tasks": 1, "user_turns": 1, "model_calls": 1,
+        "transactions": 1, "hard_seconds_per_task": 600, "hard_seconds_total": 600,
         "gateway_calls_per_task": 96, "reviewer_model_calls": 0, "automatic_reruns": 0}

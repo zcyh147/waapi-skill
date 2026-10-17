@@ -192,7 +192,7 @@ unchanged; other singletons, arbitrary subsets and duplicates remain rejected.
 skills/waapi-skill/.venv/bin/python tests/semantic/run_codex_skill_campaign.py \
   --profile waapi_v11_repairs_4 --version 2025.1 --case-id REPAIR25-F4 \
   --model gpt-5.6-terra --reasoning-effort medium --service-tier default \
-  --campaign-root skills/waapi-skill-workspace/imac-v11-repairs-remaining1-r6
+  --campaign-root skills/waapi-skill-workspace/imac-v11-repairs-final-f4-r6
 ```
 
 A 1/1 result would cover F4 only. Preserve F1's separate business assessment,
@@ -202,7 +202,7 @@ F2/F3 failures, and all original campaign verdicts in the overall report.
 ## Optional retries after r6: new approval required
 
 The authorized attempts have been spent. F4 passed in
-`imac-v11-repairs-remaining1-r6`; this does not erase F2/F3 failures or change
+`imac-v11-repairs-final-f4-r6`; this does not erase F2/F3 failures or change
 F1's separately recorded business assessment and original campaign verdict.
 The continuation sections above describe the authorization available at those
 historical checkpoints, not permission for another run.
@@ -222,3 +222,21 @@ approved attempt needs a new root and frozen candidate. Default/all-four and
 previous continuation selections are unchanged; other subsets, duplicates and
 permutations remain rejected. A selected 1/1 or 2/2 root never establishes a
 four-workflow PASS, and no original root is modified or regraded.
+
+
+## Remaining authorized F3 after r7
+
+After new approval for one F2 and one F3 attempt,
+`imac-v11-repairs-retry-f2-f3-r7` attempted only F2. The harness rejected a valid
+offline version-prefixed schema query before Gateway dispatch. Its original
+F2 FAIL and campaign BLOCKED verdict stay frozen; this repair does not regrade
+that root or authorize another F2 attempt.
+
+F3 remains authorized and unattempted under that approval. The exact singleton
+`--case-id REPAIR25-F3` selects one fresh CLI task, one user turn, one transaction
+and at most 600 Agent seconds, with unchanged 2025.1 and Terra/medium/default
+settings. The formal campaign and authenticated archive remain mandatory. The
+coordinator must freeze and review the repaired candidate before starting a new
+root; selector preparation launches nothing. All previous selections remain
+unchanged. Other subsets, duplicates and permutations remain rejected. A
+selected 1/1 PASS would cover F3 only, with all original failures preserved.
