@@ -905,6 +905,7 @@ def test_transport_late_creation_verification_cannot_resurrect_prior_lifetime(tm
     assert code == 2, result
     assert result["error_code"] in {"TRANSPORT_HANDLE_GENERATION_DRIFT", "TRANSPORT_HANDLE_LIFETIME_RETIRED"}
     assert result["automatic_retry"] is False
+    assert result["verified"] is False
 
 
 def test_transport_retired_lifetime_capacity_is_reusable_and_old_verification_stays_rejected(tmp_path: Path, monkeypatch) -> None:

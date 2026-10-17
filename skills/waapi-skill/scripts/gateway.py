@@ -22288,6 +22288,7 @@ def _dispatch_transaction_command_with_execution_lease(
                         {
                             "ok": False,
                             "status": "transport_handle_persistence_failed",
+                            "verified": False,
                             "error_code": getattr(
                                 exc,
                                 "error_code",
