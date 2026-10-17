@@ -3,6 +3,71 @@
   "host": "wwise-authoring",
   "native_catalog_sha256": "411c83c1e9b0d8d1fcb0fa82242e1a47728525379dfca93d1c4c40a9325679b5",
   "schemas": {
+    "ak.wwise.ui.layout.closeView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "viewID": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique id of the view to close."
+          }
+        },
+        "required": [
+          "viewID"
+        ],
+        "type": "object"
+      },
+      "description": "Requests to close a view by its unique id. The view might not yet be closed when returning from this function.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      }
+    },
+    "ak.wwise.ui.layout.getOrCreateView": {
+      "argsSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "The unique identifier, as a string, of the view type to get or create.",
+            "type": "string"
+          },
+          "posX": {
+            "description": "Initial position of the created view on the horizontal axis. Defaults to -1.",
+            "type": "integer"
+          },
+          "posY": {
+            "description": "Initial position of the created view on the vertical axis. Defaults to -1.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "description": "Gets a view, if it exists in the current layout, or creates a new one.",
+      "optionsSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "resultSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common_definitions.json#/definitions/guid",
+            "description": "The unique ID of the view."
+          }
+        },
+        "type": "object"
+      }
+    },
     "ak.wwise.ui.layout.removeLayout": {
       "argsSchema": {
         "additionalProperties": false,

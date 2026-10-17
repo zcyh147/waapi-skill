@@ -22,6 +22,7 @@ from wwise_waapi.safety import (
     REVIEWED_TOPIC_URIS,
 )
 from wwise_waapi.selection_guidance import CAPABILITY_SELECTION_GUIDANCE
+from wwise_waapi.authoring_layout import LAYOUT_READ_URIS
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS
 
 
@@ -198,13 +199,16 @@ def test_2025_media_pool_reads_use_the_bounded_direct_route() -> None:
 
     for uri, gateway_commands in {
         "ak.wwise.core.mediaPool.get": ("request-schema", "core-call"),
-        "ak.wwise.core.mediaPool.getFields": ("request-schema",),
     }.items():
         capability = catalog.describe("2025.1", uri)
         assert capability.preferred_route == "manifest_dispatch"
         assert capability.gateway_commands == gateway_commands
         assert capability.safety.read_only is True
         assert capability.safety.requires_authorization is False
+    fields = catalog.describe("2025.1", "ak.wwise.core.mediaPool.getFields")
+    assert fields.gateway_commands == ("metadata media-pool-fields",)
+    assert fields.preferred_route == "fixed_command"
+    assert fields.safety.read_only is True and fields.safety.requires_authorization is False
 
 
 def test_catalog_keeps_specific_builder_boundaries_and_hides_generic_bypass() -> None:
@@ -298,8 +302,8 @@ def test_catalog_summary_reconciles_all_five_version_totals() -> None:
     }
     assert summary["totals"]["preferred_routes"] == {
         "bounded_topic_wait": 152,
-        "fixed_command": 56,
-        "manifest_dispatch": 111,
+        "fixed_command": 57,
+        "manifest_dispatch": 110,
         "transaction_operation": 489,
         "unsupported_boundary": 6,
     }
@@ -377,7 +381,6 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion",
             "ak.wwise.core.blendContainer.getAssignments",
             "ak.wwise.core.mediaPool.get",
-            "ak.wwise.core.mediaPool.getFields",
             "ak.wwise.core.log.get",
             "ak.wwise.core.object.diff",
             "ak.wwise.core.object.isLinked",
@@ -398,12 +401,19 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             "ak.wwise.core.transport.getState",
             "ak.wwise.ui.commands.getCommands",
             "ak.wwise.ui.getSelectedFiles",
+            "ak.wwise.ui.layout.getLayoutNames",
+            "ak.wwise.ui.layout.getCurrentLayoutName",
+            "ak.wwise.ui.layout.getLayout",
+            "ak.wwise.ui.layout.getViewInstances",
+            "ak.wwise.ui.layout.getViewTypes",
+            "ak.wwise.ui.layout.getElementRectangle",
+            "ak.wwise.ui.layout.getViewHandle",
             "ak.wwise.waapi.getFunctions",
             "ak.wwise.waapi.getSchema",
             "ak.wwise.waapi.getTopics",
         }
     )
-    assert public_calls == REVIEWED_PUBLIC_CALL_URIS - {"ak.wwise.ui.getSelectedFiles"}
+    assert public_calls == REVIEWED_PUBLIC_CALL_URIS - {"ak.wwise.ui.getSelectedFiles"} - LAYOUT_READ_URIS
     authoring_calls = {
         entry.uri
         for version in SUPPORTED_WWISE_VERSION_KEYS
@@ -420,6 +430,7 @@ def test_public_manifest_dispatch_is_exactly_the_immutable_reviewed_call_allowli
             ("request-schema",),
             ("request-schema", "core-call"),
             ("request-schema", "waapi-schema"),
+            ("request-schema", "layout-read"),
         }
         for entry in entries
         if entry.preferred_route == "manifest_dispatch"

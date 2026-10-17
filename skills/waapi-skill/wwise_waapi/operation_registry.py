@@ -16,6 +16,7 @@ import json
 import math
 import os
 import re
+import time
 import stat
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -23,7 +24,7 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -8829,7 +8830,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 raise OperationContractError('INVALID_READBACK', 'Current layout name was omitted; cannot prepare layout switching')
             metadata['layout_original_current'] = dict(current)
             verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
-                'expected_name': call_args['name']}
+                'expected_name': call_args.get('name', arguments['layout_binding']['layout_name'])}
             if api == LAYOUT_SET_URI:
                 try:
                     metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
@@ -8841,6 +8842,27 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     metadata['layout_factory_names'] = dict(require_temporary_layout(call_args['name'], read=read))
                 except ValueError as exc:
                     raise OperationContractError('FACTORY_LAYOUT_REMOVAL_FORBIDDEN', str(exc)) from exc
+            elif api == LAYOUT_GET_OR_CREATE_URI:
+                binding = arguments['layout_binding']
+                try:
+                    if current['name'] != binding['layout_name']:
+                        raise ValueError('View creation requires its discovered layout to be current; switch and inspect again')
+                    observed = view_creation_observation(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', str(exc)) from exc
+                metadata['layout_view_prestate'] = observed
+                verification.update(expected_name=binding['layout_name'], view_type=call_args['name'],
+                    coordinates={field: call_args[field] for field in ('posX', 'posY') if field in call_args},
+                    existing_view_ids=[row['viewID'] for row in observed['instances'] if row['viewName'] == call_args['name']])
+            elif api == LAYOUT_CLOSE_URI:
+                binding = arguments['layout_binding']
+                if current['name'] != binding['layout_name']:
+                    raise OperationContractError('INVALID_LAYOUT_VIEW_SCOPE', 'Closing a view requires its discovered layout to be current')
+                try:
+                    validate_layout_view_binding(binding, read=read)
+                except ValueError as exc:
+                    raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+                verification.update(expected_name=binding['layout_name'], view_id=call_args['viewID'])
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -13589,6 +13611,15 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                     readbacks.append(absence)
                 elif api == LAYOUT_REMOVE_URI:
                     require_temporary_layout(call_args['name'], read=layout_guard_read)
+                elif api == LAYOUT_GET_OR_CREATE_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for view creation is no longer current')
+                    if view_creation_observation(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_view_prestate'):
+                        raise ValueError('View catalog or instances changed after preview; inspect and preview again')
+                elif api == LAYOUT_CLOSE_URI:
+                    if current.get('name') != arguments['layout_binding']['layout_name']:
+                        raise ValueError('The layout for view closing is no longer current')
+                    validate_layout_view_binding(arguments['layout_binding'], read=layout_guard_read)
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
@@ -15868,6 +15899,52 @@ def verify_prepared_operation(
             else:
                 readbacks.append(absent)
                 check('Temporary layout is absent after unregister', True, absent)
+        elif uri == LAYOUT_CLOSE_URI:
+            observed, pending = {}, True
+            for poll in range(16):
+                observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                instances = canonical_view_instances(observed)
+                pending = any(_same_identity(row['viewID'], plan['view_id']) for row in instances)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'poll': poll + 1,
+                    'result_sha256': canonical_sha256(observed), 'view_present': pending})
+                if not pending:
+                    break
+                if poll < 15:
+                    time.sleep(0.2)
+            readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']},
+                'options': {}, 'result': observed})
+            check('Closed view disappears from independently read layout instances', not pending,
+                {'view_id': plan['view_id'], 'pending_async_close': pending, 'polls': poll + 1})
+        elif uri == LAYOUT_GET_OR_CREATE_URI:
+            result = execution_result.get('result')
+            view_id = result.get('id') if isinstance(result, Mapping) else None
+            valid_id = isinstance(view_id, str) and _PLUGIN_GUID.fullmatch(view_id) is not None
+            check('View result includes its exact native GUID', valid_id, {'id': view_id})
+            if valid_id:
+                current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                current_scope_matches = current.get('name') == plan['expected_name']
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+                check('Created or reused view remains in the reviewed current layout', current_scope_matches,
+                    {'expected': plan['expected_name'], 'actual': current.get('name')})
+                observed = read_call('ak.wwise.ui.layout.getViewInstances', {'name': plan['expected_name']}, {})
+                instances = canonical_view_instances(observed)
+                readbacks.append({'uri': 'ak.wwise.ui.layout.getViewInstances', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': observed})
+                matches = [row for row in instances if _same_identity(row['viewID'], view_id)]
+                check('Returned view exists with the requested live type', len(matches) == 1 and matches[0]['viewName'] == plan['view_type'],
+                    {'expected_type': plan['view_type'], 'id': view_id, 'actual': matches})
+                existing = plan.get('existing_view_ids', [])
+                if existing:
+                    check('Existing view is reused', any(_same_identity(item, view_id) for item in existing),
+                        {'existing_ids': existing, 'returned_id': view_id})
+                elif plan.get('coordinates') and current_scope_matches:
+                    rectangle = read_call('ak.wwise.ui.layout.getElementRectangle', {'id': view_id}, {})
+                    validate_layout_read_result('rectangle', rectangle)
+                    readbacks.append({'uri': 'ak.wwise.ui.layout.getElementRectangle', 'args': {'id': view_id}, 'options': {}, 'result': rectangle})
+                    for native, edge in (('posX', 'left'), ('posY', 'top')):
+                        if native in plan['coordinates']:
+                            check('New view initial ' + edge + ' matches its declared coordinate', rectangle.get(edge) == plan['coordinates'][native],
+                                {'expected': plan['coordinates'][native], 'actual': rectangle.get(edge), 'rectangle': rectangle})
         else:
             current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
             validate_layout_read_result('current', current)
