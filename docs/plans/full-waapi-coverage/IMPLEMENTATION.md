@@ -397,6 +397,62 @@ The next full Non-live gate is scheduled after the fixed #179/#185 integration,
 with duration reporting, so these related runtime changes share one settled
 milestone. There is no automatic repeated Program gate or native/Fresh launch.
 
+## Eleventh through thirteenth integration checkpoints
+
+R11 froze `593877b2bb17f8a23c9ba636fa39b8b063f297f4`. Its central preflight
+passed **825 tests in 21.50 seconds**; the single full Non-live run retained
+**62 failed / 21,782 passed / 132 skipped / 41 deselected in 4,567.49 seconds**.
+All 1,820 tracked hashes remained unchanged and its owned process group ended.
+This remains the latest completed full Non-live result, not a whole-gate PASS.
+The original 62 failures divide into forty plugin metadata fixtures, sixteen
+contract/evidence/reference fixtures, and six compact-output test functions;
+repairs and their focused proofs retain their own candidates below.
+
+R12 reconciled the fixed object graph, Console artifact, runtime/shared schema,
+2022 reference-array and compact-output inputs. Central preflight on `b12db6c9`
+retained **790 passed / 35 failed in 30.22 seconds**, following an earlier
+external developer-environment collection block (exit 4). Console fixtures
+retained an initial failure at `89cea4bd`, then **35 passed in 2.37 seconds** on
+`1db0d7dc`. That candidate's crossfocus retained **43 passed / 1 failed in
+13.08 seconds**, followed by only its unexecuted independent remainder:
+**122 passed in 67.29 seconds**. These are separate selections, not a combined
+all-green run. After the 2022 schema correction, `c538d104` passed the affected
+**8 tests in 0.93 seconds** and the sixteen original triage nodes in **1.43
+seconds**; two obsolete-node collection errors remain recorded. Final
+`db57c484fdc69bd92c7ef92c9d869858cc3d775b` passed the six original output
+functions (**10 tests in 11.42 seconds**, including five SoundBank versions).
+Its 1,829 tracked hashes remained unchanged and owned processes ended.
+
+R13 combines Short ID source/Definition contracts `a32b2c71` and explicit native
+pytest-selection fixes `07b6a4d0` / locked coverage-option successor `45fcb03c`.
+The five-version source evidence supports bounded typed Short ID reads; public
+Definition processing remains 2022.1–2025.1. Numeric Short ID, canonical GUID,
+type and later role drift checks remain independent. Driver tests use injected
+runners only; they provide no native execution evidence. Sequential interface,
+branch and release-report checks passed after preserving an initial stale
+branch-fingerprint check failure caused by final reference pruning.
+
+Central preflight on exact `21d2c248ba55e7d2ad56a74bf754aa043fc2fb07` retained
+**821 passed / 4 failed in 21.76 seconds**. The four inherited matrix fixtures
+incorrectly required filesystem-effect metadata for `cli.verify`, whose
+contract exposes only the documented process outcome. Test-only successor
+`4ce17e5de020a13909641738099edf73d4c62def` explicitly preserves that weaker
+boundary and passed one deduplicated crossfocus of **20 tests in 0.98 seconds**:
+2021 query/schema, 2022 DialogueEvent Definition and Short ID role drift,
+explicit live/destructive/matrix argument selection, coverage-option handling,
+reference controls, and those exact four failures. Both runs preserved all
+1,834 tracked hashes and ended without owned processes. No full preflight,
+Program or Non-live rerun is inferred from the focused repair.
+
+R12/R13 preserve 896 public rows / 227 URIs, the actual 251-node Program roster,
+all 272,313 native obligation identities/shapes/owners/requirements/evidence and
+historical seals. No native obligation receives PASS credit. Original logs,
+failures, source hashes and process receipts remain in ignored
+`integration-partials-r11`, `integration-partials-r12` and
+`integration-partials-r13`. Native applicability, inline media compatibility
+and the remaining same-parent obligations stay open; no smaller scope,
+Fresh acceptance, ticket closure or main merge is claimed.
+
 ## Standing completion rules
 
 Every in-scope missing branch must receive implementation and required proof.
