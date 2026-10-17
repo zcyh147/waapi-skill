@@ -730,3 +730,86 @@ def test_public_compound_undo_replays_each_original_child_record(tmp_path, no_ev
         path.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
         with pytest.raises(TypedDraftEvidenceError):
             validate_typed_draft_evidence(state_directory=copied, steps=steps, broker_records=records)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX developer transport/archive proof")
+def test_public_owned_lua_input_cleanup_preserves_original_formal_archive(tmp_path, monkeypatch):
+    """The fake WAAPI result runs no Lua; only the original owned input is released."""
+    from tests.semantic.support.codex_eval_protocol_v3 import build_transaction_protocol
+    from tests.semantic import run_codex_skill_campaign as campaign
+    root = Path(__file__).resolve().parents[2]
+    project = tmp_path / "project/Sandbox.wproj"
+    project.parent.mkdir()
+    project.write_text("<WwiseDocument/>", encoding="utf-8")
+    owned = tmp_path / "owned-lua-input"
+    owned.mkdir()
+    script = owned / "user-script.lua"
+    script.write_text("return wa_args.request_id\n", encoding="utf-8")
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(json.dumps({"version": "2025.1", "platform": "macosx", "objects": [], "fields": [],
+        "process_path": str(tmp_path / "WwiseConsole"), "project_path": str(project),
+        "lua_cli_result": {"result": 0}}), encoding="utf-8")
+    protocol = build_transaction_protocol(({
+        "contract": "waapi-skill.operation-request/v1", "version": "2025.1", "operation": "lua.executeCliFile",
+        "arguments": {"script_file": str(script), "io_root": str(owned), "source_authority": "user_supplied_verbatim",
+                      "wa_args": {"request_id": 'owned 界 "\\ input'}}},))
+    steps = protocol.steps
+    payloads, command_facts = {}, []
+    workspace = tmp_path / "agent-workspace"
+    installed = prepare_workspace_skill_install(workspace, root / "skills/waapi-skill")
+    monkeypatch.chdir(workspace)
+    with CodexGatewayBroker(skill_source=root / "skills/waapi-skill", expected_steps=steps,
+        invocation_skill_source=installed, expected_wwise_version="2025.1", runner_environment={**os.environ,
+            "PYTHONPATH": os.pathsep.join((str(WAAPI_SHIM_ROOT), str(root), str(root / "skills/waapi-skill"))),
+            FIXTURE_ENV: str(fixture), "WWISE_WAAPI_HOST": "127.0.0.1", "WWISE_WAAPI_PORT": "31337"},
+        working_root=tmp_path / "broker", transport="tcp") as broker:
+        for step in steps:
+            argv = [step.subcommand]
+            for argument in step.arguments:
+                if isinstance(argument, ResponseBinding):
+                    value = payloads[argument.step]
+                    for token in argument.pointer.lstrip("/").split("/"):
+                        value = value[token]
+                    argv.append(str(value))
+                else:
+                    argv.append(argument)
+            runner_path = None
+            for previous in reversed(tuple(payloads.values())):
+                copied = previous.get("draft", {}).get("next_action_binding", {}).get("check", {}).get("fixed_argv_prefix_copy")
+                if isinstance(copied, str) and shlex.split(copied)[3:] == argv:
+                    runner_path = Path(shlex.split(copied)[1])
+                    break
+            result = run_model_command(broker, argv, runner_path=runner_path)
+            (tmp_path / f"{step.name}.stdout.txt").write_text(result.stdout, encoding="utf-8")
+            (tmp_path / "lua-broker-evidence.json").write_text(json.dumps(broker.evidence().as_dict(include_output=True), ensure_ascii=False), encoding="utf-8")
+            assert result.returncode == 0, (step.name, result.stdout, result.stderr)
+            payloads[step.name] = json.loads(result.stdout)
+            command_facts.append({"argv": list(result.args), "command": shlex.join(result.args),
+                "exit_code": result.returncode, "status": "completed", "has_shell_operators": False,
+                "parse_error": "", "parser_kind": "posix-native", "aggregated_output": result.stdout})
+        evidence = broker.evidence()
+    assert evidence.passed, evidence
+    records = json.loads(json.dumps(evidence.as_dict()))["records"]
+    state = tmp_path / "broker/state"
+    def replay_original_archive():
+        campaign._validate_heavy_v3_broker_records(records, task_root=tmp_path, steps=steps,
+            command_records=command_facts, options=SimpleNamespace(skill_source=root / "skills/waapi-skill", windows_powershell_core_host=None),
+            version="2025.1", label="developer original owned Lua archive",
+            expected_project_modification_policy="ask_before_changes")
+    replay_original_archive()
+    before = validate_typed_draft_evidence(state_directory=state, steps=steps, broker_records=records)
+    terminal = payloads["tx01.verify"]
+    assert terminal["status"] == "result_schema_checked" and terminal["verified"] is False
+    assert list(terminal)[-1] == "agent_result"
+    tx = terminal["transaction_id"]
+    assert [event["event_type"] for event in TransactionStore(state).read_events(tx)].count("execution_completed") == 1
+    script.unlink()
+    owned.rmdir()
+    with pytest.raises(TypedDraftEvidenceError):
+        validate_typed_draft_evidence(state_directory=state, steps=steps, broker_records=records)
+    after = validate_typed_draft_evidence(state_directory=state, steps=steps, broker_records=records,
+        allow_cleaned_file_evidence=True)
+    assert after == before
+    replay_original_archive()
+    (tmp_path / "lua-command-facts.json").write_text(json.dumps(command_facts, ensure_ascii=False), encoding="utf-8")
+    (tmp_path / "lua-original-archive-evidence.json").write_text(json.dumps(after, ensure_ascii=False), encoding="utf-8")

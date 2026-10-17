@@ -7398,7 +7398,11 @@ def _validate_heavy_v3_compact_policy_binding(
             if not isinstance(draft_id, str) or not isinstance(authority, str):
                 raise ValueError("compact Draft lacks its issued authority")
             records = load_operation_draft_archive_records(state,
-                (draft_id,) if archive_draft_ids is None else archive_draft_ids)
+                (draft_id,) if archive_draft_ids is None else archive_draft_ids,
+                # This reader replays an original archive after lifecycle
+                # cleanup. The Store limits this aperture to sealed records
+                # and Adapters that own cleaned-file evidence materialization.
+                allow_cleaned_file_evidence=True)
             durable = records[draft_id]
             binding = durable.connection_binding
             response = payload.get("draft")
