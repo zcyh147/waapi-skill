@@ -22,6 +22,8 @@ Users can manage inclusions, process definitions, convert external sources and g
 - [ ] Verify the highest existing public Gateway seam with positive and meaningful negative controls. Use sequential owned native tests where behavior needs native proof; preserve source projects and original evidence. No Fresh run is authorized until a separate exact budget is approved.
 - [ ] Preserve Gateway-owned request construction, configuration binding, the three modification policies, immutable Preview, execute-once semantics and truthful uncertainty. Do not add a raw-input escape or weaken safety to claim coverage.
 
+- [ ] Reconcile SoundBank Definition Short-ID resolution with the version-aware read resolver in #181. The current `_resolve_definition_identity` uses an unversioned Event/Effect/AuxBus code table while the read resolver retains an unresolved 2021.1 mapping. Establish matching native mapping or a proved equivalent Gateway-owned resolution for every supported release and Definition type; validate exact Short ID/type readback and wrong-type/ambiguous negatives. Do not infer 2021 codes from later definitions, PluginID or classId, and do not count a new unsupported boundary as completion. This is a source-audit inconsistency at `a0c192d9`, not an observed native execution failure.
+
 ## Blocked by
 
 - [02: Make branch completion and gap ownership executable](https://github.com/zcyh147/waapi-skill/issues/176)

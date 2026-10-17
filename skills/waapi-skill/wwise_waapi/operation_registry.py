@@ -7431,10 +7431,16 @@ def _condition_metadata_assertions(pre_state, *, read):
     condition_metadata_groups = list(pre_state.get("condition_metadata_guards", [])) if isinstance(pre_state, Mapping) else []
     if isinstance(condition_metadata, Mapping):
         condition_metadata_groups.append(condition_metadata)
+    observed_fields = {}
+    def observed_field(object_id, name):
+        key = (object_id, name)
+        if key not in observed_fields:
+            observed_fields[key] = _read_property_info(read, object_id=object_id, name=name)
+        return observed_fields[key]
     for condition_metadata in condition_metadata_groups:
         for expected in condition_metadata["fields"]:
             name = expected.get("field_binding", {}).get("token", expected["name"])
-            observed = _read_property_info(read, object_id=condition_metadata["object_id"], name=name).as_dict()
+            observed = observed_field(condition_metadata["object_id"], name).as_dict()
             assertions.append({"name": f"condition metadata {name} unchanged",
                                "passed": _native_snapshot_equal(observed, expected),
                                "evidence": {"expected": expected, "actual": observed}})
@@ -7446,6 +7452,12 @@ def _condition_metadata_assertions(pre_state, *, read):
                 assertions.append({"name": f"structurally visible field {name} remains enabled",
                     "passed": isinstance(result, Mapping) and result.get("return") is True,
                     "evidence": {"uri": OBJECT_IS_PROPERTY_ENABLED_URI, "args": args, "result": result}})
+        for selected in condition_metadata.get("native_fields", []):
+            name = selected["token"]
+            observed = dict(observed_field(condition_metadata["object_id"], name).raw)
+            assertions.append({"name": f"selected native metadata {name} unchanged",
+                               "passed": _native_snapshot_equal(observed, selected["metadata"]),
+                               "evidence": {"expected": selected["metadata"], "actual": observed}})
     return assertions
 
 
@@ -9254,6 +9266,14 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         )
         info = _read_property_info(read, object_id=source.object, name=field_value)
         metadata["field_info"] = info.as_dict()
+        # Every exact selected field stays bound through prewrite and verify,
+        # including dependency-free fields and cleared references. Raw facts
+        # distinguish native omission from explicit null/default containers.
+        metadata["condition_metadata"] = {
+            "object_id": source.object, "platform": platform,
+            "fields": [info.as_dict()],
+            "native_fields": [{"token": field_value, "metadata": dict(info.raw)}],
+        }
         if platform is not None and request.operation == "object.setProperty":
             _require_platform_field_enabled(
                 read,
@@ -9279,11 +9299,7 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if related_conditions:
                 metadata["related_conditions"] = related_conditions
             if info.dependencies:
-                metadata["condition_metadata"] = {
-                    "object_id": source.object,
-                    "platform": platform,
-                    "fields": [info.as_dict(), *(item.as_dict() for item in activation_metadata.values())],
-                }
+                metadata["condition_metadata"]["fields"].extend(item.as_dict() for item in activation_metadata.values())
         field_before_result = read(
             OBJECT_GET_URI,
             {"from": {"id": [source.object]}},

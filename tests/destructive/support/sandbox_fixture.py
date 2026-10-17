@@ -22,6 +22,7 @@ from wwise_waapi.headless import (  # pyright: ignore[reportMissingImports]
     PortUnavailable,
     assert_port_free,
 )
+from wwise_waapi.native_catalog import load_native_catalog
 from .live_environment import (  # pyright: ignore[reportMissingImports]
     ENV_WWISE_FIXTURE_PROJECT,
     ENV_WWISE_SANDBOX_ROOT,
@@ -275,6 +276,7 @@ class SandboxMetadata:
     ready_duration_seconds: float | None = None
     get_info_version: dict[str, Any] | None = None
     get_info_display_name: str | None = None
+    authoring_launch: dict[str, Any] | None = None
     process_cleanup_result: str | None = None
     process_cleanup_details: dict[str, Any] | None = None
     keep_decision: str = "pending"
@@ -476,8 +478,16 @@ def launch_sandboxed_wwise(
     port: int | None = None,
     wine_prefix_path: Path | None = None,
     case_owned_root: Path | None = None,
+    host_kind: str = 'wwise-console',
 ) -> HeadlessLifecycle:
-    """Launch WwiseConsole only against the sandbox copy."""
+    """Launch the selected fixed lifecycle strategy against the sandbox copy."""
+
+    if host_kind not in {'wwise-console', 'wwise-authoring'}:
+        raise SandboxFixtureError('unsupported sandbox lifecycle host strategy')
+    if host_kind == 'wwise-authoring' and (
+        wine_prefix_path is None or case_owned_root is None or port not in (None, 8080)
+    ):
+        raise SandboxFixtureError('Authoring requires an owned private HOME bottle and the fixed default port')
 
     env_map = dict(env if env is not None else os.environ)
     env_map.update(sandbox.env)
@@ -497,10 +507,15 @@ def launch_sandboxed_wwise(
     contract = require_destructive_environment(env_map)
     if contract.active_destructive_project != sandbox.sandbox_project.resolve(strict=False):
         raise SandboxFixtureError("destructive environment did not select the sandbox project")
-    env_map = prepare_headless_console_environment(
-        env_map,
-        version=contract.version,
-    )
+    strategy_arguments = {}
+    if host_kind == 'wwise-authoring':
+        if contract.version not in {'2024.1', '2025.1'}:
+            raise SandboxFixtureError('Authoring requires a pinned supported native catalog')
+        build = load_native_catalog(contract.version, 'wwise-authoring')['provenance']['build']
+        strategy_arguments = {'host_kind': host_kind, 'authoring_build': build, 'authoring_owned_root': case_owned_root}
+        port = 8080
+    else:
+        env_map = prepare_headless_console_environment(env_map, version=contract.version)
 
     launch_cwd = sandbox.sandbox_root.resolve(strict=True)
     lifecycle = HeadlessLifecycle(
@@ -510,6 +525,7 @@ def launch_sandboxed_wwise(
         timeouts=timeouts or _timeouts_from_env(env_map),
         launch_env=env_map,
         launch_cwd_path=launch_cwd,
+        **strategy_arguments,
     )
     sandbox.metadata.launch_cwd_path = str(launch_cwd)
     try:
@@ -520,6 +536,8 @@ def launch_sandboxed_wwise(
             lifecycle,
             expected_version=contract.version,
         )
+        if host_kind == 'wwise-authoring':
+            ready_info = require_authoring_launch_proof(lifecycle, project=sandbox.sandbox_project, build=build)
         if lifecycle.launch_cwd != launch_cwd:
             raise SandboxFixtureError(
                 "WwiseConsole lifecycle did not retain the exact sandbox-root cwd"
@@ -564,6 +582,13 @@ def launch_sandboxed_wwise(
             )
         raise
     finally:
+        if host_kind == 'wwise-authoring':
+            sandbox.metadata.authoring_launch = {
+                'host_kind': host_kind, 'build': build,
+                'preparation': list(lifecycle.launch_preparation),
+                'project_attestation': lifecycle.launch_project_attestation,
+                'get_info': lifecycle.ready_result,
+            }
         sandbox.write_metadata()
 
 
@@ -711,6 +736,31 @@ def require_lifecycle_ready_proof(
     if not lifecycle.command:
         raise SandboxFixtureError("WwiseConsole readiness proof requires the launch command")
     return ready_result
+
+
+def require_authoring_launch_proof(
+    lifecycle: HeadlessLifecycle, *, project: Path, build: str,
+) -> Mapping[str, Any]:
+    """Bind the fixed GUI command to the owned project and exact native host."""
+    info = require_lifecycle_ready_proof(lifecycle, expected_version='.'.join(build.split('.')[:2]))
+    version = info['version']
+    actual = tuple(version.get(key) for key in ('year', 'major', 'minor', 'build'))
+    if (getattr(lifecycle, 'host_kind', None) != 'wwise-authoring'
+            or info.get('isCommandLine') is not False
+            or any(type(value) is not int for value in actual)
+            or actual != tuple(map(int, build.split('.')))):
+        raise SandboxFixtureError('Authoring launch did not prove the exact native host/build')
+    proof = getattr(lifecycle, 'launch_project_attestation', None)
+    command = lifecycle.command
+    expected_executable = f'c:/Program Files/Audiokinetic/Wwise {build}/Authoring/x64/Release/bin/Wwise.exe'
+    if (not isinstance(proof, Mapping) or proof.get('method') != 'owned_winepath_roundtrip'
+            or proof.get('project') != str(project) or proof.get('roundtrip_project') != str(project)
+            or proof.get('build') != build or not isinstance(proof.get('native_project'), str)
+            or not proof['native_project'] or lifecycle.host != '127.0.0.1' or lifecycle.port != 8080
+            or len(command) != 5 or Path(command[0]).name != 'wine'
+            or list(command[1:]) != ['start.exe', '/wait', expected_executable, proof['native_project']]):
+        raise SandboxFixtureError('Authoring launch did not prove the private project path and fixed command')
+    return info
 
 
 def _get_info_display_name(info: Mapping[str, Any]) -> str | None:
@@ -917,6 +967,7 @@ __all__ = [
     "launch_sandboxed_wwise",
     "prepare_sample_project_sandbox",
     "require_lifecycle_ready_proof",
+    "require_authoring_launch_proof",
     "resolve_safe_sandbox_root",
     "shutdown_sandboxed_wwise",
     "verify_project_identity",

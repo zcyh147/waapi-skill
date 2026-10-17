@@ -260,7 +260,10 @@ def discover_metadata(
     capped by :data:`MAX_METADATA_DISCOVERY_DETAIL_POOL`.
     """
 
-    normalized_queries = _validate_queries(queries)
+    # The exact field comes only from a freshly revalidated Gateway selection.
+    # Caller-authored lexical meanings retain their independent small limit.
+    normalized_queries = ((exact_field,) if exact_field is not None and tuple(queries) == (exact_field,)
+                          else _validate_queries(queries))
     _validate_limit(limit)
     scope, live_scope_args = _resolve_scope(
         read_call,
@@ -1377,14 +1380,14 @@ def _required_live_name(name: Any) -> str:
             "Live property/reference names must be non-empty strings.",
             details={"uri": GET_PROPERTY_AND_REFERENCE_NAMES_URI},
         )
-    if len(name) > MAX_METADATA_DISCOVERY_NAME_CHARS:
+    if len(name.encode("utf-8")) > MAX_METADATA_DISCOVERY_RESULT_BYTES:
         raise MetadataDiscoveryError(
             "LIVE_METADATA_LIMIT_EXCEEDED",
             "One live property/reference name exceeds the discovery limit.",
             details={
                 "uri": GET_PROPERTY_AND_REFERENCE_NAMES_URI,
                 "characters": len(name),
-                "limit": MAX_METADATA_DISCOVERY_NAME_CHARS,
+                "limit_bytes": MAX_METADATA_DISCOVERY_RESULT_BYTES,
             },
         )
     return name
@@ -1478,7 +1481,8 @@ __all__ = [
 
 def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
                           meanings: Sequence[str] = (), page: str | None = None,
-                          page_size: int = 20) -> dict[str, Any]:
+                          page_size: int = 20, selection: str | None = None,
+                          detail_page: str | None = None, decorate: Any = None) -> dict[str, Any]:
     """Lossless live type inventory, with explicit lexical filtering and pages."""
     import hashlib
     import time
@@ -1491,12 +1495,29 @@ def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
     if len(records) > MAX_METADATA_DISCOVERY_TYPES:
         raise MetadataDiscoveryError("LIVE_METADATA_LIMIT_EXCEEDED", "Live object type inventory exceeds the bounded reader limit.")
     all_rows = [dict(record.raw) for record in records]
+    inventory_snapshot = hashlib.sha256(canonical_json_bytes([context, all_rows])).hexdigest()
+    now = issued = int(time.time())
+    def type_locator(index: int) -> str:
+        digest = hashlib.sha256(canonical_json_bytes([inventory_snapshot, issued, index])).hexdigest()
+        return f"mts1.{issued}.{index}.{digest}"
+    if selection is not None:
+        try:
+            kind, stamp, position, _digest = selection.split(".")
+            issued, index = int(stamp), int(position)
+            valid = kind == "mts1" and 0 <= index < len(all_rows) and selection == type_locator(index)
+        except (ValueError, TypeError, AttributeError):
+            valid = False
+        if not valid:
+            raise MetadataDiscoveryError("METADATA_SELECTION_SCOPE_CHANGED", "Type inventory, host, build or session changed; list types again.")
+        if issued > now or now - issued > 900:
+            raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Type selection expired; list types again.")
+        from .metadata_detail import detail_page as project_detail
+        return project_detail(all_rows[index], selection=selection, scope={"kind": "live-type-inventory"}, cursor=detail_page)
     filters = tuple(meaning.casefold() for meaning in meanings)
     rows = [row for row in all_rows if not filters or any(
         any(isinstance(row.get(key), str) and meaning in row[key].casefold() for key in ("name", "type"))
         for meaning in filters)]
     snapshot = hashlib.sha256(canonical_json_bytes([context, all_rows, filters])).hexdigest()
-    now = issued = int(time.time())
     offset = 0
     def locator(index: int) -> str:
         digest = hashlib.sha256(canonical_json_bytes([snapshot, issued, index])).hexdigest()
@@ -1513,20 +1534,38 @@ def browse_metadata_types(*, read_call: ReadCall, context: Mapping[str, Any],
         if issued > now or now - issued > 900:
             raise MetadataDiscoveryError("METADATA_SELECTION_EXPIRED", "Type page expired; list types again.")
     end = min(len(rows), offset + page_size)
+    from .metadata_detail import bounded_native_header
+    def project(row: dict[str, Any]) -> dict[str, Any]:
+        if len(canonical_json_bytes(row)) <= 4096:
+            return row
+        return {**bounded_native_header(row), "selection": type_locator(all_rows.index(row)),
+                "details_complete": False}
     while True:
-        result = {"contract": "waapi-skill.metadata-types-page/v1", "types": rows[offset:end],
+        result = {"contract": "waapi-skill.metadata-types-page/v1", "types": [project(row) for row in rows[offset:end]],
                   "meanings": list(meanings), "filter_kind": "case-insensitive-name-or-type-substring",
                   "snapshot": snapshot, "available_count": len(all_rows), "total_count": len(rows),
                   "offset": offset, "remaining_count": len(rows) - end, "complete": end == len(rows),
                   "next_page": locator(end) if end < len(rows) else None,
                   "expires_at": issued + 900, "mutation_authority": False}
         try:
+            if decorate is not None:
+                decorate(result)
             _require_result_size(result, maximum_bytes=16 * 1024, pretty=True)
             return result
         except MetadataDiscoveryError:
             if end <= offset + 1:
                 raise
             end -= 1
+
+
+def resolve_metadata_type_selection(*, read_call: ReadCall, context: Mapping[str, Any], selection: str) -> int:
+    """Resolve only a fresh inventory-bound native class ID, never caller args."""
+    result = browse_metadata_types(read_call=read_call, context=context, selection=selection)
+    # A type row's classId is a small native scalar and remains in the header.
+    class_id = result["field"].get("classId")
+    if isinstance(class_id, bool) or not isinstance(class_id, int) or not 0 <= class_id <= 0xFFFFFFFF:
+        raise MetadataDiscoveryError("METADATA_CLASS_ID_UNAVAILABLE", "Selected live type omits the class ID required for class metadata; choose an exact object scope.")
+    return class_id
 
 
 def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
@@ -1604,10 +1643,11 @@ def browse_metadata(*, read_call: ReadCall, context: Mapping[str, Any],
                 raise MetadataDiscoveryError("METADATA_DETAIL_TOO_LARGE", "The selected field detail exceeds the bounded detail response; no detail was truncated.", details={"field": name, "selection": selection, "scope": scope, "cause": exc.as_dict(), "repair": "Inspect another listed field; this exact field requires a separately supported larger-detail reader."}) from exc
             raise
     end = min(offset + page_size, len(names))
+    from .metadata_detail import bounded_native_header
     while True:
         result = {"contract": "waapi-skill.metadata-page/v1", "scope": scope,
                   "snapshot": snapshot, "snapshot_kind": "live-property-reference-inventory",
-                  "fields": [{"name": names[i], "selection": locator("mf1", i)} for i in range(offset, end)],
+                  "fields": [{**bounded_native_header({"name": names[i]}), "selection": locator("mf1", i)} for i in range(offset, end)],
                   "total_count": len(names), "offset": offset, "remaining_count": len(names) - end,
                   "complete": end == len(names), "next_page": locator("mp1", end) if end < len(names) else None,
                   "expires_at": issued + 900, "mutation_authority": False}

@@ -21,6 +21,7 @@ from .media_build_business_contracts import (
     MEDIA_POOL_SORT_DIRECTIONS,
     MEDIA_POOL_TEXT_OPERATOR_TOKENS,
     PEAKS_REGION_URI,
+    MAX_PEAK_PAIR_COUNT,
     PEAKS_TRIMMED_URI,
     SOUNDBANK_GET_INCLUSIONS_URI,
     media_build_business_contract_data,
@@ -29,7 +30,6 @@ from .media_build_business_contracts import (
 
 MEDIA_BUILD_CALL_CONTRACT = "waapi-skill.media-build-call/v1"
 MEDIA_BUILD_RESULT_CONTRACT = "waapi-skill.media-build-result/v1"
-MAX_PEAK_PAIR_COUNT = 512
 MAX_MEDIA_POOL_RESULTS = 200
 MAX_MEDIA_POOL_FILTERS = 16
 MAX_MEDIA_POOL_DATABASES = 8

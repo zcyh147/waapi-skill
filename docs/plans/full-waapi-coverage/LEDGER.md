@@ -256,3 +256,25 @@ native alternatives and all remaining requirements remain in the denominator.
 Neither these route linkages nor controlled producer/lifecycle tests establish
 native effects, exact accepted branch evidence or ticket completion. The new
 shared Authoring adapter and condition native fixture remain not launch-ready.
+
+Ticket #188 additionally has fake-tested owned Mac Authoring strategy plumbing in
+the existing ScenarioLifecycle/sandbox/HeadlessLifecycle path. Exact build,
+private default bottle, copied-project roundtrip, readiness identity and cleanup
+failure controls passed without launching an installed tool or native client.
+This grants no branch/native effect credit. The existing driver now installs the
+Mac owner after exact successful collection with fake-only controls. Native
+Windows ownership, cross-family integration and the remaining layout contracts
+and observations stay open; the Authoring permission-window hold remains active.
+
+The fifth partial integration refreshes current source seals for peak/raw/header
+continuations, live metadata selections, unconditional selected-field drift
+guards and original condition/Authoring lifecycle plumbing. Its exact public
+route set remains unchanged at 874 version rows / 216 unique URIs. Every native
+ID/shape/owner tuple, independent catalog, original definition and detailed
+selector/completed-family seal is preserved, with no state transition or new
+verified/native/Fresh credit. All 25 layout rows retain #188 migration-required
+ownership. Controlled condition cleanup now waits for final pytest reports;
+native execution, Windows ownership and cross-family proof remain outstanding.
+Definition Short-ID version-proof inconsistency is a new explicit open #183
+acceptance item with shared #181 work, not an exclusion or denominator change.
+No old product receipt is transferred to this integrated source candidate.
