@@ -117,6 +117,38 @@ original received packet or bounded diagnostic and compare its exact source
 seal. #195 owns scheduling and native acceptance; #187 owns the Topic shape fix
 after that observation.
 
+## Exact 2021 recursive SoundBank question
+
+Both captured `2021.1.14.8108` host routes for
+`ak.wwise.core.soundbank.generated` retain the legacy reference
+`soundBankInfoSwitchContainer` at
+`/publishSchema/properties/bankInfo/items/properties/IncludedEvents/items/SwitchContainers/items/properties/Children/items`.
+The matching `id` is attached to the `SwitchContainers` array, so resolving the
+captured reference requires each `Children` element to be an array, rather than
+directly the SwitchContainer object described by the surrounding source text.
+The original raw pointer is retained here; the runtime implicit-property
+projection inserts its normal `properties` wrapper without changing native IDs.
+
+The newly reachable business rows cover the first SwitchContainers and Media
+levels. Recursive Children descent is still missing business construction,
+separate from the required native evidence. It remains owned by #187. Do not
+invent a reference correction or call the missing recursive predicate a native
+limitation.
+
+The minimal future controlled probe uses an owned 2021 sandbox, one disposable
+SoundBank containing a nested SwitchContainer Event, two selected Switch/State
+levels and minimal media. #182's closed build/metadata configuration and the
+closed Switch-assignment workflow supply the actual fixture/trigger dependency.
+Subscribe through public `stream-topic` to `soundbank.generated` with bounded
+event count/duration and its disclosed metadata options, wait for `started`,
+then execute one separately previewed/authorized build. Compare the exact
+tracked bank/Event's `Children` elements: object, array, empty or omitted, and
+retain the reference-validation section/expected/actual type if the event is
+rejected. Inspect a complete small event diagnostic when available; larger
+packets require an explicit reviewed evidence-capture extension. Preserve
+unsubscribe, independent build artifact/business readback, source immutability
+and owned sandbox cleanup. No native build or event was run for this question.
+
 ## Remaining delivery obligations and dependencies
 
 - Real events and unsubscribe/resource cleanup remain required for object
