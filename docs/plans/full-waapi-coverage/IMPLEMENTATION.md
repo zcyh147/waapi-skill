@@ -314,7 +314,12 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   seconds remains a FAIL, independently of the repaired Tone fixture evidence.
   Worker #194's original synthetic-fixture failures remain preserved; its fixed
   four-module focus passed **742 tests with 6 native-Windows skips** in 371.31
-  seconds. Combined integration focus and broad gates are pending. No native,
+  seconds. Combined integration focus on clean `8a87aa3e` passed **1488 tests
+  with 5 intentional scalar-product capture skips** in 545.81 seconds, exit 0.
+  All 1801 tracked file hashes remained unchanged and the owned process group
+  was empty afterward. This focused run covers the merged public compatibility,
+  metadata, WAL, Tone, route matrix and derived-contract seams; full Program and
+  Non-live gates remain pending. No native,
   Authoring, Console or Fresh process was launched for this integration, no
   historical receipt is transferred, and no ticket completion is claimed.
 
