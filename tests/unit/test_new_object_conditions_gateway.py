@@ -537,3 +537,46 @@ def test_plugin_prerequisite_effect_is_not_inferred_from_creation_success(tmp_pa
     code, failed = gateway.execute_gateway(["verify", tx], env=env, client_factory=lambda _: client)
     assert code == 2 and failed["verified"] is False, failed
     assert sum(uri.endswith("object.set") for uri, _, _ in client.calls) == 1
+
+
+HIERARCHY_GROUP = "{66666666-6666-6666-6666-666666666666}"
+HIERARCHY_TARGET = "{77777777-7777-7777-7777-777777777777}"
+HIERARCHY_OTHER = "{88888888-8888-8888-8888-888888888888}"
+
+
+class ProspectiveReferenceTask(ClassTask):
+    """Same five-version rule as the sealed existing DefaultSwitch model."""
+    def __init__(self, path, version, *, state=False):
+        super().__init__(path, version, "SwitchContainer")
+        self.objects[FIRST]["path"] = r"\Actor-Mixer Hierarchy\Default Work Unit"
+        group_type, target_type = ("StateGroup", "State") if state else ("SwitchGroup", "Switch")
+        for identity, name in ((HIERARCHY_GROUP, "Surface"), (HIERARCHY_OTHER, "Weather")):
+            self.objects[identity] = {"id": identity, "name": name, "type": group_type,
+                "path": "\\Switches\\Default Work Unit\\" + name, "parent": {"id": FIRST}}
+        self.objects[HIERARCHY_TARGET] = {"id": HIERARCHY_TARGET, "name": "Concrete", "type": target_type,
+            "path": r"\Switches\Default Work Unit\Surface\Concrete", "parent": {"id": HIERARCHY_GROUP}}
+        self.metadata = {
+            "DefaultSwitchOrState": {"name": "DefaultSwitchOrState", "type": "", "default": None,
+                "restriction": {"type": "reference", "restrictions": [
+                    {"childOfReference": "SwitchGroupOrStateGroup"}, {"type": ["Switch", "State"]}]},
+                "dependencies": [{"type": "reference", "action": "Enable", "context": "Self",
+                    "property": "SwitchGroupOrStateGroup", "conditions": [{"referenceIsSet": True}]}]},
+            "SwitchGroupOrStateGroup": {"name": "SwitchGroupOrStateGroup", "type": "", "default": None,
+                "restriction": {"type": "reference", "restrictions": [{"type": ["SwitchGroup", "StateGroup"]}]}},
+        }
+
+    def declare_hierarchy(self, *, reverse=False):
+        target, group = self.bind(HIERARCHY_TARGET), self.bind(HIERARCHY_GROUP)
+        values = [("DefaultSwitchOrState", target), ("SwitchGroupOrStateGroup", group)]
+        if reverse:
+            values.reverse()
+        return self.declare(**dict(values))
+
+
+@pytest.mark.parametrize("version", VERSIONS)
+def test_new_reference_hierarchy_accepts_an_explicit_controlling_group(tmp_path, version):
+    task = ProspectiveReferenceTask(tmp_path, version)
+    task.declare_hierarchy()
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    assert not any(uri.endswith(("object.create", "object.set")) for uri, _, _ in task.calls)
