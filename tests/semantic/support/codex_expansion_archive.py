@@ -12,6 +12,7 @@ import hashlib
 import importlib
 import io
 import json
+import os
 import math
 import re
 import sys
@@ -255,6 +256,28 @@ def _validate_predispatch_rejection(record, rejection):
         and record.get("rejection") == rejection
         and record.get("stderr") == "Gateway broker rejected command: " + rejection + "\n",
         "rejected command lacks authenticated pre-dispatch proof")
+
+
+def _validate_initial_admission_rejection(record, *, argv, operation):
+    """Accept a new producer's closed admission decision, never infer it from prose.
+
+    The authenticated marker binds argv and the selected operation while the
+    policy has no Draft, transaction, or execution reservation. Its enclosing
+    receipt proves no runner dispatch; final replay also requires no stored
+    capabilities, only read prefixes, and unchanged reconciled project state.
+    Older unknown rejections have no marker and keep their original boundary.
+    """
+    expected = {"contract": "waapi-skill.gateway-admission-rejection/v1",
+        "stage": "initial_policy_admission", "policy_state": "unprepared",
+        "bound_operation": operation, "gateway_argv_sha256": canonical_digest(argv),
+        "runner_dispatched": False, "execution_reserved": False, "draft_id": None, "transaction_id": None}
+    marker = record.get("admission_rejection")
+    _require(isinstance(marker, dict) and canonical_digest(marker) == canonical_digest(expected),
+        "invalid initial admission rejection marker")
+    reason = record.get("rejection")
+    _require(isinstance(reason, str) and reason.startswith("expansion policy rejected command: ")
+        and len(reason) <= 4096, "initial policy rejection lacks its bounded reason")
+    _validate_predispatch_rejection(record, reason)
 
 
 def _validate_rejected_draft_bind(record, *, argv, gate, draft_id, authority, revision):
@@ -512,7 +535,11 @@ def _receipts(root: Path, plan: Mapping[str, Any], broker: Mapping[str, Any]) ->
         _require(list(resolved.gateway_arguments) == argv
             and list(resolved.normalized_model_argv) == record["normalized_model_argv"], "recorded Gateway argv differs from actual invocation")
         if record.get("accepted") is not True:
-            if argv[:1] == ["draft-bind-object"]:
+            if "admission_rejection" in record:
+                _validate_initial_admission_rejection(record, argv=argv, operation=expected_operation)
+                _require(draft_id is None and all(prior["gateway_arguments"][0] in _READS for prior in records[:index - 1]),
+                    "initial admission rejection follows a Draft or transaction")
+            elif argv[:1] == ["draft-bind-object"]:
                 gate.public_parser(argv)
                 _validate_rejected_draft_bind(record, argv=argv, gate=gate,
                     draft_id=draft_id, authority=authority, revision=revision)
@@ -849,6 +876,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
     _require(oracle.get("before") == plan["before"], "independent pre-state changed")
     rejected_read = any(record.get("accepted") is False for record in records)
     if rejected_read:
+        initial_admission = "admission_rejection" in records[-1]
         rejected_declaration = records[-1]["gateway_arguments"][:1] == ["draft-declare-core-plan"]
         rejected_check = records[-1]["gateway_arguments"][:1] == ["draft-check"]
         allowed_prefix = _READS | {"draft-start", "draft-bind-object"}
@@ -859,7 +887,7 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
         _require(result["passed"] is False and result.get("status") == "FAIL"
             and result.get("terminal_state") == "unprepared"
             and len(turns) == 1 and not turns[0].get("incomplete")
-            and (rejected_declaration or rejected_check or records[-1]["gateway_arguments"][0] in allowed_prefix)
+            and (initial_admission or rejected_declaration or rejected_check or records[-1]["gateway_arguments"][0] in allowed_prefix)
             and oracle.get("transaction_id") is None and oracle.get("artifact_hash") is None
             and oracle.get("authorization") is None and oracle.get("permit") is None
             and ((repair and case_id == "F2" and oracle.get("after") == plan["before"]
@@ -867,7 +895,16 @@ def _verify_task(root: Path, unit_id: str, version: str, inputs_sha256: str) -> 
                  or oracle.get("after") is None and result.get("assertions") == {})
             and broker.get("passed") is False and broker.get("complete") is False,
             "rejected read cannot carry a Preview, mutation or successful outcome")
-        if rejected_check:
+        if initial_admission:
+            _require(all(key in oracle and oracle[key] is None for key in
+                ("preview_before", "preview_after", "gateway_verification_state"))
+                and result.get("gateway_verification_state") is None,
+                "initial admission rejection claims later phase evidence")
+            _require(all(record["gateway_arguments"][0] in _READS for record in records[:-1])
+                and not os.path.lexists(root / "broker/state/operation-drafts-v1")
+                and not os.path.lexists(root / "broker/state/transactions"),
+                "initial admission rejection contains persisted Draft or transaction state")
+        elif rejected_check:
             _declared_import_rejected_check(root, plan, records)
             _require(all(key in oracle and oracle[key] is None for key in
                 ("transaction_id", "artifact_hash", "authorization", "permit", "after", "preview_before", "preview_after", "gateway_verification_state"))

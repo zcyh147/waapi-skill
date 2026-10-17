@@ -2253,6 +2253,7 @@ class GatewayBrokerRecord:
     started_at_unix_ns: int = 0
     finished_at_unix_ns: int = 0
     subscription_ack: Mapping[str, Any] | None = None
+    admission_rejection: Mapping[str, Any] | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -4025,6 +4026,8 @@ class GatewayBrokerEvidence:
         payload["passed"] = self.passed
         for record_payload, record in zip(payload["records"], self.records):
             record_payload["succeeded"] = record.succeeded
+            if record.admission_rejection is None:
+                record_payload.pop("admission_rejection")
         if not include_output:
             for record in payload["records"]:
                 record.pop("stdout", None)
@@ -10498,10 +10501,12 @@ class CodexGatewayBroker:
             with self._lock:
                 if self._terminal_state != _BROKER_RUNNING:
                     return self._reject_locked(resolved, f"broker is terminal {self._terminal_state}", authenticated=True)
+                admission_prepared = False
                 try:
                     step = self._expansion_outcome_policy.prepare(
                         resolved.gateway_arguments, state_directory=self.state_directory,
                     )
+                    admission_prepared = True
                     self._execution_steps.append(step)
                     self._selected_expected_steps.append(step)
                     self.expected_steps = (*self.expected_steps, step)
@@ -10510,7 +10515,18 @@ class CodexGatewayBroker:
                         self._expansion_read_step_names.add(step.name)
                     semantic_hash, execution_arguments = self._validate_step(step, resolved.gateway_arguments)
                 except Exception as exc:  # policy/parser/store errors fail before dispatch
-                    return self._reject_locked(resolved, f"expansion policy rejected command: {exc}", authenticated=True)
+                    from tests.semantic.support.codex_expansion_policy import ExpansionPolicyError
+                    policy = self._expansion_outcome_policy
+                    marker = None
+                    if (isinstance(exc, ExpansionPolicyError) and not admission_prepared and policy.transaction.state == "unprepared"
+                            and policy.draft_id is None and policy.transaction_id is None):
+                        marker = {"contract": "waapi-skill.gateway-admission-rejection/v1",
+                            "stage": "initial_policy_admission", "policy_state": "unprepared",
+                            "bound_operation": policy.operation, "gateway_argv_sha256": _argv_sha256(resolved.gateway_arguments),
+                            "runner_dispatched": False, "execution_reserved": False,
+                            "draft_id": None, "transaction_id": None}
+                    return self._reject_locked(resolved, f"expansion policy rejected command: {exc}",
+                        authenticated=True, admission_rejection=marker)
             return self._execute(step, resolved, semantic_hash,
                                  execution_arguments=execution_arguments, submitted_draft_actions=None)
 
@@ -15438,6 +15454,7 @@ class CodexGatewayBroker:
         authenticated: bool,
         response_exit: int = 126,
         payload_error: str = "",
+        admission_rejection: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         if authenticated:
             self._terminal_state = _BROKER_FAILED
@@ -15477,6 +15494,7 @@ class CodexGatewayBroker:
             started_at_unix_ns=now_ns,
             finished_at_unix_ns=now_ns,
             subscription_ack=None,
+            admission_rejection=admission_rejection,
         )
         self._append_record_locked(record)
         return {"exit_code": response_exit, "stdout": "", "stderr": response_stderr}

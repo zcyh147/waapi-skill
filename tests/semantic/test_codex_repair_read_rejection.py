@@ -10,14 +10,14 @@ from tests.semantic.support.codex_gateway_broker import CodexGatewayBroker
 from tests.semantic.support.codex_harness import completed_command_records, classify_task_commands, audit_session_events
 from tests.semantic.support.codex_expansion_cases import PreparedExpansionCase
 from tests.semantic.support.codex_expansion_policy import canonical_digest
-from tests.semantic.support.codex_repair_cases import F2_ASSERTIONS, verify_f2
+from tests.semantic.support.codex_repair_cases import F2_ASSERTIONS, F3_ASSERTIONS, verify_f2
 from tests.semantic.support.codex_expansion_archive import verify_expansion_task_archive, ExpansionArchiveError
 
 SKILL = Path(__file__).parents[2] / "skills/waapi-skill"
 INPUTS = "a" * 64
 
 
-def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only"):
+def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only", rejected_argv=None):
     held = {}
     def broker_factory(**kwargs):
         held["broker"] = CodexGatewayBroker(**kwargs)
@@ -40,8 +40,8 @@ def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only"):
                 item = {"id": f"read-{number}", "type": "command_execution", "command": shlex.join(["cat", str(path)]),
                     "status": "completed", "exit_code": 0, "aggregated_output": path.read_text()}
                 events.extend([{"type": "item.started", "item": {**item, "status": "in_progress"}}, {"type": "item.completed", "item": item}])
-            argv = [str(broker.invocation_runner_path), "gateway.py", "query-object", "--kind", "game-parameter",
-                    "--include", "range", "--include", "default", "--max-results", "100"]
+            argv = [str(broker.invocation_runner_path), "gateway.py", *(rejected_argv or ["query-object", "--kind", "game-parameter",
+                    "--include", "range", "--include", "default", "--max-results", "100"])]
             reply = broker._handle_request({"token": broker._token, "interpreter": "python", "argv": argv})
             assert reply["exit_code"] == 126
             item = {"id": "query", "type": "command_execution", "command": shlex.join(["python", *argv]),
@@ -51,7 +51,7 @@ def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only"):
             self.budget.finish_turn(101)
             commands = completed_command_records(events, platform_name="posix")
             facts = classify_task_commands(commands, workspace=self.config.workspace, skill_source=SKILL,
-                expected_gateway_subcommands=("query-object",), expected_wwise_version="2025.1")
+                expected_gateway_subcommands=("query-object", "draft-start"), expected_wwise_version="2025.1")
             result = SimpleNamespace(stdout="".join(json.dumps(event) + "\n" for event in events), stderr="", exit_status=0,
                 timed_out=False, thread_id=self.thread_id, final_response="I could not complete the read. No change was made.",
                 command_facts=facts, isolation_audit=SimpleNamespace(passed=True), prompt_audit=SimpleNamespace(passed=True, has_memory=False),
@@ -70,7 +70,7 @@ def produce_rejected_task(tmp_path, monkeypatch, *, policy="read_only"):
               "source_integrity": {"sha256": INPUTS, "mtime_ns": 1}, "media": {}}
     prepared = PreparedExpansionCase(prompt="Find the named parameter and report range and default.", policy=policy,
         operation="ak.wwise.core.object.get" if policy == "read_only" else "object.create", before=before, read_object_ids=frozenset({"{11111111-1111-1111-1111-111111111111}"}), relationship_sources=frozenset(),
-        read_includes=frozenset(), required_assertions=F2_ASSERTIONS, approve_preview=lambda _: False,
+        read_includes=frozenset(), required_assertions=F2_ASSERTIONS if policy == "read_only" else F3_ASSERTIONS, approve_preview=lambda _: False,
         snapshot=lambda: before, verify=lambda old, new: verify_f2(old, new, expected=expected, target_id=target),
         archive_oracle_parameters={"target_id": target, "expected": expected})
     options = SimpleNamespace(skill_source=SKILL, model="gpt-5.6-terra", reasoning_effort="medium", service_tier="default",
@@ -129,27 +129,30 @@ def test_real_rejected_task_isolates_only_with_truthful_archive_source_and_clean
     assert expansion_case_isolated(record) is (fault is None)
 
 
-def test_formal_matrix_continues_after_archived_ordinary_read_failure(tmp_path, monkeypatch):
+@pytest.mark.parametrize("failed_case", ["F2", "F3"])
+def test_formal_matrix_continues_after_archived_ordinary_admission_failure(tmp_path, monkeypatch, failed_case):
     from tests.semantic import run_codex_skill_matrix as matrix
     from tests.semantic.support.codex_expansion_runtime import ExpansionOutcome
     from tests.semantic.test_codex_repair_cli_wiring import options
-    selected = options(tmp_path, monkeypatch, "matrix", "--case-id", "REPAIR25-F2", "--case-id", "REPAIR25-F3", "--case-id", "REPAIR25-F4")
+    ids = ["REPAIR25-F2", "REPAIR25-F3", "REPAIR25-F4"] if failed_case == "F2" else ["REPAIR25-F3", "REPAIR25-F4"]
+    selected = options(tmp_path, monkeypatch, "matrix", *[part for value in ids for part in ("--case-id", value)])
     monkeypatch.setattr(matrix, "prepare_iteration_root", lambda path, **_: path.mkdir())
     called = []
     def execute(unit, *, scenario_root, options):
         called.append(unit.unit_id)
-        if unit.case_id != "F2":
+        if unit.case_id != failed_case:
             raise RuntimeError("fake executor ends after proving next workflow was reached")
         scenario_root.mkdir(parents=True)
-        task_root, outcome, _ = produce_rejected_task(scenario_root, monkeypatch)
+        kwargs = {} if failed_case == "F2" else {"policy": "allow_changes", "rejected_argv": ["draft-start", "ak.wwise.core.gameParameter.setRange"]}
+        task_root, outcome, _ = produce_rejected_task(scenario_root, monkeypatch, **kwargs)
         lifecycle = {"scenario_id": unit.unit_id, "version": unit.version, "source_hash_before": {"sha256": "source"},
             "source_hash_after": {"sha256": "source"}, "source_mtime_before_ns": 1, "source_mtime_after_ns": 1, "errors": []}
         return ExpansionOutcome(unit.unit_id, unit.version, "FAIL", "ordinary invalid query", str(scenario_root),
             str(task_root), outcome["thread_id"], {"trusted_oracle_closed": True}, lifecycle, INPUTS)
     assert matrix.run_heavy_v3_matrix(selected, unit_runner=execute, dependency_preflight=lambda: {"ok": True}) == 1
-    assert called[:2] == ["REPAIR25-F2", "REPAIR25-F3"]
+    assert called[:2] == ids[:2]
     summary = json.loads((selected.iteration_root / "summary.json").read_text())
-    assert summary["failed_unit_ids"] == ["REPAIR25-F2"]
+    assert summary["failed_unit_ids"] == [ids[0]]
     assert summary["all_selected_passed"] is False
 
 
