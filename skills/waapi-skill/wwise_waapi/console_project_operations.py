@@ -252,7 +252,7 @@ def inspect_created_project(plan: Mapping[str, Any]) -> dict[str, Any]:
     for field in ('platforms', 'languages'):
         if args.get(field) == []:
             unresolved.append(f'{field}_explicit_empty_native_semantics')
-    return {'kind': 'authoring-created-project-artifact' if plan['uri'] == AUTHORING_CREATE_URI else 'console-created-project-artifact', 'file_proof': proof,
+    return {'kind': 'authoring-created-project-artifact' if plan.get('uri') == AUTHORING_CREATE_URI else 'console-created-project-artifact', 'file_proof': proof,
         'project': {'id': project.get('ID'), 'name': project.get('Name')},
         'platforms': platforms, 'languages': languages, 'default_language': defaults[0].get('Value'),
         'platforms_match': platform_matches if expected_platforms else True,
