@@ -22,6 +22,9 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
+from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, validate_layout_call, validate_layout_live_binding
+
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
@@ -264,7 +267,7 @@ REPLAY_GUARD_OPERATIONS = frozenset(
         "ui.captureScreen",
     }
 )
-PACKAGED_TRANSACTION_READBACK_URIS = frozenset(
+PACKAGED_TRANSACTION_READBACK_URIS = (LAYOUT_READ_URIS - {'ak.wwise.ui.layout.getViewHandle'}) | frozenset(
     {
         OBJECT_GET_URI,
         OBJECT_GET_TYPES_URI,
@@ -1984,7 +1987,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection"),
+        ("args", "options", "io_root", "result_projection", "layout_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2019,6 +2022,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
                 "result_projection": {
                     "type": "object",
                     "description": (
@@ -2027,7 +2031,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -4118,7 +4122,7 @@ def _public_call_arguments(
 
         registry = ExecutionContractRegistry()
         contract = (registry.authoring_ui_describe(version, api)
-                    if requires_core_supplement(version, api) else registry.describe(version, api))
+                    if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS else registry.describe(version, api))
     except ExecutionContractError as exc:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",
@@ -4174,7 +4178,15 @@ def _public_call_arguments(
             "Packaged waapi.call does not accept custom command-line hooks.",
             details={"api": api, "fields": list(supplied_forbidden)},
         )
-    validation = validate_semantic_payload(api, raw_args, raw_options, version=version)
+    if api in LAYOUT_MUTATION_URIS:
+        try:
+            validate_layout_call(version, api, raw_args, raw_options, arguments.get('layout_binding'))
+        except ValueError as exc:
+            raise OperationContractError('INVALID_LAYOUT_BUSINESS_BINDING', str(exc)) from exc
+    elif 'layout_binding' in arguments:
+        raise OperationContractError('INVALID_ARGUMENT', 'Layout binding is reserved for closed Authoring layout operations')
+    validation = validate_semantic_payload(api, raw_args, raw_options, version=version,
+        authoring_ui_profile=api in LAYOUT_MUTATION_URIS)
     result_projection = arguments.get("result_projection")
     if result_projection is not None:
         if api != "ak.wwise.core.sourceControl.getSourceFiles":
@@ -8691,6 +8703,17 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 else None
             ),
         )
+        if api in LAYOUT_MUTATION_URIS:
+            try:
+                validate_layout_live_binding(arguments['layout_binding'], read=read)
+            except ValueError as exc:
+                raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+            current = read('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+            if not isinstance(current.get('name'), str):
+                raise OperationContractError('INVALID_READBACK', 'Current layout name was omitted; cannot prepare layout switching')
+            metadata['layout_original_current'] = dict(current)
+            verification = {'kind': 'authoring-layout-state', 'uri': api, 'version': request.version,
+                'expected_name': call_args['name']}
         cleanup = build_transaction_cleanup_spec(
             api,
             call_args,
@@ -13412,6 +13435,20 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
         if not isinstance(version, str) or not isinstance(arguments, Mapping):
             raise OperationContractError("INVALID_PREVIEW", "waapi.call preview lacks versioned arguments.")
         api, call_args, call_options, execution_contract = _public_call_arguments(version, arguments)
+        if api in LAYOUT_MUTATION_URIS:
+            def layout_guard_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({'uri': uri, 'args': dict(args), 'options': dict(options), 'result': dict(result)})
+                return result
+            try:
+                validate_layout_live_binding(arguments['layout_binding'], read=layout_guard_read)
+                current = layout_guard_read('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+                validate_layout_read_result('current', current)
+                pre_state = prepared.get('pre_state')
+                if not isinstance(pre_state, Mapping) or current != pre_state.get('layout_original_current'):
+                    raise ValueError('Current layout changed since preview; inspect and preview again')
+            except ValueError as exc:
+                raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
         actual = {
             "uri": dispatch_payload.get("uri"),
@@ -13508,7 +13545,7 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
             "ok": passed,
             "status": "valid" if passed else "repreview_required",
             "assertions": [_json_mapping(item) for item in assertions],
-            "readbacks": [],
+            "readbacks": [_json_mapping(item) for item in readbacks] if api in LAYOUT_MUTATION_URIS else [],
         }
     if operation in UI_COMMAND_OPERATIONS:
         request_payload = prepared.get("request")
@@ -15671,6 +15708,21 @@ def verify_prepared_operation(
                 True,
                 validation.as_dict(),
             )
+    elif kind == "authoring-layout-state":
+        uri, version = plan.get('uri'), plan.get('version')
+        if uri not in LAYOUT_MUTATION_URIS or not isinstance(version, str):
+            raise OperationContractError('INVALID_PREVIEW', 'Layout verifier lacks its exact versioned operation')
+        try:
+            validation = validate_semantic_result(uri, execution_result.get('result'), version=version, authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Layout mutation returned its exact result contract', False, exc.as_dict())
+        else:
+            check('Layout mutation returned its exact result contract', True, validation.as_dict())
+        current = read_call('ak.wwise.ui.layout.getCurrentLayoutName', {}, {})
+        validate_layout_read_result('current', current)
+        readbacks.append({'uri': 'ak.wwise.ui.layout.getCurrentLayoutName', 'args': {}, 'options': {}, 'result': current})
+        check('Current layout matches the requested business layout', current.get('name') == plan.get('expected_name'),
+            {'expected': plan.get('expected_name'), 'actual': current.get('name')})
     elif kind == "project-setting-state":
         uri = plan.get("uri")
         version = plan.get("version")

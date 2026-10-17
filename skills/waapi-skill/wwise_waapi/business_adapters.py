@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
 from .audio_import_business_contracts import audio_import_business_contract_data
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, layout_business_contract_data, materialize_layout_business_request
 from .authoring_ui_business_contracts import authoring_ui_business_contract_data
 from .exact_artifact_business_contracts import (
     exact_artifact_business_contract_data,
@@ -992,7 +993,17 @@ def _bind_adapter(operation: str, definition: Mapping[str, Any]) -> BusinessAdap
     return BusinessAdapter(operation=operation, **values)
 
 
+_LAYOUT_BUSINESS_DEFINITION = {
+    "family": "authoring-layout-business", "contract_builder": layout_business_contract_data,
+    "materializer": materialize_layout_business_request,
+    "update_commands": frozenset({"draft-declare-layout-plan"}),
+    "initial_projection_actions": ("declare-layout-plan", "inspect", "cancel"),
+    "active_projection_actions": ("declare-layout-plan", "check", "inspect", "cancel"),
+    "auto_apply_preview": True, "settings_are_complete_declaration": True,
+}
+
 _BUSINESS_ADAPTERS = {
+    **{operation: _bind_adapter(operation, _LAYOUT_BUSINESS_DEFINITION) for operation in LAYOUT_MUTATION_URIS},
     **{
         operation: _bind_adapter(operation, _HOST_UI_DEBUG_DEFINITION)
         for operation in HOST_UI_DEBUG_DRAFT_OPERATIONS
