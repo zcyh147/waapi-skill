@@ -220,12 +220,12 @@ Repeat with the same arguments plus `--check` to verify the saved result. A
 finished ticket can still produce exit 2 because other product obligations
 remain open. Use controlled scope only for checker tests, never to rename a
 partial product result complete. The committed inventory currently has 272,313
-obligations: 270,267 unresolved, 1,930 missing implementation and 116 exact
+obligations: 270,323 unresolved, 1,874 missing implementation and 116 exact
 approved exclusions. These are accounting rows, not distinct API or bug counts.
 
 The integrated #177/#181/#188 partials retain every original native obligation
-identity, shape and owner. The public source partition now contains 869 exact
-version/function/Topic rows; the 20 new 2024.1/2025.1 layout read and mutation rows
+identity, shape and owner. The public source partition now contains 872 exact
+version/function/Topic rows; the 23 new 2024.1/2025.1 layout read and mutation rows
 remain explicitly assigned to #188 as migration required in the interface-depth
 policy. Existing completed family seals remain unchanged. Public route presence
 reduces missing-route accounting only; no branch bindings, evidence requirements,
@@ -237,3 +237,9 @@ unresolved. A separately captured exact condition product receipt may establish
 program behavior for its own candidate only. Its native requirement remains
 missing, and it does not change this default product ledger or certify another
 candidate's branch evidence.
+
+The third integration adds scoped get-or-create-view on 2024.1/2025.1 and close
+on 2025.1 only, and moves existing Media Pool getFields to a bounded fixed
+metadata command. The native denominator and exact ownership stay unchanged;
+56 newly linked obligations move from missing implementation to unresolved.
+No separate product evidence is recaptured or inherited for this successor.
