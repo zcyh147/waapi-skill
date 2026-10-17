@@ -967,6 +967,10 @@ _OBJECT_SET_NODE_ARGUMENT_SCHEMA: Mapping[str, Any] = {
                 "depth 8 and 128 total nodes."
             ),
         },
+        "lists": {
+            "type": "array", "maxItems": 32,
+            "description": "Recursive owned lists of the same closed node DSL; list mode inherits from the existing target row.",
+        },
     },
 }
 _OBJECT_LIST_NAME_SCHEMA: Mapping[str, Any] = {
@@ -4654,6 +4658,7 @@ def _prepare_object_create(
     path_snapshots: list[dict[str, Any]] = []
     list_snapshots: list[dict[str, Any]] = []
     merge_field_snapshots: list[dict[str, Any]] = []
+    merge_children_snapshots: list[dict[str, Any]] = []
     replace_subtree_snapshots: list[dict[str, Any]] = []
     list_before: list[dict[str, Any]] = []
     if list_name is not None:
@@ -4707,12 +4712,6 @@ def _prepare_object_create(
                     },
                 )
             node_specs[0]["preexisting_id"] = collisions[0].get("id")
-            if normalized.root.children:
-                raise OperationContractError(
-                    "LIST_MERGE_CHILDREN_UNSUPPORTED",
-                    "A pre-existing object.create list member with requested descendants requires a dedicated list operation.",
-                    details={"list": list_name, "name": normalized.root.name},
-                )
             merge_fields = _object_spec_return_fields(node_specs[0])
             merge_options: dict[str, Any] = {"return": merge_fields}
             if platform is not None:
@@ -4737,6 +4736,33 @@ def _prepare_object_create(
                     "rows": merge_rows,
                 }
             )
+            node_specs[0]["pre_state"] = merge_rows[0]
+            spec_by_path = {str(spec["request_path"]): spec for spec in node_specs}
+            for spec in node_specs:
+                if spec is not node_specs[0]:
+                    parent_spec = spec_by_path[str(spec["parent_request_path"])]
+                    candidates = [row for row in parent_spec.get("preexisting_children", [])
+                                  if str(row.get("name", "")).casefold() == str(spec["requested_name"]).casefold()]
+                    if len(candidates) > 1:
+                        raise OperationContractError("AMBIGUOUS_IDENTITY", "A merged list descendant name is not unique.")
+                    if candidates:
+                        if not _object_type_matches(candidates[0].get("type"), spec):
+                            raise OperationContractError("INVALID_TARGET_TYPE", "A merged list descendant has another live type.")
+                        spec["preexisting_id"] = candidates[0]["id"]
+                        spec["pre_state"] = candidates[0]
+                        spec["requested_name"] = candidates[0]["name"]
+                if spec.get("preexisting_id") is not None:
+                    children_before = _read_direct_children(spec["preexisting_id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                    spec["preexisting_children"] = children_before
+                    merge_children_snapshots.append({"object_id": spec["preexisting_id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": children_before})
+                    if spec is not node_specs[0]:
+                        fields = _object_spec_return_fields(spec)
+                        options = {"return": fields, **({"platform": platform} if platform else {})}
+                        observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [spec["preexisting_id"]]}}, options))
+                        if len(observed) != 1 or not _same_identity(observed[0].get("id"), spec["preexisting_id"]):
+                            raise OperationContractError("INVALID_READBACK", "Merged list descendant lost its exact identity.")
+                        spec["pre_state"] = observed[0]
+                        merge_field_snapshots.append({"object_id": spec["preexisting_id"], "fields": fields, "platform": platform, "rows": observed})
         if conflict == "rename":
             node_specs[0]["rename_collision_rows"] = collisions
     elif conflict == "fail":
@@ -4921,7 +4947,7 @@ def _prepare_object_create(
             ]
             if list_name is None
             else []
-        ),
+        ) + merge_children_snapshots,
         "list_snapshots": list_snapshots,
         "field_snapshots": merge_field_snapshots,
         "subtree_snapshots": replace_subtree_snapshots,
@@ -5822,7 +5848,7 @@ def _prepare_object_set(
                 child_spec_by_path[node.request_path]["import"] = import_spec
         for child_spec in child_specs:
             child_spec.setdefault("platform", platform)
-            child_spec["collection"] = "children"
+            child_spec.setdefault("collection", "children")
             child_spec["on_name_conflict"] = row_conflict
         if children.roots:
             trusted["children"] = [
@@ -5887,6 +5913,17 @@ def _prepare_object_set(
                 if child_spec["parent_request_path"] is None
                 else child_spec["parent_request_path"]
             )
+            if child_spec.get("collection") != "children":
+                continue
+            parent_spec = child_spec_by_path.get(str(child_spec.get("parent_request_path")))
+            list_ancestor = False
+            while parent_spec is not None:
+                if parent_spec.get("collection") != "children":
+                    list_ancestor = True
+                    break
+                parent_spec = child_spec_by_path.get(str(parent_spec.get("parent_request_path")))
+            if list_ancestor:
+                continue
             expected_path = (
                 _request_node_expected_path(
                     future_target_path,
@@ -5935,6 +5972,8 @@ def _prepare_object_set(
                 child_spec["expected_path"] = expected_path
                 if rows:
                     child_spec["preexisting_id"] = rows[0].get("id")
+                    child_spec["existing_path"] = rows[0].get("path")
+                    child_spec["pre_state"] = rows[0]
                     preexisting_children = _read_direct_children(
                         rows[0].get("id"),
                         fields=IDENTITY_RETURN_FIELDS,
@@ -6070,7 +6109,7 @@ def _prepare_object_set(
                 is_root = list_spec.get("request_path") in root_paths
                 list_spec["target_index"] = index
                 list_spec.setdefault("platform", platform)
-                list_spec["collection"] = descriptor.name if is_root else "children"
+                list_spec["collection"] = descriptor.name if is_root else list_spec.get("collection", "children")
                 list_spec["list_owner_id"] = target.object
                 list_spec["list_name"] = descriptor.name
                 list_spec["list_mode"] = row_list_mode
@@ -6120,21 +6159,10 @@ def _prepare_object_set(
                                 "actual": collisions[0].get("type"),
                             },
                         )
-                    direct_requested_children = [
-                        spec
-                        for spec in prepared_specs
-                        if spec.get("parent_request_path") == root_spec.get("request_path")
-                    ]
-                    if direct_requested_children:
-                        raise OperationContractError(
-                            "LIST_MERGE_CHILDREN_UNSUPPORTED",
-                            "A pre-existing object-list member with requested descendants requires a dedicated list operation.",
-                            details={
-                                "list": descriptor.name,
-                                "name": requested_name,
-                            },
-                        )
                     root_spec["preexisting_id"] = collisions[0].get("id")
+                    root_spec["existing_path"] = collisions[0].get("path")
+                    root_spec["preexisting_children"] = _read_direct_children(collisions[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                    children_snapshots.append({"object_id": collisions[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": root_spec["preexisting_children"]})
                     existing_fields = _object_spec_return_fields(root_spec)
                     snapshot_platform = root_spec.get("platform")
                     snapshot_language = _localized_import_read_language(
@@ -6168,6 +6196,7 @@ def _prepare_object_set(
                             "rows": existing_rows,
                         }
                     )
+                    root_spec["pre_state"] = existing_rows[0]
             trusted[f"@{descriptor.name}"] = [
                 _materialize_canonical_object_node(
                     root,
@@ -6179,6 +6208,79 @@ def _prepare_object_set(
                 for root in descriptor.objects
             ]
             list_specs.extend(prepared_specs)
+
+        nested_nodes = [*children.nodes, *(node for descriptor in lists for node in descriptor.nodes)]
+        nested_specs = {str(spec["request_path"]): spec for spec in [*child_specs, *list_specs]}
+        for node in nested_nodes:
+            owner_spec = nested_specs[node.request_path]
+            parent_spec = nested_specs.get(str(owner_spec.get("parent_request_path")))
+            if (node.collection == "children" and parent_spec is not None
+                    and "expected_path" not in owner_spec and parent_spec.get("existing_path")
+                    and row_conflict in {"fail", "merge"}):
+                expected_path = _child_path(parent_spec["existing_path"], node.name, field="nested-parent.path")
+                fields = _object_spec_return_fields(owner_spec)
+                existing_rows = _read_object_path_rows(expected_path, fields=fields, read=read, platform=owner_spec.get("platform"))
+                if len(existing_rows) > 1:
+                    raise OperationContractError("AMBIGUOUS_IDENTITY", "A nested descendant resolves more than once.")
+                if existing_rows and row_conflict == "fail":
+                    raise OperationContractError("TARGET_EXISTS", "The requested nested descendant already exists.")
+                path_snapshots.append({"path": expected_path, "fields": fields, "platform": owner_spec.get("platform"), "rows": existing_rows})
+                owner_spec["expected_path"] = expected_path
+                if existing_rows:
+                    if not _object_type_matches(existing_rows[0].get("type"), owner_spec):
+                        raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested descendant has another type.")
+                    owner_spec["preexisting_id"] = existing_rows[0]["id"]
+                    owner_spec["existing_path"] = existing_rows[0]["path"]
+                    owner_spec["pre_state"] = existing_rows[0]
+                    owner_spec["preexisting_children"] = _read_direct_children(existing_rows[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                    children_snapshots.append({"object_id": existing_rows[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": owner_spec["preexisting_children"]})
+            for descriptor in node.lists:
+                if descriptor.name.casefold() in OBJECT_DEDICATED_LIST_NAMES:
+                    raise OperationContractError("DEDICATED_OPERATION_REQUIRED", "Specialized plug-in and RTPC lists use their dedicated operation.", details={"list": descriptor.name})
+                if not descriptor.objects and row_list_mode != "replaceAll":
+                    raise OperationContractError("NO_OP", "An empty nested object list requires replace-all.")
+                before_rows: list[dict[str, Any]] = []
+                owner_id = owner_spec.get("preexisting_id")
+                if owner_id is not None:
+                    before_rows = _normalize_object_list_snapshot(
+                        _read_object_list(owner_id, descriptor.name, fields=OBJECT_LIST_SNAPSHOT_FIELDS, read=read,
+                                          platform=owner_spec.get("platform")), owner_id=owner_id, list_name=descriptor.name,
+                    )
+                snapshot = {"object_id": owner_id, "list": descriptor.name, "fields": list(OBJECT_LIST_SNAPSHOT_FIELDS),
+                            "platform": owner_spec.get("platform"), "rows": before_rows}
+                owner_spec.setdefault("list_snapshots", []).append(snapshot)
+                owner_spec["list_mode"] = row_list_mode
+                if owner_id is not None:
+                    list_snapshots.append(snapshot)
+                    if row_list_mode == "replaceAll":
+                        removed = _capture_object_list_replace_subtrees(before_rows, read=read)
+                        for subtree in removed:
+                            subtree.update({"object_id": owner_id, "list": descriptor.name})
+                        list_subtree_snapshots.extend(removed)
+                for member in descriptor.objects:
+                    spec = nested_specs[member.request_path]
+                    spec.update({"collection": descriptor.name, "list_name": descriptor.name,
+                                 "list_mode": row_list_mode, "on_name_conflict": row_conflict})
+                    collisions = [row for row in before_rows if str(row.get("name", "")).casefold() == member.name.casefold()]
+                    if len(collisions) > 1:
+                        raise OperationContractError("AMBIGUOUS_IDENTITY", "A nested list member name resolves more than once.")
+                    if collisions and row_list_mode == "append":
+                        if row_conflict == "fail":
+                            raise OperationContractError("TARGET_EXISTS", "The nested list member already exists.")
+                        if row_conflict == "merge":
+                            if not _object_type_matches(collisions[0].get("type"), spec):
+                                raise OperationContractError("INVALID_TARGET_TYPE", "The merged nested list member has another type.")
+                            spec["preexisting_id"] = collisions[0]["id"]
+                            spec["existing_path"] = collisions[0].get("path")
+                            fields = _object_spec_return_fields(spec)
+                            options = {"return": fields, **({"platform": spec["platform"]} if spec.get("platform") else {})}
+                            observed = _rows(read(OBJECT_GET_URI, {"from": {"id": [collisions[0]["id"]]}}, options))
+                            if len(observed) != 1 or not _same_identity(observed[0].get("id"), collisions[0]["id"]):
+                                raise OperationContractError("INVALID_READBACK", "Merged nested member lost its exact identity.")
+                            field_snapshots.append({"object_id": collisions[0]["id"], "fields": fields, "platform": spec.get("platform"), "rows": observed})
+                            spec["pre_state"] = observed[0]
+                            spec["preexisting_children"] = _read_direct_children(collisions[0]["id"], fields=IDENTITY_RETURN_FIELDS, read=read)
+                            children_snapshots.append({"object_id": collisions[0]["id"], "fields": list(IDENTITY_RETURN_FIELDS), "rows": spec["preexisting_children"]})
 
         snapshot_fields = _dedupe_fields(
             [
@@ -6352,6 +6454,7 @@ def _prepare_object_set(
                 for row in node_specs
                 if isinstance(row.get("list_name"), str)
             }
+            | {snapshot["list"] for row in node_specs for snapshot in row.get("list_snapshots", [])}
         ),
         "replaced_list_subtree_rows": [
             dict(row)
@@ -6960,6 +7063,7 @@ def _prepare_object_node_specs(
             "requested_notes": node.notes,
             "properties": [],
             "references": [],
+            "collection": node.collection,
         }
         if node.language is not None:
             if _object_type_token(type_info.name) != "sound":
@@ -7986,6 +8090,11 @@ def _materialize_canonical_object_node(
             for item in flatten_request_nodes((node,))
             if item.import_arg is not None
         }
+        subtree_reference_paths = {
+            reference.request_path
+            for item in flatten_request_nodes((node,))
+            for reference in item.references
+        }
         import_bindings = {
             path: dict(value)
             for path, value in dict(materialized_imports or {}).items()
@@ -7993,7 +8102,7 @@ def _materialize_canonical_object_node(
         }
         payload = materialize_waapi_node(
             node,
-            resolved_references=resolved_references,
+            resolved_references={path: value for path, value in resolved_references.items() if path in subtree_reference_paths},
             materialized_imports=import_bindings,
         )
     except ObjectOperationContractError as exc:
@@ -8026,6 +8135,9 @@ def _materialize_canonical_object_node(
             row[key] = value
         for child, child_row in zip(current.children, row.get("children", []), strict=True):
             apply(child, child_row)
+        for descriptor in current.lists:
+            for child, child_row in zip(descriptor.objects, row.get("@" + descriptor.name, []), strict=True):
+                apply(child, child_row)
 
     apply(node, payload)
     return payload
@@ -17455,7 +17567,7 @@ def verify_prepared_operation(
                     row.get("notes") == spec.get("requested_notes"),
                     {"expected": spec.get("requested_notes"), "actual": row.get("notes")},
                 )
-            elif spec.get("existing_target") is True and isinstance(spec.get("pre_state"), Mapping):
+            elif (spec.get("existing_target") is True or spec.get("preexisting_id") is not None) and isinstance(spec.get("pre_state"), Mapping):
                 check(
                     f"{request_path} untouched notes remain unchanged",
                     row.get("notes") == spec["pre_state"].get("notes"),
@@ -18064,7 +18176,7 @@ def verify_prepared_operation(
                         unchanged,
                         {"expected": expected_collision, "actual": collided_rows},
                     )
-        if kind == "object-set-batch":
+        if kind == "object-set-batch" or (kind == "object-create-graph" and plan.get("on_name_conflict") == "merge" and plan.get("list") is not None):
             direct_specs_by_parent: dict[str, list[Mapping[str, Any]]] = {}
             for child_spec in specs:
                 if child_spec.get("collection") not in {None, "children"}:
@@ -18133,6 +18245,19 @@ def verify_prepared_operation(
                         "rows": actual_children,
                     },
                 )
+                requested_ids = {_identity_key(value) for value in resolved_id_by_path.values() if _valid_object_id(value)}
+                for before_child in parent_spec.get("preexisting_children", []):
+                    if not isinstance(before_child, Mapping) or _identity_key(before_child.get("id")) in requested_ids:
+                        continue
+                    matches = [row for row in actual_children if _same_identity(row.get("id"), before_child.get("id"))]
+                    unchanged = len(matches) == 1 and all(
+                        (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_child.get(field)))
+                         if field in {"id", "parent"} and before_child.get(field) is not None
+                         else matches[0].get(field) == before_child.get(field))
+                        for field in ("id", "name", "type", "parent", "notes") if field in before_child
+                    )
+                    check(f"{parent_path} unrequested pre-existing child identity and notes remain unchanged", unchanged,
+                          {"before": dict(before_child), "after": matches})
         list_roots_by_owner: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
         for list_spec in specs:
             collection = list_spec.get("collection")
@@ -18151,7 +18276,7 @@ def verify_prepared_operation(
                 ).append(list_spec)
         if kind == "object-set-batch":
             for owner_spec in specs:
-                if owner_spec.get("existing_target") is not True:
+                if not owner_spec.get("list_snapshots"):
                     continue
                 owner_path = owner_spec.get("request_path")
                 snapshots = owner_spec.get("list_snapshots", [])
@@ -18262,6 +18387,21 @@ def verify_prepared_operation(
                     "rows": actual_rows,
                 },
             )
+            if list_mode == "append":
+                requested_ids = {_identity_key(resolved_id_by_path[str(spec["request_path"])])
+                                 for spec in list_root_specs if str(spec["request_path"]) in resolved_id_by_path}
+                for before_member in before_rows:
+                    if _identity_key(before_member["id"]) in requested_ids:
+                        continue
+                    matches = [row for row in actual_rows if _same_identity(row.get("id"), before_member["id"])]
+                    unchanged = len(matches) == 1 and all(
+                        (_same_identity(_parent_value(matches[0].get(field)), _parent_value(before_member.get(field)))
+                         if field in {"id", "parent", "owner"} and before_member.get(field) is not None
+                         else matches[0].get(field) == before_member.get(field))
+                        for field in ("id", "name", "type", "parent", "owner", "notes") if field in before_member
+                    )
+                    check(f"{owner_path}.@{list_name} unrequested member identity and notes remain unchanged", unchanged,
+                          {"before": dict(before_member), "after": matches})
         if kind == "object-set-batch":
             replaced_rows = plan.get("replaced_list_subtree_rows", [])
             if not isinstance(replaced_rows, list):
@@ -21151,7 +21291,8 @@ def _validate_nested_request_shape(
                     allow_language=True,
                     allow_import=version in OBJECT_SET_IMPORT_VERSIONS,
                 )
-                saw_list_assignment = saw_list_assignment or bool(lists)
+                nested_lists = [descriptor for node in [*forest.nodes, *(node for descriptor in lists for node in descriptor.nodes)] for descriptor in node.lists]
+                saw_list_assignment = saw_list_assignment or bool(lists) or bool(nested_lists)
                 list_nodes = sum(len(descriptor.nodes) for descriptor in lists)
                 total_nodes += list_nodes
                 if row_list_mode == "append" and any(
@@ -21163,7 +21304,7 @@ def _validate_nested_request_shape(
                     )
                 if (
                     item.get("list_mode") == "replaceAll"
-                    and not lists
+                    and not lists and not nested_lists
                 ):
                     raise OperationContractError(
                         "NO_OP",

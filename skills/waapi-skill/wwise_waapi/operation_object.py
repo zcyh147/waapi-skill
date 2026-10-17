@@ -42,7 +42,7 @@ DEFAULT_MAX_RTPC_POINTS = 256
 DEFAULT_MAX_IMPORT_FILES = 16
 
 NODE_FIELDS = frozenset({"type", "name", "notes", "properties", "references", "children"})
-OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import"}
+OBJECT_SET_NODE_FIELDS = NODE_FIELDS | {"platform", "language", "import", "lists"}
 LIST_FIELDS = frozenset({"name", "objects"})
 PROPERTY_FIELDS = frozenset({"name", "value"})
 REFERENCE_FIELDS = frozenset({"name", "target"})
@@ -306,6 +306,8 @@ class ObjectNodeDescriptor:
     properties: tuple[ObjectPropertyDescriptor, ...]
     references: tuple[ObjectReferenceDescriptor, ...]
     children: tuple[ObjectNodeDescriptor, ...]
+    lists: tuple[ObjectListDescriptor, ...] = ()
+    collection: str = "children"
 
     def as_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {"type": self.type, "name": self.name}
@@ -323,6 +325,8 @@ class ObjectNodeDescriptor:
             result["references"] = [item.as_dict() for item in self.references]
         if self.children:
             result["children"] = [item.as_dict() for item in self.children]
+        if self.lists:
+            result["lists"] = [item.as_dict() for item in self.lists]
         return result
 
 
@@ -928,6 +932,9 @@ def flatten_request_nodes(roots: Sequence[ObjectNodeDescriptor]) -> tuple[Object
         result.append(node)
         for child in node.children:
             visit(child)
+        for descriptor in node.lists:
+            for child in descriptor.objects:
+                visit(child)
 
     for root in roots:
         visit(root)
@@ -1010,6 +1017,8 @@ def materialize_waapi_node(
             result[f"@{reference.name}"] = target
         if current.children:
             result["children"] = [build(child) for child in current.children]
+        for descriptor in current.lists:
+            result["@" + descriptor.name] = [build(child) for child in descriptor.objects]
         return result
 
     return build(node)
@@ -1127,6 +1136,7 @@ def flatten_set_result(
                     max_nodes=limit,
                     counter=counter,
                     collection="children",
+                    allowed_lists=normalized_lists,
                 )
             )
         for list_name, rows in list_rows.items():
@@ -1139,6 +1149,7 @@ def flatten_set_result(
                         max_nodes=limit,
                         counter=counter,
                         collection=list_name,
+                        allowed_lists=normalized_lists,
                     )
                 )
     return tuple(result)
@@ -1212,6 +1223,7 @@ class _NormalizationState:
         request_path: str,
         parent_path: str | None,
         depth: int,
+        collection: str = "children",
     ) -> ObjectNodeDescriptor:
         if depth > self.limits.max_depth:
             raise ObjectOperationContractError(
@@ -1351,6 +1363,20 @@ class _NormalizationState:
             for index, child in enumerate(raw_children)
         )
         _reject_duplicate_sibling_names(children, path=f"{request_path}.children")
+        lists: list[ObjectListDescriptor] = []
+        for index, raw_list in enumerate(_descriptor_rows(
+            mapping.get("lists", []), request_path=f"{request_path}.lists", limit=self.limits.max_children_per_node,
+        )):
+            list_path = f"{request_path}.lists[{index}]"
+            _exact_fields(raw_list, required=LIST_FIELDS, optional=frozenset(), path=list_path)
+            list_name = normalize_object_list_name(raw_list.get("name"), request_path=f"{list_path}.name", limits=self.limits)
+            if list_name.casefold() in field_names or list_name.casefold() in {item.name.casefold() for item in lists}:
+                raise ObjectOperationContractError("DUPLICATE_FIELD", "A nested list must not collide with another list, property or reference.")
+            members = _descriptor_rows(raw_list.get("objects"), request_path=f"{list_path}.objects", limit=self.limits.max_children_per_node)
+            objects = tuple(self.node(member, request_path=f"{list_path}.objects[{member_index}]", parent_path=request_path,
+                                      depth=depth + 1, collection=list_name) for member_index, member in enumerate(members))
+            _reject_duplicate_sibling_names(objects, path=f"{list_path}.objects")
+            lists.append(ObjectListDescriptor(list_path, list_name, objects, flatten_request_nodes(objects)))
         return ObjectNodeDescriptor(
             request_path=request_path,
             parent_request_path=parent_path,
@@ -1363,6 +1389,8 @@ class _NormalizationState:
             properties=properties,
             references=references,
             children=children,
+            lists=tuple(lists),
+            collection=collection,
         )
 
 
@@ -1640,6 +1668,7 @@ def _flatten_result_node(
     max_nodes: int,
     counter: list[int],
     collection: str = "children",
+    allowed_lists: Sequence[str] = (),
 ) -> list[ObjectResultNode]:
     counter[0] += 1
     if counter[0] > max_nodes:
@@ -1650,7 +1679,7 @@ def _flatten_result_node(
         )
     mapping = _mapping(payload, path=request_path)
     dynamic_fields = sorted(key for key in mapping if key.startswith("@"))
-    if dynamic_fields:
+    if any(key[1:] not in allowed_lists for key in dynamic_fields):
         raise ObjectOperationContractError(
             "INVALID_RESULT_SHAPE",
             "Nested object results contain an unreviewed object-list association.",
@@ -1661,13 +1690,17 @@ def _flatten_result_node(
         mapping.get("children", []),
         request_path=f"{request_path}.children",
     )
+    list_rows = {
+        key: _result_collection_rows(mapping[key], request_path=f"{request_path}.{key}", allow_single=True)
+        for key in dynamic_fields
+    }
     result = [
         ObjectResultNode(
             request_path,
             parent_path,
             object_id,
             name,
-            len(children),
+            len(children) + sum(len(rows) for rows in list_rows.values()),
             collection,
         )
     ]
@@ -1680,8 +1713,13 @@ def _flatten_result_node(
                 max_nodes=max_nodes,
                 counter=counter,
                 collection="children",
+                allowed_lists=allowed_lists,
             )
         )
+    for key, rows in list_rows.items():
+        for index, child in enumerate(rows):
+            result.extend(_flatten_result_node(child, request_path=f"{request_path}.{key}[{index}]", parent_path=request_path,
+                                              max_nodes=max_nodes, counter=counter, collection=key[1:], allowed_lists=allowed_lists))
     return result
 
 

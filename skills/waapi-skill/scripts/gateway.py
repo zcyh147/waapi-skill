@@ -17117,15 +17117,15 @@ def dispatch_offline_business_draft_update(
                 )
             else:
                 row = matches[0]
-                if (
-                    not isinstance(row.target, ExistingObjectTarget)
-                    or row.target.object_handle != args.object_handle
-                ):
+                exact_owner = (
+                    row.target.object_handle if isinstance(row.target, ExistingObjectTarget) else row.result_handle
+                )
+                if exact_owner != args.object_handle:
                     raise business_repair(
                         "DECLARATION_TARGET_MISMATCH",
                         field="object_handle",
                         draft_revision=current.revision,
-                        action="reuse this declaration id only for its exact bound owner",
+                        action="reuse this declaration id only for its exact bound or planned owner",
                     )
                 fields = dict(row.fields)
                 raw_names = fields.get("clear_object_lists", [])

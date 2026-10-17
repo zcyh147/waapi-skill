@@ -54,6 +54,7 @@ _CREATE_SETTINGS = frozenset(
 )
 _SET_NODE_EXTENSION_FIELDS = frozenset(
     {
+        "clear_object_lists",
         "language",
         "list_behavior",
         "media_files",
@@ -388,7 +389,25 @@ def _compile_set_new_node(
             choices=["append", "replace-all"],
             action="choose one disclosed per-target object-list outcome",
         )
-    if list_behavior is not None and object_list is None:
+    clears = extension_fields.get("clear_object_lists")
+    if clears is not None:
+        if not isinstance(clears, list) or not 1 <= len(clears) <= DEFAULT_MAX_CHILDREN_PER_NODE:
+            raise _repair(session, "OBJECT_SET_LIST_CLEAR_LIMIT_INVALID", field="clear_object_lists",
+                          action="name a bounded nonempty set of owned lists to clear")
+        if list_behavior != "replace-all":
+            raise _repair(session, "OBJECT_SET_EMPTY_LIST_REQUIRES_REPLACE", field="list_behavior",
+                          action="choose replace-all before clearing an owned list")
+        names = []
+        for name in clears:
+            try:
+                names.append(normalize_object_list_name(name, request_path="$.business.clear_object_lists"))
+            except Exception as exc:
+                raise _repair(session, "OBJECT_SET_LIST_NAME_INVALID", field="clear_object_lists",
+                              action="provide exact owned-list names without an @ prefix") from exc
+        if len({name.casefold() for name in names}) != len(names):
+            raise _repair(session, "OBJECT_SET_LIST_DUPLICATE", field="clear_object_lists", action="name each list once")
+        node["lists"] = [{"name": name, "objects": []} for name in names]
+    if list_behavior is not None and object_list is None and clears is None:
         raise _repair(
             session,
             "OBJECT_SET_LIST_NAME_REQUIRED",
@@ -786,7 +805,7 @@ def _materialize_create(
                 session,
                 "OBJECT_CREATE_DESCENDANT_LIST_UNAVAILABLE",
                 field="object_list",
-                action="object.create accepts list placement only on its root; use object.set for recursive lists",
+                action="object.create accepts list placement only on its root; use object.set for recursive owned lists",
             )
         base = BusinessDeclaration(
             declaration_id=row.declaration_id,
@@ -1308,36 +1327,29 @@ def _materialize_set(
         else:
             root_new.append(row)
 
-    def compile_node(
-        row: BusinessDeclaration,
-        *,
-        allow_object_list: bool,
-    ) -> tuple[dict[str, Any], str | None, str | None]:
+    def compile_node(row: BusinessDeclaration) -> tuple[dict[str, Any], str | None, str | None]:
         assert isinstance(row.target, NewDescendantTarget)
         node, object_list, list_behavior = _compile_set_new_node(session, row)
-        if not allow_object_list and object_list is not None:
-            raise _repair(
-                session,
-                "OBJECT_SET_NESTED_LIST_UNAVAILABLE",
-                field="object_list",
-                action="put object-list roots directly under one bound existing owner",
-            )
         descendants = planned_children.get(row.result_handle, [])
         if descendants:
             for child in descendants:
                 assert isinstance(child.target, NewDescendantTarget)
-                _validate_specialized_relationship(
-                    session,
-                    parent_type=node["type"],
-                    child_type=_resolve_native_object_type(
-                        session,
-                        child.target.kind,
-                    ),
-                )
-            node["children"] = [
-                compile_node(child, allow_object_list=False)[0]
-                for child in descendants
-            ]
+                child_node, child_list, child_behavior = compile_node(child)
+                if child_behavior is not None:
+                    if list_behavior is not None and list_behavior != child_behavior:
+                        raise _repair(session, "OBJECT_SET_LIST_BEHAVIOR_CONFLICT", field="list_behavior",
+                                      action="use one inherited per-target list behavior for this graph")
+                    list_behavior = child_behavior
+                if child_list is None:
+                    _validate_specialized_relationship(session, parent_type=node["type"], child_type=child_node["type"])
+                    node.setdefault("children", []).append(child_node)
+                else:
+                    lists = node.setdefault("lists", [])
+                    descriptor = next((item for item in lists if item["name"] == child_list), None)
+                    if descriptor is None:
+                        descriptor = {"name": child_list, "objects": []}
+                        lists.append(descriptor)
+                    descriptor["objects"].append(child_node)
         return node, object_list, list_behavior
 
     rows: list[dict[str, Any]] = []
@@ -1369,19 +1381,12 @@ def _materialize_set(
             row = {"object": {"kind": "id", "value": parent.object_id}}
             rows_by_handle[parent_handle] = row
             rows.append(row)
-        node, object_list, list_behavior = compile_node(
-            declaration,
-            allow_object_list=True,
-        )
-        _validate_specialized_relationship(
-            session,
-            parent_type=parent.object_type,
-            child_type=node["type"],
-        )
+        node, object_list, list_behavior = compile_node(declaration)
+        _apply_row_list_behavior(session, row, list_behavior)
         if object_list is None:
+            _validate_specialized_relationship(session, parent_type=parent.object_type, child_type=node["type"])
             row.setdefault("children", []).append(node)
         else:
-            _apply_row_list_behavior(session, row, list_behavior)
             lists = row.setdefault("lists", [])
             existing = next(
                 (item for item in lists if item["name"] == object_list),
