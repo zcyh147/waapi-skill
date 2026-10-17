@@ -597,20 +597,25 @@ def test_gateway_voice_contributions_accepts_copy_ready_voice_and_bus_handles(
         }
     )
 
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    project_file = project_root / "SampleProject.wproj"
+    project_file.write_text("fixture", encoding="utf-8")
+    client.responses[GET_PROJECT_INFO_URI] = {"id": "{AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA}",
+        "name": "SampleProject", "path": str(project_file)}
+    env = {**_gateway_env(tmp_path, "2025.1"), "WAAPI_SKILL_STATE_DIR": str(tmp_path / "state")}
+    observed = []
+    for operation in (GET_VOICES_URI, GET_BUSSES_URI):
+        code, result = waapi_gateway.execute_gateway(["core-call", operation, "--profiler-position", "1200"],
+            env=env, client_factory=lambda _url: client)
+        assert code == 0, result
+        observed.append(result["agent_result"]["return"])
     exit_code, payload = waapi_gateway.execute_gateway(
-        [
-            "profiler-voice-contributions",
-            "--capture",
-            "latest",
-            "--voice-instance-handle",
-            "voice-instance-00000011",
-            "--bus-instance-handle",
-            "bus-instance-00000015",
-            "--bus-instance-handle",
-            "bus-instance-00000016",
-        ],
-        env=_gateway_env(tmp_path, "2025.1"),
-        client_factory=lambda url: client,
+        ["profiler-voice-contributions", "--capture-ms", "1200",
+         "--voice-instance-handle", observed[0][0]["voice_instance_handle"],
+         "--bus-instance-handle", observed[1][0]["bus_instance_handle"],
+         "--bus-instance-handle", observed[1][1]["bus_instance_handle"]],
+        env=env, client_factory=lambda _url: client,
     )
 
     assert exit_code == 0, payload
@@ -619,7 +624,7 @@ def test_gateway_voice_contributions_accepts_copy_ready_voice_and_bus_handles(
         {
             "voicePipelineID": 17,
             "bussesPipelineID": [21, 22],
-            "time": "capture",
+            "time": 1200,
         },
         {},
     )

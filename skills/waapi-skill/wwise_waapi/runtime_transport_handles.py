@@ -108,10 +108,79 @@ class RuntimeTransportHandleStore:
         self.state_dir = state_dir
         self.root = state_dir / "runtime-transport-handles-v1"
         self.records = self.root / "records"
+        self.lifetimes = self.root / "lifetimes"
         self._token_bytes = token_bytes
         self._ensure_directory(self.state_dir)
         self._ensure_directory(self.root)
         self._ensure_directory(self.records)
+        self._ensure_directory(self.lifetimes)
+
+    def lease(self):
+        from .transactions import TransactionStore
+        return TransactionStore(self.state_dir / "transport-runtime-lease").execution_lease("transport-resources")
+
+    def _lifetime_path(self, transport_id: int, context: RuntimeTransportContext) -> Path:
+        return self.lifetimes / (canonical_sha256({"transport_id": transport_id, "context": context.as_dict()}) + ".json")
+
+    def _read_lifetime(self, path: Path) -> dict[str, Any]:
+        try:
+            metadata = path.lstat()
+            if not stat.S_ISREG(metadata.st_mode) or path_is_link_or_reparse(path, metadata=metadata) or metadata.st_size > _MAX_RECORD_BYTES:
+                raise ValueError("unsafe lifetime file")
+            data = path.read_bytes()
+            if len(data) > _MAX_RECORD_BYTES:
+                raise ValueError("lifetime file grew beyond its byte ceiling")
+            payload = json.loads(data)
+            if not isinstance(payload, dict) or set(payload) != {"contract", "transport_id", "context", "source_transaction_id", "source_artifact_hash", "publishable", "sha256"}:
+                raise ValueError("invalid lifetime shape")
+            body = {key: value for key, value in payload.items() if key != "sha256"}
+            context = RuntimeTransportContext(**body["context"])
+            native_id = body["transport_id"]
+            if (body["contract"] != "waapi-skill.runtime-transport-lifetime/v1"
+                    or type(native_id) is not int or not 0 <= native_id <= 0xFFFFFFFF
+                    or type(body["publishable"]) is not bool or not _SHA256.fullmatch(body["source_artifact_hash"])
+                    or not _required_text(body["source_transaction_id"], field="source_transaction_id", maximum_bytes=128)
+                    or self._lifetime_path(native_id, context) != path or canonical_sha256(body) != payload["sha256"]):
+                raise ValueError("invalid lifetime provenance")
+            return body
+        except FileNotFoundError as exc:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_GENERATION_DRIFT", "The execution-bound transport lifetime is unavailable; old verification cannot publish it.") from exc
+        except (OSError, ValueError, TypeError) as exc:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_STORE_CORRUPT", "Transport lifetime cannot be read safely.") from exc
+
+    def _write_lifetime(self, path: Path, body: Mapping[str, Any]) -> None:
+        self._replace(path, {**body, "sha256": canonical_sha256(body)})
+
+    def require_lifetime_capacity(self) -> None:
+        paths = tuple(self.lifetimes.iterdir())
+        if len(paths) > _MAX_RECORDS:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_STORE_LIMIT", "Transport lifetime store exceeds its fixed record ceiling.")
+        retired = [path for path in paths if not self._read_lifetime(path)["publishable"]]
+        required = max(0, len(paths) + 1 - _MAX_RECORDS)
+        for path in retired[:required]:
+            path.unlink()
+        if len(paths) - min(required, len(retired)) >= _MAX_RECORDS:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_STORE_LIMIT", "Transport lifetime store is full of active or pending authority.")
+
+    def begin_lifetime(self, *, transport_id: int, context: RuntimeTransportContext,
+                       source_transaction_id: str, source_artifact_hash: str) -> None:
+        if type(transport_id) is not int or not 0 <= transport_id <= 0xFFFFFFFF:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_RESULT_INVALID", "Transport create did not return a uint32 identity.")
+        path = self._lifetime_path(transport_id, context)
+        if not path.exists():
+            self.require_lifetime_capacity()
+        self._retire_native_id(transport_id, context=context)
+        self._write_lifetime(path, {"contract": "waapi-skill.runtime-transport-lifetime/v1", "transport_id": transport_id,
+            "context": context.as_dict(), "source_transaction_id": source_transaction_id,
+            "source_artifact_hash": source_artifact_hash, "publishable": True})
+
+    def require_current_lifetime(self, *, transport_id: int, context: RuntimeTransportContext,
+                                 source_transaction_id: str, source_artifact_hash: str) -> None:
+        body = self._read_lifetime(self._lifetime_path(transport_id, context))
+        if body["source_transaction_id"] != source_transaction_id or body["source_artifact_hash"] != source_artifact_hash:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_GENERATION_DRIFT", "A later creation replaced this transport lifetime; delayed verification cannot reclaim it.")
+        if not body["publishable"]:
+            raise RuntimeTransportHandleError("TRANSPORT_HANDLE_LIFETIME_RETIRED", "Destruction consumed this transport lifetime; delayed verification cannot resurrect it.")
 
     def issue(
         self,
@@ -121,6 +190,7 @@ class RuntimeTransportHandleStore:
         source_transaction_id: str,
         source_artifact_hash: str,
         transport_row_sha256: str,
+        require_current_lifetime: bool = False,
     ) -> RuntimeTransportHandle:
         if (
             isinstance(transport_id, bool)
@@ -135,6 +205,9 @@ class RuntimeTransportHandleStore:
             field="source_transaction_id",
             maximum_bytes=128,
         )
+        if require_current_lifetime:
+            self.require_current_lifetime(transport_id=transport_id, context=context,
+                source_transaction_id=source_transaction_id, source_artifact_hash=source_artifact_hash)
         if not isinstance(source_artifact_hash, str) or not _SHA256.fullmatch(
             source_artifact_hash
         ):
@@ -199,6 +272,10 @@ class RuntimeTransportHandleStore:
         *,
         context: RuntimeTransportContext,
     ) -> tuple[str, ...]:
+        path = self._lifetime_path(transport_id, context)
+        if path.exists():
+            body = self._read_lifetime(path)
+            self._write_lifetime(path, {**body, "publishable": False})
         return self._retire_native_id(transport_id, context=context)
 
     def _retire_native_id(

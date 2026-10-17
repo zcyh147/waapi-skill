@@ -690,6 +690,16 @@ def runtime_inspection_business_contract_data(
             else "wwise-console-or-authoring"
         ),
         "start": start,
+        **({"result_delivery": {
+            "mode": "immutable_bounded_observation",
+            "page_size": "max_results is a presentation page size, not a total result limit",
+            "continuation": "Copy agent_result.next_command exactly; pages read the retained observation without a new native call",
+            "lifetime_seconds": 900,
+            "large_rows": "Complete JSON row fragments with character offsets and reconstruction instructions",
+            "pipeline_handles": "Gateway-issued capture-observation selectors; exact configuration, project, host, frozen time and identity are revalidated",
+            "observation_boundary": "Capture rows are not instantaneous SoundEngine resource authority; identical externally replaced captures cannot be distinguished without a native capture generation",
+            "resource_bounds": {"snapshot_bytes": 2 * 1024 * 1024, "total_storage_bytes": 16 * 1024 * 1024, "records": 128},
+        }} if operation in _PROFILER_ROW_READS or operation == LOG_GET_URI else {}),
         "declaration": {
             "subcommand": (
                 "core-call"
