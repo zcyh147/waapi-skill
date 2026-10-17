@@ -183,6 +183,7 @@ FIXED_COMMANDS_BY_URI: Mapping[str, tuple[str, ...]] = MappingProxyType(
             "project-default-work-units",
         ),
         "ak.wwise.core.object.get": ("query-object", "buses"),
+        "ak.wwise.core.mediaPool.getFields": ("metadata media-pool-fields",),
         "ak.wwise.core.object.getAttenuationCurve": ("metadata attenuation",),
         "ak.wwise.core.object.getPropertyAndReferenceNames": (
             "metadata discover",
@@ -234,7 +235,6 @@ BOUNDED_DIRECT_CALL_URIS = frozenset(
     {
         "ak.soundengine.getState",
         "ak.soundengine.getSwitch",
-        "ak.wwise.core.mediaPool.getFields",
         "ak.wwise.core.object.diff",
         "ak.wwise.core.object.isLinked",
         "ak.wwise.core.ping",

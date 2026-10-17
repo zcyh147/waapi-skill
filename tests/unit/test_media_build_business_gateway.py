@@ -1100,3 +1100,136 @@ def test_media_pool_durable_plan_capacity_reclaims_only_expired_query_records(tm
     code, fresh = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
     assert code == 0 and "next_command" in fresh["agent_result"], fresh
     assert len(list((tmp_path / "external-state").rglob("mpq1-*.json"))) == 1
+
+
+def test_media_pool_fields_has_one_bounded_metadata_continuation_and_pages_live_names(tmp_path: Path) -> None:
+    api = "ak.wwise.core.mediaPool.getFields"
+    code, schema = gateway.execute_gateway(["request-schema", api], env=_env(tmp_path), client_factory=lambda _: pytest.fail("offline schema connected"))
+    assert code == 0, schema
+    assert schema["input_shape"] == "fixed_business_command"
+    assert schema["continuation"] == {"subcommand": "metadata", "arguments": ["media-pool-fields"], "business_values_required": False}
+    contract = schema["business_contract"]
+    assert contract["input_forms"]["meaning"]["flag"] == "--meaning"
+    assert contract["input_forms"]["page_size"]["maximum"] == 64
+    assert contract["field_types"] == "native getFields reports names only; field value types remain unknown"
+    fields = ["Filename", "WAV/Duration", "IXML/Scene", "IXML/Take"]
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 2, api: [{"return": fields}] * 2})
+    command = ["metadata", "media-pool-fields", "--meaning", "IXML", "--page-size", "1"]
+    code, first = gateway.execute_gateway(command, env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, first
+    assert [field["name"] for field in first["agent_result"]["fields"]] == ["IXML/Scene"]
+    assert first["agent_result"]["complete"] is False
+    code, final = gateway.execute_gateway(first["agent_result"]["next_command"]["gateway_argv"], env=_env(tmp_path), client_factory=lambda _: client)
+    assert code == 0, final
+    assert [field["name"] for field in final["agent_result"]["fields"]] == ["IXML/Take"]
+    assert final["agent_result"]["complete"] is True
+    assert final["agent_result"]["available_count"] == 4
+    assert final["agent_result"]["total_count"] == 2
+    assert [call for call in client.calls if call[0] == api] == [(api, {}, {}), (api, {}, {})]
+
+
+@pytest.mark.parametrize("raw", [{}, {"return": []}, {"return": [None]}])
+def test_media_pool_fields_distinguishes_absent_empty_and_malformed_native_lists(tmp_path: Path, raw: dict) -> None:
+    api = "ak.wwise.core.mediaPool.getFields"
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()], api: [raw]})
+    code, payload = gateway.execute_gateway(["metadata", "media-pool-fields"], env=_env(tmp_path), client_factory=lambda _: client)
+    if "return" not in raw:
+        assert code == 0 and payload["status"] == "partial", payload
+        assert payload["agent_result"]["native_result"] == {}
+        assert payload["agent_result"]["unavailable_fields"] == ["return"]
+        assert "fields" not in payload["agent_result"] and "total_count" not in payload["agent_result"]
+    elif raw["return"] == []:
+        assert code == 0 and payload["agent_result"]["fields"] == [], payload
+        assert payload["agent_result"]["total_count"] == 0 and payload["agent_result"]["complete"] is True
+    else:
+        assert code == 2 and payload["error_code"] == "MEDIA_POOL_FIELDS_INVALID", payload
+        assert payload["details"]["call"]["ok"] is True
+        assert payload["details"]["native_observation"] == raw
+
+
+def test_media_pool_field_large_name_has_lossless_bounded_typed_detail_pages(tmp_path: Path) -> None:
+    api = "ak.wwise.core.mediaPool.getFields"
+    name = "IXML/" + "雨" * 24000
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 30, api: [{"return": [name]}] * 30})
+    env = _env(tmp_path)
+    code, listed = gateway.execute_gateway(["metadata", "media-pool-fields"], env=env, client_factory=lambda _: client)
+    assert code == 0, listed
+    field = listed["agent_result"]["fields"][0]
+    assert field["name_complete"] is False
+    assert len(field["name_preview"].encode("utf-8")) <= 1024
+    command = field["next_command"]["gateway_argv"]
+    recovered = ""
+    for _ in range(30):
+        code, detail = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+        assert code == 0, detail
+        assert len(json.dumps(detail, ensure_ascii=False).encode("utf-8")) < 32 * 1024
+        page = detail["agent_result"]
+        assert page["name_fragment"]["character_offset"] == len(recovered)
+        recovered += page["name_fragment"]["value"]
+        if page["complete"]:
+            break
+        command = page["next_command"]["gateway_argv"]
+    assert recovered == name
+
+
+def test_media_pool_field_pages_budget_actual_windows_detail_continuations(tmp_path: Path, monkeypatch) -> None:
+    class WindowsEnvelopeOS:
+        name = "nt"
+
+        def __getattr__(self, name):
+            import os
+            return getattr(os, name)
+
+    monkeypatch.setattr(gateway, "os", WindowsEnvelopeOS())
+    api = "ak.wwise.core.mediaPool.getFields"
+    fields = [f"IXML/{index}/" + "雨" * 3200 for index in range(20)]
+    client = FakeClient({"ak.wwise.core.getInfo": [_info()] * 30, api: [{"return": fields}] * 30})
+    env = _env(tmp_path)
+    command = ["metadata", "media-pool-fields"]
+    observed = []
+    for _ in range(30):
+        code, payload = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+        assert code == 0, payload
+        assert len(json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")) <= 32 * 1024
+        result = payload["agent_result"]
+        observed.extend(row["selection"] for row in result["fields"])
+        if result["complete"]:
+            break
+        command = result["next_command"]["gateway_argv"]
+    assert len(set(observed)) == len(fields)
+
+
+@pytest.mark.parametrize("change", ["session", "fields", "order", "meaning", "configuration", "expired"])
+def test_media_pool_field_pages_reject_inventory_filter_or_live_context_drift(tmp_path: Path, change: str, monkeypatch) -> None:
+    api = "ak.wwise.core.mediaPool.getFields"
+    info = _info()
+    if change == "session":
+        info["sessionId"] = "{CCCCCCCC-CCCC-CCCC-CCCC-CCCCCCCCCCCC}"
+    fields = ["IXML/Scene", "IXML/Take"]
+    later_fields = fields[::-1] if change == "order" else [*fields, "IXML/Other"] if change == "fields" else fields
+    client = FakeClient({"ak.wwise.core.getInfo": [_info(), info], api: [{"return": fields}, {"return": later_fields}]})
+    env = _env(tmp_path)
+    code, first = gateway.execute_gateway(["metadata", "media-pool-fields", "--meaning", "IXML", "--page-size", "1"], env=env, client_factory=lambda _: client)
+    assert code == 0, first
+    command = first["agent_result"]["next_command"]["gateway_argv"]
+    if change == "configuration":
+        set_gateway_config(env, waapi_port=31338)
+    elif change == "meaning":
+        command += ["--meaning", "WAV"]
+    elif change == "expired":
+        import time
+        later = time.time() + 901
+        monkeypatch.setattr(time, "time", lambda: later)
+    code, stopped = gateway.execute_gateway(command, env=env, client_factory=lambda _: client)
+    assert code == 2, stopped
+    assert stopped["error_code"] == ("METADATA_SELECTION_EXPIRED" if change == "expired" else "METADATA_SELECTION_SCOPE_CHANGED")
+    assert stopped["details"]["call"]["ok"] is True
+    assert stopped["details"]["native_observation"] == {"return": later_fields}
+
+
+@pytest.mark.parametrize("version", ["2021.1", "2022.1", "2023.1", "2024.1"])
+def test_media_pool_field_browse_rejects_other_version_contracts_before_connection(tmp_path: Path, version: str) -> None:
+    code, payload = gateway.execute_gateway(["metadata", "media-pool-fields"], env=_env(tmp_path, version=version),
+        client_factory=lambda _: pytest.fail("unpackaged field discovery version connected"))
+    assert code == 2 and payload["error_code"] == "GatewayInputError", payload
+    assert "2025.1 contract" in payload["message"]
