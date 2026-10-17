@@ -248,6 +248,21 @@ def load_definition_graph(
     )
 
 
+def load_authoring_definition_graph(version: str) -> DefinitionGraph:
+    """Use the sealed independent Authoring graph without changing Console truth."""
+    from .native_catalog import load_native_catalog
+    catalog = load_native_catalog(version, 'wwise-authoring')
+    payload = catalog['definitions']
+    unsigned = {key: value for key, value in payload.items() if key != 'inventory_sha256'}
+    if (payload.get('contract') != DEFINITION_GRAPH_CONTRACT or payload.get('version') != version
+            or payload.get('wwise_build') != catalog['provenance']['build']
+            or _canonical_sha256(unsigned) != payload.get('inventory_sha256')):
+        raise SchemaInventoryError('Independent Authoring definition graph identity/digest mismatch')
+    return DefinitionGraph(contract=payload['contract'], version=version, wwise_build=payload['wwise_build'],
+        source_file_names=tuple(payload['source_file_names']), documents=MappingProxyType(payload['documents']),
+        inventory_sha256=payload['inventory_sha256'])
+
+
 def validate_packaged_typed_request_surface(
     *,
     root: Path = DEFAULT_MANIFEST_ROOT,
@@ -1170,6 +1185,42 @@ def _is_legacy_implicit_property(
         and f"{node_path}/{_encode_pointer_token(keyword)}" in allowed_paths
         and isinstance(schema.get(keyword), Mapping)
     )
+
+
+def topic_publish_schema(version: str, uri: str, schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Project known legacy Topic members using the inventory's exact parser.
+
+    The immutable reflected resource and its native branch pointers stay intact.
+    Only the already reviewed 2021 SoundBank implicit properties are moved into
+    the normal properties wrapper for construction and delivered-event checks.
+    """
+    allowed = (
+        LEGACY_2021_SOUNDBANK_IMPLICIT_PROPERTY_PATHS
+        if version == "2021.1" and uri == "ak.wwise.core.soundbank.generated"
+        else frozenset()
+    )
+
+    def project(value: Any, path: str) -> Any:
+        if isinstance(value, list):
+            return [project(child, f"{path}/{index}") for index, child in enumerate(value)]
+        if not isinstance(value, Mapping):
+            return value
+        result = {key: project(child, f"{path}/{_encode_pointer_token(key)}") for key, child in value.items()}
+        implicit = [key for key in value if _is_legacy_implicit_property(
+            value, key, node_path=path, allowed_paths=allowed,
+        )]
+        if implicit:
+            properties = result.setdefault("properties", {})
+            for key in implicit:
+                if key in properties:
+                    raise SchemaInventoryError(f"Conflicting legacy Topic property at {path}/{key}")
+                properties[key] = result.pop(key)
+        return result
+
+    publish = schema.get("publishSchema")
+    if not isinstance(publish, Mapping):
+        raise SchemaInventoryError(f"Topic {uri!r} has no reflected publish schema")
+    return project(publish, "/publishSchema")
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:

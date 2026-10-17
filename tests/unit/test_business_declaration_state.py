@@ -661,3 +661,17 @@ def _add_weather(session: BusinessDeclarationSession) -> BusinessDeclarationSess
         ),
         fields={"media_file": "/tmp/rain.wav", "volume_db": -4.0},
     )
+
+@pytest.mark.parametrize('settings_form', ['ordinary', 'model-field-names', 'unbound-model-operation'])
+@pytest.mark.parametrize('depth', [11, 13])
+def test_non_model_settings_cannot_bypass_the_default_json_depth(settings_form, depth):
+    deep = 'leaf'
+    for _ in range(depth):
+        deep = {'child': deep}
+    settings = {'ordinary': deep}
+    if settings_form != 'ordinary':
+        settings = {'authoring_model_plan': deep, 'authoring_model_binding': {}}
+    if settings_form == 'unbound-model-operation':
+        settings['authoring_model_binding'] = {'operation': 'ak.wwise.core.object.create', 'plan': deep}
+    with pytest.raises(BusinessDeclarationError):
+        BusinessDeclarationSession.create(_context(version='2025.1')).with_settings(settings)

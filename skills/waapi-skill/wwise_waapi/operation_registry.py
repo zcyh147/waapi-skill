@@ -24,6 +24,8 @@ from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
 from .layout_blueprint import declared_layout_matches, declared_layout_mismatches
+from .authoring_model_business import MODEL_OPERATIONS, MODEL_READ_URI, validate_model_call, state_query_from_assignments, canonical_state_result, model_file_audit
+from .authoring_wafm import select_registered_template
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
 from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
@@ -275,7 +277,7 @@ REPLAY_GUARD_OPERATIONS = frozenset(
         "ui.captureScreen",
     }
 )
-PACKAGED_TRANSACTION_READBACK_URIS = (LAYOUT_READ_URIS - {'ak.wwise.ui.layout.getViewHandle'}) | frozenset(
+PACKAGED_TRANSACTION_READBACK_URIS = frozenset({MODEL_READ_URI}) | (LAYOUT_READ_URIS - {'ak.wwise.ui.layout.getViewHandle'}) | frozenset(
     {
         OBJECT_GET_URI,
         OBJECT_GET_TYPES_URI,
@@ -1996,7 +1998,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
         "public-execution-contract",
         "Execute one manifest-registered guarded function without model-authored code.",
         ("api",),
-        ("args", "options", "io_root", "result_projection", "layout_binding"),
+        ("args", "options", "io_root", "result_projection", "layout_binding", "model_binding"),
         argument_contract=_object_contract(
             ("api",),
             {
@@ -2031,6 +2033,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                         "inside args."
                     ),
                 },
+                "model_binding": {"type": "object", "description": "Gateway-owned Authoring resource and declaration proof."},
                 "layout_binding": {"type": "object", "description": "Gateway-owned scoped Authoring layout identity proof; never forwarded."},
                 "result_projection": {
                     "type": "object",
@@ -2040,7 +2043,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
                     ),
                 },
             },
-            optional=("args", "options", "io_root", "result_projection", "layout_binding"),
+            optional=("args", "options", "io_root", "result_projection", "layout_binding", "model_binding"),
         ),
         constraints=(
             "api must be reflected by the requested Wwise version",
@@ -4132,7 +4135,7 @@ def _public_call_arguments(
 
         registry = ExecutionContractRegistry()
         contract = (registry.authoring_ui_describe(version, api)
-                    if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS else registry.describe(version, api))
+                    if requires_core_supplement(version, api) or api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS else registry.describe(version, api))
     except ExecutionContractError as exc:
         raise OperationContractError(
             "UNAVAILABLE_IN_VERSION",
@@ -4188,6 +4191,13 @@ def _public_call_arguments(
             "Packaged waapi.call does not accept custom command-line hooks.",
             details={"api": api, "fields": list(supplied_forbidden)},
         )
+    if api in MODEL_OPERATIONS:
+        try:
+            validate_model_call(version, api, raw_args, raw_options, arguments.get("model_binding"))
+        except ValueError as exc:
+            raise OperationContractError("INVALID_AUTHORING_RESOURCE_BINDING", str(exc)) from exc
+    elif "model_binding" in arguments:
+        raise OperationContractError("INVALID_ARGUMENT", "Authoring resource binding belongs only to its closed operations")
     if api in LAYOUT_MUTATION_URIS:
         try:
             validate_layout_call(version, api, raw_args, raw_options, arguments.get('layout_binding'))
@@ -4196,7 +4206,7 @@ def _public_call_arguments(
     elif 'layout_binding' in arguments:
         raise OperationContractError('INVALID_ARGUMENT', 'Layout binding is reserved for closed Authoring layout operations')
     validation = validate_semantic_payload(api, raw_args, raw_options, version=version,
-        authoring_ui_profile=api in LAYOUT_MUTATION_URIS)
+        authoring_ui_profile=api in LAYOUT_MUTATION_URIS | MODEL_OPERATIONS)
     if api in PROJECT_FILE_URIS:
         validation = validate_resolved_semantic_payload(api, raw_args, raw_options, version=version)
     result_projection = arguments.get("result_projection")
@@ -4256,6 +4266,8 @@ def _public_call_arguments(
             "waapi.call io_root is accepted only for isolated_transaction routes.",
             details={"api": api, "version": version, "route": contract.route},
         )
+    if api == 'ak.wwise.ui.model.registerWafm' and isinstance(raw_args.get('wafm'), str):
+        io_audit = model_file_audit(arguments['model_binding'])
     return api, dict(raw_args), dict(raw_options), {
         **contract.as_dict(),
         "request_validation": validation.as_dict(),
@@ -8806,6 +8818,9 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
 
     def read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
         result = read_call(uri, args, options)
+        if uri == MODEL_READ_URI and isinstance(result, list):
+            reads.append({"uri": uri, "args": dict(args), "options": dict(options), "result": [_json_mapping(row) for row in result]})
+            return result
         if not isinstance(result, Mapping):
             raise OperationContractError(
                 "INVALID_READBACK",
@@ -8952,6 +8967,15 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                 verification = prepare_tone_verification(call_args, execution_contract['io_audit'], request.version)
             except SoundBankContractError as exc:
                 raise OperationContractError(exc.error_code, str(exc), details=exc.details) from exc
+        if api in MODEL_OPERATIONS:
+            verification = {"kind": "authoring-model-state", "uri": api, "version": request.version,
+                "binding": dict(arguments["model_binding"]), "native_args": dict(call_args)}
+            if api == 'ak.wwise.ui.model.setState':
+                query = state_query_from_assignments(call_args)
+                try:
+                    metadata['model_state_before'] = canonical_state_result(read(MODEL_READ_URI, query, {}), query)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_MODEL_STATE_OBSERVATION', str(exc)) from exc
         if api in LAYOUT_MUTATION_URIS:
             try:
                 validate_layout_live_binding(arguments['layout_binding'], read=read)
@@ -9630,6 +9654,9 @@ def prepare_object_set_batch_check(
                 details={"limit": MAX_OBJECT_SET_BATCH_CHECK_READS},
             )
         result = read_call(uri, args, options)
+        if uri == MODEL_READ_URI and isinstance(result, list):
+            reads.append({"uri": uri, "args": dict(args), "options": dict(options), "result": [_json_mapping(row) for row in result]})
+            return result
         if not isinstance(result, Mapping):
             raise OperationContractError(
                 "INVALID_READBACK",
@@ -13812,6 +13839,11 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                         raise ValueError('Dock target, view or rectangles changed after preview')
             except ValueError as exc:
                 raise OperationContractError('STALE_LAYOUT_IDENTITY', str(exc)) from exc
+        if api == 'ak.wwise.ui.model.setState':
+            query = state_query_from_assignments(call_args)
+            observed = canonical_state_result(read_call(MODEL_READ_URI, query, {}), query)
+            if canonical_sha256(observed) != canonical_sha256(prepared.get('pre_state', {}).get('model_state_before')):
+                raise OperationContractError('STALE_MODEL_STATE', 'Widget state changed after Preview; inspect and preview again')
         expected = {"uri": api, "args": dict(call_args), "options": dict(call_options)}
         actual = {
             "uri": dispatch_payload.get("uri"),
@@ -16114,6 +16146,46 @@ def verify_prepared_operation(
                 True,
                 validation.as_dict(),
             )
+    elif kind == "authoring-model-state":
+        uri, version = plan['uri'], plan['version']
+        try:
+            validation = validate_semantic_result(uri, execution_result.get('result'), version=version, authoring_ui_profile=True)
+        except SemanticValidationError as exc:
+            check('Authoring operation returned its exact reflected result', False, exc.as_dict())
+        else:
+            check('Authoring operation returned its exact reflected result', True, validation.as_dict())
+        business_state_verified = False
+        success_status = 'result_schema_checked'
+        verification_strength = 'native_result_only_observable_effect_unfinished'
+        if uri in {MODEL_READ_URI, 'ak.wwise.ui.model.setState'}:
+            native = plan['native_args']
+            query = native if uri == MODEL_READ_URI else state_query_from_assignments(native)
+            observed_raw = execution_result.get('result') if uri == MODEL_READ_URI else read_call(MODEL_READ_URI, query, {})
+            observed = canonical_state_result(observed_raw, query)
+            readbacks.append({'uri': MODEL_READ_URI, 'args': query, 'options': {}, 'result': observed_raw})
+            if uri != MODEL_READ_URI:
+                expected = {row['widgetID']: {item['attribute']: item['value'] for item in row['state']} for row in native['state']}
+                check('Independently read widget state matches the selected assignments', canonical_sha256(observed) == canonical_sha256(expected), {'expected': expected, 'observed': observed})
+            business_state_verified = True
+            success_status = 'verified'
+            verification_strength = 'independent_widget_state_observation'
+        if uri == 'ak.wwise.ui.model.createHandle':
+            value = execution_result.get('result', {}).get('handleID')
+            import re
+            valid_id = isinstance(value, str) and bool(re.fullmatch(r'\{[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\}', value))
+            check('Frontend creation returned an owned native identity', valid_id, {'handleID': value})
+            if valid_id:
+                widgets = select_registered_template(plan['binding']['resources']['template'], plan['binding']['plan'].get('template_key'))[0]['widgets']
+                query = {'handleID': value, 'state': [{'widgetID': row['key'], 'state': []} for row in widgets]}
+                observed_raw = read_call(MODEL_READ_URI, query, {})
+                canonical_state_result(observed_raw, query)
+                readbacks.append({'uri': MODEL_READ_URI, 'args': query, 'options': {}, 'result': observed_raw})
+        if uri == 'ak.wwise.ui.model.registerWafm':
+            check('Authoring accepted the owned template registration', execution_result.get('result', {}).get('success') is True, execution_result.get('result'))
+        if uri == 'ak.wwise.ui.window.create':
+            import re
+            value = execution_result.get('result', {}).get('windowID')
+            check('Window creation returned an owned native identity', isinstance(value, str) and bool(re.fullmatch(r'\{[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}\}', value)), {'windowID': value})
     elif kind == "authoring-layout-state":
         uri, version = plan.get('uri'), plan.get('version')
         if uri not in LAYOUT_MUTATION_URIS or not isinstance(version, str):

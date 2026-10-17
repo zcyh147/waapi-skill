@@ -101,6 +101,8 @@ def local_filesystem_path_roles(
     uri = arguments.get("api")
     if not isinstance(version, str) or not isinstance(uri, str):
         return ()
+    if uri == 'ak.wwise.ui.model.registerWafm' and isinstance(arguments.get('args'), Mapping) and isinstance(arguments['args'].get('wafm'), str):
+        return ('arguments.model_binding.resources.wafm_file',)
     if route_lookup(version, uri) != "isolated_transaction":
         return ()
     return ("execution_contract.isolated_transaction",)

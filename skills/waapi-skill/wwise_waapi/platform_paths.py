@@ -34,6 +34,7 @@ WINE_WIRE_PATH_WAAPI_URIS = frozenset(
         "ak.wwise.core.soundbank.processDefinitionFiles",
         "ak.wwise.ui.project.create",
         "ak.wwise.ui.project.open",
+        "ak.wwise.ui.model.registerWafm",
     }
 )
 _AUTHORING_PROJECT_TRANSITION_URIS = frozenset(
