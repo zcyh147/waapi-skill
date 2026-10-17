@@ -1,0 +1,1155 @@
+{
+  "contract": "waapi-skill.branch-ownership/v1",
+  "routes": {
+    "function|ak.soundengine.executeActionOnEvent": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.getState": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.getSwitch": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.loadBank": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.postEvent": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.postMsgMonitor": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.postTrigger": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.registerGameObj": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.resetRTPCValue": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.seekOnEvent": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setDefaultListeners": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setGameObjectAuxSendValues": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setGameObjectOutputBusVolume": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setListenerSpatialization": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setListeners": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setMultiplePositions": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setObjectObstructionAndOcclusion": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setPosition": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setRTPCValue": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setScalingFactor": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setState": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.setSwitch": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.stopAll": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.stopPlayingID": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.unloadBank": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.soundengine.unregisterGameObj": {
+      "owner_issue": 185,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.addNewPlatform": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.convertExternalSource": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.createNewProject": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.dumpObjects": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.executeLuaScript": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.generateSoundbank": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.migrate": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.moveMediaIdsToSingleFile": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.moveMediaIdsToWorkUnits": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.tabDelimitedImport": {
+      "owner_issue": 182,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.updateMediaIdsInSingleFile": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.verify": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.cli.waapiServer": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.console.project.close": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.console.project.create": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.console.project.open": {
+      "owner_issue": 184,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.convert": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.import": {
+      "owner_issue": 182,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.importTabDelimited": {
+      "owner_issue": 182,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.mute": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.resetMute": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.resetSolo": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.setConversionPlugin": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audio.solo": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInRegion": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.audioSourcePeaks.getMinMaxPeaksInTrimmedRegion": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.blendContainer.addAssignment": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.blendContainer.addTrack": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.blendContainer.getAssignments": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.blendContainer.removeAssignment": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.executeLuaScript": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.gameParameter.setRange": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.getInfo": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.getProjectInfo": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.log.addItem": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.log.clear": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.log.get": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.mediaPool.get": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.mediaPool.getFields": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.copy": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.create": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.delete": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.diff": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.get": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.getAttenuationCurve": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.getPropertyAndReferenceNames": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.getPropertyInfo": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.getTypes": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.isLinked": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.isPropertyEnabled": {
+      "owner_issue": 181,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.move": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.pasteProperties": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.set": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setAttenuationCurve": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setLinked": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setName": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setNotes": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setProperty": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setRandomizer": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setReference": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setStateGroups": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.object.setStateProperties": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.ping": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.enableProfilerData": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getAudioObjects": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getBusses": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getCpuUsage": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getCursorTime": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getGameObjects": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getLoadedMedia": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getMeters": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getPerformanceMonitor": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getRTPCs": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getStreamedMedia": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getVoiceContributions": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.getVoices": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.moveCursor": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.registerMeter": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.saveCapture": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.setCursorTime": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.startCapture": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.stopCapture": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.profiler.unregisterMeter": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.project.save": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.remote.connect": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.remote.disconnect": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.remote.getAvailableConsoles": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.remote.getConnectionStatus": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sound.setActiveSource": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.soundbank.convertExternalSources": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.soundbank.generate": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.soundbank.getInclusions": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.soundbank.processDefinitionFiles": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.soundbank.setInclusions": {
+      "owner_issue": 183,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.add": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.checkOut": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.commit": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.delete": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.getSourceFiles": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.getStatus": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.move": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.revert": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.sourceControl.setProvider": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.switchContainer.addAssignment": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.switchContainer.getAssignments": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.switchContainer.removeAssignment": {
+      "owner_issue": 191,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.create": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.destroy": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.executeAction": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.getList": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.getState": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.prepare": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.transport.useOriginals": {
+      "owner_issue": 186,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.undo.beginGroup": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.undo.cancelGroup": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.undo.endGroup": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.undo.redo": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.undo.undo": {
+      "owner_issue": 192,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.workUnit.load": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.core.workUnit.unload": {
+      "owner_issue": 180,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.enableAsserts": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.enableAutomationMode": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.generateToneWAV": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.getWalTree": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.restartWaapiServers": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.testAssert": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.testCrash": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.debug.validateCall": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.bringToForeground": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.captureScreen": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.cli.executeLuaScript": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.cli.launch": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.commands.execute": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.commands.getCommands": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.commands.register": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.commands.unregister": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.getSelectedFiles": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.getSelectedObjects": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.closeView": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.dockView": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getCurrentLayoutName": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getElementRectangle": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getLayout": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getLayoutNames": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getOrCreateView": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getViewHandle": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getViewInstances": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.getViewTypes": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.moveSplitter": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.removeLayout": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.resetLayouts": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.setLayout": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.switchLayout": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.layout.undockView": {
+      "owner_issue": 188,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.model.createHandle": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.model.destroyHandle": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.model.getState": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.model.registerWafm": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.model.setState": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.project.close": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.project.create": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.project.open": {
+      "owner_issue": 190,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.signal.emit": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.window.close": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.window.create": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.ui.window.present": {
+      "owner_issue": 189,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.waapi.getFunctions": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.waapi.getSchema": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "function|ak.wwise.waapi.getTopics": {
+      "owner_issue": 193,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.audio.imported": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.log.itemAdded": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.attenuationCurveChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.attenuationCurveLinkChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.childAdded": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.childRemoved": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.created": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.curveChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.nameChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.notesChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.postDeleted": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.preDeleted": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.propertyChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.referenceChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.object.structureChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.profiler.captureLog.itemAdded": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.profiler.gameObjectRegistered": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.profiler.gameObjectReset": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.profiler.gameObjectUnregistered": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.profiler.stateChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.profiler.switchChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.project.loaded": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.project.postClosed": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.project.preClosed": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.project.saved": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.soundbank.generated": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.soundbank.generationDone": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.switchContainer.assignmentAdded": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.switchContainer.assignmentRemoved": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.core.transport.stateChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.debug.assertFailed": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.ui.commands.executed": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.ui.selectionChanged": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.ui.signal.click": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    },
+    "topic|ak.wwise.ui.signal.toggle": {
+      "owner_issue": 187,
+      "parent_issue": 174,
+      "blocks_issue": 195
+    }
+  }
+}

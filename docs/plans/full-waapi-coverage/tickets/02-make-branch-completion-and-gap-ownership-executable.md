@@ -31,3 +31,9 @@ The coverage checker explains exactly which native-supported uses are unavailabl
 ## Completion boundary
 
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.
+
+## Maintainer delivery
+
+See [LEDGER.md](../LEDGER.md) for the existing audit CLI, exact binding and evidence requirements, original-producer readers, reviewed reuse, and controlled proof scope. The generated product inventory retains 272,313 obligations across 1,683 native host/build routes: 268,559 unresolved, 3,638 missing implementation and 116 exact approved exclusions; none has received verified execution credit. Every functional obligation is owned by #177–#193. #194 owns the formal Fresh archive bridge; #195 remains acceptance only.
+
+The combined focused suite passed 66 tests. Subsequent narrow guards passed the three affected boundary tests and five reader tests; a final current-candidate receipt pass passed 9 tests with exact argv, raw log and immutable controlled receipts preserved outside Git. No Wwise process, native effect test, Fresh task, full Program gate or broad Non-live gate was launched for this maintainer-only change. Generation and `--check --require-complete` both report structural consistency and expected exit 2 for incomplete product coverage.
