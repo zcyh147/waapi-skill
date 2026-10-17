@@ -188,3 +188,25 @@ def test_advertised_maximum_blueprint_depth_can_be_read_back_and_verified(tmp_pa
         fields=('--new-layout-name', 'DeepOwnedLayout', '--blueprint', json.dumps(blueprint)))
     verified = confirm_execute_verify(env, state, client, preview)
     assert verified['verification']['business_state_verified'] is True
+
+
+def test_fifteen_level_blueprint_exceeds_gateway_resource_bound_before_any_client_or_write(tmp_path):
+    env = gateway_env(tmp_path)
+    set_gateway_config(env, wwise_version='2025.1')
+    state = ['--state-dir', str(tmp_path / 'state')]
+    client = LayoutClient(tmp_path)
+    _, inspected = gateway.execute_gateway([*state, 'layout-inspect', '--layout-name', 'Designer'], env=env, client_factory=lambda _: client)
+    _, schema = gateway.execute_gateway(['--version', '2025.1', 'request-schema', URI + 'setLayout'], env=env)
+    assert schema['business_adapter']['blueprint_schema']['gateway_bounds']['maximum_depth'] == 14
+    _, started = gateway.execute_gateway([*state, *schema['continuation']['gateway_argv']], env=env)
+    blueprint = {'contract': 'waapi-skill.layout-blueprint/v1', 'root': 'n0', 'nodes': [
+        {'key': 'n' + str(index), 'kind': 'stack', 'label': 'Nested workspace', 'orientation': 'vertical',
+            'children': ['n' + str(index + 1)] if index < 14 else []} for index in range(15)]}
+    calls_before = list(client.calls)
+    code, result = gateway.execute_gateway([*state, 'draft-declare-layout-plan', started['draft']['draft_id'],
+        '--task-authority', started['task_authority'], '--expected-revision', str(started['draft']['revision']),
+        '--layout-handle', inspected['layout_handle'], '--new-layout-name', 'NeverWritten', '--blueprint', json.dumps(blueprint)],
+        env=env, client_factory=lambda _: pytest.fail('resource bound must stop before opening a client'))
+    assert code != 0 and 'blueprint' in result['message'].lower()
+    assert client.calls == calls_before
+    assert URI + 'setLayout' not in [row[0] for row in client.calls]

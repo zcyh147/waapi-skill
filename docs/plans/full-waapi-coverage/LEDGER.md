@@ -336,3 +336,12 @@ inconsistencies remain untouched. This is a partial constructor, not complete
 nested-layout coverage. Typed editor/sidebar/window/history creation and state
 changes, reset branches and owned effect evidence remain #188 work under the
 unchanged GUI hold. No old native receipt is transferred to this source.
+
+Immutable constructor checkpoint `57d885c2` subsequently passed its complete
+focused selection: 48 tests, including an actual public Preview/execute/readback
+at the advertised 14-level edge. An additional explicit 15-level valid-Draft
+control rejects before opening any client or writing; that control and the
+14-level accepted edge passed together (2 passed). The nesting ceiling is solely
+a Gateway resource bound, never a native Wwise restriction. Legitimate deeper
+native arrangements remain an explicit resource gap requiring reviewed support
+or an approved boundary, without automatic branch-completion credit.
