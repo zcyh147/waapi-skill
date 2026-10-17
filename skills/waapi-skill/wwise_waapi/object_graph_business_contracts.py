@@ -62,15 +62,15 @@ def object_graph_business_contract_data(
             "binding": {
                 "target": "bound_object_handle",
                 "plugin_type": "live_discovered_type_handle",
-                "properties": "class_scoped_field_handles",
+                "properties_and_references": "class_scoped_field_handles",
                 "placement_targets": {
                     "owner": "compatible audio object; never a Work Unit",
-                    "shareset": "WorkUnit under the Effects hierarchy; Effect plug-ins only",
+                    "shareset": "WorkUnit under Effects, Audio Devices, or Metadata for the exact Effect, Sink, or Metadata class",
                 },
             },
             "type_discovery": {
                 "subcommand": "draft-discover-types",
-                "roles": ["source", "effect"],
+                "roles": ["source", "effect", "sink", "metadata"],
                 "result": "copy_one_gateway_returned_type_handle",
             },
             "declaration": {
@@ -90,7 +90,7 @@ def object_graph_business_contract_data(
                 ],
                 "placement": {
                     "owner": "attach a local Source or Effect to a compatible audio object",
-                    "shareset": "create an independent Effect child of an Effects Work Unit",
+                    "shareset": "create an independent Effect, AudioDevice, or Metadata child in its matching hierarchy",
                     "default": "owner",
                 },
                 "field_value_types": {
@@ -106,11 +106,24 @@ def object_graph_business_contract_data(
             "gateway_derivations": [
                 "plugin_class_id",
                 "versioned_plugin_topology",
-                "metadata_property_tokens",
+                "metadata_property_and_reference_tokens",
                 "native_request",
                 "preview_change_intent",
                 "continuation",
             ],
+            "plugin_kind_routes": {
+                "SourcePlugin": {"role": "source", "placement": ["owner"], "native_type": "Source"},
+                "EffectPlugin": {"role": "effect", "placement": ["owner", "shareset"], "native_type": "Effect"},
+                "SinkPlugin": {"role": "sink", "placement": ["shareset"], "native_type": "AudioDevice", "hierarchy": "Audio Devices"},
+                "MetadataPlugin": {"role": "metadata", "placement": ["shareset"], "native_type": "Metadata", "hierarchy": "Metadata",
+                    "owner_local_placement": {"status": "missing_implementation", "tracking_issue": 179}},
+                "ConversionPlugin": {"discovery_role": "conversion", "native_type": "Conversion",
+                    "attachment": {"request_schema_command": ["request-schema", "ak.wwise.core.audio.setConversionPlugin"],
+                        "supported_versions": ["2024.1", "2025.1"]},
+                    "older_version_alternatives": {"status": "unresolved_native_mapping", "tracking_issue": 179}},
+            },
+            "version_boundaries": {"2021.1": {"creation": "missing_implementation", "tracking_issue": 179,
+                "reason": "The older create schema lacks classId and object.set is absent; alternative native construction still requires matching evidence."}},
             "legacy_shallow_composer_public": False,
             "safety": {
                 "immutable_preview": True,
