@@ -33,10 +33,11 @@ references. No main merge is authorized.
   the final-candidate preserved selection passed 9 tests. Post-merge `--check`
   exited 0 with structural consistency; product completion remains false.
   [Ledger usage and evidence contracts](LEDGER.md) guide the functional tickets.
-- Active implementation frontier: #177 (conditions), #181 (queries/metadata) and
-  #188 (Authoring layouts/views), in separate worktrees. Working agents now use
-  GPT-6.1 Sol with high reasoning, as explicitly requested; root owns decisions,
-  integration and native scheduling. #180 remains
+- Active implementation frontier: #187 (Topics) and #189 (Authoring model,
+  window and signal operations), each in a separate worktree from `f6adb041`
+  with `fork_turns="none"`. #177/#181/#188 and #184/#193/#194 retain open partial
+  checkpoints; their former workers are not active on those slices. Root owns
+  decisions, integration and native scheduling. #180 remains
   blocked by #178; do not infer readiness from family proximity.
 - Read-only object/plugin condition research is retained for #177/#178/#179.
   It includes integer enums/ranges, parent contexts, reference requirements,
@@ -338,6 +339,22 @@ unrelated pre-existing Wine helpers are never terminated by this work.
   states, requirements and evidence remain unchanged. The earlier eighth-partial
   result remains separate. Full Program/Non-live gates and all native acceptance
   remain pending; no native or Fresh process was launched.
+
+- Ninth partial integration merges only #184 `57468391`, #193 `67e7ee7c`,
+  #194 `3a3a1aac` and retro `603d0f7b`. Saved-project observations, Tone marker
+  and anonymous-header checks, and exact multi-root/cleaned-input archive replay
+  remain partial implementation with native acceptance open. A narrow matrix
+  fixture RED (8 failures) and repaired GREEN (8 passes) remain separate.
+  Clean `f6adb041` passed the central preflight **825 tests in 22.01 seconds**
+  and its non-overlapping affected focus **494 tests in 191.01 seconds**; all
+  1806 tracked hashes remained unchanged and both owned groups ended. A later
+  public-seam platform-matching regression preserved **3 failed / 3 passed**,
+  then **6 passed in 3.28 seconds** after matching named constraints before
+  base-only rows. Those results are separate from the earlier candidate.
+  Reconciliation preserves 878 routes, 218 URIs and all 272,313 native obligation
+  IDs/shapes/owners/states/requirements/evidence; the Program roster is 242 unique
+  nodes. Full gate selection remains Root-owned. No native or Fresh launch,
+  ticket closure, historical evidence transfer or main merge occurred.
 
 ## Standing completion rules
 
