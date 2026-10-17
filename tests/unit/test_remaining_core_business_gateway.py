@@ -2071,3 +2071,29 @@ def test_sound_source_resolved_language_is_rechecked_before_provider_dispatch(tm
     code, result = run("execute", preview["transaction_id"])
     assert code != 0, result
     assert not any(call[0].endswith("sourceControl.checkOut") for call in client.calls)
+
+
+@pytest.mark.parametrize("drift", (False, True))
+def test_bound_move_rechecks_resolved_name_only_language_guid_proof(tmp_path, drift):
+    language = "{44444444-4444-4444-4444-444444444444}"
+    def prepare(client):
+        client.source["audioSource:language"] = {"name": "French"}
+    client, state, preview, run = _sound_source_file_case(
+        tmp_path, move=True, language=language, prepare=prepare)
+    binding = TransactionStore(state).load_preview(preview["transaction_id"]).artifact[
+        "request"]["arguments"]["source_control_binding"]
+    assert binding["objects"][0]["source"]["language"] == {"name": "French"}
+    assert binding["objects"][0]["source"]["language_identity"]["id"] == language
+    assert binding["moves"][0]["source_path"] == str(client.media)
+    if drift:
+        client.rows[language]["path"] = r"\Languages\Moved"
+    code, payload = run("execute", preview["transaction_id"])
+    writes = [call[1] for call in client.calls if call[0].endswith("sourceControl.move")]
+    if drift:
+        assert code != 0 and writes == [], payload
+    else:
+        assert code == 0, payload
+        assert writes == [{"files": [str(client.media)],
+                           "newFiles": [str(client.other_media.parent / "moved-雨.wav")]}]
+        code, verified = run("verify", preview["transaction_id"])
+        assert code == 0 and verified["agent_result"]["verified"] is False, verified

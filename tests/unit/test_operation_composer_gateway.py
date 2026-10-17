@@ -333,6 +333,20 @@ def test_non_object_set_operation_schema_digest_inventory_is_reviewed() -> None:
 
     assert len(non_object_set_digests) == 149
     assert canonical_sha256(non_object_set_digests) == (
+        "b0dd7d647d234d61ba4a4771336fe742839e1d2476712ecca09a3cf3f8b88fa3"
+    )
+    # Only object.create adds the internal documented List proof. Remove that
+    # exact property and both optional entries to retain every prior seal.
+    for version in ("2021.1", "2022.1", "2023.1", "2024.1", "2025.1"):
+        contract = operation_request_machine_contract("object.create", version)
+        contract["optional_arguments"].remove("documented_list_bindings")
+        contract["argument_contract"]["optional"].remove("documented_list_bindings")
+        assert contract["argument_contract"]["properties"].pop("documented_list_bindings") == {
+            "type": "array", "maxItems": 128, "items": {"type": "object"},
+            "description": "Gateway-owned documented List source/owner proofs; never forwarded.",
+        }
+        non_object_set_digests[f"object.create@{version}"] = canonical_sha256(contract)
+    assert canonical_sha256(non_object_set_digests) == (
         "e7360fdd277786e360dd0da34e4ac9becf8b78b598384af5893be37c57c5dcec"
     )
     # Only the five internal waapi.call contracts add the protected provider
