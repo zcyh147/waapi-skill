@@ -52,8 +52,13 @@ def short_id_query(version: str, *, number: int, kind: str | None,
         options = {"return": fields}
         validate_resolved_semantic_payload("ak.wwise.core.object.get", args, options, version=version)
         return args, options
+    # Matching 2021–2023 native observations distinguish integer and decimal
+    # comparison literals. Every validated uint32 is exact in binary64; the
+    # existing numeric renderer emits its equivalent decimal, without guessing
+    # a failure threshold or changing the caller's integer identity.
+    literal = float(number) if version in {"2021.1", "2022.1", "2023.1"} else number
     preview = build_object_get_query(version=version, type=SHORT_ID_KIND_TYPES[kind],
-        where=QueryPredicate("shortId", "=", number), take=limit, return_fields=fields)
+        where=QueryPredicate("shortId", "=", literal), take=limit, return_fields=fields)
     return dict(preview.envelope.args), dict(preview.envelope.options)
 
 

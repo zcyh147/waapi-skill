@@ -4342,11 +4342,11 @@ def test_read_only_owned_list_native_metadata_observation(workflow_sandbox_runti
     assert category["status"] == "PASS", category
 
 
-def _collect_short_id_native_probe(runtime: _WorkflowSandboxRuntime) -> dict[str, Any]:
+def _collect_short_id_native_probe(runtime: _WorkflowSandboxRuntime, *, diagnostic: bool = False) -> dict[str, Any]:
     """Reuse the original read body inside this module's already-owned sandbox."""
-    from tests.support.short_id_native_observation import collect_short_id_typed_read_observations
+    from tests.support.short_id_native_observation import collect_short_id_typed_read_observations, collect_short_id_diagnostic_observations
 
-    output = runtime.state_dir / "short-id-native-observations.json"
+    output = runtime.state_dir / ("short-id-native-diagnostic.json" if diagnostic else "short-id-native-observations.json")
     config = Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"])
     config_sha256 = hashlib.sha256(config.read_bytes()).hexdigest()
     evidence_root = Path(runtime.env["WWISE_EVIDENCE_DIR"])
@@ -4355,31 +4355,38 @@ def _collect_short_id_native_probe(runtime: _WorkflowSandboxRuntime) -> dict[str
                 "url": runtime.lifecycle.waapi_url}
     evidence: dict[str, Any] = {
         "agent_started": False, "project_mutation_count": 0, "version": runtime.version,
-        "scope": "typed Short ID read observations only; no Definition mutation acceptance",
+        "scope": ("read-only Short ID hypotheses; collection success is not resolver or Definition acceptance" if diagnostic else
+                  "typed Short ID read observations only; no Definition mutation acceptance"),
         "candidate": runtime.candidate, "endpoint": endpoint,
         "config_path": str(config), "config_sha256": config_sha256,
         "receipts": [], "observations": [], "native_evidence": [],
         "mutation_authority": False, "business_effect_verified": False,
     }
-    category = {"category": "short-id-native-read-observation", "status": "FAIL",
-                "verifier_strength": "bounded_typed_short_id_read_and_exact_guid_observation_only",
+    category = {"category": "short-id-native-diagnostic" if diagnostic else "short-id-native-read-observation", "status": "FAIL",
+                "verifier_strength": "diagnostic_collection_no_functional_acceptance" if diagnostic else "bounded_typed_short_id_read_and_exact_guid_observation_only",
                 "observation_path": str(output), "reason": "observation incomplete"}
     runtime.category_results.append(category)
 
     def read(command: Sequence[str]) -> dict[str, Any]:
-        assert command[0] in {"status", "query-object"}, command
-        assert len(evidence["receipts"]) < 7, "Short ID observation public call bound exceeded"
+        assert command[0] in ({"status", "query-object", "query-schema"} if diagnostic else {"status", "query-object"}), command
+        assert len(evidence["receipts"]) < (10 if diagnostic else 7), "Short ID observation public call bound exceeded"
         code, payload = runtime.raw_gateway(command)
         evidence["receipts"].append({"argv": list(command), "exit_code": code, "payload": payload})
+        if diagnostic and "--advanced-waql" in command and code == 2:
+            return payload  # Retain the complete bounded rejection; never retry it.
         assert code == 0 and payload.get("ok") is True, payload
+        if diagnostic and command == ["query-schema", "--advanced"]:
+            return payload  # Offline disclosure has no live endpoint.
         assert payload.get("endpoint") == endpoint, payload
         assert payload.get("detected_version") == runtime.version, payload
         return payload
 
     status, reason = "FAIL", "Short ID native observation did not finish"
     try:
-        collect_short_id_typed_read_observations(read, evidence=evidence)
-        status, reason = "PASS", "public bounded typed Short ID reads and exact-ID readbacks succeeded"
+        collector = collect_short_id_diagnostic_observations if diagnostic else collect_short_id_typed_read_observations
+        collector(read, evidence=evidence)
+        status, reason = "PASS", ("bounded read-only diagnostic collection complete; no functional acceptance" if diagnostic else
+                                  "public bounded typed Short ID reads and exact-ID readbacks succeeded")
         return category
     except BaseException as exc:
         reason = f"{type(exc).__name__}: {exc}"
@@ -4409,4 +4416,12 @@ def _collect_short_id_native_probe(runtime: _WorkflowSandboxRuntime) -> dict[str
 def test_read_only_short_id_native_observation(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
     """Observe Event/DialogueEvent Short IDs without a second lifecycle or config write."""
     category = _collect_short_id_native_probe(workflow_sandbox_runtime)
+    assert category["status"] == "PASS", category
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_read_only_short_id_native_diagnostic(workflow_sandbox_runtime: _WorkflowSandboxRuntime) -> None:
+    """Explicitly selected hypothesis probes within the existing owned lifecycle."""
+    category = _collect_short_id_native_probe(workflow_sandbox_runtime, diagnostic=True)
     assert category["status"] == "PASS", category

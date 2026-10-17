@@ -870,6 +870,7 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
          "type": "DialogueEvent", "path": "\\Events\\Dialogue_Example", "shortId": 456},
     ]
     dispatches = []
+    dialogue_literal = "456.0" if version in {"2021.1", "2022.1", "2023.1"} else "456"
 
     class Client:
         def call(self, uri, args=None, options=None):
@@ -891,8 +892,8 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
                 selected = rows[1] if "DialogueEvent" in expression or rows[1]["id"] in expression else rows[0]
                 assert expression in {
                     "from type Event take 1", "from type DialogueEvent take 1",
-                    "from type Event where shortId = 123 take 65",
-                    "from type DialogueEvent where shortId = 456 take 65",
+                    "from type Event where shortId = 123.0 take 65",
+                    f"from type DialogueEvent where shortId = {dialogue_literal} take 65",
                     *(f'from object "{row["id"]}"' + suffix for row in rows for suffix in ("", " take 64")),
                 }, expression
             else:
@@ -923,10 +924,10 @@ def test_short_id_collector_executes_all_commands_through_public_gateway(tmp_pat
     assert [row["short_id"] for row in evidence["observations"]] == [123, 456]
     assert [row["canonical_id"] for row in evidence["observations"]] == [row["id"] for row in rows]
     assert len(dispatches) == 8
-    assert any(args == {"waql": "from type DialogueEvent where shortId = 456 take 65"}
+    assert any(args == {"waql": f"from type DialogueEvent where shortId = {dialogue_literal} take 65"}
                for args, _options in dispatches)
     if version == "2021.1":
-        assert any(args == {"waql": "from type Event where shortId = 123 take 65"}
+        assert any(args == {"waql": "from type Event where shortId = 123.0 take 65"}
                    for args, _options in dispatches)
 
 
@@ -991,3 +992,99 @@ def test_legacy_transaction_create_uses_public_draft_and_compact_verify_evidence
     assert client.objects[ROOT]["parent"] == {"id": SECOND}
     assert len([uri for uri, _args, _options in client.calls if uri.endswith("object.create")]) == 1
     assert len([command for command in commands if command[0] == "execute"]) == 1
+
+
+@pytest.mark.parametrize("version,number,signed", [
+    (version, 3970659059, -324308237) for version in ["2021.1", "2022.1", "2023.1", "2024.1", "2025.1"]
+] + [("2021.1", 0, 0), ("2021.1", 2147483648, -2147483648), ("2021.1", 4294967295, -1)])
+@pytest.mark.parametrize("fault", [None, "native-error", "exact-drift"])
+def test_short_id_diagnostic_uses_actual_gateway_and_retains_unsigned_miss(tmp_path, workflow, version, number, signed, fault):
+    from tests.unit.test_object_graph_business_gateway import _info, _project
+
+    runtime, commands, config = _short_id_probe_runtime(tmp_path, version=version)
+    config.write_text(json.dumps({"wwise_version": version, "waapi_host": "127.0.0.1",
+        "waapi_port": 8080, "project_modification_policy": "ask_before_changes"}))
+    before = config.read_bytes()
+    row = {"id": "{3C874205-5335-4290-830F-A8BFF3AE8A6B}", "name": "Objective_Status",
+        "type": "DialogueEvent", "path": "\\Dynamic Dialogue\\Dialogue\\Objective_Status", "shortId": number}
+    dispatches = []
+    expected = {
+        "from type DialogueEvent take 1",
+        f'from object "{row["id"]}"',
+        f"from type DialogueEvent where shortId = {number} take 65",
+        f'from object "{row["id"]}" where shortId = {number} take 65',
+        f"from type DialogueEvent where shortId = {signed} take 65",
+        f"from type DialogueEvent where shortId = {number}.0 take 65",
+        f'from object "{row["id"]}" take 65',
+    }
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return _project(tmp_path)
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [{"classId": 101, "name": "DialogueEvent", "type": "WObject"}]}
+            assert uri == "ak.wwise.core.object.get", (uri, args, options)
+            if args == {"waql": "from type Project take 1"}:
+                assert version == "2021.1"
+                return {"return": [{**_project(tmp_path), "type": "Project"}]}
+            expression = args["waql"]
+            assert expression in expected, expression
+            dispatches.append((expression, options))
+            if options == {"return": ["id", "name", "type", "path"]}:
+                literal = f"{number}.0" if version in {"2021.1", "2022.1", "2023.1"} else str(number)
+                assert expression == f"from type DialogueEvent where shortId = {literal} take 65"
+                return {"return": []}  # Keep a baseline-miss control after the repair, too.
+            if fault == "native-error" and f"{number}.0" in expression:
+                raise RuntimeError("diagnostic decimal literal rejected")
+            if f"shortId = {number} " in expression:
+                return {"return": []}  # Trace-shaped baseline miss, not a native semantics claim.
+            selected = dict(row)
+            if fault == "exact-drift" and expression == f'from object "{row["id"]}"':
+                selected["name"] = "Changed"
+            assert options == {"return": ["id", "name", "type", "path", "shortId"]}, options
+            return {"return": [selected]}
+
+        def disconnect(self):
+            pass
+
+    def gateway(command):
+        commands.append(list(command))
+        workflow.waapi_gateway.build_parser().parse_args(list(command))
+        return workflow.waapi_gateway.execute_gateway(["--state-dir", str(runtime.state_dir), *command],
+            env=runtime.env, client_factory=lambda _url: Client())
+
+    runtime.raw_gateway = gateway
+    if fault == "exact-drift":
+        with pytest.raises(AssertionError):
+            workflow.test_read_only_short_id_native_diagnostic(runtime)
+    else:
+        workflow.test_read_only_short_id_native_diagnostic(runtime)
+    category, = runtime.category_results
+    evidence = json.loads(Path(category["observation_path"]).read_text())
+    assert config.read_bytes() == before
+    assert evidence["business_effect_verified"] is False and evidence["mutation_authority"] is False
+    if fault == "exact-drift":
+        assert category["status"] == "FAIL" and len(commands) == 3
+        return
+    assert category["status"] == "PASS"  # Diagnostic collection only, never resolver acceptance.
+    assert evidence["baseline_contains_chosen_identity"] is False
+    assert len(commands) == 10 and commands.count(["query-schema", "--advanced"]) == 1
+    assert all(command[0] in {"status", "query-schema", "query-object"} for command in commands)
+    baseline = next(receipt for receipt in evidence["receipts"] if "--short-id" in receipt["argv"])
+    assert baseline["payload"]["source_resolution"]["short_id"] == number
+    assert baseline["payload"]["agent_result"] == []
+    assert len(evidence["variants"]) == 5
+    assert {variant["name"] for variant in evidence["variants"]} == {
+        "typed-unsigned", "guid-unsigned", "typed-signed32", "typed-decimal", "guid-no-predicate"}
+    assert all(variant["hypothesis"] for variant in evidence["variants"])
+    assert all(expression.endswith((" take 1", " take 65")) or expression == f'from object "{row["id"]}"'
+               for expression, _ in dispatches)
+    if fault == "native-error":
+        failed = next(variant for variant in evidence["variants"] if variant["name"] == "typed-decimal")
+        assert failed["status"] == "query_failed"
+        receipt = next(receipt for receipt in evidence["receipts"] if f"{number}.0" in str(receipt["argv"]))
+        assert receipt["exit_code"] == 2
+        assert receipt["payload"]["call"]["error_code"] == "RuntimeError"

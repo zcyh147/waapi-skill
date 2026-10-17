@@ -841,8 +841,9 @@ def test_convert_external_sources_verifies_exact_outputs_and_no_unreviewed_files
 
 
 class DefinitionReader:
-    def __init__(self, project: Mapping[str, Any]) -> None:
+    def __init__(self, project: Mapping[str, Any], *, version: str = "2025.1") -> None:
         self.project = dict(project)
+        self.version = version
         self.target_exists = False
         self.wrong_target_inclusions = False
         self.event = _row(EVENT_ID, "Play_Test", "Event", r"\Events\Default Work Unit\Play_Test")
@@ -874,7 +875,8 @@ class DefinitionReader:
             ]:
                 return {"return": [self.event, self.control]}
             query = args.get("waql")
-            if query == f"from type DialogueEvent where shortId = {self.event['shortId']} take 2":
+            literal = f"{self.event['shortId']}.0" if self.version in {"2022.1", "2023.1"} else str(self.event["shortId"])
+            if query == f"from type DialogueEvent where shortId = {literal} take 2":
                 return {"return": [self.event]}
             if query == 'from type Event where name = "Play_Test" take 2':
                 return {"return": [self.event]}
@@ -1069,7 +1071,7 @@ def test_process_definition_files_resolves_short_id_through_reflected_uint32_id(
 
 
 @pytest.mark.parametrize("version", ["2022.1", "2023.1", "2024.1", "2025.1"])
-@pytest.mark.parametrize("number", [1, 123])
+@pytest.mark.parametrize("number", [1, 123, 3970659059, 4294967295])
 def test_process_definition_files_resolves_dialogue_short_id_and_guards_guid_readback(
     tmp_path: Path,
     version: str,
@@ -1081,7 +1083,7 @@ def test_process_definition_files_resolves_dialogue_short_id_and_guards_guid_rea
         f"Gameplay_Main\t-DialogueEvent\t{number}\tEvent\tMedia\n",
         encoding="utf-8",
     )
-    reader = DefinitionReader(project)
+    reader = DefinitionReader(project, version=version)
     reader.event["type"] = "DialogueEvent"
     reader.event["shortId"] = number
     request = _request("soundbank.processDefinitionFiles", {"files": [str(definition)], "io_root": str(io_root)})
@@ -1099,3 +1101,7 @@ def test_process_definition_files_resolves_dialogue_short_id_and_guards_guid_rea
     reader.event["shortId"] = number
     reader.event["type"] = "Event"
     assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
+    reader.event["type"] = "DialogueEvent"
+    for changed_id in (CONTROL_BANK_ID, "malformed"):
+        reader.event["id"] = changed_id
+        assert validate_prepared_roles(prepared, read_call=reader)["ok"] is False
