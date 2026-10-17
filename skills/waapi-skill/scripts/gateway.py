@@ -2563,7 +2563,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_declare_object_change.add_argument("--notes")
     draft_declare_object_change.add_argument(
         "--name-conflict",
-        choices=("fail", "rename"),
+        choices=("fail", "rename", "replace"),
     )
     add_source = draft_declare_object_change.add_mutually_exclusive_group()
     add_source.add_argument(
@@ -26146,7 +26146,7 @@ def _business_next_action_binding(
             declaration_append.extend(["--notes", "<exact-notes>"])
         optional_fields = business_contract["declaration"]["optional_fields"]
         if "name_conflict" in optional_fields:
-            declaration_append.append("[--name-conflict fail|rename]")
+            declaration_append.append("[--name-conflict fail|rename|replace]")
         if "add_to_source_control" in optional_fields:
             declaration_append.append(
                 "[--add-to-source-control|--no-add-to-source-control]"

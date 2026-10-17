@@ -18,7 +18,7 @@ import os
 import re
 import time
 import stat
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
@@ -31,6 +31,7 @@ from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAY
 
 from .console_project_operations import CLI_PROJECT_FILE_URIS, PROJECT_FILE_URIS, observe_cli_project_outcome, CONSOLE_CREATE_URI, prepare_console_project_creation, validate_console_project_creation, inspect_created_project
 from .canonical import canonical_json_bytes, canonical_sha256
+from .object_lifecycle_graph import LifecycleGraphError, capture_lifecycle_graph, lifecycle_graph_matches
 from .business_adapters import business_adapter
 from .builders.identity import ObjectIdentity, ResolvedObject, plan_object_resolution
 from .builders.metadata import (
@@ -3213,7 +3214,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "parent": IDENTITY_ARGUMENT_SCHEMA,
-                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename", "replace"]},
                 "auto_add_to_source_control": _COPY_AUTO_ADD_SCHEMA,
                 "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
             },
@@ -3237,7 +3238,7 @@ OPERATION_SPECS: Mapping[str, OperationSpec] = {
             {
                 "object": IDENTITY_ARGUMENT_SCHEMA,
                 "parent": IDENTITY_ARGUMENT_SCHEMA,
-                "on_name_conflict": {"type": "string", "enum": ["fail", "rename"]},
+                "on_name_conflict": {"type": "string", "enum": ["fail", "rename", "replace"]},
                 "auto_check_out_to_source_control": _OBJECT_MUTATION_AUTO_CHECK_OUT_SCHEMA,
             },
             optional=("on_name_conflict", "auto_check_out_to_source_control"),
@@ -9311,11 +9312,6 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
         _reject_protected_delete(source)
         roles.update({"object": source, "parent": parent})
         conflict = str(arguments.get("on_name_conflict", "fail"))
-        if conflict == "replace":
-            raise OperationContractError(
-                "UNSUPPORTED_DESTRUCTIVE_COLLISION_POLICY",
-                "object.copy and object.move do not expose native replace because it can delete an unreviewed destination subtree.",
-            )
         source_name = source.row.get("name")
         parent_path = parent.row.get("path")
         _reject_non_intrinsic_object_name_operation(
@@ -9349,6 +9345,33 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "path": collision_path,
             "rows": collision_rows,
         }
+        lifecycle_source: list[dict[str, Any]] = []
+        lifecycle_replaced: list[dict[str, Any]] = []
+        if conflict == "replace":
+            source_path = _absolute_live_object_path(source.row.get("path"), field="object.path")
+            if (_same_identity(_parent_value(source.row.get("parent")), parent.object)
+                    or _is_strict_descendant_object_path(parent_path, source_path)):
+                raise OperationContractError("INVALID_REPLACEMENT_TOPOLOGY", "Replacement destination cannot be the source's current parent or lie inside its subtree.")
+            try:
+                lifecycle_source = capture_lifecycle_graph(source.object, read=read)
+                if collision_rows:
+                    collision_row = collision_rows[0]
+                    collision = ResolvedObject(identity=ObjectIdentity(path=collision_path), object=collision_row.get("id"),
+                                               resolution="live-exact-copy-move-collision", row=collision_row)
+                    _reject_protected_replace_boundary(collision)
+                    if (str(collision_row.get("path", "")).casefold() != collision_path.casefold()
+                            or not _same_identity(_parent_value(collision_row.get("parent")), parent.object)
+                            or _is_strict_descendant_object_path(source_path, collision_path)
+                            or _same_identity(source.object, collision.object)):
+                        raise OperationContractError("INVALID_REPLACEMENT_TOPOLOGY", "Replacement must target exactly the destination's direct collision without deleting the source.")
+                    lifecycle_replaced = capture_lifecycle_graph(collision.object, read=read)
+                    roles["replace_collision"] = collision
+            except LifecycleGraphError as exc:
+                raise OperationContractError("INVALID_LIFECYCLE_SNAPSHOT", str(exc)) from exc
+            metadata["copy_move_collision_guard"].update({
+                "source_snapshot": lifecycle_source,
+                "replacement_snapshot": lifecycle_replaced,
+            })
         try:
             auto_check_out = normalize_auto_check_out_to_source_control(
                 arguments.get("auto_check_out_to_source_control"),
@@ -9372,6 +9395,12 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             if request.operation == "object.copy"
             else builder.move(object=source, parent=parent, on_name_conflict=conflict, auto_check_out_to_source_control=auto_check_out)
         )
+        if conflict == "replace":
+            preview = replace(preview, envelope=replace(preview.envelope, metadata={
+                **preview.envelope.metadata, "source_subtree": lifecycle_source,
+                "replaced_subtree": lifecycle_replaced,
+                "reversal": "not_automatic;_deleted_destination_guids_cannot_be_restored",
+            }))
         verification = {
             "kind": "copied-guid-under-parent" if request.operation == "object.copy" else "moved-guid-under-parent",
             "source_id": source.object,
@@ -9381,6 +9410,13 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
             "expected_parent_id": parent.object,
             "expected_parent_path": parent.row.get("path"),
             "on_name_conflict": conflict,
+            **({"source_subtree_rows": lifecycle_source,
+                "replaced_subtree_rows": lifecycle_replaced,
+                "verification_scope": {
+                    "observed": ["hierarchy", "notes", "discovered_default_view_fields", "replaced_guid_absence"],
+                    "unobserved": ["unlinked_platform_views", "owned_lists_and_plugin_state"],
+                    "complete_business_verification": False,
+                }} if conflict == "replace" else {}),
         }
         cleanup = {
             "kind": "delete-created-copy" if request.operation == "object.copy" else "move-back-to-original-parent",
@@ -14297,6 +14333,25 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 "evidence": {"path": path, "expected": expected_rows, "actual": actual_rows},
             }
         )
+        for label in ("source_snapshot", "replacement_snapshot"):
+            expected = copy_move_collision_guard.get(label)
+            if expected is None or expected == []:
+                continue
+            if not isinstance(expected, list) or not all(isinstance(row, Mapping) for row in expected):
+                raise OperationContractError("INVALID_PREVIEW", "Lifecycle graph guard is malformed.")
+
+            def graph_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({"role": "copy-move-" + label, "uri": uri, "args": dict(args),
+                                  "options": dict(options), "result": dict(result)})
+                return result
+
+            try:
+                observed = capture_lifecycle_graph(expected[0]["id"], read=graph_read)
+            except LifecycleGraphError as exc:
+                observed = {"error": str(exc)}
+            assertions.append({"name": "copy/move " + label + " is unchanged", "passed": observed == expected,
+                               "evidence": {"expected": expected, "actual": observed}})
 
     linked_before = pre_state.get("linked_before") if isinstance(pre_state, Mapping) else None
     if isinstance(linked_before, Mapping):
@@ -18323,6 +18378,45 @@ def verify_prepared_operation(
                     "old path no longer resolves to moved GUID",
                     not any(_same_identity(row.get("id"), plan.get("source_id")) for row in old_rows),
                     old_rows,
+                )
+        if plan.get("on_name_conflict") == "replace":
+            source_snapshot = plan.get("source_subtree_rows")
+            replaced_snapshot = plan.get("replaced_subtree_rows")
+            if (not isinstance(source_snapshot, list) or not source_snapshot
+                    or not isinstance(replaced_snapshot, list)):
+                raise OperationContractError("INVALID_PREVIEW", "Lifecycle replacement lacks its complete source and destination snapshots.")
+
+            def graph_read(uri: str, args: Mapping[str, Any], options: Mapping[str, Any]) -> Mapping[str, Any]:
+                result = read_call(uri, args, options)
+                readbacks.append({"uri": uri, "args": dict(args), "options": dict(options), "result": dict(result)})
+                return result
+
+            try:
+                actual_graph = capture_lifecycle_graph(object_id, read=graph_read)
+                graph_matches = lifecycle_graph_matches(source_snapshot, actual_graph, is_copy=is_copy)
+            except LifecycleGraphError as exc:
+                actual_graph, graph_matches = {"error": str(exc)}, False
+            check("lifecycle result preserves the complete relative topology, notes and discovered fields", graph_matches,
+                  {"source": source_snapshot, "result": actual_graph})
+            if is_copy:
+                try:
+                    remaining_source = capture_lifecycle_graph(plan["source_id"], read=graph_read)
+                except LifecycleGraphError as exc:
+                    remaining_source = {"error": str(exc)}
+                check("copy leaves its complete source subtree unchanged", remaining_source == source_snapshot,
+                      {"expected": source_snapshot, "actual": remaining_source})
+            old_ids = [row["id"] for row in replaced_snapshot]
+            for offset in range(0, len(old_ids), MULTI_IDENTITY_READ_MAX_IDS):
+                old_args = {"from": {"id": old_ids[offset:offset + MULTI_IDENTITY_READ_MAX_IDS]}}
+                old_result = graph_read(OBJECT_GET_URI, old_args, {"return": list(OBJECT_REPLACE_SNAPSHOT_FIELDS)})
+                old_rows = _rows(old_result)
+                check("every reviewed replaced subtree GUID is absent", not old_rows,
+                      {"expected_absent": old_args["from"]["id"], "remaining": old_rows})
+            if all(assertion.get("passed") is True for assertion in assertions):
+                return VerificationResult(
+                    operation, "indeterminate", tuple(assertions), tuple(readbacks),
+                    "Hierarchy, notes, discovered default-view fields and replaced GUID absence passed. Unlinked platform views and owned-list/plug-in state remain unobserved; complete copy/move preservation is unverified.",
+                    "hierarchy_notes_default_view_fields_only", False,
                 )
     elif kind == "same-guid-renamed":
         object_id = plan.get("object_id")

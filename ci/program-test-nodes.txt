@@ -71,6 +71,7 @@ tests/unit/test_non_intrinsic_identity_gateway.py
 tests/unit/test_cross_family_bus_gateway.py
 tests/unit/test_cross_family_collection_gateway.py
 tests/unit/test_object_graph_owned_choices_gateway.py
+tests/unit/test_object_lifecycle_replace_gateway.py
 tests/unit/test_cross_family_voice_import.py
 tests/unit/test_cross_family_game_sync_gateway.py
 tests/unit/test_business_declaration_state.py

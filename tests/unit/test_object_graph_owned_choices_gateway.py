@@ -50,7 +50,8 @@ class OwnedGraphTask(FieldTask):
             if "id" in source:
                 rows = [row for key, row in self.objects.items() if key in source["id"]]
             elif "path" in source:
-                rows = [row for row in self.objects.values() if row["path"] in source["path"]]
+                paths = {path.casefold() for path in source["path"]}
+                rows = [row for row in self.objects.values() if row["path"].casefold() in paths]
             else:
                 expression = args["waql"]
                 assert expression.startswith('from object "'), expression
