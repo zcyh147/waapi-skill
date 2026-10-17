@@ -627,3 +627,62 @@ def test_shared_only_guard_seals_query_meaning_even_if_changed_query_returns_sam
     monkeypatch.setattr(WaqlQueryBuilder, 'build', changed_build)
     code, verified = task.run('verify', tx)
     assert code == 2 and verified.get('verified') is not True, verified
+
+
+NULL_GUID = '{00000000-0000-0000-0000-000000000000}'
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+def test_shared_only_preview_cannot_certify_a_native_null_guid_parent(tmp_path, version):
+    task = SharedReferenceTask(tmp_path, version)
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    task.declare()
+    code, checked = task.step('draft-check')
+    if code == 2:
+        assert checked['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', checked
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 2 and preview['error_code'] == 'CONSTRAINED_REFERENCE_BOUNDARY', preview
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize('version', VERSIONS[1:])
+@pytest.mark.parametrize('phase', ['before', 'after'])
+def test_shared_only_parent_drift_to_native_null_guid_cannot_write_or_verify(tmp_path, version, phase):
+    task = SharedReferenceTask(tmp_path, version)
+    task.declare()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    code, preview = task.step('preview-from-draft')
+    assert code == 0, preview
+    tx = preview['transaction_id']
+    code, shown = task.run('transaction-show', tx)
+    assert code == 0, shown
+    code, confirmed = task.run('confirm', tx, '--confirmation-token', shown['confirmation']['token'])
+    assert code == 0, confirmed
+    if phase == 'before':
+        task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, executed = task.run('execute', tx)
+    if phase == 'before':
+        assert code == 2, executed
+        assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)
+        return
+    assert code == 0, executed
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, verified = task.run('verify', tx)
+    assert code == 2 and verified.get('verified') is not True, verified
+
+
+@pytest.mark.parametrize('version', VERSIONS)
+def test_child_of_reference_preview_treats_zero_guid_controller_as_unset(tmp_path, version):
+    task = DefaultSwitchTask(tmp_path, version)
+    task.declare_default()
+    code, checked = task.step('draft-check')
+    assert code == 0, checked
+    task.objects[FIRST]['SwitchGroupOrStateGroup'] = {'id': NULL_GUID}
+    task.objects[SECOND]['parent'] = {'id': NULL_GUID}
+    code, preview = task.step('preview-from-draft')
+    assert code == 2 and preview['error_code'] == 'REFERENCE_ACTIVATION_REQUIRED', preview
+    assert not any(uri.endswith(('setReference', 'object.set')) for uri, _, _ in task.calls)

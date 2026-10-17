@@ -21819,7 +21819,7 @@ def _read_shared_reference_target(target_id, *, read, platform, version):
     if len(rows) != 1 or not _same_identity(rows[0].get("id"), target_id):
         raise OperationContractError("INVALID_READBACK", "Shared-only target must resolve exactly the chosen GUID.")
     parent = rows[0].get("parent")
-    if parent is None or isinstance(parent, Mapping) and "id" not in parent:
+    if _reference_value_is_null(parent) or isinstance(parent, Mapping) and "id" not in parent:
         raise OperationContractError("CONSTRAINED_REFERENCE_BOUNDARY", "Shared-only target needs a fresh canonical parent relationship.")
     parent_id = _reference_identity(parent)
     if not isinstance(parent, Mapping) or not isinstance(parent_id, str) or _PLUGIN_GUID.fullmatch(parent_id) is None:
