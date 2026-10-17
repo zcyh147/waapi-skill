@@ -1,6 +1,7 @@
 """Existing producer compatibility, independent of new branch coverage claims."""
 import hashlib
 import json
+import gzip
 from pathlib import Path
 from copy import deepcopy
 
@@ -35,6 +36,19 @@ def metadata_descriptor():
     return {'seal': sealed(root / 'seal.json'), 'root': str(root), 'receipt': '006', 'status_receipt': '003'}
 
 
+def isolated_original_sources(target, context, names):
+    fixture = json.loads(gzip.decompress((FIXTURES / 'original-sources.json.gz').read_bytes()))
+    assert fixture['candidate'] == context['candidate']
+    for name in names:
+        original = fixture['files'][name]
+        raw = original['text'].encode('utf-8')
+        assert hashlib.sha256(raw).hexdigest() == original['sha256'] == context['relevant_sources'][name]
+        path = target / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+    return target
+
+
 def test_existing_scenario_metadata_positive_and_exact_receipt_corruption(tmp_path):
     descriptor = metadata_descriptor()
     result = completion.read_metadata_run(descriptor, tmp_path)
@@ -58,6 +72,7 @@ def test_metadata_branch_uses_original_receipt_and_reviewed_source_equivalence(t
               'pointer': '/installed/condition', 'kind': 'metadata_condition', 'shape_sha256': 'b' * 64}
     candidate = 'c' * 64
     sources = ['skills/waapi-skill/scripts/run.py', 'skills/waapi-skill/scripts/gateway.py']
+    original_root = isolated_original_sources(tmp_path / 'original-source-context', context, sources)
     binding = {'input': {'gateway_argv': context['gateway']['argv']}, 'native_hosts': ['wwise-console'],
         'observation_pointer': '/gateway/payload/agent_result/metadata/dependencies/0/context', 'relevant_sources': sources,
         **{key: {'source': 'skills/waapi-skill/scripts/gateway.py#execute_gateway', 'selector': branch['pointer']}
@@ -75,12 +90,14 @@ def test_metadata_branch_uses_original_receipt_and_reviewed_source_equivalence(t
         'sources': {name: context['relevant_sources'][name] for name in sources}}
     proof_path = tmp_path / 'reuse.json';proof_path.write_text(json.dumps(proof))
     binding['native_equivalence'] = ({context['receipt_sha256']: sealed(proof_path)} if per_record else sealed(proof_path))
-    assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding) == ('passed', None)
+    assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding, source_root=original_root) == ('passed', None)
+    # The same historical proof must not silently certify a changed Gateway.
+    assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding, source_root=audit.ROOT) == ('missing', 'equivalence relevant source changed')
     assert completion.evidence_result(descriptor, branch, candidate, 'native', 'controlled', tmp_path, binding)[0] == 'missing'
     assert completion.evidence_result(descriptor, branch, candidate, 'fresh', 'controlled', tmp_path, binding)[0] == 'missing'
     record['branch_assertions'][branch['id']]['checks'][0]['equals'] = 'Parent'
     path.write_text(json.dumps(record));descriptor = sealed(path, nodeid='preserved-metadata')
-    assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding)[0] == 'missing'
+    assert completion.evidence_result(descriptor, branch, candidate, 'live_metadata', 'controlled', tmp_path, binding, source_root=original_root)[0] == 'missing'
 
 
 def test_native_absence_requires_omission_in_each_exact_host_observation():

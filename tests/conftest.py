@@ -36,7 +36,7 @@ def pytest_collection_modifyitems(items):
             )
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
 def pytest_runtest_makereport(item, call):
     """Retain exact phase outcomes for real-evidence fixture finalizers."""
 
@@ -47,3 +47,5 @@ def pytest_runtest_makereport(item, call):
         reports = {}
         setattr(item, "_waapi_phase_reports", reports)
     reports[report.when] = report.outcome
+    from tests.support.exact_evidence_finalization import finalize_reported_node_evidence
+    finalize_reported_node_evidence(item, report)
