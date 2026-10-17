@@ -486,13 +486,6 @@ class SetReplaceTask(OwnedGraphTask):
                 source = self.objects[item["object"]]
                 before_path = source["path"]
                 after_path = before_path.rsplit("\\", 1)[0] + "\\" + item["name"]
-                if item.get("onNameConflict", args.get("onNameConflict")) == "replace":
-                    collisions = [row for row in self.objects.values() if row["id"] != source["id"]
-                                  and row["path"].casefold() == after_path.casefold()]
-                    for collision in collisions:
-                        for object_id, row in list(self.objects.items()):
-                            if object_id == collision["id"] or row["path"].startswith(collision["path"] + "\\"):
-                                del self.objects[object_id]
                 source["name"] = item["name"]
                 for row in self.objects.values():
                     if row["path"] == before_path or row["path"].startswith(before_path + "\\"):
@@ -635,21 +628,22 @@ def test_set_replace_without_collision_creates_the_requested_graph(tmp_path: Pat
 
 
 @pytest.mark.parametrize("version", VERSIONS[1:])
-def test_set_replace_rename_keeps_source_identity_and_replaces_exact_sibling(tmp_path: Path, version: str) -> None:
+def test_set_replace_renames_owner_to_absent_name_and_replaces_its_colliding_child(tmp_path: Path, version: str) -> None:
     task = SetReplaceTask(tmp_path, version)
-    task.objects[ROOT].update({"parent": {"id": SECOND}, "path": task.objects[SECOND]["path"] + r"\LAYERS"})
-    task.objects[CHILD]["path"] = task.objects[ROOT]["path"] + r"\Old child"
     source = task.bind(FIRST)
     code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
     assert code == 0, configured
     code, declared = task.step("draft-declare-existing", "--declaration-id", "source", "--object-handle", source,
-                               "--field", "new_name", "Layers")
+                               "--field", "new_name", "Storm")
     assert code == 0, declared
+    code, child = task.step("draft-declare-new", "--declaration-id", "layers", "--parent-handle", source,
+                            "--name", "Layers", "--kind", "actor-mixer")
+    assert code == 0, child
     tx, shown = task.preview()
     assert {row["id"] for row in shown["artifact"]["prepared_operation"]["verification_plan"]["replaced_subtree_rows"]} == {ROOT, CHILD}
     code, verified = task.finish(tx, shown)
     assert code == 0 and verified["verified"] is True, json.dumps(verified)
-    assert task.objects[FIRST]["name"] == "Layers" and ROOT not in task.objects and CHILD not in task.objects
+    assert task.objects[FIRST]["name"] == "Storm" and ROOT not in task.objects and CHILD not in task.objects
     wind = task.objects["{77777777-7777-7777-7777-777777777777}"]
     assert wind["parent"] == {"id": FIRST} and wind["notes"] == "Keep wind"
 
@@ -749,4 +743,20 @@ def test_set_reference_arrays_reject_unbound_oversized_or_disallowed_targets_wit
     assert code == 2, rejected
     code, after = task.run("draft-inspect", task.draft, "--task-authority", task.authority)
     assert code == 0 and after["draft"] == before["draft"], after
+    assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+def test_set_child_replace_policy_does_not_authorize_existing_target_rename_collision(tmp_path: Path, version: str) -> None:
+    task = SetReplaceTask(tmp_path, version)
+    task.objects[ROOT].update({"parent": {"id": SECOND}, "path": task.objects[SECOND]["path"] + r"\LAYERS"})
+    task.objects[CHILD]["path"] = task.objects[ROOT]["path"] + r"\Old child"
+    owner = task.bind(FIRST)
+    code, configured = task.step("draft-business-configure", "--name-conflict", "replace")
+    assert code == 0, configured
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "owner", "--object-handle", owner,
+                               "--field", "new_name", "Layers")
+    assert code == 0, declared
+    code, rejected = task.step("draft-check")
+    assert code == 2 and rejected["details"]["issues"][0]["error_code"] == "TARGET_EXISTS", rejected
     assert not any(uri.endswith("object.set") for uri, _, _ in task.calls)

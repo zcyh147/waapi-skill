@@ -5959,7 +5959,11 @@ def _prepare_object_set(
             )
             target_spec["rename_collision_rows"] = rename_rows
             if row_conflict == "replace" and rename_rows:
-                seal_replace_collision(rename_rows[0])
+                raise OperationContractError(
+                    "TARGET_EXISTS",
+                    "The child replacement policy does not authorize deleting an existing target's rename collision.",
+                    details={"path": future_target_path, "rows": rename_rows, "name_conflict_scope": "new_children_and_list_members"},
+                )
             if row_conflict in {"fail", "replace"}:
                 target_spec["expected_path"] = future_target_path
         for child_spec in child_specs:
