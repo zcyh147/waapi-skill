@@ -174,6 +174,53 @@ class CliProjectTask(FieldTask):
         return tx
 
 
+def test_cli_add_platform_uses_documented_2025_default_name_when_omitted(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    tx = task.execute_plan('--value', 'base_platform', 'Windows')
+    writes = [args for uri, args, _ in task.calls if uri == task.operation]
+    assert writes == [{'project': str(task.project_file), 'new-platform-base': 'Windows'}]
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+    assert payload['verification']['business_state_verified'] is False
+    code, payload = task.run('execute', tx)
+    assert code != 0, payload
+    assert len([row for row in task.calls if row[0] == task.operation]) == 1
+
+
+@pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
+def test_cli_add_platform_discloses_versioned_name_requirement_and_preserves_explicit_name(tmp_path, version):
+    task = CliProjectTask(tmp_path, version, 'ak.wwise.cli.addNewPlatform')
+    code, schema = task.run('--version', version, 'request-schema', task.operation)
+    assert code == 0, schema
+    declaration = schema['business_adapter']['declaration']
+    assert ('platform_name' in declaration['required_fields']) is (version != '2025.1')
+    assert ('platform_name' in declaration['optional_fields']) is (version == '2025.1')
+    if version == '2025.1':
+        assert declaration['constraints']['platform_name_when_omitted'] == 'use the base_platform name'
+    code, started = task.run('draft-start', task.operation)
+    assert code == 0, started
+    continuation = started['draft']['next_action_binding']['declaration']
+    for field in ('required_fields', 'optional_fields', 'input_forms'):
+        assert continuation[field] == declaration[field]
+    assert started['draft']['next_action_binding']['business_contract']['declaration'] == declaration
+    tx = task.execute_plan('--value', 'base_platform', 'Windows',
+                           '--value', 'platform_name', 'Studio',
+                           '--value', 'copy_settings_from_platform', 'Windows_Old')
+    assert [args for uri, args, _ in task.calls if uri == task.operation] == [{
+        'project': str(task.project_file), 'new-platform-base': 'Windows',
+        'new-platform-name': 'Studio', 'copy-from-platform': 'Windows_Old'}]
+    code, payload = task.run('verify', tx)
+    assert code == 0 and payload['state'] == 'result_schema_checked', payload
+
+
+def test_cli_add_platform_default_name_still_requires_documented_base(tmp_path):
+    task = CliProjectTask(tmp_path, '2025.1', 'ak.wwise.cli.addNewPlatform')
+    code, payload = task.step('draft-declare-cli-console-plan',
+        '--value', 'project_file', str(task.project_file))
+    assert code != 0, payload
+    assert not any(uri == task.operation for uri, _, _ in task.calls)
+
+
 @pytest.mark.parametrize('version', ('2021.1', '2022.1', *VERSIONS))
 def test_cli_reported_error_cannot_pass_verification_or_retry(tmp_path, version):
     task = CliProjectTask(tmp_path, version, outcome=1)
