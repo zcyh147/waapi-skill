@@ -597,6 +597,63 @@ def test_atomic_presence_guard_preserves_an_existing_reference_without_rewriting
 
 
 @pytest.mark.parametrize("version", VERSIONS)
+def test_conflicting_reference_presence_conditions_reject_before_any_write(tmp_path, version):
+    task = ReferencePresenceTask(tmp_path, version)
+    contradictory = deepcopy(task.metadata["UserAuxSendVolume0"]["dependencies"][0])
+    contradictory["conditions"][0]["referenceIsSet"] = False
+    task.metadata["UserAuxSendVolume0"]["dependencies"].append(contradictory)
+    target = task.bind(FIRST)
+    field = task.discover(target, "UserAuxSendVolume0")
+    code, declared = task.step("draft-declare-field-change", "--object-handle", target,
+                              "--field-handle", field, "--business-value", "-6")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 2 and checked["error_code"] == "REFERENCE_DEPENDENCY_CONFLICT", checked
+    assert not any(uri.endswith(("object.set", "setProperty", "setReference")) for uri, _, _ in task.calls)
+
+
+class SerializedScalarTask(ScalarPropertyTask):
+    def call(self, uri, args=None, options=None):
+        # Exercise independent JSON values as the external WAAPI transport does.
+        return json.loads(json.dumps(super().call(uri, args, options)))
+
+
+@pytest.mark.parametrize("version", VERSIONS[1:])
+@pytest.mark.parametrize("current,metadata_type,restriction", [
+    (999.0, "Real64", {"type": "range", "min": 1, "max": 1000}),
+    (1, "int16", {"type": "enum", "values": [{"value": 1.0}]}),
+])
+def test_satisfied_numeric_condition_preserves_native_value_across_json_reads(tmp_path, version, current, metadata_type, restriction):
+    task = SerializedScalarTask(tmp_path, version, operation="object.set")
+    task.metadata["LfoSmoothing"]["dependencies"][0]["conditions"][0]["restriction"] = restriction
+    task.metadata["LfoWaveform"] = {"name": "LfoWaveform", "type": metadata_type,
+                                    "restriction": {"type": "range", "min": 0, "max": 1000}}
+    task.objects[FIRST]["LfoWaveform"] = current
+    target = task.bind(FIRST)
+    field = task.discover(target, "LfoSmoothing")
+    code, declared = task.step("draft-declare-existing", "--declaration-id", "smoothing",
+                              "--object-handle", target, "--field-value", field, "50")
+    assert code == 0, declared
+    code, checked = task.step("draft-check")
+    assert code == 0, checked
+    code, preview = task.step("preview-from-draft")
+    assert code == 0, preview
+    assert "derived_changes" not in preview["preview_summary"]
+    tx = preview["transaction_id"]
+    code, shown = task.run("transaction-show", tx)
+    assert code == 0, shown
+    assert "@LfoWaveform" not in shown["artifact"]["prepared_operation"]["dispatch"]["args"]["objects"][0]
+    code, confirmed = task.run("confirm", tx, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, executed = task.run("execute", tx)
+    assert code == 0, executed
+    code, verified = task.run("verify", tx)
+    assert code == 0 and verified["verified"] is True, verified
+    assert type(task.objects[FIRST]["LfoWaveform"]) is type(current)
+    assert task.objects[FIRST]["LfoWaveform"] == current
+
+
+@pytest.mark.parametrize("version", VERSIONS)
 @pytest.mark.parametrize("context", ["Self", "Parent"])
 def test_visibility_condition_does_not_derive_or_require_a_prerequisite_write(tmp_path, version, context):
     task = AttenuationTask(tmp_path, version, operation="object.setProperty")

@@ -109,10 +109,18 @@ def condition_restriction(conditions: Any) -> dict[str, Any]:
     raise MetadataRestrictionError("INVALID_METADATA", "Condition restriction is malformed or has an unimplemented native shape.")
 
 
+def condition_values_equal(left: Any, right: Any) -> bool:
+    """Compare native scalars without treating Boolean values as numbers."""
+    if isinstance(left, (int, float)) and not isinstance(left, bool):
+        return (isinstance(right, (int, float)) and not isinstance(right, bool)
+                and math.isfinite(left) and math.isfinite(right) and left == right)
+    return type(left) is type(right) and left == right
+
+
 def condition_matches(restriction: Mapping[str, Any], value: Any) -> bool:
     """Evaluate a validated scalar condition with Boolean/number distinction."""
     if restriction["type"] == "enum":
-        return any(type(value) is type(row["value"]) and value == row["value"] for row in restriction["values"])
+        return any(condition_values_equal(value, row["value"]) for row in restriction["values"])
     return (isinstance(value, (int, float)) and not isinstance(value, bool)
             and math.isfinite(value) and restriction["min"] <= value <= restriction["max"])
 

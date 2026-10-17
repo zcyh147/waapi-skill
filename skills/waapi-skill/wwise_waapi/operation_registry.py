@@ -65,6 +65,7 @@ from .io_policy import IOPolicyError, validate_isolated_io
 from .identity_limits import MULTI_IDENTITY_READ_MAX_IDS
 from .metadata_restrictions import (
     MetadataRestrictionError,
+    condition_values_equal,
     reference_allowed_types,
     reference_type_token,
 )
@@ -6130,9 +6131,9 @@ def _prepare_object_set(
             }
         )
         for property_spec in target_spec["properties"]:
-            if property_spec.get("derived") and _field_value(
+            if property_spec.get("derived") and condition_values_equal(_field_value(
                 snapshot_rows[0], property_spec["name"]
-            ) is property_spec["value"]:
+            ), property_spec["value"]):
                 trusted.pop(f"@{property_spec['name']}", None)
                 property_spec["already_satisfied"] = True
         target_spec["pre_state"] = snapshot_rows[0]
@@ -7340,6 +7341,16 @@ def _apply_reference_activation_dependencies(
             from .metadata_restrictions import reference_presence_condition, MetadataRestrictionError
             try:
                 required_presence = reference_presence_condition(conditions)
+                if dependency["action"] == "Enable":
+                    accumulated = {
+                        reference_presence_condition(item.get("conditions"))
+                        for source in (metadata, *_condition_sources) for item in source.dependencies
+                        if item.get("type") == "reference" and item.get("action") == dependency["action"]
+                        and item.get("context") == dependency["context"]
+                        and isinstance(item.get("property"), str) and item["property"].casefold() == name.casefold()
+                    }
+                    if len(accumulated) != 1:
+                        raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference-presence conditions require incompatible states.")
             except MetadataRestrictionError as exc:
                 raise OperationContractError("INVALID_METADATA", str(exc)) from exc
             if dependency["action"] == "Show" and dependency["context"] in {"Self", "Parent", "AssocParent"}:
@@ -7469,15 +7480,15 @@ def _apply_reference_activation_dependencies(
                         details={"property": property_name, "value": required_value, "restriction": restriction})
             else:
                 choices = restriction.get("values", [])
-                if len(choices) == 1:
-                    required_value = choices[0]["value"]
-                elif object_id is not None:
+                if object_id is not None:
                     rows = _rows(read(OBJECT_GET_URI, {"from": {"id": [object_id]}},
                                       {"return": ["id", property_name]}))
                     if len(rows) != 1 or not _same_identity(rows[0].get("id"), object_id) or not _has_field(rows[0], property_name):
                         raise OperationContractError("INVALID_READBACK", "Condition value must resolve on the exact object.")
                     required_value = _field_value(rows[0], property_name)
-                    if not condition_matches(restriction, required_value):
+                    if not condition_matches(restriction, required_value) and len(choices) == 1:
+                        required_value = choices[0]["value"]
+                    elif not condition_matches(restriction, required_value):
                         raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
                             "Choose an explicit prerequisite value satisfying the live condition.",
                             details={"property": property_name, "current_value": required_value,
@@ -7487,6 +7498,8 @@ def _apply_reference_activation_dependencies(
                                          "object_id": object_id, "selection": "live_discovered_Field_Handle",
                                          "restriction": restriction,
                                      }]})
+                elif len(choices) == 1:
+                    required_value = choices[0]["value"]
                 else:
                     raise OperationContractError("REFERENCE_ACTIVATION_REQUIRED",
                         "A new object needs an explicit prerequisite value satisfying the live condition.",
@@ -7520,7 +7533,7 @@ def _apply_reference_activation_dependencies(
             raise OperationContractError("REFERENCE_DEPENDENCY_LIMIT", "Reference activation dependency count exceeds 16.")
         if property_key in seen_dependencies:
             prior = next(spec for spec in property_specs if str(spec["name"]).casefold() == property_key)
-            if type(prior["value"]) is not type(required_value) or prior["value"] != required_value:
+            if not condition_values_equal(prior["value"], required_value):
                 raise OperationContractError("REFERENCE_DEPENDENCY_CONFLICT", "Reference activation conditions conflict.", details={"property": property_name})
             continue
         seen_dependencies.add(property_key)
@@ -7585,7 +7598,7 @@ def _apply_reference_activation_dependencies(
             )
         if matching_specs:
             property_spec = matching_specs[0]
-            if type(property_spec.get("value")) is not type(required_value) or property_spec.get("value") != required_value:
+            if not condition_values_equal(property_spec.get("value"), required_value):
                 raise OperationContractError(
                     "REFERENCE_DEPENDENCY_CONFLICT",
                     "An explicit property value conflicts with the reference activation requirement.",
