@@ -132,6 +132,25 @@ def test_every_public_route_executes_through_packaged_program_code(entry: Capabi
         assert code != 0 and len(client.calls) == 1, replay
         return
 
+    if entry.uri in {"ak.wwise.core.undo.undo", "ak.wwise.core.undo.redo"}:
+        # History now requires an owned scoped expectation through the public
+        # business Draft; empty schema arguments cannot establish that proof.
+        from tests.unit.test_compound_undo_business_gateway import _owned_notes_history_case
+        client, _state, _source, preview, _shown, run = _owned_notes_history_case(
+            tmp_path, version=entry.version, direction=entry.uri.rsplit(".", 1)[-1])
+        assert not any(call[0] == entry.uri for call in client.calls)
+        code, executed = run("execute", preview["transaction_id"])
+        assert code == 0 and executed["executed"] is True, executed
+        assert [call[1:] for call in client.calls if call[0] == entry.uri] == [({}, {})]
+        code, verified = run("verify", preview["transaction_id"])
+        assert code == 0 and verified["verified"] is True, verified
+        assert verified["verification_strength"] == "scoped_history_effect_readback"
+        assert verified["agent_result"]["result"] == {}
+        assert list(verified)[-1] == "agent_result"
+        code, replay = run("execute", preview["transaction_id"])
+        assert code != 0 and len([call for call in client.calls if call[0] == entry.uri]) == 1, replay
+        return
+
     args, options, expected_result = request_and_result_from_schema(entry.schema)
     earlier_void = (entry.version in {"2021.1", "2022.1", "2023.1"} and entry.uri in {
         "ak.wwise.cli.moveMediaIdsToSingleFile", "ak.wwise.cli.moveMediaIdsToWorkUnits",
