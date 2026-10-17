@@ -5172,7 +5172,7 @@ def test_wait_topic_uses_payload_match_and_unsubscribes(tmp_path: Path) -> None:
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"}},
                 {"object": {"id": wanted, "name": "UI"}},
             ]
         },
@@ -5209,7 +5209,7 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"}},
                 {"object": {"id": wanted, "name": "UI_1"}},
                 {"object": {"id": wanted, "name": "UI_2"}},
             ]
@@ -5246,7 +5246,7 @@ def test_stream_topic_emits_matching_events_immediately_from_one_subscription(
     assert records[0]["session_context"]["available"] is True
     assert terminal["contract"] == waapi_gateway.TOPIC_STREAM_RECORD_CONTRACT
     assert terminal["record_type"] == "terminal"
-    assert terminal["status"] == "completed"
+    assert terminal["status"] == "stopped"
     assert terminal["completion_reason"] == "duration_elapsed"
     assert terminal["event_count"] == 2
     assert terminal["cleanup"] == "unsubscribed"
@@ -5322,7 +5322,7 @@ def test_stream_topic_discloses_effective_idle_policy_without_shortening_user_du
 ) -> None:
     topic = "ak.wwise.core.object.created"
     client = FakeClient({"ak.wwise.core.getInfo": live_info()},
-        subscription_events={topic: [{"object": {"id": "one", "name": "One"}}]})
+        subscription_events={topic: [{"object": {"id": "{00000000-0000-0000-0000-000000000001}", "name": "One"}}]})
     records: list[Mapping[str, Any]] = []
     code, terminal = waapi_gateway.execute_gateway(
         [*global_args, "stream-topic", topic, "--event-count", "1", *idle_args,
@@ -5355,7 +5355,7 @@ def test_stream_topic_matching_events_restart_idle_clock(tmp_path: Path, monkeyp
     monkeypatch.setattr(waapi_gateway, "time", SimpleNamespace(monotonic=lambda: clock[0]))
     topic = "ak.wwise.core.object.created"
     client = FakeClient({"ak.wwise.core.getInfo": live_info()}, subscription_events={
-        topic: [{"object": {"id": str(i), "name": "Sound"}} for i in range(3)]})
+        topic: [{"object": {"id": f"{{00000000-0000-0000-0000-{i:012x}}}", "name": "Sound"}} for i in range(3)]})
     def sink(record: Mapping[str, Any]) -> None:
         if record["record_type"] == "event":
             clock[0] += 4.0
@@ -5378,9 +5378,9 @@ def test_stream_topic_stops_at_its_explicit_event_count_bound(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "one", "name": "UI_1"}},
-                {"object": {"id": "two", "name": "UI_2"}},
-                {"object": {"id": "three", "name": "UI_3"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000001}", "name": "UI_1"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000002}", "name": "UI_2"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "UI_3"}},
             ]
         },
     )
@@ -5472,7 +5472,7 @@ def test_stream_topic_bounds_cumulative_event_record_output(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": str(index), "name": "x" * 512}}
+                {"object": {"id": f"{{00000000-0000-0000-0000-{index:012x}}}", "name": "x" * 512}}
                 for index in range(8)
             ]
         },
@@ -5735,7 +5735,7 @@ def test_wait_topic_no_timeout_returns_strict_bounded_json(
     tmp_path: Path,
 ) -> None:
     topic = "ak.wwise.core.object.created"
-    event = {"object": {"id": "wanted", "name": "UI"}}
+    event = {"object": {"id": "{00000000-0000-0000-0000-000000000002}", "name": "UI"}}
     client = FakeClient(
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={topic: [event]},
@@ -5849,7 +5849,7 @@ def test_wait_topic_collects_bounded_matching_events_in_order(tmp_path: Path) ->
         {"ak.wwise.core.getInfo": live_info()},
         subscription_events={
             topic: [
-                {"object": {"id": "wrong", "name": "Ignore"}},
+                {"object": {"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"}},
                 {"object": {"id": wanted, "name": "UI_1"}},
                 {"object": {"id": wanted, "name": "UI_2"}},
                 {"object": {"id": wanted, "name": "UI_3"}},
@@ -5918,7 +5918,7 @@ def test_wait_topic_accepts_waapi_client_kwargs_only_callback_shape(tmp_path: Pa
         ) -> FakeEventHandler:
             handler = FakeEventHandler()
             self.handlers.append(handler)
-            callback(object={"id": "wrong", "name": "Ignore"})
+            callback(object={"id": "{00000000-0000-0000-0000-000000000003}", "name": "Ignore"})
             callback(object={"id": wanted, "name": "UI"})
             return handler
 

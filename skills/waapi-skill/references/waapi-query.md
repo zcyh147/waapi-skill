@@ -181,8 +181,12 @@ The stream ends at count/time limits, user cancellation, or a bounded low-freque
 health check detects host loss. Every streamed event and the cumulative NDJSON
 bytes are bounded and validated; overflow fails closed instead of silently
 dropping an event. Every exit always attempts to unsubscribe and emits one
-terminal NDJSON record. For `idle_timeout`, report observed/target counts and
-the stop reason, not completion; do not automatically restart.
+terminal NDJSON record. Use `monitoring_outcome.target_completed` as completion
+authority. Duration or idle termination before the count reports `stopped`;
+report observed/target counts and the stop reason without automatically restarting.
+Subscription acknowledgement proves setup only. Every delivered event is checked
+against its pinned publish schema and reachable definitions before matching;
+malformed events and overflow fail monitoring with separate cleanup evidence.
 
 For a vague `ak.wwise.core.soundbank.generated` wait, explicitly pass gateway-global
 `--timeout 120` and announce 120 seconds. This is Skill-selected; Gateway still

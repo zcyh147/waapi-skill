@@ -9,7 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from .capabilities import CapabilityCatalog, CapabilityNotFoundError
 from .canonical import canonical_sha256
-from .schema_inventory import DefinitionGraph, load_definition_graph
+from .schema_inventory import DefinitionGraph, load_definition_graph, topic_publish_schema
 from .typed_requests import (
     MaterializedTypedRequest,
     TypedRequestContract,
@@ -90,7 +90,7 @@ def topic_match_contract(version: str, topic: str) -> TypedRequestContract:
         version=version,
         uri=f"{TOPIC_MATCH_OPERATION_PREFIX}{topic}",
         schema={
-            "argsSchema": _optional_match_schema(publish),
+            "argsSchema": _optional_match_schema(topic_publish_schema(version, topic, schema)),
             "optionsSchema": _empty_object_schema(),
         },
         graph=_optional_match_definition_graph(version),

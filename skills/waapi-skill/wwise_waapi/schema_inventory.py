@@ -1172,6 +1172,42 @@ def _is_legacy_implicit_property(
     )
 
 
+def topic_publish_schema(version: str, uri: str, schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Project known legacy Topic members using the inventory's exact parser.
+
+    The immutable reflected resource and its native branch pointers stay intact.
+    Only the already reviewed 2021 SoundBank implicit properties are moved into
+    the normal properties wrapper for construction and delivered-event checks.
+    """
+    allowed = (
+        LEGACY_2021_SOUNDBANK_IMPLICIT_PROPERTY_PATHS
+        if version == "2021.1" and uri == "ak.wwise.core.soundbank.generated"
+        else frozenset()
+    )
+
+    def project(value: Any, path: str) -> Any:
+        if isinstance(value, list):
+            return [project(child, f"{path}/{index}") for index, child in enumerate(value)]
+        if not isinstance(value, Mapping):
+            return value
+        result = {key: project(child, f"{path}/{_encode_pointer_token(key)}") for key, child in value.items()}
+        implicit = [key for key in value if _is_legacy_implicit_property(
+            value, key, node_path=path, allowed_paths=allowed,
+        )]
+        if implicit:
+            properties = result.setdefault("properties", {})
+            for key in implicit:
+                if key in properties:
+                    raise SchemaInventoryError(f"Conflicting legacy Topic property at {path}/{key}")
+                properties[key] = result.pop(key)
+        return result
+
+    publish = schema.get("publishSchema")
+    if not isinstance(publish, Mapping):
+        raise SchemaInventoryError(f"Topic {uri!r} has no reflected publish schema")
+    return project(publish, "/publishSchema")
+
+
 def _read_json_object(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))

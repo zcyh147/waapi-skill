@@ -28,4 +28,9 @@ Users can monitor every in-scope Topic using its legal filtering/options and obt
 
 ## Completion boundary
 
+The partial monitoring implementation, independent five-version catalog
+comparison, exact 2025 Notes-shape probe and outstanding native/#189 trigger
+dependencies are recorded in [Topic monitoring](../TOPIC_MONITORING.md). That
+checkpoint does not close this ticket or grant native/Fresh coverage.
+
 Complete only the exact branch scope and evidence owned by this ticket. A native limitation must be supported by matching native evidence and considered alternatives; an implementation or environment limitation remains unfinished. Any required shared implementation discovered during work must become an explicit dependency, not an undocumented ordering assumption.

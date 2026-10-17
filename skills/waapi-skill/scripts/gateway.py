@@ -182,7 +182,7 @@ from wwise_waapi.topic_business import (  # noqa: E402  # pyright: ignore[report
     topic_business_contract,
 )
 from wwise_waapi.builders.schema import (  # noqa: E402  # pyright: ignore[reportMissingImports]
-    validate_semantic_event,
+    validate_resolved_semantic_event as validate_semantic_event,
     validate_semantic_payload,
     validate_semantic_result,
 )
@@ -509,6 +509,7 @@ from wwise_waapi.safety import (  # noqa: E402  # pyright: ignore[reportMissingI
 from wwise_waapi.subscriptions import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DEFAULT_LISTENER_QUEUE_SIZE,
     MAX_WAIT_EVENT_COUNT,
+    SubscriptionEventValidationError,
     SubscriptionManager,
     payload_matches,
 )
@@ -8709,6 +8710,16 @@ def dispatch_offline_command(args: argparse.Namespace, *, env: Mapping[str, str]
                 "idle_override": "--idle-timeout",
                 "idle_disable": "--no-idle-timeout",
                 "default_idle_applies": "without_total_timeout",
+                "event_validation": "pinned_publish_schema_and_reachable_definitions_before_matching",
+                "matching": {
+                    "objects": "recursive_subset",
+                    "arrays": "exact_length_and_position",
+                    "scalars": "json_equality_with_distinct_booleans",
+                    "duplicate_callbacks": "count_separately",
+                },
+                "completion_authority": "monitoring_outcome.target_completed",
+                "partial_duration_or_idle_status": "stopped",
+                "subscription_acknowledgement": "setup_only",
             },
             "continuation": {
                 "subcommands": ["wait-topic", "stream-topic"],
@@ -15320,6 +15331,10 @@ def dispatch_command(
             options=request_options,
             topic_match=match or None,
             topic_event_count=args.event_count,
+            topic_event_validator=lambda event: validate_monitored_topic_event(
+                args.api, event, version=detected_version,
+                authoring_ui_profile=live_info.get("isCommandLine") is False,
+            ),
             operation_timeout=reserved_topic_wait_timeout(connection),
             result_limit_bytes=int(capability.execution_contract["result_limit_bytes"]),
         )
@@ -15345,6 +15360,19 @@ def dispatch_command(
             "call": dispatch_call_summary(result),
         }
         cleanup = topic_subscription_cleanup_status(result)
+        payload["monitoring_outcome"] = {
+            "subscription_established": True if cleanup != "unknown" else None,
+            "requested_event_count": args.event_count,
+            "event_count": (
+                args.event_count if result.get("ok")
+                else (result.get("details") or {}).get("event_count")
+            ),
+            "target_completed": bool(result.get("ok")),
+            "termination": (
+                "event_count_reached" if result.get("ok")
+                else "timeout" if result.get("error_code") == "TIMEOUT" else "error"
+            ),
+        }
         if args.event_count == 1:
             event = normalize_topic_event_result(result, expected_topic=args.api) if result.get("ok") else None
             event_validation = (
@@ -15403,6 +15431,23 @@ def dispatch_command(
             common=common,
         )
     raise GatewayInputError(f"unsupported command: {args.command}")
+
+
+def validate_monitored_topic_event(
+    topic: str, event: Any, *, version: str, authoring_ui_profile: bool,
+) -> Any:
+    """Keep a small exact native-shape diagnostic without accepting bad events."""
+    try:
+        return validate_semantic_event(
+            topic, event, version=version, authoring_ui_profile=authoring_ui_profile,
+        )
+    except SemanticValidationError as exc:
+        diagnostic = None
+        if probe_gateway_json_document_size(event, 2048) == "ok":
+            diagnostic = json.dumps(event, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        raise SubscriptionEventValidationError(
+            topic, validation_failure=exc.as_dict(), event_json=diagnostic,
+        ) from exc
 
 
 def dispatch_topic_stream(
@@ -15573,8 +15618,6 @@ def dispatch_topic_stream(
             )
             if event is None:
                 continue
-            if match and not payload_matches(event.payload, match):
-                continue
             payload_probe = probe_gateway_json_document_size(
                 event.payload,
                 result_limit_bytes,
@@ -15593,12 +15636,14 @@ def dispatch_topic_stream(
                         else "RESULT_NOT_JSON"
                     ),
                 )
-            validation = validate_semantic_event(
+            validation = validate_monitored_topic_event(
                 args.api,
                 event.payload,
                 version=detected_version,
                 authoring_ui_profile=live_info.get("isCommandLine") is False,
             )
+            if match and not payload_matches(event.payload, match):
+                continue
             if idle_seconds is not None:
                 idle_expires_at = time.monotonic() + idle_seconds
             sequence = event_count + 1
@@ -15678,6 +15723,13 @@ def dispatch_topic_stream(
         "event_count_reached": event_count >= args.event_count,
         "elapsed_seconds": max(0.0, time.monotonic() - stream_started_at),
         "cleanup": cleanup_status,
+        "monitoring_outcome": {
+            "subscription_established": True,
+            "requested_event_count": args.event_count,
+            "event_count": event_count,
+            "target_completed": event_count >= args.event_count and primary_error is None and cleanup_failure is None,
+            "termination": "error" if primary_error is not None or cleanup_failure is not None else completion_reason,
+        },
     }
     if primary_error is not None:
         normalized = normalize_gateway_exception(primary_error)
@@ -15713,7 +15765,7 @@ def dispatch_topic_stream(
     terminal.update(
         {
             "ok": True,
-            "status": "stopped" if completion_reason == "idle_timeout" else "completed",
+            "status": "completed" if completion_reason == "event_count_reached" else "stopped",
             "completion_reason": completion_reason,
         }
     )
@@ -22451,6 +22503,7 @@ def dispatch(
     topic_mode: str = "wait",
     topic_match: Mapping[str, Any] | None = None,
     topic_event_count: int = 1,
+    topic_event_validator: Callable[[Any], Any] | None = None,
     live_behavior: bool = False,
     exact_object_lookup: bool = False,
     operation_timeout: float | None = None,
@@ -22474,6 +22527,7 @@ def dispatch(
         topic_mode=topic_mode,
         topic_match=topic_match,
         topic_event_count=topic_event_count,
+        topic_event_validator=topic_event_validator,
         live_behavior=live_behavior,
         result_limit_bytes=result_limit_bytes,
     )
