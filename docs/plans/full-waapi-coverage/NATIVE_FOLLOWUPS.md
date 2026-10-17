@@ -21,6 +21,12 @@ three exact source patterns are in
 unfinished. Changing old source-control fixtures to the padded WAV only
 isolates those fixtures' intended behavior.
 
+The committed reproduction is
+`tests/unit/test_object_native_surface.py::test_object_set_2023_inline_wav_import_is_canonicalized`:
+mono 16-bit PCM at 44100 Hz, zero frames versus two zero-valued frames. The
+48-byte file SHA-256 is
+`0588c6a627c6603830a9e5d87ab258d4977c02876b9bac8f9598fccef098c1cf`.
+
 Obtain exact matching native evidence for the unpadded case and a padded control,
 including the resulting source/media bytes. Historical searches of named
 `object_set.json` receipts in the ignored campaign and evidence trees found no
