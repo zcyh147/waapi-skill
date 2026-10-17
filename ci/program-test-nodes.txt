@@ -218,6 +218,7 @@ tests/unit/test_authoring_core_gateway.py
 tests/unit/test_authoring_layout_gateway.py
 tests/unit/test_authoring_layout_mutation_gateway.py
 tests/unit/test_authoring_layout_splitter_gateway.py
+tests/unit/test_authoring_layout_blueprint_gateway.py
 tests/unit/test_authoring_batch_adapter.py
 tests/unit/test_authoring_batch_owner.py
 tests/unit/test_authoring_launch_lifecycle.py

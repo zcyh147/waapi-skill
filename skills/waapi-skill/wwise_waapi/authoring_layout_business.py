@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from .authoring_layout import LAYOUT_VERSIONS, validate_layout_read_result
 from .canonical import canonical_sha256
+from .layout_blueprint import blueprint_schema, validate_blueprint, mint_blueprint_ids, compile_blueprint, blueprint_view_types
 
 LAYOUT_SWITCH_URI = 'ak.wwise.ui.layout.switchLayout'
 LAYOUT_SET_URI = 'ak.wwise.ui.layout.setLayout'
@@ -56,11 +57,15 @@ def layout_business_contract_data(operation: str, version: str) -> dict[str, Any
         'verifier': {'kind': 'authoring-layout-state', 'observation': 'independent current layout name'}}
     if operation == LAYOUT_SET_URI:
         result['declaration']['required_fields'].append('new_layout_name')
-        result['declaration']['public_fields'].append('new_layout_name')
+        result['declaration']['public_fields'].extend(['new_layout_name', 'blueprint'])
+        result['declaration']['optional_fields'] = ['blueprint']
+        result['declaration']['field_types']['blueprint'] = 'closed_layout_blueprint'
+        result['declaration']['input_forms']['blueprint'] = {'gateway_flag': '--blueprint', 'shape': 'json'}
+        result['blueprint_schema'] = blueprint_schema()
         result['declaration']['field_types']['new_layout_name'] = 'new_temporary_layout_name'
         result['declaration']['input_forms']['new_layout_name'] = {'gateway_flag': '--new-layout-name', 'shape': 'scalar'}
         result['responsibility_split']['agent'] = ['choose a new temporary layout name and discovered anchor layout']
-        result['responsibility_split']['gateway'] = ['prove exact target absence', 'construct empty layout declaration',
+        result['responsibility_split']['gateway'] = ['prove exact target absence', 'compile the closed optional nested blueprint with frozen generated identities',
             'bind to the discovered Authoring session', 'register once after authorization', 'read back the registered layout']
         result['verifier'] = {'kind': 'authoring-layout-state', 'observation': 'independent exact registered layout readback'}
     elif operation == LAYOUT_REMOVE_URI:
@@ -157,11 +162,15 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
                               target_identity: Mapping[str, Any] | None = None,
                               dock_request: Mapping[str, Any] | None = None,
                               splitter_identity: Mapping[str, Any] | None = None,
-                              splitter_request: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                              splitter_request: Mapping[str, Any] | None = None,
+                              blueprint: Mapping[str, Any] | None = None) -> dict[str, Any]:
     body = {key: record[key] for key in ('handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at')}
     body['observation_sha256'] = canonical_sha256(record['observation'])
     if registration_name is not None:
         body['registration_name'] = validate_new_layout_name(registration_name)
+    if blueprint is not None:
+        body['layout_blueprint'] = validate_blueprint(blueprint)
+        body['blueprint_node_ids'] = mint_blueprint_ids(blueprint)
     if view_request is not None:
         native_view_request(view_request)
         body['view_request'] = dict(view_request)
@@ -185,7 +194,7 @@ def layout_binding_descriptor(record: Mapping[str, Any], *, registration_name: s
 
 def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, Any]:
     expected = {'handle', 'context', 'layout_name', 'role', 'native_id', 'expires_at', 'observation_sha256', 'binding_sha256'}
-    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}, expected | {'view_identity', 'target_identity', 'dock_request'}, expected | {'splitter_identity', 'splitter_request'}):
+    if not isinstance(binding, Mapping) or set(binding) not in (expected, expected | {'registration_name'}, expected | {'registration_name', 'layout_blueprint', 'blueprint_node_ids'}, expected | {'view_request'}, expected | {'view_identity'}, expected | {'view_identity', 'position_request'}, expected | {'view_identity', 'target_identity', 'dock_request'}, expected | {'splitter_identity', 'splitter_request'}):
         raise ValueError('Layout mutation lacks an exact Gateway-owned identity binding')
     body = dict(binding)
     digest = body.pop('binding_sha256')
@@ -217,6 +226,8 @@ def validate_layout_binding(binding: Any, *, role: str = 'layout') -> dict[str, 
         raise ValueError('Layout mutation identity binding fields are malformed')
     if 'registration_name' in body:
         validate_new_layout_name(body['registration_name'])
+    if 'layout_blueprint' in body:
+        compile_blueprint(body['layout_blueprint'], name=body['registration_name'], node_ids=body['blueprint_node_ids'])
     if 'view_request' in body:
         native_view_request(body['view_request'])
     if 'position_request' in body:
@@ -255,7 +266,9 @@ def materialize_layout_business_request(operation: str, session: Any) -> Mapping
         name = validate_new_layout_name(plan['new_layout_name'])
         if name != binding.get('registration_name'):
             raise ValueError('New layout name differs from the Gateway-owned declaration binding')
-        native_args = {'name': name, 'layout': {'Layout': {'Name': name}}}
+        if plan.get('blueprint') != binding.get('layout_blueprint'):
+            raise ValueError('Nested blueprint differs from its Gateway-owned declaration binding')
+        native_args = {'name': name, 'layout': registration_layout(binding)}
     elif operation == LAYOUT_GET_OR_CREATE_URI:
         view_request = {key: value for key, value in plan.items() if key != 'layout_handle'}
         if binding.get('view_request') != view_request:
@@ -295,7 +308,7 @@ def validate_layout_call(version: str, api: str, args: Mapping[str, Any], option
     expected = {'name': verified['layout_name']}
     if api == LAYOUT_SET_URI:
         name = validate_new_layout_name(verified.get('registration_name'))
-        expected = {'name': name, 'layout': {'Layout': {'Name': name}}}
+        expected = {'name': name, 'layout': registration_layout(verified)}
     elif api == LAYOUT_GET_OR_CREATE_URI:
         expected = native_view_request(verified.get('view_request'))
     elif api == LAYOUT_SPLITTER_URI:
@@ -631,3 +644,27 @@ def layout_view_identities(instances: list[dict[str, Any]]) -> list[dict[str, st
     rows = canonical_view_instances({'viewInstances': instances})
     return sorted([{'view_id': _element_identity(row['viewID']), 'view_type': row['viewName']}
                    for row in rows], key=lambda row: (row['view_id'], row['view_type']))
+
+
+def registration_layout(binding: Mapping[str, Any]) -> dict[str, Any]:
+    name = validate_new_layout_name(binding['registration_name'])
+    if 'layout_blueprint' not in binding:
+        return {'Layout': {'Name': name}}
+    return compile_blueprint(binding['layout_blueprint'], name=name, node_ids=binding['blueprint_node_ids'])
+
+
+def blueprint_view_catalog(binding: Mapping[str, Any], *, read: Any) -> list[dict[str, Any]]:
+    if 'layout_blueprint' not in binding:
+        return []
+    requested = blueprint_view_types(binding['layout_blueprint'])
+    if not requested:
+        return []
+    catalog = read('ak.wwise.ui.layout.getViewTypes', {}, {})
+    validate_layout_read_result('types', catalog)
+    result = []
+    for name in requested:
+        matches = [row for row in catalog.get('viewTypes', []) if row.get('viewName') == name]
+        if not matches or any(row != matches[0] for row in matches):
+            raise ValueError('Nested blueprint requires each exact type in the fresh live view catalog')
+        result.append(dict(matches[0]))
+    return result

@@ -314,3 +314,25 @@ old wrapper removal and changed dock flags; the 30-case full positive movement
 matrix plus pre-execute unrelated-view drift controls passed. Container-ID or
 whole-view-state equality is not an extra post-write prerequisite. Original
 native behavior proof and complete nested/reset scope remain outstanding.
+
+A further #188 constructor partial extends the existing setLayout Draft with a
+closed local-key stack/view blueprint. The Gateway generates and freezes unique
+node identities at declaration, validates a bounded single tree, derives native
+keys, checks fresh view-type availability before Preview and execution, and
+verifies all requested nested fields and child order after registration. Empty
+registration remains available. A distinct optional workspace name preserves
+Layout.Name separately from the temporary lookup name; omission uses the lookup
+name as a Gateway convenience. Matching installed SDK documentation supports the
+field distinction, not native divergent-name write or overwrite acceptance.
+
+Focused source validation passed 47 tests across blueprint contracts, existing
+empty registration/removal, profiles, original definition obligations, exact
+owner and additive 231-node Program roster. Original schema/fixture failures are
+retained. A later maximum-depth control exposed a genuine readback mismatch at
+16 stack levels (one failed); the declared business bound was tightened to 14
+without changing the existing native-result limits, and that control passed.
+Native definitions, their capital OneOf/allOf and per-version sidebar enum
+inconsistencies remain untouched. This is a partial constructor, not complete
+nested-layout coverage. Typed editor/sidebar/window/history creation and state
+changes, reset branches and owned effect evidence remain #188 work under the
+unchanged GUI hold. No old native receipt is transferred to this source.

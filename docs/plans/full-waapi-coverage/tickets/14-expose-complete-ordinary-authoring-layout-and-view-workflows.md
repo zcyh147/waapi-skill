@@ -111,3 +111,22 @@ tool was executed. This closes the Mac source plumbing milestone for the five
 currently owner-aware layout nodes, with real startup/effect proof still pending.
 Windows ownership and other families remain explicit unsupported integration
 requirements. The five-node roster grants no complete-layout or native credit.
+
+
+## Closed nested constructor partial (2026-10-17)
+
+The existing setLayout Draft accepts a bounded local-key stack/view blueprint.
+The Gateway owns generated IDs, native keys, live view-type validation, immutable
+materialization and complete requested-field/order readback. A separate optional
+workspace name expresses the inner Layout.Name without forcing equality to its
+temporary lookup name; omission deliberately uses the latter as a convenience.
+The matching SDK getLayout example documents differing names but grants no
+native write/overwrite proof. Focused fake controls passed 47 cases; a further
+maximum-depth RED exposed the serialized readback limit and passed after the
+business ceiling was tightened to 14, preserving existing native bounds.
+
+This is a constructor milestone only. Typed editor/sidebar state choices and
+changes, floating windows, all eight history lists, view-specific state, splitter
+and tab-panel contradictions, reset omission/empty/list behavior and host-specific
+effect evidence remain owned here. Opaque observed-state reuse does not complete
+new state creation. All acceptance boxes and native requirements remain open.

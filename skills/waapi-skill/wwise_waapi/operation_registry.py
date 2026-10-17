@@ -23,8 +23,9 @@ from pathlib import Path
 from typing import Any, Callable, Mapping, NoReturn, Sequence
 from xml.etree import ElementTree as ET
 
+from .layout_blueprint import declared_layout_matches
 from .authoring_layout import LAYOUT_READ_URIS, validate_layout_read_result
-from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
+from .authoring_layout_business import LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_REMOVE_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, blueprint_view_catalog, layout_view_identities, splitter_state_observation, splitter_element_context, docking_topology_proof, layout_subtree_ids, dock_state_observation, layout_element_observation, require_layout_rectangle, docking_side_matches, validate_layout_view_binding, validate_layout_call, validate_layout_live_binding, require_layout_absence, require_temporary_layout, view_creation_observation, canonical_view_instances
 
 from .canonical import canonical_json_bytes, canonical_sha256
 from .business_adapters import business_adapter
@@ -8861,6 +8862,10 @@ def prepare_operation(request: OperationRequest, *, read_call: ReadCall) -> Prep
                     metadata['layout_target_absence'] = require_layout_absence(call_args['name'], read=read)
                 except ValueError as exc:
                     raise OperationContractError('LAYOUT_REGISTRATION_COLLISION', str(exc)) from exc
+                try:
+                    metadata['layout_blueprint_view_catalog'] = blueprint_view_catalog(arguments['layout_binding'], read=read)
+                except ValueError as exc:
+                    raise OperationContractError('INVALID_LAYOUT_BLUEPRINT_VIEW_TYPE', str(exc)) from exc
                 verification['expected_layout'] = dict(call_args['layout'])
             elif api == LAYOUT_REMOVE_URI:
                 try:
@@ -13664,6 +13669,8 @@ def validate_prepared_roles(prepared: Mapping[str, Any], *, read_call: ReadCall)
                 if api == LAYOUT_SET_URI:
                     absence = require_layout_absence(call_args['name'], read=read_call)
                     readbacks.append(absence)
+                    if blueprint_view_catalog(arguments['layout_binding'], read=layout_guard_read) != pre_state.get('layout_blueprint_view_catalog'):
+                        raise ValueError('Nested blueprint live view catalog changed after preview')
                 elif api == LAYOUT_REMOVE_URI:
                     require_temporary_layout(call_args['name'], read=layout_guard_read)
                 elif api == LAYOUT_GET_OR_CREATE_URI:
@@ -15949,10 +15956,12 @@ def verify_prepared_operation(
             validate_layout_read_result('contents', registered)
             readbacks.append({'uri': 'ak.wwise.ui.layout.getLayout', 'args': {'name': plan['expected_name']}, 'options': {}, 'result': registered})
             expected_layout = plan.get('expected_layout')
-            # This initial closed registration declares only a name: no canvas or arrangement is claimed.
             check('Registered layout retains its declared name', isinstance(expected_layout, Mapping)
                 and registered.get('Layout', {}).get('Name') == expected_layout.get('Layout', {}).get('Name'),
                 {'expected': expected_layout, 'actual': registered})
+            if isinstance(expected_layout, Mapping) and 'StackPanel' in expected_layout.get('Layout', {}):
+                check('Registered layout retains every declared nested field and child order',
+                    declared_layout_matches(expected_layout, registered), {'expected': expected_layout, 'actual': registered})
         elif uri == LAYOUT_REMOVE_URI:
             try:
                 absent = require_layout_absence(plan['expected_name'], read=read_call)

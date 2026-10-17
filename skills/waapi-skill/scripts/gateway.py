@@ -45,6 +45,7 @@ from wwise_waapi.authoring_layout import (  # noqa: E402
     LAYOUT_READS, LAYOUT_READ_URIS, LAYOUT_VERSIONS, MAX_LAYOUT_RESULT_BYTES,
     layout_read_arguments, layout_read_contract, layout_catalog_rows, validate_layout_read_result, layout_identity_rows,
 )
+from wwise_waapi.layout_blueprint import validate_blueprint  # noqa: E402
 from wwise_waapi.authoring_layout_handles import LayoutHandleStore, LayoutHandleError  # noqa: E402
 from wwise_waapi.authoring_layout_business import (  # noqa: E402
     LAYOUT_MUTATION_URIS, LAYOUT_SET_URI, LAYOUT_GET_OR_CREATE_URI, LAYOUT_CLOSE_URI, LAYOUT_UNDOCK_URI, LAYOUT_DOCK_URI, LAYOUT_SPLITTER_URI, layout_mutation_versions, layout_business_contract_data, layout_business_catalog_rows, layout_binding_descriptor,
@@ -2628,6 +2629,7 @@ def build_parser() -> argparse.ArgumentParser:
     draft_layout_plan.add_argument("--view-handle")
     draft_layout_plan.add_argument("--position-x", type=int)
     draft_layout_plan.add_argument("--position-y", type=int)
+    draft_layout_plan.add_argument("--blueprint")
     draft_layout_plan.add_argument('--splitter-handle')
     draft_layout_plan.add_argument('--pixel-delta', type=int)
     draft_layout_plan.add_argument('--target-element-handle')
@@ -6202,6 +6204,11 @@ def preflight_json_inputs(args: argparse.Namespace) -> None:
                 f"{args.command} --event-count must be between 1 and "
                 f"{MAX_WAIT_EVENT_COUNT}"
             )
+    elif args.command == 'draft-declare-layout-plan' and args.blueprint is not None:
+        try:
+            validate_blueprint(parse_json_object(args.blueprint, '--blueprint', max_document_bytes=256 * 1024))
+        except ValueError as exc:
+            raise GatewayInputError(str(exc)) from exc
     elif args.command == "draft-apply":
         # The authorized Draft binding decides the operation-local typed
         # Composer grammar. Dispatch performs that state-bound decision before
@@ -13390,6 +13397,12 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
         plan['new_layout_name'] = args.new_layout_name
     elif args.new_layout_name is not None:
         raise GatewayInputError('--new-layout-name belongs only to temporary layout registration')
+    blueprint = None
+    if args.blueprint is not None:
+        if pending.operation != LAYOUT_SET_URI:
+            raise GatewayInputError('Nested blueprint belongs only to temporary layout registration')
+        blueprint = validate_blueprint(parse_json_object(args.blueprint, '--blueprint', max_document_bytes=256 * 1024))
+        plan['blueprint'] = blueprint
     view_request = None
     if pending.operation == LAYOUT_GET_OR_CREATE_URI:
         view_request = {'view_type': args.view_type}
@@ -13437,7 +13450,7 @@ def dispatch_business_layout_plan(args: argparse.Namespace, *, env: Mapping[str,
                     registration_name=args.new_layout_name if pending.operation == LAYOUT_SET_URI else None,
                     view_request=view_request, view_identity=view_identity, position_request=position_request,
                     target_identity=target_identity, dock_request=dock_request,
-                    splitter_identity=splitter_identity, splitter_request=splitter_request)}
+                    splitter_identity=splitter_identity, splitter_request=splitter_request, blueprint=blueprint)}
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings(settings)
         adapter.materialize(candidate)
