@@ -1014,6 +1014,8 @@ def test_cli_migration_compact_identity_proofs_preserve_every_row(tmp_path, chan
     *[(version, 'AudioFileSource', None) for version in ['2021.1', '2022.1', '2023.1', '2024.1', '2025.1']],
     ('2025.1', 'MidiFileSource', None), ('2025.1', 'PluginMediaSource', None),
     ('2025.1', 'AudioFileSource', 'already-central'),
+    ('2025.1', 'AudioFileSource', 'mode-conflicting-encodings'),
+    ('2025.1', 'AudioFileSource', 'mode-value-list'),
     *[('2025.1', 'AudioFileSource', change) for change in ['media-id', 'source-id', 'filename',
         'language-id', 'other-language', 'duplicate-source', 'duplicate-media', 'missing-media',
         'mode-unchanged', 'work-unit-ids-remain', 'unrelated-property', 'unrelated-same-name-property']],
@@ -1066,6 +1068,12 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
                     if field is None:
                         field = ET.SubElement(fields, 'Property', Name='MediaIDsInSingleFile', Type='bool')
                     field.set('Value', 'True')
+                    if change in {'mode-conflicting-encodings', 'mode-value-list'}:
+                        if change == 'mode-conflicting-encodings':
+                            field.set('Value', 'False')
+                        else:
+                            del field.attrib['Value']
+                        ET.SubElement(ET.SubElement(field, 'ValueList'), 'Value').text = 'True'
                 tree.write(self.project_file)
             return super().call(uri, args, options)
     task = MoveMediaTask(tmp_path, version, 'ak.wwise.cli.moveMediaIdsToSingleFile')
@@ -1094,7 +1102,7 @@ def test_cli_media_id_move_verifies_exact_source_mapping_and_storage_mode(tmp_pa
     tree.write(task.unit)
     tx = task.execute_plan()
     code, payload = task.run('verify', tx)
-    if change not in {None, 'already-central'}:
+    if change not in {None, 'already-central', 'mode-value-list'}:
         assert code != 0 and payload['state'] == 'verification_failed', payload
         assert payload['verified'] is False
         code, payload = task.run('execute', tx)
