@@ -3,6 +3,7 @@ from __future__ import annotations
 from tests.support.gateway_config import set_gateway_config
 
 import importlib.util
+import base64
 import json
 import sys
 from collections import deque
@@ -2594,3 +2595,404 @@ def test_public_graph_preview_bounds_recursive_schema_reference_expansion(
     test_public_graph_preview_validates_reachable_native_definitions(
         tmp_path, "2025.1", "object.create", "reference-cycle", monkeypatch,
     )
+
+
+INLINE_PCM_PADDED = "UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="
+INLINE_PCM_UNPADDED = "UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
+
+
+def _public_inline_wav_preview(tmp_path, version, source_value, *, nested=True, verification_case=None):
+    """Drive the actual public Draft/Preview with only the native client faked."""
+    from tests.unit.test_object_native_surface import _project_info
+
+    root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    parent = {"id": PARENT_ID, "name": "Default Work Unit", "type": "WorkUnit",
+              "path": rf"\{root}\Default Work Unit"}
+    container_import = verification_case == "container-import"
+    if container_import:
+        parent.update(name="Weather", notes="", type="PropertyContainer" if version == "2025.1" else "ActorMixer",
+                      path=parent["path"] + r"\Weather")
+    project = _project(tmp_path)
+    project_root = Path(project["path"]).parent
+    complete_project = _project_info(project_root, language="SFX")
+    complete_project.update(project)
+    project = complete_project
+    calls = []
+    executed = False
+    copied = project_root / "Originals" / "SFX" / "Inline.wav"
+    sound = {"id": SECOND_ACTION_ID, "name": "Rain", "type": "Sound", "notes": "",
+             "path": parent["path"] + r"\Rain", "parent": {"id": PARENT_ID},
+             "activeSource": {"id": THIRD_ACTION_ID}, "originalFilePath": str(copied)}
+    source = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource", "notes": "",
+              "path": sound["path"] + r"\Inline", "parent": {"id": SECOND_ACTION_ID},
+              "audioSource:language": {"id": CONTROL_ID, "name": "SFX"}, "originalFilePath": str(copied)}
+    if container_import:
+        sound.update(name="Inline", path=parent["path"] + r"\Inline")
+        source["path"] = sound["path"] + r"\Inline"
+    if verification_case == "wrong-active-source":
+        sound["activeSource"] = {"id": CONTROL_ID}
+    elif verification_case == "wrong-parent":
+        source["parent"] = {"id": CONTROL_ID}
+    elif verification_case == "wrong-source-type":
+        source["type"] = "SourcePlugin"
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            nonlocal executed
+            calls.append(uri)
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [
+                    {"classId": 1, "name": "PropertyContainer" if version == "2025.1" else "ActorMixer", "type": "WObject"},
+                    {"classId": 2, "name": "Sound", "type": "Sound"},
+                ]}
+            if uri == "ak.wwise.core.object.get":
+                if args == {"waql": "from type Project take 1"}:
+                    return {"return": [{**project, "type": "Project"}]}
+                if args.get("from", {}).get("id") == [PARENT_ID] and not args.get("transform"):
+                    return {"return": [parent]}
+                if executed:
+                    ids = args.get("from", {}).get("id")
+                    if args.get("transform"):
+                        rows = ([sound, source] if container_import and args["transform"] == [{"select": ["descendants"]}]
+                                else [sound] if ids == [PARENT_ID] else [source])
+                        if verification_case == "extra-child" and ids == [SECOND_ACTION_ID] and args["transform"] == [{"select": ["children"]}]:
+                            rows = [*rows, {"id": CONTROL_ID, "name": "Unexpected", "type": "Sound",
+                                           "path": sound["path"] + r"\Unexpected", "parent": {"id": SECOND_ACTION_ID}}]
+                        return {"return": rows}
+                    if ids == [SECOND_ACTION_ID]:
+                        return {"return": [sound]}
+                    if ids == [THIRD_ACTION_ID]:
+                        return {"return": [source]}
+                return {"return": []}
+            if uri == "ak.wwise.core.object.set" and verification_case is not None:
+                executed = True
+                copied.parent.mkdir(parents=True)
+                audio = base64.b64decode(source_value.partition("|")[2])
+                copied.write_bytes(audio[:-1] + b"\1" if verification_case == "wrong-bytes" else audio)
+                if container_import:
+                    return {"objects": [{"id": PARENT_ID, "name": parent["name"],
+                                         "import": {"logs": [], "objects": [sound, source]}}]}
+                return {"objects": [{"id": PARENT_ID, "name": parent["name"], "children": [{
+                    **{key: sound[key] for key in ("id", "name", "type", "path", "parent", "notes")},
+                    "import": {"logs": [], "objects": [source]},
+                }]}]}
+            raise AssertionError(f"Unexpected native call {uri}: {args}")
+
+        def disconnect(self):
+            pass
+
+    def invoke(*argv):
+        return gateway.execute_gateway(
+            ["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path, version), client_factory=lambda _url: Client(),
+        )
+
+    code, started = invoke("draft-start", "object.set")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    revision = started["draft"]["revision"]
+
+    def update(command, *argv):
+        nonlocal revision
+        code, payload = invoke(command, draft_id, "--task-authority", authority,
+                               "--expected-revision", str(revision), *argv)
+        if code == 0 and "draft" in payload:
+            revision = payload["draft"]["revision"]
+        return code, payload
+
+    code, bound = update("draft-bind-object", "--object-id", PARENT_ID)
+    assert code == 0, bound
+    handle = bound["bound_object"]["handle"]
+    if nested:
+        code, group = update("draft-declare-new", "--declaration-id", "weather",
+                             "--parent-handle", handle, "--name", "Weather", "--kind", "actor-mixer")
+        assert code == 0, group
+        handle = group["draft"]["declared_object"]["result_handle"]
+    code, declared_sound = (
+        update("draft-declare-existing", "--declaration-id", "rain", "--object-handle", handle,
+               "--field", "notes", "")
+        if container_import else
+        update("draft-declare-new", "--declaration-id", "rain",
+               "--parent-handle", handle, "--name", "Rain", "--kind", "sound-sfx")
+    )
+    assert code == 0, declared_sound
+    code, added = update("draft-add-media", "--declaration-id", "rain", "--inline-wav", source_value,
+                         "--kind", "sound-sfx", "--language", "SFX")
+    if code != 0:
+        return code, added, calls
+    code, checked = update("draft-check")
+    if code != 0:
+        return code, checked, calls
+    code, previewed = update("preview-from-draft")
+    if code != 0:
+        return code, previewed, calls
+    code, shown = invoke("transaction-show", previewed["transaction_id"])
+    assert code == 0, shown
+    if verification_case is not None:
+        transaction_id = previewed["transaction_id"]
+        code, confirmed = invoke("confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"])
+        assert code == 0, confirmed
+        code, dispatched = invoke("execute", transaction_id)
+        assert code == 0, json.dumps(dispatched)
+        code, verified = invoke("verify", transaction_id)
+        return code, verified, calls
+    return code, shown["artifact"]["prepared_operation"], calls
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("source_form", ["padded", "unpadded", "extra-padding"])
+@pytest.mark.parametrize("nested", [False, True], ids=["direct", "nested"])
+def test_public_object_set_inline_wav_reaches_immutable_preview_unchanged(tmp_path, version, source_form, nested):
+    encoded = INLINE_PCM_PADDED if source_form == "padded" else INLINE_PCM_UNPADDED
+    source = "Inline.wav|" + encoded + ("=" if source_form == "extra-padding" else "")
+    code, prepared, calls = _public_inline_wav_preview(tmp_path, version, source, nested=nested)
+    assert code == 0, json.dumps(prepared)
+    node = prepared["dispatch"]["args"]["objects"][0]["children"][0]
+    if nested:
+        node = node["children"][0]
+    actual = node["import"]["files"][0]["audioFileBase64"]
+    assert actual == "Inline.wav|" + encoded
+    assert base64.b64decode(actual.partition("|")[2], validate=True) == base64.b64decode(encoded, validate=True)
+    validation = prepared["semantic_preview"]["envelope"]["metadata"]["schema_validation"]
+    assert validation["unresolved_refs"] == []
+    assert validation["compatibility_rules"] == [{
+        "rule_id": "object-set-inline-wav-canonical-base64/v1", "uri": "ak.wwise.core.object.set",
+        "version": version, "document": "waapi_definitions.json", "definition_pointer": "/definitions/oneImportFile",
+        "field": "audioFileBase64", "reflected_definition_sha256": "e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac",
+        "native_observation_build": {"2023.1": "2023.1.19.8928", "2024.1": "2024.1.13.9056", "2025.1": "2025.1.7.9143"}[version],
+        "section": "args.objects[0].children[0]" + (".children[0]" if nested else "") + ".import.files[0].audioFileBase64",
+    }]
+    assert "ak.wwise.core.object.set" not in calls
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("bad_source", ["alphabet", "broken-padding", "not-wave", "too-large", "unsafe-path"])
+def test_public_object_set_inline_wav_keeps_existing_input_rejections(tmp_path, version, bad_source):
+    source = {
+        "alphabet": "Inline.wav|" + INLINE_PCM_UNPADDED[:-1] + "!",
+        "broken-padding": "Inline.wav|" + INLINE_PCM_PADDED[:-2],
+        "not-wave": "Inline.wav|" + base64.b64encode(b"this is not WAV").decode(),
+        "too-large": "Inline.wav|" + base64.b64encode(b"RIFF0000WAVE" + b"\0" * (180 * 1024)).decode(),
+        "unsafe-path": "../Inline.wav|" + INLINE_PCM_UNPADDED,
+    }[bad_source]
+    code, rejected, calls = _public_inline_wav_preview(tmp_path, version, source)
+    assert code == 2, rejected
+    assert "transaction_id" not in rejected
+    assert "ak.wwise.core.object.set" not in calls
+    assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("changed_member", ["base64-pattern", "another-member"])
+def test_public_object_set_inline_wav_stops_on_definition_drift(tmp_path, version, changed_member, monkeypatch):
+    import copy
+    from dataclasses import replace
+    import wwise_waapi.schema_inventory as inventory
+
+    resolve = inventory.resolve_schema_reference
+
+    def drifted(reference, **kwargs):
+        resolved = resolve(reference, **kwargs)
+        if resolved.pointer == "/definitions/oneImportFile":
+            target = copy.deepcopy(resolved.target)
+            if changed_member == "base64-pattern":
+                target["properties"]["audioFileBase64"]["pattern"] = ".*"
+            else:
+                target["properties"]["language"]["description"] += " changed source"
+            return replace(resolved, target=target)
+        return resolved
+
+    monkeypatch.setattr(inventory, "resolve_schema_reference", drifted)
+    code, rejected, calls = _public_inline_wav_preview(tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED)
+    assert code == 2 and rejected["error_code"] == "SemanticValidationError", rejected
+    assert "compatibility definition changed" in rejected["message"]
+    assert "ak.wwise.core.object.set" not in calls
+    assert not list((tmp_path / "state" / "transactions").glob("*/preview.json"))
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+def test_inline_wav_compatibility_rejects_noncanonical_compiler_output(tmp_path, version):
+    from wwise_waapi.builders.schema import validate_resolved_semantic_payload
+    from wwise_waapi.builders.common import SemanticValidationError
+
+    code, prepared, _calls = _public_inline_wav_preview(tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED)
+    assert code == 0, prepared
+    args = prepared["dispatch"]["args"]
+    args["objects"][0]["children"][0]["children"][0]["import"]["files"][0]["audioFileBase64"] += "="
+    with pytest.raises(SemanticValidationError, match="must already use its canonical"):
+        validate_resolved_semantic_payload("ak.wwise.core.object.set", args, {}, version=version)
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("placement", ["valid", "container-import"], ids=["declared-sound", "container"])
+def test_public_object_set_inline_wav_verifies_sound_source_and_direct_children(tmp_path, version, placement):
+    code, verified, calls = _public_inline_wav_preview(
+        tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED, nested=False, verification_case=placement,
+    )
+    assert code == 0 and verified["state"] == "verified", json.dumps(verified)
+    assert verified["verification"]["business_state_verified"] is True
+    assert calls.count("ak.wwise.core.object.set") == 1
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("fault", ["wrong-active-source", "wrong-parent", "extra-child", "wrong-bytes", "wrong-source-type"])
+def test_public_object_set_inline_wav_verifier_rejects_broken_media_relationships(tmp_path, version, fault):
+    code, verified, calls = _public_inline_wav_preview(
+        tmp_path, version, "Inline.wav|" + INLINE_PCM_UNPADDED, nested=False, verification_case=fault,
+    )
+    assert code == 2 and verified["state"] == "verification_failed", verified
+    assert verified["verification"]["business_state_verified"] is False
+    assert calls.count("ak.wwise.core.object.set") == 1
+
+
+def _public_localized_inline_wav_verify(tmp_path, version, *, fault=None):
+    """Existing English Voice gains French media; native reads honor language/projection."""
+    from tests.unit.test_object_native_surface import _project_info
+
+    project = _project(tmp_path)
+    project_root = Path(project["path"]).parent
+    project = {**_project_info(project_root, language="English(US)"), **project}
+    project["languages"].append({"id": "{43000000-0000-0000-0000-000000000005}", "name": "French", "shortId": 32})
+    root = "Containers" if version == "2025.1" else "Actor-Mixer Hierarchy"
+    sound = {"id": PARENT_ID, "name": "Rain", "type": "Sound", "notes": "",
+             "path": rf"\{root}\Default Work Unit\Rain", "parent": {"id": SECOND_ACTION_ID}}
+    english_file = project_root / "Originals" / "Voices" / "English(US)" / "English.wav"
+    french_file = project_root / "Originals" / "Voices" / "French" / "Inline.wav"
+    english_file.parent.mkdir(parents=True)
+    english_file.write_bytes(base64.b64decode(INLINE_PCM_PADDED))
+    english = {"id": CONTROL_ID, "name": "English", "type": "AudioFileSource",
+               "path": sound["path"] + r"\English", "parent": {"id": PARENT_ID},
+               "audioSource:language": project["languages"][0], "originalFilePath": str(english_file)}
+    french = {"id": THIRD_ACTION_ID, "name": "Inline", "type": "AudioFileSource",
+              "path": sound["path"] + r"\Inline", "parent": {"id": PARENT_ID},
+              "audioSource:language": project["languages"][1], "originalFilePath": str(french_file)}
+    executed = False
+    verifying = False
+    reads = []
+    dispatches = []
+
+    class Client:
+        def call(self, uri, args=None, options=None):
+            nonlocal executed
+            if uri == "ak.wwise.core.getInfo":
+                return _info(version)
+            if uri == "ak.wwise.core.getProjectInfo":
+                return project
+            if uri == "ak.wwise.core.object.getTypes":
+                return {"return": [{"classId": 2, "name": "Sound", "type": "Sound"}]}
+            if uri == "ak.wwise.core.object.get":
+                assert isinstance(options.get("return"), list), options
+                language = options.get("language", "English(US)")
+                assert language in {"English(US)", "French"}, options
+                localized_sound = {**sound, "activeSource": {"id": THIRD_ACTION_ID
+                    if executed and language == "French" else CONTROL_ID},
+                    "originalFilePath": str(french_file if executed and language == "French" else english_file)}
+                if verifying and fault == "cross-language-active-source":
+                    localized_sound["activeSource"] = {"id": THIRD_ACTION_ID if language == "English(US)" else CONTROL_ID}
+                if verifying and language == "French":
+                    changed_identity = {
+                        "wrong-target-identity": ("id", SECOND_ACTION_ID),
+                        "wrong-target-name": ("name", "Other"),
+                        "wrong-target-type": ("type", "AudioFileSource"),
+                        "wrong-target-path": ("path", sound["path"] + "Other"),
+                        "wrong-target-parent": ("parent", {"id": CONTROL_ID}),
+                    }.get(fault)
+                    if changed_identity is not None:
+                        localized_sound[changed_identity[0]] = changed_identity[1]
+                if args == {"waql": "from type Project take 1"}:
+                    rows = [{**project, "type": "Project"}]
+                else:
+                    ids = args.get("from", {}).get("id")
+                    if args.get("transform"):
+                        assert ids == [PARENT_ID], args
+                        rows = [english, french] if executed else [english]
+                    else:
+                        rows = [{PARENT_ID: localized_sound, CONTROL_ID: english,
+                                 THIRD_ACTION_ID: french}[object_id] for object_id in ids]
+                # Return only requested native fields, including for all identity reads.
+                rows = [{field: row[field] for field in options["return"] if field in row} for row in rows]
+                if verifying:
+                    reads.append({"args": args, "options": options, "rows": rows})
+                return {"return": rows}
+            if uri == "ak.wwise.core.object.set":
+                assert not executed
+                dispatches.append(args)
+                executed = True
+                french_file.parent.mkdir(parents=True)
+                french_file.write_bytes(base64.b64decode(INLINE_PCM_UNPADDED))
+                return {"objects": [{**sound, "import": {"logs": [], "objects": [french]}}]}
+            raise AssertionError(f"Unexpected native call {uri}: {args}")
+
+        def disconnect(self):
+            pass
+
+    def invoke(*argv):
+        return gateway.execute_gateway(["--state-dir", str(tmp_path / "state"), *argv],
+            env=_env(tmp_path, version), client_factory=lambda _url: Client())
+
+    code, started = invoke("draft-start", "object.set")
+    assert code == 0, started
+    draft_id, authority = started["draft"]["draft_id"], started["task_authority"]
+    revision = started["draft"]["revision"]
+
+    def update(command, *argv):
+        nonlocal revision
+        code, payload = invoke(command, draft_id, "--task-authority", authority,
+                               "--expected-revision", str(revision), *argv)
+        assert code == 0, payload
+        if "draft" in payload:
+            revision = payload["draft"]["revision"]
+        return payload
+
+    bound = update("draft-bind-object", "--object-id", PARENT_ID)
+    update("draft-declare-existing", "--declaration-id", "rain", "--object-handle",
+           bound["bound_object"]["handle"], "--field", "notes", "")
+    update("draft-add-media", "--declaration-id", "rain", "--inline-wav", "Inline.wav|" + INLINE_PCM_UNPADDED,
+           "--kind", "sound-voice", "--language", "French")
+    update("draft-check")
+    previewed = update("preview-from-draft")
+    transaction_id = previewed["transaction_id"]
+    code, shown = invoke("transaction-show", transaction_id)
+    assert code == 0, shown
+    code, confirmed = invoke("confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"])
+    assert code == 0, confirmed
+    code, dispatched = invoke("execute", transaction_id)
+    assert code == 0, dispatched
+    verifying = True
+    code, verified = invoke("verify", transaction_id)
+    assert len(dispatches) == 1
+    assert dispatches[0]["objects"][0]["import"]["files"][0]["language"] == "French"
+    return code, verified, reads
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+def test_public_object_set_inline_wav_verifies_source_specific_language(tmp_path, version):
+    code, verified, reads = _public_localized_inline_wav_verify(tmp_path, version)
+    assert code == 0 and verified["state"] == "verified", json.dumps(verified)
+    assert verified["verification"]["business_state_verified"] is True
+    target_reads = {read["options"].get("language", "English(US)"): read["rows"][0]
+                    for read in reads if read["args"] == {"from": {"id": [PARENT_ID]}}
+                    and "activeSource" in read["options"]["return"]}
+    assert target_reads["English(US)"]["activeSource"] == {"id": CONTROL_ID}
+    assert target_reads["French"]["activeSource"] == {"id": THIRD_ACTION_ID}
+    children = [read["rows"] for read in reads
+                if read["args"].get("transform") == [{"select": ["children"]}]]
+    assert len(children) == 1 and {row["id"] for row in children[0]} == {CONTROL_ID, THIRD_ACTION_ID}
+
+
+@pytest.mark.parametrize("version", ["2023.1", "2024.1", "2025.1"])
+@pytest.mark.parametrize("fault", ["cross-language-active-source", "wrong-target-identity",
+    "wrong-target-name", "wrong-target-type", "wrong-target-path", "wrong-target-parent"])
+def test_public_object_set_inline_wav_rejects_cross_language_target_mismatch(tmp_path, version, fault):
+    code, verified, _reads = _public_localized_inline_wav_verify(tmp_path, version, fault=fault)
+    assert code == 2 and verified["state"] == "verification_failed", verified
+    assert verified["verification"]["business_state_verified"] is False
+    assertions = {item["name"]: item for item in verified["verification"]["assertions"]}
+    assert assertions["$.objects[0].import source 0 was copied once with the exact hash"]["passed"] is True
+    type_check = assertions["$.objects[0].import source 0 created the requested object type"]
+    assert type_check["passed"] is False
+    assert type_check["evidence"]["target_read_language"] == "French"

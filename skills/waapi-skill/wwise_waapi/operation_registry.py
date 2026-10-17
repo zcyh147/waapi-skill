@@ -17944,6 +17944,7 @@ def verify_prepared_operation(
                             read_languages.append(read_language)
 
                 grouped_candidates: dict[str | None, list[dict[str, Any]]] = {}
+                grouped_target_rows: dict[str | None, list[dict[str, Any]]] = {}
                 for read_language in read_languages:
                     target_rows = (
                         [row]
@@ -17955,6 +17956,7 @@ def verify_prepared_operation(
                             platform=platform,
                         )
                     )
+                    grouped_target_rows[read_language] = target_rows
                     language_rows = list(target_rows)
                     for target_row in target_rows:
                         active_source_id = _reference_identity(
@@ -18289,6 +18291,48 @@ def verify_prepared_operation(
                                     ),
                                 )
                             ]
+                            # Importing into an already-declared Sound creates
+                            # an AudioFileSource below that Sound. The ancestor
+                            # helper intentionally excludes the sealed target;
+                            # include it only with the exact active-source edge
+                            # in this source's language. Localized accessors
+                            # differ, but the separately read target identity
+                            # must still match the verified base-language row.
+                            source_read_language = (
+                                _localized_import_read_language(requested_source_language)
+                                if requested_source_language is not None
+                                else base_read_language
+                            )
+                            source_target_rows = grouped_target_rows[source_read_language]
+                            source_target = source_target_rows[0] if len(source_target_rows) == 1 else {}
+                            target_sound_matches = (
+                                _object_type_token(requested_source_type) == "sound"
+                                and _object_type_token(source_target.get("type")) == "sound"
+                                and _same_identity(source_target.get("id"), object_id)
+                                and _object_type_matches(source_target.get("type"), spec)
+                                and source_target.get("name") == row.get("name")
+                                and isinstance(source_target.get("path"), str)
+                                and bool(source_target.get("path"))
+                                and source_target.get("path") == row.get("path")
+                                and _valid_object_id(_parent_value(source_target.get("parent")))
+                                and _same_identity(
+                                    _parent_value(source_target.get("parent")),
+                                    _parent_value(row.get("parent")),
+                                )
+                                and _import_created_name_matches(
+                                    source_target.get("name"), spec.get("requested_name"),
+                                    on_name_conflict=effective_conflict,
+                                )
+                                and len(ancestor_chain) == 1
+                                and _object_type_token(matched_row.get("type")) == "audiofilesource"
+                                and _same_identity(_parent_value(matched_row.get("parent")), object_id)
+                                and _same_identity(
+                                    _reference_identity(_field_value(source_target, "activeSource")),
+                                    matched_row.get("id"),
+                                )
+                            )
+                            if target_sound_matches:
+                                type_matches.append(source_target)
                             unique_type_ids = {
                                 _identity_key(candidate.get("id"))
                                 for candidate in type_matches
@@ -18307,6 +18351,9 @@ def verify_prepared_operation(
                                     "expected_object_name": expected_object_name,
                                     "matches": type_matches,
                                     "ancestor_chain": ancestor_chain,
+                                    "sealed_target_is_requested_sound": target_sound_matches,
+                                    "target_read_language": source_read_language,
+                                    "target_readback": source_target_rows,
                                 },
                             )
                         if type_ok and ancestor_chain:

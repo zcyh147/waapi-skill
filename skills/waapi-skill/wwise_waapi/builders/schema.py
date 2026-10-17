@@ -31,6 +31,7 @@ class SchemaValidationResult:
     section: str = "request"
     validated_nodes: int = 0
     unresolved_refs: tuple[str, ...] = ()
+    compatibility_rules: tuple[Mapping[str, Any], ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -41,6 +42,8 @@ class SchemaValidationResult:
             "section": self.section,
             "validated_nodes": self.validated_nodes,
             "unresolved_refs": list(self.unresolved_refs),
+            **({"compatibility_rules": [dict(rule) for rule in self.compatibility_rules]}
+               if self.compatibility_rules else {}),
         }
 
 
@@ -205,7 +208,7 @@ def validate_resolved_semantic_payload(
     Unlike conservative reflection validation, unresolved references cannot
     establish a match here. Reuse the same constraint walker and its budgets.
     """
-    from wwise_waapi.schema_inventory import load_definition_graph, resolve_schema_reference, SchemaInventoryError
+    from wwise_waapi.schema_inventory import load_definition_graph, resolve_schema_reference, resolved_request_schema, ResolvedSchemaReference, SchemaInventoryError
 
     if authoring_ui_profile:
         from wwise_waapi.schema_inventory import load_authoring_definition_graph
@@ -213,9 +216,11 @@ def validate_resolved_semantic_payload(
     else:
         graph = load_definition_graph(version)
     schema = SemanticSchemaValidator(version=version, authoring_ui_profile=authoring_ui_profile).schema_for(uri)
+    compatibility_rules: list[Mapping[str, Any]] = []
 
     class ResolvedWalker(_SchemaWalker):
         context: Mapping[str, Any]
+        context_document: str = "<schema>"
         reference_depth: int = 0
 
         def validate(self, node, value, *, path, depth=0):
@@ -231,6 +236,10 @@ def validate_resolved_semantic_payload(
                 except SchemaInventoryError as exc:
                     raise _schema_error(uri, version, "Native schema reference cannot be resolved", section=path) from exc
                 previous = self.context
+                previous_document = self.context_document
+                if resolved.document_name == "<schema>" and previous_document != "<schema>":
+                    resolved = ResolvedSchemaReference(resolved.reference, previous_document, resolved.pointer, resolved.target)
+                self.context_document = resolved.document_name
                 self.context = previous if resolved.document_name == "<schema>" else graph.documents[resolved.document_name]
                 self.reference_depth += 1
                 try:
@@ -239,18 +248,27 @@ def validate_resolved_semantic_payload(
                     # object graphs, and bound reference recursion separately.
                     if self.reference_depth > SCHEMA_VALIDATION_MAX_DEPTH:
                         raise _schema_error(uri, version, "Resolved schema exceeds the reference depth budget", section=path, maximum_depth=SCHEMA_VALIDATION_MAX_DEPTH)
-                    self.validate(resolved.target, value, path=path, depth=depth)
+                    try:
+                        target, compatibility = resolved_request_schema(version, uri, resolved, value)
+                    except SchemaInventoryError as exc:
+                        raise _schema_error(uri, version, str(exc), section=path) from exc
+                    self.validate(target, value, path=path, depth=depth)
+                    if compatibility is not None:
+                        compatibility_rules.append({**compatibility, "section": path + ".audioFileBase64"})
                 finally:
                     self.reference_depth -= 1
                     self.context = previous
+                    self.context_document = previous_document
                 node = {key: child for key, child in node.items() if key not in {"$ref", "#ref"}}
             super().validate(node, value, path=path, depth=depth)
 
     walker = ResolvedWalker(uri=uri, version=version)
     for section, payload in (("args", args), ("options", options)):
         walker.context = schema.get(section + "Schema", {})
+        walker.context_document = "<schema>"
         walker.validate(walker.context, dict(payload), path=section)
-    return SchemaValidationResult(uri=uri, version=version, section="request", validated_nodes=walker.nodes)
+    return SchemaValidationResult(uri=uri, version=version, section="request", validated_nodes=walker.nodes,
+                                  compatibility_rules=tuple(compatibility_rules))
 
 
 def validate_semantic_result(

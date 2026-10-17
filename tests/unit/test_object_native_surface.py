@@ -797,15 +797,10 @@ def test_object_set_2023_inline_wav_import_is_canonicalized(
     )
 
     if unpadded_base64:
-        # The pinned 2023.1 importArg pattern requires '=' padding. This valid
-        # 48-byte PCM WAV is a documented native/schema compatibility gap;
-        # never alter audio bytes or add noncanonical '=' to bypass it.
-        from wwise_waapi.builders.common import SemanticValidationError
+        # The original pattern rejection is retained in the pre-repair RED
+        # evidence. Matching native 2023/24/25 imports now prove this canonical
+        # 48-byte PCM WAV must compile without padding or audio-byte changes.
         assert len(wav) == 48 and not encoded.endswith("=")
-        with pytest.raises(SemanticValidationError, match="reflected pattern") as error:
-            prepare_operation(request, read_call=reader)
-        assert error.value.details["section"].endswith(".audioFileBase64")
-        return
     prepared = prepare_operation(request, read_call=reader).as_dict()
 
     import_arg = prepared["dispatch"]["args"]["objects"][0]["children"][0][

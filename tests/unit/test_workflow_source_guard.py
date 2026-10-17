@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -17,6 +18,163 @@ def workflow(monkeypatch):
     monkeypatch.setenv("WWISE_LIVE", "1")
     monkeypatch.setenv("WWISE_DESTRUCTIVE", "1")
     return importlib.import_module("tests.destructive.test_gateway_workflow_transaction_matrix")
+
+
+@pytest.mark.parametrize("state", ("execution_failed", "indeterminate"))
+def test_inline_wav_probe_keeps_terminal_receipt_without_retry(tmp_path, workflow, state):
+    calls = []
+    native_error = {"ok": False, "state": state, "dispatch_result": {
+        "ok": False, "waapi_error_uri": "ak.wwise.invalid_arguments",
+        "waapi_error_details": {"message": "exact original native error"},
+    }, "error": {
+        "code": "NATIVE_REJECTION" if state == "execution_failed" else "TIMEOUT",
+        "message": "original native diagnostic", "details": {"unmodified": [1, 2]},
+    }}
+    runtime = _inline_probe_runtime(tmp_path, workflow, calls, terminal=native_error)
+    receipt = {"calls": [], "lifecycle_final_reference": {"transaction_id": None, "phase": "final"}}
+    workflow._run_inline_wav_probe(runtime, "{11111111-1111-1111-1111-111111111111}", "InlineProbe", receipt)
+    retained = json.loads((tmp_path / "inline-wav-probe.json").read_text())
+    assert retained["calls"][-1]["payload"] == native_error
+    assert retained["native_outcome"] == ("rejected" if state == "execution_failed" else "indeterminate")
+    assert retained["media_effect"] == "not_observed"
+    assert retained["gateway_terminal_state"] == state
+    assert retained["native_response"] == native_error["dispatch_result"]
+    assert retained["lifecycle_final_reference"] == {"transaction_id": "transaction", "phase": "final"}
+    assert [command[0] for command in calls].count("execute") == 1
+    assert not any(command[0] in {"verify", "query-object"} for command in calls[calls.index(["execute", "transaction"]) + 1:])
+    media = next(command for command in calls if command[0] == "draft-add-media")
+    assert media[media.index("--inline-wav") + 1] == (
+        "InlineProbe.wav|UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
+    )
+    assert retained["compiled_native_request"]["args"]["objects"][0]["children"][0]["import"]["files"][0]["audioFileBase64"] == media[media.index("--inline-wav") + 1]
+
+
+def _inline_probe_runtime(tmp_path, workflow, calls, *, terminal=None, corrupt=False):
+    parent = "{11111111-1111-1111-1111-111111111111}"
+    sound = "{22222222-2222-2222-2222-222222222222}"
+    source = "{33333333-3333-3333-3333-333333333333}"
+    project = tmp_path / "sandbox"
+    original = project / "Originals" / "SFX" / "InlineProbe.wav"
+    original.parent.mkdir(parents=True)
+    native = {"uri": "ak.wwise.core.object.set", "args": {"objects": [{"children": [{"import": {"files": [{
+        "audioFileBase64": "InlineProbe.wav|UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA",
+    }]}}]}]}, "options": {}}
+    revision = 0
+    executed = False
+
+    def raw(command):
+        nonlocal revision, executed
+        calls.append(list(command))
+        kind = command[0]
+        revision += 1
+        payload = {"ok": True, "draft": {"draft_id": "draft", "revision": revision},
+                   "task_authority": "authority"}
+        if kind == "draft-bind-object":
+            payload["bound_object"] = {"handle": "parent-handle"}
+        elif kind == "preview-from-draft":
+            payload.update(transaction_id="transaction", artifact_hash="a" * 64)
+        elif kind == "transaction-show":
+            payload.update(artifact={"prepared_operation": {"dispatch": native}},
+                           confirmation={"token": "confirmation"})
+        elif kind == "execute":
+            executed = True
+            original.write_bytes(bytes.fromhex(
+                "524946462800000057415645666d7420100000000100010044ac00008858010002001000646174610400000000000000"
+            ) if not corrupt else b"wrong media")
+            return (1, terminal) if terminal else (0, {"ok": True, "state": "executed_unverified", "dispatch_result": {"ok": True, "result": {"objects": [{"id": sound}]}}})
+        elif kind == "verify":
+            payload = {"ok": True, "state": "verified", "verification": {"business_state_verified": True}}
+        elif kind == "query-object":
+            if "--relationship" in command:
+                rows = [] if not executed else ([{"id": sound, "name": "InlineProbe", "type": "Sound", "path": r"\Containers\Default Work Unit\Probe\InlineProbe"}]
+                        if command[command.index("--exact-id") + 1] == parent else
+                        [{"id": source, "type": "AudioFileSource"}])
+            elif command[command.index("--exact-id") + 1] == sound:
+                rows = [{"id": sound, "name": "InlineProbe", "type": "Sound", "path": r"\Containers\Default Work Unit\Probe\InlineProbe", "active_source": {"id": source}}]
+            else:
+                rows = [{"id": source, "name": "InlineProbe", "type": "AudioFileSource", "path": r"\Containers\Default Work Unit\Probe\InlineProbe\InlineProbe", "parent": {"id": sound}, "original_file_path": str(original), "source_language": {"id": "{44444444-4444-4444-4444-444444444444}", "name": "SFX"}}]
+            payload = {"ok": True, "count": len(rows), "objects": rows}
+        return 0, payload
+
+    return SimpleNamespace(raw_gateway=raw, state_dir=tmp_path / "state", version="2025.1",
+                           sandbox=SimpleNamespace(sandbox_path=project))
+
+
+@pytest.mark.parametrize("corrupt", (False, True), ids=("exact-original", "corrupt-original"))
+def test_inline_wav_probe_requires_linked_exact_original_media(tmp_path, workflow, corrupt):
+    calls = []
+    runtime = _inline_probe_runtime(tmp_path, workflow, calls, corrupt=corrupt)
+    receipt = {"calls": []}
+    if corrupt:
+        with pytest.raises(AssertionError):
+            workflow._run_inline_wav_probe(runtime, "{11111111-1111-1111-1111-111111111111}", "InlineProbe", receipt)
+    else:
+        workflow._run_inline_wav_probe(runtime, "{11111111-1111-1111-1111-111111111111}", "InlineProbe", receipt)
+    retained = json.loads((tmp_path / "inline-wav-probe.json").read_text())
+    assert retained["native_outcome"] == "accepted"
+    assert retained["media_effect"] == ("incomplete" if corrupt else "proven")
+    assert [command[0] for command in calls].count("execute") == 1
+    if not corrupt:
+        assert retained["original_wav"]["sha256"] == "0588c6a627c6603830a9e5d87ab258d4977c02876b9bac8f9598fccef098c1cf"
+        assert retained["original_wav"]["pcm"] == {"channels": 1, "sample_width_bytes": 2, "sample_rate_hz": 44100, "frame_count": 2}
+
+
+@pytest.mark.parametrize("fault", ("wrong-source-parent", "converted-media", "read-error",
+                                   "wrong-language", "malformed-language-id", "string-language"))
+def test_inline_wav_probe_does_not_credit_unlinked_or_unreadable_media(tmp_path, workflow, fault):
+    calls = []
+    runtime = _inline_probe_runtime(tmp_path, workflow, calls)
+    raw_gateway = runtime.raw_gateway
+
+    def broken_read(command):
+        code, payload = raw_gateway(command)
+        if command[0] == "query-object" and "original-file-path" in command:
+            if fault == "read-error":
+                return 1, {"ok": False, "error_code": "READ_FAILED", "message": "retained read failure"}
+            if fault == "wrong-source-parent":
+                payload["objects"][0]["parent"]["id"] = "{99999999-9999-9999-9999-999999999999}"
+            elif fault == "wrong-language":
+                payload["objects"][0]["source_language"]["name"] = "English(US)"
+            elif fault == "malformed-language-id":
+                payload["objects"][0]["source_language"]["id"] = "not-a-guid"
+            elif fault == "string-language":
+                payload["objects"][0]["source_language"] = "SFX"
+            else:
+                payload["objects"][0]["original_file_path"] = str(tmp_path / "sandbox" / ".cache" / "InlineProbe.wav")
+        return code, payload
+
+    runtime.raw_gateway = broken_read
+    receipt = {"calls": []}
+    with pytest.raises((AssertionError, ValueError)):
+        workflow._run_inline_wav_probe(runtime, "{11111111-1111-1111-1111-111111111111}", "InlineProbe", receipt)
+    retained = json.loads((tmp_path / "inline-wav-probe.json").read_text())
+    assert retained["native_outcome"] == "accepted" and retained["media_effect"] == "incomplete"
+    assert retained["diagnostic_error"]
+    assert [command[0] for command in calls].count("execute") == 1
+    if fault == "read-error":
+        assert retained["calls"][-1]["payload"]["message"] == "retained read failure"
+
+
+def test_inline_wav_probe_preserves_failed_gateway_verdict_beside_proven_effect(tmp_path, workflow):
+    calls = []
+    runtime = _inline_probe_runtime(tmp_path, workflow, calls)
+    raw_gateway = runtime.raw_gateway
+    failure = {"ok": False, "state": "verification_failed", "verification": {"business_state_verified": False}}
+
+    def failed_verifier(command):
+        code, payload = raw_gateway(command)
+        return (2, failure) if command[0] == "verify" else (code, payload)
+
+    runtime.raw_gateway = failed_verifier
+    receipt = {"calls": []}
+    workflow._run_inline_wav_probe(runtime, "{11111111-1111-1111-1111-111111111111}", "InlineProbe", receipt)
+    retained = json.loads((tmp_path / "inline-wav-probe.json").read_text())
+    assert retained["media_effect"] == "proven"
+    assert retained["gateway_verification"] == {
+        "exit_code": 2, "ok": False, "state": "verification_failed", "business_state_verified": False,
+    }
+    assert next(row["payload"] for row in retained["calls"] if row["argv"][0] == "verify") == failure
+    assert [command[0] for command in calls].count("execute") == 1
 
 
 def _source(root: Path) -> Path:

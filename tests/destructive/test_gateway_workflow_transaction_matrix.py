@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import importlib.util
+import io
 import json
 import math
 import os
@@ -34,6 +35,8 @@ from tests.destructive.support.live_environment import (  # pyright: ignore[repo
     resolve_sample_project_source,
 )
 from tests.destructive.support.category_evidence import (  # pyright: ignore[reportMissingImports]  # noqa: E402
+    EVIDENCE_ROOT,
+    current_evidence_platform,
     exact_git_candidate,
 )
 from tests.destructive.support.console_file_observation import observe_console_file  # noqa: E402
@@ -68,6 +71,7 @@ from tests.support.host_path_relatives import (  # pyright: ignore[reportMissing
 from tests.semantic.support.codex_filesystem_security import (  # noqa: E402
     binary_file_open_flags,
     path_is_link_or_reparse,
+    read_bounded_exclusive_regular_file,
 )
 from tests.semantic.support.codex_project_prelaunch_v3 import (  # pyright: ignore[reportMissingImports]  # noqa: E402
     ProjectPrelaunchRequest,
@@ -78,6 +82,8 @@ from wwise_waapi.headless import HeadlessLifecycle  # pyright: ignore[reportMiss
 from wwise_waapi.operation_registry import OPERATION_REQUEST_CONTRACT  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.transactions import TransactionState, TransactionStore  # pyright: ignore[reportMissingImports]  # noqa: E402
 from wwise_waapi.versions import SUPPORTED_WWISE_VERSION_KEYS  # pyright: ignore[reportMissingImports]  # noqa: E402
+from wwise_waapi.host_paths import localize_waapi_host_path  # noqa: E402
+from wwise_waapi.operation_soundbank import prove_artifact_path  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -502,6 +508,225 @@ def _query_exact_path_id(
     assert len(rows) == 1 and isinstance(rows[0], Mapping), rows
     assert rows[0].get("path") == expected_path, rows[0]
     return _required_string(rows[0], "id")
+
+
+INLINE_WAV_BASE64 = "UklGRigAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAAA"
+INLINE_WAV_SHA256 = "0588c6a627c6603830a9e5d87ab258d4977c02876b9bac8f9598fccef098c1cf"
+
+
+def _inline_wav_current_binding() -> dict[str, Any]:
+    """Bind current acceptance without borrowing the separate historical pin."""
+    from tests.semantic.support.codex_harness import (
+        WORKSPACE_SKILL_EXCLUDED_NAMES, workspace_skill_tree_sha256,
+    )
+    return {
+        "current_skill_sha256": workspace_skill_tree_sha256(
+            REPO_ROOT / "skills/waapi-skill", exclude_names=WORKSPACE_SKILL_EXCLUDED_NAMES,
+        ),
+        "test_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+
+
+def _persist_inline_wav_receipt(runtime: _WorkflowSandboxRuntime, receipt: dict[str, Any]) -> None:
+    target = runtime.state_dir.parent / "inline-wav-probe.json"
+    encoded = json.dumps(receipt, ensure_ascii=False, indent=2).encode("utf-8")
+    assert len(encoded) <= 2 * 1024 * 1024, "inline diagnostic evidence bound exceeded"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(".tmp")
+    temporary.write_bytes(encoded)
+    temporary.replace(target)
+
+
+class _InlineWavReceiptGateway:
+    """Retain every public response before the ordinary Draft helpers assert."""
+
+    def __init__(self, runtime: _WorkflowSandboxRuntime, receipt: dict[str, Any]):
+        self.runtime, self.receipt = runtime, receipt
+
+    def raw_gateway(self, command: Sequence[str]) -> tuple[int, dict[str, Any]]:
+        row: dict[str, Any] = {"argv": list(command)}
+        self.receipt["calls"].append(row)
+        try:
+            code, payload = self.runtime.raw_gateway(command)
+            row.update(exit_code=code, payload=payload)
+            return code, payload
+        except Exception as exc:
+            row["exception"] = {"type": type(exc).__name__, "message": str(exc)}
+            raise
+        finally:
+            _persist_inline_wav_receipt(self.runtime, self.receipt)
+
+    def gateway(self, command: Sequence[str], *, live: bool) -> dict[str, Any]:
+        code, payload = self.raw_gateway(command)
+        assert code == 0 and payload.get("ok") is True, payload
+        return payload
+
+
+def _run_inline_wav_probe(
+    runtime: _WorkflowSandboxRuntime,
+    parent_id: str,
+    sound_name: str,
+    receipt: dict[str, Any],
+) -> None:
+    """One public object.set execution; failures never authorize another write."""
+    gateway = _InlineWavReceiptGateway(runtime, receipt)
+    receipt.update(native_outcome="not_executed", media_effect="not_observed")
+    inline_wav = sound_name + ".wav|" + INLINE_WAV_BASE64
+    receipt["source"] = {"inline_wav": inline_wav, "bytes": 48, "sha256": INLINE_WAV_SHA256}
+    try:
+        empty_parent = gateway.gateway([
+            "query-object", "--exact-id", parent_id, "--relationship", "children", "--max-results", "2",
+        ], live=True)
+        assert empty_parent["count"] == 0 and empty_parent["objects"] == [], empty_parent
+        expected_original = runtime.sandbox.sandbox_path / "Originals" / "SFX" / (sound_name + ".wav")
+        prove_artifact_path(expected_original, io_root=runtime.sandbox.sandbox_path, field="new inline Originals WAV", expect_directory=False)
+        assert not expected_original.exists(), expected_original
+        receipt["original_absent_before"] = str(expected_original)
+        draft = _start_business_draft(gateway, "object.set")
+        parent_handle = _bind_business_object(gateway, draft, object_id=parent_id)
+        _update_business_draft(gateway, draft, "draft-declare-new", [
+            "--declaration-id", "inline-sound", "--parent-handle", parent_handle,
+            "--name", sound_name, "--kind", "sound-sfx",
+        ], live=False)
+        _update_business_draft(gateway, draft, "draft-add-media", [
+            "--declaration-id", "inline-sound", "--inline-wav", inline_wav,
+            "--kind", "sound-sfx", "--language", "SFX",
+        ], live=False)
+        _update_business_draft(gateway, draft, "draft-check", live=True)
+        preview = _update_business_draft(gateway, draft, "preview-from-draft", live=True)
+        transaction_id = _required_string(preview, "transaction_id")
+        receipt.update(transaction_id=transaction_id, preview_hash=preview["artifact_hash"])
+        if "lifecycle_final_reference" in receipt:
+            receipt["lifecycle_final_reference"]["transaction_id"] = transaction_id
+        shown = gateway.gateway(["transaction-show", transaction_id], live=False)
+        native = shown["artifact"]["prepared_operation"]["dispatch"]
+        receipt["compiled_native_request"] = native
+        # Check an exact leaf without manufacturing the native request.
+        files = native["args"]["objects"][0]["children"][0]["import"]["files"]
+        assert len(files) == 1 and files[0]["audioFileBase64"] == inline_wav, native
+        assert native["uri"] == "ak.wwise.core.object.set", native
+        _persist_inline_wav_receipt(runtime, receipt)
+        gateway.gateway(["confirm", transaction_id, "--confirmation-token", shown["confirmation"]["token"]], live=False)
+        receipt["native_outcome"] = "indeterminate"
+        code, executed = gateway.raw_gateway(["execute", transaction_id])
+        receipt["gateway_terminal_state"] = executed.get("state")
+        receipt["native_response"] = executed.get("dispatch_result")
+        if code != 0 or executed.get("ok") is not True:
+            receipt["native_outcome"] = (
+                "rejected" if executed.get("state") == "execution_failed" else "indeterminate"
+            )
+            return
+        assert executed.get("state") == "executed_unverified", executed
+        dispatch_result = executed.get("dispatch_result")
+        assert isinstance(dispatch_result, Mapping) and dispatch_result.get("ok") is True, executed
+        receipt.update(native_outcome="accepted", media_effect="incomplete")
+        # Even a failed verifier cannot erase acceptance or justify replay.
+        verify_code, verified = gateway.raw_gateway(["verify", transaction_id])
+        receipt["gateway_verification"] = {
+            "exit_code": verify_code, "ok": verified.get("ok"), "state": verified.get("state"),
+            "business_state_verified": verified.get("verification", {}).get("business_state_verified"),
+        }
+        children = gateway.gateway([
+            "query-object", "--exact-id", parent_id, "--relationship", "children", "--max-results", "2",
+        ], live=True)
+        rows = children["objects"]
+        assert children["count"] == 1 and len(rows) == 1, children
+        sound = rows[0]
+        assert sound["type"] == "Sound" and sound["name"] == sound_name, sound
+        sound_id = _required_string(sound, "id")
+        exact_sound = gateway.gateway([
+            "query-object", "--exact-id", sound_id, "--include", "active-source", "--max-results", "1",
+        ], live=True)
+        assert exact_sound["count"] == 1 and len(exact_sound["objects"]) == 1, exact_sound
+        sound_row = exact_sound["objects"][0]
+        assert all(sound_row.get(key) == sound.get(key) for key in ("id", "name", "type", "path")), exact_sound
+        source_id = _required_string(sound_row["active_source"], "id")
+        sources = gateway.gateway([
+            "query-object", "--exact-id", sound_id, "--relationship", "children", "--max-results", "2",
+        ], live=True)
+        assert sources["count"] == 1 and len(sources["objects"]) == 1, sources
+        assert sources["objects"][0]["id"] == source_id and sources["objects"][0]["type"] == "AudioFileSource", sources
+        exact_source = gateway.gateway([
+            "query-object", "--exact-id", source_id, "--include", "parent",
+            "--include", "original-file-path", "--include", "source-language", "--max-results", "1",
+        ], live=True)
+        assert exact_source["count"] == 1 and len(exact_source["objects"]) == 1, exact_source
+        source = exact_source["objects"][0]
+        assert source["id"] == source_id and source["type"] == "AudioFileSource", source
+        assert source["parent"]["id"] == sound_id, source
+        language = source["source_language"]
+        assert isinstance(language, Mapping) and language.get("name") == "SFX", source
+        assert uuid.UUID(_required_string(language, "id")).int != 0, source
+        assert source["path"] == sound_row["path"] + "\\" + sound_name, source
+        original = Path(localize_waapi_host_path(source["original_file_path"]))
+        originals = runtime.sandbox.sandbox_path / "Originals"
+        # Refuse converted/cache media and any path outside this private project.
+        prove_artifact_path(original, io_root=originals, field="inline imported Originals WAV", must_exist=True, expect_directory=False)
+        assert original == expected_original, original
+        snapshot = read_bounded_exclusive_regular_file(original, max_bytes=48, require_private_posix_mode=False)
+        receipt["original_wav"] = {
+            "path": str(original), "size": len(snapshot.raw), "sha256": hashlib.sha256(snapshot.raw).hexdigest(),
+            "hex": snapshot.raw.hex(), "sound_id": sound_id, "source_id": source_id,
+        }
+        assert receipt["original_wav"]["sha256"] == INLINE_WAV_SHA256, receipt["original_wav"]
+        with wave.open(io.BytesIO(snapshot.raw), "rb") as wav:
+            pcm = {"channels": wav.getnchannels(), "sample_width_bytes": wav.getsampwidth(),
+                   "sample_rate_hz": wav.getframerate(), "frame_count": wav.getnframes()}
+        receipt["original_wav"]["pcm"] = pcm
+        assert pcm == {"channels": 1, "sample_width_bytes": 2, "sample_rate_hz": 44100, "frame_count": 2}, pcm
+        receipt["media_effect"] = "proven"
+    except Exception as exc:
+        receipt["diagnostic_error"] = {"type": type(exc).__name__, "message": str(exc)}
+        raise
+    finally:
+        _persist_inline_wav_receipt(runtime, receipt)
+
+
+@pytest.mark.live
+@pytest.mark.destructive
+def test_object_set_canonical_unpadded_inline_wav_acceptance(workflow_sandbox_runtime) -> None:
+    """Require current Gateway verification and independent exact Originals proof."""
+    runtime = workflow_sandbox_runtime
+    if runtime.version not in {"2023.1", "2024.1", "2025.1"}:
+        pytest.skip("object.set inline WAV compatibility applies to 2023.1–2025.1")
+    configured_evidence = runtime.env.get("WWISE_CATEGORY_EVIDENCE_PATH")
+    if configured_evidence is None and sys.platform == "darwin":
+        configured_evidence = runtime.env.get("WWISE_MACOS_CATEGORY_EVIDENCE_PATH")
+    lifecycle_path = (Path(configured_evidence).expanduser().resolve(strict=False)
+                      if configured_evidence else
+                      REPO_ROOT / EVIDENCE_ROOT / (current_evidence_platform() + "-category-evidence.jsonl"))
+    receipt: dict[str, Any] = {
+        "category": "object-set-unpadded-inline-wav-acceptance", "status": "FAIL",
+        "verifier_strength": "gateway_verified_plus_independent_sound_source_originals_bytes",
+        "candidate": runtime.candidate, **_inline_wav_current_binding(),
+        "version": runtime.version, "calls": [],
+        "config_sha256": hashlib.sha256(Path(runtime.env["WAAPI_SKILL_CONFIG_PATH"]).read_bytes()).hexdigest(),
+        "endpoint": {"host": runtime.lifecycle.host, "port": runtime.port, "url": runtime.lifecycle.waapi_url},
+        "build": runtime.sandbox.metadata.get_info_version,
+        "receipt_path": str(runtime.state_dir.parent / "inline-wav-probe.json"),
+        "lifecycle_final_reference": {
+            "path": str(lifecycle_path), "contract": "waapi-skill.host-category-evidence/v3",
+            "phase": "final", "candidate": runtime.candidate,
+            "category": "object-set-unpadded-inline-wav-acceptance", "transaction_id": None,
+            "cleanup_status": "unresolved_until_final_row",
+        },
+        "lifecycle_acceptance": "Requires the final host-category-evidence/v3 row with this candidate, transaction_id and category; prepared/PENDING is not cleanup success. That final row binds source before/after hash/mtime and residual process cleanup.",
+    }
+    runtime.category_results.append(receipt)
+    _persist_inline_wav_receipt(runtime, receipt)
+    root_segments = CONTAINERS_PARENT_SEGMENTS if runtime.version == "2025.1" else ACTOR_MIXER_PARENT_SEGMENTS
+    suffix = uuid.uuid4().hex[:12]
+    try:
+        parent_id = _create_object(runtime, parent="\\" + "\\".join(root_segments), object_type="ActorMixer", name="WAAPI_INLINE_PARENT_" + suffix)
+        receipt["owned_parent_id"] = parent_id
+        _run_inline_wav_probe(runtime, parent_id, "WAAPI_INLINE_" + suffix, receipt)
+        assert receipt["native_outcome"] == "accepted" and receipt["media_effect"] == "proven", receipt
+        assert receipt["gateway_verification"] == {
+            "exit_code": 0, "ok": True, "state": "verified", "business_state_verified": True,
+        }, receipt
+        receipt["status"] = "PASS"
+    finally:
+        _persist_inline_wav_receipt(runtime, receipt)
 
 
 @pytest.mark.live

@@ -1233,6 +1233,63 @@ def topic_publish_schema(version: str, uri: str, schema: Mapping[str, Any]) -> d
     return project(publish, "/publishSchema")
 
 
+# Native object.set observations on these exact Console builds proved unchanged
+# canonical unpadded WAV bytes in Originals. The reflected resources stay
+# immutable. A changed definition requires review before this rule can apply.
+_INLINE_WAV_REQUEST_COMPATIBILITY = {
+    "2023.1": ("e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac", "2023.1.19.8928"),
+    "2024.1": ("e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac", "2024.1.13.9056"),
+    "2025.1": ("e98c169fbd4c3fbe76d961020a251e5f87d10f981fc29838c9cb2c88f84ce9ac", "2025.1.7.9143"),
+}
+
+
+def resolved_request_schema(
+    version: str,
+    uri: str,
+    resolved: ResolvedSchemaReference,
+    value: Any,
+) -> tuple[Mapping[str, Any], Mapping[str, Any] | None]:
+    """Project one proven request delta without changing the native source.
+
+    Like topic_publish_schema, this is an exact source/URI/version projection,
+    never a global pattern override. All other members retain their constraints.
+    The original canonicalizer continues owning business input normalization;
+    a compiled native value must already be canonical and bounded here.
+    """
+    binding = _INLINE_WAV_REQUEST_COMPATIBILITY.get(version)
+    if (binding is None or uri != "ak.wwise.core.object.set"
+            or resolved.document_name != "waapi_definitions.json"
+            or resolved.pointer != "/definitions/oneImportFile"
+            or not isinstance(value, Mapping) or "audioFileBase64" not in value):
+        return resolved.target, None
+    digest, build = binding
+    if _canonical_sha256(resolved.target) != digest:
+        raise SchemaInventoryError("The object.set inline WAV compatibility definition changed; review the new schema before use")
+    field = resolved.target["properties"]["audioFileBase64"]
+    native_value = value["audioFileBase64"]
+    from .operation_import import ImportContractError, normalize_inline_audio_file
+
+    try:
+        canonical, _proof = normalize_inline_audio_file(native_value, field="audioFileBase64")
+    except ImportContractError as exc:
+        raise SchemaInventoryError(f"Compiled object.set inline WAV is invalid: {exc}") from exc
+    if canonical != native_value:
+        raise SchemaInventoryError("Compiled object.set inline WAV must already use its canonical path and Base64")
+    # Keep the original lower-case .wav path grammar. The single corrected
+    # alternative admits complete four-character groups without mandatory '='.
+    projected = {**resolved.target, "properties": {
+        **resolved.target["properties"], "audioFileBase64": {
+            **field, "pattern": r"^(.+\.wav\|(?:[A-Za-z0-9\+\/]{4})*(?:[A-Za-z0-9\+\/]{2}==|[A-Za-z0-9\+\/]{3}=)?)$",
+        },
+    }}
+    return projected, {
+        "rule_id": "object-set-inline-wav-canonical-base64/v1",
+        "uri": uri, "version": version, "document": resolved.document_name,
+        "definition_pointer": resolved.pointer, "field": "audioFileBase64",
+        "reflected_definition_sha256": digest, "native_observation_build": build,
+    }
+
+
 def _read_json_object(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
