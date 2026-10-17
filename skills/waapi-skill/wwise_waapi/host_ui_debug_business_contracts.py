@@ -146,7 +146,13 @@ def host_ui_debug_business_contract_data(
             **({"tone_artifact_verification": {
                 "owned_output": "one exact regular file inside the existing isolated output directory",
                 "maximum_artifact_bytes": 536870912,
+                "maximum_business_plan_utf8_bytes": 131072,
+                "maximum_rendered_terminal_request_utf8_bytes": 262144,
+                "maximum_terminal_stdout_utf8_bytes": 286720,
+                "ordinary_small_terminal_stdout_utf8_bytes": 24576,
                 "maximum_riff_chunks": 4096,
+                "format_header_payload_reserve_bytes": 4096,
+                "prewrite_resource_estimate": "audio plus complete accepted format/framing and requested UTF-8 cue/label metadata; native encoding/additional chunks/rounding remain unproven",
                 "maximum_marker_count": 128,
                 "maximum_marker_list_bytes": 131072,
                 "sample_inspection": "all frames; bounded blocks; no raw audio in results",

@@ -58,6 +58,7 @@ from wwise_waapi.builders.common import (  # noqa: E402  # pyright: ignore[repor
     SemanticPreview,
     SemanticValidationError,
 )
+from wwise_waapi.wal_read_continuation import wal_read_contract  # noqa: E402
 from wwise_waapi.builders.debug_lua import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     DebugLuaContractError,
     MAX_WAL_TREE_NODES,
@@ -101,6 +102,7 @@ from wwise_waapi.metadata_discovery import (  # noqa: E402  # pyright: ignore[re
 from wwise_waapi.host_paths import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     HostPathError,
     host_path_comparison_key,
+    parse_absolute_host_path,
     localize_waapi_host_path,
 )
 from wwise_waapi.platform_commands import (  # noqa: E402  # pyright: ignore[reportMissingImports]
@@ -302,6 +304,7 @@ from wwise_waapi.host_ui_debug_business_cli import (  # noqa: E402  # pyright: i
 )
 from wwise_waapi.host_ui_debug_business import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     materialize_waapi_schema_read_args,
+    MAX_HOST_PLAN_BYTES, MAX_COLLECTION_ITEMS, MAX_TEXT_BYTES, MAX_PATH_BYTES,
 )
 from wwise_waapi.core_business_contracts import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     core_business_catalog_rows,
@@ -1835,10 +1838,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="max_nodes",
         metavar=f"1..{MAX_WAL_TREE_NODES}",
         help=(
-            "Maximum WAL nodes returned after the complete bounded call; "
+            "Maximum node summaries or lossless document fragments per page; "
             f"defaults to 128 and is capped at {MAX_WAL_TREE_NODES}"
         ),
     )
+    debug_wal_tree.add_argument('--wal-page', help='Copy the Gateway-owned exact-observation continuation')
     debug_validate_call = subparsers.add_parser(
         "debug-validate-call",
         help=(
@@ -6151,6 +6155,12 @@ def preflight_debug_read_input(
                 "debug-wal-tree --max-nodes must be between 1 and "
                 f"{MAX_WAL_TREE_NODES}"
             )
+        if args.wal_page is not None:
+            from wwise_waapi.wal_read_continuation import parse_wal_page, WalContinuationError
+            try:
+                parse_wal_page(args.wal_page)
+            except WalContinuationError as exc:
+                raise GatewayInputError(str(exc)) from exc
         return
     if args.command != "debug-validate-call":
         raise GatewayInputError(f"unsupported debug-read command: {args.command}")
@@ -7146,6 +7156,9 @@ def fixed_command_route_payload(capability: CapabilityRecord) -> dict[str, Any]:
         "commands": commands,
         **({"business_contract": media_pool_field_discovery_contract()}
            if capability.uri == "ak.wwise.core.mediaPool.getFields" else {}),
+        **({'business_contract': wal_read_contract(
+            native_limit=int(capability.execution_contract['result_limit_bytes']), maximum=MAX_WAL_TREE_NODES)}
+           if capability.uri == 'ak.wwise.debug.getWalTree' else {}),
         "continuation": (
             commands[0]
             if len(commands) == 1
@@ -14425,6 +14438,13 @@ def dispatch_command(
             raise GatewayInputError(
                 f"{api} is not bound to the packaged {args.command} route in Wwise {detected_version}"
             )
+        from wwise_waapi.wal_read_continuation import prepare_wal_page, finish_wal_page, WalContinuationError
+        wal_context = {'configuration': selected_connection_binding(env), 'endpoint': common['endpoint'],
+            'live': dict(live_info)}
+        try:
+            wal_page = prepare_wal_page(token=args.wal_page, maximum=args.max_nodes, context=wal_context)
+        except WalContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': False}, error_code=exc.code) from exc
         request_validation = validate_semantic_payload(
             api,
             {},
@@ -14486,6 +14506,11 @@ def dispatch_command(
                 result.get("result"),
                 take=args.max_nodes,
             )
+            projection = finish_wal_page(wal_page, raw=result['result'], normalized=projection,
+                next_command=lambda token: transaction_next_command('debug-wal-tree',
+                    ['debug-wal-tree', '--max-nodes', str(args.max_nodes), '--wal-page', token]))
+        except WalContinuationError as exc:
+            raise GatewayResultShapeError(str(exc), details={'native_query_dispatched': True}, error_code=exc.code) from exc
         except DebugLuaContractError as exc:
             raise GatewayResultShapeError(
                 str(exc),
@@ -17535,10 +17560,9 @@ def dispatch_business_host_ui_debug_plan(
 
     def update(current: BusinessDeclarationSession) -> BusinessDeclarationSession:
         candidate = current.with_settings({"host_ui_debug_plan": plan})
-        parse_operation_request(
-            adapter.materialize(candidate),
-            expected_version=detected_version,
-        )
+        materialized = parse_operation_request(
+            adapter.materialize(candidate), expected_version=detected_version).as_dict()
+        transaction_verify_terminal_budget(materialized)
         return candidate
 
     record = binding.store.apply_business_update(
@@ -19803,7 +19827,7 @@ def create_transaction_preview(
         request_payload,
         expected_version=detected_version,
     ).as_dict()
-    layout_blueprint_terminal_budget(canonical_request)
+    transaction_verify_terminal_budget(canonical_request)
     project_guard_mode, target_project_path = transaction_project_guard_spec(
         canonical_request,
         version=detected_version,
@@ -20437,7 +20461,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 "cleanup": transaction_cleanup_payload(prepared, phase="preview"),
             }
         request_payload = require_mapping(artifact.get("request"), "transaction request")
-        layout_blueprint_terminal_budget(request_payload)
+        transaction_verify_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -21284,7 +21308,7 @@ def _dispatch_transaction_command_with_execution_lease(
                 f"current state is {record.state.value!r}."
             )
         request_payload = require_mapping(artifact.get("request"), "transaction request")
-        layout_blueprint_terminal_budget(request_payload)
+        transaction_verify_terminal_budget(request_payload)
         project_guard_mode, target_project_path = transaction_project_guard_spec(
             request_payload,
             version=detected_version,
@@ -24288,6 +24312,58 @@ def layout_blueprint_terminal_budget(request: Any) -> int:
         else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES)
 
 
+def transaction_verify_terminal_budget(request: Any) -> int:
+    """Select bounded exceptional capacity only for reviewed closed constructors."""
+    ordinary = TRANSACTION_VERIFY_SUCCESS_STDOUT_BUDGET_BYTES
+    layout_budget = layout_blueprint_terminal_budget(request)
+    if layout_budget != ordinary:
+        return layout_budget
+    if (not isinstance(request, Mapping)
+            or set(request) != {'contract', 'version', 'operation', 'arguments'}
+            or request.get('contract') != 'waapi-skill.operation-request/v1'
+            or request.get('operation') != 'waapi.call'
+            or request.get('version') not in {'2023.1', '2024.1', '2025.1'}):
+        return ordinary
+    arguments = request.get('arguments')
+    if (not isinstance(arguments, Mapping)
+            or set(arguments) != {'api', 'args', 'options', 'io_root'}
+            or arguments.get('api') != 'ak.wwise.debug.generateToneWAV'
+            or arguments.get('options') != {} or not isinstance(arguments.get('args'), Mapping)):
+        return ordinary
+    native = arguments['args']
+    try:
+        parse_operation_request(request, expected_version=request['version'])
+        validate_semantic_payload(arguments['api'], native, {}, version=request['version'])
+        path = native['path']
+        markers = native.get('markers', [])
+        layout = native.get('channelConfig', '1.0')
+        channels = ((int(layout.split()[1][0]) + 1) ** 2 if layout.startswith('Ambisonics ')
+            else sum(int(part) for part in layout.split('.')))
+        mask = native.get('waveformChannelMask')
+        if (not path.casefold().endswith('.wav')
+                or host_path_comparison_key(str(parse_absolute_host_path(path).pure_path.parent)) != host_path_comparison_key(arguments['io_root'])
+                or mask is not None and (isinstance(mask, bool) or not isinstance(mask, int) or not 0 <= mask < 1 << channels)
+                or layout.startswith('Ambisonics ') and native.get('waveform', 'silence') != 'silence'):
+            return ordinary
+        if (len(canonical_json_bytes(native)) > MAX_HOST_PLAN_BYTES
+                or not isinstance(path, str) or len(path.encode('utf-8')) > MAX_PATH_BYTES
+                or not isinstance(markers, list) or len(markers) > MAX_COLLECTION_ITEMS
+                or any('label' in row and (not isinstance(row['label'], str)
+                    or '\x00' in row['label'] or len(row['label'].encode('utf-8')) > MAX_TEXT_BYTES) for row in markers)):
+            return ordinary
+    except (ValueError, TypeError, KeyError):
+        return ordinary
+    # Host plans are shallow and sealed under 128 KiB. Retaining their exact
+    # request uses the existing 256 KiB rendered-request/Draft ceiling plus
+    # ordinary terminal framing. No input count/label bound is reduced.
+    rendered_limit = min(MAX_OPERATION_DRAFT_EVIDENCE_BYTES, 2 * MAX_HOST_PLAN_BYTES)
+    observed = gateway_json_document_size({'agent_result': {'request': request}},
+        stop_after_bytes=rendered_limit)
+    if observed > rendered_limit:
+        raise GatewayInputError('Tone request exceeds its bounded rendered terminal UTF-8 capacity')
+    return ordinary if observed <= TRANSACTION_VERIFY_AGENT_VIEW_TARGET_BYTES else LAYOUT_BLUEPRINT_VERIFY_STDOUT_BUDGET_BYTES
+
+
 def project_successful_transaction_verify_payload(
     payload: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -24304,7 +24380,7 @@ def project_successful_transaction_verify_payload(
         validate_successful_transaction_verify_projection(payload)
     )
     verification_summary = successful_verification_result_summary(verification)
-    stdout_budget = layout_blueprint_terminal_budget(agent_result.get("request"))
+    stdout_budget = transaction_verify_terminal_budget(agent_result.get("request"))
     projected = dict(payload)
     projected.pop("agent_result", None)
     projection = {

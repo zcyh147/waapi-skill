@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import stat
 from pathlib import Path
 from typing import Any, Mapping
 
 
-MAX_WAL_TREE_NODES = 256
+MAX_WAL_TREE_NODES = 256  # Gateway page choice, never a native map-count limit.
 MAX_LUA_SOURCE_BYTES = 64 * 1024
 MAX_LUA_WA_ARGS_BYTES = 64 * 1024
 MAX_LUA_WA_ARGS_KEYS = 64
@@ -219,7 +220,7 @@ def verify_isolated_lua_file(proof: Any) -> dict[str, Any]:
 
 
 def normalize_wal_tree_result(value: Any, *, take: int) -> dict[str, Any]:
-    """Project the private WAL node map into one deterministic bounded list."""
+    """Summarize a transport-bounded WAL map; full native delivery is separate."""
 
     if isinstance(take, bool) or not isinstance(take, int) or not 1 <= take <= MAX_WAL_TREE_NODES:
         raise DebugLuaContractError(
@@ -229,21 +230,14 @@ def normalize_wal_tree_result(value: Any, *, take: int) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         raise DebugLuaContractError("INVALID_READBACK", "getWalTree result must be a JSON object.")
     returned = value.get("return")
+    if isinstance(returned, Mapping) and 'nodes' not in returned:
+        return {'nodes': [], 'returned_count': 0, 'total_count': None,
+                'nodes_available': False, 'possibly_truncated': False, 'take': take}
     nodes = returned.get("nodes") if isinstance(returned, Mapping) else None
     if not isinstance(nodes, Mapping):
         raise DebugLuaContractError(
             "INVALID_READBACK",
             "getWalTree result must contain return.nodes as an object.",
-        )
-    if len(nodes) > MAX_WAL_TREE_NODES:
-        raise DebugLuaContractError(
-            "LIMIT_EXCEEDED",
-            f"getWalTree returned more than {MAX_WAL_TREE_NODES} nodes; "
-            "the gateway will not sort or project an unbounded private result.",
-            details={
-                "node_count": len(nodes),
-                "limit": MAX_WAL_TREE_NODES,
-            },
         )
     rows: list[dict[str, Any]] = []
     for key in sorted(nodes, key=str):
@@ -252,14 +246,14 @@ def normalize_wal_tree_result(value: Any, *, take: int) -> dict[str, Any]:
             not isinstance(key, str)
             or not isinstance(node, Mapping)
             or isinstance(node.get("id"), bool)
-            or not isinstance(node.get("id"), int)
-            or not 0 <= node["id"] <= MAX_WWISE_SHORT_ID
+            or not isinstance(node.get("id"), (int, float))
+            or (isinstance(node["id"], float) and not math.isfinite(node["id"]))
             or not isinstance(node.get("name"), str)
             or not isinstance(node.get("type"), str)
         ):
             raise DebugLuaContractError(
                 "INVALID_READBACK",
-                "Every WAL node must have one string key, a uint32 integer id, "
+                "Every WAL node must have one string key, a finite numeric id, "
                 "and string name/type.",
                 details={
                     "key": str(key),
@@ -268,7 +262,6 @@ def normalize_wal_tree_result(value: Any, *, take: int) -> dict[str, Any]:
                         if isinstance(node, Mapping)
                         else type(node).__name__
                     ),
-                    "id_range": [0, MAX_WWISE_SHORT_ID],
                 },
             )
         rows.append(

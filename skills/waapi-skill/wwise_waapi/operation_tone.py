@@ -32,15 +32,9 @@ def prepare_tone_verification(args: Mapping[str, Any], audit: Mapping[str, Any],
         raise SoundBankContractError("INVALID_PATH", "Tone output lacks its exact isolated path audit.")
     path, root = paths[0]["resolved_path"], audit["io_root"]
     effective = {**TONE_DEFAULTS, **dict(args)}
-    rate = Decimal(str(effective['sampleRate']))
-    seconds = sum(Decimal(str(effective[key])) for key in ('attackTime', 'sustainTime', 'releaseTime'))
-    layout = effective['channelConfig']
-    channels = STANDARD_LAYOUTS[layout][0] if layout in STANDARD_LAYOUTS else (int(layout.split()[1][0]) + 1) ** 2
-    minimum_audio_bytes = int(rate * seconds) * channels * (2 if effective['bitDepth'] == 'int16' else 4)
-    if minimum_audio_bytes + 44 > MAX_TREE_FILE_BYTES:
-        raise SoundBankContractError('LIMIT_EXCEEDED', 'Requested Tone WAV exceeds the 512 MiB Gateway artifact budget before dispatch.')
+    budget = tone_artifact_budget(effective)
     return {"kind": "tone-wav-artifact", "uri": TONE_URI, "version": version,
-        "args": dict(args), "effective": effective,
+        "args": dict(args), "effective": effective, "artifact_budget": budget,
         "explicit_fields": sorted(args),
         "schema_sha256": canonical_sha256(SemanticSchemaValidator(version=version).schema_for(TONE_URI)),
         "path": path, "io_root": root,
@@ -60,17 +54,19 @@ def _root_identity(root: str) -> dict[str, Any]:
     path = Path(root)
     try:
         metadata = path.lstat()
-    except OSError as exc:
-        raise SoundBankContractError('INVALID_IO_ROOT', 'Tone isolated output root is inaccessible.', details={'reason': str(exc)}) from exc
-    if metadata_is_link_or_reparse(metadata) or not path.is_dir():
-        raise SoundBankContractError('INVALID_IO_ROOT', 'Tone output root must remain a real directory.')
-    return {'resolved_path': str(path.resolve(strict=True)), 'device': metadata.st_dev, 'inode': metadata.st_ino}
+        if metadata_is_link_or_reparse(metadata) or not path.is_dir():
+            raise SoundBankContractError('INVALID_IO_ROOT', 'Tone output root must remain a real directory.')
+        resolved = path.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise SoundBankContractError('INVALID_IO_ROOT', 'Tone isolated output root is inaccessible or changed.', details={'reason': str(exc)}) from exc
+    return {'resolved_path': str(resolved), 'device': metadata.st_dev, 'inode': metadata.st_ino}
 
 
 def validate_tone_binding(plan, args, audit, version):
     if (plan.get('kind') != 'tone-wav-artifact' or plan.get('uri') != TONE_URI
             or plan.get('version') != version or plan.get('args') != dict(args)
             or plan.get('effective') != {**TONE_DEFAULTS, **dict(args)}
+            or plan.get('artifact_budget') != tone_artifact_budget({**TONE_DEFAULTS, **dict(args)})
             or plan.get('explicit_fields') != sorted(args)
             or plan.get('schema_sha256') != canonical_sha256(SemanticSchemaValidator(version=version).schema_for(TONE_URI))
             or plan.get('io_root') != audit.get('io_root')
@@ -97,6 +93,44 @@ def verify_tone_artifact(plan: Mapping[str, Any]) -> dict[str, Any]:
 # Bounded format metadata; audio is consumed in fixed blocks, never allocated by
 # a file-authored chunk size. These are Gateway resource ceilings, not WAV limits.
 MAX_WAV_CHUNKS = 4096
+MAX_WAV_FORMAT_BYTES = 4096
+MAX_WAV_MARKER_LIST_BYTES = 128 * 1024
+
+
+
+def tone_artifact_budget(effective: Mapping[str, Any]) -> dict[str, Any]:
+    rate = Decimal(str(effective['sampleRate']))
+    segments = [Decimal(str(effective[key])) * rate for key in ('attackTime', 'sustainTime', 'releaseTime')]
+    layout = effective['channelConfig']
+    channels = STANDARD_LAYOUTS[layout][0] if layout in STANDARD_LAYOUTS else (int(layout.split()[1][0]) + 1) ** 2
+    audio_bytes = int(sum(segments)) * channels * (2 if effective['bitDepth'] == 'int16' else 4)
+    # Reserve the full accepted fmt payload, RIFF+data framing, every cue and
+    # requested UTF-8 label including optional terminator/padding. This is a
+    # disclosed resource reservation, not a claim about the native writer's
+    # chosen fmt size or marker text encoding. Extra/native-variant metadata
+    # and fractional duration interpretation remain independently bounded at readback.
+    markers = effective.get('markers')
+    metadata_bytes = 0
+    list_bytes = 0
+    if markers is not None:
+        list_bytes = 4
+        for marker in markers:
+            payload = 4 + len(marker.get('label', '').encode('utf-8')) + 1
+            list_bytes += 8 + payload + (payload & 1)
+        metadata_bytes = 12 + 24 * len(markers) + 8 + list_bytes
+    framing_bytes = 12 + 8 + MAX_WAV_FORMAT_BYTES + 8 + metadata_bytes
+    reserved = audio_bytes + framing_bytes
+    budget = {'artifact_limit_bytes': MAX_TREE_FILE_BYTES, 'audio_bytes_before_native_rounding': audio_bytes,
+        'format_payload_reserve_bytes': MAX_WAV_FORMAT_BYTES,
+        'requested_utf8_marker_list_bytes': list_bytes, 'header_and_metadata_reserve_bytes': framing_bytes,
+        'reserved_total_bytes': reserved,
+        'duration_rounding_unresolved': rate != rate.to_integral_value() or any(value != value.to_integral_value() for value in segments),
+        'native_marker_encoding_unresolved': bool(markers), 'additional_native_chunks_unknown': True}
+    if reserved > MAX_TREE_FILE_BYTES or list_bytes > MAX_WAV_MARKER_LIST_BYTES:
+        raise SoundBankContractError('LIMIT_EXCEEDED',
+            'Requested Tone WAV exceeds the 512 MiB Gateway artifact budget including format/marker resource reservations before dispatch.',
+            details={'artifact_budget': budget})
+    return budget
 
 
 def _invalid(message: str) -> SoundBankContractError:
@@ -152,7 +186,7 @@ def inspect_tone_wav(path: str, root: str, args: Mapping[str, Any]) -> dict[str,
                 if reader.offset + size + (size & 1) > reader.size:
                     raise _invalid("Tone WAV chunk extends past the declared RIFF boundary.")
                 if chunk_id == b"fmt ":
-                    if fmt is not None or not 16 <= size <= 4096:
+                    if fmt is not None or not 16 <= size <= MAX_WAV_FORMAT_BYTES:
                         raise _invalid("Tone WAV requires one bounded format chunk.")
                     fmt = reader.read(size)
                 elif chunk_id == b"data":
@@ -322,7 +356,7 @@ def _scan_samples(stream, data, observed: Mapping[str, Any], args: Mapping[str, 
 
 def _read_marker_labels(reader: _WavReader, end: int, labels: set[int]) -> None:
     metadata_bytes = end - reader.offset
-    if metadata_bytes > 128 * 1024:
+    if metadata_bytes > MAX_WAV_MARKER_LIST_BYTES:
         raise SoundBankContractError("LIMIT_EXCEEDED", "Tone WAV marker metadata exceeds the 128 KiB Gateway bound.")
     chunks = 0
     while reader.offset < end:

@@ -481,3 +481,24 @@ failure / 11 Windows-only skips; the exact five-version guidance-seal repair
 `b1fadd6e` passes its entire 16-test file separately. Original failures stay
 preserved, no runtime changes follow the combined source run, and no broad or
 native acceptance is inferred from these focused results.
+
+
+## #193 terminal-capacity and path-race successor
+
+The successor to `c253c5ae` makes the original long-marker request survive exact
+bounded terminal verification using the existing constructor-capacity mechanism.
+Actual public maximum-aggregate/maximum-count ASCII, UTF-8 and escaping controls
+preserve the immutable request, exact agent_result, journal digest and actual
+main stdout with session context. Other/unbound shapes and small requests cannot
+claim the larger bounded budget. No marker input limit was reduced and no global
+output ceiling was raised. Broker/archive reception remains additional #194 work.
+
+Public filesystem fault injection reproduced and normalized post-hash unlink and
+root stat/resolve disappearance. Separate resource tests exposed missing header
+and marker overhead in the old audio+44 estimate. The new prewrite reservation
+accounts accepted format/framing and requested UTF-8 cue/label metadata while
+retaining unknown native encoding/extra chunks/fractional rounding explicitly.
+The reserved maximum fmt size is Gateway resource policy, not observed writer
+behavior. UTF-8 maximum-plan LIST framing already fits its bound; no unsupported
+encoding inference or new native credit follows. Full #193/WAL and #188 remain
+open, and original REDs stay retained in distinct `/tmp/waapi-tone-*` roots.
